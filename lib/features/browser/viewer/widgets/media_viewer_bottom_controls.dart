@@ -1,86 +1,210 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
-
-import '../native_video_controller.dart';
-import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
   final VideoPlaybackManager playbackManager;
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
+  final MediaViewerToolbarConfig toolbarConfig;
   final bool isImage;
+  final bool isAudio;
   final bool showUI;
   final bool isPlaylistMode;
   final bool autoAdvance;
   final int slideshowDelaySeconds;
   final bool isMuted;
   final VideoPlaybackMode videoPlaybackMode;
-  final VoidCallback onNavigateToPrev;
-  final VoidCallback onNavigateToNext;
-  final ValueChanged<bool> onTogglePlayPause;
-  final ValueChanged<VideoPlaybackMode> onPlaybackModeChanged;
-  final VoidCallback onToggleMute;
-  final VoidCallback onAdvancedSettingsPressed;
-  final VoidCallback? onDiagnosticsPressed;
+  final ValueChanged<MediaViewerAction> onExecuteAction;
   final VoidCallback onStartHideTimer;
   final ValueChanged<bool> onShowUIChanged;
   final bool isCarouselVisible;
-  final VoidCallback? onToggleCarousel;
+  final VoidCallback? onMenuOpened;
+  final VoidCallback? onMenuClosed;
 
   const MediaViewerBottomControls({
     super.key,
     required this.playlistController,
     required this.playbackManager,
     required this.videoProgressNotifier,
+    required this.toolbarConfig,
     required this.isImage,
+    required this.isAudio,
     required this.showUI,
     required this.isPlaylistMode,
     required this.autoAdvance,
     required this.slideshowDelaySeconds,
     required this.isMuted,
     required this.videoPlaybackMode,
-    required this.onNavigateToPrev,
-    required this.onNavigateToNext,
-    required this.onTogglePlayPause,
-    required this.onPlaybackModeChanged,
-    required this.onToggleMute,
-    required this.onAdvancedSettingsPressed,
-    this.onDiagnosticsPressed,
+    required this.onExecuteAction,
     required this.onStartHideTimer,
     required this.onShowUIChanged,
     this.isCarouselVisible = false,
-    this.onToggleCarousel,
+    this.onMenuOpened,
+    this.onMenuClosed,
   });
 
   String _formatDuration(Duration d) {
-    final Duration absoluteDuration = d.isNegative ? -d : d;
-    final String minutes = absoluteDuration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final String seconds = absoluteDuration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final Duration abs = d.isNegative ? -d : d;
+    final String minutes =
+        abs.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final String seconds =
+        abs.inSeconds.remainder(60).toString().padLeft(2, '0');
     final String sign = d.isNegative ? '-' : '';
-    if (absoluteDuration.inHours > 0) {
-      final String hours = absoluteDuration.inHours.toString().padLeft(2, '0');
+    if (abs.inHours > 0) {
+      final String hours = abs.inHours.toString().padLeft(2, '0');
       return '$sign$hours:$minutes:$seconds';
     }
     return '$sign$minutes:$seconds';
   }
 
+  Widget _buildActionItem(
+    BuildContext context,
+    MediaViewerAction action,
+    ColorScheme cs,
+  ) {
+    if (action == MediaViewerAction.playPause) {
+      return _buildHeroPlayPause(context, cs);
+    }
+    if (action == MediaViewerAction.previous) {
+      final bool isFirst = playlistController.currentIndex == 0;
+      return IconButton(
+        icon: const Icon(Icons.skip_previous_rounded,
+            color: Colors.white, size: 26),
+        onPressed:
+            isFirst ? null : () => onExecuteAction(MediaViewerAction.previous),
+      );
+    }
+    if (action == MediaViewerAction.next) {
+      final bool isLast = playlistController.currentIndex ==
+          playlistController.playlist.length - 1;
+      return IconButton(
+        icon:
+            const Icon(Icons.skip_next_rounded, color: Colors.white, size: 26),
+        onPressed: isLast ? null : () => onExecuteAction(MediaViewerAction.next),
+      );
+    }
+
+    bool isHighlighted = false;
+    Color? highlightColor;
+    IconData? customIcon;
+
+    if (action == MediaViewerAction.mute) {
+      isHighlighted = isMuted;
+      highlightColor = cs.error;
+      customIcon = isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded;
+    } else if (action == MediaViewerAction.playbackMode) {
+      isHighlighted = videoPlaybackMode != VideoPlaybackMode.playOnce;
+      switch (videoPlaybackMode) {
+        case VideoPlaybackMode.playOnce:
+          customIcon = Icons.repeat_rounded;
+        case VideoPlaybackMode.playAndAdvance:
+          customIcon = Icons.queue_play_next_rounded;
+          highlightColor = cs.primary;
+        case VideoPlaybackMode.loop:
+          customIcon = Icons.repeat_one_rounded;
+          highlightColor = cs.primary;
+      }
+    } else if (action == MediaViewerAction.thumbnailCarousel) {
+      isHighlighted = isCarouselVisible;
+      highlightColor = cs.primary;
+    }
+
+    return MediaViewerActionButton(
+      action: action,
+      isHighlighted: isHighlighted,
+      highlightColor: highlightColor,
+      customIcon: customIcon,
+      onTap: () => onExecuteAction(action),
+      onLongPress: action == MediaViewerAction.advancedSettings
+          ? () => onExecuteAction(MediaViewerAction.diagnostics)
+          : null,
+    );
+  }
+
+  Widget _buildHeroPlayPause(BuildContext context, ColorScheme cs) {
+    return ValueListenableBuilder<NativeVideoController?>(
+      valueListenable: playbackManager.activeControllerNotifier,
+      builder: (context, activeCtrl, _) {
+        if (isImage || activeCtrl == null) {
+          final isPlaying = isImage ? autoAdvance : false;
+          return _buildPlayPauseCircle(cs, isPlaying);
+        }
+        return ValueListenableBuilder<NativeVideoValue>(
+          valueListenable: activeCtrl,
+          builder: (context, playerValue, _) =>
+              _buildPlayPauseCircle(cs, playerValue.isPlaying),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlayPauseCircle(ColorScheme cs, bool isPlaying) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Material(
+          color: cs.primary,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              onShowUIChanged(true);
+              onExecuteAction(MediaViewerAction.playPause);
+            },
+            child: Center(
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 28,
+                color: cs.onPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    final cs = context.colors;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    final pinned = toolbarConfig.bottomBarActions.where((a) {
+      if (isImage && !toolbarConfig.showCenterTransportForImages) {
+        if (a == MediaViewerAction.playPause ||
+            a == MediaViewerAction.previous ||
+            a == MediaViewerAction.next) {
+          return false;
+        }
+      }
+      return a.isApplicable(
+        isImage: isImage,
+        isAudio: isAudio,
+        isPlaylistMode: isPlaylistMode,
+      );
+    }).toList();
+
     return Container(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: bottomPadding + 16,
-        top: 32,
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        bottom: bottomInset + AppSpacing.md,
+        top: AppSpacing.lg,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -88,7 +212,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           end: Alignment.topCenter,
           colors: [
             Colors.black.withValues(alpha: 0.9),
-            Colors.black.withValues(alpha: 0.5),
+            Colors.black.withValues(alpha: 0.45),
             Colors.transparent,
           ],
         ),
@@ -96,45 +220,90 @@ class MediaViewerBottomControls extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isImage) ...[
-            _buildProgressBar(context, cs),
-            const SizedBox(height: 12),
+          if (!isImage && toolbarConfig.showProgressBar) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: _buildProgressBar(context, cs),
+            ),
+            const SizedBox(height: AppSpacing.xs),
           ],
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                flex: 1,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _buildLeftControls(context, cs),
-                ),
-              ),
-              _buildBottomTransportControls(cs),
-              Flexible(
-                flex: 1,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _buildRightControls(context, cs),
-                ),
-              ),
-            ],
-          ),
+          if (pinned.isNotEmpty || (isImage && toolbarConfig.showStatusBadge))
+            _buildTransparentDock(context, cs, pinned),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTransparentDock(
+    BuildContext context,
+    ColorScheme cs,
+    List<MediaViewerAction> pinned,
+  ) {
+    return Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isImage && isPlaylistMode && toolbarConfig.showStatusBadge) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      autoAdvance
+                          ? Icons.slideshow_rounded
+                          : Icons.image_rounded,
+                      color: autoAdvance ? cs.primary : Colors.white70,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      autoAdvance
+                          ? context.l10n.slideshowDelaySecondsValue(
+                              slideshowDelaySeconds)
+                          : context.l10n.staticLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            for (final action in pinned)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: _buildActionItem(context, action, cs),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProgressBar(BuildContext context, ColorScheme cs) {
     return SizedBox(
-      height: 36,
+      height: 32,
       child: SliderTheme(
         data: SliderTheme.of(context).copyWith(
           activeTrackColor: cs.primary,
           inactiveTrackColor: Colors.white24,
           trackHeight: 3,
           thumbColor: cs.primary,
-          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
           overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
           trackShape: const RectangularSliderTrackShape(),
         ),
@@ -152,392 +321,69 @@ class MediaViewerBottomControls extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Expanded(
-                  child: Semantics(
-                    label: context.l10n.videoPlaybackSliderLabel,
-                    value: '${(progress.sliderValue * 100).toStringAsFixed(0)}%',
-                    child: Slider(
-                      value: progress.sliderValue.clamp(0.0, 1.0),
-                      onChangeStart: hasValidDuration
-                          ? (value) {
-                              onShowUIChanged(true);
-                              videoProgressNotifier.value = progress.copyWith(
-                                isDragging: true,
-                              );
-                            }
-                          : null,
-                      onChanged: hasValidDuration
-                          ? (value) {
-                              onShowUIChanged(true);
-                              final durationMs = progress.duration.inMilliseconds;
-                              final targetMs = (value * durationMs).round().clamp(0, durationMs);
-                              videoProgressNotifier.value = progress.copyWith(
-                                isDragging: true,
-                                sliderValue: value,
-                                position: Duration(milliseconds: targetMs),
-                              );
-                            }
-                          : null,
-                      onChangeEnd: hasValidDuration
-                          ? (value) async {
-                              final controller = playbackManager.activeController;
-                              final durationMs = progress.duration.inMilliseconds;
-                              final targetMs = (value * durationMs).round().clamp(0, durationMs);
-                              final targetDuration = Duration(milliseconds: targetMs);
-
-                              if (controller != null && controller.value.isInitialized) {
-                                try {
-                                  await controller.seekTo(targetDuration);
-                                } catch (e) {
-                                  // UI already reflects the target position below
-                                  // regardless -- logged since a seek failure here
-                                  // means playback position and displayed position
-                                  // have silently diverged.
-                                  VeLog.w('MediaViewerBottomControls', 'Scrubber seekTo failed', e);
-                                }
+                  child: Slider(
+                    value: progress.sliderValue.clamp(0.0, 1.0),
+                    onChangeStart: hasValidDuration
+                        ? (value) {
+                            onShowUIChanged(true);
+                            videoProgressNotifier.value =
+                                progress.copyWith(isDragging: true);
+                          }
+                        : null,
+                    onChanged: hasValidDuration
+                        ? (value) {
+                            onShowUIChanged(true);
+                            final ms = progress.duration.inMilliseconds;
+                            videoProgressNotifier.value = progress.copyWith(
+                              isDragging: true,
+                              sliderValue: value,
+                              position: Duration(
+                                milliseconds: (value * ms).round().clamp(0, ms),
+                              ),
+                            );
+                          }
+                        : null,
+                    onChangeEnd: hasValidDuration
+                        ? (value) async {
+                            final controller = playbackManager.activeController;
+                            final ms = progress.duration.inMilliseconds;
+                            final targetDuration = Duration(
+                              milliseconds: (value * ms).round().clamp(0, ms),
+                            );
+                            if (controller != null &&
+                                controller.value.isInitialized) {
+                              try {
+                                await controller.seekTo(targetDuration);
+                              } catch (e) {
+                                VeLog.w('MediaViewerBottomControls',
+                                    'Scrubber seekTo failed', e);
                               }
-
-                              videoProgressNotifier.value = progress.copyWith(
-                                position: targetDuration,
-                                sliderValue: value.clamp(0.0, 1.0),
-                                isDragging: false,
-                              );
-                              onStartHideTimer();
                             }
-                          : null,
-                    ),
+                            videoProgressNotifier.value = progress.copyWith(
+                              position: targetDuration,
+                              sliderValue: value.clamp(0.0, 1.0),
+                              isDragging: false,
+                            );
+                            onStartHideTimer();
+                          }
+                        : null,
                   ),
                 ),
                 Text(
                   durationStr,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRightControls(BuildContext context, ColorScheme cs) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (isPlaylistMode && onToggleCarousel != null) ...[
-          Semantics(
-            label: context.l10n.thumbnailCarouselTooltip,
-            button: true,
-            child: _CircleOverlayButton(
-              icon: Icons.view_carousel_rounded,
-              iconColor: isCarouselVisible ? cs.primary : Colors.white,
-              tooltip: context.l10n.thumbnailCarouselTooltip,
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onToggleCarousel?.call();
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Semantics(
-          label: context.l10n.advancedSettingsTooltip,
-          hint: onDiagnosticsPressed != null ? context.l10n.longPressPlaybackDiagnosticsHint : null,
-          button: true,
-          child: _CircleOverlayButton(
-            icon: Icons.tune_rounded,
-            tooltip: context.l10n.advancedSettingsTooltip,
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onAdvancedSettingsPressed();
-            },
-            onLongPress: onDiagnosticsPressed == null
-                ? null
-                : () {
-                    HapticFeedback.mediumImpact();
-                    onDiagnosticsPressed!();
-                  },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeftControls(BuildContext context, ColorScheme cs) {
-    if (isImage) {
-      if (!isPlaylistMode) return const SizedBox.shrink();
-      return Semantics(
-        label: autoAdvance
-            ? context.l10n.slideshowModeActiveLabel(slideshowDelaySeconds)
-            : context.l10n.staticImageModeLabel,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                autoAdvance ? Icons.slideshow_rounded : Icons.image_rounded,
-                color: autoAdvance ? cs.primary : Colors.white70,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                autoAdvance ? context.l10n.slideshowDelaySecondsValue(slideshowDelaySeconds) : context.l10n.staticLabel,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      IconData modeIcon;
-      String modeTooltip;
-      Color modeColor;
-      switch (videoPlaybackMode) {
-        case VideoPlaybackMode.playOnce:
-          modeIcon = Icons.repeat_rounded;
-          modeTooltip = context.l10n.playOnceDisabledTooltip;
-          modeColor = Colors.white54;
-          break;
-        case VideoPlaybackMode.playAndAdvance:
-          modeIcon = Icons.queue_play_next_rounded;
-          modeTooltip = context.l10n.playAndAdvanceTooltip;
-          modeColor = cs.primary;
-          break;
-        case VideoPlaybackMode.loop:
-          modeIcon = Icons.repeat_rounded;
-          modeTooltip = context.l10n.loopCurrentVideoTooltip;
-          modeColor = cs.primary;
-          break;
-      }
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            label: isMuted ? context.l10n.unmuteTooltip : context.l10n.muteTooltip,
-            button: true,
-            child: _CircleOverlayButton(
-              icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-              iconColor: isMuted ? cs.error : Colors.white,
-              tooltip: isMuted ? context.l10n.unmuteTooltip : context.l10n.muteTooltip,
-              onPressed: onToggleMute,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Semantics(
-            label: context.l10n.videoPlaybackModeLabel(modeTooltip),
-            button: true,
-            child: _CircleOverlayButton(
-              icon: modeIcon,
-              iconColor: modeColor,
-              tooltip: modeTooltip,
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                VideoPlaybackMode nextMode;
-                if (!isPlaylistMode) {
-                  nextMode = videoPlaybackMode == VideoPlaybackMode.loop
-                      ? VideoPlaybackMode.playOnce
-                      : VideoPlaybackMode.loop;
-                } else {
-                  switch (videoPlaybackMode) {
-                    case VideoPlaybackMode.playOnce:
-                      nextMode = VideoPlaybackMode.loop;
-                      break;
-                    case VideoPlaybackMode.loop:
-                      nextMode = VideoPlaybackMode.playAndAdvance;
-                      break;
-                    case VideoPlaybackMode.playAndAdvance:
-                      nextMode = VideoPlaybackMode.playOnce;
-                      break;
-                  }
-                }
-                onPlaybackModeChanged(nextMode);
-              },
-            ),
-          ),
-        ],
-      );
-    }
-  }
-
-  Widget _buildBottomTransportControls(ColorScheme cs) {
-    if (isImage && !isPlaylistMode) return const SizedBox.shrink();
-    final bool isFirst = playlistController.currentIndex == 0;
-    final bool isLast =
-        playlistController.currentIndex == playlistController.playlist.length - 1;
-
-    return ValueListenableBuilder<NativeVideoController?>(
-      valueListenable: playbackManager.activeControllerNotifier,
-      builder: (context, activeCtrl, _) {
-        if (isImage || activeCtrl == null) {
-          final bool isPlayingState = isImage ? autoAdvance : false;
-          return _buildTransportRow(
-            context: context,
-            cs: cs,
-            isFirst: isFirst,
-            isLast: isLast,
-            isPlayingState: isPlayingState,
-          );
-        }
-
-        return ValueListenableBuilder<NativeVideoValue>(
-          valueListenable: activeCtrl,
-          builder: (context, playerValue, _) {
-            final bool isPlayingState = playerValue.isPlaying;
-            return _buildTransportRow(
-              context: context,
-              cs: cs,
-              isFirst: isFirst,
-              isLast: isLast,
-              isPlayingState: isPlayingState,
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTransportRow({
-    required BuildContext context,
-    required ColorScheme cs,
-    required bool isFirst,
-    required bool isLast,
-    required bool isPlayingState,
-  }) {
-    return IgnorePointer(
-      ignoring: !showUI,
-      child: AnimatedOpacity(
-        duration: MediaViewerConstants.animationDuration,
-        curve: Curves.easeInOut,
-        opacity: showUI ? 1.0 : 0.0,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isPlaylistMode) ...[
-              Semantics(
-                label: context.l10n.previousTooltip,
-                button: true,
-                child: _CircleOverlayButton(
-                  icon: Icons.skip_previous_rounded,
-                  iconSize: 22,
-                  containerSize: 44,
-                  tooltip: context.l10n.previousTooltip,
-                  onPressed: isFirst
-                      ? null
-                      : () {
-                          HapticFeedback.lightImpact();
-                          onNavigateToPrev();
-                        },
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-             SizedBox(
-              width: 56,
-              height: 56,
-              child: Material(
-                color: cs.primaryContainer,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    onShowUIChanged(true);
-                    onTogglePlayPause(isPlayingState);
-                  },
-                  child: Center(
-                    child: Icon(
-                      isPlayingState ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      size: 32,
-                      color: cs.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (isPlaylistMode) ...[
-              const SizedBox(width: 12),
-              Semantics(
-                label: context.l10n.nextTooltip,
-                button: true,
-                child: _CircleOverlayButton(
-                  icon: Icons.skip_next_rounded,
-                  iconSize: 22,
-                  containerSize: 44,
-                  tooltip: context.l10n.nextTooltip,
-                  onPressed: isLast
-                      ? null
-                      : () {
-                          HapticFeedback.lightImpact();
-                          onNavigateToNext();
-                        },
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CircleOverlayButton extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final VoidCallback? onLongPress;
-  final double iconSize;
-  final double containerSize;
-  const _CircleOverlayButton({
-    required this.icon,
-    this.iconColor,
-    required this.tooltip,
-    this.onPressed,
-    this.onLongPress,
-    this.iconSize = 20,
-    this.containerSize = 40,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return Tooltip(
-      message: tooltip,
-      child: SizedBox(
-        width: containerSize,
-        height: containerSize,
-        child: Material(
-          color: enabled
-              ? Colors.white.withValues(alpha: 0.14)
-              : Colors.white.withValues(alpha: 0.05),
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onPressed,
-            onLongPress: onLongPress,
-            child: Center(
-              child: Icon(
-                icon,
-                size: iconSize,
-                color: iconColor ?? (enabled ? Colors.white : Colors.white30),
-              ),
-            ),
-          ),
         ),
       ),
     );

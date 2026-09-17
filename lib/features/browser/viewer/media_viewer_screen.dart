@@ -35,6 +35,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controll
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_bar.dart';
@@ -45,7 +46,12 @@ import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
+
 export 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart'
+
     show VideoPlaybackMode;
 import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
@@ -926,9 +932,423 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _hideTimer?.cancel();
   }
 
-  void _menuClosed() {
+ void _menuClosed() {
     _activeMenuCount = (_activeMenuCount - 1).clamp(0, 999);
     _startHideTimer();
+  }
+
+  Future<void> _showFileInfoHelper(VaultFileIoApi fileIoApi) async {
+    _menuOpened();
+    final file = _playlistController.currentFile;
+    final lastSlash = file.lastIndexOf('/');
+    final dirPath = lastSlash == -1 ? '' : file.substring(0, lastSlash);
+    final baseName = lastSlash == -1 ? file : file.substring(lastSlash + 1);
+    var existingEntries = <RawEntry>[];
+    try {
+      final raw = await fileIoApi.listDirectory(widget.container, dirPath);
+      if (raw != null) {
+        existingEntries = RawEntry.parseAll(raw);
+      }
+    } catch (_) {}
+    final currentEntry = existingEntries.firstWhere(
+      (e) => e.name == baseName,
+      orElse: () => RawEntry(
+        name: baseName,
+        isDir: false,
+        sizeBytes: 0,
+        modifiedSecs: 0,
+      ),
+    );
+    if (mounted) {
+      await FileInfoSheet.show(
+        context,
+        container: widget.container,
+        entry: currentEntry,
+        currentDirPath: dirPath,
+      );
+    }
+    _menuClosed();
+  }
+
+void _showOrientationSheet(BuildContext context) {
+    _menuOpened();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        final l10n = sheetContext.l10n;
+        final isLandscape =
+            MediaQuery.of(sheetContext).orientation == Orientation.landscape;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Text(
+                    l10n.screenOrientationMenu,
+                    style:
+                        Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.stay_current_portrait_rounded),
+                  title: Text(l10n.forcePortraitMenu),
+                  trailing: !isLandscape
+                      ? Icon(Icons.check_rounded, color: cs.primary)
+                      : null,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    SystemChrome.setPreferredOrientations(
+                        [DeviceOrientation.portraitUp]);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.stay_current_landscape_rounded),
+                  title: Text(l10n.forceLandscapeMenu),
+                  trailing: isLandscape
+                      ? Icon(Icons.check_rounded, color: cs.primary)
+                      : null,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    SystemChrome.setPreferredOrientations([
+                      DeviceOrientation.landscapeLeft,
+                      DeviceOrientation.landscapeRight,
+                    ]);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.screen_rotation_rounded),
+                  title: Text(l10n.autoRotateSensorMenu),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    SystemChrome.setPreferredOrientations(
+                        DeviceOrientation.values);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).whenComplete(_menuClosed);
+  }
+
+  void _showPlaylistOptionsMenu() {
+    _menuOpened();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isPlaylist = _playlistController.isPlaylistMode;
+            final folderScope = _playlistController.selectedFolder;
+            final isThisFolderSelected =
+                isPlaylist && folderScope == 'Current Folder Only';
+            final isAllSelected = isPlaylist && folderScope == 'All';
+            final cs = Theme.of(context).colorScheme;
+            final l10n = context.l10n;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      child: Text(
+                        l10n.playlistOptionsTooltip,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: Icon(
+                        Icons.folder_outlined,
+                        color: isThisFolderSelected ? cs.primary : null,
+                      ),
+                      title: Text(l10n.thisFolderMenu),
+                      trailing: isThisFolderSelected
+                          ? Icon(Icons.check_rounded, color: cs.primary)
+                          : null,
+                      onTap: () async {
+                        final targetFile = _playlistController.currentFile;
+                        if (isThisFolderSelected) {
+                          _playlistController.disablePlaylist();
+                        } else {
+                          await _playlistController
+                              .enablePlaylist('Current Folder Only');
+                        }
+                        final newIndex =
+                            _playlistController.playlist.indexOf(targetFile);
+                        if (newIndex != -1) {
+                          _playlistController.updateIndex(newIndex);
+                        }
+                        _onPlaylistChanged();
+                        setSheetState(() {});
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        Icons.folder_copy_outlined,
+                        color: isAllSelected ? cs.primary : null,
+                      ),
+                      title: Text(l10n.allInclSubfoldersMenu),
+                      trailing: isAllSelected
+                          ? Icon(Icons.check_rounded, color: cs.primary)
+                          : null,
+                      onTap: () async {
+                        final targetFile = _playlistController.currentFile;
+                        if (isAllSelected) {
+                          _playlistController.disablePlaylist();
+                        } else {
+                          await _playlistController.enablePlaylist('All');
+                        }
+                        final newIndex =
+                            _playlistController.playlist.indexOf(targetFile);
+                        if (newIndex != -1) {
+                          _playlistController.updateIndex(newIndex);
+                        }
+                        _onPlaylistChanged();
+                        setSheetState(() {});
+                      },
+                    ),
+                    if (_playlistController.isPlaylistMode) ...[
+                      const Divider(),
+                      ListTile(
+                        leading: Icon(
+                          Icons.shuffle_rounded,
+                          color: _playlistController.isShuffled
+                              ? cs.primary
+                              : null,
+                        ),
+                        title: Text(_playlistController.isShuffled
+                            ? l10n.disableShuffleMenu
+                            : l10n.shufflePlaylistMenu),
+                        trailing: Switch(
+                          value: _playlistController.isShuffled,
+                          onChanged: (_) {
+                            final targetFile = _playlistController.currentFile;
+                            _playlistController.toggleShuffle();
+                            final newIndex = _playlistController.playlist
+                                .indexOf(targetFile);
+                            if (newIndex != -1) {
+                              _playlistController.updateIndex(newIndex);
+                            }
+                            _onPlaylistChanged();
+                            setSheetState(() {});
+                          },
+                        ),
+                        onTap: () {
+                          final targetFile = _playlistController.currentFile;
+                          _playlistController.toggleShuffle();
+                          final newIndex = _playlistController.playlist
+                              .indexOf(targetFile);
+                          if (newIndex != -1) {
+                            _playlistController.updateIndex(newIndex);
+                          }
+                          _onPlaylistChanged();
+                          setSheetState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 6),
+                        child: Text(
+                          l10n.playlistScrollModeMenu,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<PlaylistScrollMode>(
+                          segments: PlaylistScrollMode.values.map((mode) {
+                            return ButtonSegment<PlaylistScrollMode>(
+                              value: mode,
+                              icon: Icon(mode.icon, size: 16),
+                              label: Text(
+                                mode.getLocalizedLabel(l10n),
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            );
+                          }).toList(),
+                          selected: {_scrollMode},
+                          onSelectionChanged: (newSelection) {
+                            final newMode = newSelection.first;
+                            _sessionController.setScrollMode(newMode);
+                            ref
+                                .read(appSettingsServiceProvider)
+                                .loadSettings()
+                                .then((s) {
+                              ref
+                                  .read(appSettingsServiceProvider)
+                                  .saveSettings(
+                                      s.copyWith(playlistScrollMode: newMode));
+                            });
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                _scrollToCurrentIndex(animate: false);
+                              }
+                            });
+                            setSheetState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(_menuClosed);
+  }
+
+  void _executeMediaAction(MediaViewerAction action) {
+    _startHideTimer();
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final isImage = MediaViewerConstants.isImage(_playlistController.currentFile);
+
+    switch (action) {
+      case MediaViewerAction.playPause:
+        final controller = _playbackManager.activeController;
+        if (isImage) {
+          _updatePlaybackMode(
+            _autoAdvance
+                ? VideoPlaybackMode.playOnce
+                : VideoPlaybackMode.playAndAdvance,
+          );
+        } else if (controller != null) {
+          if (controller.value.isPlaying) {
+            controller.pause();
+          } else {
+            controller.play();
+          }
+        }
+        break;
+      case MediaViewerAction.previous:
+        _navigateToPrev();
+        break;
+      case MediaViewerAction.next:
+        _navigateToNext();
+        break;
+      case MediaViewerAction.mute:
+        _startHideTimer();
+        _sessionController.toggleMute();
+        _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
+        ref.read(appSettingsServiceProvider).loadSettings().then((appSettings) {
+          ref.read(appSettingsServiceProvider).saveSettings(
+                appSettings.copyWith(videoMuted: _isMuted),
+              );
+        });
+        break;
+      case MediaViewerAction.playbackMode:
+        VideoPlaybackMode nextMode;
+        if (!_playlistController.isPlaylistMode) {
+          nextMode = _videoPlaybackMode == VideoPlaybackMode.loop
+              ? VideoPlaybackMode.playOnce
+              : VideoPlaybackMode.loop;
+        } else {
+          nextMode = switch (_videoPlaybackMode) {
+            VideoPlaybackMode.playOnce => VideoPlaybackMode.loop,
+            VideoPlaybackMode.loop => VideoPlaybackMode.playAndAdvance,
+            VideoPlaybackMode.playAndAdvance => VideoPlaybackMode.playOnce,
+          };
+        }
+        _updatePlaybackMode(nextMode);
+        break;
+      case MediaViewerAction.thumbnailCarousel:
+        if (_enableCarousel && _playlistController.isPlaylistMode) {
+          _toggleCarousel();
+        }
+        break;
+       case MediaViewerAction.rotate90:
+        _startHideTimer();
+        _sessionController.rotateClockwise(_playlistController.currentFile);
+        break;
+      case MediaViewerAction.playlistMenu:
+        _showPlaylistOptionsMenu();
+        break;
+      case MediaViewerAction.bookmark:
+        _toggleBookmarkCurrentFile();
+        break;
+      case MediaViewerAction.fileInfo:
+        _showFileInfoHelper(fileIoApi);
+        break;
+      case MediaViewerAction.openWithApp:
+        fileIoApi.openWithApp(widget.container, _playlistController.currentFile);
+        break;
+      case MediaViewerAction.editImage:
+        _openImageEditor();
+        break;
+      case MediaViewerAction.rename:
+        _renameCurrentFile();
+        break;
+      case MediaViewerAction.delete:
+        _deleteCurrentFile();
+        break;
+      case MediaViewerAction.diagnostics:
+        _showDiagnostics(context);
+        break;
+      case MediaViewerAction.advancedSettings:
+        _showAdvancedSettings(context, isImage);
+        break;
+      case MediaViewerAction.playbackSpeed:
+        _showAdvancedSettings(context, isImage, initialPage: 'playbackSpeed');
+        break;
+      case MediaViewerAction.imageFit:
+        _showAdvancedSettings(context, isImage, initialPage: 'imageFit');
+        break;
+      case MediaViewerAction.slideshowDelay:
+        _showAdvancedSettings(context, isImage, initialPage: 'slideshowDelay');
+        break;
+      case MediaViewerAction.subtitles:
+        _showAdvancedSettings(context, isImage, initialPage: 'subtitleTracks');
+        break;
+      case MediaViewerAction.audioTrack:
+        _showAdvancedSettings(context, isImage, initialPage: 'audioTracks');
+        break;
+      case MediaViewerAction.screenOrientation:
+        _showOrientationSheet(context);
+        break;
+    }
   }
 
   void _toggleCarousel() {
@@ -961,13 +1381,33 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     controller?.setLooping(mode == VideoPlaybackMode.loop);
   }
 
-  void _showAdvancedSettings(BuildContext context, bool isImage) {
+ void _showAdvancedSettings(
+    BuildContext context,
+    bool isImage, {
+    String initialPage = 'main',
+  }) {
     _menuOpened();
+
+    final toolbarSettings = ref.read(fileManagerToolbarSettingsProvider(null));
+    final mediaConfig = toolbarSettings.config.mediaViewerToolbarConfig;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) {
-        return AdvancedSettingsSheet(
+       return AdvancedSettingsSheet(
+          initialPage: initialPage,
+          actions: mediaConfig.advancedSettingsActions,
+          isMuted: _isMuted,
+          onExecuteAction: _executeMediaAction,
+          onCustomizeControls: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const MediaViewerToolbarSettingsScreen(),
+              ),
+            );
+          },
           isPlaylistMode: _playlistController.isPlaylistMode,
           isImage: isImage,
           currentFileName: _playlistController.currentFile,
@@ -1184,6 +1624,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(mediaViewerSessionProvider(_sessionKey));
+    final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
+    final mediaViewerConfig = toolbarSettings.config.mediaViewerToolbarConfig;
     final isContainerLocked = ref.watch(
       mediaViewerLockProvider(widget.container.volId),
     );
@@ -1404,10 +1846,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   child: ListenableBuilder(
                     listenable: _playlistController,
                     builder: (context, _) => MediaViewerTopBar(
-                      container: widget.container,
                       playlistController: _playlistController,
                       currentFileName: _playlistController.currentFile,
                       totalCount: _playlistController.playlist.length,
+                      toolbarConfig: mediaViewerConfig,
                       currentTransitionEffect: _transitionEffect,
                       onTransitionEffectChanged: (newEffect) async {
                         _sessionController.setTransitionEffect(newEffect);
@@ -1434,21 +1876,23 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           if (mounted) _scrollToCurrentIndex(animate: false);
                         });
                       },
-                      onBackPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.pop(context);
+                      isMuted: _isMuted,
+                      onExecuteAction: _executeMediaAction,
+                      onCustomizeControls: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const MediaViewerToolbarSettingsScreen(),
+                          ),
+                        );
                       },
-                      onDeletePressed: _deleteCurrentFile,
-                      onRenamePressed: _renameCurrentFile,
-                      showEditImageOption: MediaViewerConstants.isImage(
-                        _playlistController.currentFile,
-                      ),
-                      onEditImagePressed: _openImageEditor,
                       isBookmark: _isCurrentFileBookmark,
-                      onBookmarkPressed: _toggleBookmarkCurrentFile,
                       onPlaylistChanged: _onPlaylistChanged,
                       onMenuOpened: _menuOpened,
                       onMenuClosed: _menuClosed,
+                      isImage: MediaViewerConstants.isImage(_playlistController.currentFile),
+                      isAudio: MediaViewerConstants.isAudio(_playlistController.currentFile),
                     ),
                   ),
                 ),
@@ -1468,78 +1912,37 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         playlistController: _playlistController,
                         playbackManager: _playbackManager,
                         videoProgressNotifier: _videoProgressNotifier,
+                        toolbarConfig: mediaViewerConfig,
                         isImage: isImg,
+                        isAudio: MediaViewerConstants.isAudio(_playlistController.currentFile),
                         showUI: _showUI,
                         isPlaylistMode: _playlistController.isPlaylistMode,
                         autoAdvance: _autoAdvance,
                         slideshowDelaySeconds: _slideshowDelaySeconds,
                         isMuted: _isMuted,
                         videoPlaybackMode: _videoPlaybackMode,
-                        onNavigateToPrev: _navigateToPrev,
-                        onNavigateToNext: _navigateToNext,
-                        onTogglePlayPause: (wasPlaying) {
-                          _startHideTimer();
-                          if (isImg) {
-                            _updatePlaybackMode(
-                              wasPlaying
-                                  ? VideoPlaybackMode.playOnce
-                                  : VideoPlaybackMode.playAndAdvance,
-                            );
-                          } else {
-                            final controller =
-                                _playbackManager.activeController;
-                            if (controller != null) {
-                              if (controller.value.isPlaying) {
-                                controller.pause();
-                              } else {
-                                controller.play();
-                              }
-                            }
-                          }
-                        },
-                        onPlaybackModeChanged: _updatePlaybackMode,
-                        onToggleMute: () async {
-                          HapticFeedback.lightImpact();
-                          _startHideTimer();
-                          _sessionController.toggleMute();
-                          _playbackManager.activeController?.setVolume(
-                            _isMuted ? 0 : 100,
-                          );
-                          final appSettingsService = ref.read(
-                            appSettingsServiceProvider,
-                          );
-                          final appSettings = await appSettingsService
-                              .loadSettings();
-                          await appSettingsService.saveSettings(
-                            appSettings.copyWith(videoMuted: _isMuted),
-                          );
-                        },
-                        onAdvancedSettingsPressed: () =>
-                            _showAdvancedSettings(context, isImg),
-                        onDiagnosticsPressed: isImg
-                            ? null
-                            : () => _showDiagnostics(context),
+                        onExecuteAction: _executeMediaAction,
                         onStartHideTimer: _startHideTimer,
                         onShowUIChanged: _setUIVisibility,
                         isCarouselVisible: _isCarouselVisible,
-                        onToggleCarousel:
-                            (_enableCarousel &&
-                                _playlistController.isPlaylistMode)
-                            ? _toggleCarousel
-                            : null,
+                        onMenuOpened: _menuOpened,
+                        onMenuClosed: _menuClosed,
                       );
                     },
                   ),
                 ),
-                if (_enableCarousel && _isCarouselVisible && _showUI)
+             if (_enableCarousel && _isCarouselVisible && _showUI)
                   AnimatedPositioned(
                     duration: MediaViewerConstants.animationDuration,
                     curve: Curves.easeOut,
                     left: 0,
                     right: 0,
                     bottom: (_isCarouselVisible && _showUI)
-                        ? 0
-                        : -PlaylistCarouselOverlay.height,
+                        ? ((MediaQuery.paddingOf(context).bottom > 0
+                                ? MediaQuery.paddingOf(context).bottom
+                                : 16.0) +
+                            12.0)
+                        : -(PlaylistCarouselOverlay.height + 60),
                     child: PlaylistCarouselOverlay(
                       container: widget.container,
                       playlist: _playlistController.playlist,

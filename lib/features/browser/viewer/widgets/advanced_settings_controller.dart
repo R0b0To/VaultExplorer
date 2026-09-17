@@ -114,17 +114,17 @@ class AdvancedSettingsController extends _$AdvancedSettingsController {
   }
 
   void setImageFit(BoxFit fit, ValueChanged<BoxFit> onImageFitChanged) {
-    state = state._copy(imageFit: fit, sheetPage: 'main');
+    state = state._copy(imageFit: fit);
     onImageFitChanged(fit);
   }
 
   void setSlideshowDelay(int delay, ValueChanged<int> onSlideshowDelayChanged) {
-    state = state._copy(slideshowDelaySeconds: delay, sheetPage: 'main');
+    state = state._copy(slideshowDelaySeconds: delay);
     onSlideshowDelayChanged(delay);
   }
 
   void setPlaybackSpeed(double speed, ValueChanged<double> onPlaybackSpeedChanged) {
-    state = state._copy(playbackSpeed: speed, sheetPage: 'main');
+    state = state._copy(playbackSpeed: speed);
     onPlaybackSpeedChanged(speed);
   }
 

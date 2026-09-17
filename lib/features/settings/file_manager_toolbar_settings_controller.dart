@@ -5,6 +5,8 @@ import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -70,8 +72,6 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> _updateConfig(FileManagerToolbarConfig newConfig) async {
-    // Preserve current listZoomLevel and column counts from the service cache
-    // so saving a toolbar toggle doesn't overwrite the active zoom level
     final currentServiceConfig = await ref.read(fileManagerToolbarServiceProvider).load();
     final preservedConfig = newConfig.copyWith(
       listZoomLevel: currentServiceConfig.listZoomLevel,
@@ -205,5 +205,65 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     state = state._copy(config: newConfig);
+  }
+
+  // Media Viewer Controls Customization
+  Future<void> updateMediaViewerConfig(MediaViewerToolbarConfig mediaConfig) =>
+      _updateConfig(state.config.copyWith(mediaViewerToolbarConfig: mediaConfig));
+
+  Future<void> setMediaViewerTopBarActions(List<MediaViewerAction> actions) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      topBarActions: actions,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerBottomBarActions(List<MediaViewerAction> actions) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      bottomBarActions: actions,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerHiddenActions(Set<MediaViewerAction> hidden) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      hiddenActions: hidden,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerShowProgressBar(bool show) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      showProgressBar: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerShowCenterTransport(bool show) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      showCenterTransport: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerShowPreviousNext(bool show) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      showPreviousNext: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerShowStatusBadge(bool show) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      showStatusBadge: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> resetMediaViewerConfigToDefaults() {
+    final updated = state.config.copyWith(
+      mediaViewerToolbarConfig: MediaViewerToolbarConfig.defaults(),
+    );
+    return _updateConfig(updated);
   }
 }

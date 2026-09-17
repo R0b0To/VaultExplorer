@@ -2,12 +2,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_controller.dart';
 
-class AdvancedSettingsSheet extends ConsumerWidget {
+class AdvancedSettingsSheet extends ConsumerStatefulWidget {
+  final String? initialPage;
+  final List<MediaViewerAction> actions;
+  final ValueChanged<MediaViewerAction> onExecuteAction;
+  final VoidCallback onCustomizeControls;
   final bool isPlaylistMode;
   final bool isImage;
   final String currentFileName;
@@ -27,11 +33,17 @@ class AdvancedSettingsSheet extends ConsumerWidget {
   final ValueChanged<double> onSubtitleFontSizeChanged;
   final ValueChanged<double> onSubtitleVerticalPositionChanged;
   final NativeVideoController? videoController;
+  final bool isMuted;
 
   const AdvancedSettingsSheet({
     super.key,
+    this.initialPage,
+    this.actions = const [],
+    required this.onExecuteAction,
+    required this.onCustomizeControls,
     required this.isPlaylistMode,
     required this.isImage,
+    this.isMuted = false,
     required this.currentFileName,
     required this.initialRotation,
     required this.initialImageFit,
@@ -51,15 +63,33 @@ class AdvancedSettingsSheet extends ConsumerWidget {
     this.videoController,
   });
 
+  @override
+  ConsumerState<AdvancedSettingsSheet> createState() =>
+      _AdvancedSettingsSheetState();
+}
+
+class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialPage != null && widget.initialPage != 'main') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(advancedSettingsControllerProvider(_buildParams()).notifier)
+            .setSheetPage(widget.initialPage!);
+      });
+    }
+  }
+
   AdvancedSettingsParams _buildParams() => AdvancedSettingsParams(
-    initialRotation: initialRotation,
-    initialImageFit: initialImageFit,
-    initialSlideshowDelaySeconds: initialSlideshowDelaySeconds,
-    initialPlaybackSpeed: initialPlaybackSpeed,
-    initialSubtitlesEnabled: initialSubtitlesEnabled,
-    initialSubtitleFontSize: initialSubtitleFontSize,
-    initialSubtitleVerticalPosition: initialSubtitleVerticalPosition,
-  );
+        initialRotation: widget.initialRotation,
+        initialImageFit: widget.initialImageFit,
+        initialSlideshowDelaySeconds: widget.initialSlideshowDelaySeconds,
+        initialPlaybackSpeed: widget.initialPlaybackSpeed,
+        initialSubtitlesEnabled: widget.initialSubtitlesEnabled,
+        initialSubtitleFontSize: widget.initialSubtitleFontSize,
+        initialSubtitleVerticalPosition: widget.initialSubtitleVerticalPosition,
+      );
 
   static String _getImageFitLabel(BuildContext context, BoxFit fit) {
     if (fit == BoxFit.contain) return context.l10n.imageFitContain;
@@ -91,13 +121,14 @@ class AdvancedSettingsSheet extends ConsumerWidget {
         HapticFeedback.mediumImpact();
         ref
             .read(advancedSettingsControllerProvider(params).notifier)
-            .rotate(onRotationChanged);
+            .rotate(widget.onRotationChanged);
       },
     );
   }
 
-  Widget _buildHeader(BuildContext context, ColorScheme cs, String title, VoidCallback? onBack) {
-    final textTheme = Theme.of(context).textTheme;
+  Widget _buildHeader(
+      BuildContext context, ColorScheme cs, String title, VoidCallback? onBack) {
+    final textTheme = context.typography;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -121,20 +152,24 @@ class AdvancedSettingsSheet extends ConsumerWidget {
               textAlign: onBack != null ? TextAlign.left : TextAlign.center,
             ),
           ),
-          if (onBack != null) const SizedBox(width: 48) else const SizedBox(width: 8),
+          if (onBack != null)
+            const SizedBox(width: 48)
+          else
+            const SizedBox(width: 8),
         ],
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final params = _buildParams();
     final state = ref.watch(advancedSettingsControllerProvider(params));
-    final cs = Theme.of(context).colorScheme;
-    final isLandscapeLayout = MediaQuery.of(context).orientation == Orientation.landscape;
+    final cs = context.colors;
+    final isLandscapeLayout =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final double maxSheetHeight = isLandscapeLayout
-        ? MediaQuery.of(context).size.height * 0.72
+        ? MediaQuery.of(context).size.height * 0.75
         : MediaQuery.of(context).size.height * 0.9;
 
     return ConstrainedBox(
@@ -143,10 +178,10 @@ class AdvancedSettingsSheet extends ConsumerWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 4,
-            bottom: 24,
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            top: AppSpacing.xs,
+            bottom: AppSpacing.lg,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -156,11 +191,13 @@ class AdvancedSettingsSheet extends ConsumerWidget {
                   _buildHeader(
                     context,
                     cs,
-                    isImage ? context.l10n.imageSettingsTitle : context.l10n.playbackSettingsTitle,
+                    widget.isImage
+                        ? context.l10n.imageSettingsTitle
+                        : context.l10n.playbackSettingsTitle,
                     null,
                   ),
                   const SizedBox(height: 8),
-                  _buildMainPage(context, ref, params, state, cs),
+                  _buildDynamicControls(context, ref, params, state, cs),
                 ] else if (state.sheetPage == 'imageFit') ...[
                   _buildHeader(
                     context,
@@ -225,214 +262,201 @@ class AdvancedSettingsSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildMainPage(
+  Widget _buildDynamicControls(
     BuildContext context,
     WidgetRef ref,
     AdvancedSettingsParams params,
     AdvancedSettingsState state,
     ColorScheme cs,
   ) {
-    if (isImage) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildRotationTile(context, ref, params, state, cs),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.aspect_ratio_rounded),
-            title: Text(context.l10n.imageFitModeLabel),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _getImageFitLabel(context, state.imageFit),
-                  style: TextStyle(color: cs.primary, fontSize: 13),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, size: 20),
-              ],
-            ),
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ref
-                  .read(advancedSettingsControllerProvider(params).notifier)
-                  .setSheetPage('imageFit');
-            },
-          ),
-          if (isPlaylistMode) ...[
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.timer_outlined),
-              title: Text(context.l10n.slideshowDelayLabel),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.l10n.slideshowDelaySecondsValue(state.slideshowDelaySeconds),
-                    style: TextStyle(color: cs.primary, fontSize: 13),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, size: 20),
-                ],
+    final effectiveActions = widget.actions.where((a) {
+      if (a == MediaViewerAction.advancedSettings) return false;
+      return a.isApplicable(
+        isImage: widget.isImage,
+        isAudio: false,
+        isPlaylistMode: widget.isPlaylistMode,
+      );
+    }).toList();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (effectiveActions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Text(
+              'No controls assigned to Advanced Settings.',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: cs.onSurfaceVariant,
               ),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                ref
-                    .read(advancedSettingsControllerProvider(params).notifier)
-                    .setSheetPage('slideshowDelay');
-              },
             ),
+          )
+        else
+          for (int i = 0; i < effectiveActions.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            _buildActionRow(context, ref, params, state, cs, effectiveActions[i]),
           ],
-        ],
-      );
-    } else {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildRotationTile(context, ref, params, state, cs),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.slow_motion_video_rounded),
-            title: Text(context.l10n.playbackSpeedLabel),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  context.l10n.playbackSpeedValue('${state.playbackSpeed}'),
-                  style: TextStyle(color: cs.primary, fontSize: 13),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, size: 20),
-              ],
-            ),
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ref
-                  .read(advancedSettingsControllerProvider(params).notifier)
-                  .setSheetPage('playbackSpeed');
+        const Divider(),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.dashboard_customize_rounded, color: cs.primary),
+          title: Text(
+            context.l10n.mediaViewerCustomizeControls,
+            style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onCustomizeControls();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionRow(
+    BuildContext context,
+    WidgetRef ref,
+    AdvancedSettingsParams params,
+    AdvancedSettingsState state,
+    ColorScheme cs,
+    MediaViewerAction action,
+  ) {
+    switch (action) {
+      case MediaViewerAction.rotate90:
+        return _buildRotationTile(context, ref, params, state, cs);
+      case MediaViewerAction.imageFit:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.aspect_ratio_rounded),
+          title: Text(context.l10n.imageFitModeLabel),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _getImageFitLabel(context, state.imageFit),
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('imageFit');
+          },
+        );
+      case MediaViewerAction.playbackSpeed:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.slow_motion_video_rounded),
+          title: Text(context.l10n.playbackSpeedLabel),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                context.l10n.playbackSpeedValue('${state.playbackSpeed}'),
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('playbackSpeed');
+          },
+        );
+      case MediaViewerAction.slideshowDelay:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.timer_outlined),
+          title: Text(context.l10n.slideshowDelayLabel),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                context.l10n
+                    .slideshowDelaySecondsValue(state.slideshowDelaySeconds),
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('slideshowDelay');
+          },
+        );
+      case MediaViewerAction.audioTrack:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.audiotrack_rounded),
+          title: Text(context.l10n.audioTrackTitle),
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('audioTracks');
+          },
+        );
+     case MediaViewerAction.subtitles:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.subtitles_rounded),
+          title: Text(context.l10n.subtitlesLabel),
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('subtitleTracks');
+          },
+        );
+      case MediaViewerAction.mute:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            widget.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            color: widget.isMuted ? cs.error : null,
+          ),
+          title: Text(
+            action.getLocalizedLabel(context.l10n),
+            style: widget.isMuted ? TextStyle(color: cs.error) : null,
+          ),
+          trailing: Switch(
+            value: !widget.isMuted,
+            activeColor: cs.primary,
+            onChanged: (_) {
+              widget.onExecuteAction(MediaViewerAction.mute);
             },
           ),
-          if (videoController != null) ...[
-            ValueListenableBuilder<List<AudioTrackInfo>>(
-              valueListenable: videoController!.audioTracksNotifier,
-              builder: (context, audioTracks, _) {
-                if (audioTracks.length <= 1) return const SizedBox.shrink();
-                final selected = audioTracks.firstWhere(
-                  (t) => t.isSelected,
-                  orElse: () => audioTracks.first,
-                );
-                final selectedLabel = selected.label.isNotEmpty
-                    ? selected.label
-                    : (selected.language.isNotEmpty
-                        ? selected.language
-                        : context.l10n.trackNumberLabel(selected.trackIndex + 1));
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Divider(),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.audiotrack_rounded),
-                      title: Text(context.l10n.audioTrackTitle),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            selectedLabel,
-                            style: TextStyle(color: cs.primary, fontSize: 13),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 20),
-                        ],
-                      ),
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        ref
-                            .read(advancedSettingsControllerProvider(params).notifier)
-                            .setSheetPage('audioTracks');
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-            ValueListenableBuilder<List<SubtitleTrackInfo>>(
-              valueListenable: videoController!.subtitleTracksNotifier,
-              builder: (context, subTracks, _) {
-                final hasSubTracks = subTracks.isNotEmpty;
-                if (!hasSubTracks && !hasSubtitles) return const SizedBox.shrink();
-
-                final selectedSub = subTracks.firstWhere(
-                  (t) => t.isSelected,
-                  orElse: () => const SubtitleTrackInfo(
-                    groupIndex: -1,
-                    trackIndex: -1,
-                    isSelected: false,
-                    language: '',
-                    label: '',
-                    mimeType: '',
-                    id: '',
-                  ),
-                );
-                final label = (selectedSub.isSelected && state.subtitlesEnabled)
-                    ? (selectedSub.label.isNotEmpty
-                        ? selectedSub.label
-                        : (selectedSub.language.isNotEmpty
-                            ? selectedSub.language
-                            : context.l10n.subtitleTrackNumberLabel(selectedSub.trackIndex + 1)))
-                    : (state.subtitlesEnabled && hasSubtitles ? context.l10n.externalLabel : context.l10n.offLabel);
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Divider(),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.subtitles_rounded),
-                      title: Text(context.l10n.subtitlesLabel),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            label,
-                            style: TextStyle(color: cs.primary, fontSize: 13),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 20),
-                        ],
-                      ),
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        ref
-                            .read(advancedSettingsControllerProvider(params).notifier)
-                            .setSheetPage('subtitleTracks');
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          ] else if (hasSubtitles) ...[
-            const Divider(),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              secondary: const Icon(Icons.subtitles_rounded),
-              title: Text(context.l10n.subtitlesLabel),
-              value: state.subtitlesEnabled,
-              activeThumbColor: cs.primary,
-              onChanged: (val) {
-                HapticFeedback.lightImpact();
-                ref
-                    .read(advancedSettingsControllerProvider(params).notifier)
-                    .setSubtitlesEnabled(val, onSubtitlesEnabledChanged);
-              },
-            ),
-          ],
-        ],
-      );
+          onTap: () {
+            widget.onExecuteAction(MediaViewerAction.mute);
+          },
+        );
+      default:
+        final isDelete = action == MediaViewerAction.delete;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(action.icon, color: isDelete ? cs.error : null),
+          title: Text(
+            action.getLocalizedLabel(context.l10n),
+            style: isDelete ? TextStyle(color: cs.error) : null,
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onExecuteAction(action);
+          },
+        );
     }
   }
 
@@ -464,7 +488,14 @@ class AdvancedSettingsSheet extends ConsumerWidget {
             HapticFeedback.lightImpact();
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
-                .setImageFit(fit, onImageFitChanged);
+                .setImageFit(fit, widget.onImageFitChanged);
+            if (widget.initialPage != null && widget.initialPage != 'main') {
+              Navigator.pop(context);
+            } else {
+              ref
+                  .read(advancedSettingsControllerProvider(params).notifier)
+                  .setSheetPage('main');
+            }
           },
         );
       }).toList(),
@@ -495,11 +526,18 @@ class AdvancedSettingsSheet extends ConsumerWidget {
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
               : const SizedBox(width: 18),
-          onTap: () {
+           onTap: () {
             HapticFeedback.lightImpact();
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
-                .setSlideshowDelay(delay, onSlideshowDelayChanged);
+                .setSlideshowDelay(delay, widget.onSlideshowDelayChanged);
+            if (widget.initialPage != null && widget.initialPage != 'main') {
+              Navigator.pop(context);
+            } else {
+              ref
+                  .read(advancedSettingsControllerProvider(params).notifier)
+                  .setSheetPage('main');
+            }
           },
         );
       }).toList(),
@@ -535,7 +573,14 @@ class AdvancedSettingsSheet extends ConsumerWidget {
             HapticFeedback.lightImpact();
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
-                .setPlaybackSpeed(speed, onPlaybackSpeedChanged);
+                .setPlaybackSpeed(speed, widget.onPlaybackSpeedChanged);
+            if (widget.initialPage != null && widget.initialPage != 'main') {
+              Navigator.pop(context);
+            } else {
+              ref
+                  .read(advancedSettingsControllerProvider(params).notifier)
+                  .setSheetPage('main');
+            }
           },
         );
       }).toList(),
@@ -548,7 +593,7 @@ class AdvancedSettingsSheet extends ConsumerWidget {
     AdvancedSettingsParams params,
     ColorScheme cs,
   ) {
-    final tracks = videoController?.audioTracks ?? [];
+    final tracks = widget.videoController?.audioTracks ?? [];
     if (tracks.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
@@ -574,14 +619,16 @@ class AdvancedSettingsSheet extends ConsumerWidget {
             ),
           ),
           subtitle: track.mimeType.isNotEmpty
-              ? Text('${track.mimeType} ${track.channelCount != null ? '(${track.channelCount} ch)' : ''}')
+              ? Text(
+                  '${track.mimeType} ${track.channelCount != null ? '(${track.channelCount} ch)' : ''}')
               : null,
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
               : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
-            videoController?.selectAudioTrack(track.groupIndex, track.trackIndex);
+            widget.videoController
+                ?.selectAudioTrack(track.groupIndex, track.trackIndex);
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
                 .setSheetPage('main');
@@ -598,12 +645,12 @@ class AdvancedSettingsSheet extends ConsumerWidget {
     required ValueChanged<T> onSelected,
     bool Function(T a, T b)? isValueEqual,
   }) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     return Container(
       height: 38,
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -618,10 +665,10 @@ class AdvancedSettingsSheet extends ConsumerWidget {
                 onSelected(opt.$1);
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
+                duration: AppMotion.short2,
                 decoration: BoxDecoration(
                   color: isSelected ? cs.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -630,7 +677,8 @@ class AdvancedSettingsSheet extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                     color: isSelected ? cs.onPrimary : cs.onSurface,
                   ),
                 ),
@@ -649,9 +697,10 @@ class AdvancedSettingsSheet extends ConsumerWidget {
     AdvancedSettingsState state,
     ColorScheme cs,
   ) {
-    final tracks = videoController?.subtitleTracks ?? [];
+    final tracks = widget.videoController?.subtitleTracks ?? [];
     final hasActiveSelection = tracks.any((t) => t.isSelected);
-    final isOff = !state.subtitlesEnabled || (!hasActiveSelection && !hasSubtitles);
+    final isOff =
+        !state.subtitlesEnabled || (!hasActiveSelection && !widget.hasSubtitles);
 
     final sizeOptions = [
       (12.0, context.l10n.subtitleSizeSmall),
@@ -692,7 +741,7 @@ class AdvancedSettingsSheet extends ConsumerWidget {
                 isValueEqual: (a, b) => (a - b).abs() < 0.5,
                 onSelected: (val) => ref
                     .read(advancedSettingsControllerProvider(params).notifier)
-                    .setSubtitleFontSize(val, onSubtitleFontSizeChanged),
+                    .setSubtitleFontSize(val, widget.onSubtitleFontSizeChanged),
               ),
             ],
           ),
@@ -719,7 +768,8 @@ class AdvancedSettingsSheet extends ConsumerWidget {
                 isValueEqual: (a, b) => (a - b).abs() < 0.18,
                 onSelected: (val) => ref
                     .read(advancedSettingsControllerProvider(params).notifier)
-                    .setSubtitleVerticalPosition(val, onSubtitleVerticalPositionChanged),
+                    .setSubtitleVerticalPosition(
+                        val, widget.onSubtitleVerticalPositionChanged),
               ),
             ],
           ),
@@ -741,17 +791,22 @@ class AdvancedSettingsSheet extends ConsumerWidget {
             HapticFeedback.lightImpact();
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
-                .disableSubtitles(videoController, onSubtitlesEnabledChanged);
+                .disableSubtitles(
+                    widget.videoController, widget.onSubtitlesEnabledChanged);
           },
         ),
-        if (hasSubtitles)
+        if (widget.hasSubtitles)
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
               context.l10n.externalSubtitlesLabel,
               style: TextStyle(
-                color: state.subtitlesEnabled && !hasActiveSelection ? cs.primary : null,
-                fontWeight: state.subtitlesEnabled && !hasActiveSelection ? FontWeight.bold : FontWeight.normal,
+                color: state.subtitlesEnabled && !hasActiveSelection
+                    ? cs.primary
+                    : null,
+                fontWeight: state.subtitlesEnabled && !hasActiveSelection
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
             ),
             trailing: state.subtitlesEnabled && !hasActiveSelection
@@ -761,7 +816,8 @@ class AdvancedSettingsSheet extends ConsumerWidget {
               HapticFeedback.lightImpact();
               ref
                   .read(advancedSettingsControllerProvider(params).notifier)
-                  .enableExternalSubtitles(videoController, onSubtitlesEnabledChanged);
+                  .enableExternalSubtitles(
+                      widget.videoController, widget.onSubtitlesEnabledChanged);
             },
           ),
         ...tracks.map((track) {
@@ -769,7 +825,8 @@ class AdvancedSettingsSheet extends ConsumerWidget {
               ? track.label
               : (track.language.isNotEmpty
                   ? track.language
-                  : context.l10n.subtitleTrackNumberLabel(track.trackIndex + 1));
+                  : context.l10n
+                      .subtitleTrackNumberLabel(track.trackIndex + 1));
           final isSelected = track.isSelected && state.subtitlesEnabled;
           return ListTile(
             contentPadding: EdgeInsets.zero,
@@ -787,13 +844,13 @@ class AdvancedSettingsSheet extends ConsumerWidget {
             onTap: () {
               HapticFeedback.lightImpact();
               ref
-                  .read(advancedSettingsControllerProvider(params).notifier)
-                  .selectSubtitleTrack(
-                    videoController,
-                    track.groupIndex,
-                    track.trackIndex,
-                    onSubtitlesEnabledChanged,
-                  );
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .selectSubtitleTrack(
+                  widget.videoController,
+                  track.groupIndex,
+                  track.trackIndex,
+                  widget.onSubtitlesEnabledChanged,
+                );
             },
           );
         }),

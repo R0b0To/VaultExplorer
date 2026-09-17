@@ -2,9 +2,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 enum FileDetailColumn {
@@ -70,6 +72,7 @@ class FileManagerToolbarConfig {
   final PlaylistTransitionEffect playlistTransitionEffect;
   final ThumbnailCacheMode defaultThumbnailCacheMode;
   final ThumbnailQuality defaultThumbnailQuality;
+  final MediaViewerToolbarConfig mediaViewerToolbarConfig;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -105,6 +108,7 @@ class FileManagerToolbarConfig {
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.mediaViewerToolbarConfig = const MediaViewerToolbarConfig(),
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -148,15 +152,18 @@ class FileManagerToolbarConfig {
         playlistTransitionEffect: PlaylistTransitionEffect.slide,
         defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
         defaultThumbnailQuality: ThumbnailQuality.defaultQuality,
+        mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
       );
 
   List<FileManagerAction> get visible =>
       order.where((a) => !hidden.contains(a)).toList(growable: false);
+
   List<FileDetailColumn> get visibleDetailColumns => detailColumnsOrder
       .where((c) => !hiddenDetailColumns.contains(c))
       .toList(growable: false);
 
-  GridAspectRatio getGridAspectRatioForFolder(String containerUri, String dirPath) {
+  GridAspectRatio getGridAspectRatioForFolder(
+      String containerUri, String dirPath) {
     if (rememberPerFolderLayout) {
       final key = '$containerUri:$dirPath';
       final saved = folderGridAspectRatios[key];
@@ -197,6 +204,7 @@ class FileManagerToolbarConfig {
     PlaylistTransitionEffect? playlistTransitionEffect,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
+    MediaViewerToolbarConfig? mediaViewerToolbarConfig,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -238,6 +246,8 @@ class FileManagerToolbarConfig {
             defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
         defaultThumbnailQuality:
             defaultThumbnailQuality ?? this.defaultThumbnailQuality,
+        mediaViewerToolbarConfig:
+            mediaViewerToolbarConfig ?? this.mediaViewerToolbarConfig,
       );
 
   Map<String, dynamic> toJson() => {
@@ -272,6 +282,7 @@ class FileManagerToolbarConfig {
         'playlistTransitionEffect': playlistTransitionEffect.toJson(),
         'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
         'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
+        'mediaViewerToolbarConfig': mediaViewerToolbarConfig.toJson(),
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -300,27 +311,31 @@ class FileManagerToolbarConfig {
             .whereType<FileDetailColumn>()
             .toSet()
         : const {FileDetailColumn.type};
-    final rawFolderLayoutModes = (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
-          (k, v) => MapEntry(k, v as String),
-        ) ??
-        const <String, String>{};
+    final rawFolderLayoutModes =
+        (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
+              (k, v) => MapEntry(k, v as String),
+            ) ??
+            const <String, String>{};
     final rawFolderGridAspectRatios =
         (j['folderGridAspectRatios'] as Map<String, dynamic>?)?.map(
-          (k, v) => MapEntry(k, v as String),
-        ) ??
-        const <String, String>{};
-    final defaultThumbnailCacheMode =
-        ThumbnailCacheMode.fromJson(
+              (k, v) => MapEntry(k, v as String),
+            ) ??
+            const <String, String>{};
+    final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
         ThumbnailCacheMode.disabled;
     final defaultThumbnailQuality =
         ThumbnailQuality.fromJson(j['defaultThumbnailQuality']);
-    final longFileNameDisplayMode =
-        LongFileNameDisplayMode.fromJson(
+    final longFileNameDisplayMode = LongFileNameDisplayMode.fromJson(
           j['longFileNameDisplayMode'] as String?,
         ) ??
         LongFileNameDisplayMode.ellipsizeEnd;
+    final mediaViewerConfig = j.containsKey('mediaViewerToolbarConfig')
+        ? MediaViewerToolbarConfig.fromJson(
+            j['mediaViewerToolbarConfig'] as Map<String, dynamic>?,
+          )
+        : MediaViewerToolbarConfig.defaults();
 
     return FileManagerToolbarConfig(
       order: rawOrder,
@@ -346,7 +361,8 @@ class FileManagerToolbarConfig {
           : rawDetailColumns,
       hiddenDetailColumns: hiddenDetailColumns,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
-      gridAspectRatio: GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),
+      gridAspectRatio:
+          GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
       showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,
@@ -362,6 +378,7 @@ class FileManagerToolbarConfig {
       ),
       defaultThumbnailCacheMode: defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality,
+      mediaViewerToolbarConfig: mediaViewerConfig,
     );
   }
 }

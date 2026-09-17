@@ -1,109 +1,82 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
-import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 
-class MediaViewerTopBar extends ConsumerWidget {
-  final MountedContainer container;
+class MediaViewerTopBar extends StatelessWidget {
   final PlaylistController playlistController;
   final String currentFileName;
   final int totalCount;
+  final MediaViewerToolbarConfig toolbarConfig;
   final PlaylistTransitionEffect currentTransitionEffect;
   final ValueChanged<PlaylistTransitionEffect> onTransitionEffectChanged;
   final PlaylistScrollMode currentScrollMode;
   final ValueChanged<PlaylistScrollMode> onScrollModeChanged;
-  final VoidCallback onBackPressed;
-  final VoidCallback onDeletePressed;
-  final VoidCallback onRenamePressed;
-  final VoidCallback? onInfoPressed;
-  final bool showEditImageOption;
-  final VoidCallback onEditImagePressed;
+  final ValueChanged<MediaViewerAction> onExecuteAction;
+  final VoidCallback onCustomizeControls;
   final bool isBookmark;
-  final VoidCallback onBookmarkPressed;
+  final bool isMuted;
   final VoidCallback onPlaylistChanged;
   final VoidCallback? onMenuOpened;
   final VoidCallback? onMenuClosed;
+  final bool isImage;
+  final bool isAudio;
 
   const MediaViewerTopBar({
     super.key,
-    required this.container,
     required this.playlistController,
     required this.currentFileName,
     required this.totalCount,
+    required this.toolbarConfig,
     required this.currentTransitionEffect,
     required this.onTransitionEffectChanged,
     this.currentScrollMode = PlaylistScrollMode.horizontal,
     required this.onScrollModeChanged,
-    required this.onBackPressed,
-    required this.onDeletePressed,
-    required this.onRenamePressed,
-    this.onInfoPressed,
-    this.showEditImageOption = false,
-    required this.onEditImagePressed,
+    required this.onExecuteAction,
+    required this.onCustomizeControls,
     required this.isBookmark,
-    required this.onBookmarkPressed,
+    required this.isMuted,
     required this.onPlaylistChanged,
     this.onMenuOpened,
     this.onMenuClosed,
+    required this.isImage,
+    required this.isAudio,
   });
 
-  Future<void> _showFileInfo(BuildContext context, VaultFileIoApi fileIoApi) async {
-    onMenuOpened?.call();
-    final file = playlistController.currentFile;
-    final lastSlash = file.lastIndexOf('/');
-    final dirPath = lastSlash == -1 ? '' : file.substring(0, lastSlash);
-    final baseName = lastSlash == -1 ? file : file.substring(lastSlash + 1);
-    var existingEntries = <RawEntry>[];
-    try {
-      final raw = await fileIoApi.listDirectory(container, dirPath);
-      if (raw != null) {
-        existingEntries = RawEntry.parseAll(raw);
-      }
-    } catch (_) {
-      // Best-effort metadata lookup for the file-info dialog; a failure
-      // just leaves existingEntries empty, so the firstWhere() below falls
-      // through to its placeholder RawEntry.
-    }
-    final currentEntry = existingEntries.firstWhere(
-      (e) => e.name == baseName,
-      orElse: () => RawEntry(
-        name: baseName,
-        isDir: false,
-        sizeBytes: 0,
-        modifiedSecs: 0,
-      ),
-    );
-    if (context.mounted) {
-      await FileInfoSheet.show(
-        context,
-        container: container,
-        entry: currentEntry,
-        currentDirPath: dirPath,
-      );
-    }
-    onMenuClosed?.call();
-  }
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fileIoApi = ref.read(vaultFileIoApiProvider);
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final topInset = MediaQuery.paddingOf(context).top;
+
+    final pinnedTopActions = toolbarConfig.topBarActions.where((action) {
+      return action.isApplicable(
+        isImage: isImage,
+        isAudio: isAudio,
+        isPlaylistMode: playlistController.isPlaylistMode,
+      );
+    }).toList();
+
+    final moreActions = toolbarConfig.moreMenuActions.where((action) {
+      return action.isApplicable(
+        isImage: isImage,
+        isAudio: isAudio,
+        isPlaylistMode: playlistController.isPlaylistMode,
+      );
+    }).toList();
+
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 8,
-        bottom: 24,
-        left: 12,
-        right: 12,
+        top: topInset + AppSpacing.sm,
+        bottom: AppSpacing.lg,
+        left: AppSpacing.md,
+        right: AppSpacing.md,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -111,18 +84,20 @@ class MediaViewerTopBar extends ConsumerWidget {
           end: Alignment.bottomCenter,
           colors: [
             Colors.black.withValues(alpha: 0.85),
+            Colors.black.withValues(alpha: 0.45),
             Colors.transparent,
           ],
         ),
       ),
       child: Row(
         children: [
-          _TopBarCircleButton(
-            icon: Icons.arrow_back_rounded,
-            tooltip: context.l10n.backTooltip,
-            onPressed: onBackPressed,
+          MediaViewerActionButton(
+            action: MediaViewerAction.playPause,
+            customIcon: Icons.arrow_back_rounded,
+            customTooltip: context.l10n.backTooltip,
+            onTap: () => Navigator.pop(context),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,65 +108,162 @@ class MediaViewerTopBar extends ConsumerWidget {
                   style: textTheme.titleMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: -0.1,
+                    letterSpacing: -0.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                if (playlistController.isPlaylistMode || playlistController.isScanningSubfolders)
+                if (playlistController.isPlaylistMode ||
+                    playlistController.isScanningSubfolders) ...[
+                  const SizedBox(height: 2),
                   Text(
                     playlistController.isPlaylistMode
                         ? (playlistController.isScanningSubfolders
-                            ? context.l10n.mediaViewerPlaylistPositionScanningLabel(
-                                playlistController.currentIndex + 1, totalCount)
+                            ? context.l10n
+                                .mediaViewerPlaylistPositionScanningLabel(
+                                    playlistController.currentIndex + 1,
+                                    totalCount)
                             : context.l10n.mediaViewerPlaylistPositionLabel(
-                                playlistController.currentIndex + 1, totalCount))
+                                playlistController.currentIndex + 1,
+                                totalCount))
                         : context.l10n.mediaViewerScanningLabel,
                     style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          _buildPlaylistMenu(context, cs),
-          const SizedBox(width: 8),
-          _buildMoreMenu(context, cs, fileIoApi),
+          const SizedBox(width: AppSpacing.sm),
+          ...pinnedTopActions.map((action) {
+            if (action == MediaViewerAction.playlistMenu) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 6.0),
+                child: _buildPlaylistMenu(context, cs),
+              );
+            }
+            if (action == MediaViewerAction.screenOrientation) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 6.0),
+                child: MediaViewerActionButton(
+                  action: action,
+                  onTap: () => onExecuteAction(action),
+                ),
+              );
+            }
+
+            final isMute = action == MediaViewerAction.mute;
+            return Padding(
+              padding: const EdgeInsets.only(left: 6.0),
+              child: MediaViewerActionButton(
+                action: action,
+                isHighlighted:
+                    (action == MediaViewerAction.bookmark && isBookmark) ||
+                    (isMute && isMuted),
+                highlightColor:
+                    isMute ? cs.error : context.semanticColors.bookmark,
+                customIcon: isMute
+                    ? (isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded)
+                    : null,
+                onTap: () => onExecuteAction(action),
+              ),
+            );
+          }),
+          // More MenuAnchor
+          Padding(
+            padding: const EdgeInsets.only(left: 6.0),
+            child: _buildMoreMenu(context, cs, moreActions),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMoreMenu(
+    BuildContext context,
+    ColorScheme cs,
+    List<MediaViewerAction> actions,
+  ) {
+    return MenuAnchor(
+      onOpen: onMenuOpened,
+      onClose: onMenuClosed,
+      builder: (ctx, controller, child) => MediaViewerActionButton(
+        action: MediaViewerAction.advancedSettings,
+        customIcon: Icons.more_vert_rounded,
+        customTooltip: 'More',
+        onTap: () => controller.isOpen ? controller.close() : controller.open(),
+      ),
+      menuChildren: [
+        ...actions.map((action) {
+          final isDelete = action == MediaViewerAction.delete;
+          final isBookmarkAction = action == MediaViewerAction.bookmark;
+          final isMuteAction = action == MediaViewerAction.mute;
+
+          IconData icon = action.icon;
+          Color? iconColor = isDelete ? cs.error : cs.onSurfaceVariant;
+
+          if (isBookmarkAction && isBookmark) {
+            iconColor = context.semanticColors.bookmark;
+          } else if (isMuteAction) {
+            icon = isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded;
+            if (isMuted) iconColor = cs.error;
+          }
+
+          return MenuItemButton(
+            style: isDelete || (isMuteAction && isMuted)
+                ? MenuItemButton.styleFrom(foregroundColor: cs.error)
+                : null,
+            leadingIcon: Icon(icon, size: AppIconSize.small, color: iconColor),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              onExecuteAction(action);
+            },
+            child: Text(action.getLocalizedLabel(context.l10n)),
+          );
+        }),
+        const PopupMenuDivider(),
+        MenuItemButton(
+          leadingIcon: Icon(
+            Icons.dashboard_customize_rounded,
+            size: AppIconSize.small,
+            color: cs.primary,
+          ),
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            onCustomizeControls();
+          },
+          child: Text(
+            context.l10n.mediaViewerCustomizeControls,
+            style: TextStyle(
+              color: cs.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPlaylistMenu(BuildContext context, ColorScheme cs) {
     final isPlaylist = playlistController.isPlaylistMode;
     final folderScope = playlistController.selectedFolder;
-    final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
+    final isThisFolderSelected =
+        isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
-    final menuStyle = MenuStyle(
-      elevation: const WidgetStatePropertyAll(4),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(vertical: 8),
-      ),
-    );
+
     return MenuAnchor(
-      style: menuStyle,
       onOpen: onMenuOpened,
       onClose: onMenuClosed,
-      builder: (ctx, controller, child) => _TopBarCircleButton(
-        icon: isPlaylist ? Icons.playlist_play_rounded : Icons.playlist_add_rounded,
-        iconColor: isPlaylist ? cs.primary : Colors.white,
-        tooltip: isPlaylist ? context.l10n.playlistOptionsTooltip : context.l10n.enablePlaylistTooltip,
-        onPressed: () {
-          HapticFeedback.lightImpact();
-          controller.isOpen ? controller.close() : controller.open();
-        },
+      builder: (ctx, controller, child) => MediaViewerActionButton(
+        action: MediaViewerAction.playlistMenu,
+        customIcon: isPlaylist
+            ? Icons.playlist_play_rounded
+            : Icons.playlist_add_rounded,
+        isHighlighted: isPlaylist,
+        highlightColor: cs.primary,
+        onTap: () => controller.isOpen ? controller.close() : controller.open(),
       ),
       menuChildren: [
         MenuItemButton(
@@ -206,14 +278,13 @@ class MediaViewerTopBar extends ConsumerWidget {
               await playlistController.enablePlaylist('Current Folder Only');
             }
             final newIndex = playlistController.playlist.indexOf(targetFile);
-            if (newIndex != -1) {
-              playlistController.updateIndex(newIndex);
-            }
+            if (newIndex != -1) playlistController.updateIndex(newIndex);
             onPlaylistChanged();
           },
           leadingIcon: isThisFolderSelected
-              ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-              : const SizedBox(width: 18),
+              ? Icon(Icons.check_rounded,
+                  size: AppIconSize.small, color: cs.primary)
+              : const SizedBox(width: AppIconSize.small),
           child: Text(context.l10n.thisFolderMenu),
         ),
         MenuItemButton(
@@ -228,35 +299,35 @@ class MediaViewerTopBar extends ConsumerWidget {
               await playlistController.enablePlaylist('All');
             }
             final newIndex = playlistController.playlist.indexOf(targetFile);
-            if (newIndex != -1) {
-              playlistController.updateIndex(newIndex);
-            }
+            if (newIndex != -1) playlistController.updateIndex(newIndex);
             onPlaylistChanged();
           },
           leadingIcon: isAllSelected
-              ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-              : const SizedBox(width: 18),
+              ? Icon(Icons.check_rounded,
+                  size: AppIconSize.small, color: cs.primary)
+              : const SizedBox(width: AppIconSize.small),
           child: Text(context.l10n.allInclSubfoldersMenu),
         ),
         if (playlistController.isPlaylistMode) ...[
           const PopupMenuDivider(),
           MenuItemButton(
             style: MenuItemButton.styleFrom(
-              foregroundColor: playlistController.isShuffled ? cs.primary : null,
+              foregroundColor:
+                  playlistController.isShuffled ? cs.primary : null,
             ),
             onPressed: () {
               final targetFile = playlistController.currentFile;
               playlistController.toggleShuffle();
               final newIndex = playlistController.playlist.indexOf(targetFile);
-              if (newIndex != -1) {
-                playlistController.updateIndex(newIndex);
-              }
+              if (newIndex != -1) playlistController.updateIndex(newIndex);
               onPlaylistChanged();
             },
             leadingIcon: Icon(
               Icons.shuffle_rounded,
-              size: 18,
-              color: playlistController.isShuffled ? cs.primary : cs.onSurfaceVariant,
+              size: AppIconSize.small,
+              color: playlistController.isShuffled
+                  ? cs.primary
+                  : cs.onSurfaceVariant,
             ),
             child: Text(
               playlistController.isShuffled
@@ -267,25 +338,21 @@ class MediaViewerTopBar extends ConsumerWidget {
           SubmenuButton(
             leadingIcon: Icon(
               currentScrollMode.icon,
-              size: 18,
+              size: AppIconSize.small,
               color: cs.onSurfaceVariant,
             ),
             menuChildren: PlaylistScrollMode.values.map((mode) {
               final isSelected = mode == currentScrollMode;
               return MenuItemButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  onScrollModeChanged(mode);
-                },
+                onPressed: () => onScrollModeChanged(mode),
                 leadingIcon: isSelected
-                    ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                    ? Icon(Icons.check_rounded,
+                        size: AppIconSize.small, color: cs.primary)
                     : SizedBox(
-                        width: 18,
-                        child: Icon(
-                          mode.icon,
-                          size: 16,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
+                        width: AppIconSize.small,
+                        child: Icon(mode.icon,
+                            size: 16,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                       ),
                 child: Text(mode.getLocalizedLabel(context.l10n)),
               );
@@ -295,25 +362,21 @@ class MediaViewerTopBar extends ConsumerWidget {
           SubmenuButton(
             leadingIcon: Icon(
               currentTransitionEffect.icon,
-              size: 18,
+              size: AppIconSize.small,
               color: cs.onSurfaceVariant,
             ),
             menuChildren: PlaylistTransitionEffect.values.map((effect) {
               final isSelected = effect == currentTransitionEffect;
               return MenuItemButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  onTransitionEffectChanged(effect);
-                },
+                onPressed: () => onTransitionEffectChanged(effect),
                 leadingIcon: isSelected
-                    ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                    ? Icon(Icons.check_rounded,
+                        size: AppIconSize.small, color: cs.primary)
                     : SizedBox(
-                        width: 18,
-                        child: Icon(
-                          effect.icon,
-                          size: 16,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
+                        width: AppIconSize.small,
+                        child: Icon(effect.icon,
+                            size: 16,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                       ),
                 child: Text(effect.getLocalizedLabel(context.l10n)),
               );
@@ -322,189 +385,6 @@ class MediaViewerTopBar extends ConsumerWidget {
           ),
         ],
       ],
-    );
-  }
-
-  Widget _buildMoreMenu(BuildContext context, ColorScheme cs, VaultFileIoApi fileIoApi) {
-    final menuStyle = MenuStyle(
-      elevation: const WidgetStatePropertyAll(4),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(vertical: 8),
-      ),
-    );
-    return MenuAnchor(
-      style: menuStyle,
-      onOpen: onMenuOpened,
-      onClose: onMenuClosed,
-      builder: (ctx, controller, child) => _TopBarCircleButton(
-        icon: Icons.more_vert_rounded,
-        tooltip: context.l10n.moreActionsTooltip,
-        onPressed: () {
-          HapticFeedback.lightImpact();
-          controller.isOpen ? controller.close() : controller.open();
-        },
-      ),
-      menuChildren: [
-        MenuItemButton(
-          onPressed: () async {
-            try {
-              await fileIoApi.openWithApp(
-                container,
-                playlistController.currentFile,
-              );
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(context.l10n.failedToOpenExternalApp('$e')),
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                );
-              }
-            }
-          },
-          leadingIcon: Icon(
-            Icons.open_in_new_rounded,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          child: Text(context.l10n.openWithAppAction),
-        ),
-        if (showEditImageOption)
-          MenuItemButton(
-            onPressed: onEditImagePressed,
-            leadingIcon: Icon(
-              Icons.edit_outlined,
-              size: 18,
-              color: cs.onSurfaceVariant,
-            ),
-            child: Text(context.l10n.editImageAction),
-          ),
-        MenuItemButton(
-          onPressed: () {
-            if (onInfoPressed != null) {
-              onInfoPressed!();
-            } else {
-              _showFileInfo(context, fileIoApi);
-            }
-          },
-          leadingIcon: Icon(
-            Icons.info_outline_rounded,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          child: Text(context.l10n.fileInfoAction),
-        ),
-        MenuItemButton(
-          onPressed: onRenamePressed,
-          leadingIcon: Icon(
-            Icons.drive_file_rename_outline_rounded,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          child: Text(context.l10n.renameFileMenu),
-        ),
-        MenuItemButton(
-          onPressed: onBookmarkPressed,
-          leadingIcon: Icon(
-            isBookmark ? Icons.star_rounded : Icons.star_outline_rounded,
-            size: 18,
-            color: isBookmark ? context.semanticColors.bookmark : cs.onSurfaceVariant,
-          ),
-          child: Text(
-            isBookmark ? context.l10n.removeFromBookmarks : context.l10n.addToBookmarks,
-          ),
-        ),
-        SubmenuButton(
-          leadingIcon: Icon(
-            Icons.screen_rotation_rounded,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          menuChildren: [
-            MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                SystemChrome.setPreferredOrientations([
-                  DeviceOrientation.portraitUp,
-                ]);
-              },
-              child: Text(context.l10n.forcePortraitMenu),
-            ),
-            MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                SystemChrome.setPreferredOrientations([
-                  DeviceOrientation.landscapeLeft,
-                  DeviceOrientation.landscapeRight,
-                ]);
-              },
-              child: Text(context.l10n.forceLandscapeMenu),
-            ),
-            MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-              },
-              child: Text(context.l10n.autoRotateSensorMenu),
-            ),
-          ],
-          child: Text(context.l10n.screenOrientationMenu),
-        ),
-        const PopupMenuDivider(),
-        MenuItemButton(
-          style: MenuItemButton.styleFrom(
-            foregroundColor: cs.error,
-          ),
-          onPressed: onDeletePressed,
-          leadingIcon: Icon(
-            Icons.delete_outline_rounded,
-            size: 18,
-            color: cs.error,
-          ),
-          child: Text(context.l10n.deleteFileMenu),
-        ),
-      ],
-    );
-  }
-}
-
-class _TopBarCircleButton extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String tooltip;
-  final VoidCallback onPressed;
-  const _TopBarCircleButton({
-    required this.icon,
-    this.iconColor,
-    required this.tooltip,
-    required this.onPressed,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.14),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Icon(
-              icon,
-              size: 20,
-              color: iconColor ?? Colors.white,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

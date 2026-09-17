@@ -213,31 +213,11 @@ object ContainerEngine {
 
     // Block-image containers (VeraCrypt/LUKS/BitLocker; VaultBackendRegistry
     // has no entry for these -- that's the directory-vault formats) report
-    // free space purely from the inner filesystem's free-cluster/free-block
-    // count, which reflects the *declared* container capacity, not how much
-    // of it is physically backed on the real device yet -- see
-    // VaultPathUtils.localAvailableBytes's doc comment for why (Quick
-    // Format leaves the data area sparse). Clamp to the real device's
-    // currently available bytes too, when we can cheaply determine them,
-    // so a container that's sparse-full on a nearly-full real device
-    // doesn't keep reporting free space it can no longer actually write
-    // into. Best-effort: a session with no resolvable local path (a
-    // genuinely remote SAF tree, a USB-backed volume, or session lookup
-    // simply missing) just falls back to the inner figure alone, exactly
-    // as before this clamp existed.
+    // free space directly from the inner filesystem (f_getfree / ntfs_statfs /
+    // ext2fs_statfs) reflecting the actual volume's capacity and free space.
     fun getSpaceInfo(volId: Int): LongArray? {
         VaultBackendRegistry.get(volId)?.let { return it.getSpaceInfo() }
-        val space = NativeEngine.getSpaceInfo(volId) ?: return null
-        if (space.size > 1) {
-            val uriString = ContainerSessionRegistry.activeSessions[volId]?.uri
-            val realAvailable = uriString?.let {
-                com.aeidolon.vaultexplorer.saf.VaultPathUtils.localAvailableBytes(android.net.Uri.parse(it))
-            }
-            if (realAvailable != null && realAvailable < space[1]) {
-                space[1] = realAvailable
-            }
-        }
-        return space
+        return NativeEngine.getSpaceInfo(volId)
     }
 
     fun getVaultInfo(volId: Int): Map<String, Any?>? {

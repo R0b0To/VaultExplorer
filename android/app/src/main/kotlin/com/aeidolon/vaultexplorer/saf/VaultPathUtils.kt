@@ -162,8 +162,11 @@ object VaultPathUtils {
             }
 
             if (uri.authority == "com.android.externalstorage.documents") {
-                val extDir = Environment.getExternalStorageDirectory()
-                if (extDir.exists()) return extDir
+                val isSecondary = docId != null && docId.contains(":") && !docId.startsWith("primary:", ignoreCase = true)
+                if (!isSecondary) {
+                    val extDir = Environment.getExternalStorageDirectory()
+                    if (extDir.exists()) return extDir
+                }
             }
         }
         return null

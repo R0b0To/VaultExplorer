@@ -1,6 +1,64 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
+Widget _filterMenuItem(
+  BuildContext context,
+  ColorScheme cs,
+  String? value,
+  String? currentFilter,
+  ValueChanged<String?> onFilterChanged,
+  String label,
+  IconData icon,
+) {
+  final isActive = currentFilter == value;
+  return MenuItemButton(
+    leadingIcon: Icon(
+      icon,
+      size: 18,
+      color: isActive ? cs.primary : cs.onSurfaceVariant,
+    ),
+    trailingIcon: isActive
+        ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+        : null,
+    onPressed: () => onFilterChanged(value),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        color: isActive ? cs.primary : null,
+      ),
+    ),
+  );
+}
+
+/// The filter options, shared between [FilterMenuButton]'s own MenuAnchor
+/// and any other cascade (e.g. the FAB toolbar's "More" menu) that wants to
+/// embed the same choices as a [SubmenuButton]'s `menuChildren`.
+List<Widget> buildFilterMenuItems({
+  required BuildContext context,
+  required ColorScheme cs,
+  required String? currentFilter,
+  required ValueChanged<String?> onFilterChanged,
+  required bool hideVaultOnlyActions,
+}) {
+  final l10n = context.l10n;
+  return [
+    _filterMenuItem(context, cs, null, currentFilter, onFilterChanged,
+        l10n.filterAllFilesOption, Icons.all_inclusive_rounded),
+    _filterMenuItem(context, cs, 'image', currentFilter, onFilterChanged,
+        l10n.filterImagesOption, Icons.image_outlined),
+    _filterMenuItem(context, cs, 'video', currentFilter, onFilterChanged,
+        l10n.filterVideosOption, Icons.videocam_outlined),
+    _filterMenuItem(context, cs, 'audio', currentFilter, onFilterChanged,
+        l10n.filterAudioOption, Icons.audiotrack_rounded),
+    _filterMenuItem(context, cs, 'document', currentFilter, onFilterChanged,
+        l10n.filterDocumentsOption, Icons.description_outlined),
+    if (!hideVaultOnlyActions)
+      _filterMenuItem(context, cs, 'secure', currentFilter, onFilterChanged,
+          l10n.secureItem, Icons.lock_outline_rounded),
+  ];
+}
+
 /// Toolbar popup button for filtering files by type (images/videos/audio/documents).
 class FilterMenuButton extends StatefulWidget {
   final String? currentFilter;
@@ -25,33 +83,6 @@ class FilterMenuButton extends StatefulWidget {
 }
 
 class _FilterMenuButtonState extends State<FilterMenuButton> {
-  Widget _buildFilterMenuItem(
-    String? value,
-    String label,
-    IconData icon,
-    ColorScheme cs,
-  ) {
-    final isActive = widget.currentFilter == value;
-    return MenuItemButton(
-      leadingIcon: Icon(
-        icon,
-        size: 18,
-        color: isActive ? cs.primary : cs.onSurfaceVariant,
-      ),
-      trailingIcon: isActive
-          ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-          : null,
-      onPressed: () => widget.onFilterChanged(value),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          color: isActive ? cs.primary : null,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -72,21 +103,13 @@ class _FilterMenuButtonState extends State<FilterMenuButton> {
           }
         },
       ),
-menuChildren: [
-        _buildFilterMenuItem(
-            null, context.l10n.filterAllFilesOption, Icons.all_inclusive_rounded, cs),
-        _buildFilterMenuItem(
-            'image', context.l10n.filterImagesOption, Icons.image_outlined, cs),
-        _buildFilterMenuItem(
-            'video', context.l10n.filterVideosOption, Icons.videocam_outlined, cs),
-        _buildFilterMenuItem(
-            'audio', context.l10n.filterAudioOption, Icons.audiotrack_rounded, cs),
-        _buildFilterMenuItem(
-            'document', context.l10n.filterDocumentsOption, Icons.description_outlined, cs),
-        if (!widget.hideVaultOnlyActions)
-          _buildFilterMenuItem(
-              'secure', context.l10n.secureItem, Icons.lock_outline_rounded, cs),
-      ],
+      menuChildren: buildFilterMenuItems(
+        context: context,
+        cs: cs,
+        currentFilter: widget.currentFilter,
+        onFilterChanged: widget.onFilterChanged,
+        hideVaultOnlyActions: widget.hideVaultOnlyActions,
+      ),
     );
   }
 }

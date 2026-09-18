@@ -59,7 +59,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_manager_speed_dial_fab.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
@@ -1020,7 +1020,6 @@ void _showItemActionsSheet(RawEntry entry) {
   }
 
   Future<void> _openArchive(String fullPath, String archiveName) async {
-    _closeSpeedDial();
     String? passphrase;
     try {
       while (true) {
@@ -1057,7 +1056,6 @@ void _showItemActionsSheet(RawEntry entry) {
   }
 
   void _closeArchive() {
-    _closeSpeedDial();
     _navNotifier.closeArchive();
   }
 
@@ -1086,7 +1084,6 @@ void _showItemActionsSheet(RawEntry entry) {
   }
 
 void _enterDirectory(RawEntry entry) {
-    _closeSpeedDial();
     final currentOffset =
         _browserScrollController.hasClients ? _browserScrollController.offset : 0.0;
     final newPath = _fullPathOf(entry);
@@ -1102,7 +1099,6 @@ void _enterDirectory(RawEntry entry) {
   }
 
   Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
-    _closeSpeedDial();
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
@@ -1146,7 +1142,6 @@ void _enterDirectory(RawEntry entry) {
 
 void _navigateUp() {
     if (_atRoot) return;
-    _closeSpeedDial();
     final targetSegment =
         _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
@@ -1161,16 +1156,8 @@ void _navigateUp() {
     _loadDirectoryContents(newPath);
   }
 
-  bool _isSpeedDialOpen = false;
-
-  void _closeSpeedDial() {
-    if (_isSpeedDialOpen) {
-      setState(() => _isSpeedDialOpen = false);
-    }
-  }
-
   bool get _canPreviewFolderBackGesture =>
-      !_atRoot && !isSelectionMode && !_searchActive && !_isSpeedDialOpen;
+      !_atRoot && !isSelectionMode && !_searchActive;
   bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
 
   @override
@@ -1207,7 +1194,6 @@ void _navigateUp() {
   @override
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
-    _closeSpeedDial();
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
     _navigateUp();
@@ -1224,7 +1210,6 @@ void _navigateUp() {
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
-    _closeSpeedDial();
     final targetSegment =
         index >= 0 && index < _pathStack.length ? _pathStack[index] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
@@ -2918,6 +2903,85 @@ Future<void> _extractSelectedArchive() async {
       fileCount: fileCount,
     );
   }
+  List<Widget> _buildFabToolbar({required double bottomOffset}) {
+    final rightPadding = MediaQuery.paddingOf(context).right;
+    final baseRight = 16.0 + rightPadding;
+
+    final showAddFab = _toolbarConfig.visible.contains(FileManagerAction.add);
+    final moreActions = _toolbarConfig.visible
+        .where((a) => a != FileManagerAction.add)
+        .toList(growable: false);
+    final showMore = moreActions.isNotEmpty;
+
+    final widgets = <Widget>[];
+
+    if (showMore) {
+      final hasLocalMedia =
+          _currentItems.where((e) => !e.isDir).map((e) => e.name).any(_isSupportedMedia);
+      final hasSubfolders = _currentItems.any((e) => e.isDir);
+      final canPlayMedia = hasLocalMedia || hasSubfolders;
+
+      // When the Add FAB is visible, place More to its left (56dp FAB + 12dp spacing = 68dp).
+      // If the Add FAB is hidden via config, More takes the primary bottom-right slot.
+      final moreRight = showAddFab ? (baseRight + 68.0) : baseRight;
+
+      widgets.add(
+        Positioned(
+          right: moreRight,
+          bottom: bottomOffset + 4.0, // 4dp offset centers the 48dp button against the 56dp Add FAB
+          child: FileManagerMoreMenuButton(
+            actions: moreActions,
+            searchActive: _searchActive,
+            onToggleSearch: () => _searchNotifier.toggleActive(),
+            sortBy: sortBy,
+            sortAscending: sortAscending,
+            onSortChanged: _onSortChanged,
+            currentFilter: _currentFilter,
+            onFilterChanged: (value) => _navNotifier.setFilter(value),
+            hideVaultOnlyActions: widget.container.isLocalStorage,
+            layoutMode: _layoutMode,
+            onLayoutModeChanged: _onLayoutModeChanged,
+            gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
+              widget.container.uri,
+              _currentDirPath,
+            ),
+            onGridAspectRatioChanged: _onGridAspectRatioChanged,
+            canPlayMedia: canPlayMedia,
+            onPlayMedia: _startMediaViewerFromCurrentLocation,
+          ),
+        ),
+      );
+    }
+
+    if (showAddFab) {
+      widgets.add(
+        Positioned(
+          right: baseRight,
+          bottom: bottomOffset,
+          child: AddItemMenuButton(
+            isReadOnly: _isReadOnly,
+            hasArchiveContext: _archiveContext != null,
+            container: widget.container,
+            currentDirPath: _currentDirPath,
+            currentItems: _currentItems,
+            onSetStatus: _setStatus,
+            onExtractArchive: _extractArchive,
+            onSignalActivity: _signalActivity,
+            onLoadDirectoryContents: (path) =>
+                _loadDirectoryContents(path, refresh: true),
+            onCaptureFromCamera: _captureFromCamera,
+            onImportFilesFromDevice: _importFilesFromDevice,
+            onImportFolderFromDevice: _importFolderFromDevice,
+            onAddVaultItem: _addVaultItem,
+            hideVaultOnlyActions: widget.container.isLocalStorage,
+            asFab: true,
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2984,14 +3048,13 @@ Future<void> _extractSelectedArchive() async {
 
     final bool hasClipboardFab = !isSelectionMode &&
         !_searchActive &&
-        !_isSpeedDialOpen &&
         ref.watch(crossContainerClipboardProvider).hasItems;
-    final bool hasSpeedDialFab = useFab && !_searchActive;
+    final bool hasFabToolbar = useFab && !_searchActive;
 
     double fabClearance = 0.0;
-    if (hasClipboardFab && hasSpeedDialFab) {
+    if (hasClipboardFab && hasFabToolbar) {
       fabClearance = 132.0; // Two stacked FABs (56 + 12 + 56 = 124) + 8dp clearance
-    } else if (hasClipboardFab || hasSpeedDialFab) {
+    } else if (hasClipboardFab || hasFabToolbar) {
       fabClearance = 64.0; // Single FAB (56) + 8dp clearance
     }
 
@@ -3057,15 +3120,13 @@ Future<void> _extractSelectedArchive() async {
     }
 
     final bool canPop =
-        _atRoot && !isSelectionMode && !_searchActive && !_isSpeedDialOpen;
+        _atRoot && !isSelectionMode && !_searchActive;
 
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
-        if (_isSpeedDialOpen) {
-          _closeSpeedDial();
-        } else if (isSelectionMode) {
+        if (isSelectionMode) {
           exitSelectionMode();
         } else if (_searchActive) {
           setState(() => _clearSearch());
@@ -3426,24 +3487,18 @@ Future<void> _extractSelectedArchive() async {
       ),
     ),
 
-  // ── Speed Dial FAB ──
-  if (useFab && !_searchActive)
-    Positioned.fill(
-      child: FileManagerSpeedDialFab(
-        isOpen: _isSpeedDialOpen,
-        onToggle: () => setState(() => _isSpeedDialOpen = !_isSpeedDialOpen),
-        onClose: _closeSpeedDial,
-        actions: _toolbarConfig.visible,
-        builders: actionBuilders,
-        bottomOffset: baseBottomOffset +
-            ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
-                ? kToolbarHeight
-                : 0.0),
-      ),
+  // ── FAB Toolbar: Add FAB + "More" cascade (search/sort/filter/view/play) ──
+  if (hasFabToolbar)
+    ..._buildFabToolbar(
+      bottomOffset: baseBottomOffset +
+          ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
+              ? kToolbarHeight
+              : 0.0),
     ),
+    
 
   // ── Clipboard Paste FAB ────────────────────────────────────────────────
-  if (!isSelectionMode && !_searchActive && !_isSpeedDialOpen)
+  if (!isSelectionMode && !_searchActive)
     Positioned(
       right: 16.0 + MediaQuery.paddingOf(context).right,
       bottom: useFab

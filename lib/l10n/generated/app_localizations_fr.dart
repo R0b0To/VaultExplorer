@@ -7769,4 +7769,77 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get mediaViewerAllControlsPinned =>
       'Tous les contrôles sont déjà épinglés.';
+
+  @override
+  String get mediaPlayerControlsTitle => 'Commandes du lecteur multimédia';
+
+  @override
+  String get mediaControlsResetSuccess =>
+      'Commandes multimédias réinitialisées par défaut';
+
+  @override
+  String get playbackAndDisplayHeader => 'Lecture et affichage';
+
+  @override
+  String get showProgressBarTitle =>
+      'Afficher la barre de progression (scrubber)';
+
+  @override
+  String get showProgressBarSubtitle =>
+      'Curseur temporel pour les vidéos et l’audio';
+
+  @override
+  String get showTransportControlsOnPhotosTitle =>
+      'Afficher les commandes de lecture sur les photos';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      'Activer les commandes de diaporama sur les images (désactiver pour une vue épurée)';
+
+  @override
+  String get statusBadgeTitle => 'Badge d’état';
+
+  @override
+  String get statusBadgeSubtitle =>
+      'Affiche le minuteur de diaporama ou l’indicateur de photo statique';
+
+  @override
+  String get topBarActionsHeader => 'Actions de la barre supérieure';
+
+  @override
+  String get topBarActionsEmptyHint =>
+      'Glissez des actions ici pour les épingler à la barre supérieure';
+
+  @override
+  String get bottomDockActionsHeader => 'Actions du dock inférieur';
+
+  @override
+  String get bottomDockActionsEmptyHint =>
+      'Glissez des actions ici pour les épingler au dock inférieur';
+
+  @override
+  String get moreMenuActionsHeader => 'Actions du menu Plus (•••)';
+
+  @override
+  String get moreMenuActionsEmptyHint =>
+      'Glissez des actions ici pour le menu déroulant de la barre supérieure';
+
+  @override
+  String get advancedSettingsActionsHeader =>
+      'Paramètres avancés (débordement)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint =>
+      'Glissez des actions ici pour la feuille des paramètres avancés';
+
+  @override
+  String get dropHereAtEnd => 'Déposer ici à la fin';
+
+  @override
+  String get dragItemsHereToAdd =>
+      '+ Glissez des éléments ici pour les ajouter à cette section';
+
+  @override
+  String get moveToAdvancedSettingsTooltip =>
+      'Déplacer vers les paramètres avancés';
 }

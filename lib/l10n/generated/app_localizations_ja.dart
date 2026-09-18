@@ -7294,4 +7294,65 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mediaViewerAllControlsPinned => 'すべてのコントロールが既に固定されています。';
+
+  @override
+  String get mediaPlayerControlsTitle => 'メディアプレーヤーの操作設定';
+
+  @override
+  String get mediaControlsResetSuccess => 'メディア操作設定をデフォルトに戻しました';
+
+  @override
+  String get playbackAndDisplayHeader => '再生と表示';
+
+  @override
+  String get showProgressBarTitle => 'プログレスバー（シークバー）を表示';
+
+  @override
+  String get showProgressBarSubtitle => '動画および音声のタイムラインスライダー';
+
+  @override
+  String get showTransportControlsOnPhotosTitle => '写真に再生コントロールを表示';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      '画像のスライドショー操作を有効化（オフでシンプル表示）';
+
+  @override
+  String get statusBadgeTitle => 'ステータスバッジ';
+
+  @override
+  String get statusBadgeSubtitle => 'スライドショーのタイマーまたは静止画インジケーターを表示';
+
+  @override
+  String get topBarActionsHeader => 'トップバーのアクション';
+
+  @override
+  String get topBarActionsEmptyHint => 'アクションをここにドラッグしてトップバーに固定';
+
+  @override
+  String get bottomDockActionsHeader => 'ボトムドックのアクション';
+
+  @override
+  String get bottomDockActionsEmptyHint => 'アクションをここにドラッグしてボトムドックに固定';
+
+  @override
+  String get moreMenuActionsHeader => 'その他メニュー（•••）のアクション';
+
+  @override
+  String get moreMenuActionsEmptyHint => 'アクションをここにドラッグしてトップバーのドロップダウンに追加';
+
+  @override
+  String get advancedSettingsActionsHeader => '詳細設定アクション（オーバーフロー）';
+
+  @override
+  String get advancedSettingsActionsEmptyHint => 'アクションをここにドラッグして詳細設定シートに追加';
+
+  @override
+  String get dropHereAtEnd => '末尾にドロップ';
+
+  @override
+  String get dragItemsHereToAdd => '+ 項目をここにドラッグしてこのセクションに追加';
+
+  @override
+  String get moveToAdvancedSettingsTooltip => '詳細設定に移動';
 }

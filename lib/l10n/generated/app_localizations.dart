@@ -12744,6 +12744,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All controls are already pinned.'**
   String get mediaViewerAllControlsPinned;
+
+  /// Title for media player toolbar customization screen
+  ///
+  /// In en, this message translates to:
+  /// **'Media Player Controls'**
+  String get mediaPlayerControlsTitle;
+
+  /// Snackbar message when media controls are reset to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Media controls reset to defaults'**
+  String get mediaControlsResetSuccess;
+
+  /// Section header for playback and display toggles
+  ///
+  /// In en, this message translates to:
+  /// **'Playback & Display'**
+  String get playbackAndDisplayHeader;
+
+  /// Switch title to toggle seekbar/scrubber visibility
+  ///
+  /// In en, this message translates to:
+  /// **'Show Progress Bar (Scrubber)'**
+  String get showProgressBarTitle;
+
+  /// Subtitle explaining timeline slider feature
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline slider for videos and audio'**
+  String get showProgressBarSubtitle;
+
+  /// Switch title to toggle transport controls on photos
+  ///
+  /// In en, this message translates to:
+  /// **'Show Transport Controls on Photos'**
+  String get showTransportControlsOnPhotosTitle;
+
+  /// Subtitle explaining slideshow transport controls on images
+  ///
+  /// In en, this message translates to:
+  /// **'Enable slideshow controls on images (off for minimalist view)'**
+  String get showTransportControlsOnPhotosSubtitle;
+
+  /// Switch title for status badge visibility
+  ///
+  /// In en, this message translates to:
+  /// **'Status Badge'**
+  String get statusBadgeTitle;
+
+  /// Subtitle explaining status badge details
+  ///
+  /// In en, this message translates to:
+  /// **'Shows slideshow timer or static photo indicator'**
+  String get statusBadgeSubtitle;
+
+  /// Section header for top bar actions
+  ///
+  /// In en, this message translates to:
+  /// **'Top Bar Actions'**
+  String get topBarActionsHeader;
+
+  /// Hint shown when top bar actions list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Drag actions here to pin to Top Bar'**
+  String get topBarActionsEmptyHint;
+
+  /// Section header for bottom dock actions
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom Dock Actions'**
+  String get bottomDockActionsHeader;
+
+  /// Hint shown when bottom dock actions list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Drag actions here to pin to Bottom Dock'**
+  String get bottomDockActionsEmptyHint;
+
+  /// Section header for dropdown more menu actions
+  ///
+  /// In en, this message translates to:
+  /// **'More Menu (•••) Actions'**
+  String get moreMenuActionsHeader;
+
+  /// Hint shown when more menu actions list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Drag actions here for Top Bar dropdown menu'**
+  String get moreMenuActionsEmptyHint;
+
+  /// Section header for advanced settings overflow actions
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings Actions (Overflow)'**
+  String get advancedSettingsActionsHeader;
+
+  /// Hint shown when advanced settings actions list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Drag actions here for Advanced Settings sheet'**
+  String get advancedSettingsActionsEmptyHint;
+
+  /// Text on drop target indicating dropping item at the end of the section
+  ///
+  /// In en, this message translates to:
+  /// **'Drop here at end'**
+  String get dropHereAtEnd;
+
+  /// Default empty state hint for drop target container
+  ///
+  /// In en, this message translates to:
+  /// **'+ Drag items here to add to this section'**
+  String get dragItemsHereToAdd;
+
+  /// Tooltip for button moving an action to the advanced settings section
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Advanced Settings'**
+  String get moveToAdvancedSettingsTooltip;
 }
 
 class _AppLocalizationsDelegate

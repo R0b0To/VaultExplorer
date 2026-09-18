@@ -7196,4 +7196,64 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mediaViewerAllControlsPinned => '所有控件均已固定。';
+
+  @override
+  String get mediaPlayerControlsTitle => '媒体播放器控制';
+
+  @override
+  String get mediaControlsResetSuccess => '媒体控制已重置为默认设置';
+
+  @override
+  String get playbackAndDisplayHeader => '播放与显示';
+
+  @override
+  String get showProgressBarTitle => '显示进度条（快进快退滑块）';
+
+  @override
+  String get showProgressBarSubtitle => '用于视频和音频的时间轴滑块';
+
+  @override
+  String get showTransportControlsOnPhotosTitle => '在照片上显示播放控制';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle => '启用图像幻灯片控制（关闭以使用极简视图）';
+
+  @override
+  String get statusBadgeTitle => '状态徽章';
+
+  @override
+  String get statusBadgeSubtitle => '显示幻灯片计时器或静态照片指示器';
+
+  @override
+  String get topBarActionsHeader => '顶部栏操作';
+
+  @override
+  String get topBarActionsEmptyHint => '将操作拖动到此处以固定到顶部栏';
+
+  @override
+  String get bottomDockActionsHeader => '底部 Dock 操作';
+
+  @override
+  String get bottomDockActionsEmptyHint => '将操作拖动到此处以固定到底部 Dock';
+
+  @override
+  String get moreMenuActionsHeader => '“更多”菜单（•••）操作';
+
+  @override
+  String get moreMenuActionsEmptyHint => '将操作拖动到此处以添加到顶部栏下拉菜单';
+
+  @override
+  String get advancedSettingsActionsHeader => '高级设置操作（溢出）';
+
+  @override
+  String get advancedSettingsActionsEmptyHint => '将操作拖动到此处以添加到高级设置面板';
+
+  @override
+  String get dropHereAtEnd => '拖放到末尾';
+
+  @override
+  String get dragItemsHereToAdd => '+ 拖动项目到此处以添加到此区域';
+
+  @override
+  String get moveToAdvancedSettingsTooltip => '移动到高级设置';
 }

@@ -7711,4 +7711,76 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get mediaViewerAllControlsPinned =>
       'Todos os controles já estão fixados.';
+
+  @override
+  String get mediaPlayerControlsTitle => 'Controles do reprodutor multimídia';
+
+  @override
+  String get mediaControlsResetSuccess =>
+      'Controles multimídia redefinidos para os padrões';
+
+  @override
+  String get playbackAndDisplayHeader => 'Reprodução e exibição';
+
+  @override
+  String get showProgressBarTitle => 'Mostrar barra de progresso (scrubber)';
+
+  @override
+  String get showProgressBarSubtitle =>
+      'Controle deslizante de linha do tempo para vídeos e áudio';
+
+  @override
+  String get showTransportControlsOnPhotosTitle =>
+      'Mostrar controles de reprodução nas fotos';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      'Ativar controles de apresentação nas imagens (desative para visual minimalista)';
+
+  @override
+  String get statusBadgeTitle => 'Distintivo de status';
+
+  @override
+  String get statusBadgeSubtitle =>
+      'Mostra o temporizador de apresentação ou indicador de foto estática';
+
+  @override
+  String get topBarActionsHeader => 'Ações da barra superior';
+
+  @override
+  String get topBarActionsEmptyHint =>
+      'Arraste ações aqui para fixar na barra superior';
+
+  @override
+  String get bottomDockActionsHeader => 'Ações do dock inferior';
+
+  @override
+  String get bottomDockActionsEmptyHint =>
+      'Arraste ações aqui para fixar no dock inferior';
+
+  @override
+  String get moreMenuActionsHeader => 'Ações do menu Mais (•••)';
+
+  @override
+  String get moreMenuActionsEmptyHint =>
+      'Arraste ações aqui para o menu suspenso da barra superior';
+
+  @override
+  String get advancedSettingsActionsHeader =>
+      'Ações de configurações avançadas (excedente)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint =>
+      'Arraste ações aqui para a folha de configurações avançadas';
+
+  @override
+  String get dropHereAtEnd => 'Soltar aqui no final';
+
+  @override
+  String get dragItemsHereToAdd =>
+      '+ Arraste itens aqui para adicionar a esta seção';
+
+  @override
+  String get moveToAdvancedSettingsTooltip =>
+      'Mover para configurações avançadas';
 }

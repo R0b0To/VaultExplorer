@@ -7760,4 +7760,75 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get mediaViewerAllControlsPinned =>
       'Усі елементи керування вже закріплені.';
+
+  @override
+  String get mediaPlayerControlsTitle => 'Керування медіаплеєром';
+
+  @override
+  String get mediaControlsResetSuccess =>
+      'Елементи керування мультимедіа скинуто до стандартних';
+
+  @override
+  String get playbackAndDisplayHeader => 'Відтворення та відображення';
+
+  @override
+  String get showProgressBarTitle => 'Показувати панель прогресу (повзунок)';
+
+  @override
+  String get showProgressBarSubtitle => 'Шкала часу для відео та аудіо';
+
+  @override
+  String get showTransportControlsOnPhotosTitle =>
+      'Показувати елементи керування на фотографіях';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      'Увімкнути керування слайд-шоу для зображень (вимкніть для мінімалізму)';
+
+  @override
+  String get statusBadgeTitle => 'Значок стану';
+
+  @override
+  String get statusBadgeSubtitle =>
+      'Показує таймер слайд-шоу або індикатор статичного фото';
+
+  @override
+  String get topBarActionsHeader => 'Дії верхньої панелі';
+
+  @override
+  String get topBarActionsEmptyHint =>
+      'Перетягніть дії сюди, щоб закріпити на верхній панелі';
+
+  @override
+  String get bottomDockActionsHeader => 'Дії нижньої панелі (док)';
+
+  @override
+  String get bottomDockActionsEmptyHint =>
+      'Перетягніть дії сюди, щоб закріпити на нижній панелі';
+
+  @override
+  String get moreMenuActionsHeader => 'Дії меню «Більше» (•••)';
+
+  @override
+  String get moreMenuActionsEmptyHint =>
+      'Перетягніть дії сюди для випадаючого меню верхньої панелі';
+
+  @override
+  String get advancedSettingsActionsHeader =>
+      'Дії розширених налаштувань (додатково)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint =>
+      'Перетягніть дії сюди для вкладки розширених налаштувань';
+
+  @override
+  String get dropHereAtEnd => 'Відпустити тут наприкінці';
+
+  @override
+  String get dragItemsHereToAdd =>
+      '+ Перетягніть елементи сюди, щоб додати до цього розділу';
+
+  @override
+  String get moveToAdvancedSettingsTooltip =>
+      'Перемістити до розширених налаштувань';
 }

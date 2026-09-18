@@ -7770,4 +7770,75 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mediaViewerAllControlsPinned => 'جميع عناصر التحكم مثبتة بالفعل.';
+
+  @override
+  String get mediaPlayerControlsTitle => 'عناصر تحكم مشغل الوسائط';
+
+  @override
+  String get mediaControlsResetSuccess =>
+      'تمت إعادة ضبط عناصر تحكم الوسائط إلى الإعدادات الافتراضية';
+
+  @override
+  String get playbackAndDisplayHeader => 'التشغيل والعرض';
+
+  @override
+  String get showProgressBarTitle => 'إظهار شريط التقدم (الممرر)';
+
+  @override
+  String get showProgressBarSubtitle =>
+      'شريط التمرير الزمني لمقاطع الفيديو والصوت';
+
+  @override
+  String get showTransportControlsOnPhotosTitle =>
+      'إظهار عناصر التحكم في العرض على الصور';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      'تمكين عناصر تحكم عرض الشرائح على الصور (عطله لمظهر بسيط)';
+
+  @override
+  String get statusBadgeTitle => 'شارة الحالة';
+
+  @override
+  String get statusBadgeSubtitle =>
+      'عرض مؤقت عرض الشرائح أو مؤشر الصورة الثابتة';
+
+  @override
+  String get topBarActionsHeader => 'إجراءات الشريط العلوي';
+
+  @override
+  String get topBarActionsEmptyHint =>
+      'اسحب الإجراءات إلى هنا لتثبيتها في الشريط العلوي';
+
+  @override
+  String get bottomDockActionsHeader => 'إجراءات الشريط السفلي';
+
+  @override
+  String get bottomDockActionsEmptyHint =>
+      'اسحب الإجراءات إلى هنا لتثبيتها في الشريط السفلي';
+
+  @override
+  String get moreMenuActionsHeader => 'إجراءات قائمة المزيد (•••)';
+
+  @override
+  String get moreMenuActionsEmptyHint =>
+      'اسحب الإجراءات إلى هنا للقائمة المنسدلة للشريط العلوي';
+
+  @override
+  String get advancedSettingsActionsHeader =>
+      'إجراءات الإعدادات المتقدمة (إضافي)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint =>
+      'اسحب الإجراءات إلى هنا لصفحة الإعدادات المتقدمة';
+
+  @override
+  String get dropHereAtEnd => 'أفلت هنا في النهاية';
+
+  @override
+  String get dragItemsHereToAdd =>
+      '+ اسحب العناصر إلى هنا لإضافتها إلى هذا القسم';
+
+  @override
+  String get moveToAdvancedSettingsTooltip => 'نقل إلى الإعدادات المتقدمة';
 }

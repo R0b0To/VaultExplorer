@@ -9723,5 +9723,85 @@
   "mediaViewerAllControlsPinned": "All controls are already pinned.",
   "@mediaViewerAllControlsPinned": {
     "description": "Message when all actions are used"
+  },
+  "mediaPlayerControlsTitle": "Media Player Controls",
+  "@mediaPlayerControlsTitle": {
+    "description": "Title for media player toolbar customization screen"
+  },
+  "mediaControlsResetSuccess": "Media controls reset to defaults",
+  "@mediaControlsResetSuccess": {
+    "description": "Snackbar message when media controls are reset to defaults"
+  },
+  "playbackAndDisplayHeader": "Playback & Display",
+  "@playbackAndDisplayHeader": {
+    "description": "Section header for playback and display toggles"
+  },
+  "showProgressBarTitle": "Show Progress Bar (Scrubber)",
+  "@showProgressBarTitle": {
+    "description": "Switch title to toggle seekbar/scrubber visibility"
+  },
+  "showProgressBarSubtitle": "Timeline slider for videos and audio",
+  "@showProgressBarSubtitle": {
+    "description": "Subtitle explaining timeline slider feature"
+  },
+  "showTransportControlsOnPhotosTitle": "Show Transport Controls on Photos",
+  "@showTransportControlsOnPhotosTitle": {
+    "description": "Switch title to toggle transport controls on photos"
+  },
+  "showTransportControlsOnPhotosSubtitle": "Enable slideshow controls on images (off for minimalist view)",
+  "@showTransportControlsOnPhotosSubtitle": {
+    "description": "Subtitle explaining slideshow transport controls on images"
+  },
+  "statusBadgeTitle": "Status Badge",
+  "@statusBadgeTitle": {
+    "description": "Switch title for status badge visibility"
+  },
+  "statusBadgeSubtitle": "Shows slideshow timer or static photo indicator",
+  "@statusBadgeSubtitle": {
+    "description": "Subtitle explaining status badge details"
+  },
+  "topBarActionsHeader": "Top Bar Actions",
+  "@topBarActionsHeader": {
+    "description": "Section header for top bar actions"
+  },
+  "topBarActionsEmptyHint": "Drag actions here to pin to Top Bar",
+  "@topBarActionsEmptyHint": {
+    "description": "Hint shown when top bar actions list is empty"
+  },
+  "bottomDockActionsHeader": "Bottom Dock Actions",
+  "@bottomDockActionsHeader": {
+    "description": "Section header for bottom dock actions"
+  },
+  "bottomDockActionsEmptyHint": "Drag actions here to pin to Bottom Dock",
+  "@bottomDockActionsEmptyHint": {
+    "description": "Hint shown when bottom dock actions list is empty"
+  },
+  "moreMenuActionsHeader": "More Menu (•••) Actions",
+  "@moreMenuActionsHeader": {
+    "description": "Section header for dropdown more menu actions"
+  },
+  "moreMenuActionsEmptyHint": "Drag actions here for Top Bar dropdown menu",
+  "@moreMenuActionsEmptyHint": {
+    "description": "Hint shown when more menu actions list is empty"
+  },
+  "advancedSettingsActionsHeader": "Advanced Settings Actions (Overflow)",
+  "@advancedSettingsActionsHeader": {
+    "description": "Section header for advanced settings overflow actions"
+  },
+  "advancedSettingsActionsEmptyHint": "Drag actions here for Advanced Settings sheet",
+  "@advancedSettingsActionsEmptyHint": {
+    "description": "Hint shown when advanced settings actions list is empty"
+  },
+  "dropHereAtEnd": "Drop here at end",
+  "@dropHereAtEnd": {
+    "description": "Text on drop target indicating dropping item at the end of the section"
+  },
+  "dragItemsHereToAdd": "+ Drag items here to add to this section",
+  "@dragItemsHereToAdd": {
+    "description": "Default empty state hint for drop target container"
+  },
+  "moveToAdvancedSettingsTooltip": "Move to Advanced Settings",
+  "@moveToAdvancedSettingsTooltip": {
+    "description": "Tooltip for button moving an action to the advanced settings section"
   }
 }

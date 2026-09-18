@@ -7295,4 +7295,65 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get mediaViewerAllControlsPinned => '모든 컨트롤이 이미 고정되어 있습니다.';
+
+  @override
+  String get mediaPlayerControlsTitle => '미디어 플레이어 컨트롤';
+
+  @override
+  String get mediaControlsResetSuccess => '미디어 컨트롤을 기본값으로 초기화했습니다';
+
+  @override
+  String get playbackAndDisplayHeader => '재생 및 디스플레이';
+
+  @override
+  String get showProgressBarTitle => '진행률 표시줄(스크러버) 표시';
+
+  @override
+  String get showProgressBarSubtitle => '비디오 및 오디오용 타임라인 슬라이더';
+
+  @override
+  String get showTransportControlsOnPhotosTitle => '사진에 탐색 컨트롤 표시';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      '이미지 슬라이드쇼 컨트롤 활성화(미니멀 뷰는 해제)';
+
+  @override
+  String get statusBadgeTitle => '상태 배지';
+
+  @override
+  String get statusBadgeSubtitle => '슬라이드쇼 타이머 또는 정적 사진 표시기 표시';
+
+  @override
+  String get topBarActionsHeader => '상단 표시줄 작업';
+
+  @override
+  String get topBarActionsEmptyHint => '상단 표시줄에 고정하려면 작업을 여기로 드래그하세요';
+
+  @override
+  String get bottomDockActionsHeader => '하단 도크 작업';
+
+  @override
+  String get bottomDockActionsEmptyHint => '하단 도크에 고정하려면 작업을 여기로 드래그하세요';
+
+  @override
+  String get moreMenuActionsHeader => '더보기 메뉴(•••) 작업';
+
+  @override
+  String get moreMenuActionsEmptyHint => '상단 표시줄 드롭다운 메뉴용 작업을 여기로 드래그하세요';
+
+  @override
+  String get advancedSettingsActionsHeader => '고급 설정 작업(더보기)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint => '고급 설정 시트용 작업을 여기로 드래그하세요';
+
+  @override
+  String get dropHereAtEnd => '끝에 드롭';
+
+  @override
+  String get dragItemsHereToAdd => '+ 이 섹션에 추가하려면 항목을 여기로 드래그하세요';
+
+  @override
+  String get moveToAdvancedSettingsTooltip => '고급 설정으로 이동';
 }

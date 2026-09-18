@@ -7586,4 +7586,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaViewerAllControlsPinned => 'All controls are already pinned.';
+
+  @override
+  String get mediaPlayerControlsTitle => 'Media Player Controls';
+
+  @override
+  String get mediaControlsResetSuccess => 'Media controls reset to defaults';
+
+  @override
+  String get playbackAndDisplayHeader => 'Playback & Display';
+
+  @override
+  String get showProgressBarTitle => 'Show Progress Bar (Scrubber)';
+
+  @override
+  String get showProgressBarSubtitle => 'Timeline slider for videos and audio';
+
+  @override
+  String get showTransportControlsOnPhotosTitle =>
+      'Show Transport Controls on Photos';
+
+  @override
+  String get showTransportControlsOnPhotosSubtitle =>
+      'Enable slideshow controls on images (off for minimalist view)';
+
+  @override
+  String get statusBadgeTitle => 'Status Badge';
+
+  @override
+  String get statusBadgeSubtitle =>
+      'Shows slideshow timer or static photo indicator';
+
+  @override
+  String get topBarActionsHeader => 'Top Bar Actions';
+
+  @override
+  String get topBarActionsEmptyHint => 'Drag actions here to pin to Top Bar';
+
+  @override
+  String get bottomDockActionsHeader => 'Bottom Dock Actions';
+
+  @override
+  String get bottomDockActionsEmptyHint =>
+      'Drag actions here to pin to Bottom Dock';
+
+  @override
+  String get moreMenuActionsHeader => 'More Menu (•••) Actions';
+
+  @override
+  String get moreMenuActionsEmptyHint =>
+      'Drag actions here for Top Bar dropdown menu';
+
+  @override
+  String get advancedSettingsActionsHeader =>
+      'Advanced Settings Actions (Overflow)';
+
+  @override
+  String get advancedSettingsActionsEmptyHint =>
+      'Drag actions here for Advanced Settings sheet';
+
+  @override
+  String get dropHereAtEnd => 'Drop here at end';
+
+  @override
+  String get dragItemsHereToAdd => '+ Drag items here to add to this section';
+
+  @override
+  String get moveToAdvancedSettingsTooltip => 'Move to Advanced Settings';
 }

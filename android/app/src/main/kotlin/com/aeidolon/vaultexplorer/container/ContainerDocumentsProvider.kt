@@ -33,7 +33,11 @@ import com.aeidolon.vaultexplorer.VeLog
 class ContainerDocumentsProvider : DocumentsProvider() {
 
     companion object {
-        private const val AUTHORITY = "com.aeidolon.vaultexplorer.documents"
+        /** Not private: `ThumbnailHandlers.handleGetApkIcon` builds a
+         *  document URI for this provider directly (to get a real
+         *  `ParcelFileDescriptor` for vault content -- see that method's
+         *  doc comment for why), so it needs this authority string too. */
+        const val AUTHORITY = "com.aeidolon.vaultexplorer.documents"
         private const val TAG = "ContainerDocsProvider"
 
         /** The in-container thumbnail disk cache directory (see

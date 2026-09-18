@@ -21,6 +21,7 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
@@ -422,11 +423,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     final ext = fileName.split('.').last;
     if (vaultIconForExt(ext) != null) return false;
     if (widget.archiveContext != null &&
-        MediaViewerConstants.isVideo(fileName)) {
+        (MediaViewerConstants.isVideo(fileName) || isApkFile(fileName))) {
       return false;
     }
     return MediaViewerConstants.isImage(fileName) ||
-        MediaViewerConstants.isVideo(fileName);
+        MediaViewerConstants.isVideo(fileName) ||
+        isApkFile(fileName);
   }
 
   Widget _buildDirCell(
@@ -496,6 +498,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final isApk = isApkFile(cleanName) && !entry.isPlaceholder;
     final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
       cleanName,
       insideArchive: widget.archiveContext != null,
@@ -538,6 +541,17 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
             onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
           ),
         ),
+      );
+    } else if (isApk && widget.archiveContext == null) {
+      // Same restriction as video above -- see fetchApkIconForThumbnail's
+      // doc comment for why an APK nested inside an open archive falls
+      // through to the plain icon instead.
+      previewWidget = _ApkIconMasonryThumb(
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+        quality: widget.thumbnailQuality,
+        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
       );
     } else {
       previewWidget = Center(
@@ -930,6 +944,175 @@ class _VideoMasonryThumb extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _errorPlaceholder(ColorScheme cs) => Container(
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(Icons.broken_image_rounded,
+              size: AppIconSize.feature, color: cs.outline),
+        ),
+      );
+}
+
+class _ApkIconMasonryThumb extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final void Function(int width, int height) onSizeKnown;
+
+  const _ApkIconMasonryThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.onSizeKnown,
+  });
+
+  /// A launcher icon is always square by spec, but this decodes the
+  /// actual bytes rather than assuming 1:1 -- cheap, and stays correct
+  /// if that ever changes. Mirrors `_EncryptedImageMasonryThumb`'s
+  /// `_checkAndReportSizeFromBytes` in this same file.
+  static Future<(int, int)?> _decodeSize(Uint8List bytes) async {
+    if (bytes.isEmpty) return null;
+    ui.Codec? codec;
+    try {
+      codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final size = (frame.image.width, frame.image.height);
+      frame.image.dispose();
+      return size;
+    } catch (_) {
+      // Malformed/undecodable icon bytes -- leave the aspect ratio at
+      // whatever _defaultRatioFor already fell back to (the same square
+      // _iconRatio a plain file-type icon gets).
+      return null;
+    } finally {
+      codec?.dispose();
+    }
+  }
+
+  /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
+  /// the same three-tier cache real image thumbnails use, keyed by
+  /// [filePath] like any other file.
+  static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
+    void Function(int width, int height) onSizeKnown,
+  ) async {
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await thumbnailCache.fetchWithSize(
+        container: container,
+        filePath: path,
+        mode: mode,
+        quality: quality,
+      );
+      if (cached != null && cached.$1.isNotEmpty) {
+        final (bytes, width, height) = cached;
+        if (width != null && height != null) {
+          onSizeKnown(width, height);
+        } else {
+          final size = await _decodeSize(bytes);
+          if (size != null) onSizeKnown(size.$1, size.$2);
+        }
+        return bytes;
+      }
+    }
+    final bytes = await fetchApkIconForThumbnail(
+      container: container,
+      filePath: path,
+      fileIoApi: fileIoApi,
+    );
+    final size = await _decodeSize(bytes);
+    if (size != null) onSizeKnown(size.$1, size.$2);
+    thumbnailCache.cacheInMemory(
+      container,
+      path,
+      bytes,
+      quality,
+      size?.$1,
+      size?.$2,
+    );
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        thumbnailCache.store(
+          container: container,
+          filePath: path,
+          data: bytes,
+          mode: mode,
+          quality: quality,
+          width: size?.$1,
+          height: size?.$2,
+        ),
+      );
+    }
+    return bytes;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    final syncEntry = thumbnailCache.peekMemoryWithSize(
+      container,
+      filePath,
+      quality,
+    );
+    if (syncEntry != null && syncEntry.$1.isNotEmpty) {
+      final (bytes, width, height) = syncEntry;
+      if (width != null && height != null) {
+        onSizeKnown(width, height);
+      } else {
+        unawaited(
+          _decodeSize(bytes).then((size) {
+            if (size != null) onSizeKnown(size.$1, size.$2);
+          }),
+        );
+      }
+    }
+
+    return AsyncThumbnail(
+      key: ValueKey('apk:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) =>
+          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
+      debounce: const Duration(milliseconds: 100),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      // Contain rather than image/video's cover -- an app icon is meant
+      // to be seen whole, never cropped.
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => _errorPlaceholder(cs),
+      ),
+      loadingBuilder: (context) => Container(
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: cs.primary.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+      ),
+      errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
 

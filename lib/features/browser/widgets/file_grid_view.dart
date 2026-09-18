@@ -19,6 +19,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
@@ -352,6 +353,7 @@ class _FileGridViewState extends State<FileGridView> {
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final isApk = isApkFile(cleanName) && !entry.isPlaceholder;
     final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
       cleanName,
       insideArchive: widget.archiveContext != null,
@@ -392,6 +394,16 @@ class _FileGridViewState extends State<FileGridView> {
             quality: widget.thumbnailQuality,
           ),
         ),
+      );
+    } else if (isApk && widget.archiveContext == null) {
+      // Same restriction as video above -- see fetchApkIconForThumbnail's
+      // doc comment for why an APK nested inside an open archive falls
+      // through to the plain icon instead.
+      previewWidget = _ApkIconGridThumb(
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+        quality: widget.thumbnailQuality,
       );
     } else {
       previewWidget = Center(
@@ -649,6 +661,113 @@ class _VideoThumb extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _errorPlaceholder(ColorScheme cs) => Container(
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            size: AppIconSize.feature,
+            color: cs.outline,
+          ),
+        ),
+      );
+}
+
+class _ApkIconGridThumb extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+
+  const _ApkIconGridThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+  });
+
+  /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
+  /// the same three-tier cache real image thumbnails use, keyed by
+  /// [filePath] like any other file.
+  static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
+  ) async {
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await thumbnailCache.fetch(
+        container: container,
+        filePath: path,
+        mode: mode,
+        quality: quality,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+    final bytes = await fetchApkIconForThumbnail(
+      container: container,
+      filePath: path,
+      fileIoApi: fileIoApi,
+    );
+    thumbnailCache.cacheInMemory(container, path, bytes, quality);
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        thumbnailCache.store(
+          container: container,
+          filePath: path,
+          data: bytes,
+          mode: mode,
+          quality: quality,
+        ),
+      );
+    }
+    return bytes;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return AsyncThumbnail(
+      key: ValueKey('apk:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      debounce: const Duration(milliseconds: 100),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      // Contain rather than image/video's cover -- an app icon is meant
+      // to be seen whole, never cropped.
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => _errorPlaceholder(cs),
+      ),
+      loadingBuilder: (context) => Container(
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: cs.primary.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+      ),
+      errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
 

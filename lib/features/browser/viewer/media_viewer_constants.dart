@@ -79,9 +79,9 @@ static const List<String> audioExtensions = [
   ///
   /// Vault items (passwords, cards, etc.) always render as icons. Pass
   /// [insideArchive] when browsing inside an open archive, since video
-  /// thumbnails aren't supported there. Pass [isPlaceholder] for an item
-  /// still mid-transfer, since it renders as a generic icon regardless of
-  /// its eventual type.
+  /// and APK-icon thumbnails aren't supported there. Pass [isPlaceholder]
+  /// for an item still mid-transfer, since it renders as a generic icon
+  /// regardless of its eventual type.
   static bool hasRealThumbnail(
     String fileName, {
     bool insideArchive = false,
@@ -90,7 +90,16 @@ static const List<String> audioExtensions = [
     if (isPlaceholder) return false;
     final ext = fileName.contains('.') ? fileName.split('.').last : '';
     if (vaultIconForExt(ext) != null) return false;
-    if (insideArchive && isVideo(fileName)) return false;
-    return isImage(fileName) || isVideo(fileName);
+    if (insideArchive && (isVideo(fileName) || isApkFile(fileName))) {
+      return false;
+    }
+    // isApkFile: an approximation, not a guarantee -- unlike
+    // isImage/isVideo this can't be known from the filename alone (it
+    // depends on whether the APK actually has a resolvable android:icon,
+    // see apk_icon_support.dart). A rare APK with no extractable icon
+    // still hides its name label under this heuristic; AsyncThumbnail's
+    // error fallback still shows the correct generic icon in that case,
+    // just without the name visible.
+    return isImage(fileName) || isVideo(fileName) || isApkFile(fileName);
   }
 }

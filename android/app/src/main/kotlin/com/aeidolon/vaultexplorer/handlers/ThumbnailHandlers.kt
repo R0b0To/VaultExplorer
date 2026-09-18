@@ -3,11 +3,13 @@ package com.aeidolon.vaultexplorer.handlers
 import android.graphics.Bitmap
 import android.net.Uri
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.graphics.YuvImage
+import android.content.pm.PackageManager
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -15,6 +17,8 @@ import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import android.view.PixelCopy
 import android.view.Surface
 import androidx.exifinterface.media.ExifInterface
@@ -31,9 +35,12 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
+import com.aeidolon.vaultexplorer.DocumentId
+import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.container.ContainerInputStream
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
@@ -1075,6 +1082,144 @@ class ThumbnailHandlers(
                 "width" to outcome.sourceWidth,
                 "height" to outcome.sourceHeight,
             )
+        }
+    }
+
+    /**
+     * Extracts an APK's own launcher icon for use as a file-manager
+     * thumbnail, via `PackageManager.getPackageArchiveInfo` +
+     * `ApplicationInfo.loadIcon` -- i.e. the same resource-resolution and
+     * (crucially) adaptive-icon compositing Android itself uses once the
+     * app is actually installed. This is deliberately *not* implemented
+     * by hand-parsing the compiled manifest/resource table the way the
+     * Dart-side fallback in `apk_icon_support.dart` does: that approach
+     * can't render an adaptive icon (foreground+background layering,
+     * masking, vector-drawable layers) and can miss real icons behind a
+     * few binary-format edge cases (resource aliasing/reference chains,
+     * newer "compact" resource-table entries) -- exactly the gap a plain
+     * `PackageManager` call doesn't have, because it's the OS's own
+     * code doing the resolving.
+     *
+     * The catch: `getPackageArchiveInfo` needs a real, openable file
+     * path -- it does a plain `open()` under the hood, nothing more. Three
+     * cases, mirroring [runImageThumbnail]'s branching exactly:
+     *
+     *  - Local storage (decoy): the file already has a real absolute
+     *    path -- pass it straight through, no file descriptor needed.
+     *  - SAF external storage (`content://` from another app/provider):
+     *    resolve via [SafStorageManager.getDocumentUri] and open a real
+     *    `ParcelFileDescriptor` for it, same as [runImageThumbnail]'s own
+     *    `content://` branch already does for image/video thumbnails.
+     *  - An actual encrypted vault: there's no OS-level file or file
+     *    descriptor for decrypted content -- it only ever exists in this
+     *    process's memory, produced on demand by the native engine. But
+     *    this app already exposes unlocked vault content to *other* apps
+     *    as a `DocumentsProvider` ([ContainerDocumentsProvider]) backed by
+     *    `StorageManager.openProxyFileDescriptor` (a real fd whose reads
+     *    are served by callbacks straight from the vault session, with no
+     *    disk write of any kind -- see `ContainerProxyCallback`). Building
+     *    a `content://` URI for our own provider and opening it via our
+     *    own `ContentResolver` reuses exactly that existing, tested
+     *    plumbing to get a real fd for vault content -- same-process
+     *    `ContentResolver` calls to a provider in this process skip Binder
+     *    entirely, so this isn't real IPC.
+     *
+     * Either way, once there's a real path or fd, the technique is the
+     * same one used by other Android file managers that support APK icon
+     * preview from arbitrary sources (e.g. MaterialFiles'
+     * `PackageManagerPathExtensions.getPackageArchiveInfoCompat`): open
+     * `/proc/self/fd/<fd>` as the "archive file path" -- a Linux procfs
+     * trick that gives `getPackageArchiveInfo`'s plain `open()` call
+     * something to resolve back to the already-open fd -- then manually
+     * point the returned `ApplicationInfo.sourceDir`/`publicSourceDir` at
+     * that same pseudo-path, since `loadIcon` reads resources from
+     * wherever those fields say, and `getPackageArchiveInfo` doesn't
+     * reliably fill them in for a fd-backed path on its own.
+     */
+    fun handleGetApkIcon(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val fileName = call.argument<String>("fileName")
+        val targetSize = call.argument<Int>("targetSize") ?: 192
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+
+        if (uriString == null || fileName == null) {
+            result.error("INVALID_ARGS", "filePath and fileName required", null)
+            return
+        }
+
+        imageExecutor.execute {
+            var pfd: ParcelFileDescriptor? = null
+            try {
+                val archiveFilePath: String
+                when {
+                    uriString.startsWith("content://") -> {
+                        val docUri = activity.safStorageManager.getDocumentUri(Uri.parse(uriString), fileName)
+                            ?: throw java.io.FileNotFoundException("Could not resolve SAF document for $fileName")
+                        pfd = activity.contentResolver.openFileDescriptor(docUri, "r")
+                            ?: throw java.io.FileNotFoundException("Could not open SAF file descriptor for $fileName")
+                        archiveFilePath = "/proc/self/fd/${pfd.fd}"
+                    }
+                    isLocalStorage -> {
+                        val file = if (fileName.startsWith("/")) java.io.File(fileName) else java.io.File(uriString, fileName)
+                        if (!file.exists()) throw java.io.FileNotFoundException("Local file not found: $fileName")
+                        archiveFilePath = file.path
+                    }
+                    else -> {
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                            ?: throw java.io.FileNotFoundException("Container not mounted")
+                        val docId = DocumentId(volId, "file", fileName).toString()
+                        val docUri = DocumentsContract.buildDocumentUri(ContainerDocumentsProvider.AUTHORITY, docId)
+                        pfd = activity.contentResolver.openFileDescriptor(docUri, "r")
+                            ?: throw java.io.FileNotFoundException("Could not open vault file descriptor for $fileName")
+                        archiveFilePath = "/proc/self/fd/${pfd.fd}"
+                    }
+                }
+
+                val packageManager = activity.packageManager
+                val packageInfo = packageManager.getPackageArchiveInfo(archiveFilePath, 0)
+                    ?: throw java.io.IOException("Not a valid APK: $fileName")
+                val applicationInfo = packageInfo.applicationInfo
+                    ?: throw java.io.IOException("APK has no application info: $fileName")
+                if (applicationInfo.icon == 0) {
+                    // No android:icon at all -- Android would otherwise
+                    // hand back its own generic package-icon drawable
+                    // here, which would look like a real (if boring) icon
+                    // rather than a missing one. Error out instead so the
+                    // Dart side falls back the same way it does for any
+                    // other unresolvable icon.
+                    throw java.io.FileNotFoundException("APK has no android:icon: $fileName")
+                }
+                // loadIcon() resolves resources (including a full
+                // adaptive-icon definition, if that's what android:icon
+                // points at) from sourceDir/publicSourceDir -- neither of
+                // which getPackageArchiveInfo reliably fills in for a
+                // fd-backed pseudo-path, so both are set explicitly here.
+                applicationInfo.sourceDir = archiveFilePath
+                applicationInfo.publicSourceDir = archiveFilePath
+
+                val drawable = applicationInfo.loadIcon(packageManager)
+                val size = targetSize.coerceIn(48, 512)
+                val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, size, size)
+                drawable.draw(canvas)
+
+                val stream = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                bitmap.recycle()
+                val bytes = stream.toByteArray()
+
+                activity.runOnUiThread { result.success(bytes) }
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "handleGetApkIcon failed for $fileName: ${e.message}" }
+                activity.runOnUiThread { result.error("APK_ICON_FAILED", e.message, null) }
+            } finally {
+                try {
+                    pfd?.close()
+                } catch (e: Exception) {
+                    VeLog.w(TAG) { "Error closing APK icon file descriptor for $fileName" }
+                }
+            }
         }
     }
 

@@ -300,6 +300,37 @@ class VaultFileIoApi {
     }
   }
 
+  /// Extracts an APK's own launcher icon via `PackageManager` on the
+  /// native side -- full adaptive-icon compositing included, since it's
+  /// the OS's own icon-resolution code doing the work, not a hand-rolled
+  /// parser. See `ThumbnailHandlers.handleGetApkIcon`'s doc comment for
+  /// why that's necessary (and how it still works for a real vault, which
+  /// has no on-disk file for `PackageManager` to open directly) and
+  /// `apk_icon_support.dart` for the manual-parsing fallback this is
+  /// preferred over.
+  ///
+  /// Returns `null` on any failure -- no `android:icon` on the APK, a
+  /// corrupt/unreadable archive, or any other native-side error -- so
+  /// callers should treat `null` exactly like a thrown
+  /// `ApkIconUnavailable`.
+  Future<Uint8List?> getApkIcon(
+    MountedContainer container,
+    String fileName, {
+    int targetSize = 192,
+  }) async {
+    try {
+      return await _channel.invokeMethod<Uint8List>(ChannelMethods.getApkIcon, {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'targetSize': targetSize,
+        'isLocalStorage': container.isLocalStorage,
+      });
+    } catch (e) {
+      logSwallowed('getApkIcon', e, expected: true);
+      return null;
+    }
+  }
+
  Future<List<String>?> listDirectory(
     MountedContainer container,
     String dirPath, {

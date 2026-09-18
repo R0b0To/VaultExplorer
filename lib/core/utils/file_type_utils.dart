@@ -11,6 +11,15 @@ bool isAppEncryptedFileName(String name) {
   return lower.endsWith('.vxenc') || lower.endsWith('.aes');
 }
 
+/// True for an Android application package (`.apk`) -- used to decide
+/// whether a file-manager tile should attempt to show the app's own
+/// launcher icon instead of a generic file-type icon. See
+/// `apk_icon_support.dart`.
+bool isApkFile(String name) {
+  final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  return ext == 'apk';
+}
+
 /// Returns the appropriate [IconData] for a file based on its extension.
 IconData iconForFile(String name) {
   final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
@@ -52,6 +61,8 @@ IconData iconForFile(String name) {
     case '7z':
     case 'rar':
       return Icons.archive_outlined;
+    case 'apk':
+      return Icons.android_rounded;
     default:
       return Icons.insert_drive_file_outlined;
   }
@@ -99,6 +110,8 @@ Color colorForFile(String name) {
     case 'bz2':
     case 'xz':
       return const Color(0xFFFF8F00); // Amber for archives
+    case 'apk':
+      return const Color(0xFF8BC34A); // Android green
     default:
       return const Color(0xFF546E7A);
   }

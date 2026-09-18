@@ -99,11 +99,7 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
             constraints: const BoxConstraints(maxWidth: 480, maxHeight: 620),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: cs.primary.withValues(alpha: 0.35),
-                width: 1.5,
-              ),
+              borderRadius: BorderRadius.circular(24),    
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.5),
@@ -358,7 +354,7 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

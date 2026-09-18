@@ -6,94 +6,69 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
-import 'dart:async';
 
-class _DragActionPayload {
-  final MediaViewerAction action;
-  final String fromSection; // 'top', 'bottom', 'more', 'advanced'
-  final int fromIndex;
-
-  const _DragActionPayload({
-    required this.action,
-    required this.fromSection,
-    required this.fromIndex,
-  });
-}
-
-class MediaViewerToolbarSettingsScreen extends ConsumerStatefulWidget {
+class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
   const MediaViewerToolbarSettingsScreen({super.key});
 
-  @override
-  ConsumerState<MediaViewerToolbarSettingsScreen> createState() =>
-      _MediaViewerToolbarSettingsScreenState();
-}
-
-
-
-class _MediaViewerToolbarSettingsScreenState
-    extends ConsumerState<MediaViewerToolbarSettingsScreen> {
-  late final ScrollController _scrollController;
-  Timer? _autoScrollTimer;
-  double _autoScrollDelta = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-  }
-
-  @override
-  void dispose() {
-    _stopAutoScroll();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _handleDragUpdate(DragUpdateDetails details) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final dy = details.globalPosition.dy;
-    const edgeThreshold = 120.0;
-    const maxScrollStep = 15.0;
-
-    if (dy < edgeThreshold) {
-      final intensity = (edgeThreshold - dy) / edgeThreshold;
-      _startAutoScroll(-maxScrollStep * intensity.clamp(0.2, 1.0));
-    } else if (dy > screenHeight - edgeThreshold) {
-      final intensity =
-          (dy - (screenHeight - edgeThreshold)) / edgeThreshold;
-      _startAutoScroll(maxScrollStep * intensity.clamp(0.2, 1.0));
-    } else {
-      _stopAutoScroll();
-    }
-  }
-
-  void _startAutoScroll(double delta) {
-    _autoScrollDelta = delta;
-    if (_autoScrollTimer != null && _autoScrollTimer!.isActive) return;
-    _autoScrollTimer =
-        Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (!_scrollController.hasClients) return;
-      final target =
-          (_scrollController.offset + _autoScrollDelta).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      if (target != _scrollController.offset) {
-        _scrollController.jumpTo(target);
-      }
-    });
-  }
-
-  void _stopAutoScroll() {
-    _autoScrollTimer?.cancel();
-    _autoScrollTimer = null;
-  }
-
-  void _onActionDropped({
-    required _DragActionPayload payload,
-    required String targetSection, // 'top', 'bottom', 'more', 'advanced'
-    int? targetIndex,
+  void _reorderSection(
+    WidgetRef ref, {
+    required String sectionName,
+    required int oldIndex,
+    required int newIndex,
   }) {
+    final state = ref.read(fileManagerToolbarSettingsProvider(null));
+    final mediaConfig = state.config.mediaViewerToolbarConfig;
+    final controller =
+        ref.read(fileManagerToolbarSettingsProvider(null).notifier);
+
+    // Standard Flutter ReorderableListView index offset adjustment
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    final top = List<MediaViewerAction>.from(mediaConfig.topBarActions);
+    final bottom = List<MediaViewerAction>.from(mediaConfig.bottomBarActions);
+    final more = List<MediaViewerAction>.from(mediaConfig.moreMenuActions);
+    final advanced =
+        List<MediaViewerAction>.from(mediaConfig.advancedSettingsActions);
+
+    switch (sectionName) {
+      case 'top':
+        final item = top.removeAt(oldIndex);
+        top.insert(newIndex, item);
+        break;
+      case 'bottom':
+        final item = bottom.removeAt(oldIndex);
+        bottom.insert(newIndex, item);
+        break;
+      case 'more':
+        final item = more.removeAt(oldIndex);
+        more.insert(newIndex, item);
+        break;
+      case 'advanced':
+        final item = advanced.removeAt(oldIndex);
+        advanced.insert(newIndex, item);
+        break;
+    }
+
+    final updated = mediaConfig.copyWith(
+      topBarActions: top,
+      bottomBarActions: bottom,
+      moreMenuActions: more,
+      advancedSettingsActions: advanced,
+    );
+    controller.updateMediaViewerConfig(updated);
+    HapticFeedback.mediumImpact();
+  }
+
+  void _moveAction(
+    WidgetRef ref, {
+    required MediaViewerAction action,
+    required String fromSection,
+    required String toSection,
+  }) {
+    if (fromSection == toSection) return;
+
     final state = ref.read(fileManagerToolbarSettingsProvider(null));
     final mediaConfig = state.config.mediaViewerToolbarConfig;
     final controller =
@@ -105,50 +80,38 @@ class _MediaViewerToolbarSettingsScreenState
     final advanced =
         List<MediaViewerAction>.from(mediaConfig.advancedSettingsActions);
 
-    if (payload.fromSection == targetSection &&
-        payload.fromIndex == targetIndex) {
-      return;
-    }
-
-    // 1. Remove from source
-    switch (payload.fromSection) {
+    // 1. Remove from source list
+    switch (fromSection) {
       case 'top':
-        if (payload.fromIndex < top.length) top.removeAt(payload.fromIndex);
+        top.remove(action);
         break;
       case 'bottom':
-        if (payload.fromIndex < bottom.length) bottom.removeAt(payload.fromIndex);
+        bottom.remove(action);
         break;
       case 'more':
-        if (payload.fromIndex < more.length) more.removeAt(payload.fromIndex);
+        more.remove(action);
         break;
       case 'advanced':
-        if (payload.fromIndex < advanced.length) {
-          advanced.removeAt(payload.fromIndex);
-        }
+        advanced.remove(action);
         break;
     }
 
-    // 2. Insert into target
-    switch (targetSection) {
+    // 2. Append to target list
+    switch (toSection) {
       case 'top':
-        final idx = (targetIndex ?? top.length).clamp(0, top.length);
-        top.insert(idx, payload.action);
+        top.add(action);
         break;
       case 'bottom':
-        final idx = (targetIndex ?? bottom.length).clamp(0, bottom.length);
-        bottom.insert(idx, payload.action);
+        bottom.add(action);
         break;
       case 'more':
-        final idx = (targetIndex ?? more.length).clamp(0, more.length);
-        more.insert(idx, payload.action);
+        more.add(action);
         break;
       case 'advanced':
-        final idx = (targetIndex ?? advanced.length).clamp(0, advanced.length);
-        advanced.insert(idx, payload.action);
+        advanced.add(action);
         break;
     }
 
-    // 3. Atomically update all four sections together
     final updated = mediaConfig.copyWith(
       topBarActions: top,
       bottomBarActions: bottom,
@@ -160,29 +123,31 @@ class _MediaViewerToolbarSettingsScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(fileManagerToolbarSettingsProvider(null));
-    final cs = context.colors;
-    final textTheme = context.typography;
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final mediaConfig = state.config.mediaViewerToolbarConfig;
     final controller =
         ref.read(fileManagerToolbarSettingsProvider(null).notifier);
 
+    final l10n = context.l10n;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Media Player Controls',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.mediaPlayerControlsTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
-            tooltip: context.l10n.resetToDefaultsTooltip,
+            tooltip: l10n.resetToDefaultsTooltip,
             onPressed: () {
               controller.resetMediaViewerConfigToDefaults();
               showAppSnackBar(
                 context,
-                message: 'Media controls reset to defaults',
+                message: l10n.mediaControlsResetSuccess,
                 tone: AppBannerTone.success,
               );
             },
@@ -194,13 +159,15 @@ class _MediaViewerToolbarSettingsScreenState
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : SafeArea(
               child: ListView(
-                controller: _scrollController,
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.sm,
                 ),
                 children: [
-                  const SectionHeader('Playback & Display'),
+                  // ==========================================
+                  // 1. PLAYBACK & DISPLAY
+                  // ==========================================
+                  SectionHeader(l10n.playbackAndDisplayHeader),
                   SectionCard(
                     children: [
                       SwitchListTile(
@@ -209,18 +176,20 @@ class _MediaViewerToolbarSettingsScreenState
                         value: mediaConfig.showProgressBar,
                         onChanged: controller.setMediaViewerShowProgressBar,
                         title: Text(
-                          'Show Progress Bar (Scrubber)',
+                          l10n.showProgressBarTitle,
                           style: textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          'Timeline slider for videos and audio',
+                          l10n.showProgressBarSubtitle,
                           style: textTheme.bodySmall
                               ?.copyWith(color: cs.onSurfaceVariant),
                         ),
-                        secondary: Icon(Icons.linear_scale_rounded,
-                            color: cs.primary),
-                      ),                
+                        secondary: Icon(
+                          Icons.linear_scale_rounded,
+                          color: cs.primary,
+                        ),
+                      ),
                       SwitchListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16),
@@ -228,21 +197,24 @@ class _MediaViewerToolbarSettingsScreenState
                         onChanged: (val) {
                           controller.updateMediaViewerConfig(
                             mediaConfig.copyWith(
-                                showCenterTransportForImages: val),
+                              showCenterTransportForImages: val,
+                            ),
                           );
                         },
                         title: Text(
-                          'Show Transport Controls on Photos',
+                          l10n.showTransportControlsOnPhotosTitle,
                           style: textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          'Enable slideshow controls on images (off for minimalist view)',
+                          l10n.showTransportControlsOnPhotosSubtitle,
                           style: textTheme.bodySmall
                               ?.copyWith(color: cs.onSurfaceVariant),
                         ),
-                        secondary: Icon(Icons.slideshow_rounded,
-                            color: cs.primary),
+                        secondary: Icon(
+                          Icons.slideshow_rounded,
+                          color: cs.primary,
+                        ),
                       ),
                       SwitchListTile(
                         contentPadding:
@@ -250,12 +222,12 @@ class _MediaViewerToolbarSettingsScreenState
                         value: mediaConfig.showStatusBadge,
                         onChanged: controller.setMediaViewerShowStatusBadge,
                         title: Text(
-                          'Status Badge',
+                          l10n.statusBadgeTitle,
                           style: textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          'Shows slideshow timer or static photo indicator',
+                          l10n.statusBadgeSubtitle,
                           style: textTheme.bodySmall
                               ?.copyWith(color: cs.onSurfaceVariant),
                         ),
@@ -264,45 +236,65 @@ class _MediaViewerToolbarSettingsScreenState
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader('Top Bar Actions'),
-                  _buildSectionDropArea(
+                  const SizedBox(height: 16),
+
+                  // ==========================================
+                  // 2. TOP BAR ACTIONS
+                  // ==========================================
+                  SectionHeader(l10n.topBarActionsHeader),
+                  _buildReorderableSection(
                     context: context,
+                    ref: ref,
                     sectionName: 'top',
                     actions: mediaConfig.topBarActions,
+                    emptyHint: l10n.topBarActionsEmptyHint,
                     cs: cs,
                     textTheme: textTheme,
-                    emptyHint: 'Drag actions here to pin to Top Bar',
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader('Bottom Dock Actions'),
-                  _buildSectionDropArea(
+                  const SizedBox(height: 16),
+
+                  // ==========================================
+                  // 3. BOTTOM DOCK ACTIONS
+                  // ==========================================
+                  SectionHeader(l10n.bottomDockActionsHeader),
+                  _buildReorderableSection(
                     context: context,
+                    ref: ref,
                     sectionName: 'bottom',
                     actions: mediaConfig.bottomBarActions,
+                    emptyHint: l10n.bottomDockActionsEmptyHint,
                     cs: cs,
                     textTheme: textTheme,
-                    emptyHint: 'Drag actions here to pin to Bottom Dock',
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader('More Menu (•••) Actions'),
-                  _buildSectionDropArea(
+                  const SizedBox(height: 16),
+
+                  // ==========================================
+                  // 4. MORE MENU (•••) ACTIONS
+                  // ==========================================
+                  SectionHeader(l10n.moreMenuActionsHeader),
+                  _buildReorderableSection(
                     context: context,
+                    ref: ref,
                     sectionName: 'more',
                     actions: mediaConfig.moreMenuActions,
+                    emptyHint: l10n.moreMenuActionsEmptyHint,
                     cs: cs,
                     textTheme: textTheme,
-                    emptyHint: 'Drag actions here for Top Bar dropdown menu',
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  const SectionHeader('Advanced Settings Actions (Overflow)'),
-                  _buildSectionDropArea(
+                  const SizedBox(height: 16),
+
+                  // ==========================================
+                  // 5. ADVANCED SETTINGS (OVERFLOW)
+                  // ==========================================
+                  SectionHeader(l10n.advancedSettingsActionsHeader),
+                  _buildReorderableSection(
                     context: context,
+                    ref: ref,
                     sectionName: 'advanced',
                     actions: mediaConfig.advancedSettingsActions,
+                    emptyHint: l10n.advancedSettingsActionsEmptyHint,
                     cs: cs,
                     textTheme: textTheme,
-                    emptyHint: 'Drag actions here for Advanced Settings sheet',
                   ),
                   const SizedBox(height: AppSpacing.xl),
                 ],
@@ -311,222 +303,267 @@ class _MediaViewerToolbarSettingsScreenState
     );
   }
 
-  Widget _buildSectionDropArea({
+  Widget _buildReorderableSection({
     required BuildContext context,
+    required WidgetRef ref,
     required String sectionName,
     required List<MediaViewerAction> actions,
+    required String emptyHint,
     required ColorScheme cs,
     required TextTheme textTheme,
-    required String emptyHint,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.35),
-          width: 1,
+    final l10n = context.l10n;
+
+    if (actions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
         ),
-      ),
-      child: Column(
-        children: [
-          if (actions.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Text(
-                emptyHint,
-                style: TextStyle(
-                  fontStyle: FontStyle.italic,
-                  color: cs.onSurfaceVariant,
-                  fontSize: 13,
+        child: Center(
+          child: Text(
+            emptyHint,
+            style: textTheme.bodySmall?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: actions.length,
+      onReorder: (oldIndex, newIndex) {
+        _reorderSection(
+          ref,
+          sectionName: sectionName,
+          oldIndex: oldIndex,
+          newIndex: newIndex,
+        );
+      },
+      itemBuilder: (context, i) {
+        final action = actions[i];
+
+        return Padding(
+          key: ValueKey('${sectionName}_${action.name}'),
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(i == 0 ? 20 : 4),
+              bottom: Radius.circular(i == actions.length - 1 ? 20 : 4),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 2,
+              ),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(action.icon, size: 20, color: cs.primary),
+              ),
+              title: Text(
+                action.getLocalizedLabel(l10n),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
                 ),
               ),
-            )
-          else
-            ...actions.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final action = entry.value;
-              return _buildDraggableTile(
-                context: context,
-                action: action,
-                sectionName: sectionName,
-                index: idx,
-                cs: cs,
-                textTheme: textTheme,
-              );
-            }),
-          DragTarget<_DragActionPayload>(
-            onWillAcceptWithDetails: (_) => true,
-            onAcceptWithDetails: (details) {
-              _onActionDropped(
-                payload: details.data,
-                targetSection: sectionName,
-                targetIndex: actions.length,
-              );
-            },
-            builder: (ctx, candidates, _) {
-              final isTargetingEnd = candidates.isNotEmpty;
-              return Container(
-                height: 38,
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: isTargetingEnd
-                      ? cs.primary.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(
-                    color: isTargetingEnd
-                        ? cs.primary
-                        : cs.outlineVariant.withValues(alpha: 0.25),
-                    style: BorderStyle.solid,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Quick move menu to transfer between sections
+                  _buildMoveMenu(
+                    context: context,
+                    ref: ref,
+                    action: action,
+                    currentSection: sectionName,
+                    cs: cs,
+                    l10n: l10n,
                   ),
-                ),
-                child: Center(
-                  child: Text(
-                    isTargetingEnd
-                        ? 'Drop here at end'
-                        : '+ Drag items here to add to this section',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isTargetingEnd ? cs.primary : cs.onSurfaceVariant,
-                      fontWeight: isTargetingEnd
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+
+                  // Quick 1-tap removal to Advanced Settings
+                  if (sectionName != 'advanced') ...[
+                    const SizedBox(width: 2),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: cs.error,
+                      ),
+                      tooltip: l10n.moveToAdvancedSettingsTooltip,
+                      onPressed: () {
+                        _moveAction(
+                          ref,
+                          action: action,
+                          fromSection: sectionName,
+                          toSection: 'advanced',
+                        );
+                      },
+                    ),
+                  ],
+
+                  const SizedBox(width: 4),
+
+                  // Native ReorderableDragStartListener handle (smooth 120 FPS reordering)
+                  ReorderableDragStartListener(
+                    index: i,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color:
+                            cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.drag_handle_rounded,
+                        color: cs.onSurfaceVariant,
+                        size: 20,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildDraggableTile({
+  Widget _buildMoveMenu({
     required BuildContext context,
+    required WidgetRef ref,
     required MediaViewerAction action,
-    required String sectionName,
-    required int index,
+    required String currentSection,
     required ColorScheme cs,
-    required TextTheme textTheme,
+    required dynamic l10n,
   }) {
-    final payload = _DragActionPayload(
-      action: action,
-      fromSection: sectionName,
-      fromIndex: index,
-    );
+    final isAdvanced = currentSection == 'advanced';
 
-    final tileContent = Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: ListTile(
-        dense: true,
-        leading: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Icon(action.icon, size: 18, color: cs.primary),
-        ),
-        title: Text(
-          action.getLocalizedLabel(context.l10n),
-          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (sectionName != 'advanced')
-              IconButton(
-                icon: Icon(Icons.close_rounded, size: 18, color: cs.error),
-                tooltip: 'Move to Advanced Settings',
-                onPressed: () {
-                  _onActionDropped(
-                    payload: payload,
-                    targetSection: 'advanced',
-                  );
-                },
-              ),
-            Icon(Icons.drag_indicator_rounded,
-                color: cs.onSurfaceVariant, size: 20),
-          ],
-        ),
+    return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
+      icon: Icon(
+        isAdvanced
+            ? Icons.add_circle_outline_rounded
+            : Icons.drive_file_move_outlined,
+        size: 19,
+        color: isAdvanced ? cs.primary : cs.onSurfaceVariant,
       ),
-    );
-
-    return DragTarget<_DragActionPayload>(
-      onWillAcceptWithDetails: (_) => true,
-      onAcceptWithDetails: (details) {
-        _onActionDropped(
-          payload: details.data,
-          targetSection: sectionName,
-          targetIndex: index,
+      tooltip: isAdvanced ? 'Add to toolbar' : 'Move to section',
+      onSelected: (targetSection) {
+        _moveAction(
+          ref,
+          action: action,
+          fromSection: currentSection,
+          toSection: targetSection,
         );
       },
-      builder: (context, candidateData, rejectedData) {
-        final isHovering = candidateData.isNotEmpty;
-
-        return AnimatedContainer(
-          duration: AppMotion.short1,
-          margin: const EdgeInsets.only(bottom: 4),
-          decoration: BoxDecoration(
-            border: isHovering
-                ? Border(top: BorderSide(color: cs.primary, width: 3))
-                : null,
-          ),
-         child: LongPressDraggable<_DragActionPayload>(
-            data: payload,
-            feedback: _buildDragFeedback(context, action, cs, textTheme),
-            onDragUpdate: _handleDragUpdate,
-            onDragEnd: (_) => _stopAutoScroll(),
-            onDraggableCanceled: (_, __) => _stopAutoScroll(),
-            childWhenDragging: Opacity(opacity: 0.35, child: tileContent),
-            child: tileContent,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDragFeedback(
-    BuildContext context,
-    MediaViewerAction action,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: cs.primary, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+      itemBuilder: (context) => [
+        if (currentSection != 'top')
+          PopupMenuItem(
+            value: 'top',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.vertical_align_top_rounded,
+                  size: 18,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l10n.topBarActionsHeader,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(action.icon, color: cs.primary, size: 20),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              action.getLocalizedLabel(context.l10n),
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface,
-              ),
+          ),
+        if (currentSection != 'bottom')
+          PopupMenuItem(
+            value: 'bottom',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.vertical_align_bottom_rounded,
+                  size: 18,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l10n.bottomDockActionsHeader,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        if (currentSection != 'more')
+          PopupMenuItem(
+            value: 'more',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.more_horiz_rounded,
+                  size: 18,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l10n.moreMenuActionsHeader,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (currentSection != 'advanced')
+          PopupMenuItem(
+            value: 'advanced',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l10n.advancedSettingsActionsHeader,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

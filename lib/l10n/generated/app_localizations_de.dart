@@ -7774,4 +7774,38 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Zu erweiterten Einstellungen verschieben';
+
+  @override
+  String get noVaultsMounted => 'Keine Tresore eingebunden';
+
+  @override
+  String get vaultsMountedSummary => 'Tresor(e) eingebunden';
+
+  @override
+  String get dashboardNavLabel => 'Dashboard';
+
+  @override
+  String get vaultsSectionTitle => 'Tresore';
+
+  @override
+  String get vaultStatusMounted => 'Eingebunden';
+
+  @override
+  String get lockVaultTooltip => 'Tresor sperren';
+
+  @override
+  String get lockAllVaultsTitle => 'Alle Tresore sperren';
+
+  @override
+  String get safProviderLabel => 'SAF-Anbieter';
+
+  @override
+  String get singleFileCryptoTitle => 'Einzeldatei-Kryptografie';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Dateien außerhalb von Tresoren ver- oder entschlüsseln';
+
+  @override
+  String get passwordGeneratorTitle => 'Passwort-Generator';
 }

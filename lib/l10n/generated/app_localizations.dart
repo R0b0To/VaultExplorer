@@ -11811,7 +11811,7 @@ abstract class AppLocalizations {
   /// **'Unlocked'**
   String get vaultStatusUnlocked;
 
-  /// Status subtitle for a locked vault
+  /// Status subtitle indicating a vault is locked
   ///
   /// In en, this message translates to:
   /// **'Locked'**
@@ -12864,6 +12864,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move to Advanced Settings'**
   String get moveToAdvancedSettingsTooltip;
+
+  /// Subtitle in the drawer header when no vaults are currently mounted
+  ///
+  /// In en, this message translates to:
+  /// **'No vaults mounted'**
+  String get noVaultsMounted;
+
+  /// Suffix in the drawer header indicating count of mounted vaults
+  ///
+  /// In en, this message translates to:
+  /// **'vault(s) mounted'**
+  String get vaultsMountedSummary;
+
+  /// Drawer navigation destination label for the main vault dashboard
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get dashboardNavLabel;
+
+  /// Section header in the drawer for the list of encrypted vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Vaults'**
+  String get vaultsSectionTitle;
+
+  /// Status subtitle indicating a vault is unlocked and mounted
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted'**
+  String get vaultStatusMounted;
+
+  /// Tooltip for the lock button on an active vault row in the drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Lock vault'**
+  String get lockVaultTooltip;
+
+  /// Quick action tile in the drawer to lock all mounted vaults at once
+  ///
+  /// In en, this message translates to:
+  /// **'Lock all vaults'**
+  String get lockAllVaultsTitle;
+
+  /// Subtitle for external storage locations mounted via Storage Access Framework
+  ///
+  /// In en, this message translates to:
+  /// **'SAF Provider'**
+  String get safProviderLabel;
+
+  /// Title for the tool to encrypt or decrypt standalone files outside of a vault
+  ///
+  /// In en, this message translates to:
+  /// **'Single-File Crypto'**
+  String get singleFileCryptoTitle;
+
+  /// Subtitle describing single-file encryption tool
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt / decrypt outside vaults'**
+  String get singleFileCryptoSubtitle;
+
+  /// Title for the quick password generator tool
+  ///
+  /// In en, this message translates to:
+  /// **'Password Generator'**
+  String get passwordGeneratorTitle;
 }
 
 class _AppLocalizationsDelegate

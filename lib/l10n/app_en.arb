@@ -9080,7 +9080,7 @@
   },
   "vaultStatusLocked": "Locked",
   "@vaultStatusLocked": {
-    "description": "Status subtitle for a locked vault"
+    "description": "Status subtitle indicating a vault is locked"
   },
   "compositeCarrierGrowthSectionHeader": "Stealth & Capacity",
   "@compositeCarrierGrowthSectionHeader": {
@@ -9803,5 +9803,49 @@
   "moveToAdvancedSettingsTooltip": "Move to Advanced Settings",
   "@moveToAdvancedSettingsTooltip": {
     "description": "Tooltip for button moving an action to the advanced settings section"
+  },
+  "noVaultsMounted": "No vaults mounted",
+  "@noVaultsMounted": {
+    "description": "Subtitle in the drawer header when no vaults are currently mounted"
+  },
+  "vaultsMountedSummary": "vault(s) mounted",
+  "@vaultsMountedSummary": {
+    "description": "Suffix in the drawer header indicating count of mounted vaults"
+  },
+  "dashboardNavLabel": "Dashboard",
+  "@dashboardNavLabel": {
+    "description": "Drawer navigation destination label for the main vault dashboard"
+  },
+  "vaultsSectionTitle": "Vaults",
+  "@vaultsSectionTitle": {
+    "description": "Section header in the drawer for the list of encrypted vaults"
+  },
+  "vaultStatusMounted": "Mounted",
+  "@vaultStatusMounted": {
+    "description": "Status subtitle indicating a vault is unlocked and mounted"
+  },
+  "lockVaultTooltip": "Lock vault",
+  "@lockVaultTooltip": {
+    "description": "Tooltip for the lock button on an active vault row in the drawer"
+  },
+  "lockAllVaultsTitle": "Lock all vaults",
+  "@lockAllVaultsTitle": {
+    "description": "Quick action tile in the drawer to lock all mounted vaults at once"
+  },
+  "safProviderLabel": "SAF Provider",
+  "@safProviderLabel": {
+    "description": "Subtitle for external storage locations mounted via Storage Access Framework"
+  },
+  "singleFileCryptoTitle": "Single-File Crypto",
+  "@singleFileCryptoTitle": {
+    "description": "Title for the tool to encrypt or decrypt standalone files outside of a vault"
+  },
+  "singleFileCryptoSubtitle": "Encrypt / decrypt outside vaults",
+  "@singleFileCryptoSubtitle": {
+    "description": "Subtitle describing single-file encryption tool"
+  },
+  "passwordGeneratorTitle": "Password Generator",
+  "@passwordGeneratorTitle": {
+    "description": "Title for the quick password generator tool"
   }
 }

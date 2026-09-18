@@ -7783,4 +7783,38 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Mover para configurações avançadas';
+
+  @override
+  String get noVaultsMounted => 'Nenhum cofre montado';
+
+  @override
+  String get vaultsMountedSummary => 'cofre(s) montado(s)';
+
+  @override
+  String get dashboardNavLabel => 'Painel';
+
+  @override
+  String get vaultsSectionTitle => 'Cofres';
+
+  @override
+  String get vaultStatusMounted => 'Montado';
+
+  @override
+  String get lockVaultTooltip => 'Bloquear cofre';
+
+  @override
+  String get lockAllVaultsTitle => 'Bloquear todos os cofres';
+
+  @override
+  String get safProviderLabel => 'Provedor SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'Criptografia de arquivo único';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Criptografar ou descriptografar fora dos cofres';
+
+  @override
+  String get passwordGeneratorTitle => 'Gerador de senhas';
 }

@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Trascina qui le azioni per il pannello delle impostazioni avanzate",
   "dropHereAtEnd": "Rilascia qui alla fine",
   "dragItemsHereToAdd": "+ Trascina elementi qui per aggiungerli a questa sezione",
-  "moveToAdvancedSettingsTooltip": "Sposta in Impostazioni avanzate"
+  "moveToAdvancedSettingsTooltip": "Sposta in Impostazioni avanzate",
+  "noVaultsMounted": "Nessuna cassaforte montata",
+  "vaultsMountedSummary": "cassaforte/i montata/e",
+  "dashboardNavLabel": "Dashboard",
+  "vaultsSectionTitle": "Cassaforti",
+  "vaultStatusMounted": "Montata",
+  "lockVaultTooltip": "Blocca cassaforte",
+  "lockAllVaultsTitle": "Blocca tutte le cassaforti",
+  "safProviderLabel": "Provider SAF",
+  "singleFileCryptoTitle": "Crittografia file singolo",
+  "singleFileCryptoSubtitle": "Cifra o decifra all’esterno delle cassaforti",
+  "passwordGeneratorTitle": "Generatore di password"
 }

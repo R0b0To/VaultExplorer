@@ -7792,4 +7792,38 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'Mover a ajustes avanzados';
+
+  @override
+  String get noVaultsMounted => 'Ninguna bóveda montada';
+
+  @override
+  String get vaultsMountedSummary => 'bóveda(s) montada(s)';
+
+  @override
+  String get dashboardNavLabel => 'Panel';
+
+  @override
+  String get vaultsSectionTitle => 'Bóvedas';
+
+  @override
+  String get vaultStatusMounted => 'Montada';
+
+  @override
+  String get lockVaultTooltip => 'Bloquear bóveda';
+
+  @override
+  String get lockAllVaultsTitle => 'Bloquear todas las bóvedas';
+
+  @override
+  String get safProviderLabel => 'Proveedor SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'Cifrado de archivo único';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Cifrar o descifrar fuera de las bóvedas';
+
+  @override
+  String get passwordGeneratorTitle => 'Generador de contraseñas';
 }

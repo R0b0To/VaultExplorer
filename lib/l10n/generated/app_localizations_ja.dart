@@ -7355,4 +7355,37 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '詳細設定に移動';
+
+  @override
+  String get noVaultsMounted => 'マウントされた保管庫はありません';
+
+  @override
+  String get vaultsMountedSummary => '個の保管庫をマウント中';
+
+  @override
+  String get dashboardNavLabel => 'ダッシュボード';
+
+  @override
+  String get vaultsSectionTitle => '保管庫';
+
+  @override
+  String get vaultStatusMounted => 'マウント済み';
+
+  @override
+  String get lockVaultTooltip => '保管庫をロック';
+
+  @override
+  String get lockAllVaultsTitle => 'すべての保管庫をロック';
+
+  @override
+  String get safProviderLabel => 'SAF プロバイダー';
+
+  @override
+  String get singleFileCryptoTitle => '単一ファイル暗号化';
+
+  @override
+  String get singleFileCryptoSubtitle => '保管庫外で暗号化/復号';
+
+  @override
+  String get passwordGeneratorTitle => 'パスワード生成ツール';
 }

@@ -7356,4 +7356,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '고급 설정으로 이동';
+
+  @override
+  String get noVaultsMounted => '마운트된 보관함 없음';
+
+  @override
+  String get vaultsMountedSummary => '개 보관함 마운트됨';
+
+  @override
+  String get dashboardNavLabel => '대시보드';
+
+  @override
+  String get vaultsSectionTitle => '보관함';
+
+  @override
+  String get vaultStatusMounted => '마운트됨';
+
+  @override
+  String get lockVaultTooltip => '보관함 잠금';
+
+  @override
+  String get lockAllVaultsTitle => '모든 보관함 잠금';
+
+  @override
+  String get safProviderLabel => 'SAF 공급자';
+
+  @override
+  String get singleFileCryptoTitle => '단일 파일 암호화';
+
+  @override
+  String get singleFileCryptoSubtitle => '보관함 외부에서 암호화/복호화';
+
+  @override
+  String get passwordGeneratorTitle => '비밀번호 생성기';
 }

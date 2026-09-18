@@ -7212,7 +7212,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultStatusUnlocked => 'مفتوحة';
 
   @override
-  String get vaultStatusLocked => 'مقفلة';
+  String get vaultStatusLocked => 'مقفل';
 
   @override
   String get compositeCarrierGrowthSectionHeader => 'التخفي والسعة';
@@ -7841,4 +7841,37 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'نقل إلى الإعدادات المتقدمة';
+
+  @override
+  String get noVaultsMounted => 'لا توجد خزائن محملة';
+
+  @override
+  String get vaultsMountedSummary => 'خزائن محملة';
+
+  @override
+  String get dashboardNavLabel => 'لوحة التحكم';
+
+  @override
+  String get vaultsSectionTitle => 'الخزائن';
+
+  @override
+  String get vaultStatusMounted => 'محمل';
+
+  @override
+  String get lockVaultTooltip => 'قفل الخزنة';
+
+  @override
+  String get lockAllVaultsTitle => 'قفل جميع الخزائن';
+
+  @override
+  String get safProviderLabel => 'مزود SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'تشفير ملف فردي';
+
+  @override
+  String get singleFileCryptoSubtitle => 'تشفير أو فك تشفير خارج الخزائن';
+
+  @override
+  String get passwordGeneratorTitle => 'مولد كلمات المرور';
 }

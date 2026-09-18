@@ -7831,4 +7831,38 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Перемістити до розширених налаштувань';
+
+  @override
+  String get noVaultsMounted => 'Немає змонтованих сховищ';
+
+  @override
+  String get vaultsMountedSummary => 'сховищ(а) змонтовано';
+
+  @override
+  String get dashboardNavLabel => 'Панель керування';
+
+  @override
+  String get vaultsSectionTitle => 'Сховища';
+
+  @override
+  String get vaultStatusMounted => 'Змонтовано';
+
+  @override
+  String get lockVaultTooltip => 'Заблокувати сховище';
+
+  @override
+  String get lockAllVaultsTitle => 'Заблокувати всі сховища';
+
+  @override
+  String get safProviderLabel => 'Провайдер SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'Шифрування окремого файлу';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Шифрування або розшифрування за межами сховищ';
+
+  @override
+  String get passwordGeneratorTitle => 'Генератор паролів';
 }

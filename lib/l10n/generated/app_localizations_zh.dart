@@ -7256,4 +7256,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '移动到高级设置';
+
+  @override
+  String get noVaultsMounted => '未挂载任何保险库';
+
+  @override
+  String get vaultsMountedSummary => '个已挂载保险库';
+
+  @override
+  String get dashboardNavLabel => '仪表板';
+
+  @override
+  String get vaultsSectionTitle => '保险库';
+
+  @override
+  String get vaultStatusMounted => '已挂载';
+
+  @override
+  String get lockVaultTooltip => '锁定保险库';
+
+  @override
+  String get lockAllVaultsTitle => '锁定所有保险库';
+
+  @override
+  String get safProviderLabel => 'SAF 提供程序';
+
+  @override
+  String get singleFileCryptoTitle => '单文件加密';
+
+  @override
+  String get singleFileCryptoSubtitle => '在保险库外加密或解密';
+
+  @override
+  String get passwordGeneratorTitle => '密码生成器';
 }

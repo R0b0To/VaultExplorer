@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Arrastra acciones aquí para el panel de ajustes avanzados",
   "dropHereAtEnd": "Soltar aquí al final",
   "dragItemsHereToAdd": "+ Arrastra elementos aquí para añadirlos a esta sección",
-  "moveToAdvancedSettingsTooltip": "Mover a ajustes avanzados"
+  "moveToAdvancedSettingsTooltip": "Mover a ajustes avanzados",
+  "noVaultsMounted": "Ninguna bóveda montada",
+  "vaultsMountedSummary": "bóveda(s) montada(s)",
+  "dashboardNavLabel": "Panel",
+  "vaultsSectionTitle": "Bóvedas",
+  "vaultStatusMounted": "Montada",
+  "lockVaultTooltip": "Bloquear bóveda",
+  "lockAllVaultsTitle": "Bloquear todas las bóvedas",
+  "safProviderLabel": "Proveedor SAF",
+  "singleFileCryptoTitle": "Cifrado de archivo único",
+  "singleFileCryptoSubtitle": "Cifrar o descifrar fuera de las bóvedas",
+  "passwordGeneratorTitle": "Generador de contraseñas"
 }

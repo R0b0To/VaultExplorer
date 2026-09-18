@@ -7842,4 +7842,38 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Déplacer vers les paramètres avancés';
+
+  @override
+  String get noVaultsMounted => 'Aucun coffre monté';
+
+  @override
+  String get vaultsMountedSummary => 'coffre(s) monté(s)';
+
+  @override
+  String get dashboardNavLabel => 'Tableau de bord';
+
+  @override
+  String get vaultsSectionTitle => 'Coffres';
+
+  @override
+  String get vaultStatusMounted => 'Monté';
+
+  @override
+  String get lockVaultTooltip => 'Verrouiller le coffre';
+
+  @override
+  String get lockAllVaultsTitle => 'Verrouiller tous les coffres';
+
+  @override
+  String get safProviderLabel => 'Fournisseur SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'Chiffrement de fichier unique';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Chiffrer ou déchiffrer hors des coffres';
+
+  @override
+  String get passwordGeneratorTitle => 'Générateur de mots de passe';
 }

@@ -7653,4 +7653,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'Move to Advanced Settings';
+
+  @override
+  String get noVaultsMounted => 'No vaults mounted';
+
+  @override
+  String get vaultsMountedSummary => 'vault(s) mounted';
+
+  @override
+  String get dashboardNavLabel => 'Dashboard';
+
+  @override
+  String get vaultsSectionTitle => 'Vaults';
+
+  @override
+  String get vaultStatusMounted => 'Mounted';
+
+  @override
+  String get lockVaultTooltip => 'Lock vault';
+
+  @override
+  String get lockAllVaultsTitle => 'Lock all vaults';
+
+  @override
+  String get safProviderLabel => 'SAF Provider';
+
+  @override
+  String get singleFileCryptoTitle => 'Single-File Crypto';
+
+  @override
+  String get singleFileCryptoSubtitle => 'Encrypt / decrypt outside vaults';
+
+  @override
+  String get passwordGeneratorTitle => 'Password Generator';
 }

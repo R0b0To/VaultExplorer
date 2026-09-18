@@ -1944,7 +1944,7 @@
   "saveToVaultTitle": "حفظ في الخزنة",
   "noVaultsAvailableAddFromDashboardPrompt": "لا توجد خزائن بعد. أضف خزنة من لوحة التحكم أولاً.",
   "vaultStatusUnlocked": "مفتوحة",
-  "vaultStatusLocked": "مقفلة",
+  "vaultStatusLocked": "مقفل",
   "compositeCarrierGrowthSectionHeader": "التخفي والسعة",
   "compositeCarrierGrowthSliderTitle": "زيادة حجم ملفات الحامل",
   "compositeCarrierGrowthPercentLabel": "+{percent}% لكل ملف",
@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "اسحب الإجراءات إلى هنا لصفحة الإعدادات المتقدمة",
   "dropHereAtEnd": "أفلت هنا في النهاية",
   "dragItemsHereToAdd": "+ اسحب العناصر إلى هنا لإضافتها إلى هذا القسم",
-  "moveToAdvancedSettingsTooltip": "نقل إلى الإعدادات المتقدمة"
+  "moveToAdvancedSettingsTooltip": "نقل إلى الإعدادات المتقدمة",
+  "noVaultsMounted": "لا توجد خزائن محملة",
+  "vaultsMountedSummary": "خزائن محملة",
+  "dashboardNavLabel": "لوحة التحكم",
+  "vaultsSectionTitle": "الخزائن",
+  "vaultStatusMounted": "محمل",
+  "lockVaultTooltip": "قفل الخزنة",
+  "lockAllVaultsTitle": "قفل جميع الخزائن",
+  "safProviderLabel": "مزود SAF",
+  "singleFileCryptoTitle": "تشفير ملف فردي",
+  "singleFileCryptoSubtitle": "تشفير أو فك تشفير خارج الخزائن",
+  "passwordGeneratorTitle": "مولد كلمات المرور"
 }

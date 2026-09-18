@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "고급 설정 시트용 작업을 여기로 드래그하세요",
   "dropHereAtEnd": "끝에 드롭",
   "dragItemsHereToAdd": "+ 이 섹션에 추가하려면 항목을 여기로 드래그하세요",
-  "moveToAdvancedSettingsTooltip": "고급 설정으로 이동"
+  "moveToAdvancedSettingsTooltip": "고급 설정으로 이동",
+  "noVaultsMounted": "마운트된 보관함 없음",
+  "vaultsMountedSummary": "개 보관함 마운트됨",
+  "dashboardNavLabel": "대시보드",
+  "vaultsSectionTitle": "보관함",
+  "vaultStatusMounted": "마운트됨",
+  "lockVaultTooltip": "보관함 잠금",
+  "lockAllVaultsTitle": "모든 보관함 잠금",
+  "safProviderLabel": "SAF 공급자",
+  "singleFileCryptoTitle": "단일 파일 암호화",
+  "singleFileCryptoSubtitle": "보관함 외부에서 암호화/복호화",
+  "passwordGeneratorTitle": "비밀번호 생성기"
 }

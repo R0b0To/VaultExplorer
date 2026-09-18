@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Glissez des actions ici pour la feuille des paramètres avancés",
   "dropHereAtEnd": "Déposer ici à la fin",
   "dragItemsHereToAdd": "+ Glissez des éléments ici pour les ajouter à cette section",
-  "moveToAdvancedSettingsTooltip": "Déplacer vers les paramètres avancés"
+  "moveToAdvancedSettingsTooltip": "Déplacer vers les paramètres avancés",
+  "noVaultsMounted": "Aucun coffre monté",
+  "vaultsMountedSummary": "coffre(s) monté(s)",
+  "dashboardNavLabel": "Tableau de bord",
+  "vaultsSectionTitle": "Coffres",
+  "vaultStatusMounted": "Monté",
+  "lockVaultTooltip": "Verrouiller le coffre",
+  "lockAllVaultsTitle": "Verrouiller tous les coffres",
+  "safProviderLabel": "Fournisseur SAF",
+  "singleFileCryptoTitle": "Chiffrement de fichier unique",
+  "singleFileCryptoSubtitle": "Chiffrer ou déchiffrer hors des coffres",
+  "passwordGeneratorTitle": "Générateur de mots de passe"
 }

@@ -7773,4 +7773,38 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'Sposta in Impostazioni avanzate';
+
+  @override
+  String get noVaultsMounted => 'Nessuna cassaforte montata';
+
+  @override
+  String get vaultsMountedSummary => 'cassaforte/i montata/e';
+
+  @override
+  String get dashboardNavLabel => 'Dashboard';
+
+  @override
+  String get vaultsSectionTitle => 'Cassaforti';
+
+  @override
+  String get vaultStatusMounted => 'Montata';
+
+  @override
+  String get lockVaultTooltip => 'Blocca cassaforte';
+
+  @override
+  String get lockAllVaultsTitle => 'Blocca tutte le cassaforti';
+
+  @override
+  String get safProviderLabel => 'Provider SAF';
+
+  @override
+  String get singleFileCryptoTitle => 'Crittografia file singolo';
+
+  @override
+  String get singleFileCryptoSubtitle =>
+      'Cifra o decifra all’esterno delle cassaforti';
+
+  @override
+  String get passwordGeneratorTitle => 'Generatore di password';
 }

@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Aktionen hierher ziehen für das Fenster der erweiterten Einstellungen",
   "dropHereAtEnd": "Hier am Ende ablegen",
   "dragItemsHereToAdd": "+ Elemente hierher ziehen, um sie zu diesem Bereich hinzuzufügen",
-  "moveToAdvancedSettingsTooltip": "Zu erweiterten Einstellungen verschieben"
+  "moveToAdvancedSettingsTooltip": "Zu erweiterten Einstellungen verschieben",
+  "noVaultsMounted": "Keine Tresore eingebunden",
+  "vaultsMountedSummary": "Tresor(e) eingebunden",
+  "dashboardNavLabel": "Dashboard",
+  "vaultsSectionTitle": "Tresore",
+  "vaultStatusMounted": "Eingebunden",
+  "lockVaultTooltip": "Tresor sperren",
+  "lockAllVaultsTitle": "Alle Tresore sperren",
+  "safProviderLabel": "SAF-Anbieter",
+  "singleFileCryptoTitle": "Einzeldatei-Kryptografie",
+  "singleFileCryptoSubtitle": "Dateien außerhalb von Tresoren ver- oder entschlüsseln",
+  "passwordGeneratorTitle": "Passwort-Generator"
 }

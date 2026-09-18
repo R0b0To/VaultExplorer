@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "アクションをここにドラッグして詳細設定シートに追加",
   "dropHereAtEnd": "末尾にドロップ",
   "dragItemsHereToAdd": "+ 項目をここにドラッグしてこのセクションに追加",
-  "moveToAdvancedSettingsTooltip": "詳細設定に移動"
+  "moveToAdvancedSettingsTooltip": "詳細設定に移動",
+  "noVaultsMounted": "マウントされた保管庫はありません",
+  "vaultsMountedSummary": "個の保管庫をマウント中",
+  "dashboardNavLabel": "ダッシュボード",
+  "vaultsSectionTitle": "保管庫",
+  "vaultStatusMounted": "マウント済み",
+  "lockVaultTooltip": "保管庫をロック",
+  "lockAllVaultsTitle": "すべての保管庫をロック",
+  "safProviderLabel": "SAF プロバイダー",
+  "singleFileCryptoTitle": "単一ファイル暗号化",
+  "singleFileCryptoSubtitle": "保管庫外で暗号化/復号",
+  "passwordGeneratorTitle": "パスワード生成ツール"
 }

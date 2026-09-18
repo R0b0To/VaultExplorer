@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Перетягніть дії сюди для вкладки розширених налаштувань",
   "dropHereAtEnd": "Відпустити тут наприкінці",
   "dragItemsHereToAdd": "+ Перетягніть елементи сюди, щоб додати до цього розділу",
-  "moveToAdvancedSettingsTooltip": "Перемістити до розширених налаштувань"
+  "moveToAdvancedSettingsTooltip": "Перемістити до розширених налаштувань",
+  "noVaultsMounted": "Немає змонтованих сховищ",
+  "vaultsMountedSummary": "сховищ(а) змонтовано",
+  "dashboardNavLabel": "Панель керування",
+  "vaultsSectionTitle": "Сховища",
+  "vaultStatusMounted": "Змонтовано",
+  "lockVaultTooltip": "Заблокувати сховище",
+  "lockAllVaultsTitle": "Заблокувати всі сховища",
+  "safProviderLabel": "Провайдер SAF",
+  "singleFileCryptoTitle": "Шифрування окремого файлу",
+  "singleFileCryptoSubtitle": "Шифрування або розшифрування за межами сховищ",
+  "passwordGeneratorTitle": "Генератор паролів"
 }

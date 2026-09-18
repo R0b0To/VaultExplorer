@@ -2118,5 +2118,16 @@
   "advancedSettingsActionsEmptyHint": "Arraste ações aqui para a folha de configurações avançadas",
   "dropHereAtEnd": "Soltar aqui no final",
   "dragItemsHereToAdd": "+ Arraste itens aqui para adicionar a esta seção",
-  "moveToAdvancedSettingsTooltip": "Mover para configurações avançadas"
+  "moveToAdvancedSettingsTooltip": "Mover para configurações avançadas",
+  "noVaultsMounted": "Nenhum cofre montado",
+  "vaultsMountedSummary": "cofre(s) montado(s)",
+  "dashboardNavLabel": "Painel",
+  "vaultsSectionTitle": "Cofres",
+  "vaultStatusMounted": "Montado",
+  "lockVaultTooltip": "Bloquear cofre",
+  "lockAllVaultsTitle": "Bloquear todos os cofres",
+  "safProviderLabel": "Provedor SAF",
+  "singleFileCryptoTitle": "Criptografia de arquivo único",
+  "singleFileCryptoSubtitle": "Criptografar ou descriptografar fora dos cofres",
+  "passwordGeneratorTitle": "Gerador de senhas"
 }

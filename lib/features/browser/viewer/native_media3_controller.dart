@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
@@ -428,6 +429,60 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   Future<void> disableSubtitleTrack() async {
     if (!_disposed) {
       await _cmdChannel.invokeMethod('disableSubtitleTrack');
+    }
+  }
+
+  /// Opens a native scrub-preview decode session for this controller's
+  /// video, reused across every [getScrubPreviewFrame] call until
+  /// [endScrubPreview]. Returns false (and the caller should skip showing
+  /// preview UI entirely) when the native side has no software decoder
+  /// for this video's codec, or the video has no video track at all.
+  Future<bool> startScrubPreview() async {
+    if (_disposed) return false;
+    try {
+      final result = await _cmdChannel.invokeMethod('startScrubPreview');
+      if (result is Map) {
+        return result['available'] as bool? ?? false;
+      }
+      return false;
+    } catch (_) {
+      // Best-effort: a failed session open just means no scrub preview
+      // is shown for this drag, not a playback error.
+      return false;
+    }
+  }
+
+  /// Decodes the frame nearest [position] using the session opened by
+  /// [startScrubPreview]. Returns null if no session is open, the frame
+  /// couldn't be decoded, or a newer request superseded this one on the
+  /// native side -- either way the caller should just keep showing
+  /// whatever preview it already has rather than clear it.
+  Future<Uint8List?> getScrubPreviewFrame(
+    Duration position, {
+    int maxSize = 200,
+    int quality = 55,
+  }) async {
+    if (_disposed) return null;
+    try {
+      return await _cmdChannel.invokeMethod<Uint8List>('getScrubPreviewFrame', {
+        'positionMs': position.inMilliseconds,
+        'maxSize': maxSize,
+        'quality': quality,
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Closes the scrub-preview session opened by [startScrubPreview],
+  /// releasing its native decoder. Safe to call even if no session is
+  /// open (e.g. [startScrubPreview] returned false).
+  Future<void> endScrubPreview() async {
+    if (_disposed) return;
+    try {
+      await _cmdChannel.invokeMethod('endScrubPreview');
+    } catch (_) {
+      // Best-effort teardown, mirroring dispose()'s release() call below.
     }
   }
 

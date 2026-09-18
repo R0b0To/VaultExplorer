@@ -2,16 +2,15 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
-import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_progress_bar.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -54,20 +53,6 @@ class MediaViewerBottomControls extends StatelessWidget {
     this.onMenuOpened,
     this.onMenuClosed,
   });
-
-  String _formatDuration(Duration d) {
-    final Duration abs = d.isNegative ? -d : d;
-    final String minutes =
-        abs.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final String seconds =
-        abs.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final String sign = d.isNegative ? '-' : '';
-    if (abs.inHours > 0) {
-      final String hours = abs.inHours.toString().padLeft(2, '0');
-      return '$sign$hours:$minutes:$seconds';
-    }
-    return '$sign$minutes:$seconds';
-  }
 
   Widget _buildActionItem(
     BuildContext context,
@@ -223,7 +208,12 @@ class MediaViewerBottomControls extends StatelessWidget {
           if (!isImage && toolbarConfig.showProgressBar) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: _buildProgressBar(context, cs),
+              child: VideoScrubProgressBar(
+                playbackManager: playbackManager,
+                videoProgressNotifier: videoProgressNotifier,
+                onShowUIChanged: onShowUIChanged,
+                onStartHideTimer: onStartHideTimer,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
           ],
@@ -289,101 +279,6 @@ class MediaViewerBottomControls extends StatelessWidget {
                 child: _buildActionItem(context, action, cs),
               ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(BuildContext context, ColorScheme cs) {
-    return SizedBox(
-      height: 32,
-      child: SliderTheme(
-        data: SliderTheme.of(context).copyWith(
-          activeTrackColor: cs.primary,
-          inactiveTrackColor: Colors.white24,
-          trackHeight: 3,
-          thumbColor: cs.primary,
-          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-          overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-          trackShape: const RectangularSliderTrackShape(),
-        ),
-        child: ValueListenableBuilder<VideoPlaybackProgress>(
-          valueListenable: videoProgressNotifier,
-          builder: (context, progress, child) {
-            final positionStr = _formatDuration(progress.position);
-            final durationStr = _formatDuration(progress.duration);
-            final bool hasValidDuration = progress.duration.inMilliseconds > 0;
-
-            return Row(
-              children: [
-                Text(
-                  positionStr,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: progress.sliderValue.clamp(0.0, 1.0),
-                    onChangeStart: hasValidDuration
-                        ? (value) {
-                            onShowUIChanged(true);
-                            videoProgressNotifier.value =
-                                progress.copyWith(isDragging: true);
-                          }
-                        : null,
-                    onChanged: hasValidDuration
-                        ? (value) {
-                            onShowUIChanged(true);
-                            final ms = progress.duration.inMilliseconds;
-                            videoProgressNotifier.value = progress.copyWith(
-                              isDragging: true,
-                              sliderValue: value,
-                              position: Duration(
-                                milliseconds: (value * ms).round().clamp(0, ms),
-                              ),
-                            );
-                          }
-                        : null,
-                    onChangeEnd: hasValidDuration
-                        ? (value) async {
-                            final controller = playbackManager.activeController;
-                            final ms = progress.duration.inMilliseconds;
-                            final targetDuration = Duration(
-                              milliseconds: (value * ms).round().clamp(0, ms),
-                            );
-                            if (controller != null &&
-                                controller.value.isInitialized) {
-                              try {
-                                await controller.seekTo(targetDuration);
-                              } catch (e) {
-                                VeLog.w('MediaViewerBottomControls',
-                                    'Scrubber seekTo failed', e);
-                              }
-                            }
-                            videoProgressNotifier.value = progress.copyWith(
-                              position: targetDuration,
-                              sliderValue: value.clamp(0.0, 1.0),
-                              isDragging: false,
-                            );
-                            onStartHideTimer();
-                          }
-                        : null,
-                  ),
-                ),
-                Text(
-                  durationStr,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            );
-          },
         ),
       ),
     );

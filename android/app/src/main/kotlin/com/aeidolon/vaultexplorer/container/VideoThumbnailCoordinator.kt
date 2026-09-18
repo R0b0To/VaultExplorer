@@ -1,9 +1,15 @@
 package com.aeidolon.vaultexplorer.container
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.media.MediaCodec
 import android.media.MediaCodecList
+import android.media.MediaExtractor
 import android.os.Build
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.locks.ReentrantLock
@@ -334,5 +340,170 @@ object VideoThumbnailCoordinator {
             VeLog.w(TAG) { "isLikelyBlankFrame check failed, treating frame as not blank: ${e.message}" }
             false
         }
+    }
+
+    /**
+     * Drains [extractor]/[codec] for a single decoded frame at [seekTimeUs],
+     * flushing the codec and re-seeking the extractor first so the pair can
+     * be reused for another timestamp on the very next call rather than
+     * torn down and rebuilt.
+     *
+     * Moved here (from `ThumbnailHandlers`, which still forwards to this
+     * copy so its own call sites are unchanged) so
+     * `NativePlayerManager`'s scrub-preview session -- repeated seeks
+     * against one long-lived software decoder while the user drags the
+     * seekbar -- can drive the same extractor/codec pair this way without
+     * a second, drifting copy of the drain loop.
+     */
+    fun decodeSoftwareFrameAt(
+        extractor: MediaExtractor,
+        codec: MediaCodec,
+        seekTimeUs: Long,
+    ): Bitmap? {
+        extractor.seekTo(seekTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+        codec.flush()
+
+        val info = MediaCodec.BufferInfo()
+        var inputDone = false
+        var outputFrame: Bitmap? = null
+        val timeoutUs = 10_000L
+        // 30 attempts (~300ms) was too tight for slower software decoders
+        // to reliably yield a first frame; 100 (~1s worst case) gives
+        // real headroom without risking a multi-second stall. See the
+        // matching note on the original call site in ThumbnailHandlers
+        // for why this budget is kept bounded rather than raised further.
+        val maxAttempts = 100
+        var attempts = 0
+
+        while (outputFrame == null && attempts < maxAttempts) {
+            attempts++
+            if (!inputDone) {
+                val inputIndex = codec.dequeueInputBuffer(timeoutUs)
+                if (inputIndex >= 0) {
+                    val inputBuffer = codec.getInputBuffer(inputIndex)
+                    if (inputBuffer != null) {
+                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                        if (sampleSize < 0) {
+                            codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            val presentationTimeUs = extractor.sampleTime
+                            codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+            }
+
+            val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
+            if (outputIndex >= 0) {
+                if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                    break
+                }
+                if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val image = codec.getOutputImage(outputIndex)
+                    if (image != null) {
+                        outputFrame = yuv420ToBitmap(image)
+                        image.close()
+                    }
+                }
+                codec.releaseOutputBuffer(outputIndex, false)
+            }
+        }
+        return outputFrame
+    }
+
+    /** Converts a YUV_420_888 [android.media.Image] (the output format of
+     *  an explicit software [MediaCodec] decoder) to a [Bitmap] via an
+     *  intermediate NV21 buffer + JPEG round-trip -- there's no direct
+     *  YUV-to-Bitmap constructor in the framework. Shared with
+     *  `ThumbnailHandlers` for the same reason as [decodeSoftwareFrameAt]. */
+    fun yuv420ToBitmap(image: android.media.Image): Bitmap {
+        val width = image.width
+        val height = image.height
+        val planes = image.planes
+
+        val yPlane = planes[0]
+        val uPlane = planes[1]
+        val vPlane = planes[2]
+
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+
+        val yRowStride = yPlane.rowStride
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+
+        // Ceiling division: 4:2:0 chroma planes still exist for odd
+        // width/height (e.g. a cropped or user-generated source), just
+        // rounded up by one sample. width/2, height/2 (floor) would
+        // under-size the NV21 buffer and silently drop the last chroma
+        // row/column for such videos.
+        val chromaWidth = (width + 1) / 2
+        val chromaHeight = (height + 1) / 2
+        // NV21 requires exactly width * height Y bytes followed by
+        // 2 * chromaWidth * chromaHeight interleaved V and U bytes.
+        val nv21 = ByteArray(width * height + chromaWidth * chromaHeight * 2)
+
+        // 1. Copy Y plane, stripping row padding if yRowStride > width
+        var nvIndex = 0
+        if (yRowStride == width) {
+            yBuffer.get(nv21, 0, width * height)
+            nvIndex = width * height
+        } else {
+            val yRow = ByteArray(yRowStride)
+            for (row in 0 until height) {
+                val toRead = minOf(yRowStride, yBuffer.remaining())
+                if (toRead <= 0) break
+                yBuffer.get(yRow, 0, toRead)
+                val copyLen = minOf(width, toRead)
+                System.arraycopy(yRow, 0, nv21, nvIndex, copyLen)
+                nvIndex += width
+            }
+        }
+
+        // 2. Interleave V and U planes into NV21 format (V0, U0, V1, U1...)
+        val vRow = ByteArray(uvRowStride)
+        val uRow = ByteArray(uvRowStride)
+
+        for (row in 0 until chromaHeight) {
+            val vPos = row * uvRowStride
+            val uPos = row * uvRowStride
+
+            if (vPos < vBuffer.capacity() && uPos < uBuffer.capacity()) {
+                vBuffer.position(vPos)
+                uBuffer.position(uPos)
+
+                val vRead = minOf(uvRowStride, vBuffer.remaining())
+                val uRead = minOf(uvRowStride, uBuffer.remaining())
+
+                if (vRead > 0 && uRead > 0) {
+                    vBuffer.get(vRow, 0, vRead)
+                    uBuffer.get(uRow, 0, uRead)
+
+                    for (col in 0 until chromaWidth) {
+                        val vIdx = col * uvPixelStride
+                        val uIdx = col * uvPixelStride
+                        if (vIdx < vRead && uIdx < uRead && nvIndex + 1 < nv21.size) {
+                            nv21[nvIndex++] = vRow[vIdx]
+                            nv21[nvIndex++] = uRow[uIdx]
+                        }
+                    }
+                }
+            }
+        }
+
+        val yuvImage = YuvImage(
+            nv21,
+            ImageFormat.NV21,
+            width,
+            height,
+            null
+        )
+        val out = ByteArrayOutputStream()
+        yuvImage.compressToJpeg(Rect(0, 0, width, height), 90, out)
+        val jpegBytes = out.toByteArray()
+        return BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
     }
 }

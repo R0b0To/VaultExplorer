@@ -621,6 +621,23 @@ open class MainActivity : FlutterFragmentActivity() {
                 "getDiagnostics" -> {
                     result.success(nativePlayerManager.getDiagnosticsMap())
                 }
+                "startScrubPreview" -> {
+                    nativePlayerManager.startScrubPreview { available ->
+                        result.success(mapOf("available" to available))
+                    }
+                }
+                "getScrubPreviewFrame" -> {
+                    val positionMs = call.argument<Number>("positionMs")?.toLong() ?: 0L
+                    val maxSize = call.argument<Number>("maxSize")?.toInt() ?: 200
+                    val quality = call.argument<Number>("quality")?.toInt() ?: 55
+                    nativePlayerManager.getScrubPreviewFrame(positionMs, maxSize, quality) { bytes ->
+                        result.success(bytes)
+                    }
+                }
+                "endScrubPreview" -> {
+                    nativePlayerManager.endScrubPreview()
+                    result.success(null)
+                }
                 "release" -> {
                     nativePlayerManager.release()
                     result.success(null)

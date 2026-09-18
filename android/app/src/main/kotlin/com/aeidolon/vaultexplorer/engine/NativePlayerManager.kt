@@ -1,6 +1,10 @@
 package com.aeidolon.vaultexplorer.engine
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -32,10 +36,16 @@ import androidx.media3.extractor.mp4.FragmentedMp4Extractor
 import androidx.media3.extractor.mp4.Mp4Extractor
 import com.aeidolon.vaultexplorer.DeviceCapabilityProfiler
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
+import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -76,6 +86,24 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var isFallbackMode = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    // --- Scrub-preview (seekbar drag thumbnail) state ---
+    // A single dedicated thread, separate from VideoThumbnailCoordinator's
+    // browser-thumbnail pool: this work is latency-sensitive and tied to
+    // one interactive drag gesture, not a background batch. The extractor
+    // + codec pair is opened once per drag (startScrubPreview) and reused
+    // across every position the finger crosses (getScrubPreviewFrame),
+    // rather than paying MediaCodec.configure()/start() per frame.
+    private val previewFrameExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    // Every request/session-close bumps this; a queued task that finds
+    // its own id no longer current when it *starts* (superseded by a
+    // newer scrub position before its turn came up) or *finishes*
+    // (superseded while it was decoding) drops its result silently
+    // instead of delivering a stale frame out of order.
+    private val previewRequestSeq = AtomicLong(0)
+    private var previewExtractor: MediaExtractor? = null
+    private var previewCodec: MediaCodec? = null
+    private var previewDurationUs: Long = 0L
 
     private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
         val factory = DefaultExtractorsFactory()
@@ -289,6 +317,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     fun initialize(volId: Int, filePath: String, isLocalStorage: Boolean = false): Long {
+        // A scrub-preview session from the outgoing video (if the user
+        // swiped to the next item mid-drag) is pinned to that video's
+        // extractor/codec -- never valid for whatever loads next.
+        endScrubPreview()
         currentVolId = volId
         currentFilePath = filePath
         currentIsLocalStorage = isLocalStorage
@@ -480,7 +512,180 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             .build()
     }
 
+    // --- Scrub-preview (seekbar drag thumbnail) ---
+    //
+    // Deliberately always software-decoded (see VideoThumbnailCoordinator's
+    // doc comment on why a software MediaCodec doesn't contend for hw
+    // decoder resources): this session runs *while the same video is
+    // already open and possibly playing* in this exact ExoPlayer instance,
+    // so a second hardware decode attempt here is precisely the scenario
+    // that coordinator exists to avoid. A single MediaExtractor+MediaCodec
+    // pair is opened once (startScrubPreview) and reused for every
+    // position the drag visits (getScrubPreviewFrame) until the gesture
+    // ends (endScrubPreview) -- cheap per-frame, unlike re-configuring a
+    // codec from scratch each time.
+    //
+    // All three entry points are safe to call from the platform thread;
+    // the actual extractor/codec work always happens on
+    // previewFrameExecutor's single thread, so previewExtractor/
+    // previewCodec/previewDurationUs are only ever touched there.
+
+    /**
+     * Opens a scrub-preview session pinned to whichever (volId, filePath,
+     * isLocalStorage) is current right now. Any existing session is torn
+     * down first, so a stray double-start can't leak a codec.
+     *
+     * [callback] receives whether a preview is available for this video at
+     * all (false for an unsupported codec, an empty file path, or a track
+     * layout with no video track -- e.g. audio-only) -- the caller should
+     * skip showing scrub-preview UI entirely rather than call
+     * getScrubPreviewFrame for a session that never opened.
+     */
+    fun startScrubPreview(callback: (available: Boolean) -> Unit) {
+        val volId = currentVolId
+        val filePath = currentFilePath
+        val isLocalStorage = currentIsLocalStorage
+        previewRequestSeq.incrementAndGet()
+        previewFrameExecutor.execute {
+            closePreviewSessionOnPreviewThread()
+            if (filePath.isEmpty()) {
+                mainHandler.post { callback(false) }
+                return@execute
+            }
+            val opened = try {
+                openPreviewSessionOnPreviewThread(volId, filePath, isLocalStorage)
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "Scrub preview session failed to open: ${e.message}" }
+                closePreviewSessionOnPreviewThread()
+                false
+            }
+            mainHandler.post { callback(opened) }
+        }
+    }
+
+    /**
+     * Decodes the frame nearest [positionMs] using the session opened by
+     * [startScrubPreview]. If a newer call to this method (or
+     * [endScrubPreview]) arrives before this one has started or finished
+     * decoding, this call drops its result instead of delivering a frame
+     * for a position the user has already scrubbed past -- so callers
+     * don't need to track request ordering themselves, though coalescing
+     * requests on the Dart side first is still worthwhile to avoid
+     * queueing more decode work than the finger's pace warrants.
+     *
+     * [callback] receives JPEG bytes, or null if no session is open, the
+     * position couldn't be decoded, or this request was superseded.
+     */
+    fun getScrubPreviewFrame(positionMs: Long, maxSize: Int, quality: Int, callback: (ByteArray?) -> Unit) {
+        val myId = previewRequestSeq.incrementAndGet()
+        previewFrameExecutor.execute {
+            if (myId != previewRequestSeq.get()) return@execute
+            val extractor = previewExtractor
+            val codec = previewCodec
+            if (extractor == null || codec == null) {
+                mainHandler.post { callback(null) }
+                return@execute
+            }
+            val clampedMs = if (previewDurationUs > 0) {
+                positionMs.coerceIn(0L, previewDurationUs / 1000L)
+            } else {
+                positionMs.coerceAtLeast(0L)
+            }
+            val bytes = try {
+                val frame = VideoThumbnailCoordinator.decodeSoftwareFrameAt(extractor, codec, clampedMs * 1000L)
+                if (frame != null) {
+                    val scaled = VideoThumbnailCoordinator.scaledToFit(frame, maxSize)
+                    val stream = ByteArrayOutputStream()
+                    scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+                    if (scaled !== frame) scaled.recycle()
+                    frame.recycle()
+                    stream.toByteArray()
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "Scrub preview frame decode failed: ${e.message}" }
+                null
+            }
+            if (myId == previewRequestSeq.get()) {
+                mainHandler.post { callback(bytes) }
+            }
+        }
+    }
+
+    /** Ends the current scrub-preview session, releasing its codec/extractor. */
+    fun endScrubPreview() {
+        // Invalidates any getScrubPreviewFrame call still queued or
+        // mid-decode on previewFrameExecutor before this close runs.
+        previewRequestSeq.incrementAndGet()
+        previewFrameExecutor.execute { closePreviewSessionOnPreviewThread() }
+    }
+
+    /** Must only be called on previewFrameExecutor's thread. */
+    private fun openPreviewSessionOnPreviewThread(volId: Int, filePath: String, isLocalStorage: Boolean): Boolean {
+        val extractor = MediaExtractor()
+        if (isLocalStorage) {
+            if (filePath.startsWith("content://")) {
+                val resolved = com.aeidolon.vaultexplorer.MainActivity.activeMainActivity
+                    ?.safStorageManager?.resolveDocumentUriFromTreePath(filePath)
+                    ?: Uri.parse(filePath)
+                extractor.setDataSource(context, resolved, null)
+            } else {
+                extractor.setDataSource(filePath)
+            }
+        } else {
+            extractor.setDataSource(ContainerMediaDataSource(context, filePath, filePath, volId))
+        }
+
+        var videoTrackIndex = -1
+        var format: MediaFormat? = null
+        var mimeType: String? = null
+        for (i in 0 until extractor.trackCount) {
+            val trackFormat = extractor.getTrackFormat(i)
+            val mime = trackFormat.getString(MediaFormat.KEY_MIME) ?: continue
+            if (mime.startsWith("video/")) {
+                videoTrackIndex = i
+                format = trackFormat
+                mimeType = mime
+                break
+            }
+        }
+        if (videoTrackIndex < 0 || format == null || mimeType == null) {
+            extractor.release()
+            return false
+        }
+        val swCodecName = VideoThumbnailCoordinator.findSoftwareDecoderName(mimeType)
+        if (swCodecName == null) {
+            extractor.release()
+            return false
+        }
+        extractor.selectTrack(videoTrackIndex)
+        val codec = MediaCodec.createByCodecName(swCodecName)
+        codec.configure(format, null, null, 0)
+        codec.start()
+
+        previewExtractor = extractor
+        previewCodec = codec
+        previewDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
+            format.getLong(MediaFormat.KEY_DURATION)
+        } else {
+            0L
+        }
+        return true
+    }
+
+    /** Must only be called on previewFrameExecutor's thread. */
+    private fun closePreviewSessionOnPreviewThread() {
+        runCatching { previewCodec?.stop() }
+        runCatching { previewCodec?.release() }
+        previewCodec = null
+        runCatching { previewExtractor?.release() }
+        previewExtractor = null
+        previewDurationUs = 0L
+    }
+
     fun release() {
+        endScrubPreview()
         isFallbackMode = false
         mainHandler.removeCallbacks(positionUpdateRunnable)
         player?.let { p ->

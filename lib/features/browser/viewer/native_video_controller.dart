@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';
@@ -174,6 +175,17 @@ Future<void> initialize() async {
   Future<void> disableSubtitleTrack() async {
     await _media3.disableSubtitleTrack();
   }
+
+  Future<bool> startScrubPreview() => _media3.startScrubPreview();
+
+  Future<Uint8List?> getScrubPreviewFrame(
+    Duration position, {
+    int maxSize = 200,
+    int quality = 55,
+  }) =>
+      _media3.getScrubPreviewFrame(position, maxSize: maxSize, quality: quality);
+
+  Future<void> endScrubPreview() => _media3.endScrubPreview();
 
   bool get isDisposed => _media3.isDisposed;
 

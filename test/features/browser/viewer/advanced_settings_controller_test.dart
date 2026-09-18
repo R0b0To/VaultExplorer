@@ -69,23 +69,23 @@ void main() {
       expect(container.read(provider).sheetPage, 'main');
     });
 
-    test('setImageFit, setSlideshowDelay, and setPlaybackSpeed reset sheetPage to main', () {
+    test('setImageFit, setSlideshowDelay, and setPlaybackSpeed update values and preserve sheetPage', () {
       final controller = container.read(provider.notifier);
 
       controller.setSheetPage('imageFit');
       controller.setImageFit(BoxFit.cover, (_) {});
       expect(container.read(provider).imageFit, BoxFit.cover);
-      expect(container.read(provider).sheetPage, 'main');
+      expect(container.read(provider).sheetPage, 'imageFit');
 
       controller.setSheetPage('slideshowDelay');
       controller.setSlideshowDelay(8, (_) {});
       expect(container.read(provider).slideshowDelaySeconds, 8);
-      expect(container.read(provider).sheetPage, 'main');
+      expect(container.read(provider).sheetPage, 'slideshowDelay');
 
       controller.setSheetPage('playbackSpeed');
       controller.setPlaybackSpeed(1.5, (_) {});
       expect(container.read(provider).playbackSpeed, 1.5);
-      expect(container.read(provider).sheetPage, 'main');
+      expect(container.read(provider).sheetPage, 'playbackSpeed');
     });
 
     test('subtitle sizing and positioning mutators update state', () {

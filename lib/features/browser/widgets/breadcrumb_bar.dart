@@ -10,34 +10,43 @@ class _BreadcrumbDragGestureRecognizer
     extends HorizontalDragGestureRecognizer {
   _BreadcrumbDragGestureRecognizer();
 
-  Offset? _startPosition;
+  final Map<int, Offset> _startPositions = {};
 
   @override
   void addAllowedPointer(PointerDownEvent event) {
-    _startPosition = event.position;
     super.addAllowedPointer(event);
+    _startPositions[event.pointer] = event.position;
+  }
+
+  @override
+  void rejectGesture(int pointer) {
+    _startPositions.remove(pointer);
+    super.rejectGesture(pointer);
   }
 
   @override
   void handleEvent(PointerEvent event) {
-    if (event is PointerMoveEvent && _startPosition != null) {
-      final deltaX = (event.position.dx - _startPosition!.dx).abs();
-      final deltaY = (event.position.dy - _startPosition!.dy).abs();
+    if (event is PointerMoveEvent) {
+      final startPosition = _startPositions[event.pointer];
+      if (startPosition != null) {
+        final deltaX = (event.position.dx - startPosition.dx).abs();
+        final deltaY = (event.position.dy - startPosition.dy).abs();
 
-      // Only claim the gesture if there is clear horizontal movement > 8px.
-      // This allows natural tap jitter (1-4px) to register cleanly as taps,
-      // while still beating the Scaffold drawer (which waits for 18px slop).
-      if (deltaX > 8.0 && deltaX > deltaY) {
-        resolve(GestureDisposition.accepted);
+        if (deltaX > 8.0 && deltaX > deltaY) {
+          resolve(GestureDisposition.accepted);
+          _startPositions.remove(event.pointer);
+        }
       }
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _startPositions.remove(event.pointer);
     }
     super.handleEvent(event);
   }
 
   @override
-  void didStopTrackingLastPointer(int pointer) {
-    _startPosition = null;
-    super.didStopTrackingLastPointer(pointer);
+  void dispose() {
+    _startPositions.clear();
+    super.dispose();
   }
 }
 

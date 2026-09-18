@@ -155,6 +155,8 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  double _drawerDragDistance = 0.0;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -3201,11 +3203,9 @@ Future<void> _extractSelectedArchive() async {
           }
         },
         child: Scaffold(
+          key: _scaffoldKey,
           resizeToAvoidBottomInset: false,
-          // Full-screen swipe-to-open from anywhere, automatically yielding
-          // whenever 2 or more fingers touch down for pinch-to-zoom.
-          drawerEdgeDragWidth: double.maxFinite,
-          drawerEnableOpenDragGesture: !_isMultiTouch,
+          drawerEnableOpenDragGesture: false,
           drawer: widget.drawer,
           bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
@@ -3234,10 +3234,33 @@ Future<void> _extractSelectedArchive() async {
           bottom: false,
           child: NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
-            child: Stack(
-              children: [
-                Column(
-                  children: [
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: (_) {
+                _drawerDragDistance = 0.0;
+              },
+              onHorizontalDragUpdate: (details) {
+                if (_isMultiTouch || widget.drawer == null) return;
+                _drawerDragDistance += details.primaryDelta ?? 0.0;
+                if (_drawerDragDistance > 40.0) {
+                  _scaffoldKey.currentState?.openDrawer();
+                  _drawerDragDistance = 0.0;
+                }
+              },
+              onHorizontalDragEnd: (details) {
+                if (_isMultiTouch || widget.drawer == null) return;
+                if ((details.primaryVelocity ?? 0.0) > 150.0 || _drawerDragDistance > 40.0) {
+                  _scaffoldKey.currentState?.openDrawer();
+                }
+                _drawerDragDistance = 0.0;
+              },
+              onHorizontalDragCancel: () {
+                _drawerDragDistance = 0.0;
+              },
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
                    ClipRect(
                       key: const Key('browser_app_bar_clip_rect'),
                       child: AnimatedBuilder(
@@ -3581,6 +3604,7 @@ Future<void> _extractSelectedArchive() async {
       ),
     ),
 ],
+),
 ),
 ),
 ),

@@ -30,6 +30,11 @@ class ToolsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Text(
           context.l10n.toolsScreenTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

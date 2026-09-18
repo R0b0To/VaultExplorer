@@ -822,7 +822,6 @@ case _UnlockCredentialState.password:
                   controller: _pimCtrl,
                   enabled: !state.loading,
                 ),
-                const SizedBox(height: 8),
               ],
               if (hasDirectOptions) ...[
                 Padding(

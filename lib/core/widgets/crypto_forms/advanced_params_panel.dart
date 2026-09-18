@@ -20,7 +20,7 @@ class PimInputField extends StatelessWidget {
     final textTheme = context.typography;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -56,7 +56,6 @@ class PimInputField extends StatelessWidget {
               filled: true,
               fillColor: cs.surfaceContainerHighest,
               hintText: '0',
-              isDense: true,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide.none,

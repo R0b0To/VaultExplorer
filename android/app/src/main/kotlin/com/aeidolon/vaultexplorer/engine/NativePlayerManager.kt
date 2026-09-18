@@ -623,55 +623,84 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     /** Must only be called on previewFrameExecutor's thread. */
     private fun openPreviewSessionOnPreviewThread(volId: Int, filePath: String, isLocalStorage: Boolean): Boolean {
-        val extractor = MediaExtractor()
-        if (isLocalStorage) {
-            if (filePath.startsWith("content://")) {
-                val resolved = com.aeidolon.vaultexplorer.MainActivity.activeMainActivity
-                    ?.safStorageManager?.resolveDocumentUriFromTreePath(filePath)
-                    ?: Uri.parse(filePath)
-                extractor.setDataSource(context, resolved, null)
+        // extractor/codec are declared outside the try (mirroring
+        // ThumbnailHandlers.extractVideoFrameSoftware's established
+        // pattern for this exact hazard) so the finally below can
+        // release whichever of them got created, however far this got.
+        // A first version of this function only released `extractor` in
+        // the two early "no video track" / "no software decoder"
+        // returns below, with no cleanup at all if
+        // createByCodecName/configure/start threw -- and start() is
+        // exactly the call MediaCodec documents as throwing when codec
+        // resources are unavailable. That leaked the extractor (and,
+        // for a local or content:// path, its file descriptor) on every
+        // failed attempt, which starves the next decode a little more,
+        // including totally unrelated ones like the file-browser
+        // thumbnail pipeline -- a cascade that gets worse the more it
+        // fails, which matches a real regression report better than a
+        // one-off leak would.
+        var extractor: MediaExtractor? = null
+        var codec: MediaCodec? = null
+        var success = false
+        try {
+            val ext = MediaExtractor()
+            extractor = ext
+            if (isLocalStorage) {
+                if (filePath.startsWith("content://")) {
+                    val resolved = com.aeidolon.vaultexplorer.MainActivity.activeMainActivity
+                        ?.safStorageManager?.resolveDocumentUriFromTreePath(filePath)
+                        ?: Uri.parse(filePath)
+                    ext.setDataSource(context, resolved, null)
+                } else {
+                    ext.setDataSource(filePath)
+                }
             } else {
-                extractor.setDataSource(filePath)
+                ext.setDataSource(ContainerMediaDataSource(context, filePath, filePath, volId))
             }
-        } else {
-            extractor.setDataSource(ContainerMediaDataSource(context, filePath, filePath, volId))
-        }
 
-        var videoTrackIndex = -1
-        var format: MediaFormat? = null
-        var mimeType: String? = null
-        for (i in 0 until extractor.trackCount) {
-            val trackFormat = extractor.getTrackFormat(i)
-            val mime = trackFormat.getString(MediaFormat.KEY_MIME) ?: continue
-            if (mime.startsWith("video/")) {
-                videoTrackIndex = i
-                format = trackFormat
-                mimeType = mime
-                break
+            var videoTrackIndex = -1
+            var format: MediaFormat? = null
+            var mimeType: String? = null
+            for (i in 0 until ext.trackCount) {
+                val trackFormat = ext.getTrackFormat(i)
+                val mime = trackFormat.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("video/")) {
+                    videoTrackIndex = i
+                    format = trackFormat
+                    mimeType = mime
+                    break
+                }
+            }
+            if (videoTrackIndex < 0 || format == null || mimeType == null) {
+                return false
+            }
+            val swCodecName = VideoThumbnailCoordinator.findSoftwareDecoderName(mimeType)
+            if (swCodecName == null) {
+                return false
+            }
+            ext.selectTrack(videoTrackIndex)
+
+            val dec = MediaCodec.createByCodecName(swCodecName)
+            codec = dec
+            dec.configure(format, null, null, 0)
+            dec.start()
+
+            previewExtractor = ext
+            previewCodec = dec
+            previewDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
+                format.getLong(MediaFormat.KEY_DURATION)
+            } else {
+                0L
+            }
+            success = true
+            return true
+        } finally {
+            if (!success) {
+                runCatching { codec?.stop() }
+                runCatching { codec?.release() }
+                runCatching { extractor?.release() }
             }
         }
-        if (videoTrackIndex < 0 || format == null || mimeType == null) {
-            extractor.release()
-            return false
-        }
-        val swCodecName = VideoThumbnailCoordinator.findSoftwareDecoderName(mimeType)
-        if (swCodecName == null) {
-            extractor.release()
-            return false
-        }
-        extractor.selectTrack(videoTrackIndex)
-        val codec = MediaCodec.createByCodecName(swCodecName)
-        codec.configure(format, null, null, 0)
-        codec.start()
-
-        previewExtractor = extractor
-        previewCodec = codec
-        previewDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
-            format.getLong(MediaFormat.KEY_DURATION)
-        } else {
-            0L
-        }
-        return true
     }
 
     /** Must only be called on previewFrameExecutor's thread. */

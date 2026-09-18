@@ -217,6 +217,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     Widget buildDrawer({int? currentVolId}) {
       return AppNavigationDrawer(
         currentVolId: currentVolId,
+        primaryLocalContainer: _dashboardKey.currentState?.localStorageContainer,
         selectedTabIndex: _index,
         onSelectTab: _onTabTap,
         onSelectContainer: (container) {
@@ -237,12 +238,18 @@ class _MainShellState extends ConsumerState<MainShell> {
             _dashboardKey.currentState?.openItem(item);
           });
         },
+        onAddVault: () {
+          _onTabTap(0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _dashboardKey.currentState?.showAddOptionsSheet();
+          });
+        },
       );
     }
 
-    final Widget scaffold = Scaffold(
-      drawerEdgeDragWidth: 24.0,
-      drawerEnableOpenDragGesture: true,
+     final Widget scaffold = Scaffold(
+      drawerEdgeDragWidth: double.maxFinite,
+      drawerEnableOpenDragGesture: _index != 0,
       drawer: buildDrawer(),
       body: body,
     );

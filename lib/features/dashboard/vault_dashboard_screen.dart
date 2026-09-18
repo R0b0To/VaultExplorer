@@ -49,8 +49,10 @@ class VaultDashboard extends ConsumerStatefulWidget {
 
 class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBindingObserver {
   SessionLockController get _lockController => ref.read(sessionLockControllerProvider);
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
+  double _drawerDragDistance = 0.0;
 
   // Cached stand-in [MountedContainer] for real device storage (see
   // buildLocalStorageContainer), refreshed whenever all-files access is
@@ -62,6 +64,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   // callback but resolving the real storage root is async (see
   // DecoyLocalRepository.primaryRoot).
   MountedContainer? _localStorageContainer;
+  MountedContainer? get localStorageContainer => _localStorageContainer;
+  void showAddOptionsSheet() => _showAddOptionsSheet();
 
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
@@ -680,12 +684,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
 
-    return Listener(
+     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
-  child: Scaffold(
-        drawerEdgeDragWidth: 24.0,
-        drawerEnableOpenDragGesture: true,
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawerEnableOpenDragGesture: false,
         drawer: _buildDrawer(),
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -715,10 +719,32 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             }
             return false;
           },
-          child: Stack(
-            children: [
-              _buildBody(displayItems, state),
-            ],
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (_) {
+              _drawerDragDistance = 0.0;
+            },
+            onHorizontalDragUpdate: (details) {
+              _drawerDragDistance += details.primaryDelta ?? 0.0;
+              if (_drawerDragDistance > 40.0) {
+                _scaffoldKey.currentState?.openDrawer();
+                _drawerDragDistance = 0.0;
+              }
+            },
+            onHorizontalDragEnd: (details) {
+              if ((details.primaryVelocity ?? 0.0) > 150.0 || _drawerDragDistance > 40.0) {
+                _scaffoldKey.currentState?.openDrawer();
+              }
+              _drawerDragDistance = 0.0;
+            },
+            onHorizontalDragCancel: () {
+              _drawerDragDistance = 0.0;
+            },
+            child: Stack(
+              children: [
+                _buildBody(displayItems, state),
+              ],
+            ),
           ),
         ),
         floatingActionButton: AnimatedSlide(

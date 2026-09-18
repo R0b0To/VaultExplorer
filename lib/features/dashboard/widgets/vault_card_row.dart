@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -39,6 +40,12 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
   }
 
   @override
+  void rejectGesture(int pointer) {
+    _startPositions.remove(pointer);
+    super.rejectGesture(pointer);
+  }
+
+  @override
   void handleEvent(PointerEvent event) {
     if (event is PointerMoveEvent) {
       final startPosition = _startPositions[event.pointer];
@@ -47,14 +54,14 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
         final double dx = delta.dx.abs();
         final double dy = delta.dy.abs();
 
-        // Only reject for vertical scrolling if movement clearly exceeds touch slop (18.0)
-        // so natural finger-squish on touch down does not abort the swipe.
+        // 1. If movement is vertical, yield to ReorderableListView scrolling
         if (dy > dx && dy > kTouchSlop) {
           resolve(GestureDisposition.rejected);
           _startPositions.remove(event.pointer);
+          return;
         }
-        // When swiping horizontally, explicitly claim the gesture arena
-        else if (dx > 12.0 && dx > dy) {
+        // 2. If movement is horizontal on the card, claim victory!
+        else if (dx > 8.0 && dx > dy) {
           resolve(GestureDisposition.accepted);
           _startPositions.remove(event.pointer);
         }
@@ -234,14 +241,18 @@ class _VaultCardRowState extends State<VaultCardRow>
     }
   }
 
-  void _onDragStart(DragStartDetails details) {
+   void _onDragStart(DragStartDetails details) {
     _isDragging = true;
     _controller.stop();
     _gestureStartSide = _openSide;
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging) return;
+    if (!_isDragging) {
+      _isDragging = true;
+      _controller.stop();
+      _gestureStartSide = _openSide;
+    }
     setState(() {
       final next = _dx + details.delta.dx;
       _dx = switch (_gestureStartSide) {
@@ -271,7 +282,7 @@ class _VaultCardRowState extends State<VaultCardRow>
     _animateTo(target);
   }
 
-   Widget _maybeDragWrap({required Widget child}) {
+  Widget _maybeDragWrap({required Widget child}) {
     if (!widget.dragEnabled) return child;
     return ReorderableDelayedDragStartListener(index: widget.index, child: child);
   }
@@ -402,14 +413,23 @@ class _VaultCardRowState extends State<VaultCardRow>
                               ],
                             ),
                           ),
-                              Transform.translate(
+                    Transform.translate(
                             offset: Offset(_dx, 0),
-                            child: GestureDetector(
+                            child: RawGestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onHorizontalDragStart: _onDragStart,
-                              onHorizontalDragUpdate: _onDragUpdate,
-                              onHorizontalDragEnd: _onDragEnd,
-                              onHorizontalDragCancel: _onDragCancel,
+                              gestures: <Type, GestureRecognizerFactory>{
+                                StrictHorizontalDragGestureRecognizer:
+                                    GestureRecognizerFactoryWithHandlers<StrictHorizontalDragGestureRecognizer>(
+                                  () => StrictHorizontalDragGestureRecognizer(),
+                                  (StrictHorizontalDragGestureRecognizer instance) {
+                                    instance
+                                      ..onStart = _onDragStart
+                                      ..onUpdate = _onDragUpdate
+                                      ..onEnd = _onDragEnd
+                                      ..onCancel = _onDragCancel;
+                                  },
+                                ),
+                              },
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 220),
                                 switchInCurve: Curves.easeOutCubic,

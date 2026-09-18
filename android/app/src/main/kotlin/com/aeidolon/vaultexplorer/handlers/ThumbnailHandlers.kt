@@ -701,7 +701,23 @@ class ThumbnailHandlers(
 
         videoExecutor.execute {
             try {
-                if (uriString.startsWith("content://")) {
+                // Guarded on isLocalStorage, not just the URI scheme: for a
+                // mounted vault container, `filePath`/uriString is the
+                // *container's own* URI (used below only to look up which
+                // mounted volume this is, via ContainerSessionRegistry) --
+                // and that's a genuine content:// URI whenever the
+                // container file itself lives on SAF-accessible external
+                // storage, which is the common case, not an edge case.
+                // Without this guard, every video request for such a vault
+                // took this branch and asked SafStorageManager to resolve
+                // `fileName` as a SAF-relative child of the *container's*
+                // document -- nonsensical, since the container is one
+                // opaque encrypted file, not a folder containing the
+                // video as a sibling -- so it always failed with
+                // FRAME_FAILED. This only short-circuits here for genuine
+                // raw-SAF local-storage browsing, where uriString truly is
+                // the folder root fileName lives under.
+                if (isLocalStorage && uriString.startsWith("content://")) {
                     val thumb = activity.safStorageManager.getThumbnail(
                         Uri.parse(uriString),
                         fileName,
@@ -1007,7 +1023,13 @@ class ThumbnailHandlers(
 
         imageExecutor.execute {
             try {
-                if (uriString.startsWith("content://")) {
+                // Same isLocalStorage guard as runVideoThumbnail above, and
+                // for the identical reason: uriString is the *container's*
+                // URI for a mounted vault, not necessarily fileName's own
+                // directly-openable document, so a bare content:// scheme
+                // check isn't enough to say this is genuine raw-SAF
+                // browsing.
+                if (isLocalStorage && uriString.startsWith("content://")) {
                     val thumb = activity.safStorageManager.getThumbnail(
                         Uri.parse(uriString),
                         fileName,
@@ -1152,7 +1174,14 @@ class ThumbnailHandlers(
             try {
                 val archiveFilePath: String
                 when {
-                    uriString.startsWith("content://") -> {
+                    // Same isLocalStorage guard as runVideoThumbnail/
+                    // runImageThumbnail: uriString is the *container's*
+                    // own URI for a mounted vault (content:// whenever the
+                    // container file lives on SAF-accessible storage),
+                    // not necessarily fileName's own document, so the
+                    // scheme alone can't tell genuine raw-SAF browsing
+                    // apart from a vault case below.
+                    isLocalStorage && uriString.startsWith("content://") -> {
                         val docUri = activity.safStorageManager.getDocumentUri(Uri.parse(uriString), fileName)
                             ?: throw java.io.FileNotFoundException("Could not resolve SAF document for $fileName")
                         pfd = activity.contentResolver.openFileDescriptor(docUri, "r")

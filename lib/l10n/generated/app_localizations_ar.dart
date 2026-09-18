@@ -7874,4 +7874,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => 'مولد كلمات المرور';
+
+  @override
+  String get contentsLabel => 'المحتويات';
+
+  @override
+  String get totalSizeLabel => 'الحجم الإجمالي';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عنصر',
+      many: '$count عنصر',
+      few: '$count عناصر',
+      two: 'عنصران',
+      one: 'عنصر واحد',
+      zero: 'فارغ',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => 'جارٍ الحساب…';
 }

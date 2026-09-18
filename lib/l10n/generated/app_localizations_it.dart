@@ -7807,4 +7807,25 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => 'Generatore di password';
+
+  @override
+  String get contentsLabel => 'Contenuto';
+
+  @override
+  String get totalSizeLabel => 'Dimensione totale';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementi',
+      one: '1 elemento',
+      zero: 'Vuota',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => 'Calcolo in corso…';
 }

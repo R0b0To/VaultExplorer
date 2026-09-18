@@ -58,29 +58,28 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
 
   @override
   void initState() {
-  super.initState();
+    super.initState();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    ref
-        .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
-        .load(widget.container, widget.entry);
-  });
-}
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final notifier = ref
+          .read(fileInfoProvider(widget.container.volId, _fullPath).notifier);
+      notifier.load(widget.container, widget.entry);
 
-  Future<void> _computeSha256() {
-    return ref
-        .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
-        .computeSha256(widget.container, widget.entry);
+      // Trigger folder stats scan for directories
+      if (widget.entry.isDir) {
+        notifier.loadFolderStats(widget.container);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(fileInfoProvider(widget.container.volId, _fullPath));
-    final _metadata = controllerState.metadata;
-    final _sha256 = controllerState.sha256;
-    final _calculatingSha256 = controllerState.calculatingSha256;
-    final _loading = controllerState.loading;
+    final metadata = controllerState.metadata;
+    final sha256 = controllerState.sha256;
+    final calculatingSha256 = controllerState.calculatingSha256;
+    final loading = controllerState.loading;
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -136,7 +135,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
             const Divider(height: 1),
             const SizedBox(height: 8),
             Expanded(
-              child: _loading
+              child: loading
                   ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -154,6 +153,22 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                   context.l10n.sizeLabel,
                                   '${formatBytes(widget.entry.sizeBytes)} (${widget.entry.sizeBytes} B)',
                                 ),
+                              if (widget.entry.isDir)
+                                _buildInfoTile(
+                                  context,
+                                  context.l10n.contentsLabel,
+                                  controllerState.folderItemCount != null
+                                      ? context.l10n.folderItemCount(controllerState.folderItemCount!)
+                                      : context.l10n.calculatingFolderStats,
+                                ),
+                              if (widget.entry.isDir)
+                                _buildInfoTile(
+                                  context,
+                                  context.l10n.totalSizeLabel,
+                                  controllerState.folderTotalBytes != null
+                                      ? '${formatBytes(controllerState.folderTotalBytes!)} (${controllerState.folderTotalBytes!} B)'
+                                      : context.l10n.calculatingFolderStats,
+                                ),
                               if (widget.entry.modifiedSecs > 0)
                                 _buildInfoTile(
                                   context,
@@ -165,51 +180,51 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                               _buildInfoTile(context, context.l10n.vaultLabel, widget.container.displayName),
                             ],
                           ),
-                          if (_metadata?.hasMediaInfo == true) ...[
+                          if (metadata?.hasMediaInfo == true) ...[
                             const SizedBox(height: 16),
                             _buildSectionTitle(context, context.l10n.mediaDimensionsSectionHeader),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
-                                if (_metadata?.width != null && _metadata?.height != null)
+                                if (metadata?.width != null && metadata?.height != null)
                                   _buildInfoTile(
                                     context,
                                     context.l10n.resolutionLabel,
-                                    '${_metadata!.width} × ${_metadata.height}${_metadata.megapixels != null ? ' (${_metadata.megapixels} MP)' : ''}',
+                                    '${metadata!.width} × ${metadata.height}${metadata.megapixels != null ? ' (${metadata.megapixels} MP)' : ''}',
                                   ),
-                                if (_metadata?.aspectRatioString != null)
-                                  _buildInfoTile(context, context.l10n.aspectRatioLabel, _metadata!.aspectRatioString!),
-                                if (_metadata?.mimeType != null)
-                                  _buildInfoTile(context, context.l10n.formatLabel, _metadata!.mimeType!),
+                                if (metadata?.aspectRatioString != null)
+                                  _buildInfoTile(context, context.l10n.aspectRatioLabel, metadata!.aspectRatioString!),
+                                if (metadata?.mimeType != null)
+                                  _buildInfoTile(context, context.l10n.formatLabel, metadata!.mimeType!),
                               ],
                             ),
                           ],
-                          if (_metadata?.hasExifData == true) ...[
+                          if (metadata?.hasExifData == true) ...[
                             const SizedBox(height: 16),
                             _buildSectionTitle(context, context.l10n.exifCameraDataSectionHeader),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
-                                if (_metadata?.cameraModel != null)
-                                  _buildInfoTile(context, context.l10n.cameraLabel, _metadata!.cameraModel!),
-                                if (_metadata?.lensModel != null)
-                                  _buildInfoTile(context, context.l10n.lensLabel, _metadata!.lensModel!),
-                                if (_metadata?.dateTaken != null)
-                                  _buildInfoTile(context, context.l10n.dateTakenLabel, _metadata!.dateTaken!),
-                                if (_metadata?.exposureTime != null)
-                                  _buildInfoTile(context, context.l10n.shutterSpeedLabel, _metadata!.exposureTime!),
-                                if (_metadata?.fNumber != null)
-                                  _buildInfoTile(context, context.l10n.apertureLabel, 'f/${_metadata!.fNumber}'),
-                                if (_metadata?.iso != null)
-                                  _buildInfoTile(context, context.l10n.isoLabel, 'ISO ${_metadata!.iso}'),
-                                if (_metadata?.focalLength != null)
-                                  _buildInfoTile(context, context.l10n.focalLengthLabel, _metadata!.focalLength!),
-                                if (_metadata?.flash != null)
-                                  _buildInfoTile(context, context.l10n.flashLabel, _metadata!.flash!),
-                                if (_metadata?.software != null)
-                                  _buildInfoTile(context, context.l10n.softwareLabel, _metadata!.software!),
-                                if (_metadata?.gpsCoordinates != null)
-                                  _buildInfoTile(context, context.l10n.gpsLocationLabel, _metadata!.gpsCoordinates!),
+                                if (metadata?.cameraModel != null)
+                                  _buildInfoTile(context, context.l10n.cameraLabel, metadata!.cameraModel!),
+                                if (metadata?.lensModel != null)
+                                  _buildInfoTile(context, context.l10n.lensLabel, metadata!.lensModel!),
+                                if (metadata?.dateTaken != null)
+                                  _buildInfoTile(context, context.l10n.dateTakenLabel, metadata!.dateTaken!),
+                                if (metadata?.exposureTime != null)
+                                  _buildInfoTile(context, context.l10n.shutterSpeedLabel, metadata!.exposureTime!),
+                                if (metadata?.fNumber != null)
+                                  _buildInfoTile(context, context.l10n.apertureLabel, 'f/${metadata!.fNumber}'),
+                                if (metadata?.iso != null)
+                                  _buildInfoTile(context, context.l10n.isoLabel, 'ISO ${metadata!.iso}'),
+                                if (metadata?.focalLength != null)
+                                  _buildInfoTile(context, context.l10n.focalLengthLabel, metadata!.focalLength!),
+                                if (metadata?.flash != null)
+                                  _buildInfoTile(context, context.l10n.flashLabel, metadata!.flash!),
+                                if (metadata?.software != null)
+                                  _buildInfoTile(context, context.l10n.softwareLabel, metadata!.software!),
+                                if (metadata?.gpsCoordinates != null)
+                                  _buildInfoTile(context, context.l10n.gpsLocationLabel, metadata!.gpsCoordinates!),
                               ],
                             ),
                           ],
@@ -219,56 +234,46 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                             AppCard(
                               padding: const EdgeInsets.all(16),
                               children: [
-                                Row(
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'SHA-256',
-                                            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          if (_sha256 != null)
-                                            Text(
-                                              _sha256,
-                                              style: textTheme.bodySmall?.copyWith(
-                                                fontFamily: 'monospace',
-                                                fontSize: 11.5,
-                                              ),
-                                            )
-                                          else
-                                            Text(
-                                              _calculatingSha256
-                                                  ? context.l10n.computingHashMessage
-                                                  : context.l10n.tapCalculateToVerifyMessage,
-                                              style: textTheme.bodySmall?.copyWith(
-                                                color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
+                                    Text(
+                                      'SHA-256',
+                                      style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                                     ),
-                                    if (_sha256 == null) ...[
-                                      const SizedBox(width: 8),
-                                      FilledButton.tonal(
-                                        onPressed: _calculatingSha256 ? null : _computeSha256,
-                                        style: FilledButton.styleFrom(
-                                          minimumSize: Size.zero,
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          visualDensity: VisualDensity.compact,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    const SizedBox(height: 4),
+                                    if (sha256 != null)
+                                      Text(
+                                        sha256,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          fontFamily: 'monospace',
+                                          fontSize: 11.5,
                                         ),
-                                        child: _calculatingSha256
-                                            ? const SizedBox(
-                                                width: 14,
-                                                height: 14,
-                                                child: CircularProgressIndicator(strokeWidth: 2),
-                                              )
-                                            : Text(context.l10n.calculateButton),
+                                      )
+                                    else if (calculatingSha256)
+                                      Row(
+                                        children: [
+                                          const SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            context.l10n.computingHashMessage,
+                                            style: textTheme.bodySmall?.copyWith(
+                                              color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      Text(
+                                        '—',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
-                                    ],
                                   ],
                                 ),
                               ],

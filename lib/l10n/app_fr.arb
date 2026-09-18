@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "fr",
   "cancel": "Annuler",
   "close": "Fermer",
@@ -2129,5 +2129,9 @@
   "safProviderLabel": "Fournisseur SAF",
   "singleFileCryptoTitle": "Chiffrement de fichier unique",
   "singleFileCryptoSubtitle": "Chiffrer ou déchiffrer hors des coffres",
-  "passwordGeneratorTitle": "Générateur de mots de passe"
+  "passwordGeneratorTitle": "Générateur de mots de passe",
+  "contentsLabel": "Contenu",
+  "totalSizeLabel": "Taille totale",
+  "folderItemCount": "{count, plural, =0{Vide} =1{1 élément} other{{count} éléments}}",
+  "calculatingFolderStats": "Calcul en cours…"
 }

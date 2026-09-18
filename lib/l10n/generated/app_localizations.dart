@@ -12930,6 +12930,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password Generator'**
   String get passwordGeneratorTitle;
+
+  /// Label for item count row in folder info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get contentsLabel;
+
+  /// Label for total size row in folder info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Total Size'**
+  String get totalSizeLabel;
+
+  /// Formatted item count for folder contents
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Empty} =1{1 item} other{{count} items}}'**
+  String folderItemCount(num count);
+
+  /// Placeholder text while scanning folder contents
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating…'**
+  String get calculatingFolderStats;
 }
 
 class _AppLocalizationsDelegate

@@ -7388,4 +7388,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => 'パスワード生成ツール';
+
+  @override
+  String get contentsLabel => 'コンテンツ';
+
+  @override
+  String get totalSizeLabel => '合計サイズ';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個の項目',
+      zero: '空',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => '計算中…';
 }

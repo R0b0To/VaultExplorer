@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "uk",
   "cancel": "Скасувати",
   "close": "Закрити",
@@ -2129,5 +2129,9 @@
   "safProviderLabel": "Провайдер SAF",
   "singleFileCryptoTitle": "Шифрування окремого файлу",
   "singleFileCryptoSubtitle": "Шифрування або розшифрування за межами сховищ",
-  "passwordGeneratorTitle": "Генератор паролів"
+  "passwordGeneratorTitle": "Генератор паролів",
+  "contentsLabel": "Вміст",
+  "totalSizeLabel": "Загальний розмір",
+  "folderItemCount": "{count, plural, =0{Порожньо} =1{1 елемент} few{{count} елементи} many{{count} елементів} other{{count} елементів}}",
+  "calculatingFolderStats": "Обчислення…"
 }

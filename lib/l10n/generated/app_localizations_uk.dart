@@ -7865,4 +7865,27 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => 'Генератор паролів';
+
+  @override
+  String get contentsLabel => 'Вміст';
+
+  @override
+  String get totalSizeLabel => 'Загальний розмір';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів',
+      many: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
+      zero: 'Порожньо',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => 'Обчислення…';
 }

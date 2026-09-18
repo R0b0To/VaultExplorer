@@ -2129,5 +2129,9 @@
   "safProviderLabel": "مزود SAF",
   "singleFileCryptoTitle": "تشفير ملف فردي",
   "singleFileCryptoSubtitle": "تشفير أو فك تشفير خارج الخزائن",
-  "passwordGeneratorTitle": "مولد كلمات المرور"
+  "passwordGeneratorTitle": "مولد كلمات المرور",
+  "contentsLabel": "المحتويات",
+  "totalSizeLabel": "الحجم الإجمالي",
+  "folderItemCount": "{count, plural, =0{فارغ} =1{عنصر واحد} =2{عنصران} few{{count} عناصر} many{{count} عنصر} other{{count} عنصر}}",
+  "calculatingFolderStats": "جارٍ الحساب…"
 }

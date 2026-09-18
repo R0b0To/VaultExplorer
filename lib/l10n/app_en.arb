@@ -9847,5 +9847,26 @@
   "passwordGeneratorTitle": "Password Generator",
   "@passwordGeneratorTitle": {
     "description": "Title for the quick password generator tool"
+  },
+  "contentsLabel": "Contents",
+  "@contentsLabel": {
+    "description": "Label for item count row in folder info sheet"
+  },
+  "totalSizeLabel": "Total Size",
+  "@totalSizeLabel": {
+    "description": "Label for total size row in folder info sheet"
+  },
+  "folderItemCount": "{count, plural, =0{Empty} =1{1 item} other{{count} items}}",
+  "@folderItemCount": {
+    "description": "Formatted item count for folder contents",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "calculatingFolderStats": "Calculating…",
+  "@calculatingFolderStats": {
+    "description": "Placeholder text while scanning folder contents"
   }
 }

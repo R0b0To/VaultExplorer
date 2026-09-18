@@ -7389,4 +7389,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => '비밀번호 생성기';
+
+  @override
+  String get contentsLabel => '콘텐츠';
+
+  @override
+  String get totalSizeLabel => '총 크기';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목',
+      zero: '비어 있음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => '계산 중…';
 }

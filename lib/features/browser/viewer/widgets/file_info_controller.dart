@@ -5,6 +5,7 @@
 // pure in-memory parsers (_ParsedMetadata/_MetadataParser and their EXIF/
 // JPEG/PNG/GIF/WebP byte-parsing) stay exactly where they are in
 // file_info_sheet.dart -- they're stateless functions, nothing to convert.
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -13,7 +14,8 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
-import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart' show ParsedMetadata, MetadataParser;
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart'
+    show ParsedMetadata, MetadataParser;
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 part 'file_info_controller.g.dart';
@@ -23,12 +25,18 @@ class FileInfoState {
   final ParsedMetadata? metadata;
   final String? sha256;
   final bool calculatingSha256;
+  final int? folderItemCount;
+  final int? folderTotalBytes;
+  final bool loadingFolderStats;
 
   const FileInfoState({
     this.loading = true,
     this.metadata,
     this.sha256,
     this.calculatingSha256 = false,
+    this.folderItemCount,
+    this.folderTotalBytes,
+    this.loadingFolderStats = false,
   });
 
   FileInfoState copyWith({
@@ -36,12 +44,18 @@ class FileInfoState {
     ParsedMetadata? metadata,
     String? sha256,
     bool? calculatingSha256,
+    int? folderItemCount,
+    int? folderTotalBytes,
+    bool? loadingFolderStats,
   }) =>
       FileInfoState(
         loading: loading ?? this.loading,
         metadata: metadata ?? this.metadata,
         sha256: sha256 ?? this.sha256,
         calculatingSha256: calculatingSha256 ?? this.calculatingSha256,
+        folderItemCount: folderItemCount ?? this.folderItemCount,
+        folderTotalBytes: folderTotalBytes ?? this.folderTotalBytes,
+        loadingFolderStats: loadingFolderStats ?? this.loadingFolderStats,
       );
 }
 
@@ -53,9 +67,8 @@ class FileInfo extends _$FileInfo {
   }
 
   Future<void> load(MountedContainer container, RawEntry entry) async {
-     
-     if (!state.loading) {
-    state = state.copyWith(loading: true);
+    if (!state.loading) {
+      state = state.copyWith(loading: true);
     }
     try {
       final isImg = MediaViewerConstants.isImage(entry.name);
@@ -84,6 +97,11 @@ class FileInfo extends _$FileInfo {
 
       if (!ref.mounted) return;
       state = state.copyWith(metadata: parsed, loading: false);
+
+      // Auto-trigger SHA-256 computation for files
+      if (!entry.isDir) {
+        unawaited(computeSha256(container, entry));
+      }
     } catch (_) {
       if (ref.mounted) state = state.copyWith(loading: false);
     }
@@ -119,6 +137,66 @@ class FileInfo extends _$FileInfo {
       }
     } catch (_) {
       if (ref.mounted) state = state.copyWith(calculatingSha256: false);
+    }
+  }
+
+  /// Recursively walks the folder tree, counting items and summing file sizes.
+  /// Starts with null counts to display "Calculating...", then updates progressively.
+  Future<void> loadFolderStats(MountedContainer container) async {
+    if (state.loadingFolderStats) return;
+    state = state.copyWith(
+      loadingFolderStats: true,
+      folderItemCount: null,
+      folderTotalBytes: null,
+    );
+
+    try {
+      final fileIoApi = ref.read(vaultFileIoApiProvider);
+      int totalItems = 0;
+      int totalBytes = 0;
+
+      // Iterative BFS to prevent call-stack overflow on deeply nested trees
+      final queue = <String>[fullPath];
+
+      while (queue.isNotEmpty) {
+        if (!ref.mounted) return;
+        final dirPath = queue.removeAt(0);
+        final rawList = await fileIoApi.listDirectory(container, dirPath);
+        if (rawList == null) continue;
+
+        final entries = RawEntry.parseAll(rawList.cast<String>());
+        for (final entry in entries) {
+          totalItems++;
+          if (!entry.isDir) {
+            totalBytes += entry.sizeBytes;
+          } else {
+            final childPath = dirPath.isEmpty
+                ? entry.name
+                : '$dirPath/${entry.name}';
+            queue.add(childPath);
+          }
+        }
+
+        // Progressive update after each directory is parsed
+        if (ref.mounted) {
+          state = state.copyWith(
+            folderItemCount: totalItems,
+            folderTotalBytes: totalBytes,
+          );
+        }
+      }
+
+      if (ref.mounted) {
+        state = state.copyWith(
+          folderItemCount: totalItems,
+          folderTotalBytes: totalBytes,
+          loadingFolderStats: false,
+        );
+      }
+    } catch (_) {
+      if (ref.mounted) {
+        state = state.copyWith(loadingFolderStats: false);
+      }
     }
   }
 }

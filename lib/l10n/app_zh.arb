@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "zh",
   "cancel": "取消",
   "close": "关闭",
@@ -2129,5 +2129,9 @@
   "safProviderLabel": "SAF 提供程序",
   "singleFileCryptoTitle": "单文件加密",
   "singleFileCryptoSubtitle": "在保险库外加密或解密",
-  "passwordGeneratorTitle": "密码生成器"
+  "passwordGeneratorTitle": "密码生成器",
+  "contentsLabel": "内容",
+  "totalSizeLabel": "总大小",
+  "folderItemCount": "{count, plural, =0{空} other{{count} 个项目}}",
+  "calculatingFolderStats": "正在计算…"
 }

@@ -2129,5 +2129,9 @@
   "safProviderLabel": "SAF プロバイダー",
   "singleFileCryptoTitle": "単一ファイル暗号化",
   "singleFileCryptoSubtitle": "保管庫外で暗号化/復号",
-  "passwordGeneratorTitle": "パスワード生成ツール"
+  "passwordGeneratorTitle": "パスワード生成ツール",
+  "contentsLabel": "コンテンツ",
+  "totalSizeLabel": "合計サイズ",
+  "folderItemCount": "{count, plural, =0{空} other{{count}個の項目}}",
+  "calculatingFolderStats": "計算中…"
 }

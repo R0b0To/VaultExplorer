@@ -7289,4 +7289,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get passwordGeneratorTitle => '密码生成器';
+
+  @override
+  String get contentsLabel => '内容';
+
+  @override
+  String get totalSizeLabel => '总大小';
+
+  @override
+  String folderItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个项目',
+      zero: '空',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calculatingFolderStats => '正在计算…';
 }

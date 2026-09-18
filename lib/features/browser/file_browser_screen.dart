@@ -134,6 +134,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
  final bool showBackButton;
   final Widget Function(Widget title)? wrapAppBarTitle;
   final VoidCallback? onOpenStorageSwitcher;
+  final Widget? drawer;
 
   const FileBrowserScreen({
     super.key,
@@ -145,6 +146,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.showBackButton = true,
     this.wrapAppBarTitle,
     this.onOpenStorageSwitcher,
+    this.drawer,
   });
 
   @override
@@ -447,6 +449,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
     _navNotifier.setContainerLocked(true);
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   DateTime? _lastOpReloadTime;
@@ -2989,6 +2994,11 @@ Future<void> _extractSelectedArchive() async {
     ref.watch(fileBrowserSortProvider(widget.container.volId));
     ref.watch(fileBrowserNavigationProvider(widget.container.volId));
     if (_isContainerLocked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -3113,7 +3123,8 @@ Future<void> _extractSelectedArchive() async {
         onSettingsClosed: _loadToolbarConfig,
         isFiltered: isFiltered,
         onPaste: _isReadOnly ? null : _paste,
-         showBackButton: widget.showBackButton,
+        onNavigateUp: _atRoot ? null : _navigateUp,
+        showBackButton: widget.showBackButton,
         wrapTitle: widget.wrapAppBarTitle,
         onOpenStorageSwitcher: widget.onOpenStorageSwitcher,
       );
@@ -3136,6 +3147,9 @@ Future<void> _extractSelectedArchive() async {
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
+        drawerEdgeDragWidth: double.maxFinite,
+        drawerEnableOpenDragGesture: true,
+        drawer: widget.drawer,
         bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
                 mainAxisSize: MainAxisSize.min,

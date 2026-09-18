@@ -22,7 +22,9 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/widgets/storage_locations_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_empty_state.dart';
@@ -38,7 +40,8 @@ const _kLogTag = 'VaultDashboardScreen';
 
 class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
-  const VaultDashboard({super.key, this.mountedNotifier});
+  final ValueChanged<int>? onNavigateTab;
+  const VaultDashboard({super.key, this.mountedNotifier, this.onNavigateTab});
 
   @override
   ConsumerState<VaultDashboard> createState() => VaultDashboardState();
@@ -248,11 +251,31 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
+  Widget _buildDrawer({int? currentVolId}) {
+    return AppNavigationDrawer(
+      currentVolId: currentVolId,
+      primaryLocalContainer: _localStorageContainer,
+      selectedTabIndex: 0,
+      onSelectTab: widget.onNavigateTab,
+      onSelectContainer: (newContainer) {
+        if (currentVolId == null) {
+          Navigator.push(context, _buildBrowserRoute(newContainer));
+        } else {
+          Navigator.pushReplacement(context, _buildBrowserRoute(newContainer));
+        }
+      },
+      onUnlockVault: openItem,
+      onAddVault: _showAddOptionsSheet,
+    );
+  }
+
   Route<void> _buildBrowserRoute(MountedContainer container) {
     return MaterialPageRoute<void>(
       builder: (_) => FileBrowserScreen(
         container: container,
         resolveContainer: _resolveAnyContainer,
+        drawer: _buildDrawer(currentVolId: container.volId),
+        showBackButton: true,
         onUserActivity: () {
           ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
         },
@@ -265,6 +288,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       builder: (_) => FileBrowserScreen(
         container: container,
         resolveContainer: _resolveAnyContainer,
+        drawer: _buildDrawer(currentVolId: container.volId),
+        showBackButton: true,
         onUserActivity: () {},
       ),
     );
@@ -502,31 +527,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
                 _showCreateSheet();
               },
             ),
-            SheetOptionTile(
-              icon: Icons.add_to_drive_rounded,
-              iconColor: cs.primary,
-              title: context.l10n.addStorageLocationTitle,
-              subtitle: context.l10n.addStorageLocationSubtitle,
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                final loc = await ref.read(externalStorageLocationsProvider.notifier).promptAndAddLocation();
-                if (!mounted) return;
-                if (loc != null) {
-                  final container = buildExternalStorageContainer(
-                    rootPath: loc.path,
-                    displayName: loc.displayName,
-                    volId: loc.volId,
-                  );
-                  Navigator.push(context, _buildLocalStorageRoute(container));
-                } else {
-                  showAppSnackBar(
-                    context,
-                    message: context.l10n.storageLocationUnresolvedError,
-                    tone: AppBannerTone.warning,
-                  );
-                }
-              },
-            ),
           ],
         ),
       ),
@@ -571,7 +571,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
-  void _openItem(VaultListItem item) {
+  void openItem(VaultListItem item) {
     switch (item) {
       case MountedVaultItem(:final container):
         _openBrowser(container);
@@ -604,225 +604,65 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget _buildBody(
     List<VaultListItem> displayItems,
     VaultDashboardViewState state,
-    bool showLocalStorageCard,
   ) {
-    final externalStorages = ref.watch(externalStorageLocationsProvider);
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    final bool hasMultipleStorages = externalStorages.isNotEmpty;
-    final bool hasAnyStorage = showLocalStorageCard || hasMultipleStorages;
-
-    if (displayItems.isEmpty && !state.isLoading && !hasAnyStorage) {
+    if (displayItems.isEmpty && !state.isLoading) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
 
-    final vaultList = displayItems.isEmpty && !state.isLoading
-        ? EmptyState(onAdd: _showAddOptionsSheet)
-        : ReorderableListView.builder(
-            buildDefaultDragHandles: false,
-            padding: EdgeInsets.fromLTRB(16, hasAnyStorage ? 0 : 12, 16, 120),
-            itemCount: displayItems.length,
-            onReorderItem: (oldIndex, newIndex) =>
-                ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
-            proxyDecorator: (child, index, animation) {
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (context, child) {
-                  final animValue = Curves.easeInOut.transform(animation.value);
-                  final elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
-                  return Material(
-                    elevation: elevation,
-                    color: Colors.transparent,
-                    shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    child: child,
-                  );
-                },
-                child: child,
-              );
-            },
-            itemBuilder: (context, i) {
-              final item = displayItems[i];
-              final triggerNudge = i == 0 && !state.appSettings.hasSeenSwipeTutorial;
-              return VaultCardRow(
-                key: ValueKey(item.uri),
-                index: i,
-                item: item,
-                group: _swipeGroup,
-                onOpen: () => _openItem(item),
-                onEdit: () => _requestEdit(item),
-                onDelete: () => _requestDelete(item),
-                onLocked: (volId) =>
-                    ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
-                isRemoving: state.animatingOutUris.contains(item.uri),
-                isInserting: state.animatingInUris.contains(item.uri),
-                triggerNudge: triggerNudge,
-                swapActions: state.appSettings.swapCardActions,
-                dragEnabled: state.appSettings.containerSortMode == ContainerSortMode.manual,
-                onNudgeComplete: () async {
-                  final updated = state.appSettings.copyWith(hasSeenSwipeTutorial: true);
-                  await ref.read(appSettingsServiceProvider).saveSettings(updated);
-                  ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-                },
-              );
-            },
-          );
+    final vaultList = ReorderableListView.builder(
+      buildDefaultDragHandles: false,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+      itemCount: displayItems.length,
+      onReorderItem: (oldIndex, newIndex) =>
+          ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final animValue = Curves.easeInOut.transform(animation.value);
+            final elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
+            return Material(
+              elevation: elevation,
+              color: Colors.transparent,
+              shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              child: child,
+            );
+          },
+          child: child,
+        );
+      },
+      itemBuilder: (context, i) {
+        final item = displayItems[i];
+        final triggerNudge = i == 0 && !state.appSettings.hasSeenSwipeTutorial;
+        return VaultCardRow(
+          key: ValueKey(item.uri),
+          index: i,
+          item: item,
+          group: _swipeGroup,
+          onOpen: () => openItem(item),
+          onEdit: () => _requestEdit(item),
+          onDelete: () => _requestDelete(item),
+          onLocked: (volId) =>
+              ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
+          isRemoving: state.animatingOutUris.contains(item.uri),
+          isInserting: state.animatingInUris.contains(item.uri),
+          triggerNudge: triggerNudge,
+          swapActions: state.appSettings.swapCardActions,
+          dragEnabled: state.appSettings.containerSortMode == ContainerSortMode.manual,
+          onNudgeComplete: () async {
+            final updated = state.appSettings.copyWith(hasSeenSwipeTutorial: true);
+            await ref.read(appSettingsServiceProvider).saveSettings(updated);
+            ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+          },
+        );
+      },
+    );
 
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
-        child: Column(
-          children: [
-            if (hasAnyStorage)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0, 10, 0, 12),
-                child: !hasMultipleStorages
-                    // Single storage: render the familiar full-width card
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: LocalStorageCard(onTap: _openLocalStorage),
-                      )
-                    // Multiple storages: horizontal scroll carousel (fixed 96dp height)
-                    : SizedBox(
-                        height: 96,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          separatorBuilder: (_, __) => const SizedBox(width: 10),
-                          itemCount: (showLocalStorageCard ? 1 : 0) + externalStorages.length,
-                          itemBuilder: (context, index) {
-                            // First card is internal storage if enabled
-                            if (showLocalStorageCard && index == 0) {
-                              return SizedBox(
-                                width: 220,
-                                child: Material(
-                                  color: cs.surfaceContainerHigh,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: _openLocalStorage,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: cs.primary.withValues(alpha: 0.12),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Icon(Icons.phone_android_rounded, color: cs.primary, size: 22),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  context.l10n.localStorageCardTitle,
-                                                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  context.l10n.internalStorageSubtitle,
-                                                  style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            final locIndex = showLocalStorageCard ? index - 1 : index;
-                            final loc = externalStorages[locIndex];
-                            final isSaf = loc.path.startsWith('content://');
-
-                            return SizedBox(
-                              width: 220,
-                              child: Material(
-                                color: cs.surfaceContainerHigh,
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => _openExternalStorage(loc),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: cs.secondary.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Icon(
-                                            isSaf ? Icons.cloud_outlined : Icons.sd_card_rounded,
-                                            color: cs.secondary,
-                                            size: 22,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                loc.displayName,
-                                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                isSaf ? 'SAF Provider' : loc.path,
-                                                style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        PopupMenuButton<String>(
-                                          icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                          onSelected: (action) {
-                                            if (action == 'rename') {
-                                              _promptRenameExternalStorage(loc);
-                                            } else if (action == 'remove') {
-                                              _confirmRemoveExternalStorage(loc);
-                                            }
-                                          },
-                                          itemBuilder: (_) => [
-                                            PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
-                                            PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-              ),
-            Expanded(child: vaultList),
-          ],
-        ),
+        child: vaultList,
       ),
     );
   }
@@ -844,8 +684,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
       child: Scaffold(
+        drawerEdgeDragWidth: double.maxFinite,
+        drawerEnableOpenDragGesture: true,
+        drawer: _buildDrawer(),
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+          leading: Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              tooltip: context.l10n.storageLocationsTitle,
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
           title: Text(
             context.l10n.appNameVaultExplorer,
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -867,7 +717,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           },
           child: Stack(
             children: [
-              _buildBody(displayItems, state, showLocalStorageCard),
+              _buildBody(displayItems, state),
             ],
           ),
         ),

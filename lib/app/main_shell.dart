@@ -8,7 +8,9 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
@@ -202,61 +204,48 @@ class _MainShellState extends ConsumerState<MainShell> {
     final body = IndexedStack(
       index: _index,
       children: [
-        VaultDashboard(key: _dashboardKey, mountedNotifier: _mountedNotifier),
+        VaultDashboard(
+          key: _dashboardKey,
+          mountedNotifier: _mountedNotifier,
+          onNavigateTab: _onTabTap,
+        ),
         ToolsScreen(mountedContainers: _mountedNotifier),
         const AppSettingsScreen(),
       ],
     );
 
-    final Widget scaffold;
-    if (context.screen.isLandscape) {
-      scaffold = Scaffold(
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-           
-             
-              _NavRail(
-                destinations: destinations,
-                selectedIndex: _index,
-                onTap: _onTabTap,
-              ),
-            
-            VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: cs.outlineVariant.withValues(alpha: 0.4),
-            ),
-            Expanded(child: body),
-          ],
-        ),
-      );
-    } else {
-      scaffold = Scaffold(
-        body: body,
-        bottomNavigationBar: Material(
-          color: cs.surfaceContainer,
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 68,
-              child: Row(
-                children: [
-                  for (int i = 0; i < destinations.length; i++)
-                    _MainBottomBarItem(
-                      icon: destinations[i].icon,
-                      selectedIcon: destinations[i].selectedIcon,
-                      label: destinations[i].label,
-                      selected: _index == i,
-                      onTap: () => _onTabTap(i),
-                    ),
-                ],
+    Widget buildDrawer({int? currentVolId}) {
+      return AppNavigationDrawer(
+        currentVolId: currentVolId,
+        selectedTabIndex: _index,
+        onSelectTab: _onTabTap,
+        onSelectContainer: (container) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FileBrowserScreen(
+                container: container,
+                drawer: buildDrawer(currentVolId: container.volId),
+                showBackButton: true,
               ),
             ),
-          ),
-        ),
+          );
+        },
+        onUnlockVault: (item) {
+          _onTabTap(0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _dashboardKey.currentState?.openItem(item);
+          });
+        },
       );
     }
+
+    final Widget scaffold = Scaffold(
+      drawerEdgeDragWidth: double.maxFinite,
+      drawerEnableOpenDragGesture: true,
+      drawer: buildDrawer(),
+      body: body,
+    );
 
     return PopScope(
       canPop: _index == 0,

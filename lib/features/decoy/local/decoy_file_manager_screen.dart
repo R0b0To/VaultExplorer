@@ -19,7 +19,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
-import 'package:vaultexplorer/features/browser/widgets/storage_locations_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/storage_locations_drawer.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_share_import_flow.dart';
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
@@ -37,6 +37,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   bool _checkingAccess = true;
   bool _hasAccess = false;
   MountedContainer? _container;
+  MountedContainer? _primaryContainer;
   Future<void>? _accessCheckFuture;
 
   // Android Share Sheet integration while Mask Mode's decoy identity is
@@ -128,6 +129,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
         _checkingAccess = false;
         _hasAccess = false;
         _container = null;
+        _primaryContainer = null;
         _deferBrowserForShare = false;
       });
       return;
@@ -141,6 +143,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
     setState(() {
       _checkingAccess = false;
       _hasAccess = true;
+      _primaryContainer = container;
       _container = container;
       _deferBrowserForShare = pendingShare != null;
     });
@@ -219,6 +222,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
     }
 
    final container = _container;
+    final primary = _primaryContainer ?? container;
     if (container == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -226,25 +230,19 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       key: ValueKey(container.volId),
       container: container,
       resolveContainer: (volId) {
-        if (volId == kDecoyLocalVolId) return _container;
+        if (volId == kDecoyLocalVolId) return _primaryContainer ?? _container;
         return ref.read(externalStorageLocationsProvider.notifier).resolveContainer(volId);
       },
       onUserActivity: () {},
       showBackButton: false,
       wrapAppBarTitle: (title) => HiddenVaultTrigger(child: title),
-      onOpenStorageSwitcher: () {
-        StorageLocationsSheet.show(
-          context,
-          activeVolId: container.volId,
-          primaryLocalContainer: buildLocalStorageContainer(
-            rootPath: _container!.uri,
-            displayName: context.l10n.filesTabLabel,
-          ),
-          onSelected: (newContainer) {
-            setState(() => _container = newContainer);
-          },
-        );
-      },
+      drawer: StorageLocationsDrawer(
+        activeVolId: container.volId,
+        primaryLocalContainer: primary,
+        onSelected: (newContainer) {
+          setState(() => _container = newContainer);
+        },
+      ),
     );
   }
 }

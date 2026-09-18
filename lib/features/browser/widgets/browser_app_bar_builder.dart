@@ -73,6 +73,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
+  VoidCallback? onNavigateUp,
   bool isInsideArchive = false,
   bool showBackButton = true,
   Widget Function(Widget title)? wrapTitle,
@@ -477,20 +478,47 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
  return AppBar(
-    leading: showBackButton
-        ? IconButton(
+    leading: Builder(
+      builder: (ctx) {
+        final scaffold = Scaffold.maybeOf(ctx);
+
+        // If a sidebar drawer is present, ALWAYS show the hamburger icon so
+        // the user can open the sidebar from any subfolder depth.
+        // Folder-up navigation is handled by system back gesture, breadcrumbs, and title menu.
+        if (scaffold?.hasDrawer == true) {
+          return IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: context.l10n.storageLocationsTitle,
+            onPressed: () => scaffold!.openDrawer(),
+          );
+        }
+
+        if (showBackButton) {
+          return IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: context.l10n.backToDashboardTooltip,
-            onPressed: () => Navigator.of(context).pop(),
-          )
-        : (onOpenStorageSwitcher != null
-            ? IconButton(
-                icon: const Icon(Icons.storage_rounded),
-                tooltip: context.l10n.storageLocationsTitle,
-                onPressed: onOpenStorageSwitcher,
-              )
-            : null),
-    automaticallyImplyLeading: showBackButton,
+            onPressed: () {
+              if (pathStack.length > 1 && onNavigateUp != null) {
+                onNavigateUp();
+              } else {
+                Navigator.of(ctx).pop();
+              }
+            },
+          );
+        }
+
+        if (onOpenStorageSwitcher != null) {
+          return IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: context.l10n.storageLocationsTitle,
+            onPressed: onOpenStorageSwitcher,
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
+    ),
+    automaticallyImplyLeading: false,
     title: (wrapTitle ?? (Widget w) => w)(
       Column(
         mainAxisSize: MainAxisSize.min,
@@ -515,11 +543,6 @@ PreferredSizeWidget buildBrowserAppBar(
             .where((action) => actionBuilders.containsKey(action))
             .map((action) => actionBuilders[action]!(context)),
       ],
-      SettingsMenuButton(
-        containerUri: container.isLocalStorage ? null : container.uri,
-        isLocalStorage: container.isLocalStorage,
-        onSettingsClosed: onSettingsClosed,
-      ),
     ],
   );
 }

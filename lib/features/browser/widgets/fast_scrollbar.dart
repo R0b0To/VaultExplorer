@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -8,19 +9,6 @@ import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart'
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 
 /// A Material-style fast scroller inspired by MaterialFiles (AndroidFastScroll).
-///
-/// Features:
-/// - **Full-Track Press & Drag**: The user can press anywhere along the right edge
-///   track and start scrolling immediately.
-/// - **Direct Thumb Grab**: Grabbing the thumb directly tracks the finger smoothly
-///   without snapping, while pressing elsewhere along the track jumps directly to
-///   that section.
-/// - **Gesture Safe**: Does not hijack taps on trailing menu buttons or interfere
-///   with system/predictive back gestures.
-/// - **Section Popup Bubble**: Displays a floating badge to the left of the thumb
-///   showing section initial, extension, formatted size, or date depending on [sortBy].
-/// - **Auto-Hide & Smooth Fade**: Displays an idle 4px thumb during regular scroll,
-///   expanding to an active 10px pill during drag, fading out after 1.5s.
 class FastScrollbar extends StatefulWidget {
   final ScrollController controller;
   final Widget child;
@@ -67,6 +55,8 @@ class _FastScrollbarState extends State<FastScrollbar>
   double _dragTouchOffsetInThumb = 0.0;
   final GlobalKey _trackKey = GlobalKey();
 
+  bool _postFrameCallbackPending = false;
+
   @override
   void initState() {
     super.initState();
@@ -78,9 +68,7 @@ class _FastScrollbarState extends State<FastScrollbar>
       parent: _fadeController,
       curve: Curves.easeOut,
     );
-    _fadeController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    // FadeTransition handles animating its own opacity without needing setState rebuilds.
     widget.controller.addListener(_onControllerChange);
   }
 
@@ -101,6 +89,26 @@ class _FastScrollbarState extends State<FastScrollbar>
     super.dispose();
   }
 
+  /// Safely runs [fn] and schedules a rebuild without throwing "Build scheduled during frame".
+  void _safeSetState(VoidCallback fn) {
+    if (!mounted) return;
+
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      fn();
+      if (!_postFrameCallbackPending) {
+        _postFrameCallbackPending = true;
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          _postFrameCallbackPending = false;
+          if (mounted) {
+            setState(() {});
+          }
+        });
+      }
+    } else {
+      setState(fn);
+    }
+  }
+
   bool get _canScroll {
     if (!widget.controller.hasClients) return false;
     try {
@@ -117,7 +125,7 @@ class _FastScrollbarState extends State<FastScrollbar>
       if (pos.hasContentDimensions && pos.maxScrollExtent > 0) {
         final newFraction = (pos.pixels / pos.maxScrollExtent).clamp(0.0, 1.0);
         if ((newFraction - _scrollFraction).abs() > 0.0005) {
-          setState(() {
+          _safeSetState(() {
             _scrollFraction = newFraction;
           });
         }
@@ -126,19 +134,26 @@ class _FastScrollbarState extends State<FastScrollbar>
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification.depth == 0 && notification.metrics.maxScrollExtent > 0) {
+    if (notification.depth == 0) {
+      if (notification.metrics.maxScrollExtent <= 0) {
+        return false;
+      }
+
       if (!_isDragging) {
         final newFraction = (notification.metrics.pixels /
                 notification.metrics.maxScrollExtent)
             .clamp(0.0, 1.0);
-        _scrollFraction = newFraction;
+
         if (notification is ScrollUpdateNotification ||
             notification is ScrollStartNotification) {
           _showThumb(autoHide: true);
         } else if (notification is ScrollEndNotification) {
           _startAutoHideTimer();
         }
-        setState(() {});
+
+        _safeSetState(() {
+          _scrollFraction = newFraction;
+        });
       }
     }
     return false;
@@ -369,8 +384,6 @@ class _FastScrollbarState extends State<FastScrollbar>
                   key: _trackKey,
                   children: [
                     // Interactive edge strip covering the full track.
-                    // Translucent behavior allows taps to pass through to trailing buttons,
-                    // while vertical drags activate fast scrolling anywhere along the edge.
                     if (canScroll)
                       Positioned(
                         right: 0,

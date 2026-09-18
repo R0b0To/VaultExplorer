@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -664,12 +665,12 @@ class VaultDashboardController extends _$VaultDashboardController {
         return sorted;
       case ContainerSortMode.nameAZ:
         sorted.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          (a, b) => naturalCompare(a.name.toLowerCase(), b.name.toLowerCase()),
         );
         return sorted;
       case ContainerSortMode.nameZA:
         sorted.sort(
-          (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+          (a, b) => naturalCompare(b.name.toLowerCase(), a.name.toLowerCase()),
         );
         return sorted;
       case ContainerSortMode.newest:

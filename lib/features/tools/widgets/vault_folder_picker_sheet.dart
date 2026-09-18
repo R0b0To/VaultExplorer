@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -63,7 +64,7 @@ class VaultFolderPickerSheet extends ConsumerWidget {
       emptyMessage: (ctx) => ctx.l10n.vaultFolderPickerEmptyMessage,
       processEntries: (raw) {
         final folders = raw.where((e) => e.isDir).toList();
-        folders.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        folders.sort((a, b) => naturalCompare(a.name.toLowerCase(), b.name.toLowerCase()));
         return folders;
       },
       buildEntryTile: (ctx, entry) => ListTile(

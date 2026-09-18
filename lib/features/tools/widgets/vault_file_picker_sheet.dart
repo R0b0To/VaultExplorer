@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -71,7 +72,7 @@ class _VaultFilePickerSheetState extends ConsumerState<VaultFilePickerSheet> {
         final sorted = List<RawEntry>.from(raw);
         sorted.sort((a, b) {
           if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          return naturalCompare(a.name.toLowerCase(), b.name.toLowerCase());
         });
         return sorted;
       },

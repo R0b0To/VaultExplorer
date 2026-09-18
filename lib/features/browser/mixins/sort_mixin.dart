@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 enum SortBy {
@@ -32,21 +33,21 @@ int compareEntriesBySort(
   int result;
   switch (sortBy) {
     case SortBy.name:
-      result = ea.lowercaseName.compareTo(eb.lowercaseName);
+      result = naturalCompare(ea.lowercaseName, eb.lowercaseName);
     case SortBy.size:
       result = ea.sizeBytes.compareTo(eb.sizeBytes);
       if (result == 0) {
-        result = ea.lowercaseName.compareTo(eb.lowercaseName);
+        result = naturalCompare(ea.lowercaseName, eb.lowercaseName);
       }
     case SortBy.extension:
       result = ea.extension.compareTo(eb.extension);
       if (result == 0) {
-        result = ea.lowercaseName.compareTo(eb.lowercaseName);
+        result = naturalCompare(ea.lowercaseName, eb.lowercaseName);
       }
     case SortBy.date:
       result = ea.modifiedSecs.compareTo(eb.modifiedSecs);
       if (result == 0) {
-        result = ea.lowercaseName.compareTo(eb.lowercaseName);
+        result = naturalCompare(ea.lowercaseName, eb.lowercaseName);
       }
   }
   return sortAscending ? result : -result;

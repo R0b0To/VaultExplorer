@@ -1,5 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart'
     show PathSegment;
@@ -44,7 +45,7 @@ class LocalDestinationPicker extends _$LocalDestinationPicker {
         .listDirectory(path);
     final entries = rawEntries.where((e) => e.isDir).toList()
       ..sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        (a, b) => naturalCompare(a.name.toLowerCase(), b.name.toLowerCase()),
       );
     if (!ref.mounted) return;
     state = LocalDestinationPickerState(

@@ -3,6 +3,7 @@ library;
 import 'dart:async';
 
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -281,7 +282,7 @@ class VaultSyncService {
         return;
       }
 
-      entries.sort((a, b) => a.relativePath.compareTo(b.relativePath));
+      entries.sort((a, b) => naturalCompare(a.relativePath, b.relativePath));
       controller.add(
         VaultSyncScanUpdate(
           progress: VaultSyncScanProgress(

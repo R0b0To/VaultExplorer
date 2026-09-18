@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -157,6 +158,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   double _drawerDragDistance = 0.0;
+  bool _isTouchFromEdge = false;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -467,12 +469,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (_pointerCount >= 2 && !_isMultiTouch) {
       setState(() => _isMultiTouch = true);
     }
+    final edgeInset = math.max(
+      72.0,
+      MediaQuery.systemGestureInsetsOf(context).left,
+    );
+    _isTouchFromEdge = event.position.dx <= edgeInset;
+    _drawerDragDistance = 0.0;
   }
 
   void _handlePointerUp(PointerEvent event) {
     _pointerCount = math.max(0, _pointerCount - 1);
     if (_pointerCount < 2 && _isMultiTouch) {
       setState(() => _isMultiTouch = false);
+    }
+    if (_pointerCount == 0) {
+      _drawerDragDistance = 0.0;
     }
   }
 
@@ -481,6 +492,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (_isMultiTouch) {
       setState(() => _isMultiTouch = false);
     }
+    _drawerDragDistance = 0.0;
   }
 
   void _onOperationsChanged() {
@@ -1193,6 +1205,9 @@ void _navigateUp() {
 
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    _drawerDragDistance = 0.0;
+    _isTouchFromEdge = true;
+
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
     final targetSegment =
@@ -1200,7 +1215,6 @@ void _navigateUp() {
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
     _resetBackGesturePreviewScrollController(initialOffset: savedOffset);
 
-    // Query the parent folder's specific layout mode (e.g. List vs Grid)
     final parentPath = targetSegment?.fatPath ?? '';
     final parentLayoutMode = _getLayoutModeForFolder(parentPath);
 
@@ -1212,18 +1226,22 @@ void _navigateUp() {
 
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    _drawerDragDistance = 0.0;
+    _isTouchFromEdge = true;
     if (!_isOwnRouteCurrent) return;
     _navNotifier.updateBackGestureProgress(backEvent.progress);
   }
 
   @override
   void handleCancelBackGesture() {
+    _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
     _navNotifier.cancelBackGesture();
   }
 
   @override
   void handleCommitBackGesture() {
+    _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
@@ -3236,22 +3254,37 @@ Future<void> _extractSelectedArchive() async {
             onNotification: _handleScrollNotification,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              onHorizontalDragStart: (_) {
+              dragStartBehavior: DragStartBehavior.down,
+              onHorizontalDragStart: (details) {
+                final edgeInset = math.max(
+                  72.0,
+                  MediaQuery.systemGestureInsetsOf(context).left,
+                );
+                if (_isTouchFromEdge ||
+                    details.globalPosition.dx <= edgeInset ||
+                    _backGestureProgress != null) {
+                  _isTouchFromEdge = true;
+                  _drawerDragDistance = 0.0;
+                  return;
+                }
                 _drawerDragDistance = 0.0;
               },
               onHorizontalDragUpdate: (details) {
-                if (_isMultiTouch || widget.drawer == null) return;
+                if (_isTouchFromEdge ||
+                    _backGestureProgress != null ||
+                    _isMultiTouch ||
+                    widget.drawer == null) {
+                  _drawerDragDistance = 0.0;
+                  return;
+                }
                 _drawerDragDistance += details.primaryDelta ?? 0.0;
-                if (_drawerDragDistance > 40.0) {
+                if (_drawerDragDistance > 60.0) {
                   _scaffoldKey.currentState?.openDrawer();
                   _drawerDragDistance = 0.0;
+                  _isTouchFromEdge = true;
                 }
               },
-              onHorizontalDragEnd: (details) {
-                if (_isMultiTouch || widget.drawer == null) return;
-                if ((details.primaryVelocity ?? 0.0) > 150.0 || _drawerDragDistance > 40.0) {
-                  _scaffoldKey.currentState?.openDrawer();
-                }
+              onHorizontalDragEnd: (_) {
                 _drawerDragDistance = 0.0;
               },
               onHorizontalDragCancel: () {

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,6 +55,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
   double _drawerDragDistance = 0.0;
+  bool _isTouchFromEdge = false;
 
   // Cached stand-in [MountedContainer] for real device storage (see
   // buildLocalStorageContainer), refreshed whenever all-files access is
@@ -686,7 +689,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
      return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _lockController.scheduleAutoLock(),
+      onPointerDown: (event) {
+        _lockController.scheduleAutoLock();
+        final edgeInset = math.max(
+          72.0,
+          MediaQuery.systemGestureInsetsOf(context).left,
+        );
+        _isTouchFromEdge = event.position.dx <= edgeInset;
+        _drawerDragDistance = 0.0;
+      },
       child: Scaffold(
         key: _scaffoldKey,
         drawerEnableOpenDragGesture: false,
@@ -721,20 +732,32 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           },
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onHorizontalDragStart: (_) {
+            dragStartBehavior: DragStartBehavior.down,
+            onHorizontalDragStart: (details) {
+              final edgeInset = math.max(
+                72.0,
+                MediaQuery.systemGestureInsetsOf(context).left,
+              );
+              if (_isTouchFromEdge || details.globalPosition.dx <= edgeInset) {
+                _isTouchFromEdge = true;
+                _drawerDragDistance = 0.0;
+                return;
+              }
               _drawerDragDistance = 0.0;
             },
             onHorizontalDragUpdate: (details) {
+              if (_isTouchFromEdge) {
+                _drawerDragDistance = 0.0;
+                return;
+              }
               _drawerDragDistance += details.primaryDelta ?? 0.0;
-              if (_drawerDragDistance > 40.0) {
+              if (_drawerDragDistance > 60.0) {
                 _scaffoldKey.currentState?.openDrawer();
                 _drawerDragDistance = 0.0;
+                _isTouchFromEdge = true;
               }
             },
-            onHorizontalDragEnd: (details) {
-              if ((details.primaryVelocity ?? 0.0) > 150.0 || _drawerDragDistance > 40.0) {
-                _scaffoldKey.currentState?.openDrawer();
-              }
+            onHorizontalDragEnd: (_) {
               _drawerDragDistance = 0.0;
             },
             onHorizontalDragCancel: () {

@@ -457,6 +457,30 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   DateTime? _lastOpReloadTime;
   Timer? _opReloadTimer;
 
+  int _pointerCount = 0;
+  bool _isMultiTouch = false;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerCount++;
+    if (_pointerCount >= 2 && !_isMultiTouch) {
+      setState(() => _isMultiTouch = true);
+    }
+  }
+
+  void _handlePointerUp(PointerEvent event) {
+    _pointerCount = math.max(0, _pointerCount - 1);
+    if (_pointerCount < 2 && _isMultiTouch) {
+      setState(() => _isMultiTouch = false);
+    }
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _pointerCount = 0;
+    if (_isMultiTouch) {
+      setState(() => _isMultiTouch = false);
+    }
+  }
+
   void _onOperationsChanged() {
     if (!mounted) return;
     setState(() {});
@@ -3133,24 +3157,30 @@ Future<void> _extractSelectedArchive() async {
     final bool canPop =
         _atRoot && !isSelectionMode && !_searchActive;
 
-    return PopScope(
-      canPop: canPop,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        if (isSelectionMode) {
-          exitSelectionMode();
-        } else if (_searchActive) {
-          setState(() => _clearSearch());
-        } else if (!_atRoot) {
-          _navigateUp();
-        }
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        drawerEdgeDragWidth: double.maxFinite,
-        drawerEnableOpenDragGesture: true,
-        drawer: widget.drawer,
-        bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
+    return Listener(
+      onPointerDown: _handlePointerDown,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
+      child: PopScope(
+        canPop: canPop,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) return;
+          if (isSelectionMode) {
+            exitSelectionMode();
+          } else if (_searchActive) {
+            setState(() => _clearSearch());
+          } else if (!_atRoot) {
+            _navigateUp();
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          // Full-screen swipe-to-open from anywhere, automatically yielding
+          // whenever 2 or more fingers touch down for pinch-to-zoom.
+          drawerEdgeDragWidth: double.maxFinite,
+          drawerEnableOpenDragGesture: !_isMultiTouch,
+          drawer: widget.drawer,
+          bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -3524,6 +3554,7 @@ Future<void> _extractSelectedArchive() async {
       ),
     ),
 ],
+),
 ),
 ),
 ),

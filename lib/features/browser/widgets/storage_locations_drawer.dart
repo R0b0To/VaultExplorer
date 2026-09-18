@@ -202,10 +202,6 @@ class StorageLocationsDrawer extends ConsumerWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    subtitle: Text(
-                      context.l10n.addStorageLocationSubtitle,
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
                     onTap: () async {
                       final notifier = ref.read(externalStorageLocationsProvider.notifier);
                       final loc = await notifier.promptAndAddLocation();

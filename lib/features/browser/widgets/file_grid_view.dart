@@ -399,11 +399,28 @@ class _FileGridViewState extends State<FileGridView> {
       // Same restriction as video above -- see fetchApkIconForThumbnail's
       // doc comment for why an APK nested inside an open archive falls
       // through to the plain icon instead.
-      previewWidget = _ApkIconGridThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
+      //
+      // Sized and centred exactly like the plain file-type icon in the
+      // `else` branch below rather than filled into the cell the way a
+      // photo or video frame is. An app icon is a piece of artwork with
+      // its own shape and padding, so blown up to the full cell it reads
+      // as a picture of an icon boxed inside a square; at icon size it
+      // reads as what it is -- the icon this file would have once
+      // installed.
+      previewWidget = Center(
+        child: SizedBox(
+          width: iconSize,
+          height: iconSize,
+          child: _ApkIconGridThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+            fallbackIcon: iconForFile(cleanName),
+            fallbackColor: colorForFile(cleanName),
+            fallbackIconSize: iconSize,
+          ),
+        ),
       );
     } else {
       previewWidget = Center(
@@ -682,11 +699,22 @@ class _ApkIconGridThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
 
+  /// Shown while loading fails or the APK turns out to have no resolvable
+  /// launcher icon -- the same plain file-type icon the cell would have
+  /// drawn had it never tried, which is the fallback
+  /// `fetchApkIconForThumbnail`'s doc comment asks callers for.
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double fallbackIconSize;
+
   const _ApkIconGridThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    required this.fallbackIconSize,
   });
 
   /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
@@ -733,7 +761,6 @@ class _ApkIconGridThumb extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
-    final cs = Theme.of(context).colorScheme;
 
     return AsyncThumbnail(
       key: ValueKey('apk:$filePath'),
@@ -747,38 +774,36 @@ class _ApkIconGridThumb extends ConsumerWidget {
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // Contain rather than image/video's cover -- an app icon is meant
-      // to be seen whole, never cropped.
+      // to be seen whole, never cropped. No filled placeholder behind
+      // any of the three states either: the caller sizes this to the
+      // icon box, so a coloured rectangle here would be a square drawn
+      // around the icon rather than the cell's own background showing
+      // through.
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
         cacheHeight: cacheHeight,
-        errorBuilder: (_, _, _) => _errorPlaceholder(cs),
+        errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cs.primary.withValues(alpha: 0.6),
-            ),
+      loadingBuilder: (context) => Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
           ),
         ),
       ),
-      errorBuilder: (context) => _errorPlaceholder(cs),
+      errorBuilder: (context) => _fallbackWidget(),
     );
   }
 
-  Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(
-            Icons.broken_image_rounded,
-            size: AppIconSize.feature,
-            color: cs.outline,
-          ),
+  Widget _fallbackWidget() => Center(
+        child: Icon(
+          fallbackIcon,
+          size: fallbackIconSize,
+          color: fallbackColor,
         ),
       );
 }

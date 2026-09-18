@@ -45,6 +45,17 @@ class OpenWithSystemApp extends FileOpenAction {
   const OpenWithSystemApp({this.packageName});
 }
 
+/// Hand the file to the system package installer.
+///
+/// Sits below every saved preference, so a user who has explicitly
+/// pointed `.apk` at some other app (an APK analyser, an archive viewer
+/// -- an APK is a ZIP) still gets that app. With no preference set,
+/// though, tapping an APK means one thing to almost everyone, and
+/// offering a chooser instead just adds a step to it.
+class InstallApk extends FileOpenAction {
+  const InstallApk();
+}
+
 /// No preference, and the extension doesn't match anything built in --
 /// ask the user via `OpenWithDialog`.
 class ShowOpenWithDialog extends FileOpenAction {
@@ -86,5 +97,6 @@ FileOpenAction decideFileOpenAction({
   if (ext == 'pdf') return const OpenInPdfViewer();
   if (ext == 'html' || ext == 'htm') return const OpenInHtmlViewer();
   if (ext == 'md' || ext == 'markdown') return const OpenInMarkdownViewer();
+  if (ext == 'apk') return const InstallApk();
   return const ShowOpenWithDialog();
 }

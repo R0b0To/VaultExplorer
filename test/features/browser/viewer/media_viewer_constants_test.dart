@@ -52,6 +52,13 @@ void main() {
       }
     });
 
+    test('false for an APK, which renders as a centred icon', () {
+      // An APK does get a thumbnail -- its own launcher icon -- but it's
+      // drawn at icon size inside the cell rather than filling it, so it
+      // needs its name label for the same reason a PDF does.
+      expect(MediaViewerConstants.hasRealThumbnail('signal.apk'), isFalse);
+    });
+
     test('false for vault item pseudo-files regardless of extension name', () {
       // Vault items (passwords, cards, etc.) always render with a fixed
       // icon, even though "password" isn't a real file extension.

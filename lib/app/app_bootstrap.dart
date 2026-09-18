@@ -13,12 +13,14 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/services/memory_pressure_observer.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/services/resume_paint_signal.dart';
+import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 
 void configurePlatformIntegrations(ProviderContainer container) {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   MemoryPressureObserver.register();
+  ThumbnailRetrySignal.register();
   final fileIoApi = container.read(vaultFileIoApiProvider);
   ResumePaintSignal.register(fileIoApi);
   PlaybackThrottleController.configure(fileIoApi);

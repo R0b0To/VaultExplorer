@@ -3,6 +3,8 @@
     <string name="app_name">Vault Explorer</string>
     <string name="decoy_app_name">Archive Explorer</string>
     <string name="pdf_edit_unavailable">Editing isn\'t available for this document</string>
+    <string name="install_unknown_apps_required">Allow this app to install apps, then tap the APK again</string>
+    <string name="install_no_installer">No app on this device can install APK files</string>
 
     <string name="vault_keep_alive_channel_description">Ongoing status notifications</string>
     <plurals name="vault_keep_alive_notification_text">

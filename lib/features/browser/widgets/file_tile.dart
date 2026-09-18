@@ -121,6 +121,10 @@ class FileTile extends StatelessWidget {
       );
     }
     Widget? customLeading;
+    // See `FileRowShell.customLeadingIsIcon`: true only for an APK's own
+    // launcher icon, which is shown as-is rather than filled into (and
+    // clipped by) the row's tinted squircle the way a photo/video frame is.
+    bool customLeadingIsIcon = false;
     final fullPath = currentDirPath.isEmpty
         ? entry.name
         : '$currentDirPath/${entry.name}';
@@ -176,6 +180,7 @@ class FileTile extends StatelessWidget {
         // reason: an APK nested inside an already-open archive has no
         // real container/local path for fetchApkIconForThumbnail to open
         // -- see that function's doc comment.
+        customLeadingIsIcon = true;
         customLeading = Material(
           type: MaterialType.transparency,
           child: _ListApkIconThumb(
@@ -238,6 +243,7 @@ class FileTile extends StatelessWidget {
       isDetailed: isDetailed,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
+      customLeadingIsIcon: customLeadingIsIcon,
       iconBadge: badge,
     );
   }
@@ -582,25 +588,27 @@ class _ListApkIconThumb extends ConsumerWidget {
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // An app icon is meant to be seen whole, unlike a photo -- contain
-      // rather than image/video's cover, so it's never cropped.
+      // rather than image/video's cover, so it's never cropped. The row
+      // draws no tinted square behind it either (see
+      // `FileRowShell.customLeadingIsIcon`), so the loading and fallback
+      // states below are deliberately background-free as well: an icon
+      // that briefly sits on a filled square and then doesn't would read
+      // as the layout shifting under the user.
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Center(
-          child: SizedBox(
-            width: 14 * zoomLevel,
-            height: 14 * zoomLevel,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.6),
-            ),
+      loadingBuilder: (context) => Center(
+        child: SizedBox(
+          width: 14 * zoomLevel,
+          height: 14 * zoomLevel,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.6),
           ),
         ),
       ),

@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.Manifest
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -14,13 +15,17 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
+import com.aeidolon.vaultexplorer.R
 
 const val STORAGE_PERMISSION_REQUEST_CODE = 9822
 const val NOTIFICATION_PERMISSION_REQUEST_CODE = 9823
@@ -266,6 +271,116 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             result.success(pInfo.versionName ?: "1.0.0")
         } catch (e: Exception) {
             result.success("1.0.0")
+        }
+    }
+
+    /**
+     * Hands an APK straight to the system package installer, skipping the
+     * "open with" chooser [handleOpenWithApp] would otherwise show.
+     *
+     * The APK is exposed the same way every other external hand-off in
+     * this app is -- as a `content://` URI backed by
+     * `ContainerDocumentsProvider` (or, for plain device storage, the
+     * `localfiles` [FileProvider]) with a one-shot read grant attached to
+     * the intent. The installer streams the archive from there; no
+     * decrypted copy is written to disk by this app, which is what lets
+     * this exist at all given the no-plaintext-at-rest rule. (The
+     * installer does stage its own copy inside the system's install
+     * session -- unavoidable, since installing is precisely asking the OS
+     * to keep the package, and it only happens on an explicit tap.)
+     *
+     * Installing also needs the user's own per-app "install unknown apps"
+     * switch, which `REQUEST_INSTALL_PACKAGES` in the manifest only makes
+     * it possible to ask for. When it's off, this opens that settings
+     * page rather than firing an intent the installer would silently
+     * refuse, and reports back which of the two happened so the caller
+     * doesn't treat "sent the user to Settings" as "installing now".
+     */
+    fun handleInstallApk(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val fileName = call.argument<String>("fileName")
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+        if (uriString == null || fileName == null) {
+            result.error("INVALID_ARGS", "filePath and fileName required", null)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !activity.packageManager.canRequestPackageInstalls()
+        ) {
+            Toast.makeText(
+                activity,
+                R.string.install_unknown_apps_required,
+                Toast.LENGTH_LONG,
+            ).show()
+            try {
+                activity.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${activity.packageName}"),
+                    )
+                )
+            } catch (_: Exception) {
+                // Some OEM builds don't accept the per-package form of
+                // this action; the plain list is a fine second choice.
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES))
+                } catch (e: Exception) {
+                    result.error("INSTALL_APK_ERROR", e.message, null)
+                    return
+                }
+            }
+            result.success("permissionRequired")
+            return
+        }
+
+        try {
+            val apkUri: Uri = when {
+                isLocalStorage && uriString.startsWith("content://") ->
+                    activity.safStorageManager.getDocumentUri(Uri.parse(uriString), fileName)
+                        ?: run {
+                            result.error("NOT_FOUND", "Could not resolve $fileName", null)
+                            return
+                        }
+
+                isLocalStorage -> {
+                    val file = if (fileName.startsWith("/")) File(fileName)
+                               else File(uriString, fileName)
+                    if (!file.exists()) {
+                        result.error("NOT_FOUND", "Local file not found: $fileName", null)
+                        return
+                    }
+                    FileProvider.getUriForFile(
+                        activity,
+                        "${activity.packageName}.localfiles",
+                        file,
+                    )
+                }
+
+                else -> {
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: run {
+                            result.error("NOT_MOUNTED", "Container not mounted", null)
+                            return
+                        }
+                    DocumentsContract.buildDocumentUri(
+                        "com.aeidolon.vaultexplorer.documents",
+                        "$volId:file:$fileName?mimeType=${MimeTypeHelper.APK}",
+                    )
+                }
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, MimeTypeHelper.APK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(intent)
+            result.success("started")
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(activity, R.string.install_no_installer, Toast.LENGTH_LONG).show()
+            result.success("noInstaller")
+        } catch (e: Exception) {
+            result.error("INSTALL_APK_ERROR", e.message, null)
         }
     }
 

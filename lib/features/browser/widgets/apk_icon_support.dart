@@ -63,10 +63,42 @@ class ApkIconUnavailable implements Exception {
 /// `VaultFileIoApi.getApkIcon` and [ArchiveService.open]/[openLocal] need.
 /// Callers should only reach this when `archiveContext == null`.
 ///
-/// Throws [ApkIconUnavailable] if both routes fail; callers should let
+/// Throws [ApkIconUnavailable] if both routes fail -- including if the
+/// whole attempt outruns [_extractionTimeout]; callers should let
 /// [AsyncThumbnail]'s existing error handling fall back to the plain
 /// file-type icon, same as [fetchArchiveEntryForThumbnail].
 Future<Uint8List> fetchApkIconForThumbnail({
+  required MountedContainer container,
+  required String filePath,
+  required VaultFileIoApi fileIoApi,
+}) {
+  return _fetchApkIcon(
+    container: container,
+    filePath: filePath,
+    fileIoApi: fileIoApi,
+  ).timeout(
+    _extractionTimeout,
+    onTimeout: () => throw const ApkIconUnavailable(
+      'Icon extraction timed out',
+    ),
+  );
+}
+
+/// Upper bound on a single icon extraction, after which the tile gives
+/// up and shows the plain file-type icon.
+///
+/// Neither route below is cancellable once it has reached native code (a
+/// `MethodChannel` call can't be interrupted, and neither can a
+/// `PackageManager` parse of a file descriptor into the container), so
+/// without a deadline a wedged extraction leaves its tile spinning for
+/// as long as the screen stays alive -- there is no failure for
+/// [AsyncThumbnail] to fall back from, only an absence of a result.
+/// Deliberately generous: even a large APK on slow storage resolves its
+/// icon in well under a second, since only the archive's directory and
+/// the icon resource itself are ever read, never the whole file.
+const _extractionTimeout = Duration(seconds: 20);
+
+Future<Uint8List> _fetchApkIcon({
   required MountedContainer container,
   required String filePath,
   required VaultFileIoApi fileIoApi,

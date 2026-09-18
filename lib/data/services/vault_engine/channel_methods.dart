@@ -98,6 +98,7 @@ abstract final class ChannelMethods {
   static const deleteFile = 'deleteFile';
   static const setLastModifiedTime = 'setLastModifiedTime';
   static const openWithApp = 'openWithApp';
+  static const installApk = 'installApk';
   static const shareFile = 'shareFile';
   static const openLocalFileWithApp = 'openLocalFileWithApp';
   static const getLocalFileUri = 'getLocalFileUri';

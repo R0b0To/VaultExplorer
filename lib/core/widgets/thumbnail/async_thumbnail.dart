@@ -78,13 +78,21 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   @override
   void didUpdateWidget(AsyncThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Defensive: every current call site keys this widget by content
+    // Every current call site keys this widget by content
     // (ValueKey('img:$filePath') etc.), so in practice a filePath change
-    // tears down the old Element and mounts a fresh one -- this path
-    // isn't expected to run. Kept so an in-place filePath/quality swap
-    // (were a future caller to omit a content-based key) still starts the
-    // new family instance's load rather than showing a stale/blank tile.
-    if (oldWidget.filePath != widget.filePath || oldWidget.quality != widget.quality) {
+    // tears down the old Element and mounts a fresh one. The container is
+    // the case that doesn't work that way: the same file at the same path
+    // can arrive under a rebuilt [MountedContainer] (a fresh `mountedAt`
+    // is enough), which is a different family instance -- with a fresh,
+    // still-loading state -- behind an Element that Flutter happily
+    // reuses. Without this the new instance is never armed and the tile
+    // spins forever. (`build` re-arms too, so this is belt and braces;
+    // it's kept explicit because the container is easy to overlook when
+    // reading the family key.)
+    if (oldWidget.filePath != widget.filePath ||
+        oldWidget.quality != widget.quality ||
+        oldWidget.container.volId != widget.container.volId ||
+        oldWidget.container.mountedAt != widget.container.mountedAt) {
       _ensureLoaded();
     }
   }
@@ -103,6 +111,18 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
 
   @override
   Widget build(BuildContext context) {
+    // Arming on every build, not just on mount. `ensureLoaded` is a no-op
+    // for a provider instance that has already started, so this costs
+    // nothing in the normal case -- but the provider is autoDispose and
+    // family-keyed, so the instance behind this widget can be replaced
+    // (disposed and recreated, or keyed differently) without the widget
+    // itself being rebuilt from scratch. `initState` has already run by
+    // then and `didUpdateWidget` may see no change it recognises, which
+    // used to leave a brand-new instance sitting in its initial loading
+    // state with nothing in flight and no way out. Re-arming here makes
+    // that self-correcting: any instance this widget is currently
+    // watching is, by construction, one that has been asked to load.
+    _ensureLoaded();
     final state = ref.watch(_provider);
     if (state.isLoading) {
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();

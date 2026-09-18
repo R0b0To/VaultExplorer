@@ -144,6 +144,32 @@ void main() {
       }
     });
 
+    test('.apk goes straight to the package installer', () {
+      final action = decideFileOpenAction(
+        ext: 'apk',
+        extensionPreference: null,
+        needsSystemAppForLocal: false,
+        isSupportedMedia: false,
+      );
+      expect(action, isA<InstallApk>());
+    });
+
+    test('a saved preference still beats the installer for .apk', () {
+      // An APK is a ZIP, so pointing it at an archive tool or an APK
+      // analyser is a legitimate thing to have chosen.
+      final action = decideFileOpenAction(
+        ext: 'apk',
+        extensionPreference: 'package:com.example.apkinspector',
+        needsSystemAppForLocal: false,
+        isSupportedMedia: false,
+      );
+      expect(action, isA<OpenWithSystemApp>());
+      expect(
+        (action as OpenWithSystemApp).packageName,
+        'com.example.apkinspector',
+      );
+    });
+
     test('anything else shows the open-with dialog', () {
       final action = decideFileOpenAction(
         ext: 'xyz',

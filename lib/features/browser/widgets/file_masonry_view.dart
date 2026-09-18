@@ -419,16 +419,24 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     );
   }
 
+  /// Whether this file's cell is sized by decoded artwork (and so needs a
+  /// real aspect ratio) rather than by a centred icon.
+  ///
+  /// An APK is deliberately *not* one of these, even though it does get a
+  /// thumbnail: its launcher icon is drawn at icon size inside the cell
+  /// rather than filling it (see `_buildFileCell`), so the cell should
+  /// take the same square icon ratio a PDF or an archive does. Sizing the
+  /// cell to the icon's own dimensions instead would let an APK stretch a
+  /// masonry row for artwork that isn't actually filling it.
   bool _hasVisualPreview(String fileName) {
     final ext = fileName.split('.').last;
     if (vaultIconForExt(ext) != null) return false;
     if (widget.archiveContext != null &&
-        (MediaViewerConstants.isVideo(fileName) || isApkFile(fileName))) {
+        MediaViewerConstants.isVideo(fileName)) {
       return false;
     }
     return MediaViewerConstants.isImage(fileName) ||
-        MediaViewerConstants.isVideo(fileName) ||
-        isApkFile(fileName);
+        MediaViewerConstants.isVideo(fileName);
   }
 
   Widget _buildDirCell(
@@ -546,12 +554,26 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       // Same restriction as video above -- see fetchApkIconForThumbnail's
       // doc comment for why an APK nested inside an open archive falls
       // through to the plain icon instead.
-      previewWidget = _ApkIconMasonryThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
-        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+      //
+      // Sized and centred exactly like the plain file-type icon in the
+      // `else` branch below rather than filled into the cell the way a
+      // photo or video frame is -- see `_hasVisualPreview` for why the
+      // cell's own ratio follows the same rule, and no size is reported
+      // back from here anymore.
+      previewWidget = Center(
+        child: SizedBox(
+          width: iconSize,
+          height: iconSize,
+          child: _ApkIconMasonryThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+            fallbackIcon: iconForFile(cleanName),
+            fallbackColor: colorForFile(cleanName),
+            fallbackIconSize: iconSize,
+          ),
+        ),
       );
     } else {
       previewWidget = Center(
@@ -961,42 +983,34 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
-  final void Function(int width, int height) onSizeKnown;
+
+  /// Shown while loading fails or the APK turns out to have no resolvable
+  /// launcher icon -- the same plain file-type icon the cell would have
+  /// drawn had it never tried, which is the fallback
+  /// `fetchApkIconForThumbnail`'s doc comment asks callers for.
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double fallbackIconSize;
 
   const _ApkIconMasonryThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
-    required this.onSizeKnown,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    required this.fallbackIconSize,
   });
-
-  /// A launcher icon is always square by spec, but this decodes the
-  /// actual bytes rather than assuming 1:1 -- cheap, and stays correct
-  /// if that ever changes. Mirrors `_EncryptedImageMasonryThumb`'s
-  /// `_checkAndReportSizeFromBytes` in this same file.
-  static Future<(int, int)?> _decodeSize(Uint8List bytes) async {
-    if (bytes.isEmpty) return null;
-    ui.Codec? codec;
-    try {
-      codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final size = (frame.image.width, frame.image.height);
-      frame.image.dispose();
-      return size;
-    } catch (_) {
-      // Malformed/undecodable icon bytes -- leave the aspect ratio at
-      // whatever _defaultRatioFor already fell back to (the same square
-      // _iconRatio a plain file-type icon gets).
-      return null;
-    } finally {
-      codec?.dispose();
-    }
-  }
 
   /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
   /// the same three-tier cache real image thumbnails use, keyed by
   /// [filePath] like any other file.
+  ///
+  /// No decoded width/height is reported back to the masonry layout here,
+  /// unlike the image/video thumbs in this file: the icon is drawn at a
+  /// fixed icon size inside its cell rather than filling it, so the cell
+  /// takes the plain square icon ratio (see `_hasVisualPreview`) and has
+  /// nothing to learn from the icon's own dimensions.
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -1004,41 +1018,22 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
-    void Function(int width, int height) onSizeKnown,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await thumbnailCache.fetchWithSize(
+      final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
         mode: mode,
         quality: quality,
       );
-      if (cached != null && cached.$1.isNotEmpty) {
-        final (bytes, width, height) = cached;
-        if (width != null && height != null) {
-          onSizeKnown(width, height);
-        } else {
-          final size = await _decodeSize(bytes);
-          if (size != null) onSizeKnown(size.$1, size.$2);
-        }
-        return bytes;
-      }
+      if (cached != null && cached.isNotEmpty) return cached;
     }
     final bytes = await fetchApkIconForThumbnail(
       container: container,
       filePath: path,
       fileIoApi: fileIoApi,
     );
-    final size = await _decodeSize(bytes);
-    if (size != null) onSizeKnown(size.$1, size.$2);
-    thumbnailCache.cacheInMemory(
-      container,
-      path,
-      bytes,
-      quality,
-      size?.$1,
-      size?.$2,
-    );
+    thumbnailCache.cacheInMemory(container, path, bytes, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         thumbnailCache.store(
@@ -1047,8 +1042,6 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
           data: bytes,
           mode: mode,
           quality: quality,
-          width: size?.$1,
-          height: size?.$2,
         ),
       );
     }
@@ -1059,25 +1052,6 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
-    final cs = Theme.of(context).colorScheme;
-
-    final syncEntry = thumbnailCache.peekMemoryWithSize(
-      container,
-      filePath,
-      quality,
-    );
-    if (syncEntry != null && syncEntry.$1.isNotEmpty) {
-      final (bytes, width, height) = syncEntry;
-      if (width != null && height != null) {
-        onSizeKnown(width, height);
-      } else {
-        unawaited(
-          _decodeSize(bytes).then((size) {
-            if (size != null) onSizeKnown(size.$1, size.$2);
-          }),
-        );
-      }
-    }
 
     return AsyncThumbnail(
       key: ValueKey('apk:$filePath'),
@@ -1087,40 +1061,40 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
       limiter: ThumbnailConcurrency.imageLimiter,
       quality: quality,
       fetchFn: (c, p) =>
-          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
+          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // Contain rather than image/video's cover -- an app icon is meant
-      // to be seen whole, never cropped.
+      // to be seen whole, never cropped. No filled placeholder behind any
+      // of the three states either: the caller sizes this to the icon
+      // box, so a coloured rectangle here would be a square drawn around
+      // the icon rather than the cell's own background showing through.
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
         cacheHeight: cacheHeight,
-        errorBuilder: (_, _, _) => _errorPlaceholder(cs),
+        errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cs.primary.withValues(alpha: 0.6),
-            ),
+      loadingBuilder: (context) => Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
           ),
         ),
       ),
-      errorBuilder: (context) => _errorPlaceholder(cs),
+      errorBuilder: (context) => _fallbackWidget(),
     );
   }
 
-  Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(Icons.broken_image_rounded,
-              size: AppIconSize.feature, color: cs.outline),
+  Widget _fallbackWidget() => Center(
+        child: Icon(
+          fallbackIcon,
+          size: fallbackIconSize,
+          color: fallbackColor,
         ),
       );
 }

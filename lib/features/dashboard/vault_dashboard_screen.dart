@@ -683,8 +683,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
-      child: Scaffold(
-        drawerEdgeDragWidth: double.maxFinite,
+  child: Scaffold(
+        drawerEdgeDragWidth: 24.0,
         drawerEnableOpenDragGesture: true,
         drawer: _buildDrawer(),
         appBar: AppBar(

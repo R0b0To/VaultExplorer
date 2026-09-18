@@ -40,23 +40,29 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
 
   @override
   void handleEvent(PointerEvent event) {
-    super.handleEvent(event);
     if (event is PointerMoveEvent) {
       final startPosition = _startPositions[event.pointer];
       if (startPosition != null) {
         final delta = event.position - startPosition;
         final double dx = delta.dx.abs();
         final double dy = delta.dy.abs();
-        if (dy > dx && dy > 6.0) {
-          rejectGesture(event.pointer);
+
+        // Only reject for vertical scrolling if movement clearly exceeds touch slop (18.0)
+        // so natural finger-squish on touch down does not abort the swipe.
+        if (dy > dx && dy > kTouchSlop) {
+          resolve(GestureDisposition.rejected);
           _startPositions.remove(event.pointer);
-        } else if (dx > 12.0) {
+        }
+        // When swiping horizontally, explicitly claim the gesture arena
+        else if (dx > 12.0 && dx > dy) {
+          resolve(GestureDisposition.accepted);
           _startPositions.remove(event.pointer);
         }
       }
     } else if (event is PointerUpEvent || event is PointerCancelEvent) {
       _startPositions.remove(event.pointer);
     }
+    super.handleEvent(event);
   }
 
   @override
@@ -265,7 +271,7 @@ class _VaultCardRowState extends State<VaultCardRow>
     _animateTo(target);
   }
 
-  Widget _maybeDragWrap({required Widget child}) {
+   Widget _maybeDragWrap({required Widget child}) {
     if (!widget.dragEnabled) return child;
     return ReorderableDelayedDragStartListener(index: widget.index, child: child);
   }
@@ -396,22 +402,14 @@ class _VaultCardRowState extends State<VaultCardRow>
                               ],
                             ),
                           ),
-                          RawGestureDetector(
-                            gestures: <Type, GestureRecognizerFactory>{
-                              StrictHorizontalDragGestureRecognizer:
-                                  GestureRecognizerFactoryWithHandlers<StrictHorizontalDragGestureRecognizer>(
-                                () => StrictHorizontalDragGestureRecognizer(),
-                                (StrictHorizontalDragGestureRecognizer instance) {
-                                  instance
-                                    ..onStart = _onDragStart
-                                    ..onUpdate = _onDragUpdate
-                                    ..onEnd = _onDragEnd
-                                    ..onCancel = _onDragCancel;
-                                },
-                              ),
-                            },
-                            child: Transform.translate(
-                              offset: Offset(_dx, 0),
+                              Transform.translate(
+                            offset: Offset(_dx, 0),
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onHorizontalDragStart: _onDragStart,
+                              onHorizontalDragUpdate: _onDragUpdate,
+                              onHorizontalDragEnd: _onDragEnd,
+                              onHorizontalDragCancel: _onDragCancel,
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 220),
                                 switchInCurve: Curves.easeOutCubic,

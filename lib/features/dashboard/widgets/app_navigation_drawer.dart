@@ -235,13 +235,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                             onLock: isMounted
                                 ? () async {
                                     final container = (item as MountedVaultItem).container;
-                                    final isViewingThisVault = container.volId == currentVolId;
-                                    if (isViewingThisVault) {
-                                      Navigator.pop(context); // Close drawer
-                                      if (Navigator.of(context).canPop()) {
-                                        Navigator.of(context).pop(); // Pop browser back to Dashboard
-                                      }
-                                    }
+                                    Navigator.pop(context); // Close drawer only
                                     await _lockSingleVault(context, ref, container);
                                   }
                                 : null,
@@ -270,8 +264,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                         ),
                         onTap: () {
                           Navigator.pop(context);
-                          if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).popUntil((route) => route.isFirst);
+                          if (currentVolId != null && Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
                           }
                           onSelectTab?.call(0);
                           onAddVault!();

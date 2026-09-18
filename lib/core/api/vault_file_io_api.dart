@@ -54,6 +54,39 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
+  /// Hands an APK to the system package installer.
+  ///
+  /// Streams the archive out of the container exactly the way
+  /// [openWithApp] does, so nothing is written to disk here either -- the
+  /// difference is that the installer is targeted directly rather than
+  /// offered as one option in a chooser, since "open" on an APK only
+  /// really means one thing.
+  ///
+  /// Returns what actually happened, so the caller can tell an install
+  /// that's under way from one that hasn't started yet:
+  ///  * `'started'` -- the installer is up.
+  ///  * `'permissionRequired'` -- the user hasn't allowed this app to
+  ///    install apps; the relevant settings page has been opened for
+  ///    them, and tapping the APK again after granting it will work.
+  ///  * `'noInstaller'` -- nothing on the device handles APKs (a managed
+  ///    or stripped-down device).
+  ///  * `null` -- the call itself failed; treat as "couldn't open".
+  Future<String?> installApk(
+    MountedContainer container,
+    String fileName,
+  ) async {
+    try {
+      return await _channel.invokeMethod<String>(ChannelMethods.installApk, {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'isLocalStorage': container.isLocalStorage,
+      });
+    } catch (e) {
+      logSwallowed('installApk', e, expected: true);
+      return null;
+    }
+  }
+
   /// Shares one or more files with another app via the system share sheet.
   ///
   /// Like [openWithApp], this streams decrypted bytes straight from

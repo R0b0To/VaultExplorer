@@ -79,9 +79,19 @@ static const List<String> audioExtensions = [
   ///
   /// Vault items (passwords, cards, etc.) always render as icons. Pass
   /// [insideArchive] when browsing inside an open archive, since video
-  /// and APK-icon thumbnails aren't supported there. Pass [isPlaceholder]
-  /// for an item still mid-transfer, since it renders as a generic icon
-  /// regardless of its eventual type.
+  /// thumbnails aren't supported there. Pass [isPlaceholder] for an item
+  /// still mid-transfer, since it renders as a generic icon regardless of
+  /// its eventual type.
+  ///
+  /// An APK counts as icon-only here even though it does get a thumbnail
+  /// of its own: its launcher icon is drawn at icon size and centred in
+  /// the cell rather than filling it, exactly like a PDF's or an
+  /// archive's generic icon, so it needs its name label for the same
+  /// reason -- two APKs side by side would otherwise be two anonymous
+  /// icons. (It would be the wrong call for a different reason too: this
+  /// can't be known from the filename alone the way isImage/isVideo can,
+  /// since it depends on whether the APK has a resolvable android:icon at
+  /// all -- see apk_icon_support.dart.)
   static bool hasRealThumbnail(
     String fileName, {
     bool insideArchive = false,
@@ -90,16 +100,7 @@ static const List<String> audioExtensions = [
     if (isPlaceholder) return false;
     final ext = fileName.contains('.') ? fileName.split('.').last : '';
     if (vaultIconForExt(ext) != null) return false;
-    if (insideArchive && (isVideo(fileName) || isApkFile(fileName))) {
-      return false;
-    }
-    // isApkFile: an approximation, not a guarantee -- unlike
-    // isImage/isVideo this can't be known from the filename alone (it
-    // depends on whether the APK actually has a resolvable android:icon,
-    // see apk_icon_support.dart). A rare APK with no extractable icon
-    // still hides its name label under this heuristic; AsyncThumbnail's
-    // error fallback still shows the correct generic icon in that case,
-    // just without the name visible.
-    return isImage(fileName) || isVideo(fileName) || isApkFile(fileName);
+    if (insideArchive && isVideo(fileName)) return false;
+    return isImage(fileName) || isVideo(fileName);
   }
 }

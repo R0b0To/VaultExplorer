@@ -309,7 +309,7 @@ class ThumbnailCacheService {
   /// Synchronous O(1) lookup into the in-memory tier. Returns the plain
   /// JPEG bytes. Use [getWithSizeFromMemory] if you also need the size.
   ///
-  /// Validated the same way a disk read is (see [_looksLikeValidJpeg]):
+  /// Validated the same way a disk read is (see [_looksLikeValidImage]):
   /// an entry that doesn't look like a real JPEG is evicted and treated as
   /// a miss rather than handed back to the caller. [putInMemory] already
   /// rejects malformed bytes before they're stored, so in the normal case
@@ -335,7 +335,7 @@ class ThumbnailCacheService {
     final key = _memKey(container, filePath, quality);
     final stored = _memoryCache[key];
     if (stored != null) {
-      if (_looksLikeValidJpeg(stored)) return stored;
+      if (_looksLikeValidImage(stored)) return stored;
       _memoryCache.remove(key);
     }
 
@@ -350,7 +350,7 @@ class ThumbnailCacheService {
     if (matchedKey.isNotEmpty) {
       final alt = _memoryCache[matchedKey];
       if (alt != null) {
-        if (_looksLikeValidJpeg(alt)) return alt;
+        if (_looksLikeValidImage(alt)) return alt;
         _memoryCache.remove(matchedKey);
       }
     }
@@ -380,7 +380,7 @@ class ThumbnailCacheService {
     final key = _memKey(container, filePath, quality);
     final stored = _memoryCache[key];
     if (stored != null) {
-      if (_looksLikeValidJpeg(stored)) {
+      if (_looksLikeValidImage(stored)) {
         final size = _sizeCache[key];
         return (stored, size?.$1, size?.$2);
       }
@@ -398,7 +398,7 @@ class ThumbnailCacheService {
     if (matchedKey.isNotEmpty) {
       final alt = _memoryCache[matchedKey];
       if (alt != null) {
-        if (_looksLikeValidJpeg(alt)) {
+        if (_looksLikeValidImage(alt)) {
           final size = _sizeCache[matchedKey];
           return (alt, size?.$1, size?.$2);
         }
@@ -413,7 +413,7 @@ class ThumbnailCacheService {
   /// [getWithSizeFromMemory] call can read them back without redecoding.
   ///
   /// Rejects [data] that doesn't look like a real JPEG (see
-  /// [_looksLikeValidJpeg]) before packing/storing it -- the same guard
+  /// [_looksLikeValidImage]) before packing/storing it -- the same guard
   /// [put] has always applied to the *disk* tier, now applied here too so
   /// the two tiers can't disagree about whether a given entry is trustworthy.
   /// This is the single choke point every writer (this method directly, and
@@ -427,7 +427,7 @@ class ThumbnailCacheService {
     int? width,
     int? height,
   ]) {
-    if (!_looksLikeValidJpeg(data)) {
+    if (!_looksLikeValidImage(data)) {
       return;
     }
     final key = _memKey(container, filePath, quality);
@@ -501,7 +501,7 @@ class ThumbnailCacheService {
         if (decrypted == null || decrypted.isEmpty) return null;
 
         final bytes = decrypted;
-        if (!_looksLikeValidJpeg(bytes)) {
+        if (!_looksLikeValidImage(bytes)) {
           return null;
         }
 
@@ -509,7 +509,7 @@ class ThumbnailCacheService {
         int? height;
 
         // Restore dimensions from sidecar .meta file if present, or parse from JPEG header
-        final dims = _extractJpegDimensions(bytes);
+        final dims = _extractImageDimensions(bytes);
         if (dims != null) {
           width = dims.$1;
           height = dims.$2;
@@ -545,12 +545,12 @@ class ThumbnailCacheService {
         if (stored == null || stored.isEmpty) return null;
 
         final bytes = stored;
-        if (!_looksLikeValidJpeg(bytes)) {
+        if (!_looksLikeValidImage(bytes)) {
           return null;
         }
 
         // Instant in-memory dimension extraction directly from JPEG header (0ms)
-        final dims = _extractJpegDimensions(bytes);
+        final dims = _extractImageDimensions(bytes);
         final width = dims?.$1;
         final height = dims?.$2;
 
@@ -631,11 +631,61 @@ class ThumbnailCacheService {
   /// unrelated targets.
   static final Map<String, Future<void>> _inFlightPuts = {};
 
-  /// True if [jpegBytes] has a plausible JPEG structure: the SOI marker
-  /// (0xFFD8) at the start and the EOI marker (0xFFD9) at the end. Not a
-  /// full decode — just cheap enough to run on every write and catch a
-  /// truncated/torn result before it's ever trusted as a cache hit,
-  /// without needing a real image codec here.
+  /// Extracts (width, height) from whichever of the supported container
+  /// formats [bytes] actually is, without decoding pixels. Dispatches on
+  /// the magic bytes rather than assuming JPEG: the cache stores JPEG for
+  /// generated image/video thumbnails, but PNG for APK launcher icons
+  /// (`PackageManager.loadIcon` is rasterised and PNG-compressed on the
+  /// native side -- see `ThumbnailHandlers.handleGetApkIcon`) and WebP for
+  /// an icon taken straight out of an APK's resource table by the
+  /// manual-parsing fallback in `apk_icon_support.dart`.
+  static (int width, int height)? _extractImageDimensions(Uint8List bytes) {
+    if (_isPng(bytes)) return _extractPngDimensions(bytes);
+    if (_isWebp(bytes)) return _extractWebpDimensions(bytes);
+    return _extractJpegDimensions(bytes);
+  }
+
+  /// PNG's IHDR chunk is mandated to be the first chunk, so width/height
+  /// always sit at a fixed offset right after the 8-byte signature.
+  static (int width, int height)? _extractPngDimensions(Uint8List bytes) {
+    if (bytes.length < 24) return null;
+    final width =
+        (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+    final height =
+        (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    if (width <= 0 || height <= 0) return null;
+    return (width, height);
+  }
+
+  /// Handles the three WebP chunk layouts (lossy `VP8 `, lossless `VP8L`,
+  /// extended `VP8X`), each of which stores its canvas size in a
+  /// different place. Returns null for anything unrecognised -- a missing
+  /// size only costs a masonry-tile aspect ratio, never the thumbnail.
+  static (int width, int height)? _extractWebpDimensions(Uint8List bytes) {
+    if (bytes.length < 30) return null;
+    final fourCc = String.fromCharCodes(bytes.sublist(12, 16));
+    switch (fourCc) {
+      case 'VP8 ':
+        final width = ((bytes[27] << 8) | bytes[26]) & 0x3FFF;
+        final height = ((bytes[29] << 8) | bytes[28]) & 0x3FFF;
+        return (width > 0 && height > 0) ? (width, height) : null;
+      case 'VP8L':
+        final bits =
+            bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24);
+        final width = (bits & 0x3FFF) + 1;
+        final height = ((bits >> 14) & 0x3FFF) + 1;
+        return (width, height);
+      case 'VP8X':
+        final width =
+            ((bytes[24] << 16) | (bytes[25] << 8) | bytes[26]) + 1;
+        final height =
+            ((bytes[27] << 16) | (bytes[28] << 8) | bytes[29]) + 1;
+        return (width, height);
+      default:
+        return null;
+    }
+  }
+
   /// Extracts (width, height) directly from the JPEG Start-of-Frame (SOF) header marker
   /// in memory in O(1) without decoding the full image pixels.
   static (int width, int height)? _extractJpegDimensions(Uint8List bytes) {
@@ -677,11 +727,75 @@ class ThumbnailCacheService {
     return null;
   }
 
-  static bool _looksLikeValidJpeg(Uint8List jpegBytes) {
-    if (jpegBytes.length < 4) return false;
-    if (jpegBytes[0] != 0xFF || jpegBytes[1] != 0xD8) return false;
-    final len = jpegBytes.length;
-    return jpegBytes[len - 2] == 0xFF && jpegBytes[len - 1] == 0xD9;
+  /// True if [bytes] has a plausible structure for one of the image
+  /// formats this cache stores -- start *and* end markers where the
+  /// format defines them. Not a full decode: just cheap enough to run on
+  /// every write and catch a truncated/torn result before it's ever
+  /// trusted as a cache hit, without needing a real image codec here.
+  ///
+  /// This used to be JPEG-only, which silently made the whole cache a
+  /// no-op for APK launcher icons: they arrive as PNG (or WebP via the
+  /// manual-parse fallback), so every tier rejected them -- [putInMemory]
+  /// dropped them, [put] refused to write them to disk, and [getWithSize]
+  /// would have discarded them on read anyway. The visible symptom was an
+  /// APK icon that re-extracted itself from scratch on every single visit
+  /// to the folder, since nothing was ever actually cached.
+  static bool _looksLikeValidImage(Uint8List bytes) {
+    if (_isPng(bytes)) return _looksLikeValidPng(bytes);
+    if (_isWebp(bytes)) return _looksLikeValidWebp(bytes);
+    return _looksLikeValidJpeg(bytes);
+  }
+
+  /// SOI marker (0xFFD8) at the start, EOI marker (0xFFD9) at the end.
+  static bool _looksLikeValidJpeg(Uint8List bytes) {
+    if (bytes.length < 4) return false;
+    if (bytes[0] != 0xFF || bytes[1] != 0xD8) return false;
+    final len = bytes.length;
+    return bytes[len - 2] == 0xFF && bytes[len - 1] == 0xD9;
+  }
+
+  static const _pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
+  static bool _isPng(Uint8List bytes) {
+    if (bytes.length < 8) return false;
+    for (var i = 0; i < _pngSignature.length; i++) {
+      if (bytes[i] != _pngSignature[i]) return false;
+    }
+    return true;
+  }
+
+  /// A complete PNG always ends with the 12-byte IEND chunk, so its
+  /// ASCII type tag sits at a fixed offset from the end -- the same
+  /// cheap truncation check the JPEG EOI marker gives us.
+  static bool _looksLikeValidPng(Uint8List bytes) {
+    if (bytes.length < 20) return false;
+    final len = bytes.length;
+    return bytes[len - 8] == 0x49 && // I
+        bytes[len - 7] == 0x45 && // E
+        bytes[len - 6] == 0x4E && // N
+        bytes[len - 5] == 0x44; //   D
+  }
+
+  static bool _isWebp(Uint8List bytes) {
+    if (bytes.length < 12) return false;
+    return bytes[0] == 0x52 && // R
+        bytes[1] == 0x49 && // I
+        bytes[2] == 0x46 && // F
+        bytes[3] == 0x46 && // F
+        bytes[8] == 0x57 && // W
+        bytes[9] == 0x45 && // E
+        bytes[10] == 0x42 && // B
+        bytes[11] == 0x50; //  P
+  }
+
+  /// WebP has no end marker, so completeness is checked against the RIFF
+  /// header's own declared payload length instead.
+  static bool _looksLikeValidWebp(Uint8List bytes) {
+    if (bytes.length < 16) return false;
+    final riffLength =
+        bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);
+    if (riffLength <= 0) return false;
+    return bytes.length >= riffLength + 8;
   }
 
   static Future<void> put({
@@ -699,7 +813,7 @@ class ThumbnailCacheService {
 
     putInMemory(container, filePath, data, quality, width, height);
 
-    if (!_looksLikeValidJpeg(data)) {
+    if (!_looksLikeValidImage(data)) {
       return Future.value();
     }
 

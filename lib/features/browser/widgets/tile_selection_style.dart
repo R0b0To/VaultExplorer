@@ -72,7 +72,21 @@ class FileRowShell extends StatelessWidget {
   final VoidCallback? onIconTap;
   final Widget? iconBadge;
   final Widget? customLeading;
-  
+
+  /// Set when [customLeading] is an icon that stands on its own -- an
+  /// APK's launcher icon, which already carries its own shape, background
+  /// and padding as designed by whoever shipped the app.
+  ///
+  /// The default (false) treats [customLeading] as edge-to-edge artwork:
+  /// it's filled into the tinted squircle and clipped to it, which is
+  /// right for a photo or video frame but wrong for an app icon -- the
+  /// tint shows as a coloured square behind an icon that already has a
+  /// background of its own, and the rounded clip shaves the icon's
+  /// corners off. When true the box contributes nothing visually: no
+  /// tint, no clip, just a small inset so the icon doesn't sit flush
+  /// against the row's text.
+  final bool customLeadingIsIcon;
+
   const FileRowShell({
     super.key,
     required this.icon,
@@ -94,6 +108,7 @@ class FileRowShell extends StatelessWidget {
     this.zoomLevel = 1.0,
     this.iconBadge,
     this.customLeading,
+    this.customLeadingIsIcon = false,
   });
 
   String _columnText(FileDetailColumn col, BuildContext context) =>
@@ -200,6 +215,14 @@ class FileRowShell extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
+    // See [customLeadingIsIcon]: a self-contained icon gets no tint, no
+    // clip and a small inset; everything else keeps the filled squircle.
+    final bareIconLeading = customLeading != null && customLeadingIsIcon;
+    final leadingBackground =
+        bareIconLeading ? Colors.transparent : squircleBackground;
+    final leadingClip = bareIconLeading ? Clip.none : Clip.antiAlias;
+    final leadingPadding =
+        bareIconLeading ? const EdgeInsets.all(2.0) : EdgeInsets.zero;
     final effectiveTrailing = trailing;
     Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
@@ -227,11 +250,12 @@ class FileRowShell extends StatelessWidget {
                     Container(
                       width: (isCompact ? 32 : 44) * zoomLevel,
                       height: (isCompact ? 32 : 44) * zoomLevel,
+                      padding: leadingPadding,
                       decoration: BoxDecoration(
-                        color: squircleBackground,
+                        color: leadingBackground,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      clipBehavior: Clip.antiAlias,
+                      clipBehavior: leadingClip,
                       child: customLeading ??
                           Icon(
                             icon,
@@ -250,11 +274,12 @@ class FileRowShell extends StatelessWidget {
                       child: Container(
                         width: (isCompact ? 32 : 44) * zoomLevel,
                         height: (isCompact ? 32 : 44) * zoomLevel,
+                        padding: leadingPadding,
                         decoration: BoxDecoration(
-                          color: squircleBackground,
+                          color: leadingBackground,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        clipBehavior: Clip.antiAlias,
+                        clipBehavior: leadingClip,
                         child: customLeading ??
                             Icon(
                               icon,

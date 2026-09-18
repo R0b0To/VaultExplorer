@@ -1,6 +1,12 @@
 package com.aeidolon.vaultexplorer
 
 object MimeTypeHelper {
+    /** The only mime type the system package installer registers for.
+     *  An APK reported as `application/octet-stream` (what the `else`
+     *  branch below used to give it) is offered to every generic file
+     *  handler on the device and to the installer by none of them. */
+    const val APK = "application/vnd.android.package-archive"
+
     fun getMimeType(fileName: String): String = when {
         fileName.endsWith(".png",  ignoreCase = true)                                         -> "image/png"
         fileName.endsWith(".jpg",  ignoreCase = true) || fileName.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
@@ -27,6 +33,7 @@ object MimeTypeHelper {
         fileName.endsWith(".xls",  ignoreCase = true)                                         -> "application/vnd.ms-excel"
         fileName.endsWith(".xlsx", ignoreCase = true)                                         -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         fileName.endsWith(".zip",  ignoreCase = true)                                         -> "application/zip"
+        fileName.endsWith(".apk",  ignoreCase = true)                                         -> APK
         fileName.endsWith(".html", ignoreCase = true) || fileName.endsWith(".htm",  ignoreCase = true) -> "text/html"
         fileName.endsWith(".css",  ignoreCase = true)                                         -> "text/css"
         fileName.endsWith(".js",   ignoreCase = true) || fileName.endsWith(".mjs",  ignoreCase = true) -> "text/javascript"

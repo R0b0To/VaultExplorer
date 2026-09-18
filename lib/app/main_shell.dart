@@ -241,7 +241,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     final Widget scaffold = Scaffold(
-      drawerEdgeDragWidth: double.maxFinite,
+      drawerEdgeDragWidth: 24.0,
       drawerEnableOpenDragGesture: true,
       drawer: buildDrawer(),
       body: body,

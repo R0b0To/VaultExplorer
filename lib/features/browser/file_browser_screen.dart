@@ -1443,6 +1443,8 @@ void _navigateUp() {
         await _openMarkdownViewer(fullPath);
       case OpenWithSystemApp(packageName: final packageName):
         _openFileWithApp(entry.name, fullPath, packageName: packageName);
+      case InstallApk():
+        await _installApk(entry.name, fullPath);
       case ShowOpenWithDialog():
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
@@ -1788,6 +1790,31 @@ void _navigateUp() {
   }
 
   bool _isSupportedMedia(String fileName) => MediaViewerConstants.isSupported(fileName);
+
+  /// Hands an APK to the system package installer (see
+  /// [VaultFileIoApi.installApk]).
+  ///
+  /// The two non-install outcomes -- the user hasn't allowed this app to
+  /// install apps, or the device has no installer at all -- are already
+  /// surfaced natively, next to the settings page the first one opens, so
+  /// they're deliberately not reported a second time here. Only an
+  /// outright failure of the call gets a status message.
+  Future<void> _installApk(String cleanName, String fullPath) async {
+    _signalActivity();
+    try {
+      final outcome = await ref.read(vaultFileIoApiProvider).installApk(
+            widget.container,
+            fullPath,
+          );
+      if (outcome == null && mounted) {
+        _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
+      }
+    }
+  }
 
   Future<void> _openFileWithApp(
     String cleanName,

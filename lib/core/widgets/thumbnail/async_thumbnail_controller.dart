@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -63,11 +64,45 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   bool _started = false;
   Completer<void>? _limiterCompleter;
 
+  /// Guards the cancellation-retry path in [_load] against looping
+  /// forever. A dequeued/cancelled request is worth retrying (see there),
+  /// but nothing previously capped how many times: a tile whose fetch
+  /// kept coming back cancelled re-entered [_load] every 150ms
+  /// indefinitely, and since each pass leaves [state] in its loading form,
+  /// the user just sees a spinner that never resolves to either an image
+  /// or the file-type fallback. Past this many attempts the error state
+  /// wins, which at least shows the correct fallback icon and lets a
+  /// later rebuild (scroll away and back, pull-to-refresh) start clean.
+  static const _maxCancellationRetries = 5;
+  int _cancellationRetries = 0;
+
+  /// Hard ceiling on how long a single tile will sit on its spinner.
+  ///
+  /// Neither half of a thumbnail fetch is cancellable once it's running:
+  /// a `MethodChannel` call can't be interrupted, and the queue slot it's
+  /// waiting for is only freed by whoever holds it. So if either one
+  /// never comes back, [state] stays in its loading form forever and the
+  /// tile spins for as long as the screen is alive -- there is no failure
+  /// for the widget to fall back from, only the absence of a result.
+  ///
+  /// Timing out here is deliberately a display decision, not a
+  /// cancellation: the underlying fetch is left running, and if it does
+  /// eventually finish it still populates the cache for next time. All
+  /// that changes is that this tile stops pretending something is about
+  /// to happen and shows its plain file-type icon instead. Generous
+  /// enough to cover a long queue on a slow device -- the queue admits
+  /// two at a time, so a folder full of large files legitimately makes
+  /// the last tile wait a while -- and [ThumbnailRetrySignal] gives a
+  /// timed-out tile another go the next time the app is foregrounded.
+  static const _watchdogTimeout = Duration(seconds: 45);
+
   @override
   AsyncThumbnailState build(int volId, DateTime mountedAt, String filePath, ThumbnailQuality quality) {
     PlaybackThrottleController.isPlaybackActive.addListener(_onPlaybackActiveChanged);
+    ThumbnailRetrySignal.generation.addListener(_onRetrySignal);
     ref.onDispose(() {
       PlaybackThrottleController.isPlaybackActive.removeListener(_onPlaybackActiveChanged);
+      ThumbnailRetrySignal.generation.removeListener(_onRetrySignal);
       _cancel();
     });
     return const AsyncThumbnailState();
@@ -109,6 +144,33 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
         _load();
       }
     });
+  }
+
+  /// The app came back to the foreground (see [ThumbnailRetrySignal]).
+  ///
+  /// Anything already showing an image is left strictly alone -- this is
+  /// a recovery path for tiles that ended up with neither bytes nor an
+  /// error, not a refresh. Those are restarted from scratch: the shared
+  /// in-flight entry is dropped first, since the whole reason to be here
+  /// is that whatever it points at may never complete, and a second
+  /// attempt that awaits the same dead future would be no attempt at all.
+  void _onRetrySignal() {
+    if (!ref.mounted) return;
+    if (state.bytes != null && state.bytes!.isNotEmpty) return;
+    _restart();
+  }
+
+  void _restart() {
+    if (!_started) return;
+    final container = _container;
+    if (container == null) return;
+    _cancel();
+    final cacheKey =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+    _cache?.remove(cacheKey);
+    _cancellationRetries = 0;
+    state = const AsyncThumbnailState();
+    _load();
   }
 
   void _onPlaybackActiveChanged() {
@@ -170,17 +232,19 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     }
 
     try {
-      final data = await future;
+      final data = await future.timeout(_watchdogTimeout);
       if (!ref.mounted) return;
+      _cancellationRetries = 0;
       state = AsyncThumbnailState(bytes: data, isLoading: false);
     } catch (e) {
       if (!ref.mounted) return;
       final errStr = e.toString();
       final isCancellation = errStr.contains('Cancelled') || errStr.contains('cancelled');
-      if (isCancellation) {
+      if (isCancellation && _cancellationRetries < _maxCancellationRetries) {
         // Dequeued/cancelled due to rapid scrolling, not a missing or
         // corrupt file. Retry after a brief delay if this instance is
-        // still live.
+        // still live -- bounded by [_maxCancellationRetries], see there.
+        _cancellationRetries++;
         Future.delayed(const Duration(milliseconds: 150), () {
           if (ref.mounted) _load();
         });

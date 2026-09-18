@@ -1,0 +1,13 @@
+### Features
+• External Storage: Added support for external storages/Document Providers and decoy file manager integration
+• APK Support: Added APK icon previews and direct install requests via the Package Installer
+• Video Scrub Preview (WIP): Added a scrub-preview minibox for video playback, with full-screen preview coming soon
+
+### Improvements
+• Navigation Redesign: Updated interface flow with a sidebar drawer accessible via hamburger button or full-screen swipe gesture
+• Split FAB: Separated the floating action button into two dedicated buttons for add operations and file actions
+• Media Viewer Controls: Added the ability to show, hide, and customize the order/position of player controls
+• Natural Sorting: Switched alphanumeric sorting to Natural Sort Order
+
+### Bug Fixes
+• Storage Calculation: Fixed file containers reading available free space from internal storage instead of their own volume

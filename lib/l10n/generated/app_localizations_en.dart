@@ -7754,4 +7754,73 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'Calculating…';
+
+  @override
+  String get videoGesturesHeader => 'Video Gestures & Zoom';
+
+  @override
+  String get edgeSwipeBrightnessTitle => 'Brightness Swipe Gesture';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'Swipe near the left edge to adjust screen brightness';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'Volume Swipe Gesture';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'Swipe near the right edge to adjust volume';
+
+  @override
+  String get edgeSwipeHudTitle => 'Show Gesture Indicator';
+
+  @override
+  String get edgeSwipeHudSubtitle =>
+      'Display a percentage overlay while swiping';
+
+  @override
+  String get edgeSwipeWidthTitle => 'Edge Zone Width';
+
+  @override
+  String get pinchZoomOutTitle => 'Allow Zoom Out';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'Pinch to shrink the video below its normal size';
+
+  @override
+  String get minZoomTitle => 'Minimum Zoom Level';
+
+  @override
+  String get holdSpeedMultiplierTitle => 'Hold-to-Fast-Forward Speed';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'Speed while press-and-holding the video';
+
+  @override
+  String get defaultAspectRatioTitle => 'Default Aspect Ratio';
+
+  @override
+  String get defaultAspectRatioSubtitle =>
+      'Applied automatically when a video is opened';
+
+  @override
+  String get aspectRatioModeLabel => 'Aspect Ratio';
+
+  @override
+  String get aspectRatioBestFit => 'Best Fit';
+
+  @override
+  String get aspectRatioFill => 'Fill';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'Centre';
 }

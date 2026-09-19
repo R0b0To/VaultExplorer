@@ -7946,4 +7946,71 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'جارٍ الحساب…';
+
+  @override
+  String get videoGesturesHeader => 'إيماءات الفيديو والتكبير';
+
+  @override
+  String get edgeSwipeBrightnessTitle => 'إيماءة سحب السطوع';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'اسحب بالقرب من الحافة اليسرى لضبط سطوع الشاشة';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'إيماءة سحب مستوى الصوت';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'اسحب بالقرب من الحافة اليمنى لضبط مستوى الصوت';
+
+  @override
+  String get edgeSwipeHudTitle => 'إظهار مؤشر الإيماءة';
+
+  @override
+  String get edgeSwipeHudSubtitle => 'عرض النسبة المئوية أثناء السحب';
+
+  @override
+  String get edgeSwipeWidthTitle => 'عرض منطقة الحافة';
+
+  @override
+  String get pinchZoomOutTitle => 'السماح بالتصغير';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'اضغط بإصبعين للتصغير إلى ما دون الحجم الطبيعي';
+
+  @override
+  String get minZoomTitle => 'الحد الأدنى لمستوى التكبير';
+
+  @override
+  String get holdSpeedMultiplierTitle => 'سرعة التقديم السريع مع الاستمرار';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'السرعة أثناء الضغط مطولاً على الفيديو';
+
+  @override
+  String get defaultAspectRatioTitle => 'نسبة العرض إلى الارتفاع الافتراضية';
+
+  @override
+  String get defaultAspectRatioSubtitle => 'تُطبق تلقائيًا عند فتح الفيديو';
+
+  @override
+  String get aspectRatioModeLabel => 'نسبة العرض إلى الارتفاع';
+
+  @override
+  String get aspectRatioBestFit => 'أفضل ملاءمة';
+
+  @override
+  String get aspectRatioFill => 'ملء';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'توسيط';
 }

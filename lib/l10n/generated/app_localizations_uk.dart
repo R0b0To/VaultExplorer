@@ -7937,4 +7937,73 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'Обчислення…';
+
+  @override
+  String get videoGesturesHeader => 'Жести відео та масштаб';
+
+  @override
+  String get edgeSwipeBrightnessTitle => 'Жест провезення для яскравості';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'Проведіть біля лівого краю для налаштування яскравості екрана';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'Жест провезення для гучності';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'Проведіть біля правого краю для налаштування гучності';
+
+  @override
+  String get edgeSwipeHudTitle => 'Показувати індикатор жесту';
+
+  @override
+  String get edgeSwipeHudSubtitle => 'Відображати відсоток під час провезення';
+
+  @override
+  String get edgeSwipeWidthTitle => 'Ширина крайової зони';
+
+  @override
+  String get pinchZoomOutTitle => 'Дозволити зменшення масштабу';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'Зведіть пальці, щоб зменшити відео нижче звичайного розміру';
+
+  @override
+  String get minZoomTitle => 'Мінімальний рівень масштабу';
+
+  @override
+  String get holdSpeedMultiplierTitle =>
+      'Швидкість притискання для перемотування';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'Швидкість під час утримання пальця на відео';
+
+  @override
+  String get defaultAspectRatioTitle => 'Стандартне співвідношення сторін';
+
+  @override
+  String get defaultAspectRatioSubtitle =>
+      'Застосовується автоматично під час відкриття відео';
+
+  @override
+  String get aspectRatioModeLabel => 'Співвідношення сторін';
+
+  @override
+  String get aspectRatioBestFit => 'Найкраще припасування';
+
+  @override
+  String get aspectRatioFill => 'Заповнення';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'По центру';
 }

@@ -13038,6 +13038,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Calculating…'**
   String get calculatingFolderStats;
+
+  /// Header for video playback gestures and zoom controls section
+  ///
+  /// In en, this message translates to:
+  /// **'Video Gestures & Zoom'**
+  String get videoGesturesHeader;
+
+  /// Title for brightness swipe gesture setting
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness Swipe Gesture'**
+  String get edgeSwipeBrightnessTitle;
+
+  /// Description for brightness swipe gesture setting
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe near the left edge to adjust screen brightness'**
+  String get edgeSwipeBrightnessSubtitle;
+
+  /// Title for volume swipe gesture setting
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Swipe Gesture'**
+  String get edgeSwipeVolumeTitle;
+
+  /// Description for volume swipe gesture setting
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe near the right edge to adjust volume'**
+  String get edgeSwipeVolumeSubtitle;
+
+  /// Title for gesture indicator overlay toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Show Gesture Indicator'**
+  String get edgeSwipeHudTitle;
+
+  /// Description for gesture indicator overlay setting
+  ///
+  /// In en, this message translates to:
+  /// **'Display a percentage overlay while swiping'**
+  String get edgeSwipeHudSubtitle;
+
+  /// Title for edge detection zone width setting
+  ///
+  /// In en, this message translates to:
+  /// **'Edge Zone Width'**
+  String get edgeSwipeWidthTitle;
+
+  /// Title for setting allowing zoom out below normal size
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Zoom Out'**
+  String get pinchZoomOutTitle;
+
+  /// Description for allow zoom out setting
+  ///
+  /// In en, this message translates to:
+  /// **'Pinch to shrink the video below its normal size'**
+  String get pinchZoomOutSubtitle;
+
+  /// Title for minimum zoom level setting
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum Zoom Level'**
+  String get minZoomTitle;
+
+  /// Title for hold-to-fast-forward playback speed multiplier
+  ///
+  /// In en, this message translates to:
+  /// **'Hold-to-Fast-Forward Speed'**
+  String get holdSpeedMultiplierTitle;
+
+  /// Description for hold-to-fast-forward speed setting
+  ///
+  /// In en, this message translates to:
+  /// **'Speed while press-and-holding the video'**
+  String get holdSpeedMultiplierSubtitle;
+
+  /// Title for default aspect ratio setting
+  ///
+  /// In en, this message translates to:
+  /// **'Default Aspect Ratio'**
+  String get defaultAspectRatioTitle;
+
+  /// Description for default aspect ratio setting
+  ///
+  /// In en, this message translates to:
+  /// **'Applied automatically when a video is opened'**
+  String get defaultAspectRatioSubtitle;
+
+  /// Label for aspect ratio selection
+  ///
+  /// In en, this message translates to:
+  /// **'Aspect Ratio'**
+  String get aspectRatioModeLabel;
+
+  /// Label for best fit aspect ratio option
+  ///
+  /// In en, this message translates to:
+  /// **'Best Fit'**
+  String get aspectRatioBestFit;
+
+  /// Label for fill aspect ratio option
+  ///
+  /// In en, this message translates to:
+  /// **'Fill'**
+  String get aspectRatioFill;
+
+  /// Label for 16:9 aspect ratio option
+  ///
+  /// In en, this message translates to:
+  /// **'16:9'**
+  String get aspectRatio16x9;
+
+  /// Label for 4:3 aspect ratio option
+  ///
+  /// In en, this message translates to:
+  /// **'4:3'**
+  String get aspectRatio4x3;
+
+  /// Label for centre aspect ratio option
+  ///
+  /// In en, this message translates to:
+  /// **'Centre'**
+  String get aspectRatioCentre;
 }
 
 class _AppLocalizationsDelegate

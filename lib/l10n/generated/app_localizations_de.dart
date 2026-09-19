@@ -7877,4 +7877,73 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'Wird berechnet…';
+
+  @override
+  String get videoGesturesHeader => 'Videogesten & Zoom';
+
+  @override
+  String get edgeSwipeBrightnessTitle => 'Helligkeits-Wischgeste';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'Am linken Rand wischen, um die Bildschirmhelligkeit anzupassen';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'Lautstärke-Wischgeste';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'Am rechten Rand wischen, um die Lautstärke anzupassen';
+
+  @override
+  String get edgeSwipeHudTitle => 'Gestenanzeige einblenden';
+
+  @override
+  String get edgeSwipeHudSubtitle =>
+      'Beim Wischen eine Prozentanzeige einblenden';
+
+  @override
+  String get edgeSwipeWidthTitle => 'Randzonenbreite';
+
+  @override
+  String get pinchZoomOutTitle => 'Verkleinern zulassen';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'Zusammenziehen, um das Video unter seine Normalgröße zu verkleinern';
+
+  @override
+  String get minZoomTitle => 'Minimale Zoomstufe';
+
+  @override
+  String get holdSpeedMultiplierTitle => 'Geschwindigkeit beim Gedrückthalten';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'Wiedergabegeschwindigkeit beim Gedrückthalten des Videos';
+
+  @override
+  String get defaultAspectRatioTitle => 'Standard-Seitenverhältnis';
+
+  @override
+  String get defaultAspectRatioSubtitle =>
+      'Wird beim Öffnen eines Videos automatisch angewendet';
+
+  @override
+  String get aspectRatioModeLabel => 'Seitenverhältnis';
+
+  @override
+  String get aspectRatioBestFit => 'Beste Passform';
+
+  @override
+  String get aspectRatioFill => 'Ausfüllen';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'Zentriert';
 }

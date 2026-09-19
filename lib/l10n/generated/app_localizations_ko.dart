@@ -7455,4 +7455,67 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => '계산 중…';
+
+  @override
+  String get videoGesturesHeader => '동영상 제스처 및 줌';
+
+  @override
+  String get edgeSwipeBrightnessTitle => '밝기 조절 스와이프 제스처';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle => '화면 왼쪽 가장자리를 스와이프하여 밝기를 조절합니다';
+
+  @override
+  String get edgeSwipeVolumeTitle => '볼륨 조절 스와이프 제스처';
+
+  @override
+  String get edgeSwipeVolumeSubtitle => '화면 오른쪽 가장자리를 스와이프하여 볼륨을 조절합니다';
+
+  @override
+  String get edgeSwipeHudTitle => '제스처 표시기 표시';
+
+  @override
+  String get edgeSwipeHudSubtitle => '스와이프하는 동안 화면에 백분율을 표시합니다';
+
+  @override
+  String get edgeSwipeWidthTitle => '가장자리 영역 너비';
+
+  @override
+  String get pinchZoomOutTitle => '축소 허용';
+
+  @override
+  String get pinchZoomOutSubtitle => '핀치 동작으로 동영상을 기본 크기보다 작게 축소합니다';
+
+  @override
+  String get minZoomTitle => '최소 줌 배율';
+
+  @override
+  String get holdSpeedMultiplierTitle => '길게 눌러 빨리감기 속도';
+
+  @override
+  String get holdSpeedMultiplierSubtitle => '동영상을 길게 누르는 동안의 재생 속도';
+
+  @override
+  String get defaultAspectRatioTitle => '기본 화면 비율';
+
+  @override
+  String get defaultAspectRatioSubtitle => '동영상이 열릴 때 자동으로 적용됩니다';
+
+  @override
+  String get aspectRatioModeLabel => '화면 비율';
+
+  @override
+  String get aspectRatioBestFit => '최적 맞춤';
+
+  @override
+  String get aspectRatioFill => '화면 채우기';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => '가운데 정렬';
 }

@@ -9927,5 +9927,89 @@
   "calculatingFolderStats": "Calculating…",
   "@calculatingFolderStats": {
     "description": "Placeholder text while scanning folder contents"
+  },
+  "videoGesturesHeader": "Video Gestures & Zoom",
+  "@videoGesturesHeader": {
+    "description": "Header for video playback gestures and zoom controls section"
+  },
+  "edgeSwipeBrightnessTitle": "Brightness Swipe Gesture",
+  "@edgeSwipeBrightnessTitle": {
+    "description": "Title for brightness swipe gesture setting"
+  },
+  "edgeSwipeBrightnessSubtitle": "Swipe near the left edge to adjust screen brightness",
+  "@edgeSwipeBrightnessSubtitle": {
+    "description": "Description for brightness swipe gesture setting"
+  },
+  "edgeSwipeVolumeTitle": "Volume Swipe Gesture",
+  "@edgeSwipeVolumeTitle": {
+    "description": "Title for volume swipe gesture setting"
+  },
+  "edgeSwipeVolumeSubtitle": "Swipe near the right edge to adjust volume",
+  "@edgeSwipeVolumeSubtitle": {
+    "description": "Description for volume swipe gesture setting"
+  },
+  "edgeSwipeHudTitle": "Show Gesture Indicator",
+  "@edgeSwipeHudTitle": {
+    "description": "Title for gesture indicator overlay toggle"
+  },
+  "edgeSwipeHudSubtitle": "Display a percentage overlay while swiping",
+  "@edgeSwipeHudSubtitle": {
+    "description": "Description for gesture indicator overlay setting"
+  },
+  "edgeSwipeWidthTitle": "Edge Zone Width",
+  "@edgeSwipeWidthTitle": {
+    "description": "Title for edge detection zone width setting"
+  },
+  "pinchZoomOutTitle": "Allow Zoom Out",
+  "@pinchZoomOutTitle": {
+    "description": "Title for setting allowing zoom out below normal size"
+  },
+  "pinchZoomOutSubtitle": "Pinch to shrink the video below its normal size",
+  "@pinchZoomOutSubtitle": {
+    "description": "Description for allow zoom out setting"
+  },
+  "minZoomTitle": "Minimum Zoom Level",
+  "@minZoomTitle": {
+    "description": "Title for minimum zoom level setting"
+  },
+  "holdSpeedMultiplierTitle": "Hold-to-Fast-Forward Speed",
+  "@holdSpeedMultiplierTitle": {
+    "description": "Title for hold-to-fast-forward playback speed multiplier"
+  },
+  "holdSpeedMultiplierSubtitle": "Speed while press-and-holding the video",
+  "@holdSpeedMultiplierSubtitle": {
+    "description": "Description for hold-to-fast-forward speed setting"
+  },
+  "defaultAspectRatioTitle": "Default Aspect Ratio",
+  "@defaultAspectRatioTitle": {
+    "description": "Title for default aspect ratio setting"
+  },
+  "defaultAspectRatioSubtitle": "Applied automatically when a video is opened",
+  "@defaultAspectRatioSubtitle": {
+    "description": "Description for default aspect ratio setting"
+  },
+  "aspectRatioModeLabel": "Aspect Ratio",
+  "@aspectRatioModeLabel": {
+    "description": "Label for aspect ratio selection"
+  },
+  "aspectRatioBestFit": "Best Fit",
+  "@aspectRatioBestFit": {
+    "description": "Label for best fit aspect ratio option"
+  },
+  "aspectRatioFill": "Fill",
+  "@aspectRatioFill": {
+    "description": "Label for fill aspect ratio option"
+  },
+  "aspectRatio16x9": "16:9",
+  "@aspectRatio16x9": {
+    "description": "Label for 16:9 aspect ratio option"
+  },
+  "aspectRatio4x3": "4:3",
+  "@aspectRatio4x3": {
+    "description": "Label for 4:3 aspect ratio option"
+  },
+  "aspectRatioCentre": "Centre",
+  "@aspectRatioCentre": {
+    "description": "Label for centre aspect ratio option"
   }
 }

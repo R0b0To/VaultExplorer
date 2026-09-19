@@ -7454,4 +7454,67 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => '計算中…';
+
+  @override
+  String get videoGesturesHeader => '動画のジェスチャーとズーム';
+
+  @override
+  String get edgeSwipeBrightnessTitle => '明るさスワイプジェスチャー';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle => '左端近くをスワイプして画面の明るさを調整します';
+
+  @override
+  String get edgeSwipeVolumeTitle => '音量スワイプジェスチャー';
+
+  @override
+  String get edgeSwipeVolumeSubtitle => '右端近くをスワイプして音量を調整します';
+
+  @override
+  String get edgeSwipeHudTitle => 'ジェスチャーインジケーターを表示';
+
+  @override
+  String get edgeSwipeHudSubtitle => 'スワイプ中にパーセンテージを表示します';
+
+  @override
+  String get edgeSwipeWidthTitle => 'エッジゾーンの幅';
+
+  @override
+  String get pinchZoomOutTitle => 'ズームアウトを許可';
+
+  @override
+  String get pinchZoomOutSubtitle => 'ピンチして動画を通常サイズより縮小します';
+
+  @override
+  String get minZoomTitle => '最小ズームレベル';
+
+  @override
+  String get holdSpeedMultiplierTitle => '長押し早送り速度';
+
+  @override
+  String get holdSpeedMultiplierSubtitle => '動画を長押ししている間の再生速度';
+
+  @override
+  String get defaultAspectRatioTitle => 'デフォルトのアスペクト比';
+
+  @override
+  String get defaultAspectRatioSubtitle => '動画を開いたときに自動的に適用されます';
+
+  @override
+  String get aspectRatioModeLabel => 'アスペクト比';
+
+  @override
+  String get aspectRatioBestFit => '最適表示';
+
+  @override
+  String get aspectRatioFill => '画面いっぱいに表示';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => '中央表示';
 }

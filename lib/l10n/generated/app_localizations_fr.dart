@@ -7945,4 +7945,74 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'Calcul en cours…';
+
+  @override
+  String get videoGesturesHeader => 'Gestes vidéo et zoom';
+
+  @override
+  String get edgeSwipeBrightnessTitle =>
+      'Geste de glissement pour la luminosité';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'Glissez près du bord gauche pour régler la luminosité de l\'écran';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'Geste de glissement pour le volume';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'Glissez près du bord droit pour régler le volume';
+
+  @override
+  String get edgeSwipeHudTitle => 'Afficher l\'indicateur de geste';
+
+  @override
+  String get edgeSwipeHudSubtitle =>
+      'Afficher un pourcentage en superposition lors du glissement';
+
+  @override
+  String get edgeSwipeWidthTitle => 'Largeur de la zone de bord';
+
+  @override
+  String get pinchZoomOutTitle => 'Autoriser le zoom arrière';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'Pincez pour réduire la vidéo en dessous de sa taille normale';
+
+  @override
+  String get minZoomTitle => 'Niveau de zoom minimum';
+
+  @override
+  String get holdSpeedMultiplierTitle => 'Vitesse d\'avance rapide au maintien';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'Vitesse lors du maintien appuyé sur la vidéo';
+
+  @override
+  String get defaultAspectRatioTitle => 'Format d\'image par défaut';
+
+  @override
+  String get defaultAspectRatioSubtitle =>
+      'Appliqué automatiquement à l\'ouverture d\'une vidéo';
+
+  @override
+  String get aspectRatioModeLabel => 'Format d\'image';
+
+  @override
+  String get aspectRatioBestFit => 'Ajustement optimal';
+
+  @override
+  String get aspectRatioFill => 'Remplir';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'Centré';
 }

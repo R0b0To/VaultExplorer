@@ -7356,4 +7356,67 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => '正在计算…';
+
+  @override
+  String get videoGesturesHeader => '视频手势与缩放';
+
+  @override
+  String get edgeSwipeBrightnessTitle => '边缘滑动调节亮度';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle => '在左侧边缘附近滑动以调节屏幕亮度';
+
+  @override
+  String get edgeSwipeVolumeTitle => '边缘滑动调节音量';
+
+  @override
+  String get edgeSwipeVolumeSubtitle => '在右侧边缘附近滑动以调节音量';
+
+  @override
+  String get edgeSwipeHudTitle => '显示手势指示器';
+
+  @override
+  String get edgeSwipeHudSubtitle => '滑动时显示百分比浮层';
+
+  @override
+  String get edgeSwipeWidthTitle => '边缘区域宽度';
+
+  @override
+  String get pinchZoomOutTitle => '允许缩小画面';
+
+  @override
+  String get pinchZoomOutSubtitle => '捏合以将视频缩小至原始尺寸以下';
+
+  @override
+  String get minZoomTitle => '最小缩放比例';
+
+  @override
+  String get holdSpeedMultiplierTitle => '长按倍速快进';
+
+  @override
+  String get holdSpeedMultiplierSubtitle => '长按视频播放画面时的快进速度';
+
+  @override
+  String get defaultAspectRatioTitle => '默认画面比例';
+
+  @override
+  String get defaultAspectRatioSubtitle => '打开视频时自动应用';
+
+  @override
+  String get aspectRatioModeLabel => '画面比例';
+
+  @override
+  String get aspectRatioBestFit => '最佳适应';
+
+  @override
+  String get aspectRatioFill => '填充';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => '居中';
 }

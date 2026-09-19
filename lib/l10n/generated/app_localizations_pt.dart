@@ -7887,4 +7887,73 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get calculatingFolderStats => 'Calculando…';
+
+  @override
+  String get videoGesturesHeader => 'Gestos de vídeo e zoom';
+
+  @override
+  String get edgeSwipeBrightnessTitle => 'Gesto de deslize para brilho';
+
+  @override
+  String get edgeSwipeBrightnessSubtitle =>
+      'Deslize perto da borda esquerda para ajustar o brilho da tela';
+
+  @override
+  String get edgeSwipeVolumeTitle => 'Gesto de deslize para volume';
+
+  @override
+  String get edgeSwipeVolumeSubtitle =>
+      'Deslize perto da borda direita para ajustar o volume';
+
+  @override
+  String get edgeSwipeHudTitle => 'Mostrar indicador de gestos';
+
+  @override
+  String get edgeSwipeHudSubtitle =>
+      'Exibir sobreposição de porcentagem ao deslizar';
+
+  @override
+  String get edgeSwipeWidthTitle => 'Largura da zona de borda';
+
+  @override
+  String get pinchZoomOutTitle => 'Permitir zoom out';
+
+  @override
+  String get pinchZoomOutSubtitle =>
+      'Junte os dedos para reduzir o vídeo abaixo do tamanho normal';
+
+  @override
+  String get minZoomTitle => 'Nível mínimo de zoom';
+
+  @override
+  String get holdSpeedMultiplierTitle => 'Velocidade ao manter pressionado';
+
+  @override
+  String get holdSpeedMultiplierSubtitle =>
+      'Velocidade enquanto mantém o vídeo pressionado';
+
+  @override
+  String get defaultAspectRatioTitle => 'Proporção padrão';
+
+  @override
+  String get defaultAspectRatioSubtitle =>
+      'Aplicado automaticamente ao abrir um vídeo';
+
+  @override
+  String get aspectRatioModeLabel => 'Proporção';
+
+  @override
+  String get aspectRatioBestFit => 'Melhor ajuste';
+
+  @override
+  String get aspectRatioFill => 'Preencher';
+
+  @override
+  String get aspectRatio16x9 => '16:9';
+
+  @override
+  String get aspectRatio4x3 => '4:3';
+
+  @override
+  String get aspectRatioCentre => 'Centro';
 }

@@ -26,7 +26,7 @@ class KeyfilesPicker extends StatelessWidget {
     final textTheme = context.typography;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -112,14 +112,7 @@ class KeyfilesPicker extends StatelessWidget {
                   )
                   .toList(),
             ),
-          ] else ...[
-            Text(
-              context.l10n.noKeyfilesAttached,
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+          ]
         ],
       ),
     );

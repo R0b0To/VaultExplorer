@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
@@ -50,7 +51,17 @@ class ContainerConfigScreen extends ConsumerStatefulWidget {
 class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
   late final TextEditingController _labelCtrl;
   late final TextEditingController _passwordCtrl;
+  late final TextEditingController _pimCtrl;
   bool _showPassword = false;
+
+  String? _prefillPassword;
+  bool _prefillCleared = false;
+
+  bool get _passwordPrefilled =>
+      _prefillPassword != null && _passwordCtrl.text == _prefillPassword;
+
+  bool get _revealLocked =>
+      (_prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
 
   String get _containerFormat =>
       widget.existingRecord?.containerFormat ??
@@ -77,7 +88,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           : widget.currentLabel,
     );
     _passwordCtrl = TextEditingController();
+    _pimCtrl = TextEditingController();
     _labelCtrl.addListener(() => setState(() {}));
+    _pimCtrl.addListener(() => setState(() {}));
 
     Future.microtask(() {
       ref.read(containerConfigControllerProvider(_params).notifier).initializeFromRecord(
@@ -92,6 +105,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
   void dispose() {
     _labelCtrl.dispose();
     _passwordCtrl.dispose();
+    _pimCtrl.dispose();
     super.dispose();
   }
 
@@ -159,6 +173,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         .read(containerConfigControllerProvider(_params).notifier)
         .saveContainer(
           passwordText: _passwordCtrl.text,
+          pimText: _pimCtrl.text,
           labelText: _labelCtrl.text,
           existingRecord: widget.existingRecord,
         );
@@ -205,8 +220,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         if (ok && mounted) {
           final savedPassword =
               await ref.read(containerRepositoryProvider).getPassword(widget.uri);
+          final savedPim =
+              await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
           ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
-          if (savedPassword != null && mounted) _passwordCtrl.text = savedPassword;
+          if (savedPassword != null && mounted) {
+            _prefillPassword = savedPassword;
+            _prefillCleared = false;
+            _passwordCtrl.text = savedPassword;
+          }
+          if (savedPim != null && mounted) _pimCtrl.text = savedPim;
         }
       } catch (e) {
         VeLog.w('ContainerConfigSheet', 'Biometric authentication to modify settings failed', e);
@@ -224,8 +246,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       if (hash != null && mounted) {
         final savedPassword =
             await ref.read(containerRepositoryProvider).getPassword(widget.uri);
+        final savedPim =
+            await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
         ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
-        if (savedPassword != null && mounted) _passwordCtrl.text = savedPassword;
+        if (savedPassword != null && mounted) {
+          _prefillPassword = savedPassword;
+          _prefillCleared = false;
+          _passwordCtrl.text = savedPassword;
+        }
+        if (savedPim != null && mounted) _pimCtrl.text = savedPim;
       }
     } else if (record.unlockMethod == ContainerUnlockMethod.pin) {
       if (state.pinHash == null) {
@@ -240,8 +269,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       if (hash != null && mounted) {
         final savedPassword =
             await ref.read(containerRepositoryProvider).getPassword(widget.uri);
+        final savedPim =
+            await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
         ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
-        if (savedPassword != null && mounted) _passwordCtrl.text = savedPassword;
+        if (savedPassword != null && mounted) {
+          _prefillPassword = savedPassword;
+          _prefillCleared = false;
+          _passwordCtrl.text = savedPassword;
+        }
+        if (savedPim != null && mounted) _pimCtrl.text = savedPim;
       }
     } else {
       final savedPassword =
@@ -270,6 +306,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               verifiedCipherId: verified.cipherId,
               verifiedHashId: verified.hashId,
             );
+        _prefillPassword = verified.password;
+        _prefillCleared = false;
         _passwordCtrl.text = verified.password;
       }
     }
@@ -295,14 +333,21 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     final textTheme = Theme.of(context).textTheme;
     final wideLayout = context.screen.useWideLayout;
 
-    // Apply auto-loaded temp password if text field is empty
+    // Apply auto-loaded temp credentials if text field is empty
     if (state.tempPassword != null &&
         state.tempPassword!.isNotEmpty &&
-        _passwordCtrl.text.isEmpty) {
+        _passwordCtrl.text.isEmpty &&
+        !_prefillCleared) {
+      _prefillPassword = state.tempPassword;
       _passwordCtrl.text = state.tempPassword!;
     }
+    if (state.tempPim != null &&
+        state.tempPim!.isNotEmpty &&
+        _pimCtrl.text.isEmpty) {
+      _pimCtrl.text = state.tempPim!;
+    }
 
-    final isModified = state.isModified(_passwordCtrl.text, _labelCtrl.text);
+    final isModified = state.isModified(_passwordCtrl.text, _labelCtrl.text, _pimCtrl.text);
     final canSave = state.canSave(_passwordCtrl.text);
 
     final generalSection = _buildGeneralSection(context);
@@ -362,26 +407,16 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               ),
         actions: [
           if (wideLayout && isModified) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: FilledButton.icon(
-                onPressed: (state.saving || !canSave) ? null : () => _save(state),
-                icon: state.saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.check_rounded, size: 18),
-                label: Text(
-                  context.l10n.saveConfigurationButton,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  shape: const StadiumBorder(),
-                ),
-              ),
+            IconButton(
+              icon: state.saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded),
+              tooltip: context.l10n.saveConfigurationButton,
+              onPressed: (state.saving || !canSave) ? null : () => _save(state),
             ),
           ],
         ],
@@ -623,18 +658,32 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     children: [
                       TextField(
                         controller: _passwordCtrl,
-                        obscureText: !_showPassword,
+                        obscureText: _revealLocked ? true : !_showPassword,
+                        enableInteractiveSelection: !_revealLocked,
                         autofillHints: null,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (val) {
+                          if (val.isEmpty) _prefillCleared = true;
+                          setState(() {});
+                        },
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: cs.surfaceContainerHighest,
                           labelText: context.l10n.containerPasswordOptionalLabel,
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                           suffixIcon: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (_passwordPrefilled)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: Tooltip(
+                                    message: context.l10n.usingSavedPasswordTooltip,
+                                    child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
+                                  ),
+                                ),
                               PasswordVisibilityToggle(
-                                obscured: !_showPassword,
+                                obscured: _revealLocked ? true : !_showPassword,
+                                enabled: !_revealLocked,
                                 onToggle: () => setState(() => _showPassword = !_showPassword),
                               ),
                               if (widget.existingRecord != null &&
@@ -648,6 +697,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                         .read(containerConfigControllerProvider(_params).notifier)
                                         .setChangePassword(false);
                                     _passwordCtrl.clear();
+                                    _prefillCleared = true;
                                   },
                                 ),
                             ],
@@ -659,21 +709,14 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          context.l10n.passwordKeystoreEncryptedHelperText,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
+                  PimInputField(
+                    controller: _pimCtrl,
+                    enabled: !state.saving,
+                  ),
                   KeyfilesPicker(
                     keyfiles: state.keyfiles,
                     picking: state.pickingKeyfiles,
@@ -735,6 +778,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
                 if (!_isCryfs)
                   AdvancedParamsPanel(
+                    collapsible: false,
                     cipherId: state.cipherId,
                     hashId: state.hashId,
                     subtitle: context.l10n.pinAlgorithmSkipAutoDetectSubtitle,
@@ -1010,53 +1054,59 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               ),
               child: SafeArea(
                 minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!canSave) ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.info_outline_rounded, size: 18, color: cs.error),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              state.needsPatternSetup
-                                  ? context.l10n.patternSetupRequiredAboveBeforeSaving
-                                  : state.needsPinSetup
-                                      ? context.l10n.pinSetupRequiredAboveBeforeSaving
-                                      : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.error,
-                                fontWeight: FontWeight.bold,
+                child: Center(
+                  heightFactor: 1.0,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!canSave) ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.info_outline_rounded, size: 18, color: cs.error),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  state.needsPatternSetup
+                                      ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                                      : state.needsPinSetup
+                                          ? context.l10n.pinSetupRequiredAboveBeforeSaving
+                                          : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.error,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
+                          const SizedBox(height: 10),
                         ],
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    FilledButton(
-                      onPressed: (state.saving || !canSave) ? null : () => _save(state),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: state.saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              context.l10n.saveConfigurationButton,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            ),
+                        FilledButton(
+                          onPressed: (state.saving || !canSave) ? null : () => _save(state),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                            shape: const StadiumBorder(),
+                          ),
+                          child: state.saving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  context.l10n.saveConfigurationButton,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

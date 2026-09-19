@@ -61,6 +61,7 @@ class ContainerConfigState {
   final bool loadingPassword;
   final bool clearingCache;
   final String? tempPassword;
+  final String? tempPim;
   final bool isMounted;
 
   // Baseline initial state for change detection
@@ -98,6 +99,7 @@ class ContainerConfigState {
     this.loadingPassword = true,
     this.clearingCache = false,
     this.tempPassword,
+    this.tempPim,
     this.isMounted = false,
     required this.initialLabel,
     required this.initialUnlockMethod,
@@ -123,8 +125,9 @@ class ContainerConfigState {
   bool get needsPinSetup =>
       unlockMethod == ContainerUnlockMethod.pin && pinHash == null;
 
-  bool isModified(String currentPasswordText, String currentLabelText) {
+  bool isModified(String currentPasswordText, String currentLabelText, [String? currentPimText]) {
     if (currentLabelText.trim() != initialLabel) return true;
+    if (currentPimText != null && currentPimText.trim() != (tempPim ?? '')) return true;
     if (unlockMethod != initialUnlockMethod) return true;
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
@@ -189,6 +192,7 @@ class ContainerConfigState {
     bool? loadingPassword,
     bool? clearingCache,
     String? tempPassword,
+    String? tempPim,
     bool? isMounted,
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
@@ -216,6 +220,7 @@ class ContainerConfigState {
     loadingPassword: loadingPassword ?? this.loadingPassword,
     clearingCache: clearingCache ?? this.clearingCache,
     tempPassword: tempPassword ?? this.tempPassword,
+    tempPim: tempPim ?? this.tempPim,
     isMounted: isMounted ?? this.isMounted,
     initialLabel: initialLabel,
     initialUnlockMethod: initialUnlockMethod,
@@ -310,10 +315,13 @@ class ContainerConfigController extends _$ContainerConfigController {
 
   Future<void> _initAsync(ContainerRecord? rec, AppSettings? appSettings) async {
     String? tempPw;
+    String? tempPim;
     try {
       tempPw = await ref.read(appSecureStorageProvider).read(key: 'temp_pw_${params.uri}');
+      tempPim = await ref.read(appSecureStorageProvider).read(key: 'temp_pim_${params.uri}');
+      tempPim ??= await ref.read(appSecureStorageProvider).read(key: 'pim_${params.uri}');
     } catch (e) {
-      VeLog.w('ContainerConfigController', 'Temp password read failed', e);
+      VeLog.w('ContainerConfigController', 'Temp credentials read failed', e);
     }
 
     bool biometricAvailable = false;
@@ -359,6 +367,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     if (!ref.mounted) return;
     state = state._copy(
       tempPassword: tempPw,
+      tempPim: tempPim,
       biometricAvailable: biometricAvailable,
       thumbnailCacheMode: thumbMode,
       thumbnailQuality: thumbQuality,
@@ -475,6 +484,7 @@ class ContainerConfigController extends _$ContainerConfigController {
 
   Future<ContainerRecord?> saveContainer({
     required String passwordText,
+    String? pimText,
     required String labelText,
     required ContainerRecord? existingRecord,
   }) async {
@@ -482,6 +492,20 @@ class ContainerConfigController extends _$ContainerConfigController {
     final label = labelText.trim().isEmpty ? params.currentLabel : labelText.trim();
     final needsPassword = state.unlockMethodNeedsPassword;
     final shouldSavePassword = needsPassword && (state.wasPasswordless || state.changePassword);
+
+    if (shouldSavePassword && pimText != null) {
+      final trimmedPim = pimText.trim();
+      if (trimmedPim.isNotEmpty && trimmedPim != '0') {
+        await ref.read(appSecureStorageProvider).write(
+          key: 'pim_${params.uri}',
+          value: trimmedPim,
+        );
+      } else {
+        await ref.read(appSecureStorageProvider).delete(key: 'pim_${params.uri}');
+      }
+    } else if (!needsPassword) {
+      await ref.read(appSecureStorageProvider).delete(key: 'pim_${params.uri}');
+    }
 
     final record = ContainerRecord(
       uri: params.uri,

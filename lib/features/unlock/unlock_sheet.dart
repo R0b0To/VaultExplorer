@@ -60,6 +60,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
 
   bool _obscure = true;
   bool _hiddenObscure = true;
+  bool _showAdvanced = false;
 
   /// True until the password field has been fully cleared at least once
   /// since it was prefilled with a saved credential. Tracking "ever
@@ -584,6 +585,8 @@ Widget _buildVaultKindSegmentedButton(
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final isWide = context.screen.useWideLayout;
+
     switch (credState) {
       case _UnlockCredentialState.loading:
         return [
@@ -655,15 +658,17 @@ Widget _buildVaultKindSegmentedButton(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.4),
-                        shape: BoxShape.circle,
+                    if (!isWide) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.fingerprint_rounded, size: 44, color: cs.primary),
                       ),
-                      child: Icon(Icons.fingerprint_rounded, size: 44, color: cs.primary),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
                     Text(
                       context.l10n.biometricUnlockTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -706,12 +711,14 @@ Widget _buildVaultKindSegmentedButton(
                       context.l10n.drawUnlockPatternTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 14),
-                    PatternLockView(
-                      key: ValueKey(state.patternResetKey),
-                      onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
-                      showError: state.patternError,
-                    ),
+                    if (!isWide) ...[
+                      const SizedBox(height: 14),
+                      PatternLockView(
+                        key: ValueKey(state.patternResetKey),
+                        onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
+                        showError: state.patternError,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
@@ -736,12 +743,14 @@ Widget _buildVaultKindSegmentedButton(
                       context.l10n.enterUnlockPinTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 14),
-                    PinLockView(
-                      key: ValueKey(state.pinResetKey),
-                      onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
-                      showError: state.pinError,
-                    ),
+                    if (!isWide) ...[
+                      const SizedBox(height: 14),
+                      PinLockView(
+                        key: ValueKey(state.pinResetKey),
+                        onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
+                        showError: state.pinError,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
@@ -803,7 +812,7 @@ case _UnlockCredentialState.password:
                             padding: const EdgeInsets.only(right: 4),
                             child: Tooltip(
                               message: context.l10n.usingSavedPasswordTooltip,
-                              child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
+                              child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
                             ),
                           ),
                         PasswordVisibilityToggle(
@@ -856,7 +865,7 @@ case _UnlockCredentialState.password:
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
-              if (state.hasAdvancedSettings) ...[
+              if (state.hasAdvancedSettings && !context.screen.useWideLayout) ...[
                 Theme(
                   data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
@@ -910,12 +919,11 @@ List<Widget> _buildAdvancedOptionsSection(
     return [
       if (!hasDirectOptions) ...[
         if (state.isVeraCrypt || state.isComposite) ...[
-          const SizedBox(height: 8),
           PimInputField(
             controller: _pimCtrl,
             enabled: !state.loading,
           ),
-          const SizedBox(height: 8),
+        
         ],
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -990,7 +998,7 @@ List<Widget> _buildAdvancedOptionsSection(
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
                 labelText: context.l10n.hiddenPasswordLabel,
-                prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.standard, color: cs.primary),
                 suffixIcon: PasswordVisibilityToggle(
                   obscured: _hiddenObscure,
                   onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
@@ -1002,7 +1010,6 @@ List<Widget> _buildAdvancedOptionsSection(
             controller: _hiddenPimCtrl,
             enabled: !state.loading,
           ),
-          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: KeyfilesPicker(
@@ -1035,7 +1042,7 @@ List<Widget> _buildAdvancedOptionsSection(
   ) {
     switch (credState) {
       case _UnlockCredentialState.loading:
-        return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
+        return const SizedBox.shrink();
 
       case _UnlockCredentialState.pattern:
         return Center(

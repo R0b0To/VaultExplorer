@@ -4,7 +4,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
-class PimInputField extends StatelessWidget {
+class PimInputField extends StatefulWidget {
   final TextEditingController controller;
   final bool enabled;
 
@@ -15,58 +15,44 @@ class PimInputField extends StatelessWidget {
   });
 
   @override
+  State<PimInputField> createState() => _PimInputFieldState();
+}
+
+class _PimInputFieldState extends State<PimInputField> {
+  bool _obscure = true;
+
+  @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    final textTheme = context.typography;
 
     return Padding(
-       padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.password_outlined,
-                size: AppIconSize.small,
-                color: cs.primary,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  context.l10n.pimFieldLabel,
-                  style: textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: TextField(
+        controller: widget.controller,
+        enabled: widget.enabled,
+        keyboardType: TextInputType.number,
+        obscureText: _obscure,
+        obscuringCharacter: '*',
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: cs.surfaceContainerHighest,
+          labelText: context.l10n.pimOptionalLabel,
+          hintText: '0',
+          prefixIcon: Icon(
+            Icons.pin_outlined,
+            size: AppIconSize.standard,
+            color: cs.primary,
           ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            obscuringCharacter: '*',
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: cs.surfaceContainerHighest,
-              hintText: '0',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-            ),
+          suffixIcon: PasswordVisibilityToggle(
+            obscured: _obscure,
+            enabled: widget.enabled,
+            onToggle: () => setState(() => _obscure = !_obscure),
           ),
-        ],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: BorderSide.none,
+          ),
+        ),
       ),
     );
   }
@@ -187,22 +173,42 @@ class AdvancedParamsPanel extends StatelessWidget {
         field,
         const SizedBox(height: 8),
       ],
-      OptionPickerTile<int>(
-        label: context.l10n.encryptionAlgorithmLabel,
-        value: cipherId,
-        prefixIcon: Icons.security_rounded,
-        options: cipherOptions,
-        onChanged: onCipherChanged,
-        enabled: enabled,
-      ),
-      const SizedBox(height: 4),
-      OptionPickerTile<int>(
-        label: context.l10n.hashAlgorithmLabel,
-        value: hashId,
-        prefixIcon: Icons.tag_rounded,
-        options: hashOptions,
-        onChanged: onHashChanged,
-        enabled: enabled,
+      Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+          leading: Icon(Icons.security_rounded, size: 20, color: cs.primary),
+          title: Text(
+            '${context.l10n.wizardEncryptionDetailsRowTitle}',
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            '${cipherOptions.firstWhere((opt) => opt.value == cipherId, orElse: () => cipherOptions.first).label} · ${hashOptions.firstWhere((opt) => opt.value == hashId, orElse: () => hashOptions.first).label}',
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          children: [
+            OptionPickerTile<int>(
+              label: context.l10n.encryptionAlgorithmLabel,
+              value: cipherId,
+              prefixIcon: Icons.lock_outline_rounded,
+              options: cipherOptions,
+              onChanged: onCipherChanged,
+              enabled: enabled,
+            ),
+            OptionPickerTile<int>(
+              label: context.l10n.hashAlgorithmLabel,
+              value: hashId,
+              prefixIcon: Icons.tag_rounded,
+              options: hashOptions,
+              onChanged: onHashChanged,
+              enabled: enabled,
+            ),
+          ],
+        ),
       ),
     ];
 

@@ -147,8 +147,8 @@ class _PinVerifySheetState extends ConsumerState<_PinVerifySheet> {
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
 
     Widget header = Column(
       mainAxisSize: MainAxisSize.min,
@@ -208,31 +208,59 @@ class _PinVerifySheetState extends ConsumerState<_PinVerifySheet> {
         child: SizedBox(
           width: double.infinity,
           child: isLandscape
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          header,
-                          const SizedBox(height: 24),
-                          cancelButton,
-                        ],
+              ? IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // ── Left: Header & Cancel Button ─────────────────────────
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            header,
+                            const SizedBox(height: 20),
+                            OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(context.l10n.cancel),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 24),
-                    pinView,
-                  ],
+                      const SizedBox(width: 24),
+                      const VerticalDivider(width: 1),
+                      const SizedBox(width: 24),
+                      // ── Right: Scaled PIN Dialpad ─────────────────────────
+                      Expanded(
+                        flex: 6,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: mq.size.height * 0.72,
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: pinView,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     header,
-                    const SizedBox(height: 28),
-                    Center(child: pinView),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: pinView,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Center(child: cancelButton),
                     const SizedBox(height: 4),

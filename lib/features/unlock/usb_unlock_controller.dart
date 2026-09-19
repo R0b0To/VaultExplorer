@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -100,6 +101,11 @@ class UsbUnlockState {
 
   final ({MountedContainer container, ContainerRecord? record, String? oldUri})?
   mountedSuccess;
+
+  bool get isLuks => ContainerFormat.isLuksWire(containerFormat);
+  bool get isBitlocker => ContainerFormat.isBitlockerWire(containerFormat);
+  bool get isVeraCrypt => !isLuks && !isBitlocker;
+  bool get hasAdvancedSettings => isVeraCrypt || isLuks;
 
   const UsbUnlockState({
     this.devices = const [],
@@ -412,6 +418,36 @@ class UsbUnlockController extends _$UsbUnlockController {
   void removeKeyfile(KeyfileRef k) {
     final newKeyfiles = state.keyfiles.where((item) => item != k).toList();
     state = state._copy(keyfiles: newKeyfiles);
+  }
+
+  Future<void> pickHiddenKeyfiles() async {
+    state = state._copy(pickingHiddenKeyfiles: true);
+    try {
+      final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
+      if (!ref.mounted) return;
+      if (picked.isNotEmpty) {
+        final existing = state.hiddenKeyfiles.map((k) => k.uri).toSet();
+        final newKeyfiles = List<KeyfileRef>.from(state.hiddenKeyfiles);
+        for (final k in picked) {
+          if (existing.add(k.uri)) newKeyfiles.add(k);
+        }
+        state = state._copy(
+          hiddenKeyfiles: newKeyfiles,
+          pickingHiddenKeyfiles: false,
+        );
+      } else {
+        state = state._copy(pickingHiddenKeyfiles: false);
+      }
+    } catch (_) {
+      if (ref.mounted) state = state._copy(pickingHiddenKeyfiles: false);
+    }
+  }
+
+  void removeHiddenKeyfile(KeyfileRef k) {
+    final newKeyfiles = state.hiddenKeyfiles
+        .where((item) => item != k)
+        .toList();
+    state = state._copy(hiddenKeyfiles: newKeyfiles);
   }
 
   Future<void> cancelUnlock() async {

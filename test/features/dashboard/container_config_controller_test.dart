@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ProviderContainer container;
 
   setUp(() {
@@ -86,9 +91,13 @@ void main() {
 
     test('saveContainer preserves compositeCarriers from existingRecord', () async {
       final fakeRepo = _FakeContainerRepo();
+      final fakeStorage = _FakeAppSecureStorage();
+      final fakeLifecycle = _FakeVaultLifecycleApi();
       final localContainer = ProviderContainer(
         overrides: [
           containerRepositoryProvider.overrideWith((ref) => fakeRepo),
+          appSecureStorageProvider.overrideWith((ref) => fakeStorage),
+          vaultLifecycleApiProvider.overrideWith((ref) => fakeLifecycle),
         ],
       );
       addTearDown(localContainer.dispose);
@@ -136,6 +145,51 @@ class _FakeContainerRepo extends ContainerRepository {
 }
 
 class _FakeVaultCryptoApi implements VaultCryptoApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeAppSecureStorage extends AppSecureStorage {
+  final Map<String, String> _storage = {};
+
+  @override
+  Future<String?> read({required String key}) async => _storage[key];
+
+  @override
+  Future<void> write({required String key, required String? value}) async {
+    if (value == null) {
+      _storage.remove(key);
+    } else {
+      _storage[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete({required String key}) async {
+    _storage.remove(key);
+  }
+
+  @override
+  Future<void> deleteAll() async {
+    _storage.clear();
+  }
+
+  @override
+  Future<Map<String, String>> readAll() async => Map.unmodifiable(_storage);
+
+  @override
+  Future<bool> containsKey({required String key}) async => _storage.containsKey(key);
+}
+
+class _FakeVaultLifecycleApi implements VaultLifecycleApi {
+  final List<String> lockedUris = [];
+
+  @override
+  Future<bool> lockContainer(String filePath) async {
+    lockedUris.add(filePath);
+    return true;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

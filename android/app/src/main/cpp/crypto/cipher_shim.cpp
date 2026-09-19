@@ -318,6 +318,128 @@ static bool pbkdf2HmacCustom(HashId hash,
     return true;
 }
 
+// ── Cancellable PBKDF2-HMAC-SHA256/512 (mirrors pbkdf2SingleBlockCustom's
+//    block/iteration structure above, but driven by mbedTLS's own HMAC
+//    primitives instead of the custom Whirlpool/Streebog/Blake2s ones) ──
+//
+// mbedtls_pkcs5_pbkdf2_hmac() used to be called directly here for these two
+// hashes, running every iteration inside one opaque library call with no
+// way to observe cancelCheck -- unlike every other hash, which already went
+// through pbkdf2HmacCustom's chunked, periodically-cancellable loop. Since
+// SHA-512/SHA-256 are tried first (see deriveAndValidateHeader's tier1) and
+// PIM directly multiplies the iteration count, a cancelled unlock attempt
+// on a high-PIM VeraCrypt volume kept grinding through this call in the
+// background: requestUnlockCancellation() flipped the flag, but nothing
+// ever looked at it until the (possibly minutes-long) mbedTLS call finished
+// on its own -- during which it also held a ThreadPool worker thread, so a
+// subsequent retry's own tier1 workers could stall behind it. This
+// reimplements the same RFC 8018 loop by hand via mbedtls_md_hmac_starts/
+// reset/update/finish, checking cancelCheck every 1024 iterations just
+// like pbkdf2SingleBlockCustom, so it can actually stop. Verified
+// byte-for-byte identical output against mbedtls_pkcs5_pbkdf2_hmac across
+// both hashes, single- and multi-block outLens, and several iteration
+// counts (incl. an exact 1024-multiple boundary) via a host-side test.
+static bool pbkdf2SingleBlockMbedtls(mbedtls_md_type_t mdType,
+                                      const unsigned char* password, size_t passwordLen,
+                                      const unsigned char* salt, size_t saltLen,
+                                      unsigned int block, unsigned int iterations,
+                                      size_t digestSize,
+                                      unsigned char* outBlock, size_t copyLen,
+                                      const std::function<bool()>& cancelCheck,
+                                      std::atomic<bool>* localFailed) {
+    if (saltLen + 4 > 256) return false;
+    unsigned char saltWithIndex[256];
+    std::memcpy(saltWithIndex, salt, saltLen);
+    saltWithIndex[saltLen]     = (block >> 24) & 0xFF;
+    saltWithIndex[saltLen + 1] = (block >> 16) & 0xFF;
+    saltWithIndex[saltLen + 2] = (block >> 8)  & 0xFF;
+    saltWithIndex[saltLen + 3] = block         & 0xFF;
+
+    const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
+    if (!mdInfo) return false;
+
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    if (mbedtls_md_setup(&ctx, mdInfo, 1) != 0) {
+        mbedtls_md_free(&ctx);
+        return false;
+    }
+    if (mbedtls_md_hmac_starts(&ctx, password, passwordLen) != 0) {
+        mbedtls_md_free(&ctx);
+        return false;
+    }
+
+    unsigned char U[64];
+    unsigned char T[64];
+
+    bool ok = mbedtls_md_hmac_update(&ctx, saltWithIndex, saltLen + 4) == 0 &&
+              mbedtls_md_hmac_finish(&ctx, U) == 0;
+    if (!ok) { mbedtls_md_free(&ctx); return false; }
+    std::memcpy(T, U, digestSize);
+
+    for (unsigned int iter = 1; iter < iterations && ok; iter++) {
+        if ((iter & 0x3FF) == 0) {
+            if ((cancelCheck && cancelCheck()) ||
+                localFailed->load(std::memory_order_relaxed)) {
+                ok = false;
+                break;
+            }
+        }
+        ok = mbedtls_md_hmac_reset(&ctx) == 0 &&
+             mbedtls_md_hmac_update(&ctx, U, digestSize) == 0 &&
+             mbedtls_md_hmac_finish(&ctx, U) == 0;
+        if (!ok) break;
+        for (size_t i = 0; i < digestSize; i++) T[i] ^= U[i];
+    }
+
+    mbedtls_md_free(&ctx);
+    if (!ok) return false;
+    std::memcpy(outBlock, T, copyLen);
+    return true;
+}
+
+static bool pbkdf2HmacMbedtlsCancellable(mbedtls_md_type_t mdType, size_t digestSize,
+                                          const unsigned char* password, size_t passwordLen,
+                                          const unsigned char* salt, size_t saltLen,
+                                          unsigned int iterations,
+                                          unsigned char* out, size_t outLen,
+                                          const std::function<bool()>& cancelCheck) {
+    if (digestSize == 0 || saltLen + 4 > 256) return false;
+
+    unsigned int blockCount = static_cast<unsigned int>((outLen + digestSize - 1) / digestSize);
+    std::atomic<bool> localFailed{false};
+
+    auto runBlock = [&](unsigned int block) -> bool {
+        size_t outOffset = static_cast<size_t>(block - 1) * digestSize;
+        size_t copyLen = std::min(digestSize, outLen - outOffset);
+        return pbkdf2SingleBlockMbedtls(mdType, password, passwordLen, salt, saltLen,
+                                         block, iterations, digestSize,
+                                         out + outOffset, copyLen, cancelCheck, &localFailed);
+    };
+
+    if (blockCount == 1) {
+        return runBlock(1);
+    }
+
+    std::vector<std::future<bool>> futures;
+    futures.reserve(blockCount - 1);
+    for (unsigned int block = 2; block <= blockCount; block++) {
+        futures.push_back(std::async(std::launch::async, [&, block]() -> bool {
+            bool ok = runBlock(block);
+            if (!ok) localFailed.store(true, std::memory_order_relaxed);
+            return ok;
+        }));
+    }
+
+    bool ok = runBlock(1);
+    if (!ok) localFailed.store(true, std::memory_order_relaxed);
+
+    for (auto& f : futures) {
+        ok = f.get() && ok;
+    }
+    return ok;
+}
+
 bool pbkdf2Hmac(HashId hash,
                  const unsigned char* password, size_t passwordLen,
                  const unsigned char* salt, size_t saltLen,
@@ -326,17 +448,9 @@ bool pbkdf2Hmac(HashId hash,
                  std::function<bool()> cancelCheck) {
     if (hash == HashId::kSha512 || hash == HashId::kSha256) {
         mbedtls_md_type_t mdType = (hash == HashId::kSha512) ? MBEDTLS_MD_SHA512 : MBEDTLS_MD_SHA256;
-        const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
-        if (!mdInfo) return false;
-        mbedtls_md_context_t ctx;
-        mbedtls_md_init(&ctx);
-        if (mbedtls_md_setup(&ctx, mdInfo, 1) != 0) {
-            mbedtls_md_free(&ctx);
-            return false;
-        }
-        int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, password, passwordLen, salt, saltLen, iterations, outLen, out);
-        mbedtls_md_free(&ctx);
-        return ret == 0;
+        size_t digestSize = (hash == HashId::kSha512) ? 64 : 32;
+        return pbkdf2HmacMbedtlsCancellable(mdType, digestSize, password, passwordLen,
+                                             salt, saltLen, iterations, out, outLen, cancelCheck);
     }
 
     return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen, cancelCheck);

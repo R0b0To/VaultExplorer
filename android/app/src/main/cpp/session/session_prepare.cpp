@@ -268,7 +268,8 @@ bool deriveHeaderKey(HashId hash,
         uint32_t parallelism = 0;
         argon2ParamsForPim(clampedPim, memoryKiB, timeCost, parallelism);
         return argon2idDeriveKey(password, passwordLen, salt, VC_SALT_SIZE,
-                                 memoryKiB, timeCost, parallelism, out, outLen);
+                                 memoryKiB, timeCost, parallelism, out, outLen,
+                                 cancelCheck);
     }
     return pbkdf2Hmac(hash, password, passwordLen, salt, VC_SALT_SIZE,
                        iterationsForHash(hash, clampedPim), out, outLen, cancelCheck);

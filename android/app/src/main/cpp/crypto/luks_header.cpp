@@ -759,6 +759,14 @@ static bool luks2Unlock(const LuksByteReader& reader,
         if (derivedKeyLen == 0) derivedKeyLen = 64; // Default/Fallback
         std::vector<uint8_t> derivedKey(derivedKeyLen);
 
+        // Argon2 can run for a very long time at LUKS2's memory/time costs,
+        // so it needs to be interruptible: by the user's cancel, and also by
+        // a sibling keyslot having already verified (no point finishing this
+        // one then).
+        auto argon2Cancel = [&found, &cancelCheck, volId]() -> bool {
+            return found.load(std::memory_order_acquire) || (cancelCheck && cancelCheck(volId));
+        };
+
         bool kdfSuccess = false;
         if (ks.kdfType == "pbkdf2") {
             if (kdfSpec.backend == HashBackend::kNone) {
@@ -769,11 +777,11 @@ static bool luks2Unlock(const LuksByteReader& reader,
         } else if (ks.kdfType == "argon2id") {
             uint32_t memoryKiB = ks.memory;
             if (memoryKiB > 1048576) memoryKiB = 1048576;
-            kdfSuccess = argon2idDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen);
+            kdfSuccess = argon2idDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen, argon2Cancel);
         } else if (ks.kdfType == "argon2i") {
             uint32_t memoryKiB = ks.memory;
             if (memoryKiB > 1048576) memoryKiB = 1048576;
-            kdfSuccess = argon2iDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen);
+            kdfSuccess = argon2iDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen, argon2Cancel);
         }
 
         if (!kdfSuccess) {

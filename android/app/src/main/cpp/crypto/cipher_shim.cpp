@@ -2,6 +2,7 @@
 #include <openssl/aes.h>
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
+#include "mbedtls/platform_util.h"
 #include "Serpent.h"
 #include "Twofish.h"
 #include "Camellia.h"
@@ -13,7 +14,11 @@
 #include <cstring>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <future>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 bool blockCipherSetKey(BlockCipherContext& ctx, CipherId id,
@@ -471,22 +476,135 @@ size_t genericHashOneShot(HashId hash,
     return hashDigestSize(hash);
 }
 
+// ── Cancellable Argon2 ─────────────────────────────────────────────────────
+//
+// VeraCrypt's bundled Argon2 (the copy argon2id_hash_raw/argon2i_hash_raw
+// come from) already knows how to abort: every fill_segment_*() variant
+// looks at *context->pAbortKeyDerivation every 64 blocks and, if it is
+// non-zero, bails out with ARGON2_OPERATION_CANCELLED (which argon2_ctx()
+// turns into "free/wipe the block memory, return the error"). These
+// wrappers used to pass nullptr for that pointer, so nothing could ever
+// trip it: on a high-PIM VeraCrypt volume the Argon2id step (tier 3 in
+// deriveAndValidateHeader -- 1 GiB and, at PIM 2000, 1982 passes) ran to
+// completion after "cancel" was tapped, holding derivationMutexes[volId]
+// the whole time, so the retry just sat behind it on "Decrypting...".
+//
+// The flag is a plain `long volatile*`, not a callback, while every
+// caller's cancel condition is a callback (found / isUnlockCancelled(volId)
+// / externalAbort, ...). A small watcher thread bridges the two: it wakes
+// every kArgon2CancelPollInterval, and the moment cancelCheck() is true it
+// raises the flag. It sleeps on a condition variable, so it costs nothing
+// while Argon2 runs and exits immediately when Argon2 finishes on its own.
+//
+// Worst-case latency from cancelCheck() turning true to Argon2 stopping is
+// therefore one poll interval plus at most 64 blocks of work, plus the time
+// argon2_ctx() spends wiping/freeing its block memory on the way out.
+static constexpr std::chrono::milliseconds kArgon2CancelPollInterval{20};
+
+enum class Argon2Variant { kI, kId };
+
+static int runArgon2(Argon2Variant variant,
+                     const unsigned char* password, size_t passwordLen,
+                     const unsigned char* salt, size_t saltLen,
+                     uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
+                     unsigned char* out, size_t outLen,
+                     long volatile* abortFlag) {
+    return variant == Argon2Variant::kId
+        ? argon2id_hash_raw(timeCost, memoryKiB, parallelism,
+                            password, passwordLen, salt, saltLen,
+                            out, outLen, abortFlag)
+        : argon2i_hash_raw(timeCost, memoryKiB, parallelism,
+                           password, passwordLen, salt, saltLen,
+                           out, outLen, abortFlag);
+}
+
+static bool argon2DeriveKeyCancellable(Argon2Variant variant,
+                                       const unsigned char* password, size_t passwordLen,
+                                       const unsigned char* salt, size_t saltLen,
+                                       uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
+                                       unsigned char* out, size_t outLen,
+                                       const std::function<bool()>& cancelCheck) {
+    if (!password || !salt || !out || parallelism == 0) return false;
+
+    if (!cancelCheck) {
+        return runArgon2(variant, password, passwordLen, salt, saltLen,
+                         memoryKiB, timeCost, parallelism, out, outLen,
+                         nullptr) == ARGON2_OK;
+    }
+
+    // Already cancelled: skip the (up to 1 GiB) allocation entirely.
+    if (cancelCheck()) return false;
+
+    long volatile abortFlag = 0;
+    std::mutex m;
+    std::condition_variable cv;
+    bool argon2Done = false;
+
+    std::thread watcher;
+    try {
+        watcher = std::thread([&]() {
+            for (;;) {
+                {
+                    std::unique_lock<std::mutex> lock(m);
+                    if (cv.wait_for(lock, kArgon2CancelPollInterval,
+                                    [&]() { return argon2Done; })) {
+                        return; // Argon2 finished by itself
+                    }
+                }
+                if (cancelCheck()) {
+                    __atomic_store_n(&abortFlag, 1L, __ATOMIC_RELEASE);
+                    return;
+                }
+            }
+        });
+    } catch (...) {
+        // No thread available (resource exhaustion). Failing the unlock over
+        // that would look like a wrong password; fall back to the old
+        // uninterruptible behavior instead.
+        return runArgon2(variant, password, passwordLen, salt, saltLen,
+                         memoryKiB, timeCost, parallelism, out, outLen,
+                         nullptr) == ARGON2_OK;
+    }
+
+    const int rc = runArgon2(variant, password, passwordLen, salt, saltLen,
+                             memoryKiB, timeCost, parallelism, out, outLen,
+                             &abortFlag);
+
+    {
+        std::lock_guard<std::mutex> lock(m);
+        argon2Done = true;
+    }
+    cv.notify_all();
+    watcher.join();
+
+    // With parallelism > 1, upstream's fill_memory_blocks_mt() discards each
+    // lane thread's fill_segment() result, so an aborted run can still come
+    // back as ARGON2_OK with a digest computed over half-filled memory.
+    // Treat "abort was raised" as failure regardless of rc, and never hand
+    // that digest to the caller.
+    if (__atomic_load_n(&abortFlag, __ATOMIC_ACQUIRE) != 0) {
+        mbedtls_platform_zeroize(out, outLen);
+        return false;
+    }
+    return rc == ARGON2_OK;
+}
+
 bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
                        const unsigned char* salt, size_t saltLen,
                        uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
-                       unsigned char* out, size_t outLen) {
-    if (!password || !salt || !out || parallelism == 0) return false;
-    return argon2id_hash_raw(timeCost, memoryKiB, parallelism,
-                             password, passwordLen, salt, saltLen,
-                             out, outLen, nullptr) == ARGON2_OK;
+                       unsigned char* out, size_t outLen,
+                       std::function<bool()> cancelCheck) {
+    return argon2DeriveKeyCancellable(Argon2Variant::kId, password, passwordLen,
+                                      salt, saltLen, memoryKiB, timeCost, parallelism,
+                                      out, outLen, cancelCheck);
 }
 
 bool argon2iDeriveKey(const unsigned char* password, size_t passwordLen,
                       const unsigned char* salt, size_t saltLen,
                       uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
-                      unsigned char* out, size_t outLen) {
-    if (!password || !salt || !out || parallelism == 0) return false;
-    return argon2i_hash_raw(timeCost, memoryKiB, parallelism,
-                            password, passwordLen, salt, saltLen,
-                            out, outLen, nullptr) == ARGON2_OK;
+                      unsigned char* out, size_t outLen,
+                      std::function<bool()> cancelCheck) {
+    return argon2DeriveKeyCancellable(Argon2Variant::kI, password, passwordLen,
+                                      salt, saltLen, memoryKiB, timeCost, parallelism,
+                                      out, outLen, cancelCheck);
 }

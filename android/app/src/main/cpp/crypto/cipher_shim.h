@@ -80,10 +80,24 @@ size_t genericHashOneShot(HashId hash,
 
 int clampPim(int pim);
 
+// Argon2id/Argon2i are one long, allocation-heavy call into VeraCrypt's
+// bundled Argon2 (up to 1 GiB x thousands of passes at high PIM), so both
+// accept an optional [cancelCheck], same convention as pbkdf2Hmac() above.
+// When it is non-null, it is polled (every ~20 ms, from a short-lived
+// watcher thread -- so it must be safe to call from any thread) and, once
+// it returns true, the derivation is abandoned and the function returns
+// false. Argon2 itself stops within a poll interval plus a fraction of a
+// millisecond; the rest of the latency is argon2_ctx() wiping/freeing its
+// block memory on the way out (about 0.4 s for 1 GiB on the x86_64 dev host
+// -- not measured on a phone). On failure no derived bytes are left in [out]
+// (it is zeroed if Argon2 had started, untouched if it never did). When
+// cancelCheck is null, behavior is exactly what it was before: one
+// uninterruptible call, no extra thread.
 bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
                         const unsigned char* salt, size_t saltLen,
                         uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
-                        unsigned char* out, size_t outLen);
+                        unsigned char* out, size_t outLen,
+                        std::function<bool()> cancelCheck = nullptr);
 
 // Argon2i variant (data-independent addressing) -- distinct KDF output from
 // argon2id for identical password/salt/cost params. LUKS2 keyslots record
@@ -92,6 +106,7 @@ bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
 bool argon2iDeriveKey(const unsigned char* password, size_t passwordLen,
                        const unsigned char* salt, size_t saltLen,
                        uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
-                       unsigned char* out, size_t outLen);
+                       unsigned char* out, size_t outLen,
+                       std::function<bool()> cancelCheck = nullptr);
 
 void argon2ParamsForPim(int clampedPim, uint32_t& memoryKiB, uint32_t& timeCost, uint32_t& parallelism);

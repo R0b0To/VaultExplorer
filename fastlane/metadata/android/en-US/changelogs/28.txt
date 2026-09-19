@@ -1,0 +1,17 @@
+### Features
+• Storage Sync: Expanded the sync tool to accept local and external storages as sync targets
+• Full-Screen Scrub Preview: Added an option for full-screen preview when scrubbing the seekbar in the media player
+• Player Gestures: Added brightness and volume swipe gestures alongside expanded media playback controls
+
+### Improvements
+• Video Scrub Preview: Improved minibox preview rendering to properly account for different aspect ratios
+• Adaptive Layout: Added smooth transitions to a two-row layout when accessibility font scaling or display zoom cannot fit side-by-side columns
+• Vault Creation: Disabled configuration parameters until a target file/folder is selected, and automatically cleared fields when switching targets
+• Sidebar Settings: Updated the internal storage toggle to show or hide the entire storage locations section in the drawer
+• UI Polish: Refined interface layouts and visual styling across multiple app pages
+
+### Bug Fixes
+• Gesture Navigation: Fixed the sidebar drawer unintentionally triggering when attempting to use the back gesture
+• File Manager: Fixed filename visibility toggle not responding in grid and masonry layouts
+• Vault Unlock: Fixed cancel action not fully aborting operations, preventing subsequent unlock attempts from waiting on the previous process
+• Landscape Orientation: Fixed duplicated UI elements appearing on several pages when in landscape mode

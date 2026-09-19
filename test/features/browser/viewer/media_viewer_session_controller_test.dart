@@ -253,4 +253,99 @@ void main() {
       expect(rotationOf(container, 'b.png'), 1);
     });
   });
+
+  group('forgetFile (regression: deleting an open image left it on screen)',
+      () {
+    MediaViewerSessionState stateOf(ProviderContainer c) =>
+        c.read(mediaViewerSessionProvider('session-1'));
+
+    test('works on the default state, whose maps are const and immutable', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      // The viewer's delete handler used to call `.remove()` on these maps
+      // directly, which throws even for a key that isn't present -- and
+      // aborted the handler after the file was already deleted.
+      expect(
+        () => stateOf(container).rotations.remove('img.png'),
+        throwsUnsupportedError,
+      );
+      expect(
+        () => stateOf(container).imageReloadEpoch.remove('img.png'),
+        throwsUnsupportedError,
+      );
+
+      expect(() => notifier.forgetFile('img.png'), returnsNormally);
+      expect(stateOf(container).rotations, isEmpty);
+      expect(stateOf(container).imageReloadEpoch, isEmpty);
+    });
+
+    test('removes rotation and reload epoch for that file only', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.png');
+      notifier.rotateClockwise('b.png');
+      notifier.bumpImageReloadEpoch('a.png');
+      notifier.bumpImageReloadEpoch('b.png');
+
+      notifier.forgetFile('a.png');
+
+      final state = stateOf(container);
+      expect(state.rotations.containsKey('a.png'), isFalse);
+      expect(state.imageReloadEpoch.containsKey('a.png'), isFalse);
+      expect(state.rotations['b.png'], 1);
+      expect(state.imageReloadEpoch['b.png'], 1);
+    });
+
+    test('handles a file that only has one of the two entries', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.png');
+      notifier.bumpImageReloadEpoch('b.png');
+
+      notifier.forgetFile('a.png');
+      notifier.forgetFile('b.png');
+
+      expect(stateOf(container).rotations, isEmpty);
+      expect(stateOf(container).imageReloadEpoch, isEmpty);
+    });
+
+    test('leaves state untouched for an unknown file', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.png');
+      final before = stateOf(container);
+
+      notifier.forgetFile('missing.png');
+
+      expect(identical(stateOf(container), before), isTrue);
+    });
+
+    test('keeps the maps immutable afterwards', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.png');
+      notifier.rotateClockwise('b.png');
+      notifier.forgetFile('a.png');
+
+      expect(
+        () => stateOf(container).rotations['c.png'] = 1,
+        throwsUnsupportedError,
+      );
+    });
+  });
 }

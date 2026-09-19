@@ -234,4 +234,30 @@ class MediaViewerSession extends _$MediaViewerSession {
     map[path] = (map[path] ?? 0) + 1;
     state = state.copyWith(imageReloadEpoch: Map.unmodifiable(map));
   }
+
+  /// Drops the transient per-file state (rotation, reload counter) kept for
+  /// [path], e.g. once the file has been deleted.
+  ///
+  /// [MediaViewerSessionState.rotations] and
+  /// [MediaViewerSessionState.imageReloadEpoch] are immutable (`const {}` by
+  /// default, `Map.unmodifiable` after any setter), so they have to be
+  /// replaced rather than mutated: calling `.remove` on them throws
+  /// [UnsupportedError] even when [path] isn't in the map.
+  void forgetFile(String path) {
+    final hasRotation = state.rotations.containsKey(path);
+    final hasEpoch = state.imageReloadEpoch.containsKey(path);
+    if (!hasRotation && !hasEpoch) return;
+    state = state.copyWith(
+      rotations: hasRotation
+          ? Map.unmodifiable(
+              Map<String, int>.from(state.rotations)..remove(path),
+            )
+          : null,
+      imageReloadEpoch: hasEpoch
+          ? Map.unmodifiable(
+              Map<String, int>.from(state.imageReloadEpoch)..remove(path),
+            )
+          : null,
+    );
+  }
 }

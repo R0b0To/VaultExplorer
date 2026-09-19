@@ -72,6 +72,7 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   final bool sortAscending;
   final Set<String>? pinnedPaths;
   final ValueChanged<String>? onCurrentFileChanged;
+  final ValueChanged<String>? onFileDeleted;
 
   const MediaViewerScreen({
     super.key,
@@ -86,6 +87,7 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
     this.sortAscending = true,
     this.pinnedPaths,
     this.onCurrentFileChanged,
+    this.onFileDeleted,
   });
 
   @override
@@ -750,9 +752,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       VeLog.e('MediaViewerScreen', 'Delete failed for ${VeLog.censorName(fileToDelete)}', e);
     }
 
+    if (success) widget.onFileDeleted?.call(fileToDelete);
+
     if (success && mounted) {
-      _rotations.remove(fileToDelete);
-      _imageReloadEpoch.remove(fileToDelete);
+      _sessionController.forgetFile(fileToDelete);
       _playlistController.removeFile(fileToDelete);
       if (_playlistController.isEmpty) {
         Navigator.pop(context);
@@ -770,6 +773,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
+          _scrollToCurrentIndex(animate: false);
           _prefetchSurroundingItems();
           _onScrollEnd();
         }

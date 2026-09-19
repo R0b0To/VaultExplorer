@@ -1600,6 +1600,7 @@ void _navigateUp() {
         ? _browserScrollController.offset
         : null;
     String lastViewedFile = fullPath;
+    bool filesDeletedInViewer = false;
 
     final result = await Navigator.push<bool>(
       context,
@@ -1623,6 +1624,7 @@ void _navigateUp() {
             lastViewedFile = newFile;
             _scrollToItem(newFile);
           },
+          onFileDeleted: (_) => filesDeletedInViewer = true,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -1650,7 +1652,7 @@ void _navigateUp() {
     }
 
     // Only reload directory contents if files were actually modified/deleted in the viewer
-    if (result == true) {
+    if (result == true || filesDeletedInViewer) {
       _loadDirectoryContents(_currentDirPath, refresh: true);
       _loadToolbarConfig();
     }

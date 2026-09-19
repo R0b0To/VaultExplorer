@@ -7740,6 +7740,23 @@ class AppLocalizationsEs extends AppLocalizations {
       'Control deslizante de línea de tiempo para vídeos y audio';
 
   @override
+  String get scrubPreviewStyleTitle => 'Estilo de vista previa al arrastrar';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Cuadro pequeño';
+
+  @override
+  String get scrubPreviewMiniBoxDesc =>
+      'Miniatura pequeña sobre la barra de progreso';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'Pantalla completa';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Un fotograma grande ocupa toda la pantalla al arrastrar la barra de progreso';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Mostrar controles de transporte en fotos';
 

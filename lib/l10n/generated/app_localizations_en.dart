@@ -7603,6 +7603,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showProgressBarSubtitle => 'Timeline slider for videos and audio';
 
   @override
+  String get scrubPreviewStyleTitle => 'Scrub Preview Style';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Mini box';
+
+  @override
+  String get scrubPreviewMiniBoxDesc => 'Small thumbnail above the seekbar';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'Fullscreen';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Large frame fills the screen while you drag the seekbar';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Show Transport Controls on Photos';
 

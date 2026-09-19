@@ -12775,6 +12775,36 @@ abstract class AppLocalizations {
   /// **'Timeline slider for videos and audio'**
   String get showProgressBarSubtitle;
 
+  /// Setting title for how the video seekbar previews the frame while it is being dragged
+  ///
+  /// In en, this message translates to:
+  /// **'Scrub Preview Style'**
+  String get scrubPreviewStyleTitle;
+
+  /// Scrub preview style: small thumbnail floating above the seekbar
+  ///
+  /// In en, this message translates to:
+  /// **'Mini box'**
+  String get scrubPreviewMiniBoxLabel;
+
+  /// Description of the mini box scrub preview style
+  ///
+  /// In en, this message translates to:
+  /// **'Small thumbnail above the seekbar'**
+  String get scrubPreviewMiniBoxDesc;
+
+  /// Scrub preview style: the frame fills the screen while dragging the seekbar
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get scrubPreviewFullscreenLabel;
+
+  /// Description of the fullscreen scrub preview style
+  ///
+  /// In en, this message translates to:
+  /// **'Large frame fills the screen while you drag the seekbar'**
+  String get scrubPreviewFullscreenDesc;
+
   /// Switch title to toggle transport controls on photos
   ///
   /// In en, this message translates to:

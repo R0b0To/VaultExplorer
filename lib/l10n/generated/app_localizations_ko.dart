@@ -7312,6 +7312,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get showProgressBarSubtitle => '비디오 및 오디오용 타임라인 슬라이더';
 
   @override
+  String get scrubPreviewStyleTitle => '탐색 미리보기 스타일';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => '미니 박스';
+
+  @override
+  String get scrubPreviewMiniBoxDesc => '진행률 표시줄 위에 작은 썸네일 표시';
+
+  @override
+  String get scrubPreviewFullscreenLabel => '전체 화면';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      '진행률 표시줄을 드래그하는 동안 큰 프레임이 화면을 가득 채웁니다';
+
+  @override
   String get showTransportControlsOnPhotosTitle => '사진에 탐색 컨트롤 표시';
 
   @override

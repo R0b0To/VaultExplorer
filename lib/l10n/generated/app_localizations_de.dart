@@ -7721,6 +7721,23 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zeitleisten-Schieberegler für Videos und Audio';
 
   @override
+  String get scrubPreviewStyleTitle => 'Stil der Scrub-Vorschau';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Mini-Vorschau';
+
+  @override
+  String get scrubPreviewMiniBoxDesc =>
+      'Kleine Miniatur über dem Fortschrittsbalken';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'Vollbild';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Großes Bild füllt beim Ziehen des Fortschrittsbalkens den Bildschirm';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Wiedergabesteuerung bei Fotos anzeigen';
 

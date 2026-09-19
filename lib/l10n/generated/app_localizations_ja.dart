@@ -7311,6 +7311,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get showProgressBarSubtitle => '動画および音声のタイムラインスライダー';
 
   @override
+  String get scrubPreviewStyleTitle => 'シーク時のプレビュー表示';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'ミニボックス';
+
+  @override
+  String get scrubPreviewMiniBoxDesc => 'シークバーの上に小さなサムネイルを表示';
+
+  @override
+  String get scrubPreviewFullscreenLabel => '全画面';
+
+  @override
+  String get scrubPreviewFullscreenDesc => 'シークバーのドラッグ中、大きなフレームを画面全体に表示';
+
+  @override
   String get showTransportControlsOnPhotosTitle => '写真に再生コントロールを表示';
 
   @override

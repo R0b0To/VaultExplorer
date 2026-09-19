@@ -7213,6 +7213,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showProgressBarSubtitle => '用于视频和音频的时间轴滑块';
 
   @override
+  String get scrubPreviewStyleTitle => '拖动预览样式';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => '迷你小窗';
+
+  @override
+  String get scrubPreviewMiniBoxDesc => '在进度条上方显示小缩略图';
+
+  @override
+  String get scrubPreviewFullscreenLabel => '全屏';
+
+  @override
+  String get scrubPreviewFullscreenDesc => '拖动进度条时，大画面铺满整个屏幕';
+
+  @override
   String get showTransportControlsOnPhotosTitle => '在照片上显示播放控制';
 
   @override

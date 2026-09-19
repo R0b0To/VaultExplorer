@@ -9744,6 +9744,26 @@
   "@showProgressBarSubtitle": {
     "description": "Subtitle explaining timeline slider feature"
   },
+  "scrubPreviewStyleTitle": "Scrub Preview Style",
+  "@scrubPreviewStyleTitle": {
+    "description": "Setting title for how the video seekbar previews the frame while it is being dragged"
+  },
+  "scrubPreviewMiniBoxLabel": "Mini box",
+  "@scrubPreviewMiniBoxLabel": {
+    "description": "Scrub preview style: small thumbnail floating above the seekbar"
+  },
+  "scrubPreviewMiniBoxDesc": "Small thumbnail above the seekbar",
+  "@scrubPreviewMiniBoxDesc": {
+    "description": "Description of the mini box scrub preview style"
+  },
+  "scrubPreviewFullscreenLabel": "Fullscreen",
+  "@scrubPreviewFullscreenLabel": {
+    "description": "Scrub preview style: the frame fills the screen while dragging the seekbar"
+  },
+  "scrubPreviewFullscreenDesc": "Large frame fills the screen while you drag the seekbar",
+  "@scrubPreviewFullscreenDesc": {
+    "description": "Description of the fullscreen scrub preview style"
+  },
   "showTransportControlsOnPhotosTitle": "Show Transport Controls on Photos",
   "@showTransportControlsOnPhotosTitle": {
     "description": "Switch title to toggle transport controls on photos"

@@ -7721,6 +7721,24 @@ class AppLocalizationsIt extends AppLocalizations {
       'Cursore della sequenza temporale per video e audio';
 
   @override
+  String get scrubPreviewStyleTitle =>
+      'Stile dell’anteprima durante il trascinamento';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Riquadro piccolo';
+
+  @override
+  String get scrubPreviewMiniBoxDesc =>
+      'Piccola miniatura sopra la barra di avanzamento';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'Schermo intero';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Un fotogramma grande riempie lo schermo mentre trascini la barra di avanzamento';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Mostra controlli di riproduzione sulle foto';
 

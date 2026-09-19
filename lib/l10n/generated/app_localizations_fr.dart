@@ -7789,6 +7789,23 @@ class AppLocalizationsFr extends AppLocalizations {
       'Curseur temporel pour les vidéos et l’audio';
 
   @override
+  String get scrubPreviewStyleTitle => 'Style d’aperçu pendant le glissement';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Mini-fenêtre';
+
+  @override
+  String get scrubPreviewMiniBoxDesc =>
+      'Petite vignette au-dessus de la barre de progression';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'Plein écran';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Une grande image remplit l’écran pendant que vous faites glisser la barre de progression';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Afficher les commandes de lecture sur les photos';
 

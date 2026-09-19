@@ -7789,6 +7789,22 @@ class AppLocalizationsAr extends AppLocalizations {
       'شريط التمرير الزمني لمقاطع الفيديو والصوت';
 
   @override
+  String get scrubPreviewStyleTitle => 'نمط المعاينة أثناء السحب';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'مربع مصغّر';
+
+  @override
+  String get scrubPreviewMiniBoxDesc => 'صورة مصغّرة صغيرة فوق شريط التقدم';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'ملء الشاشة';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'إطار كبير يملأ الشاشة أثناء سحب شريط التقدم';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'إظهار عناصر التحكم في العرض على الصور';
 

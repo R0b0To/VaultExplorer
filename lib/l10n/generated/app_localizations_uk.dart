@@ -7778,6 +7778,24 @@ class AppLocalizationsUk extends AppLocalizations {
   String get showProgressBarSubtitle => 'Шкала часу для відео та аудіо';
 
   @override
+  String get scrubPreviewStyleTitle =>
+      'Стиль попереднього перегляду під час перетягування';
+
+  @override
+  String get scrubPreviewMiniBoxLabel => 'Міні-вікно';
+
+  @override
+  String get scrubPreviewMiniBoxDesc =>
+      'Невелика мініатюра над панеллю прогресу';
+
+  @override
+  String get scrubPreviewFullscreenLabel => 'На весь екран';
+
+  @override
+  String get scrubPreviewFullscreenDesc =>
+      'Великий кадр займає весь екран під час перетягування панелі прогресу';
+
+  @override
   String get showTransportControlsOnPhotosTitle =>
       'Показувати елементи керування на фотографіях';
 

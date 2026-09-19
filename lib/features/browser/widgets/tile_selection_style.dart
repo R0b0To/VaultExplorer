@@ -127,19 +127,32 @@ class FileRowShell extends StatelessWidget {
       FileDetailColumn.size => 50,
       FileDetailColumn.type => 46,
     };
-    final effectiveWidth = width * zoomLevel;
+    // `FileListView` wraps this whole list in a `MediaQuery` override whose
+    // text scaler already multiplies the system font/display-scale setting
+    // by the row's pinch-zoom level -- the same scaler this `Text` below
+    // picks up automatically to size its own glyphs. The old `width *
+    // zoomLevel` only tracked pinch-zoom, so a larger system font grew the
+    // text but not the box around it, and the text got ellipsized. Scaling
+    // off the ambient text scaler keeps the two in step.
+    final effectiveWidth = MediaQuery.textScalerOf(context).scale(width);
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return SizedBox(
-      width: effectiveWidth,
+    return ConstrainedBox(
+      // A floor, not a cap: short text still right-aligns in a tidy,
+      // column-like slot, but if the actual rendered text needs more room
+      // than this estimate -- an extreme system font size, a long
+      // localized date format -- the box is free to grow rather than
+      // clipping the text.
+      constraints: BoxConstraints(minWidth: effectiveWidth),
       child: Text(
         _columnText(col, context),
         textAlign: TextAlign.right,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        softWrap: false,
       ),
     );
   }

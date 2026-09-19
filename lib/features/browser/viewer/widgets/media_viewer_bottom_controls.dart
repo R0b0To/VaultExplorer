@@ -8,6 +8,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_progress_bar.dart';
@@ -16,6 +17,7 @@ class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
   final VideoPlaybackManager playbackManager;
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
+  final VideoScrubPreviewHost scrubPreviewHost;
   final MediaViewerToolbarConfig toolbarConfig;
   final bool isImage;
   final bool isAudio;
@@ -37,6 +39,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     required this.playlistController,
     required this.playbackManager,
     required this.videoProgressNotifier,
+    required this.scrubPreviewHost,
     required this.toolbarConfig,
     required this.isImage,
     required this.isAudio,
@@ -213,6 +216,8 @@ class MediaViewerBottomControls extends StatelessWidget {
                 videoProgressNotifier: videoProgressNotifier,
                 onShowUIChanged: onShowUIChanged,
                 onStartHideTimer: onStartHideTimer,
+                previewStyle: toolbarConfig.scrubPreviewStyle,
+                previewHost: scrubPreviewHost,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),

@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.engine
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -104,6 +105,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var previewExtractor: MediaExtractor? = null
     private var previewCodec: MediaCodec? = null
     private var previewDurationUs: Long = 0L
+    // Clockwise degrees (0/90/180/270) the container says a decoded frame
+    // must be turned to appear upright. MediaCodec's ByteBuffer/Image output
+    // is always in *coded* orientation -- a phone-recorded portrait clip
+    // decodes as a sideways landscape frame -- so the preview has to apply
+    // this itself. Only touched on previewFrameExecutor's thread, like the
+    // fields above.
+    private var previewRotationDegrees: Int = 0
 
     private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
         val factory = DefaultExtractorsFactory()
@@ -591,12 +599,18 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             } else {
                 positionMs.coerceAtLeast(0L)
             }
+            val rotation = previewRotationDegrees
             val bytes = try {
                 val frame = VideoThumbnailCoordinator.decodeSoftwareFrameAt(extractor, codec, clampedMs * 1000L)
                 if (frame != null) {
                     val scaled = VideoThumbnailCoordinator.scaledToFit(frame, maxSize)
+                    // Rotate *after* scaling: same result, but the bitmap being
+                    // copied is at most maxSize on its long edge instead of
+                    // the full decoded frame.
+                    val upright = rotatedBy(scaled, rotation)
                     val stream = ByteArrayOutputStream()
-                    scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+                    upright.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+                    if (upright !== scaled) upright.recycle()
                     if (scaled !== frame) scaled.recycle()
                     frame.recycle()
                     stream.toByteArray()
@@ -611,6 +625,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 mainHandler.post { callback(bytes) }
             }
         }
+    }
+
+    /** Returns [src] turned clockwise by [degrees], or [src] itself when no turn is needed. */
+    private fun rotatedBy(src: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return src
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
     }
 
     /** Ends the current scrub-preview session, releasing its codec/extractor. */
@@ -692,6 +713,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             } else {
                 0L
             }
+            previewRotationDegrees = if (format.containsKey(MediaFormat.KEY_ROTATION)) {
+                ((format.getInteger(MediaFormat.KEY_ROTATION) % 360) + 360) % 360
+            } else {
+                0
+            }
             success = true
             return true
         } finally {
@@ -711,6 +737,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         runCatching { previewExtractor?.release() }
         previewExtractor = null
         previewDurationUs = 0L
+        previewRotationDegrees = 0
     }
 
     fun release() {

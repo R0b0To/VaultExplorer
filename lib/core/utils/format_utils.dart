@@ -25,6 +25,21 @@ String formatDuration(Duration d) {
   return '${seconds}s';
 }
 
+/// Formats a playback position/length the way a media player's clock reads:
+/// "03:07", or "01:02:03" once it passes an hour. A negative duration keeps
+/// its sign ("-00:05").
+String formatClockDuration(Duration d) {
+  final Duration abs = d.isNegative ? -d : d;
+  final String minutes = abs.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final String seconds = abs.inSeconds.remainder(60).toString().padLeft(2, '0');
+  final String sign = d.isNegative ? '-' : '';
+  if (abs.inHours > 0) {
+    final String hours = abs.inHours.toString().padLeft(2, '0');
+    return '$sign$hours:$minutes:$seconds';
+  }
+  return '$sign$minutes:$seconds';
+}
+
 // ── Entry date formatting ────────────────────────────────────────────────────
 
 const _months = [

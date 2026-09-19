@@ -3,17 +3,28 @@ import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart'
     show VideoPlaybackProgress;
 
 /// The video seekbar row (position label / slider / duration label), plus
-/// a floating thumbnail that appears above the drag thumb while scrubbing.
+/// a preview of the frame under the thumb while scrubbing.
+///
+/// What that preview looks like depends on [previewStyle]:
+///  - [ScrubPreviewStyle.miniBox]: a small thumbnail floating above the
+///    thumb, drawn right here by [_ScrubPreviewBubble].
+///  - [ScrubPreviewStyle.fullscreen]: the frame covers the whole video
+///    area. That can't be drawn from inside this 32px-tall row, so the
+///    active [VideoScrubPreviewController] is published to [previewHost]
+///    and `VideoScrubFullscreenLayer` (in the viewer's top-level stack)
+///    does the drawing.
 ///
 /// Split out of `MediaViewerBottomControls` (which stays a
-/// [StatelessWidget]) because showing that thumbnail needs state of its
+/// [StatelessWidget]) because showing either preview needs state of its
 /// own: a [VideoScrubPreviewController] is opened in [_beginScrub] and
 /// torn down in [_endScrub], scoped to exactly one drag gesture.
 class VideoScrubProgressBar extends StatefulWidget {
@@ -21,6 +32,8 @@ class VideoScrubProgressBar extends StatefulWidget {
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
   final ValueChanged<bool> onShowUIChanged;
   final VoidCallback onStartHideTimer;
+  final ScrubPreviewStyle previewStyle;
+  final VideoScrubPreviewHost previewHost;
 
   const VideoScrubProgressBar({
     super.key,
@@ -28,6 +41,8 @@ class VideoScrubProgressBar extends StatefulWidget {
     required this.videoProgressNotifier,
     required this.onShowUIChanged,
     required this.onStartHideTimer,
+    required this.previewStyle,
+    required this.previewHost,
   });
 
   @override
@@ -43,31 +58,37 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
     super.dispose();
   }
 
-  String _formatDuration(Duration d) {
-    final Duration abs = d.isNegative ? -d : d;
-    final String minutes = abs.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final String seconds = abs.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final String sign = d.isNegative ? '-' : '';
-    if (abs.inHours > 0) {
-      final String hours = abs.inHours.toString().padLeft(2, '0');
-      return '$sign$hours:$minutes:$seconds';
-    }
-    return '$sign$minutes:$seconds';
-  }
+  bool get _isFullscreen => widget.previewStyle == ScrubPreviewStyle.fullscreen;
 
   void _beginScrub() {
     // Guards against a stray double onChangeStart (shouldn't happen, but
     // costs nothing to be defensive about a session leak).
-    _preview?.dispose();
-    final preview = VideoScrubPreviewController(widget.playbackManager.activeController);
+    final stale = _preview;
+    if (stale != null) {
+      stale.dispose();
+      _releaseFromHost(stale);
+    }
+    final preview = VideoScrubPreviewController.forStyle(
+      widget.playbackManager.activeController,
+      widget.previewStyle,
+    );
     _preview = preview;
     unawaited(preview.begin().then((_) {
       // begin() completing can outlive the drag (a very quick tap-and-
-      // release); rebuild only if this is still the active session and
-      // the widget is still mounted, so the preview bubble can appear
-      // once availability is known instead of never showing up because
-      // the very first onChanged tick raced ahead of it.
-      if (mounted && _preview == preview) setState(() {});
+      // release); act only if this is still the active session and the
+      // widget is still mounted, so the preview can appear once
+      // availability is known instead of never showing up because the
+      // very first onChanged tick raced ahead of it.
+      if (!mounted || _preview != preview) return;
+      // Fullscreen: hand the session to the layer, but only once the
+      // native side has confirmed it can decode this video. Done here, in
+      // an async callback, rather than in build()/dispose() -- notifying
+      // the layer while the framework has the widget tree locked would
+      // assert.
+      if (_isFullscreen && preview.available) {
+        widget.previewHost.value = preview;
+      }
+      setState(() {});
     }));
   }
 
@@ -78,7 +99,15 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
   void _endScrub() {
     final preview = _preview;
     _preview = null;
-    unawaited(preview?.end());
+    if (preview == null) return;
+    unawaited(preview.end());
+    // onChangeEnd resolves after awaiting a seek, so this bar (and the
+    // screen that owns the host) may already be gone by now.
+    if (mounted) _releaseFromHost(preview);
+  }
+
+  void _releaseFromHost(VideoScrubPreviewController preview) {
+    if (widget.previewHost.value == preview) widget.previewHost.value = null;
   }
 
   @override
@@ -99,8 +128,8 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
         child: ValueListenableBuilder<VideoPlaybackProgress>(
           valueListenable: widget.videoProgressNotifier,
           builder: (context, progress, child) {
-            final positionStr = _formatDuration(progress.position);
-            final durationStr = _formatDuration(progress.duration);
+            final positionStr = formatClockDuration(progress.position);
+            final durationStr = formatClockDuration(progress.duration);
             final bool hasValidDuration = progress.duration.inMilliseconds > 0;
 
             return Row(
@@ -170,7 +199,8 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
                                   }
                                 : null,
                           ),
-                          if (progress.isDragging &&
+                          if (!_isFullscreen &&
+                              progress.isDragging &&
                               hasValidDuration &&
                               preview != null &&
                               preview.available)

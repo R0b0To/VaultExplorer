@@ -3,10 +3,18 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
-/// Debounced, session-scoped fetcher for the small preview frame shown
-/// above the seekbar thumb while the user is scrubbing.
+/// Lets the seekbar (deep inside the bottom controls) hand the current
+/// drag's [VideoScrubPreviewController] to `VideoScrubFullscreenLayer`,
+/// which is a sibling of the controls in the viewer's top-level stack.
+/// Owned and disposed by the viewer screen; holds null between drags.
+typedef VideoScrubPreviewHost = ValueNotifier<VideoScrubPreviewController?>;
+
+/// Debounced, session-scoped fetcher for the preview frame shown while the
+/// user is scrubbing -- either the small box above the seekbar thumb or the
+/// fullscreen frame, depending on [ScrubPreviewStyle].
 ///
 /// One instance is meant to live for exactly one drag gesture: [begin]
 /// opens a native decode session pinned to whatever video [_controller] is
@@ -25,9 +33,37 @@ import 'package:vaultexplorer/features/browser/viewer/native_video_controller.da
 ///    scrubbing motion, overshoot then correct -- reuses the earlier
 ///    frame instead of asking the native side to decode it again.
 class VideoScrubPreviewController {
-  VideoScrubPreviewController(this._controller);
+  VideoScrubPreviewController(
+    this._controller, {
+    this.frameMaxSize = _miniBoxFrameMaxSize,
+    this.frameQuality = _miniBoxFrameQuality,
+  });
+
+  /// Sizes the decoded frames for how [style] will show them. The ~200 px
+  /// JPEG that is plenty for the mini box would be a blurry smear stretched
+  /// across the screen, so fullscreen asks the native side for a much
+  /// larger (and correspondingly costlier) frame.
+  factory VideoScrubPreviewController.forStyle(
+    NativeVideoController? controller,
+    ScrubPreviewStyle style,
+  ) =>
+      switch (style) {
+        ScrubPreviewStyle.miniBox => VideoScrubPreviewController(controller),
+        ScrubPreviewStyle.fullscreen => VideoScrubPreviewController(
+            controller,
+            frameMaxSize: _fullscreenFrameMaxSize,
+            frameQuality: _fullscreenFrameQuality,
+          ),
+      };
 
   static const _tag = 'VideoScrubPreviewController';
+
+  // Longest edge (px) and JPEG quality requested from the native decoder.
+  // The mini-box values match the native side's own defaults.
+  static const _miniBoxFrameMaxSize = 200;
+  static const _miniBoxFrameQuality = 55;
+  static const _fullscreenFrameMaxSize = 1280;
+  static const _fullscreenFrameQuality = 70;
 
   // Coarse enough that hovering back and forth over roughly the same spot
   // reuses a cached frame; fine enough that the preview still visibly
@@ -36,6 +72,12 @@ class VideoScrubPreviewController {
   static const _maxCacheEntries = 40;
 
   final NativeVideoController? _controller;
+
+  /// Longest edge, in pixels, of each frame requested from the native side.
+  final int frameMaxSize;
+
+  /// JPEG quality (1-100) of each frame requested from the native side.
+  final int frameQuality;
 
   /// The most recently decoded preview frame, or null before the first
   /// one arrives (or if this video has no usable preview at all -- see
@@ -53,6 +95,9 @@ class VideoScrubPreviewController {
   /// video at all. False for an unsupported codec or an audio-only file.
   /// Only meaningful after [begin] has completed.
   bool get available => _available;
+
+  /// True once [dispose] has run; [frameNotifier] is unusable after that.
+  bool get isDisposed => _disposed;
 
   int _bucketFor(Duration position) => (position.inMilliseconds / _bucketMs).round();
 
@@ -85,7 +130,11 @@ class VideoScrubPreviewController {
     if (_disposed || !_available) return;
     _fetching = true;
     try {
-      final bytes = await _controller?.getScrubPreviewFrame(position);
+      final bytes = await _controller?.getScrubPreviewFrame(
+        position,
+        maxSize: frameMaxSize,
+        quality: frameQuality,
+      );
       if (_disposed) return;
       if (bytes != null) {
         final bucket = _bucketFor(position);

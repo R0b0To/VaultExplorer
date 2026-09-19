@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -256,6 +257,13 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setMediaViewerShowStatusBadge(bool show) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       showStatusBadge: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerScrubPreviewStyle(ScrubPreviewStyle style) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      scrubPreviewStyle: style,
     );
     return updateMediaViewerConfig(updated);
   }

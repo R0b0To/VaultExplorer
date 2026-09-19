@@ -1,4 +1,5 @@
 import 'media_viewer_action.dart';
+import 'scrub_preview_style.dart';
 
 class MediaViewerToolbarConfig {
   final List<MediaViewerAction> topBarActions;
@@ -12,6 +13,9 @@ class MediaViewerToolbarConfig {
   final bool showCenterScreenPlayButton;
   final bool showCenterTransportForImages;
   final bool showStatusBadge;
+
+  /// What the seekbar shows while dragging; see [ScrubPreviewStyle].
+  final ScrubPreviewStyle scrubPreviewStyle;
 
   const MediaViewerToolbarConfig({
     this.topBarActions = const [
@@ -51,6 +55,7 @@ class MediaViewerToolbarConfig {
     this.showCenterScreenPlayButton = false,
     this.showCenterTransportForImages = false,
     this.showStatusBadge = true,
+    this.scrubPreviewStyle = ScrubPreviewStyle.miniBox,
   });
 
   factory MediaViewerToolbarConfig.defaults() =>
@@ -68,6 +73,7 @@ class MediaViewerToolbarConfig {
     bool? showCenterScreenPlayButton,
     bool? showCenterTransportForImages,
     bool? showStatusBadge,
+    ScrubPreviewStyle? scrubPreviewStyle,
   }) =>
       MediaViewerToolbarConfig(
         topBarActions: topBarActions ?? this.topBarActions,
@@ -84,6 +90,7 @@ class MediaViewerToolbarConfig {
         showCenterTransportForImages:
             showCenterTransportForImages ?? this.showCenterTransportForImages,
         showStatusBadge: showStatusBadge ?? this.showStatusBadge,
+        scrubPreviewStyle: scrubPreviewStyle ?? this.scrubPreviewStyle,
       );
 
   Map<String, dynamic> toJson() => {
@@ -99,6 +106,7 @@ class MediaViewerToolbarConfig {
         'showCenterScreenPlayButton': showCenterScreenPlayButton,
         'showCenterTransportForImages': showCenterTransportForImages,
         'showStatusBadge': showStatusBadge,
+        'scrubPreviewStyle': scrubPreviewStyle.toJson(),
       };
 
   factory MediaViewerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -153,6 +161,8 @@ class MediaViewerToolbarConfig {
       showCenterTransportForImages:
           j['showCenterTransportForImages'] as bool? ?? false,
       showStatusBadge: j['showStatusBadge'] as bool? ?? true,
+      scrubPreviewStyle:
+          ScrubPreviewStyle.fromJson(j['scrubPreviewStyle'] as String?),
     );
   }
 }

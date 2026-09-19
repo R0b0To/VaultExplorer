@@ -4,7 +4,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
@@ -189,6 +191,22 @@ class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
                           Icons.linear_scale_rounded,
                           color: cs.primary,
                         ),
+                      ),
+                      // Only meaningful while the seekbar itself is shown, so it
+                      // greys out with it rather than silently doing nothing.
+                      OptionPickerTile<ScrubPreviewStyle>(
+                        label: l10n.scrubPreviewStyleTitle,
+                        value: mediaConfig.scrubPreviewStyle,
+                        prefixIcon: mediaConfig.scrubPreviewStyle.icon,
+                        enabled: mediaConfig.showProgressBar,
+                        options: ScrubPreviewStyle.values.map((style) {
+                          return SelectOption(
+                            value: style,
+                            label: style.getLocalizedLabel(l10n),
+                            subtitle: style.getLocalizedDescription(l10n),
+                          );
+                        }).toList(),
+                        onChanged: controller.setMediaViewerScrubPreviewStyle,
                       ),
                       SwitchListTile(
                         contentPadding:

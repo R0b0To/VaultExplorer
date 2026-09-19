@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -35,6 +36,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controll
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
@@ -44,6 +46,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -103,6 +106,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
+  // Carries the seekbar's current drag session to the fullscreen scrub
+  // preview layer (see ScrubPreviewStyle.fullscreen). Null between drags,
+  // and always null in mini-box mode.
+  final VideoScrubPreviewHost _scrubPreviewHost = VideoScrubPreviewHost(null);
 
   // Raw pointer tracking so a second finger touching down immediately locks
   // out swipe-to-next-item, before the gesture arena has a chance to let
@@ -1512,6 +1519,7 @@ void _showOrientationSheet(BuildContext context) {
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
+    _scrubPreviewHost.dispose();
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
       overlays: SystemUiOverlay.values,
@@ -1837,6 +1845,19 @@ void _showOrientationSheet(BuildContext context) {
                     },
                   ),
                 ),
+                // Fullscreen scrub preview: above the media, below the
+                // chrome, so the seekbar stays visible while dragging.
+                // Not built at all in mini-box mode.
+                if (mediaViewerConfig.scrubPreviewStyle ==
+                    ScrubPreviewStyle.fullscreen)
+                  Positioned.fill(
+                    child: VideoScrubFullscreenLayer(
+                      previewHost: _scrubPreviewHost,
+                      progress: _videoProgressNotifier,
+                      rotationQuarterTurns:
+                          _rotations[_playlistController.currentFile] ?? 0,
+                    ),
+                  ),
                 AnimatedPositioned(
                   duration: MediaViewerConstants.animationDuration,
                   curve: Curves.easeOut,
@@ -1912,6 +1933,7 @@ void _showOrientationSheet(BuildContext context) {
                         playlistController: _playlistController,
                         playbackManager: _playbackManager,
                         videoProgressNotifier: _videoProgressNotifier,
+                        scrubPreviewHost: _scrubPreviewHost,
                         toolbarConfig: mediaViewerConfig,
                         isImage: isImg,
                         isAudio: MediaViewerConstants.isAudio(_playlistController.currentFile),

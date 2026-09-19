@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/services/vault_sync_service.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 /// Fakes [VaultFileIoApi.listDirectory] with a fixed map of
 /// "containerUri::dirPath" -> raw wire-format entries (see [RawEntry]),
@@ -20,6 +21,22 @@ class _FakeVaultSyncApi extends VaultFileIoApi {
     bool refresh = false,
   }) async {
     return listings['${container.uri}::$dirPath'];
+  }
+}
+
+/// A [_FakeVaultSyncApi] that also records every listing request.
+class _RecordingApi extends _FakeVaultSyncApi {
+  final List<({String uri, bool refresh})> requests = [];
+  _RecordingApi(super.listings);
+
+  @override
+  Future<List<String>?> listDirectory(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) {
+    requests.add((uri: container.uri, refresh: refresh));
+    return super.listDirectory(container, dirPath, refresh: refresh);
   }
 }
 
@@ -231,5 +248,111 @@ void main() {
         expect(updates.last.entries, isEmpty);
       },
     );
+  });
+
+
+  group('VaultSyncService with device and provider storage', () {
+    MountedContainer vault(String uri, int volId) => MountedContainer(
+      uri: uri,
+      displayName: uri,
+      volId: volId,
+      rootFiles: const [],
+      mountedAt: DateTime(2026, 1, 1),
+      totalSpace: 100000000,
+      freeSpace: 50000000,
+      containerFormat: 'veracrypt',
+    );
+    final local = buildLocalStorageContainer(
+      rootPath: '/local',
+      displayName: 'Local Storage',
+    );
+    final provider = buildExternalStorageContainer(
+      rootPath: 'content://provider/tree/x',
+      displayName: 'Drive',
+      volId: -100,
+    );
+
+    VaultSyncSide side(MountedContainer c) =>
+        VaultSyncSide(container: c, relativePath: '');
+
+    test('a file whose modified time the storage did not report is left for '
+        'the user rather than guessed newer or older', () async {
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          '/local::': ['F|10|5000|notes.txt'],
+          // Some document providers report no modified time (0).
+          'content://provider/tree/x::': ['F|20|0|notes.txt'],
+        }),
+      );
+
+      final updates = await service
+          .scanDiff(left: side(local), right: side(provider))
+          .toList();
+
+      final entries = updates.last.entries;
+      expect(entries, hasLength(1));
+      expect(entries.single.status, VaultDiffStatus.conflicted);
+      expect(
+        service.defaultAction(entries.single, SyncDirection.twoWay),
+        EntryAction.skip,
+      );
+    });
+
+    test('lists device storage fresh, but not vaults or provider folders',
+        () async {
+      final api = _RecordingApi({
+        '/local::': <String>[],
+        'vault.hc::': <String>[],
+        'content://provider/tree/x::': <String>[],
+      });
+      final service = VaultSyncService(api);
+
+      await service
+          .scanDiff(left: side(local), right: side(vault('vault.hc', 7)))
+          .toList();
+      await service
+          .scanDiff(left: side(provider), right: side(vault('vault.hc', 7)))
+          .toList();
+
+      expect(
+        api.requests.where((r) => r.uri == '/local').map((r) => r.refresh),
+        everyElement(isTrue),
+      );
+      expect(
+        api.requests.where((r) => r.uri != '/local').map((r) => r.refresh),
+        everyElement(isFalse),
+      );
+    });
+
+    test('plaintextDestinations flags only vault-to-plain-storage flows', () {
+      final service = VaultSyncService(_FakeVaultSyncApi({}));
+      final v = side(vault('vault.hc', 7));
+      final other = side(vault('other.hc', 8));
+      final plain = side(local);
+      final drive = side(provider);
+
+      List<VaultSyncSide> run(
+        VaultSyncSide l,
+        VaultSyncSide r,
+        List<EntryAction> actions,
+      ) => service.plaintextDestinations(left: l, right: r, actions: actions);
+
+      // Vault (left) -> device storage (right): plain files land on the right.
+      expect(run(v, plain, [EntryAction.copyToRight]), [plain]);
+      // Same, with the vault on the right and copying to the left.
+      expect(run(plain, v, [EntryAction.copyToLeft]), [plain]);
+      expect(run(v, drive, [EntryAction.copyToRight]), [drive]);
+      // Importing into a vault, or copying nothing, exports nothing.
+      expect(run(v, plain, [EntryAction.copyToLeft]), isEmpty);
+      expect(run(v, plain, [EntryAction.skip]), isEmpty);
+      // Vault to vault stays encrypted; plain to plain was never encrypted.
+      expect(run(v, other, [EntryAction.copyToRight]), isEmpty);
+      expect(run(plain, drive, [EntryAction.copyToRight]), isEmpty);
+      // Both directions at once against plain storage lists it once.
+      expect(
+        run(v, plain, [EntryAction.copyToRight, EntryAction.copyToLeft]),
+        [plain],
+      );
+    });
   });
 }

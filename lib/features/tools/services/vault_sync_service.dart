@@ -3,12 +3,12 @@ library;
 import 'dart:async';
 
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
-import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -19,7 +19,11 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 /// comment for the shared bool-flag implementation this delegates to.
 class VaultSyncCancellationToken extends CancellationToken {}
 
-/// Core service behind the Vault-to-Vault Synchronizer / Diff tool.
+/// Core service behind the Vault Sync / Diff tool.
+///
+/// Either side can be a vault, device storage, or a document-provider (SAF)
+/// folder -- they all go through [VaultFileIoApi], which dispatches on the
+/// container type.
 ///
 /// [scanDiff] walks two [VaultSyncSide]s in lock-step using
 /// [VaultFileIoApi.listDirectory], descending into subfolders that exist
@@ -96,6 +100,9 @@ class VaultSyncService {
         leftRaw = await _fileIoApi.listDirectory(
           left.container,
           _absPath(left.relativePath, relDir),
+          // Raw file-system listings are cached briefly; native SAF copies
+          // into them bypass that cache, so always read fresh.
+          refresh: left.container.isRawLocal,
         );
       } catch (_) {
         // Unreadable on the left -- treated as empty, so everything on the
@@ -106,6 +113,7 @@ class VaultSyncService {
         rightRaw = await _fileIoApi.listDirectory(
           right.container,
           _absPath(right.relativePath, relDir),
+          refresh: right.container.isRawLocal,
         );
       } catch (_) {
         // Same for the right side.
@@ -222,7 +230,13 @@ class VaultSyncService {
         // File sizes differ -- the file contents are definitely different.
         // Compare modification times to determine which side is newer.
         final VaultDiffStatus status;
-        if (l.modifiedSecs > r.modifiedSecs + _mtimeToleranceSecs) {
+        if (l.modifiedSecs <= 0 || r.modifiedSecs <= 0) {
+          // A modified time of 0 means the storage didn't report one (some
+          // document providers don't). Guessing "newer" from a missing
+          // timestamp could overwrite the wrong side, so leave it for the
+          // user to resolve.
+          status = VaultDiffStatus.conflicted;
+        } else if (l.modifiedSecs > r.modifiedSecs + _mtimeToleranceSecs) {
           status = VaultDiffStatus.leftNewer;
         } else if (r.modifiedSecs > l.modifiedSecs + _mtimeToleranceSecs) {
           status = VaultDiffStatus.rightNewer;
@@ -282,7 +296,7 @@ class VaultSyncService {
         return;
       }
 
-      entries.sort((a, b) => naturalCompare(a.relativePath, b.relativePath));
+      entries.sort((a, b) => a.relativePath.compareTo(b.relativePath));
       controller.add(
         VaultSyncScanUpdate(
           progress: VaultSyncScanProgress(
@@ -325,6 +339,25 @@ class VaultSyncService {
       case VaultDiffStatus.conflicted:
         return EntryAction.skip;
     }
+  }
+
+  /// The sides that would receive plain files copied out of an encrypted
+  /// vault, given the [actions] chosen for each diff entry.
+  ///
+  /// Copying from a vault to device storage or a document provider (which
+  /// may be a cloud drive) leaves those files unencrypted, so callers use
+  /// this to warn before a sync starts.
+  List<VaultSyncSide> plaintextDestinations({
+    required VaultSyncSide left,
+    required VaultSyncSide right,
+    required Iterable<EntryAction> actions,
+  }) {
+    final toRight = actions.contains(EntryAction.copyToRight);
+    final toLeft = actions.contains(EntryAction.copyToLeft);
+    return [
+      if (toRight && left.isEncrypted && !right.isEncrypted) right,
+      if (toLeft && right.isEncrypted && !left.isEncrypted) left,
+    ];
   }
 
   /// Enqueues [FileOperationService] copy batches for every entry [plan]

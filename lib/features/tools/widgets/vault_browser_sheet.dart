@@ -17,6 +17,14 @@ class VaultBrowserScaffold extends ConsumerWidget {
   final Widget Function(BuildContext context) buildBottomBar;
   final List<Widget> Function(BuildContext context)? actions;
 
+  /// Optional overrides for the storage selector shown when
+  /// [VaultBrowserParams.mountedContainers] has more than one entry. Left
+  /// `null` by every caller except the Vault Sync picker, so the selector
+  /// keeps its "Vault" label and plain container names elsewhere.
+  final String Function(BuildContext context)? selectorLabel;
+  final String? Function(BuildContext context, MountedContainer container)?
+      containerSubtitle;
+
   /// Optional wrap around the app bar title widget -- e.g.
   /// `(title) => HiddenVaultTrigger(child: title)`, the way
   /// `FileBrowserScreen`'s identically-named parameter is already used
@@ -35,6 +43,8 @@ class VaultBrowserScaffold extends ConsumerWidget {
     required this.buildBottomBar,
     this.actions,
     this.wrapAppBarTitle,
+    this.selectorLabel,
+    this.containerSubtitle,
   });
 
   @override
@@ -154,12 +164,19 @@ class VaultBrowserScaffold extends ConsumerWidget {
     return Material(
       color: Colors.transparent,
       child: OptionPickerTile<int>(
-        label: context.l10n.hashVerifierVaultPickerLabel,
+        label: selectorLabel?.call(context) ??
+            context.l10n.hashVerifierVaultPickerLabel,
         value: state.selectedContainer.volId,
         subtitle: state.selectedContainer.displayName,
         prefixIcon: Icons.folder_special_rounded,
         options: params.mountedContainers
-            .map((c) => SelectOption(value: c.volId, label: c.displayName))
+            .map(
+              (c) => SelectOption(
+                value: c.volId,
+                label: c.displayName,
+                subtitle: containerSubtitle?.call(context, c),
+              ),
+            )
             .toList(),
         onChanged: (volId) {
           final container = params.mountedContainers.firstWhere(

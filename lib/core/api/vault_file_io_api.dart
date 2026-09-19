@@ -199,6 +199,10 @@ class VaultFileIoApi {
   }
 
   Future<int> getFolderSize(MountedContainer container, String dirPath) async {
+    // SAF trees have no native folder-size call, and the raw file-system
+    // backend can't read a content:// URI (it would silently report 0), so
+    // sum the listing recursively instead.
+    if (_isSaf(container)) return _safFolderSize(container, dirPath);
     if (container.isLocalStorage) {
       return _local.getFolderSize(container.uri, dirPath);
     }
@@ -207,6 +211,22 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'dirPath': dirPath},
     );
     return result ?? 0;
+  }
+
+  Future<int> _safFolderSize(MountedContainer container, String dirPath) async {
+    var total = 0;
+    final raw = await listDirectory(container, dirPath) ?? const <String>[];
+    for (final entry in RawEntry.parseAll(raw)) {
+      if (entry.isDir) {
+        total += await _safFolderSize(
+          container,
+          dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}',
+        );
+      } else {
+        total += entry.sizeBytes;
+      }
+    }
+    return total;
   }
 
   Future<Uint8List?> readFileChunk(
@@ -509,6 +529,12 @@ class VaultFileIoApi {
   }) async {
     // Fast native SAF copy
     if (src.isSafStorage || dest.isSafStorage) {
+      // The native copy only understands SAF trees and plain file-system
+      // paths. Given a vault on the other side it would treat the vault's URI
+      // as a file path, so report "not handled" and let the caller stream the
+      // file in chunks instead.
+      final other = src.isSafStorage ? dest : src;
+      if (!other.isLocalStorage) return false;
       final res = await _channel.invokeMethod<bool>(ChannelMethods.safCopyFile, {
         'srcTreeUri': src.isSafStorage ? src.uri : null,
         'srcPath': src.isSafStorage ? srcPath : _local.resolve(src.uri, srcPath),

@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 MountedContainer _container() => MountedContainer(
   uri: 'content://test-container',
@@ -327,5 +328,70 @@ void main() {
         events.removeImportItemFinishedListener(listener);
       },
     );
+  });
+
+
+  group('SAF (document provider) storage', () {
+    final saf = buildExternalStorageContainer(
+      rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+      displayName: 'SD card',
+      volId: -100,
+    );
+    final local = buildLocalStorageContainer(
+      rootPath: '/storage/emulated/0',
+      displayName: 'Local Storage',
+    );
+
+    void mockChannel(Object? Function(MethodCall call) handler) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return handler(call);
+          });
+    }
+
+    test('getFolderSize sums a SAF tree instead of reporting 0', () async {
+      final listings = <String, List<Map<String, Object>>>{
+        '': [
+          {'name': 'a.bin', 'isDir': false, 'size': 100, 'lastModified': 1},
+          {'name': 'sub', 'isDir': true, 'size': 0, 'lastModified': 1},
+        ],
+        'sub': [
+          {'name': 'b.bin', 'isDir': false, 'size': 25, 'lastModified': 1},
+          {'name': 'deep', 'isDir': true, 'size': 0, 'lastModified': 1},
+        ],
+        'sub/deep': [
+          {'name': 'c.bin', 'isDir': false, 'size': 5, 'lastModified': 1},
+        ],
+      };
+      mockChannel((call) {
+        expect(call.method, 'safListDirectory');
+        return listings[(call.arguments as Map)['dirPath']];
+      });
+
+      expect(await api.getFolderSize(saf, ''), 130);
+      expect(await api.getFolderSize(saf, 'sub'), 30);
+    });
+
+    test('copyFile does not hand a vault path to the native SAF copy', () async {
+      mockChannel((call) => true);
+
+      // The native copy would treat the vault's URI as a file path; reporting
+      // "not handled" lets the caller stream the file in chunks instead.
+      expect(await api.copyFile(saf, 'a.txt', container, 'a.txt'), isFalse);
+      expect(await api.copyFile(container, 'a.txt', saf, 'a.txt'), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('copyFile uses the native SAF copy against plain local storage or '
+        'another SAF tree', () async {
+      mockChannel((call) => true);
+
+      expect(await api.copyFile(saf, 'a.txt', local, 'Docs/a.txt'), isTrue);
+      expect(await api.copyFile(local, 'Docs/a.txt', saf, 'a.txt'), isTrue);
+      expect(await api.copyFile(saf, 'a.txt', saf, 'b.txt'), isTrue);
+      expect(calls.map((c) => c.method), everyElement('safCopyFile'));
+      expect(calls, hasLength(3));
+    });
   });
 }

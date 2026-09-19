@@ -23,7 +23,15 @@ class VaultSyncState {
   final Map<String, EntryAction> overrides;
   final bool isSyncing;
 
-  bool get canCompare => left != null && right != null && left != right;
+  /// Both sides are chosen but point at the same folder, or one sits inside
+  /// the other -- syncing them would copy a folder into itself.
+  bool get sidesOverlap {
+    final l = left;
+    final r = right;
+    return l != null && r != null && l.overlapsWith(r);
+  }
+
+  bool get canCompare => left != null && right != null && !sidesOverlap;
 
   const VaultSyncState({
     this.left,
@@ -134,10 +142,27 @@ class VaultSync extends _$VaultSync {
     return action;
   }
 
+  /// Display labels of the non-vault sides that would receive files copied
+  /// out of an encrypted vault under the current plan. Empty when nothing
+  /// leaves a vault for plain storage. Used to warn before syncing.
+  List<String> plaintextExportTargets() {
+    final left = state.left;
+    final right = state.right;
+    if (left == null || right == null) return const [];
+    return _service
+        .plaintextDestinations(
+          left: left,
+          right: right,
+          actions: state.entries.map(actionFor),
+        )
+        .map((side) => side.displayLabel)
+        .toList();
+  }
+
   Future<void> startCompare() async {
     final left = state.left;
     final right = state.right;
-    if (left == null || right == null || left == right) return;
+    if (left == null || right == null || left.overlapsWith(right)) return;
 
     _cancelToken?.cancel();
     final token = VaultSyncCancellationToken();

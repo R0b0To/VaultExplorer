@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_controller.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 MountedContainer _testContainer({
   required int volId,
@@ -90,6 +91,115 @@ void main() {
 
       final action = controller.actionFor(diffEntry);
       expect(action, equals(EntryAction.skip));
+    });
+  });
+
+
+  group('VaultSyncController with device and provider storage', () {
+    test('a nested folder in the same vault cannot be compared', () {
+      final vault = _testContainer(volId: 1, uri: 'file:///v1.hc', name: 'Vault 1');
+      final controller = container.read(vaultSyncProvider.notifier);
+      controller.setSide(
+        isLeft: true,
+        side: VaultSyncSide(container: vault, relativePath: ''),
+      );
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: vault, relativePath: 'backup'),
+      );
+
+      final state = container.read(vaultSyncProvider);
+      expect(state.sidesOverlap, isTrue);
+      expect(state.canCompare, isFalse);
+    });
+
+    test('sibling folders in the same vault can be compared', () {
+      final vault = _testContainer(volId: 1, uri: 'file:///v1.hc', name: 'Vault 1');
+      final controller = container.read(vaultSyncProvider.notifier);
+      controller.setSide(
+        isLeft: true,
+        side: VaultSyncSide(container: vault, relativePath: 'photos'),
+      );
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: vault, relativePath: 'photos-backup'),
+      );
+
+      expect(container.read(vaultSyncProvider).canCompare, isTrue);
+    });
+
+    test('a vault can be compared against device storage or a provider', () {
+      final vault = _testContainer(volId: 1, uri: 'file:///v1.hc', name: 'Vault 1');
+      final local = buildLocalStorageContainer(
+        rootPath: '/storage/emulated/0',
+        displayName: 'Local Storage',
+      );
+      final provider = buildExternalStorageContainer(
+        rootPath: 'content://provider/tree/x',
+        displayName: 'Drive',
+        volId: -100,
+      );
+      final controller = container.read(vaultSyncProvider.notifier);
+      controller.setSide(
+        isLeft: true,
+        side: VaultSyncSide(container: vault, relativePath: ''),
+      );
+
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: local, relativePath: 'Backups'),
+      );
+      expect(container.read(vaultSyncProvider).canCompare, isTrue);
+
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: provider, relativePath: ''),
+      );
+      expect(container.read(vaultSyncProvider).canCompare, isTrue);
+    });
+
+    test('the same folder reached through two containers is not comparable', () {
+      final local = buildLocalStorageContainer(
+        rootPath: '/storage/emulated/0',
+        displayName: 'Local Storage',
+      );
+      final saved = buildExternalStorageContainer(
+        rootPath: '/storage/emulated/0/Documents',
+        displayName: 'Documents',
+        volId: -100,
+      );
+      final controller = container.read(vaultSyncProvider.notifier);
+      controller.setSide(
+        isLeft: true,
+        side: VaultSyncSide(container: local, relativePath: 'Documents'),
+      );
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: saved, relativePath: ''),
+      );
+
+      expect(container.read(vaultSyncProvider).canCompare, isFalse);
+    });
+
+    test('plaintextExportTargets is empty until there is something to sync', () {
+      final vault = _testContainer(volId: 1, uri: 'file:///v1.hc', name: 'Vault 1');
+      final local = buildLocalStorageContainer(
+        rootPath: '/storage/emulated/0',
+        displayName: 'Local Storage',
+      );
+      final controller = container.read(vaultSyncProvider.notifier);
+      expect(controller.plaintextExportTargets(), isEmpty);
+
+      controller.setSide(
+        isLeft: true,
+        side: VaultSyncSide(container: vault, relativePath: ''),
+      );
+      controller.setSide(
+        isLeft: false,
+        side: VaultSyncSide(container: local, relativePath: 'Backups'),
+      );
+      // Sides chosen but no comparison run yet -> no entries -> no warning.
+      expect(controller.plaintextExportTargets(), isEmpty);
     });
   });
 }

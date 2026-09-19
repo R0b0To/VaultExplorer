@@ -1,17 +1,93 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
-/// One side of a Vault Sync comparison: a mounted container plus the
-/// folder within it being compared. [relativePath] is `''` for the
-/// container's root -- same convention as [VaultFileIoApi.listDirectory].
+/// What kind of storage one side of a Vault Sync comparison lives on.
+enum VaultSyncTargetKind {
+  /// A mounted, encrypted vault container.
+  vault,
+
+  /// Plain device storage reached through the file system (the primary
+  /// "Local Storage" root, or a saved folder on internal/removable storage).
+  deviceStorage,
+
+  /// A folder granted through Android's Storage Access Framework -- an SD
+  /// card, USB drive, or a cloud/document provider such as Google Drive.
+  documentProvider,
+}
+
+/// Classifies [container]. Device storage and document-provider folders are
+/// modelled as pseudo-containers with a negative `volId` (see
+/// `local_storage_container.dart`); a `content://` URI marks a SAF tree.
+VaultSyncTargetKind syncTargetKindOf(MountedContainer container) {
+  if (container.isSafStorage) return VaultSyncTargetKind.documentProvider;
+  if (container.isLocalStorage) return VaultSyncTargetKind.deviceStorage;
+  return VaultSyncTargetKind.vault;
+}
+
+/// One side of a Vault Sync comparison: a storage target plus the folder
+/// within it being compared. The target is a [MountedContainer] -- either a
+/// real vault, or one of the app's pseudo-containers for device storage or a
+/// document-provider folder. [relativePath] is `''` for the container's
+/// root -- same convention as [VaultFileIoApi.listDirectory].
 @immutable
 class VaultSyncSide {
   final MountedContainer container;
   final String relativePath;
 
   const VaultSyncSide({required this.container, required this.relativePath});
+
+  /// The kind of storage this side lives on.
+  VaultSyncTargetKind get kind => syncTargetKindOf(container);
+
+  /// Whether files on this side are stored encrypted (vaults only). Device
+  /// storage and document providers hold plain files.
+  bool get isEncrypted => kind == VaultSyncTargetKind.vault;
+
+  /// True when this side and [other] point at the same folder, or one is
+  /// nested inside the other. Syncing such a pair would copy a folder into
+  /// itself, so callers refuse to compare them.
+  ///
+  /// Best effort: sides are compared within one namespace -- the same vault,
+  /// the same file-system path, or the same SAF tree URI. Two different SAF
+  /// grants that happen to overlap on the provider can't be detected.
+  bool overlapsWith(VaultSyncSide other) {
+    final a = _location;
+    final b = other._location;
+    if (a.scope != b.scope) return false;
+    return _isSameOrWithin(a.path, b.path) || _isSameOrWithin(b.path, a.path);
+  }
+
+  ({String scope, String path}) get _location => switch (kind) {
+    VaultSyncTargetKind.deviceStorage => (
+      scope: 'fs',
+      path: p.posix.normalize(
+        p.posix.join(container.uri, _trimSlashes(relativePath)),
+      ),
+    ),
+    VaultSyncTargetKind.documentProvider => (
+      scope: 'saf:${container.uri}',
+      path: _trimSlashes(relativePath),
+    ),
+    VaultSyncTargetKind.vault => (
+      scope: 'vault:${container.volId}',
+      path: _trimSlashes(relativePath),
+    ),
+  };
+
+  static String _trimSlashes(String path) =>
+      path.split('/').where((s) => s.isNotEmpty).join('/');
+
+  /// Whether [child] is [parent] itself or lies beneath it. An empty
+  /// [parent] is a container root, which contains everything.
+  static bool _isSameOrWithin(String parent, String child) {
+    if (parent.isEmpty || parent == child) return true;
+    final prefix = parent.endsWith('/') ? parent : '$parent/';
+    return child.startsWith(prefix);
+  }
 
   /// Short "Vault / Folder" label for display, e.g. "Backups / photos".
   /// Falls back to just the vault name when [relativePath] is the root.

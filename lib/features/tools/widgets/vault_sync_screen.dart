@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
+import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dart';
 
 class VaultSyncScreen extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -47,7 +48,6 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
 
   Future<void> _pickSide(VaultSyncState state, {required bool isLeft}) async {
     final containers = widget.mountedContainers.value;
-    if (containers.isEmpty) return;
     final result = await Navigator.push<VaultSyncSide>(
       context,
       MaterialPageRoute(
@@ -127,10 +127,20 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       return;
     }
 
+    // Copying out of a vault leaves plain files on the other side -- say so.
+    final plaintextTargets =
+        ref.read(vaultSyncProvider.notifier).plaintextExportTargets();
+    var confirmMessage =
+        context.l10n.vaultSyncConfirmMessage(pendingTotal, formatBytes(pendingBytes));
+    if (plaintextTargets.isNotEmpty) {
+      confirmMessage =
+          '$confirmMessage\n\n${context.l10n.vaultSyncPlaintextWarning(plaintextTargets.join(', '))}';
+    }
+
     final confirmed = await showAppConfirmDialog(
       context,
       title: context.l10n.vaultSyncConfirmTitle,
-      message: context.l10n.vaultSyncConfirmMessage(pendingTotal, formatBytes(pendingBytes)),
+      message: confirmMessage,
       confirmLabel: context.l10n.vaultSyncSyncNowButton,
     );
     if (!confirmed || !mounted) return;
@@ -165,19 +175,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           SizedBox(width: 4),
         ],
       ),
-      body: ValueListenableBuilder<List<MountedContainer>>(
-        valueListenable: widget.mountedContainers,
-        builder: (context, containers, _) {
-          if (containers.isEmpty) {
-            return AppEmptyState(
-              icon: Icons.sync_disabled_rounded,
-              title: context.l10n.vaultSyncNoVaultsTitle,
-              message: context.l10n.vaultSyncNoVaultsMessage,
-            );
-          }
-          return _buildMainList(context, state);
-        },
-      ),
+      body: _buildMainList(context, state),
       bottomNavigationBar: (!state.isComparing && pendingTotal > 0)
           ? _buildBottomActionBar(context, state, pendingTotal)
           : null,
@@ -242,11 +240,11 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   // ── SIDE PICKERS ───────────────────────────────────────────────────────────
 
   Widget _buildSidePickers(BuildContext context, VaultSyncState state, bool isLandscape) {
-  final sameLocationWarning = (state.left != null && state.right != null && state.left == state.right)
+  final sameLocationWarning = state.sidesOverlap
       ? Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: Text(
-            context.l10n.vaultSyncSameLocationWarning,
+            context.l10n.vaultSyncOverlapWarning,
             style: context.typography.bodySmall?.copyWith(color: context.colors.error),
           ),
         )
@@ -384,13 +382,23 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           ],
         ],
       ),
-      subtitle: Text(
-        side == null
-            ? context.l10n.vaultSyncTapToSelect
-            : '${side.container.displayName} / ${side.relativePath.isEmpty ? context.l10n.vaultFolderPickerRootLabel : side.relativePath}',
-        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Row(
+        children: [
+          if (side != null) ...[
+            Icon(side.kind.icon, size: 13, color: cs.onSurfaceVariant),
+            const SizedBox(width: 5),
+          ],
+          Expanded(
+            child: Text(
+              side == null
+                  ? context.l10n.vaultSyncTapToSelect
+                  : '${side.container.displayName} / ${side.relativePath.isEmpty ? context.l10n.vaultFolderPickerRootLabel : side.relativePath}',
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
       trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant, size: 18),
       onTap: (state.isComparing || state.isSyncing) ? null : () => _pickSide(state, isLeft: isLeft),

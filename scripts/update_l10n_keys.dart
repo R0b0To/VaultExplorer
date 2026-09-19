@@ -3,66 +3,89 @@ import 'dart:convert';
 import 'dart:io';
 
 const Map<String, dynamic> enMetadataAndValues = {
- 'useFabForToolbarLabel': 'Use floating button for toolbar',
-  '@useFabForToolbarLabel': {
-    'description': 'Label for option to collapse bottom toolbar actions into a floating action button',
+  'contentsLabel': 'Contents',
+  '@contentsLabel': {
+    'description': 'Label for item count row in folder info sheet',
   },
-  'useFabForToolbarDesc': 'Replace the bottom bar with a single floating button for maximum viewing space',
-  '@useFabForToolbarDesc': {
-    'description': 'Description explaining that the bottom bar will be replaced by a floating button',
+  'totalSizeLabel': 'Total Size',
+  '@totalSizeLabel': {
+    'description': 'Label for total size row in folder info sheet',
+  },
+  'folderItemCount': '{count, plural, =0{Empty} =1{1 item} other{{count} items}}',
+  '@folderItemCount': {
+    'description': 'Formatted item count for folder contents',
+    'placeholders': {
+      'count': {
+        'type': 'num',
+      }
+    }
+  },
+  'calculatingFolderStats': 'Calculating…',
+  '@calculatingFolderStats': {
+    'description': 'Placeholder text while scanning folder contents',
   },
 };
 
 const Map<String, Map<String, String>> localizedValues = {
   'it': {
-    'useFabForToolbarLabel': 'Usa pulsante fluttuante per la barra',
-    'useFabForToolbarDesc': 'Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio',
-    // ...
+    'contentsLabel': 'Contenuto',
+    'totalSizeLabel': 'Dimensione totale',
+    'folderItemCount': '{count, plural, =0{Vuota} =1{1 elemento} other{{count} elementi}}',
+    'calculatingFolderStats': 'Calcolo in corso…',
   },
   'de': {
-    'useFabForToolbarLabel': 'Schwebende Schaltfläche für Symbolleiste',
-    'useFabForToolbarDesc': 'Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen',
-    // ...
+    'contentsLabel': 'Inhalt',
+    'totalSizeLabel': 'Gesamtgröße',
+    'folderItemCount': '{count, plural, =0{Leer} =1{1 Element} other{{count} Elemente}}',
+    'calculatingFolderStats': 'Wird berechnet…',
   },
   'es': {
-    'useFabForToolbarLabel': 'Usar botón flotante para la barra',
-    'useFabForToolbarDesc': 'Reemplazar la barra inferior con un botón flotante para maximizar el espacio',
-    // ...
+    'contentsLabel': 'Contenido',
+    'totalSizeLabel': 'Tamaño total',
+    'folderItemCount': '{count, plural, =0{Vacía} =1{1 elemento} other{{count} elementos}}',
+    'calculatingFolderStats': 'Calculando…',
   },
   'fr': {
-    'useFabForToolbarLabel': 'Bouton flottant pour la barre d’outils',
-    'useFabForToolbarDesc': 'Remplacer la barre inférieure par un bouton flottant pour maximiser l’espace',
-    // ...
+    'contentsLabel': 'Contenu',
+    'totalSizeLabel': 'Taille totale',
+    'folderItemCount': '{count, plural, =0{Vide} =1{1 élément} other{{count} éléments}}',
+    'calculatingFolderStats': 'Calcul en cours…',
   },
   'ar': {
-    'useFabForToolbarLabel': 'استخدام زر عائم لشريط الأدوات',
-    'useFabForToolbarDesc': 'استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى',
-    // ...
+    'contentsLabel': 'المحتويات',
+    'totalSizeLabel': 'الحجم الإجمالي',
+    'folderItemCount': '{count, plural, =0{فارغ} =1{عنصر واحد} =2{عنصران} few{{count} عناصر} many{{count} عنصر} other{{count} عنصر}}',
+    'calculatingFolderStats': 'جارٍ الحساب…',
   },
   'ja': {
-    'useFabForToolbarLabel': 'ツールバーにフローティングボタンを使用',
-    'useFabForToolbarDesc': '下部バーをフローティングボタンに置き換えて表示領域を最大化',
-    // ...
+    'contentsLabel': 'コンテンツ',
+    'totalSizeLabel': '合計サイズ',
+    'folderItemCount': '{count, plural, =0{空} other{{count}個の項目}}',
+    'calculatingFolderStats': '計算中…',
   },
   'ko': {
-    'useFabForToolbarLabel': '도구 모음에 플로팅 버튼 사용',
-    'useFabForToolbarDesc': '하단 표시줄을 플로팅 버튼으로 대체하여 화면 공간 최대화',
-    // ...
+    'contentsLabel': '콘텐츠',
+    'totalSizeLabel': '총 크기',
+    'folderItemCount': '{count, plural, =0{비어 있음} other{{count}개 항목}}',
+    'calculatingFolderStats': '계산 중…',
   },
   'pt': {
-    'useFabForToolbarLabel': 'Usar botão flutuante para barra de ferramentas',
-    'useFabForToolbarDesc': 'Substituir a barra inferior por um botão flutuante para maximizar o espaço',
-    // ...
+    'contentsLabel': 'Conteúdo',
+    'totalSizeLabel': 'Tamanho total',
+    'folderItemCount': '{count, plural, =0{Vazio} =1{1 item} other{{count} itens}}',
+    'calculatingFolderStats': 'Calculando…',
   },
   'uk': {
-    'useFabForToolbarLabel': 'Плаваюча кнопка для панелі інструментів',
-    'useFabForToolbarDesc': 'Замінити нижню панель плаваючою кнопкою для максимального простору',
-    // ...
+    'contentsLabel': 'Вміст',
+    'totalSizeLabel': 'Загальний розмір',
+    'folderItemCount': '{count, plural, =0{Порожньо} =1{1 елемент} few{{count} елементи} many{{count} елементів} other{{count} елементів}}',
+    'calculatingFolderStats': 'Обчислення…',
   },
   'zh': {
-    'useFabForToolbarLabel': '使用浮动按钮作为工具栏',
-    'useFabForToolbarDesc': '用单个浮动按钮替换底部工具栏以最大化查看空间',
-    // ...
+    'contentsLabel': '内容',
+    'totalSizeLabel': '总大小',
+    'folderItemCount': '{count, plural, =0{空} other{{count} 个项目}}',
+    'calculatingFolderStats': '正在计算…',
   },
 };
 
@@ -105,13 +128,8 @@ void main() async {
     print('Updated: app_$lang.arb');
   }
 
-  // 3. Update generated Dart classes if present
-  final genDir = Directory('${l10nDir.path}/generated');
-  if (genDir.existsSync()) {
-    _patchGeneratedClasses(genDir, targetLanguages);
-  }
-
-  print('\nARB update complete.');
+  print('\nARB files updated successfully.');
+  print('Please run "flutter gen-l10n" to regenerate localization Dart bindings.');
 }
 
 Directory? _findL10nDirectory() {
@@ -143,41 +161,5 @@ void _updateArb(File file, Map<String, dynamic> newEntries) {
   if (modified) {
     const encoder = JsonEncoder.withIndent('  ');
     file.writeAsStringSync('${encoder.convert(jsonMap)}\n');
-  }
-}
-
-void _patchGeneratedClasses(Directory genDir, List<String> targetLanguages) {
-  final baseFile = File('${genDir.path}/app_localizations.dart');
-  if (!baseFile.existsSync()) return;
-
-  var baseContent = baseFile.readAsStringSync();
-  final newKeys = enMetadataAndValues.keys.where((k) => !k.startsWith('@')).toList();
-
-  for (final key in newKeys) {
-    if (!baseContent.contains('String get $key;')) {
-      final getter = '\n  String get $key;\n}';
-      baseContent = baseContent.replaceFirst(RegExp(r'\}\s*$'), getter);
-    }
-  }
-  baseFile.writeAsStringSync(baseContent);
-  print('Patched base AppLocalizations in ${baseFile.path}');
-
-  for (final lang in ['en', ...targetLanguages]) {
-    final file = File('${genDir.path}/app_localizations_$lang.dart');
-    if (!file.existsSync()) continue;
-
-    var content = file.readAsStringSync();
-    for (final key in newKeys) {
-      if (!content.contains('String get $key =>')) {
-        final val = (lang == 'en')
-            ? enMetadataAndValues[key]
-            : (localizedValues[lang]?[key] ?? enMetadataAndValues[key]);
-        final escaped = (val as String).replaceAll("'", r"\'");
-        final override = "\n  @override\n  String get $key => '$escaped';\n}";
-        content = content.replaceFirst(RegExp(r'\}\s*$'), override);
-      }
-    }
-    file.writeAsStringSync(content);
-    print('Patched generated class: app_localizations_$lang.dart');
   }
 }

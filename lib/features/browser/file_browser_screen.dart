@@ -668,8 +668,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             }
           }
 
+          final hasLabel = showNames ||
+              entry.isDir ||
+              !MediaViewerConstants.hasRealThumbnail(entry.name);
           final previewHeight = itemWidth / ratio;
-          final currentHeight = previewHeight + (showNames ? 36.0 : 0.0);
+          final currentHeight = previewHeight + (hasLabel ? 36.0 : 0.0);
           if (i == targetIndex) {
             itemTop = colHeights[shortestCol];
             itemHeight = currentHeight;
@@ -2767,6 +2770,13 @@ Future<void> _extractSelectedArchive() async {
         });
       }
       await _toolbarSvc.save(_toolbarConfig);
+
+      // Keep the toolbar settings provider in sync so external listeners also reflect this ratio.
+      final effectiveToolbarUri =
+          widget.container.isLocalStorage ? null : widget.container.uri;
+      ref
+          .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+          .applyImportedConfig(_toolbarConfig);
     } catch (e) {
       if (mounted) {
         _setStatus(context.l10n.failedToSaveSettings, error: true);
@@ -2795,6 +2805,12 @@ Future<void> _extractSelectedArchive() async {
           folderLayoutModes: updatedFolderModes,
         );
         await _toolbarSvc.save(_toolbarConfig);
+
+        final effectiveToolbarUri =
+            widget.container.isLocalStorage ? null : widget.container.uri;
+        ref
+            .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+            .applyImportedConfig(_toolbarConfig);
       }
     } catch (e) {
       if (mounted) {
@@ -3068,11 +3084,16 @@ Future<void> _extractSelectedArchive() async {
 
     final effectiveToolbarUri =
         widget.container.isLocalStorage ? null : widget.container.uri;
-    final toolbarSettingsState =
-        ref.watch(fileManagerToolbarSettingsProvider(effectiveToolbarUri));
-    if (!toolbarSettingsState.loading) {
-      _toolbarConfig = toolbarSettingsState.config;
-    }
+    ref.listen<FileManagerToolbarSettingsState>(
+      fileManagerToolbarSettingsProvider(effectiveToolbarUri),
+      (previous, next) {
+        if (!next.loading && previous?.config != next.config) {
+          setState(() {
+            _toolbarConfig = next.config;
+          });
+        }
+      },
+    );
     if (_isContainerLocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && Navigator.of(context).canPop()) {
@@ -3397,18 +3418,33 @@ Future<void> _extractSelectedArchive() async {
                                       ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
                                       : _toolbarConfig.copyWith(gridColumnsPortrait: count);
                                   _toolbarSvc.save(_toolbarConfig);
+                                  final effectiveToolbarUri =
+                                      widget.container.isLocalStorage ? null : widget.container.uri;
+                                  ref
+                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                      .applyImportedConfig(_toolbarConfig);
                                 },
                                 onMasonryColumnCountChanged: (count) {
                                   _toolbarConfig = isLandscape
                                       ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
                                       : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
                                   _toolbarSvc.save(_toolbarConfig);
+                                  final effectiveToolbarUri =
+                                      widget.container.isLocalStorage ? null : widget.container.uri;
+                                  ref
+                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                      .applyImportedConfig(_toolbarConfig);
                                 },
                                 onListZoomLevelChanged: (newZoom) {
                                   setState(() {
                                     _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
                                   });
                                   _toolbarSvc.save(_toolbarConfig);
+                                  final effectiveToolbarUri =
+                                      widget.container.isLocalStorage ? null : widget.container.uri;
+                                  ref
+                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                      .applyImportedConfig(_toolbarConfig);
                                 },
                                 onRefresh: () {
                                   FolderThumbnailPreview.clearSessionCache();

@@ -51,6 +51,10 @@ class MediaViewerSessionState {
   final PlaylistTransitionEffect transitionEffect;
   final PlaylistScrollMode scrollMode;
   final bool isMuted;
+
+  /// Per-file rotation in clockwise quarter-turns (0-3), keyed by path.
+  /// This is the unit `RotatedBox.quarterTurns`, the `% 2` "is it sideways"
+  /// checks and the playback settings sheet all work in -- not degrees.
   final Map<String, int> rotations;
   final Map<String, int> imageReloadEpoch;
 
@@ -200,16 +204,17 @@ class MediaViewerSession extends _$MediaViewerSession {
     state = state.copyWith(isMuted: !state.isMuted);
   }
 
-  void setRotation(String path, int degrees) {
+  /// Sets [path]'s rotation in clockwise quarter-turns; anything outside
+  /// 0-3 wraps (so 4 -> 0 and -1 -> 3).
+  void setRotation(String path, int quarterTurns) {
     final map = Map<String, int>.from(state.rotations);
-    map[path] = degrees;
+    map[path] = quarterTurns % 4;
     state = state.copyWith(rotations: Map.unmodifiable(map));
   }
 
+  /// One 90-degree clockwise step.
   void rotateClockwise(String path) {
-    final current = state.rotations[path] ?? 0;
-    final next = (current + 90) % 360;
-    setRotation(path, next);
+    setRotation(path, (state.rotations[path] ?? 0) + 1);
   }
 
   void bumpImageReloadEpoch(String path) {

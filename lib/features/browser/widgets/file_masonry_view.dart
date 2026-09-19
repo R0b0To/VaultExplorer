@@ -110,13 +110,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
-      _columnCount = GridCardUtils.adaptColumnsForOrientation(
-        currentOrientation: orientation,
-        lastOrientation: _lastOrientation,
-        currentColumns: _columnCount,
-        minColumns: _minColumns,
-        maxColumns: _maxColumns,
-      );
+      _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
     }
   }

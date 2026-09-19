@@ -112,13 +112,7 @@ class _FileGridViewState extends State<FileGridView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
-      _crossAxisCount = GridCardUtils.adaptColumnsForOrientation(
-        currentOrientation: orientation,
-        lastOrientation: _lastOrientation,
-        currentColumns: _crossAxisCount,
-        minColumns: _minColumns,
-        maxColumns: _maxColumns,
-      );
+      _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
     }
   }

@@ -60,6 +60,16 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
 
   bool get _isFullscreen => widget.previewStyle == ScrubPreviewStyle.fullscreen;
 
+  /// Width / height of the frame being previewed. Uses the player's own
+  /// video size, which Media3 reports already turned upright on API 21+,
+  /// the same orientation the native scrub frames are decoded in. Falls
+  /// back to 16:9 (the old fixed box) while the size is still unknown.
+  double _previewAspectRatio() {
+    final size = widget.playbackManager.activeController?.value.size;
+    if (size == null || size.width <= 0 || size.height <= 0) return 16 / 9;
+    return size.width / size.height;
+  }
+
   void _beginScrub() {
     // Guards against a stray double onChangeStart (shouldn't happen, but
     // costs nothing to be defensive about a session leak).
@@ -209,6 +219,7 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
                               sliderValue: progress.sliderValue,
                               label: positionStr,
                               preview: preview,
+                              aspectRatio: _previewAspectRatio(),
                             ),
                         ],
                       );
@@ -232,7 +243,24 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
   }
 }
 
+/// Size of the mini-box thumbnail for frames of [aspectRatio] (width / height).
+///
+/// Fits the frame inside a 144x144 square so nothing is cropped: a 16:9 video
+/// gets the original 144x81 box, a 9:16 one gets 81x144. Extreme ratios are
+/// clamped to 1:2 .. 5:2 so the box never gets so narrow the timestamp label
+/// doesn't fit; those (rare) frames are cropped slightly instead.
+Size scrubMiniBoxSize(double aspectRatio) {
+  const maxEdge = 144.0;
+  final ratio = aspectRatio.isFinite && aspectRatio > 0
+      ? aspectRatio.clamp(0.5, 2.5).toDouble()
+      : 16 / 9;
+  return ratio >= 1 ? Size(maxEdge, maxEdge / ratio) : Size(maxEdge * ratio, maxEdge);
+}
+
 /// The floating thumbnail + timestamp shown above the slider thumb.
+///
+/// The box takes the shape of the video ([scrubMiniBoxSize]) rather than
+/// being a fixed 16:9, so portrait clips aren't cropped to a thin band.
 ///
 /// Positioned using the exact geometry Flutter's own [Slider] uses for
 /// this widget's [RoundSliderThumbShape]/[RectangularSliderTrackShape]
@@ -244,8 +272,6 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
 /// extends above the 32px-tall seekbar row, would be cut off at its top.
 class _ScrubPreviewBubble extends StatelessWidget {
   static const double _thumbRadius = 6;
-  static const double _boxWidth = 144;
-  static const double _boxHeight = 81;
   static const double _labelHeight = 20;
   static const double _gapAboveTrack = 12;
   static const double _rowHeight = 32;
@@ -255,11 +281,15 @@ class _ScrubPreviewBubble extends StatelessWidget {
   final String label;
   final VideoScrubPreviewController preview;
 
+  /// Width / height of the frames being previewed.
+  final double aspectRatio;
+
   const _ScrubPreviewBubble({
     required this.trackWidth,
     required this.sliderValue,
     required this.label,
     required this.preview,
+    required this.aspectRatio,
   });
 
   @override
@@ -267,29 +297,27 @@ class _ScrubPreviewBubble extends StatelessWidget {
     final value = sliderValue.clamp(0.0, 1.0);
     final usableWidth = (trackWidth - _thumbRadius * 2).clamp(0.0, double.infinity);
     final thumbX = _thumbRadius + usableWidth * value;
-    final maxLeft = (trackWidth - _boxWidth).clamp(0.0, double.infinity);
-    final left = (thumbX - _boxWidth / 2).clamp(0.0, maxLeft);
+    final box = scrubMiniBoxSize(aspectRatio);
+    final maxLeft = (trackWidth - box.width).clamp(0.0, double.infinity);
+    final left = (thumbX - box.width / 2).clamp(0.0, maxLeft);
 
     return Positioned(
       left: left,
       bottom: _rowHeight + _gapAboveTrack,
       child: IgnorePointer(
         child: Container(
-          width: _boxWidth,
-          // REMOVE THIS LINE:
-          // height: _boxHeight + _labelHeight,
+          width: box.width,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                width: _boxWidth,
-                height: _boxHeight,
+                width: box.width,
+                height: box.height,
                 child: ValueListenableBuilder<Uint8List?>(
                   valueListenable: preview.frameNotifier,
                   builder: (context, bytes, _) {
@@ -300,8 +328,8 @@ class _ScrubPreviewBubble extends StatelessWidget {
                       bytes,
                       fit: BoxFit.cover,
                       gaplessPlayback: true,
-                      width: _boxWidth,
-                      height: _boxHeight,
+                      width: box.width,
+                      height: box.height,
                     );
                   },
                 ),

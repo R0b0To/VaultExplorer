@@ -120,12 +120,13 @@ void main() {
       final notifier =
           container.read(mediaViewerSessionProvider('session-1').notifier);
 
-      notifier.setRotation('img1.png', 90);
+      // Rotations are clockwise quarter-turns, not degrees.
+      notifier.setRotation('img1.png', 1);
       expect(
         container
             .read(mediaViewerSessionProvider('session-1'))
             .rotations['img1.png'],
-        90,
+        1,
       );
 
       notifier.rotateClockwise('img1.png');
@@ -133,7 +134,7 @@ void main() {
         container
             .read(mediaViewerSessionProvider('session-1'))
             .rotations['img1.png'],
-        180,
+        2,
       );
 
       notifier.bumpImageReloadEpoch('img1.png');
@@ -171,6 +172,85 @@ void main() {
         container.read(mediaViewerSessionProvider('sess-2')).showUI,
         isFalse,
       );
+    });
+  });
+
+  group('rotation units (regression: the toolbar button turned 180 degrees)', () {
+    int? rotationOf(ProviderContainer c, String path) =>
+        c.read(mediaViewerSessionProvider('session-1')).rotations[path];
+
+    test('each rotateClockwise is exactly one quarter-turn and wraps after four',
+        () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      // It was 90 -> 180 -> 270 -> 0 (degrees) fed into RotatedBox's
+      // quarterTurns, which renders as 180 -> 0 -> 180 -> 0 degrees.
+      final seen = <int?>[];
+      for (var i = 0; i < 5; i++) {
+        notifier.rotateClockwise('a.mp4');
+        seen.add(rotationOf(container, 'a.mp4'));
+      }
+
+      expect(seen, [1, 2, 3, 0, 1]);
+    });
+
+    test('stays within RotatedBox range, so the % 2 sideways check is right', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.mp4');
+
+      final quarterTurns = rotationOf(container, 'a.mp4')!;
+      // After one 90-degree turn the video is sideways...
+      expect(quarterTurns % 2 != 0, isTrue);
+      // ...and a value in degrees (90) would have looked upright here.
+      expect(quarterTurns, lessThan(4));
+    });
+
+    test('toolbar button and settings-sheet row share one scale', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      // The sheet stores (rotation + 1) % 4 via setRotation.
+      notifier.setRotation('a.mp4', 2);
+      notifier.rotateClockwise('a.mp4');
+
+      expect(rotationOf(container, 'a.mp4'), 3);
+    });
+
+    test('setRotation wraps out-of-range values', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.setRotation('a.mp4', 4);
+      expect(rotationOf(container, 'a.mp4'), 0);
+      notifier.setRotation('a.mp4', 5);
+      expect(rotationOf(container, 'a.mp4'), 1);
+      notifier.setRotation('a.mp4', -1);
+      expect(rotationOf(container, 'a.mp4'), 3);
+    });
+
+    test('files rotate independently', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(mediaViewerSessionProvider('session-1').notifier);
+
+      notifier.rotateClockwise('a.mp4');
+      notifier.rotateClockwise('a.mp4');
+      notifier.rotateClockwise('b.png');
+
+      expect(rotationOf(container, 'a.mp4'), 2);
+      expect(rotationOf(container, 'b.png'), 1);
     });
   });
 }

@@ -1044,40 +1044,32 @@ if (!widget.isAudio && widget.enableZoom) {
                     child: IgnorePointer(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                          horizontal: 14,
+                          vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.75),
+                          color: Colors.black.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: cs.primary.withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              _effectiveHoldSpeed < 1.0
-                                  ? Icons.slow_motion_video_rounded
-                                  : Icons.fast_forward_rounded,
-                              color: cs.primary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
                             Text(
-                              context.l10n.holdToSpeedIndicatorLabel(
-                                _formatSpeedMultiplier(
-                                  _effectiveHoldSpeed,
-                                ),
-                              ),
-                              style: TextStyle(
-                                color: cs.primary,
+                              '${_formatSpeedMultiplier(_effectiveHoldSpeed)}x',
+                              style: const TextStyle(
+                                color: Colors.white,
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.2,
                               ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              _effectiveHoldSpeed < 1.0
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.fast_forward_rounded,
+                              color: Colors.white,
+                              size: 16,
                             ),
                           ],
                         ),

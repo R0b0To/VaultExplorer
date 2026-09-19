@@ -76,15 +76,6 @@ class FileRowShell extends StatelessWidget {
   /// Set when [customLeading] is an icon that stands on its own -- an
   /// APK's launcher icon, which already carries its own shape, background
   /// and padding as designed by whoever shipped the app.
-  ///
-  /// The default (false) treats [customLeading] as edge-to-edge artwork:
-  /// it's filled into the tinted squircle and clipped to it, which is
-  /// right for a photo or video frame but wrong for an app icon -- the
-  /// tint shows as a coloured square behind an icon that already has a
-  /// background of its own, and the rounded clip shaves the icon's
-  /// corners off. When true the box contributes nothing visually: no
-  /// tint, no clip, just a small inset so the icon doesn't sit flush
-  /// against the row's text.
   final bool customLeadingIsIcon;
 
   const FileRowShell({
@@ -122,30 +113,26 @@ class FileRowShell extends StatelessWidget {
     FileDetailColumn col,
     BuildContext context,
   ) {
-    final double width = switch (col) {
-      FileDetailColumn.date => 50,
+    final double baseWidth = switch (col) {
+      FileDetailColumn.date => 54,
       FileDetailColumn.size => 50,
       FileDetailColumn.type => 46,
     };
-    // `FileListView` wraps this whole list in a `MediaQuery` override whose
-    // text scaler already multiplies the system font/display-scale setting
-    // by the row's pinch-zoom level -- the same scaler this `Text` below
-    // picks up automatically to size its own glyphs. The old `width *
-    // zoomLevel` only tracked pinch-zoom, so a larger system font grew the
-    // text but not the box around it, and the text got ellipsized. Scaling
-    // off the ambient text scaler keeps the two in step.
-    final effectiveWidth = MediaQuery.textScalerOf(context).scale(width);
+
+    final textScaler = MediaQuery.textScalerOf(context);
+    final effectiveMinWidth = textScaler.scale(baseWidth);
+    // Bounding maxWidth allows TextOverflow.ellipsis to actually activate
+    // on long dates or localized text, preventing horizontal row overflow.
+    final effectiveMaxWidth = textScaler.scale(baseWidth * 1.6);
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return ConstrainedBox(
-      // A floor, not a cap: short text still right-aligns in a tidy,
-      // column-like slot, but if the actual rendered text needs more room
-      // than this estimate -- an extreme system font size, a long
-      // localized date format -- the box is free to grow rather than
-      // clipping the text.
-      constraints: BoxConstraints(minWidth: effectiveWidth),
+      constraints: BoxConstraints(
+        minWidth: effectiveMinWidth,
+        maxWidth: effectiveMaxWidth,
+      ),
       child: Text(
         _columnText(col, context),
         textAlign: TextAlign.right,
@@ -183,29 +170,25 @@ class FileRowShell extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Flexible(
-          child: FileNameLabel(
-            text: displayName,
-            query: searchQuery,
-            mode: longFileNameMode,
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: TileSelectionStyle.titleWeight(isSelected),
-              letterSpacing: 0,
-              height: 1.2,
-            ),
+        FileNameLabel(
+          text: displayName,
+          query: searchQuery,
+          mode: longFileNameMode,
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: TileSelectionStyle.titleWeight(isSelected),
+            letterSpacing: 0,
+            height: 1.2,
           ),
         ),
         if (caption.isNotEmpty) ...[
           const SizedBox(height: 2),
-          Flexible(
-            child: Text(
-              caption,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                height: 1.2,
-              ),
+          Text(
+            caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+              height: 1.2,
             ),
           ),
         ],
@@ -226,10 +209,10 @@ class FileRowShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final textScaler = MediaQuery.textScalerOf(context);
+
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
-    // See [customLeadingIsIcon]: a self-contained icon gets no tint, no
-    // clip and a small inset; everything else keeps the filled squircle.
     final bareIconLeading = customLeading != null && customLeadingIsIcon;
     final leadingBackground =
         bareIconLeading ? Colors.transparent : squircleBackground;
@@ -237,6 +220,14 @@ class FileRowShell extends StatelessWidget {
     final leadingPadding =
         bareIconLeading ? const EdgeInsets.all(2.0) : EdgeInsets.zero;
     final effectiveTrailing = trailing;
+
+    // Clamp zoom-scaled icon and spinner sizes so high zoom levels don't overwhelm the row.
+    final leadingSize =
+        ((isCompact ? 32.0 : 44.0) * zoomLevel).clamp(24.0, 64.0);
+    final iconActionSize = (AppIconSize.action * zoomLevel).clamp(16.0, 36.0);
+    final spinnerSize =
+        ((isCompact ? 16.0 : 20.0) * zoomLevel).clamp(12.0, 28.0);
+
     Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
       child: InkWell(
@@ -254,116 +245,159 @@ class FileRowShell extends StatelessWidget {
             horizontal: 12,
             vertical: (isCompact ? 4 : 10) * zoomLevel,
           ),
-          child: Row(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth;
+              final trailingWidth =
+                  (isSelectionMode || effectiveTrailing != null) ? 36.0 : 0.0;
+              const leadingSpacing = 10.0;
+
+              // Estimate the minimum width detail columns need
+              double columnsRequiredWidth = 0.0;
+              if (!isCompact && detailColumns.isNotEmpty) {
+                for (final col in detailColumns) {
+                  final double colBaseWidth = switch (col) {
+                    FileDetailColumn.date => 54.0,
+                    FileDetailColumn.size => 50.0,
+                    FileDetailColumn.type => 46.0,
+                  };
+                  columnsRequiredWidth +=
+                      textScaler.scale(colBaseWidth) + 8.0; // 8.0 for SizedBox
+                }
+              }
+
+              // Minimum readable width for the file name label
+              final minNameWidth = textScaler.scale(70.0);
+
+              // Check if columns + name + icon + trailing can fit without overflow
+              final canFitColumns = (availableWidth -
+                      leadingSize -
+                      leadingSpacing -
+                      trailingWidth -
+                      columnsRequiredWidth) >=
+                  minNameWidth;
+
+              // Auto-switch to the detailed 2-line layout when explicitly requested
+              // OR when zoom/font size makes side-by-side columns unable to fit.
+              final effectiveDetailed = isDetailed ||
+                  (!isCompact && !canFitColumns && detailColumns.isNotEmpty);
+
+              return Row(
                 children: [
-                  if (entry.isPlaceholder || onIconTap == null)
-                    Container(
-                      width: (isCompact ? 32 : 44) * zoomLevel,
-                      height: (isCompact ? 32 : 44) * zoomLevel,
-                      padding: leadingPadding,
-                      decoration: BoxDecoration(
-                        color: leadingBackground,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      clipBehavior: leadingClip,
-                      child: customLeading ??
-                          Icon(
-                            icon,
-                            size: AppIconSize.action * zoomLevel,
-                            color: TileSelectionStyle.leadingIconColor(
-                              cs,
-                              selected: isSelected,
-                              unselectedColor: iconColor,
-                            ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (entry.isPlaceholder || onIconTap == null)
+                        Container(
+                          width: leadingSize,
+                          height: leadingSize,
+                          padding: leadingPadding,
+                          decoration: BoxDecoration(
+                            color: leadingBackground,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                    )
-                  else
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: onIconTap,
-                      child: Container(
-                        width: (isCompact ? 32 : 44) * zoomLevel,
-                        height: (isCompact ? 32 : 44) * zoomLevel,
-                        padding: leadingPadding,
-                        decoration: BoxDecoration(
-                          color: leadingBackground,
+                          clipBehavior: leadingClip,
+                          child: customLeading ??
+                              Icon(
+                                icon,
+                                size: iconActionSize,
+                                color: TileSelectionStyle.leadingIconColor(
+                                  cs,
+                                  selected: isSelected,
+                                  unselectedColor: iconColor,
+                                ),
+                              ),
+                        )
+                      else
+                        InkWell(
                           borderRadius: BorderRadius.circular(12),
+                          onTap: onIconTap,
+                          child: Container(
+                            width: leadingSize,
+                            height: leadingSize,
+                            padding: leadingPadding,
+                            decoration: BoxDecoration(
+                              color: leadingBackground,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            clipBehavior: leadingClip,
+                            child: customLeading ??
+                                Icon(
+                                  icon,
+                                  size: iconActionSize,
+                                  color: TileSelectionStyle.leadingIconColor(
+                                    cs,
+                                    selected: isSelected,
+                                    unselectedColor: iconColor,
+                                  ),
+                                ),
+                          ),
                         ),
-                        clipBehavior: leadingClip,
-                        child: customLeading ??
-                            Icon(
-                              icon,
-                              size: AppIconSize.action * zoomLevel,
-                              color: TileSelectionStyle.leadingIconColor(
-                                cs,
-                                selected: isSelected,
-                                unselectedColor: iconColor,
+                      if (entry.isPlaceholder)
+                        Positioned.fill(
+                          child: Center(
+                            child: SizedBox(
+                              width: spinnerSize,
+                              height: spinnerSize,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.0,
+                                color: cs.primary.withValues(alpha: 0.9),
                               ),
                             ),
-                      ),
-                    ),
-                  if (entry.isPlaceholder)
-                    Positioned.fill(
-                      child: Center(
-                        child: SizedBox(
-                          width: (isCompact ? 16 : 20) * zoomLevel,
-                          height: (isCompact ? 16 : 20) * zoomLevel,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.0,
-                            color: cs.primary.withValues(alpha: 0.9),
                           ),
                         ),
-                      ),
-                    ),
-                  if (iconBadge != null && !isSelected)
-                    Positioned(
-                      left: -6,
-                      top: -6,
-                      child: iconBadge!,
-                    ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: (isDetailed && !entry.isDir)
-                    ? _buildDetailedNameBlock(context, textTheme, cs)
-                    : FileNameLabel(
-                        text: displayName,
-                        query: searchQuery,
-                        mode: longFileNameMode,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: TileSelectionStyle.titleWeight(isSelected),
-                          letterSpacing: 0,
+                      if (iconBadge != null && !isSelected)
+                        Positioned(
+                          left: -6,
+                          top: -6,
+                          child: iconBadge!,
                         ),
-                      ),
-              ),
-              if (!isCompact && !isDetailed && detailColumns.isNotEmpty) ...[
-                for (int i = 0; i < detailColumns.length; i++) ...[
-                  const SizedBox(width: 8),
-                  _buildColumnWidget(detailColumns[i], context),
-                ],
-              ],
-              if (isSelectionMode) ...[
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: Center(
-                    child: TileSelectionIndicator(selected: isSelected),
+                    ],
                   ),
-                ),
-              ] else if (effectiveTrailing != null) ...[
-                const SizedBox(width: 4),
-                effectiveTrailing,
-              ],
-            ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: (effectiveDetailed && !entry.isDir)
+                        ? _buildDetailedNameBlock(context, textTheme, cs)
+                        : FileNameLabel(
+                            text: displayName,
+                            query: searchQuery,
+                            mode: longFileNameMode,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight:
+                                  TileSelectionStyle.titleWeight(isSelected),
+                              letterSpacing: 0,
+                            ),
+                          ),
+                  ),
+                  if (!isCompact &&
+                      !effectiveDetailed &&
+                      detailColumns.isNotEmpty) ...[
+                    for (int i = 0; i < detailColumns.length; i++) ...[
+                      const SizedBox(width: 8),
+                      _buildColumnWidget(detailColumns[i], context),
+                    ],
+                  ],
+                  if (isSelectionMode) ...[
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Center(
+                        child: TileSelectionIndicator(selected: isSelected),
+                      ),
+                    ),
+                  ] else if (effectiveTrailing != null) ...[
+                    const SizedBox(width: 4),
+                    effectiveTrailing,
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
+
     if (entry.isPlaceholder) {
       row = Opacity(opacity: 0.5, child: row);
     }

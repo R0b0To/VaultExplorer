@@ -41,10 +41,16 @@ class FileManagerToolbarSettingsState {
 
 @riverpod
 class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
+  static final Set<FileManagerToolbarSettings> _activeInstances = {};
   Future<void>? _loadFuture;
 
   @override
   FileManagerToolbarSettingsState build(String? containerUri) {
+    ref.onDispose(() {
+      _activeInstances.remove(this);
+    });
+    _activeInstances.add(this);
+
     final state = FileManagerToolbarSettingsState(loading: true);
     Future.microtask(() => load(containerUri));
     return state;
@@ -81,8 +87,15 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
       masonryColumnsPortrait: currentServiceConfig.masonryColumnsPortrait,
       masonryColumnsLandscape: currentServiceConfig.masonryColumnsLandscape,
     );
-    state = state._copy(config: preservedConfig);
     await ref.read(fileManagerToolbarServiceProvider).save(preservedConfig);
+
+    // Synchronize all active family instances so any screen listening
+    // to toolbar settings updates immediately in real-time.
+    for (final instance in _activeInstances) {
+      if (instance.ref.mounted) {
+        instance.state = instance.state._copy(config: preservedConfig);
+      }
+    }
   }
 
   Future<void> setBottomSelectionBar(bool val) =>

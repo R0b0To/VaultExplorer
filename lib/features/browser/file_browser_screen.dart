@@ -79,6 +79,7 @@ import 'package:vaultexplorer/features/browser/widgets/open_with_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
@@ -3064,6 +3065,14 @@ Future<void> _extractSelectedArchive() async {
     ref.watch(fileBrowserSelectionProvider(widget.container.volId));
     ref.watch(fileBrowserSortProvider(widget.container.volId));
     ref.watch(fileBrowserNavigationProvider(widget.container.volId));
+
+    final effectiveToolbarUri =
+        widget.container.isLocalStorage ? null : widget.container.uri;
+    final toolbarSettingsState =
+        ref.watch(fileManagerToolbarSettingsProvider(effectiveToolbarUri));
+    if (!toolbarSettingsState.loading) {
+      _toolbarConfig = toolbarSettingsState.config;
+    }
     if (_isContainerLocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && Navigator.of(context).canPop()) {

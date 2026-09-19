@@ -1818,23 +1818,17 @@ abstract class AppLocalizations {
   /// **'Grant All Files Access in System Settings for optimal speed'**
   String get fastStorageAccessNotGrantedSubtitle;
 
-  /// Settings toggle title
+  /// Settings toggle title for showing the Storage Locations section (Local Storage and added locations) in the navigation drawer
   ///
   /// In en, this message translates to:
-  /// **'Pin Local Storage to Dashboard'**
-  String get showLocalStorageCardTitle;
+  /// **'Show storage locations in sidebar'**
+  String get showStorageLocationsTitle;
 
-  /// Settings toggle subtitle when all-files access is granted, so the toggle is actionable
+  /// Settings toggle subtitle explaining that the Storage Locations section is shown in the navigation drawer
   ///
   /// In en, this message translates to:
-  /// **'Adds a quick-access card for transferring files between vaults and your device'**
-  String get showLocalStorageCardSubtitle;
-
-  /// Settings toggle subtitle when all-files access is not granted, so the toggle is disabled
-  ///
-  /// In en, this message translates to:
-  /// **'Requires Fast Storage Access, enabled above'**
-  String get showLocalStorageCardDisabledSubtitle;
+  /// **'Lists Local Storage and your added storage locations in the sidebar'**
+  String get showStorageLocationsSubtitle;
 
   /// Title of the pinned dashboard card that opens real device storage, and the app bar title of the screen it opens
   ///

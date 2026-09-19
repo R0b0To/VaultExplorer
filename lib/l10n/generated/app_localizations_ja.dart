@@ -1027,15 +1027,11 @@ class AppLocalizationsJa extends AppLocalizations {
       '最適な速度のため、システム設定で「すべてのファイルへのアクセス」を許可してください';
 
   @override
-  String get showLocalStorageCardTitle => 'ローカルストレージをダッシュボードにピン留め';
+  String get showStorageLocationsTitle => 'サイドバーにストレージの場所を表示';
 
   @override
-  String get showLocalStorageCardSubtitle =>
-      '保管庫とデバイス間でファイルを転送するためのクイックアクセスカードを追加します';
-
-  @override
-  String get showLocalStorageCardDisabledSubtitle =>
-      '上記の「高速ストレージアクセス」を有効にする必要があります';
+  String get showStorageLocationsSubtitle =>
+      'ローカルストレージと追加したストレージの場所をサイドバーに表示します';
 
   @override
   String get localStorageCardTitle => 'ローカルストレージ';

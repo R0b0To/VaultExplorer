@@ -1074,16 +1074,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Accordez l\'accès à tous les fichiers dans les paramètres système pour une vitesse optimale';
 
   @override
-  String get showLocalStorageCardTitle =>
-      'Épingler le stockage local au tableau de bord';
+  String get showStorageLocationsTitle =>
+      'Afficher les emplacements de stockage dans la barre latérale';
 
   @override
-  String get showLocalStorageCardSubtitle =>
-      'Ajoute une carte d\'accès rapide pour transférer des fichiers entre les coffres et votre appareil';
-
-  @override
-  String get showLocalStorageCardDisabledSubtitle =>
-      'Nécessite l\'option « Accès rapide au stockage », activée ci-dessus';
+  String get showStorageLocationsSubtitle =>
+      'Affiche le stockage local et vos emplacements de stockage ajoutés dans la barre latérale';
 
   @override
   String get localStorageCardTitle => 'Stockage local';

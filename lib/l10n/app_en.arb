@@ -1437,17 +1437,13 @@
   "@fastStorageAccessNotGrantedSubtitle": {
     "description": "Settings toggle subtitle when permission is not granted"
   },
-  "showLocalStorageCardTitle": "Pin Local Storage to Dashboard",
-  "@showLocalStorageCardTitle": {
-    "description": "Settings toggle title"
+  "showStorageLocationsTitle": "Show storage locations in sidebar",
+  "@showStorageLocationsTitle": {
+    "description": "Settings toggle title for showing the Storage Locations section (Local Storage and added locations) in the navigation drawer"
   },
-  "showLocalStorageCardSubtitle": "Adds a quick-access card for transferring files between vaults and your device",
-  "@showLocalStorageCardSubtitle": {
-    "description": "Settings toggle subtitle when all-files access is granted, so the toggle is actionable"
-  },
-  "showLocalStorageCardDisabledSubtitle": "Requires Fast Storage Access, enabled above",
-  "@showLocalStorageCardDisabledSubtitle": {
-    "description": "Settings toggle subtitle when all-files access is not granted, so the toggle is disabled"
+  "showStorageLocationsSubtitle": "Lists Local Storage and your added storage locations in the sidebar",
+  "@showStorageLocationsSubtitle": {
+    "description": "Settings toggle subtitle explaining that the Storage Locations section is shown in the navigation drawer"
   },
   "localStorageCardTitle": "Local Storage",
   "@localStorageCardTitle": {

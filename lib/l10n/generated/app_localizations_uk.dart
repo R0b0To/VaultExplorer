@@ -1089,16 +1089,12 @@ class AppLocalizationsUk extends AppLocalizations {
       'Надайте доступ до всіх файлів у налаштуваннях для максимальної швидкості';
 
   @override
-  String get showLocalStorageCardTitle =>
-      'Закріпити локальне сховище на панелі керування';
+  String get showStorageLocationsTitle =>
+      'Показувати місця зберігання в бічній панелі';
 
   @override
-  String get showLocalStorageCardSubtitle =>
-      'Додає картку швидкого доступу для передавання файлів між сховищами та вашим пристроєм';
-
-  @override
-  String get showLocalStorageCardDisabledSubtitle =>
-      'Потребує опції «Швидкий доступ до сховища», увімкненої вище';
+  String get showStorageLocationsSubtitle =>
+      'Показує локальне сховище та додані місця зберігання в бічній панелі';
 
   @override
   String get localStorageCardTitle => 'Локальне сховище';

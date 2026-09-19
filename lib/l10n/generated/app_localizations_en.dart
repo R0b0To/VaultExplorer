@@ -5539,7 +5539,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolVaultSyncSubtitle =>
-      'Compare two vaults and copy over what\'s missing or newer';
+      'Compare two folders — in vaults, on this device or on a document provider — and copy over what\'s missing or newer';
 
   @override
   String get vaultSyncNoVaultsTitle => 'No Vaults Mounted';
@@ -5555,7 +5555,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncRightLabel => 'Right';
 
   @override
-  String get vaultSyncTapToSelect => 'Tap to select a vault & folder';
+  String get vaultSyncTapToSelect => 'Tap to select a storage & folder';
 
   @override
   String get vaultSyncSwapTooltip => 'Swap Left and Right';
@@ -5565,17 +5565,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Left and Right must be different folders.';
 
   @override
-  String get vaultSyncIntroTitle => 'Compare Two Vaults';
+  String get vaultSyncIntroTitle => 'Compare Two Folders';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Pick a Left and Right vault (or two folders in the same vault) to see what\'s missing, modified, or newer on each side.';
+      'Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer on each side.';
 
   @override
   String get vaultSyncCompareButton => 'Compare';
 
   @override
-  String get vaultSyncComparingLabel => 'Comparing vaults…';
+  String get vaultSyncComparingLabel => 'Comparing folders…';
 
   @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
@@ -5731,8 +5731,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String vaultSyncPickLocationTitle(Object side) {
-    return 'Select $side Vault & Folder';
+    return 'Select $side Folder';
   }
+
+  @override
+  String get vaultSyncOverlapWarning =>
+      'Left and Right must not be the same folder or nested inside each other.';
+
+  @override
+  String vaultSyncPlaintextWarning(Object targets) {
+    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+  }
+
+  @override
+  String get vaultSyncStorageSelectorLabel => 'Storage';
+
+  @override
+  String get vaultSyncTargetKindVault => 'Encrypted vault';
+
+  @override
+  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+
+  @override
+  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+
+  @override
+  String get vaultSyncAddStorageTooltip => 'Add storage location';
+
+  @override
+  String get vaultSyncEnableLocalStorageTooltip =>
+      'Enable Local Storage access';
+
+  @override
+  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+
+  @override
+  String get vaultSyncNoStoragesMessage =>
+      'Add a folder or document provider with the + button, or mount a vault.';
 
   @override
   String get vaultSyncReadOnlyBadge => 'Read-only';

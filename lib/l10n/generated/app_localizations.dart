@@ -9183,7 +9183,7 @@ abstract class AppLocalizations {
   /// Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool
   ///
   /// In en, this message translates to:
-  /// **'Compare two vaults and copy over what\'s missing or newer'**
+  /// **'Compare two folders — in vaults, on this device or on a document provider — and copy over what\'s missing or newer'**
   String get toolVaultSyncSubtitle;
 
   /// Empty state title shown in Vault Sync when no vaults are mounted
@@ -9213,7 +9213,7 @@ abstract class AppLocalizations {
   /// Placeholder subtitle shown on a Vault Sync side picker before a location is chosen
   ///
   /// In en, this message translates to:
-  /// **'Tap to select a vault & folder'**
+  /// **'Tap to select a storage & folder'**
   String get vaultSyncTapToSelect;
 
   /// Tooltip for the button that swaps the Left and Right sides in Vault Sync
@@ -9231,13 +9231,13 @@ abstract class AppLocalizations {
   /// Title of the idle-state intro card in Vault Sync before a comparison has run
   ///
   /// In en, this message translates to:
-  /// **'Compare Two Vaults'**
+  /// **'Compare Two Folders'**
   String get vaultSyncIntroTitle;
 
   /// Subtitle of the idle-state intro card in Vault Sync before a comparison has run
   ///
   /// In en, this message translates to:
-  /// **'Pick a Left and Right vault (or two folders in the same vault) to see what\'s missing, modified, or newer on each side.'**
+  /// **'Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer on each side.'**
   String get vaultSyncIntroSubtitle;
 
   /// Button label to start comparing the two selected vault locations
@@ -9249,7 +9249,7 @@ abstract class AppLocalizations {
   /// Progress label shown while Vault Sync is walking both sides
   ///
   /// In en, this message translates to:
-  /// **'Comparing vaults…'**
+  /// **'Comparing folders…'**
   String get vaultSyncComparingLabel;
 
   /// Live stats shown under the progress bar while comparing
@@ -9494,8 +9494,68 @@ abstract class AppLocalizations {
   /// App bar title on the Vault Sync location picker sheet, naming which side is being picked
   ///
   /// In en, this message translates to:
-  /// **'Select {side} Vault & Folder'**
+  /// **'Select {side} Folder'**
   String vaultSyncPickLocationTitle(Object side);
+
+  /// Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other
+  ///
+  /// In en, this message translates to:
+  /// **'Left and Right must not be the same folder or nested inside each other.'**
+  String get vaultSyncOverlapWarning;
+
+  /// Extra line in the Vault Sync confirmation when files will flow from an encrypted vault to plain device storage or a document provider. {targets} is a comma-separated list of destination names
+  ///
+  /// In en, this message translates to:
+  /// **'Files copied out of a vault to {targets} will be stored unencrypted.'**
+  String vaultSyncPlaintextWarning(Object targets);
+
+  /// Label of the storage selector on the Vault Sync location picker (vaults, device storage, document providers)
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get vaultSyncStorageSelectorLabel;
+
+  /// Subtitle under a vault in the Vault Sync storage selector
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted vault'**
+  String get vaultSyncTargetKindVault;
+
+  /// Subtitle under device storage in the Vault Sync storage selector
+  ///
+  /// In en, this message translates to:
+  /// **'Device storage · not encrypted'**
+  String get vaultSyncTargetKindDevice;
+
+  /// Subtitle under a document-provider folder (SD card, cloud drive) in the Vault Sync storage selector
+  ///
+  /// In en, this message translates to:
+  /// **'Document provider · not encrypted'**
+  String get vaultSyncTargetKindProvider;
+
+  /// Tooltip for the app bar button on the Vault Sync location picker that opens the system folder picker to add a storage
+  ///
+  /// In en, this message translates to:
+  /// **'Add storage location'**
+  String get vaultSyncAddStorageTooltip;
+
+  /// Tooltip for the app bar button on the Vault Sync location picker that requests all-files access so device storage can be used
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Local Storage access'**
+  String get vaultSyncEnableLocalStorageTooltip;
+
+  /// Empty-state title on the Vault Sync location picker when no vault, device storage or saved location is available
+  ///
+  /// In en, this message translates to:
+  /// **'No storage to sync yet'**
+  String get vaultSyncNoStoragesTitle;
+
+  /// Empty-state message on the Vault Sync location picker when no storage is available
+  ///
+  /// In en, this message translates to:
+  /// **'Add a folder or document provider with the + button, or mount a vault.'**
+  String get vaultSyncNoStoragesMessage;
 
   /// Short badge shown next to a Vault Sync side that's mounted read-only
   ///

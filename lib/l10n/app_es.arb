@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "es",
   "cancel": "Cancelar",
   "close": "Cerrar",
@@ -1559,6 +1559,16 @@
   "vaultSyncConfirmMessage": "Esto copiará {count} elementos ({bytes} en total) entre ambos lados. Los archivos existentes con el mismo nombre se sobrescribirán.",
   "vaultSyncStartedMessage": "Sincronización iniciada — {count} elementos en cola",
   "vaultSyncPickLocationTitle": "Seleccionar bóveda y carpeta de {side}",
+  "vaultSyncOverlapWarning": "Left and Right must not be the same folder or nested inside each other.",
+  "vaultSyncPlaintextWarning": "Files copied out of a vault to {targets} will be stored unencrypted.",
+  "vaultSyncStorageSelectorLabel": "Storage",
+  "vaultSyncTargetKindVault": "Encrypted vault",
+  "vaultSyncTargetKindDevice": "Device storage · not encrypted",
+  "vaultSyncTargetKindProvider": "Document provider · not encrypted",
+  "vaultSyncAddStorageTooltip": "Add storage location",
+  "vaultSyncEnableLocalStorageTooltip": "Enable Local Storage access",
+  "vaultSyncNoStoragesTitle": "No storage to sync yet",
+  "vaultSyncNoStoragesMessage": "Add a folder or document provider with the + button, or mount a vault.",
   "vaultSyncReadOnlyBadge": "Solo lectura",
   "vaultSyncReadOnlyTooltip": "Esta bóveda está montada en modo de solo lectura — no se pueden copiar archivos en ella",
   "vaultSyncSyncingButton": "Sincronizando…",

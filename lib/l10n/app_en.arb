@@ -7112,7 +7112,7 @@
   "@toolVaultSyncTitle": {
     "description": "Tool card title for the Vault-to-Vault Synchronizer / Diff tool"
   },
-  "toolVaultSyncSubtitle": "Compare two vaults and copy over what's missing or newer",
+  "toolVaultSyncSubtitle": "Compare two folders — in vaults, on this device or on a document provider — and copy over what's missing or newer",
   "@toolVaultSyncSubtitle": {
     "description": "Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool"
   },
@@ -7132,7 +7132,7 @@
   "@vaultSyncRightLabel": {
     "description": "Label for the right side of a Vault Sync comparison"
   },
-  "vaultSyncTapToSelect": "Tap to select a vault & folder",
+  "vaultSyncTapToSelect": "Tap to select a storage & folder",
   "@vaultSyncTapToSelect": {
     "description": "Placeholder subtitle shown on a Vault Sync side picker before a location is chosen"
   },
@@ -7144,11 +7144,11 @@
   "@vaultSyncSameLocationWarning": {
     "description": "Warning shown when Left and Right are set to the exact same vault and folder"
   },
-  "vaultSyncIntroTitle": "Compare Two Vaults",
+  "vaultSyncIntroTitle": "Compare Two Folders",
   "@vaultSyncIntroTitle": {
     "description": "Title of the idle-state intro card in Vault Sync before a comparison has run"
   },
-  "vaultSyncIntroSubtitle": "Pick a Left and Right vault (or two folders in the same vault) to see what's missing, modified, or newer on each side.",
+  "vaultSyncIntroSubtitle": "Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what's missing, modified, or newer on each side.",
   "@vaultSyncIntroSubtitle": {
     "description": "Subtitle of the idle-state intro card in Vault Sync before a comparison has run"
   },
@@ -7156,7 +7156,7 @@
   "@vaultSyncCompareButton": {
     "description": "Button label to start comparing the two selected vault locations"
   },
-  "vaultSyncComparingLabel": "Comparing vaults…",
+  "vaultSyncComparingLabel": "Comparing folders…",
   "@vaultSyncComparingLabel": {
     "description": "Progress label shown while Vault Sync is walking both sides"
   },
@@ -7360,12 +7360,55 @@
       "count": {}
     }
   },
-  "vaultSyncPickLocationTitle": "Select {side} Vault & Folder",
+  "vaultSyncPickLocationTitle": "Select {side} Folder",
   "@vaultSyncPickLocationTitle": {
     "description": "App bar title on the Vault Sync location picker sheet, naming which side is being picked",
     "placeholders": {
       "side": {}
     }
+  },
+  "vaultSyncOverlapWarning": "Left and Right must not be the same folder or nested inside each other.",
+  "@vaultSyncOverlapWarning": {
+    "description": "Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other"
+  },
+  "vaultSyncPlaintextWarning": "Files copied out of a vault to {targets} will be stored unencrypted.",
+  "@vaultSyncPlaintextWarning": {
+    "description": "Extra line in the Vault Sync confirmation when files will flow from an encrypted vault to plain device storage or a document provider. {targets} is a comma-separated list of destination names",
+    "placeholders": {
+      "targets": {}
+    }
+  },
+  "vaultSyncStorageSelectorLabel": "Storage",
+  "@vaultSyncStorageSelectorLabel": {
+    "description": "Label of the storage selector on the Vault Sync location picker (vaults, device storage, document providers)"
+  },
+  "vaultSyncTargetKindVault": "Encrypted vault",
+  "@vaultSyncTargetKindVault": {
+    "description": "Subtitle under a vault in the Vault Sync storage selector"
+  },
+  "vaultSyncTargetKindDevice": "Device storage · not encrypted",
+  "@vaultSyncTargetKindDevice": {
+    "description": "Subtitle under device storage in the Vault Sync storage selector"
+  },
+  "vaultSyncTargetKindProvider": "Document provider · not encrypted",
+  "@vaultSyncTargetKindProvider": {
+    "description": "Subtitle under a document-provider folder (SD card, cloud drive) in the Vault Sync storage selector"
+  },
+  "vaultSyncAddStorageTooltip": "Add storage location",
+  "@vaultSyncAddStorageTooltip": {
+    "description": "Tooltip for the app bar button on the Vault Sync location picker that opens the system folder picker to add a storage"
+  },
+  "vaultSyncEnableLocalStorageTooltip": "Enable Local Storage access",
+  "@vaultSyncEnableLocalStorageTooltip": {
+    "description": "Tooltip for the app bar button on the Vault Sync location picker that requests all-files access so device storage can be used"
+  },
+  "vaultSyncNoStoragesTitle": "No storage to sync yet",
+  "@vaultSyncNoStoragesTitle": {
+    "description": "Empty-state title on the Vault Sync location picker when no vault, device storage or saved location is available"
+  },
+  "vaultSyncNoStoragesMessage": "Add a folder or document provider with the + button, or mount a vault.",
+  "@vaultSyncNoStoragesMessage": {
+    "description": "Empty-state message on the Vault Sync location picker when no storage is available"
   },
   "vaultSyncReadOnlyBadge": "Read-only",
   "@vaultSyncReadOnlyBadge": {

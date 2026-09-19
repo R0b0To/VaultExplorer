@@ -1,4 +1,4 @@
-﻿{
+{
   "@@locale": "zh",
   "cancel": "取消",
   "close": "关闭",
@@ -1559,6 +1559,16 @@
   "vaultSyncConfirmMessage": "这将在两侧之间复制{count}个项目（共{bytes}）。同名的现有文件将被覆盖。",
   "vaultSyncStartedMessage": "同步已开始——已排队{count}个项目",
   "vaultSyncPickLocationTitle": "选择{side}保险库和文件夹",
+  "vaultSyncOverlapWarning": "Left and Right must not be the same folder or nested inside each other.",
+  "vaultSyncPlaintextWarning": "Files copied out of a vault to {targets} will be stored unencrypted.",
+  "vaultSyncStorageSelectorLabel": "Storage",
+  "vaultSyncTargetKindVault": "Encrypted vault",
+  "vaultSyncTargetKindDevice": "Device storage · not encrypted",
+  "vaultSyncTargetKindProvider": "Document provider · not encrypted",
+  "vaultSyncAddStorageTooltip": "Add storage location",
+  "vaultSyncEnableLocalStorageTooltip": "Enable Local Storage access",
+  "vaultSyncNoStoragesTitle": "No storage to sync yet",
+  "vaultSyncNoStoragesMessage": "Add a folder or document provider with the + button, or mount a vault.",
   "vaultSyncReadOnlyBadge": "只读",
   "vaultSyncReadOnlyTooltip": "此保险库以只读方式挂载——无法向其中复制文件",
   "vaultSyncSyncingButton": "正在同步…",

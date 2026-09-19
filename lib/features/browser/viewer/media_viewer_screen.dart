@@ -16,10 +16,11 @@ import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
-import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
+import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
@@ -35,6 +36,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
@@ -44,9 +46,9 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_b
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_bottom_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
-import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -54,7 +56,6 @@ import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 
 export 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart'
-
     show VideoPlaybackMode;
 import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
@@ -160,6 +161,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   double get _subtitleFontSize => _session.subtitleFontSize;
   double get _subtitleVerticalPosition => _session.subtitleVerticalPosition;
   BoxFit get _imageFit => _session.imageFit;
+  VideoAspectRatioMode get _videoAspectRatioMode =>
+      _session.videoAspectRatioMode;
   PlaylistTransitionEffect get _transitionEffect => _session.transitionEffect;
   PlaylistScrollMode get _scrollMode => _session.scrollMode;
   bool get _isMuted => _session.isMuted;
@@ -274,6 +277,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       }
       _sessionController.setTransitionEffect(config.playlistTransitionEffect);
       _sessionController.setScrollMode(appSettings.playlistScrollMode);
+      _sessionController.setVideoAspectRatioMode(
+        config.mediaViewerToolbarConfig.defaultAspectRatioMode,
+      );
       _sessionController.setBookmarkPaths(
         List<String>.from(bookmarkPaths ?? const []),
       );
@@ -939,7 +945,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _hideTimer?.cancel();
   }
 
- void _menuClosed() {
+  void _menuClosed() {
     _activeMenuCount = (_activeMenuCount - 1).clamp(0, 999);
     _startHideTimer();
   }
@@ -977,7 +983,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _menuClosed();
   }
 
-void _showOrientationSheet(BuildContext context) {
+  void _showOrientationSheet(BuildContext context) {
     _menuOpened();
     showModalBottomSheet(
       context: context,
@@ -1306,7 +1312,7 @@ void _showOrientationSheet(BuildContext context) {
           _toggleCarousel();
         }
         break;
-       case MediaViewerAction.rotate90:
+      case MediaViewerAction.rotate90:
         _startHideTimer();
         _sessionController.rotateClockwise(_playlistController.currentFile);
         break;
@@ -1342,6 +1348,9 @@ void _showOrientationSheet(BuildContext context) {
         break;
       case MediaViewerAction.imageFit:
         _showAdvancedSettings(context, isImage, initialPage: 'imageFit');
+        break;
+      case MediaViewerAction.aspectRatio:
+        _showAdvancedSettings(context, isImage, initialPage: 'aspectRatio');
         break;
       case MediaViewerAction.slideshowDelay:
         _showAdvancedSettings(context, isImage, initialPage: 'slideshowDelay');
@@ -1388,7 +1397,7 @@ void _showOrientationSheet(BuildContext context) {
     controller?.setLooping(mode == VideoPlaybackMode.loop);
   }
 
- void _showAdvancedSettings(
+  void _showAdvancedSettings(
     BuildContext context,
     bool isImage, {
     String initialPage = 'main',
@@ -1402,7 +1411,7 @@ void _showOrientationSheet(BuildContext context) {
       context: context,
       isScrollControlled: true,
       builder: (context) {
-       return AdvancedSettingsSheet(
+        return AdvancedSettingsSheet(
           initialPage: initialPage,
           actions: mediaConfig.advancedSettingsActions,
           isMuted: _isMuted,
@@ -1422,6 +1431,7 @@ void _showOrientationSheet(BuildContext context) {
           initialImageFit: _imageFit,
           initialSlideshowDelaySeconds: _slideshowDelaySeconds,
           initialPlaybackSpeed: _playbackSpeed,
+          initialAspectRatioMode: _videoAspectRatioMode,
           hasSubtitles: _playbackManager.isSubtitleAvailable(
             _playlistController.currentFile,
           ),
@@ -1455,6 +1465,10 @@ void _showOrientationSheet(BuildContext context) {
           onPlaybackSpeedChanged: (speed) {
             _startHideTimer();
             _sessionController.setPlaybackSpeed(speed);
+          },
+          onAspectRatioModeChanged: (mode) {
+            _startHideTimer();
+            _sessionController.setVideoAspectRatioMode(mode);
           },
           onSubtitlesEnabledChanged: (enabled) {
             _startHideTimer();
@@ -1525,6 +1539,10 @@ void _showOrientationSheet(BuildContext context) {
       overlays: SystemUiOverlay.values,
     );
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    // Best-effort: don't let a brightness edge-swipe made in this viewer
+    // leak into the rest of the app once the person leaves it. Fire-and-
+    // forget since the screen is already tearing down.
+    unawaited(ScreenBrightnessBridge.clearOverride());
     super.dispose();
   }
 
@@ -1537,6 +1555,10 @@ void _showOrientationSheet(BuildContext context) {
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
+    final gestureConfig = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig;
     final itemWidget = Container(
       color: Colors.black,
       child: isImg
@@ -1548,9 +1570,11 @@ void _showOrientationSheet(BuildContext context) {
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
               imageFit: _scrollMode.isContinuous ? BoxFit.contain : _imageFit,
-              rotationQuarterTurns: _rotations[fileName] ?? 0,
+             rotationQuarterTurns: _rotations[fileName] ?? 0,
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,
+              pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
+              minZoomScale: gestureConfig.minVideoZoomScale,
               onToggleUI: _setUIVisibility,
               onZoomChanged: _onZoomInteractionChanged,
               thumbnailQuality: widget.thumbnailQuality,
@@ -1584,8 +1608,29 @@ void _showOrientationSheet(BuildContext context) {
               onSubtitleVerticalPositionChanged: (pos) {
                 _sessionController.setSubtitleVerticalPosition(pos);
               },
-              playbackSpeed: _playbackSpeed,
+               playbackSpeed: _playbackSpeed,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
+              videoAspectRatioMode: _videoAspectRatioMode,
+              isMuted: _isMuted,
+              onMuteChanged: (muted) {
+                if (_isMuted != muted) {
+                  _sessionController.setIsMuted(muted);
+                  _playbackManager.activeController?.setVolume(muted ? 0 : 100);
+                  ref.read(appSettingsServiceProvider).loadSettings().then((appSettings) {
+                    ref.read(appSettingsServiceProvider).saveSettings(
+                          appSettings.copyWith(videoMuted: muted),
+                        );
+                  });
+                }
+              },
+              edgeSwipeBrightnessEnabled:
+                  gestureConfig.edgeSwipeBrightnessEnabled,
+              edgeSwipeVolumeEnabled: gestureConfig.edgeSwipeVolumeEnabled,
+              edgeSwipeHudEnabled: gestureConfig.edgeSwipeHudEnabled,
+              edgeSwipeWidthFraction: gestureConfig.edgeSwipeWidthFraction,
+              pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
+              minVideoZoomScale: gestureConfig.minVideoZoomScale,
+              holdToSpeedMultiplier: gestureConfig.holdToSpeedMultiplier,
               progressNotifier: _videoProgressNotifier,
               onSubtitlesAvailableChanged: (val) {
                 _playbackManager.updateSubtitleStatus(fileName, val);
@@ -1749,10 +1794,18 @@ void _showOrientationSheet(BuildContext context) {
                   },
                 );
 
-                return InteractiveViewer(
+               return InteractiveViewer(
                   transformationController: _continuousTransformationController,
-                  minScale: 1.0,
+                  minScale: mediaViewerConfig.pinchZoomOutEnabled
+                      ? mediaViewerConfig.minVideoZoomScale.clamp(
+                          MediaViewerConstants.minVideoZoomFloor,
+                          1.0,
+                        )
+                      : 1.0,
                   maxScale: MediaViewerConstants.maxImageZoom,
+                  boundaryMargin: mediaViewerConfig.pinchZoomOutEnabled
+                      ? const EdgeInsets.all(double.infinity)
+                      : EdgeInsets.zero,
                   clipBehavior: Clip.none,
                   panEnabled: true,
                   onInteractionStart: (details) {
@@ -1767,13 +1820,11 @@ void _showOrientationSheet(BuildContext context) {
                       setState(() => _continuousScale = s);
                     }
                   },
-                  onInteractionEnd: (details) {
+                   onInteractionEnd: (details) {
                     final s = _continuousTransformationController.value
                         .getMaxScaleOnAxis();
-                    if (s <= 1.01 && _continuousScale != 1.0) {
-                      setState(() => _continuousScale = 1.0);
-                    }
-                    _onZoomInteractionChanged(true);
+                    _continuousScale = s;
+                    _onZoomInteractionChanged(s <= 1.01);
                   },
                   child: listWidget,
                 );
@@ -1953,7 +2004,7 @@ void _showOrientationSheet(BuildContext context) {
                     },
                   ),
                 ),
-             if (_enableCarousel && _isCarouselVisible && _showUI)
+                if (_enableCarousel && _isCarouselVisible && _showUI)
                   AnimatedPositioned(
                     duration: MediaViewerConstants.animationDuration,
                     curve: Curves.easeOut,

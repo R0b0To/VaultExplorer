@@ -7,6 +7,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
@@ -251,6 +253,188 @@ class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
                         ),
                         secondary:
                             Icon(Icons.badge_outlined, color: cs.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ==========================================
+                  // VIDEO GESTURES & ZOOM
+                  // ==========================================
+                  SectionHeader(l10n.videoGesturesHeader),
+                  SectionCard(
+                    children: [
+                      SwitchListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        value: mediaConfig.edgeSwipeBrightnessEnabled,
+                        onChanged:
+                            controller.setMediaViewerEdgeSwipeBrightnessEnabled,
+                        title: Text(
+                          l10n.edgeSwipeBrightnessTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          l10n.edgeSwipeBrightnessSubtitle,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary:
+                            Icon(Icons.wb_sunny_rounded, color: cs.primary),
+                      ),
+                      SwitchListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        value: mediaConfig.edgeSwipeVolumeEnabled,
+                        onChanged:
+                            controller.setMediaViewerEdgeSwipeVolumeEnabled,
+                        title: Text(
+                          l10n.edgeSwipeVolumeTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          l10n.edgeSwipeVolumeSubtitle,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary:
+                            Icon(Icons.volume_up_rounded, color: cs.primary),
+                      ),
+                      SwitchListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        value: mediaConfig.edgeSwipeHudEnabled,
+                        onChanged: controller.setMediaViewerEdgeSwipeHudEnabled,
+                        title: Text(
+                          l10n.edgeSwipeHudTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          l10n.edgeSwipeHudSubtitle,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary: Icon(
+                          Icons.picture_in_picture_alt_rounded,
+                          color: cs.primary,
+                        ),
+                      ),
+                      ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        leading:
+                            Icon(Icons.swipe_vertical_rounded, color: cs.primary),
+                        title: Text(
+                          l10n.edgeSwipeWidthTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: _SettingsSlider(
+                          value: mediaConfig.edgeSwipeWidthFraction,
+                          min: MediaViewerConstants.edgeSwipeWidthMin,
+                          max: MediaViewerConstants.edgeSwipeWidthMax,
+                          divisions: 10,
+                          labelBuilder: (v) => '${(v * 100).round()}%',
+                          onChangeEnd:
+                              controller.setMediaViewerEdgeSwipeWidthFraction,
+                        ),
+                      ),
+
+                      SwitchListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        value: mediaConfig.pinchZoomOutEnabled,
+                        onChanged: controller.setMediaViewerPinchZoomOutEnabled,
+                        title: Text(
+                          l10n.pinchZoomOutTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          l10n.pinchZoomOutSubtitle,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary: Icon(
+                          Icons.zoom_out_map_rounded,
+                          color: cs.primary,
+                        ),
+                      ),
+                      if (mediaConfig.pinchZoomOutEnabled)
+                        ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          leading: Icon(
+                            Icons.photo_size_select_small_rounded,
+                            color: cs.primary,
+                          ),
+                          title: Text(
+                            l10n.minZoomTitle,
+                            style: textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: _SettingsSlider(
+                            value: mediaConfig.minVideoZoomScale,
+                            min: MediaViewerConstants.minVideoZoomFloor,
+                            max: 1.0,
+                            divisions: 18,
+                            labelBuilder: (v) => '${v.toStringAsFixed(2)}x',
+                            onChangeEnd:
+                                controller.setMediaViewerMinVideoZoomScale,
+                          ),
+                        ),
+                     
+                     ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        leading: Icon(
+                          mediaConfig.holdToSpeedMultiplier < 1.0
+                              ? Icons.slow_motion_video_rounded
+                              : Icons.speed_rounded,
+                          color: cs.primary,
+                        ),
+                        title: Text(
+                          l10n.holdSpeedMultiplierTitle,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.holdSpeedMultiplierSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            _SettingsSlider(
+                              value: mediaConfig.holdToSpeedMultiplier,
+                              min: 0.25,
+                              max: 4.0,
+                              divisions: 15,
+                              labelBuilder: (v) =>
+                                  '${v.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')}x',
+                              onChangeEnd:
+                                  controller.setMediaViewerHoldToSpeedMultiplier,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      OptionPickerTile<VideoAspectRatioMode>(
+                        label: l10n.defaultAspectRatioTitle,
+                        value: mediaConfig.defaultAspectRatioMode,
+                        prefixIcon: mediaConfig.defaultAspectRatioMode.icon,
+                        options: VideoAspectRatioMode.values.map((mode) {
+                          return SelectOption(
+                            value: mode,
+                            label: mode.getLocalizedLabel(l10n),
+                          );
+                        }).toList(),
+                        onChanged:
+                            controller.setMediaViewerDefaultAspectRatioMode,
                       ),
                     ],
                   ),
@@ -581,6 +765,76 @@ class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// A [Slider] that tracks the drag locally for a responsive knob, and only
+/// calls back (persisting through the settings controller) once the
+/// person releases it -- persisting on every intermediate `onChanged` tick
+/// would mean an async load+save round trip per pixel of drag.
+class _SettingsSlider extends StatefulWidget {
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+  final String Function(double value) labelBuilder;
+  final ValueChanged<double> onChangeEnd;
+
+  const _SettingsSlider({
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.labelBuilder,
+    required this.onChangeEnd,
+    this.divisions,
+  });
+
+  @override
+  State<_SettingsSlider> createState() => _SettingsSliderState();
+}
+
+class _SettingsSliderState extends State<_SettingsSlider> {
+  late double _liveValue = widget.value;
+
+  @override
+  void didUpdateWidget(covariant _SettingsSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _liveValue = widget.value;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clamped = _liveValue.clamp(widget.min, widget.max);
+    return Row(
+      children: [
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(trackHeight: 3),
+            child: Slider(
+              value: clamped,
+              min: widget.min,
+              max: widget.max,
+              divisions: widget.divisions,
+              onChanged: (v) => setState(() => _liveValue = v),
+              onChangeEnd: widget.onChangeEnd,
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 52,
+          child: Text(
+            widget.labelBuilder(clamped),
+            textAlign: TextAlign.end,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
       ],
     );
   }

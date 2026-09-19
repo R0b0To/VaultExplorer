@@ -7,7 +7,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.media.AudioManager
 import android.os.Build
+import android.view.WindowManager
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -590,6 +592,56 @@ open class MainActivity : FlutterFragmentActivity() {
                 "setVolume" -> {
                     val volume = call.argument<Number>("volume")?.toFloat() ?: 1.0f
                     nativePlayerManager.setVolume(volume)
+                    result.success(null)
+                }
+                "getDeviceVolume" -> {
+                    try {
+                        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            am.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+                        } else {
+                            0
+                        }
+                        val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        val norm = if (max > min) (cur - min).toFloat() / (max - min).toFloat() else 0f
+                        result.success(norm.toDouble())
+                    } catch (e: Exception) {
+                        result.success(1.0)
+                    }
+                }
+                "setDeviceVolume" -> {
+                    try {
+                        val volume = call.argument<Number>("volume")?.toFloat() ?: 1.0f
+                        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        val min = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            am.getStreamMinVolume(AudioManager.STREAM_MUSIC)
+                        } else {
+                            0
+                        }
+                        val target = Math.round(min + volume.coerceIn(0f, 1f) * (max - min))
+                        am.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.success(null)
+                    }
+                }
+                "setScreenBrightness" -> {
+                    // Brightness is a per-window Activity property, not
+                    // tied to the player engine itself, so this is handled
+                    // directly here rather than via nativePlayerManager.
+                    // A negative value clears the override (back to the
+                    // system brightness) -- used when the media viewer
+                    // screen itself is torn down.
+                    val brightness = call.argument<Number>("brightness")?.toFloat() ?: -1f
+                    val attributes = window.attributes
+                    attributes.screenBrightness = if (brightness < 0f) {
+                        WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    } else {
+                        brightness.coerceIn(0.01f, 1.0f)
+                    }
+                    window.attributes = attributes
                     result.success(null)
                 }
                 "setLooping" -> {

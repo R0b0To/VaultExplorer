@@ -300,11 +300,20 @@ class UsbUnlockController extends _$UsbUnlockController {
         matchedSelected = isMounted ? null : d;
       }
 
+        final isDisconnected = matchedSelected == null;
       state = state._copy(
         devices: devices,
         selected: matchedSelected,
+        clearSelected: isDisconnected,
         reconnectTargetMissing: targetMissing,
         loadingDevices: false,
+        keyfiles: isDisconnected && params.existingRecord == null ? const [] : state.keyfiles,
+        hiddenKeyfiles: isDisconnected && params.existingRecord == null ? const [] : state.hiddenKeyfiles,
+        cipherId: isDisconnected && params.existingRecord == null ? 255 : state.cipherId,
+        hashId: isDisconnected && params.existingRecord == null ? 255 : state.hashId,
+        hiddenCipherId: isDisconnected && params.existingRecord == null ? 255 : state.hiddenCipherId,
+        hiddenHashId: isDisconnected && params.existingRecord == null ? 255 : state.hiddenHashId,
+        protectHiddenVolume: isDisconnected && params.existingRecord == null ? false : state.protectHiddenVolume,
       );
     } catch (e) {
       if (ref.mounted) {
@@ -374,8 +383,20 @@ class UsbUnlockController extends _$UsbUnlockController {
     }
   }
 
-  void selectDevice(UsbDeviceInfo device) =>
-      state = state._copy(selected: device);
+void selectDevice(UsbDeviceInfo device) {
+    if (state.selected?.deviceName == device.deviceName) return;
+    state = state._copy(
+      selected: device,
+      keyfiles: const [],
+      hiddenKeyfiles: const [],
+      cipherId: 255,
+      hashId: 255,
+      hiddenCipherId: 255,
+      hiddenHashId: 255,
+      protectHiddenVolume: false,
+      clearError: true,
+    );
+  }
 
   void setReadOnly(bool val) => state = state._copy(readOnly: val);
 

@@ -149,6 +149,11 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final bool isLocalStorage;
   double _currentSpeed;
   int _currentVolume = 100;
+
+  /// The last volume level (0-100) applied via [setVolume]. Read by the
+  /// edge-swipe volume gesture so a drag continues smoothly from wherever
+  /// the volume already is, rather than always restarting from 100.
+  int get currentVolume => _currentVolume;
   StreamSubscription<dynamic>? _eventSubscription;
   bool _disposed = false;
   int? textureId;

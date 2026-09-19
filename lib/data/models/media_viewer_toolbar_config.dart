@@ -1,5 +1,6 @@
 import 'media_viewer_action.dart';
 import 'scrub_preview_style.dart';
+import 'video_aspect_ratio_mode.dart';
 
 class MediaViewerToolbarConfig {
   final List<MediaViewerAction> topBarActions;
@@ -16,6 +17,16 @@ class MediaViewerToolbarConfig {
 
   /// What the seekbar shows while dragging; see [ScrubPreviewStyle].
   final ScrubPreviewStyle scrubPreviewStyle;
+
+  // -- Video playback gestures & display (Media Player Controls screen) --
+  final bool edgeSwipeBrightnessEnabled;
+  final bool edgeSwipeVolumeEnabled;
+  final bool edgeSwipeHudEnabled;
+  final double edgeSwipeWidthFraction;
+  final bool pinchZoomOutEnabled;
+  final double minVideoZoomScale;
+  final VideoAspectRatioMode defaultAspectRatioMode;
+  final double holdToSpeedMultiplier;
 
   const MediaViewerToolbarConfig({
     this.topBarActions = const [
@@ -42,6 +53,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.rotate90,
       MediaViewerAction.imageFit,
       MediaViewerAction.playbackSpeed,
+      MediaViewerAction.aspectRatio,
       MediaViewerAction.subtitles,
       MediaViewerAction.audioTrack,
       MediaViewerAction.slideshowDelay,
@@ -56,6 +68,14 @@ class MediaViewerToolbarConfig {
     this.showCenterTransportForImages = false,
     this.showStatusBadge = true,
     this.scrubPreviewStyle = ScrubPreviewStyle.miniBox,
+    this.edgeSwipeBrightnessEnabled = true,
+    this.edgeSwipeVolumeEnabled = true,
+    this.edgeSwipeHudEnabled = true,
+    this.edgeSwipeWidthFraction = 0.25,
+    this.pinchZoomOutEnabled = true,
+    this.minVideoZoomScale = 0.25,
+    this.defaultAspectRatioMode = VideoAspectRatioMode.bestFit,
+    this.holdToSpeedMultiplier = 2.0,
   });
 
   factory MediaViewerToolbarConfig.defaults() =>
@@ -74,6 +94,14 @@ class MediaViewerToolbarConfig {
     bool? showCenterTransportForImages,
     bool? showStatusBadge,
     ScrubPreviewStyle? scrubPreviewStyle,
+    bool? edgeSwipeBrightnessEnabled,
+    bool? edgeSwipeVolumeEnabled,
+    bool? edgeSwipeHudEnabled,
+    double? edgeSwipeWidthFraction,
+    bool? pinchZoomOutEnabled,
+    double? minVideoZoomScale,
+    VideoAspectRatioMode? defaultAspectRatioMode,
+    double? holdToSpeedMultiplier,
   }) =>
       MediaViewerToolbarConfig(
         topBarActions: topBarActions ?? this.topBarActions,
@@ -91,6 +119,19 @@ class MediaViewerToolbarConfig {
             showCenterTransportForImages ?? this.showCenterTransportForImages,
         showStatusBadge: showStatusBadge ?? this.showStatusBadge,
         scrubPreviewStyle: scrubPreviewStyle ?? this.scrubPreviewStyle,
+        edgeSwipeBrightnessEnabled:
+            edgeSwipeBrightnessEnabled ?? this.edgeSwipeBrightnessEnabled,
+        edgeSwipeVolumeEnabled:
+            edgeSwipeVolumeEnabled ?? this.edgeSwipeVolumeEnabled,
+        edgeSwipeHudEnabled: edgeSwipeHudEnabled ?? this.edgeSwipeHudEnabled,
+        edgeSwipeWidthFraction:
+            edgeSwipeWidthFraction ?? this.edgeSwipeWidthFraction,
+        pinchZoomOutEnabled: pinchZoomOutEnabled ?? this.pinchZoomOutEnabled,
+        minVideoZoomScale: minVideoZoomScale ?? this.minVideoZoomScale,
+        defaultAspectRatioMode:
+            defaultAspectRatioMode ?? this.defaultAspectRatioMode,
+        holdToSpeedMultiplier:
+            holdToSpeedMultiplier ?? this.holdToSpeedMultiplier,
       );
 
   Map<String, dynamic> toJson() => {
@@ -107,6 +148,14 @@ class MediaViewerToolbarConfig {
         'showCenterTransportForImages': showCenterTransportForImages,
         'showStatusBadge': showStatusBadge,
         'scrubPreviewStyle': scrubPreviewStyle.toJson(),
+        'edgeSwipeBrightnessEnabled': edgeSwipeBrightnessEnabled,
+        'edgeSwipeVolumeEnabled': edgeSwipeVolumeEnabled,
+        'edgeSwipeHudEnabled': edgeSwipeHudEnabled,
+        'edgeSwipeWidthFraction': edgeSwipeWidthFraction,
+        'pinchZoomOutEnabled': pinchZoomOutEnabled,
+        'minVideoZoomScale': minVideoZoomScale,
+        'defaultAspectRatioMode': defaultAspectRatioMode.toJson(),
+        'holdToSpeedMultiplier': holdToSpeedMultiplier,
       };
 
   factory MediaViewerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -163,6 +212,20 @@ class MediaViewerToolbarConfig {
       showStatusBadge: j['showStatusBadge'] as bool? ?? true,
       scrubPreviewStyle:
           ScrubPreviewStyle.fromJson(j['scrubPreviewStyle'] as String?),
+      edgeSwipeBrightnessEnabled:
+          j['edgeSwipeBrightnessEnabled'] as bool? ?? true,
+      edgeSwipeVolumeEnabled: j['edgeSwipeVolumeEnabled'] as bool? ?? true,
+      edgeSwipeHudEnabled: j['edgeSwipeHudEnabled'] as bool? ?? true,
+      edgeSwipeWidthFraction:
+          (j['edgeSwipeWidthFraction'] as num?)?.toDouble() ?? 0.25,
+      pinchZoomOutEnabled: j['pinchZoomOutEnabled'] as bool? ?? true,
+      minVideoZoomScale:
+          (j['minVideoZoomScale'] as num?)?.toDouble() ?? 0.25,
+      defaultAspectRatioMode: VideoAspectRatioMode.fromJson(
+        j['defaultAspectRatioMode'] as String?,
+      ),
+      holdToSpeedMultiplier:
+          (j['holdToSpeedMultiplier'] as num?)?.toDouble() ?? 2.0,
     );
   }
 }

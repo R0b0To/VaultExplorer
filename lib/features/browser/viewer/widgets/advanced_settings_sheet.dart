@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
@@ -21,6 +22,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
   final BoxFit initialImageFit;
   final int initialSlideshowDelaySeconds;
   final double initialPlaybackSpeed;
+  final VideoAspectRatioMode initialAspectRatioMode;
   final bool hasSubtitles;
   final bool initialSubtitlesEnabled;
   final double initialSubtitleFontSize;
@@ -29,6 +31,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
   final ValueChanged<BoxFit> onImageFitChanged;
   final ValueChanged<int> onSlideshowDelayChanged;
   final ValueChanged<double> onPlaybackSpeedChanged;
+  final ValueChanged<VideoAspectRatioMode> onAspectRatioModeChanged;
   final ValueChanged<bool> onSubtitlesEnabledChanged;
   final ValueChanged<double> onSubtitleFontSizeChanged;
   final ValueChanged<double> onSubtitleVerticalPositionChanged;
@@ -49,6 +52,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
     required this.initialImageFit,
     required this.initialSlideshowDelaySeconds,
     required this.initialPlaybackSpeed,
+    this.initialAspectRatioMode = VideoAspectRatioMode.bestFit,
     required this.hasSubtitles,
     required this.initialSubtitlesEnabled,
     this.initialSubtitleFontSize = 15.0,
@@ -57,6 +61,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
     required this.onImageFitChanged,
     required this.onSlideshowDelayChanged,
     required this.onPlaybackSpeedChanged,
+    required this.onAspectRatioModeChanged,
     required this.onSubtitlesEnabledChanged,
     required this.onSubtitleFontSizeChanged,
     required this.onSubtitleVerticalPositionChanged,
@@ -86,6 +91,7 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
         initialImageFit: widget.initialImageFit,
         initialSlideshowDelaySeconds: widget.initialSlideshowDelaySeconds,
         initialPlaybackSpeed: widget.initialPlaybackSpeed,
+        initialAspectRatioMode: widget.initialAspectRatioMode,
         initialSubtitlesEnabled: widget.initialSubtitlesEnabled,
         initialSubtitleFontSize: widget.initialSubtitleFontSize,
         initialSubtitleVerticalPosition: widget.initialSubtitleVerticalPosition,
@@ -231,6 +237,17 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
                   ),
                   const SizedBox(height: 8),
                   _buildPlaybackSpeedSubmenu(context, ref, params, state, cs),
+                ] else if (state.sheetPage == 'aspectRatio') ...[
+                  _buildHeader(
+                    context,
+                    cs,
+                    context.l10n.aspectRatioModeLabel,
+                    () => ref
+                        .read(advancedSettingsControllerProvider(params).notifier)
+                        .setSheetPage('main'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAspectRatioSubmenu(context, ref, params, state, cs),
                 ] else if (state.sheetPage == 'audioTracks') ...[
                   _buildHeader(
                     context,
@@ -369,6 +386,29 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
                 .setSheetPage('playbackSpeed');
+          },
+        );
+      case MediaViewerAction.aspectRatio:
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.aspect_ratio_rounded),
+          title: Text(context.l10n.aspectRatioModeLabel),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                state.aspectRatioMode.getLocalizedLabel(context.l10n),
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setSheetPage('aspectRatio');
           },
         );
       case MediaViewerAction.slideshowDelay:
@@ -574,6 +614,52 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             ref
                 .read(advancedSettingsControllerProvider(params).notifier)
                 .setPlaybackSpeed(speed, widget.onPlaybackSpeedChanged);
+            if (widget.initialPage != null && widget.initialPage != 'main') {
+              Navigator.pop(context);
+            } else {
+              ref
+                  .read(advancedSettingsControllerProvider(params).notifier)
+                  .setSheetPage('main');
+            }
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAspectRatioSubmenu(
+    BuildContext context,
+    WidgetRef ref,
+    AdvancedSettingsParams params,
+    AdvancedSettingsState state,
+    ColorScheme cs,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: VideoAspectRatioMode.values.map((mode) {
+        final isSelected = state.aspectRatioMode == mode;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            mode.icon,
+            color: isSelected ? cs.primary : cs.onSurfaceVariant,
+            size: 20,
+          ),
+          title: Text(
+            mode.getLocalizedLabel(context.l10n),
+            style: TextStyle(
+              color: isSelected ? cs.primary : null,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          trailing: isSelected
+              ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
+              : const SizedBox(width: 18),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref
+                .read(advancedSettingsControllerProvider(params).notifier)
+                .setAspectRatioMode(mode, widget.onAspectRatioModeChanged);
             if (widget.initialPage != null && widget.initialPage != 'main') {
               Navigator.pop(context);
             } else {

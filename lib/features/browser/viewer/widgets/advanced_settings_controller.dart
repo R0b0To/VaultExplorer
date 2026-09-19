@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 part 'advanced_settings_controller.g.dart';
@@ -10,6 +11,7 @@ class AdvancedSettingsParams {
   final BoxFit initialImageFit;
   final int initialSlideshowDelaySeconds;
   final double initialPlaybackSpeed;
+  final VideoAspectRatioMode initialAspectRatioMode;
   final bool initialSubtitlesEnabled;
   final double initialSubtitleFontSize;
   final double initialSubtitleVerticalPosition;
@@ -19,6 +21,7 @@ class AdvancedSettingsParams {
     required this.initialImageFit,
     required this.initialSlideshowDelaySeconds,
     required this.initialPlaybackSpeed,
+    this.initialAspectRatioMode = VideoAspectRatioMode.bestFit,
     required this.initialSubtitlesEnabled,
     this.initialSubtitleFontSize = 15.0,
     this.initialSubtitleVerticalPosition = 0.0,
@@ -32,6 +35,7 @@ class AdvancedSettingsParams {
           other.initialImageFit == initialImageFit &&
           other.initialSlideshowDelaySeconds == initialSlideshowDelaySeconds &&
           other.initialPlaybackSpeed == initialPlaybackSpeed &&
+          other.initialAspectRatioMode == initialAspectRatioMode &&
           other.initialSubtitlesEnabled == initialSubtitlesEnabled &&
           other.initialSubtitleFontSize == initialSubtitleFontSize &&
           other.initialSubtitleVerticalPosition == initialSubtitleVerticalPosition;
@@ -42,6 +46,7 @@ class AdvancedSettingsParams {
         initialImageFit,
         initialSlideshowDelaySeconds,
         initialPlaybackSpeed,
+        initialAspectRatioMode,
         initialSubtitlesEnabled,
         initialSubtitleFontSize,
         initialSubtitleVerticalPosition,
@@ -54,6 +59,7 @@ class AdvancedSettingsState {
   final BoxFit imageFit;
   final int slideshowDelaySeconds;
   final double playbackSpeed;
+  final VideoAspectRatioMode aspectRatioMode;
   final bool subtitlesEnabled;
   final double subtitleFontSize;
   final double subtitleVerticalPosition;
@@ -64,6 +70,7 @@ class AdvancedSettingsState {
     required this.imageFit,
     required this.slideshowDelaySeconds,
     required this.playbackSpeed,
+    this.aspectRatioMode = VideoAspectRatioMode.bestFit,
     required this.subtitlesEnabled,
     required this.subtitleFontSize,
     required this.subtitleVerticalPosition,
@@ -75,6 +82,7 @@ class AdvancedSettingsState {
     BoxFit? imageFit,
     int? slideshowDelaySeconds,
     double? playbackSpeed,
+    VideoAspectRatioMode? aspectRatioMode,
     bool? subtitlesEnabled,
     double? subtitleFontSize,
     double? subtitleVerticalPosition,
@@ -84,6 +92,7 @@ class AdvancedSettingsState {
     imageFit: imageFit ?? this.imageFit,
     slideshowDelaySeconds: slideshowDelaySeconds ?? this.slideshowDelaySeconds,
     playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+    aspectRatioMode: aspectRatioMode ?? this.aspectRatioMode,
     subtitlesEnabled: subtitlesEnabled ?? this.subtitlesEnabled,
     subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
     subtitleVerticalPosition: subtitleVerticalPosition ?? this.subtitleVerticalPosition,
@@ -99,6 +108,7 @@ class AdvancedSettingsController extends _$AdvancedSettingsController {
       imageFit: params.initialImageFit,
       slideshowDelaySeconds: params.initialSlideshowDelaySeconds,
       playbackSpeed: params.initialPlaybackSpeed,
+      aspectRatioMode: params.initialAspectRatioMode,
       subtitlesEnabled: params.initialSubtitlesEnabled,
       subtitleFontSize: params.initialSubtitleFontSize,
       subtitleVerticalPosition: params.initialSubtitleVerticalPosition,
@@ -126,6 +136,14 @@ class AdvancedSettingsController extends _$AdvancedSettingsController {
   void setPlaybackSpeed(double speed, ValueChanged<double> onPlaybackSpeedChanged) {
     state = state._copy(playbackSpeed: speed);
     onPlaybackSpeedChanged(speed);
+  }
+
+  void setAspectRatioMode(
+    VideoAspectRatioMode mode,
+    ValueChanged<VideoAspectRatioMode> onAspectRatioModeChanged,
+  ) {
+    state = state._copy(aspectRatioMode: mode);
+    onAspectRatioModeChanged(mode);
   }
 
   void setSubtitlesEnabled(bool enabled, ValueChanged<bool> onSubtitlesEnabledChanged) {

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 
 part 'media_viewer_session_controller.g.dart';
 
@@ -28,6 +29,7 @@ class MediaViewerSessionState {
     this.subtitleFontSize = 15.0,
     this.subtitleVerticalPosition = 0.0,
     this.imageFit = BoxFit.contain,
+    this.videoAspectRatioMode = VideoAspectRatioMode.bestFit,
     this.transitionEffect = PlaylistTransitionEffect.slide,
     this.scrollMode = PlaylistScrollMode.horizontal,
     this.isMuted = false,
@@ -48,6 +50,7 @@ class MediaViewerSessionState {
   final double subtitleFontSize;
   final double subtitleVerticalPosition;
   final BoxFit imageFit;
+  final VideoAspectRatioMode videoAspectRatioMode;
   final PlaylistTransitionEffect transitionEffect;
   final PlaylistScrollMode scrollMode;
   final bool isMuted;
@@ -72,33 +75,37 @@ class MediaViewerSessionState {
     double? subtitleFontSize,
     double? subtitleVerticalPosition,
     BoxFit? imageFit,
+    VideoAspectRatioMode? videoAspectRatioMode,
     PlaylistTransitionEffect? transitionEffect,
     PlaylistScrollMode? scrollMode,
     bool? isMuted,
     Map<String, int>? rotations,
     Map<String, int>? imageReloadEpoch,
-  }) => MediaViewerSessionState(
-    showUI: showUI ?? this.showUI,
-    isCarouselVisible: isCarouselVisible ?? this.isCarouselVisible,
-    enableCarousel: enableCarousel ?? this.enableCarousel,
-    bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
-    autoAdvance: autoAdvance ?? this.autoAdvance,
-    isAutoAdvancing: isAutoAdvancing ?? this.isAutoAdvancing,
-    slideshowDelaySeconds:
-        slideshowDelaySeconds ?? this.slideshowDelaySeconds,
-    videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
-    playbackSpeed: playbackSpeed ?? this.playbackSpeed,
-    subtitlesEnabled: subtitlesEnabled ?? this.subtitlesEnabled,
-    subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
-    subtitleVerticalPosition:
-        subtitleVerticalPosition ?? this.subtitleVerticalPosition,
-    imageFit: imageFit ?? this.imageFit,
-    transitionEffect: transitionEffect ?? this.transitionEffect,
-    scrollMode: scrollMode ?? this.scrollMode,
-    isMuted: isMuted ?? this.isMuted,
-    rotations: rotations ?? this.rotations,
-    imageReloadEpoch: imageReloadEpoch ?? this.imageReloadEpoch,
-  );
+  }) =>
+      MediaViewerSessionState(
+        showUI: showUI ?? this.showUI,
+        isCarouselVisible: isCarouselVisible ?? this.isCarouselVisible,
+        enableCarousel: enableCarousel ?? this.enableCarousel,
+        bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
+        autoAdvance: autoAdvance ?? this.autoAdvance,
+        isAutoAdvancing: isAutoAdvancing ?? this.isAutoAdvancing,
+        slideshowDelaySeconds:
+            slideshowDelaySeconds ?? this.slideshowDelaySeconds,
+        videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
+        playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+        subtitlesEnabled: subtitlesEnabled ?? this.subtitlesEnabled,
+        subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
+        subtitleVerticalPosition:
+            subtitleVerticalPosition ?? this.subtitleVerticalPosition,
+        imageFit: imageFit ?? this.imageFit,
+        videoAspectRatioMode:
+            videoAspectRatioMode ?? this.videoAspectRatioMode,
+        transitionEffect: transitionEffect ?? this.transitionEffect,
+        scrollMode: scrollMode ?? this.scrollMode,
+        isMuted: isMuted ?? this.isMuted,
+        rotations: rotations ?? this.rotations,
+        imageReloadEpoch: imageReloadEpoch ?? this.imageReloadEpoch,
+      );
 }
 
 @riverpod
@@ -183,6 +190,11 @@ class MediaViewerSession extends _$MediaViewerSession {
   void setImageFit(BoxFit fit) {
     if (state.imageFit == fit) return;
     state = state.copyWith(imageFit: fit);
+  }
+
+  void setVideoAspectRatioMode(VideoAspectRatioMode mode) {
+    if (state.videoAspectRatioMode == mode) return;
+    state = state.copyWith(videoAspectRatioMode: mode);
   }
 
   void setTransitionEffect(PlaylistTransitionEffect effect) {

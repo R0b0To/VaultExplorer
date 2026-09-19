@@ -19,6 +19,27 @@ class MediaViewerConstants {
   static const double fullResDecodeZoomHeadroom = 5.0;
   static const double maxVideoZoom = 12.0;
 
+  /// Lower bound offered by the "minimum zoom" setting -- how far below
+  /// 1.0x pinch zoom-out is allowed to go at most. The configured value is
+  /// clamped into `[minVideoZoomFloor, 1.0]`.
+  static const double minVideoZoomFloor = 0.1;
+
+  /// Width, as a fraction of the player's total width, given to each edge
+  /// swipe zone (brightness on the left, volume on the right) at the
+  /// default setting. Configurable in Media Player Controls; clamped into
+  /// `[edgeSwipeWidthMin, edgeSwipeWidthMax]`.
+  static const double defaultEdgeSwipeWidthFraction = 0.25;
+  static const double edgeSwipeWidthMin = 0.15;
+  static const double edgeSwipeWidthMax = 0.40;
+
+  /// Vertical drag distance, in logical pixels, that swings an edge swipe
+  /// (brightness/volume) across its full 0%-100% range.
+  static const double edgeSwipeFullRangeDistance = 320.0;
+
+  /// How long the brightness/volume HUD stays visible after the finger
+  /// lifts before fading out.
+  static const Duration edgeSwipeHudHideDelay = Duration(milliseconds: 700);
+
   static const int maxPrefetchCacheSize = 5;
   static const int maxDirectorySearchDepth = 20;
   // Caps how many subdirectories _scanDirectoryRecursively will walk
@@ -28,7 +49,15 @@ class MediaViewerConstants {
   static const int thumbnailTargetSize = 360;
   static const int carouselThumbnailTargetSize = 160;
 
-  static const List<double> playbackSpeeds = [0.5, 1.0, 1.25, 1.5, 2.0];
+  static const List<double> playbackSpeeds = [
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+  ];
 
   static const List<String> imageExtensions = [
     'jpg',

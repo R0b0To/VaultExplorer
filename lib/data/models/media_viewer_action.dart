@@ -14,6 +14,7 @@ enum MediaViewerAction {
   subtitles,
   audioTrack,
   imageFit,
+  aspectRatio,
   slideshowDelay,
   bookmark,
   fileInfo,
@@ -38,6 +39,7 @@ enum MediaViewerAction {
         MediaViewerAction.subtitles => Icons.subtitles_rounded,
         MediaViewerAction.audioTrack => Icons.audiotrack_rounded,
         MediaViewerAction.imageFit => Icons.aspect_ratio_rounded,
+        MediaViewerAction.aspectRatio => Icons.aspect_ratio_rounded,
         MediaViewerAction.slideshowDelay => Icons.timer_outlined,
         MediaViewerAction.bookmark => Icons.star_rounded,
         MediaViewerAction.fileInfo => Icons.info_outline_rounded,
@@ -63,6 +65,7 @@ enum MediaViewerAction {
         MediaViewerAction.subtitles => l10n.subtitlesLabel,
         MediaViewerAction.audioTrack => l10n.audioTrackTitle,
         MediaViewerAction.imageFit => l10n.imageFitModeLabel,
+        MediaViewerAction.aspectRatio => l10n.aspectRatioModeLabel,
         MediaViewerAction.slideshowDelay => l10n.slideshowDelayLabel,
         MediaViewerAction.bookmark => l10n.mediaViewerActionBookmark,
         MediaViewerAction.fileInfo => l10n.fileInfoAction,
@@ -81,6 +84,7 @@ enum MediaViewerAction {
           this == MediaViewerAction.playbackSpeed ||
           this == MediaViewerAction.subtitles ||
           this == MediaViewerAction.audioTrack ||
+          this == MediaViewerAction.aspectRatio ||
           this == MediaViewerAction.diagnostics) {
         return false;
       }
@@ -101,7 +105,8 @@ enum MediaViewerAction {
     if (isAudio &&
         (this == MediaViewerAction.subtitles ||
             this == MediaViewerAction.rotate90 ||
-            this == MediaViewerAction.screenOrientation)) {
+            this == MediaViewerAction.screenOrientation ||
+            this == MediaViewerAction.aspectRatio)) {
       return false;
     }
     if (!isPlaylistMode &&

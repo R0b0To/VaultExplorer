@@ -113,6 +113,15 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     }
   }
 
+  void _resetInputFields() {
+    _passwordCtrl.clear();
+    _pimCtrl.clear();
+    _hiddenPasswordCtrl.clear();
+    _hiddenPimCtrl.clear();
+    _prefillCleared = false;
+    setState(() {});
+  }
+
   void _onUnlock() {
     ref.read(unlockControllerProvider(_params).notifier).unlock(
           passwordText: _passwordCtrl.text,
@@ -339,14 +348,17 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ( Container File )
+       // ( Container File )
         Expanded(
           child: InkWell(
             onTap: state.loading
                 ? null
-                : () => ref
-                    .read(unlockControllerProvider(_params).notifier)
-                    .setSelectedVaultKind('container'),
+                : () {
+                    _resetInputFields();
+                    ref
+                        .read(unlockControllerProvider(_params).notifier)
+                        .setSelectedVaultKind('container');
+                  },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               color: !isFolder
@@ -393,9 +405,12 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           child: InkWell(
             onTap: state.loading
                 ? null
-                : () => ref
-                    .read(unlockControllerProvider(_params).notifier)
-                    .setSelectedVaultKind('directory_vault'),
+                : () {
+                    _resetInputFields();
+                    ref
+                        .read(unlockControllerProvider(_params).notifier)
+                        .setSelectedVaultKind('directory_vault');
+                  },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               color: isFolder
@@ -475,7 +490,10 @@ Widget _buildVaultKindSegmentedButton(
       selected: {state.isFolderVault ? 'directory_vault' : 'container'},
       onSelectionChanged: state.loading
           ? null
-          : (sel) => ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind(sel.first),
+          : (sel) {
+              _resetInputFields();
+              ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind(sel.first);
+            },
     ),
   );
 }
@@ -531,13 +549,16 @@ Widget _buildVaultKindSegmentedButton(
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: (hasSelection && widget.initialUri == null && widget.initialCompositeCarriers == null)
+            trailing: (hasSelection && widget.initialUri == null && widget.initialCompositeCarriers == null)
                   ? IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
                       tooltip: context.l10n.clearAllButton,
                       onPressed: state.loading
                           ? null
-                          : () => ref.read(unlockControllerProvider(_params).notifier).clearSelection(),
+                          : () {
+                              _resetInputFields();
+                              ref.read(unlockControllerProvider(_params).notifier).clearSelection();
+                            },
                     )
                   : (widget.initialUri == null && widget.initialCompositeCarriers == null
                       ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant)
@@ -768,20 +789,26 @@ case _UnlockCredentialState.password:
         final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
         final isKnownLuks = isUnlock && state.isLuks;
         final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+        final hasSelection = state.selectedUri != null;
+        final canConfigure = hasSelection && !state.loading;
 
         return [
-          SectionCard(
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: canConfigure ? 1.0 : 0.45,
+            child: SectionCard(
             children: [
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
+                  enabled: canConfigure,
                   // Stay obscured — and block text selection, so the real
                   // characters can't be copied out either — while
                   // _revealLocked: a saved credential shouldn't be
                   // revealable in plain text just by editing around it.
                   obscureText: _revealLocked ? true : _obscure,
-                  enableInteractiveSelection: !_revealLocked,
+                  enableInteractiveSelection: !_revealLocked && canConfigure,
                   autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
                   onChanged: (val) {
                     if (val.isEmpty) _prefillCleared = true;
@@ -817,7 +844,7 @@ case _UnlockCredentialState.password:
                           ),
                         PasswordVisibilityToggle(
                           obscured: _revealLocked ? true : _obscure,
-                          enabled: !_revealLocked,
+                          enabled: !_revealLocked && canConfigure,
                           onToggle: () => setState(() => _obscure = !_obscure),
                         ),
                         const SizedBox(width: 4),
@@ -829,7 +856,7 @@ case _UnlockCredentialState.password:
               if (isKnownVeraCrypt) ...[
                 PimInputField(
                   controller: _pimCtrl,
-                  enabled: !state.loading,
+                  enabled: canConfigure,
                 ),
               ],
               if (hasDirectOptions) ...[
@@ -838,6 +865,7 @@ case _UnlockCredentialState.password:
                   child: KeyfilesPicker(
                     keyfiles: state.keyfiles,
                     picking: state.pickingKeyfiles,
+                    enabled: canConfigure,
                     onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
                     onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
                   ),
@@ -856,11 +884,11 @@ case _UnlockCredentialState.password:
                 SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: state.readOnly,
-                  onChanged: state.loading
-                      ? null
-                      : (val) {
+                  onChanged: canConfigure
+                      ? (val) {
                           ref.read(unlockControllerProvider(_params).notifier).setReadOnly(val);
-                        },
+                        }
+                      : null,
                   title: Text(context.l10n.readOnlyModeLabel),
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
@@ -869,6 +897,7 @@ case _UnlockCredentialState.password:
                 Theme(
                   data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
+                    enabled: canConfigure,
                     tilePadding: const EdgeInsets.symmetric(horizontal: 12),
                     leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
                     title: Text(
@@ -879,15 +908,15 @@ case _UnlockCredentialState.password:
                   ),
                 ),
               ],
-              if (widget.initialUri == null) ...[
+             if (widget.initialUri == null) ...[
                 SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: state.remember,
-                  onChanged: state.loading
-                      ? null
-                      : (val) {
+                  onChanged: canConfigure
+                      ? (val) {
                           ref.read(unlockControllerProvider(_params).notifier).setRemember(val);
-                        },
+                        }
+                      : null,
                   title: Text(context.l10n.rememberContainerLabel),
                   subtitle: Text(
                     context.l10n.rememberContainerSubtitle,
@@ -898,7 +927,8 @@ case _UnlockCredentialState.password:
               ],
             ],
           ),
-        ];
+        ),
+      ];
 
       default:
         return const [];
@@ -915,13 +945,15 @@ List<Widget> _buildAdvancedOptionsSection(
     final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
     final isKnownLuks = isUnlock && state.isLuks;
     final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+    final hasSelection = state.selectedUri != null;
+    final canConfigure = hasSelection && !state.loading;
 
     return [
       if (!hasDirectOptions) ...[
         if (state.isVeraCrypt || state.isComposite) ...[
           PimInputField(
             controller: _pimCtrl,
-            enabled: !state.loading,
+            enabled: canConfigure,
           ),
         
         ],
@@ -930,6 +962,7 @@ List<Widget> _buildAdvancedOptionsSection(
           child: KeyfilesPicker(
             keyfiles: state.keyfiles,
             picking: state.pickingKeyfiles,
+            enabled: canConfigure,
             onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
             onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
           ),
@@ -949,7 +982,7 @@ List<Widget> _buildAdvancedOptionsSection(
           collapsible: false,
           cipherId: state.cipherId,
           hashId: state.hashId,
-          enabled: !state.loading,
+          enabled: canConfigure,
           onCipherChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setCipherId(val),
           onHashChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHashId(val),
         ),
@@ -957,11 +990,11 @@ List<Widget> _buildAdvancedOptionsSection(
       SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         value: state.readOnly,
-        onChanged: state.loading
-            ? null
-            : (val) {
+        onChanged: canConfigure
+            ? (val) {
                 ref.read(unlockControllerProvider(_params).notifier).setReadOnly(val);
-              },
+              }
+            : null,
         title: Text(context.l10n.readOnlyModeLabel),
         subtitle: Text(
           context.l10n.readOnlyModeContainerSubtitle,
@@ -973,11 +1006,11 @@ List<Widget> _buildAdvancedOptionsSection(
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,
-          onChanged: (state.loading || state.readOnly)
-              ? null
-              : (val) {
+          onChanged: (canConfigure && !state.readOnly)
+              ? (val) {
                   ref.read(unlockControllerProvider(_params).notifier).setProtectHiddenVolume(val);
-                },
+                }
+              : null,
           title: Text(context.l10n.protectHiddenVolumeToggleTitle),
           subtitle: Text(
             state.readOnly
@@ -993,7 +1026,7 @@ List<Widget> _buildAdvancedOptionsSection(
             child: TextField(
               controller: _hiddenPasswordCtrl,
               obscureText: _hiddenObscure,
-              enabled: !state.loading,
+              enabled: canConfigure,
               decoration: InputDecoration(
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
@@ -1001,6 +1034,7 @@ List<Widget> _buildAdvancedOptionsSection(
                 prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.standard, color: cs.primary),
                 suffixIcon: PasswordVisibilityToggle(
                   obscured: _hiddenObscure,
+                  enabled: canConfigure,
                   onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
                 ),
               ),
@@ -1008,23 +1042,23 @@ List<Widget> _buildAdvancedOptionsSection(
           ),
           PimInputField(
             controller: _hiddenPimCtrl,
-            enabled: !state.loading,
+            enabled: canConfigure,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: KeyfilesPicker(
               keyfiles: state.hiddenKeyfiles,
               picking: state.pickingHiddenKeyfiles,
+              enabled: canConfigure,
               onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickHiddenKeyfiles(),
               onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeHiddenKeyfile(k),
-              enabled: !state.loading,
             ),
           ),
           AdvancedParamsPanel(
             collapsible: false,
             cipherId: state.hiddenCipherId,
             hashId: state.hiddenHashId,
-            enabled: !state.loading,
+            enabled: canConfigure,
             onCipherChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHiddenCipherId(val),
             onHashChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHiddenHashId(val),
           ),
@@ -1080,15 +1114,21 @@ List<Widget> _buildAdvancedOptionsSection(
           ),
         );
 
-      case _UnlockCredentialState.password:
+     case _UnlockCredentialState.password:
       default:
         if (!state.hasAdvancedSettings) return const SizedBox.shrink();
+        final hasSelection = state.selectedUri != null;
+        final canConfigure = hasSelection && !state.loading;
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SectionCard(
-                children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: canConfigure ? 1.0 : 0.45,
+                child: SectionCard(
+                  children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
+                ),
               ),
             ],
           ),

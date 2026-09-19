@@ -20,6 +20,8 @@ class ImagePageItem extends StatefulWidget {
   final void Function(int width, int height)? onSizeKnown;
   final VoidCallback? onError;
   final bool enableZoom;
+  final bool pinchZoomOutEnabled;
+  final double minZoomScale;
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
 
@@ -36,6 +38,8 @@ class ImagePageItem extends StatefulWidget {
     this.onSizeKnown,
     this.onError,
     this.enableZoom = true,
+    this.pinchZoomOutEnabled = true,
+    this.minZoomScale = 0.25,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
   });
@@ -48,10 +52,19 @@ class _ImagePageItemState extends State<ImagePageItem> {
   late final TransformationController _transformationController;
   double _scale = 1.0;
   TapDownDetails? _doubleTapDetails;
-  Size? _imageSize;
+ Size? _imageSize;
   BoxFit? _lastFit;
   int? _lastRotation;
   Size? _lastViewportSize;
+
+  bool get _isZoomedIn => _scale > 1.01;
+
+  double get _effectiveMinZoomScale => widget.pinchZoomOutEnabled
+      ? widget.minZoomScale.clamp(
+          MediaViewerConstants.minVideoZoomFloor,
+          1.0,
+        )
+      : 1.0;
 
   @override
   void initState() {
@@ -146,13 +159,15 @@ class _ImagePageItemState extends State<ImagePageItem> {
 
    
 
-  @override
+   @override
   void didUpdateWidget(covariant ImagePageItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.prefetchedBytes != widget.prefetchedBytes ||
         oldWidget.fileName != widget.fileName) {
       _imageSize = null;
       _lastViewportSize = null;
+      _scale = 1.0;
+      _transformationController.value = Matrix4.identity();
       _initImageDimensions();
     }
   }
@@ -310,34 +325,38 @@ class _ImagePageItemState extends State<ImagePageItem> {
           behavior: HitTestBehavior.translucent,
           onTap: () => widget.onToggleUI(!widget.showUI),
           onDoubleTapDown: (d) => _doubleTapDetails = d,
-          onDoubleTap: () {
+       onDoubleTap: () {
             final position = _doubleTapDetails?.localPosition;
-            if (_scale <= 1.01) {
-                _scale = 3.5;
-                if (position != null) {
-                  final x = -position.dx * (_scale - 1);
-                  final y = -position.dy * (_scale - 1);
-                  _transformationController.value = Matrix4.identity()
-                    ..translateByDouble(x, y, 0.0, 1.0)
-                    ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-                } else {
-                  _transformationController.value = Matrix4.identity()
-                    ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-                }
-                widget.onZoomChanged(false);
+            final bool atBaseline = (_scale - 1.0).abs() < 0.01;
+            if (atBaseline) {
+              _scale = 3.5;
+              if (position != null) {
+                final x = -position.dx * (_scale - 1);
+                final y = -position.dy * (_scale - 1);
+                _transformationController.value = Matrix4.identity()
+                  ..translateByDouble(x, y, 0.0, 1.0)
+                  ..scaleByDouble(_scale, _scale, 1.0, 1.0);
               } else {
-                _scale = 1.0;
-                _centerImageInitially(constraints);
-                widget.onZoomChanged(true);
+                _transformationController.value = Matrix4.identity()
+                  ..scaleByDouble(_scale, _scale, 1.0, 1.0);
               }
+              widget.onZoomChanged(true);
+            } else {
+              _scale = 1.0;
+              _centerImageInitially(constraints);
+              widget.onZoomChanged(true);
+            }
           },
           child: SizedBox.expand(
             child: InteractiveViewer(
               transformationController: _transformationController,
               maxScale: MediaViewerConstants.maxImageZoom,
-              minScale: 1.0,
-              boundaryMargin: EdgeInsets.zero,
+              minScale: _effectiveMinZoomScale,
+              boundaryMargin: widget.pinchZoomOutEnabled
+                  ? const EdgeInsets.all(double.infinity)
+                  : EdgeInsets.zero,
               constrained: isConstrained,
+              panEnabled: false,
               onInteractionStart: (details) {
                 if (details.pointerCount >= 2) {
                   widget.onZoomChanged(false);
@@ -351,13 +370,10 @@ class _ImagePageItemState extends State<ImagePageItem> {
               },
               onInteractionEnd: (details) {
                 final s = _transformationController.value.getMaxScaleOnAxis();
-                final settled = s <= 1.01;
-                if (settled) {
-                  _scale = 1.0;
-                }
-                widget.onZoomChanged(settled);
+                _scale = s;
+                widget.onZoomChanged(true);
               },
-             child: SizedBox(
+              child: SizedBox(
                 width: canvasWidth,
                 height: canvasHeight,
                 child: imageContent,

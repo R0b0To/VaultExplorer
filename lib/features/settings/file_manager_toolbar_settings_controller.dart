@@ -11,6 +11,7 @@ import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 
@@ -32,11 +33,12 @@ class FileManagerToolbarSettingsState {
     ContainerRecord? record,
     bool setRecord = false,
     bool? loading,
-  }) => FileManagerToolbarSettingsState(
-    config: config ?? this.config,
-    record: setRecord ? record : (record ?? this.record),
-    loading: loading ?? this.loading,
-  );
+  }) =>
+      FileManagerToolbarSettingsState(
+        config: config ?? this.config,
+        record: setRecord ? record : (record ?? this.record),
+        loading: loading ?? this.loading,
+      );
 }
 
 @riverpod
@@ -79,7 +81,8 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> _updateConfig(FileManagerToolbarConfig newConfig) async {
-    final currentServiceConfig = await ref.read(fileManagerToolbarServiceProvider).load();
+    final currentServiceConfig =
+        await ref.read(fileManagerToolbarServiceProvider).load();
     final preservedConfig = newConfig.copyWith(
       listZoomLevel: currentServiceConfig.listZoomLevel,
       gridColumnsPortrait: currentServiceConfig.gridColumnsPortrait,
@@ -195,11 +198,11 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> reorderBookmarks(int oldIndex, int newIndex) async {
     final record = state.record;
     if (record == null) return;
-    
+
     final paths = List<String>.from(record.bookmarkPaths);
     final moved = paths.removeAt(oldIndex);
     paths.insert(newIndex, moved);
-    
+
     final newRecord = record.copyWith(bookmarkPaths: paths);
     state = state._copy(record: newRecord, setRecord: true);
     await ref.read(containerRepositoryProvider).save(newRecord);
@@ -225,7 +228,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   // Media Viewer Controls Customization
   Future<void> updateMediaViewerConfig(MediaViewerToolbarConfig mediaConfig) =>
-      _updateConfig(state.config.copyWith(mediaViewerToolbarConfig: mediaConfig));
+      _updateConfig(
+        state.config.copyWith(mediaViewerToolbarConfig: mediaConfig),
+      );
 
   Future<void> setMediaViewerTopBarActions(List<MediaViewerAction> actions) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
@@ -279,6 +284,64 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setMediaViewerScrubPreviewStyle(ScrubPreviewStyle style) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       scrubPreviewStyle: style,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerEdgeSwipeBrightnessEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      edgeSwipeBrightnessEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerEdgeSwipeVolumeEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      edgeSwipeVolumeEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerEdgeSwipeHudEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      edgeSwipeHudEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerEdgeSwipeWidthFraction(double fraction) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      edgeSwipeWidthFraction: fraction,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerPinchZoomOutEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      pinchZoomOutEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerMinVideoZoomScale(double scale) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      minVideoZoomScale: scale,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerDefaultAspectRatioMode(
+    VideoAspectRatioMode mode,
+  ) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      defaultAspectRatioMode: mode,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerHoldToSpeedMultiplier(double multiplier) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      holdToSpeedMultiplier: multiplier,
     );
     return updateMediaViewerConfig(updated);
   }

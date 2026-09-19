@@ -461,11 +461,20 @@ class UnlockController extends _$UnlockController {
     await checkStoragePermission();
   }
 
-  void setSelectedVaultKind(String kind) {
+   void setSelectedVaultKind(String kind) {
     state = state._copy(
       containerFormat: kind,
       clearSelectedUri: true,
       clearSelectedName: true,
+      clearCompositeCarrierUris: true,
+      isPlainDiskImage: false,
+      keyfiles: const [],
+      hiddenKeyfiles: const [],
+      cipherId: 255,
+      hashId: 255,
+      hiddenCipherId: 255,
+      hiddenHashId: 255,
+      protectHiddenVolume: false,
       clearError: true,
     );
   }
@@ -491,13 +500,21 @@ class UnlockController extends _$UnlockController {
   void setShowPasswordFallback(bool show) =>
       state = state._copy(showPasswordFallback: show);
 
-  void clearSelection() {
+ void clearSelection() {
     state = state._copy(
       clearSelectedUri: true,
       clearSelectedName: true,
       clearCompositeCarrierUris: true,
       containerFormat: state.isFolderVault ? 'directory_vault' : 'container',
       isPlainDiskImage: false,
+      keyfiles: const [],
+      hiddenKeyfiles: const [],
+      cipherId: 255,
+      hashId: 255,
+      hiddenCipherId: 255,
+      hiddenHashId: 255,
+      protectHiddenVolume: false,
+      clearError: true,
     );
   }
 

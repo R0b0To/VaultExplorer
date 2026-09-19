@@ -857,6 +857,7 @@ case _UnlockCredentialState.password:
                 PimInputField(
                   controller: _pimCtrl,
                   enabled: canConfigure,
+                  onSubmitted: (_) => _onUnlock(),
                 ),
               ],
               if (hasDirectOptions) ...[
@@ -954,6 +955,7 @@ List<Widget> _buildAdvancedOptionsSection(
           PimInputField(
             controller: _pimCtrl,
             enabled: canConfigure,
+            onSubmitted: (_) => _onUnlock(),
           ),
         
         ],
@@ -1043,6 +1045,7 @@ List<Widget> _buildAdvancedOptionsSection(
           PimInputField(
             controller: _hiddenPimCtrl,
             enabled: canConfigure,
+            onSubmitted: (_) => _onUnlock(),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),

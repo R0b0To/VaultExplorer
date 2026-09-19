@@ -610,6 +610,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 PimInputField(
                   controller: _pimCtrl,
                   enabled: canConfigure,
+                  onSubmitted: (_) => _onUnlock(),
                 ),
               ],
               if (hasDirectOptions) ...[
@@ -691,10 +692,11 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     final canConfigure = hasSelection && !state.loading;
 
     return [
-      if (!hasDirectOptions) ...[
+     if (!hasDirectOptions) ...[
         PimInputField(
           controller: _pimCtrl,
           enabled: canConfigure,
+          onSubmitted: (_) => _onUnlock(),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -767,9 +769,10 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             ),
           ),
         ),
-        PimInputField(
+       PimInputField(
           controller: _hiddenPimCtrl,
           enabled: canConfigure,
+          onSubmitted: (_) => _onUnlock(),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),

@@ -7,11 +7,13 @@ import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 class PimInputField extends StatefulWidget {
   final TextEditingController controller;
   final bool enabled;
+  final ValueChanged<String>? onSubmitted;
 
   const PimInputField({
     super.key,
     required this.controller,
     this.enabled = true,
+    this.onSubmitted,
   });
 
   @override
@@ -27,10 +29,12 @@ class _PimInputFieldState extends State<PimInputField> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: TextField(
+     child: TextField(
         controller: widget.controller,
         enabled: widget.enabled,
         keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        onSubmitted: widget.onSubmitted,
         obscureText: _obscure,
         obscuringCharacter: '*',
         decoration: InputDecoration(

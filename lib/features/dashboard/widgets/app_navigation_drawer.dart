@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -159,6 +160,13 @@ class AppNavigationDrawer extends ConsumerWidget {
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
     final externalStorages = ref.watch(externalStorageLocationsProvider);
+    // Whole "Storage Locations" section (Local Storage + added locations +
+    // the add button) is toggled from Settings. Hiding it only affects this
+    // drawer; [primaryLocalContainer] stays resolvable for cross-container
+    // paste regardless.
+    final showStorageLocations = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.showStorageLocationsInDrawer),
+    );
     final primary = primaryLocalContainer;
 
     final isDashboard = currentVolId == null && selectedTabIndex == 0;
@@ -254,7 +262,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                     if (onAddVault != null)
                       ListTile(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                        leading: Icon(Icons.add_box_outlined, color: cs.primary),
+                        leading: Icon(Icons.add, color: cs.primary),
                         title: Text(
                           context.l10n.addAVaultTitle,
                           style: textTheme.bodyMedium?.copyWith(
@@ -273,122 +281,124 @@ class AppNavigationDrawer extends ConsumerWidget {
                       ),
                   ],
 
-                  // 3. Storage Locations Section
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                    child: Text(
-                      context.l10n.storageLocationsTitle,
-                      style: textTheme.labelMedium?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  if (primary != null)
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      selected: currentVolId == kDecoyLocalVolId,
-                      selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                      leading: Icon(
-                        Icons.phone_android_rounded,
-                        color: currentVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        context.l10n.localStorageCardTitle,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontWeight: currentVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
+                  if (showStorageLocations) ...[
+                    // 3. Storage Locations Section
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
+                      child: Text(
+                        context.l10n.storageLocationsTitle,
+                        style: textTheme.labelMedium?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle: Text(
-                        context.l10n.internalStorageSubtitle,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (currentVolId == kDecoyLocalVolId) return;
-                        onSelectContainer?.call(primary);
-                      },
                     ),
 
-                  for (final loc in externalStorages) ...[
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      selected: currentVolId == loc.volId,
-                      selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                      leading: Icon(
-                        loc.path.startsWith('content://') ? Icons.cloud_outlined : Icons.sd_card_rounded,
-                        color: currentVolId == loc.volId ? cs.primary : cs.secondary,
-                      ),
-                      title: Text(
-                        loc.displayName,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontWeight: currentVolId == loc.volId ? FontWeight.bold : FontWeight.w500,
+                    if (primary != null)
+                      ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                        selected: currentVolId == kDecoyLocalVolId,
+                        selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                        leading: Icon(
+                          Icons.phone_android_rounded,
+                          color: currentVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
                         ),
-                      ),
-                      subtitle: Text(
-                        loc.path.startsWith('content://')
-                            ? context.l10n.safProviderLabel
-                            : loc.path,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-                        onSelected: (action) {
-                          if (action == 'rename') {
-                            _promptRename(context, ref, loc);
-                          } else if (action == 'remove') {
-                            _confirmRemove(context, ref, loc);
-                          }
+                        title: Text(
+                          context.l10n.localStorageCardTitle,
+                          style: textTheme.bodyLarge?.copyWith(
+                            fontWeight: currentVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          context.l10n.internalStorageSubtitle,
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          if (currentVolId == kDecoyLocalVolId) return;
+                          onSelectContainer?.call(primary);
                         },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
-                          PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
-                        ],
                       ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (currentVolId == loc.volId) return;
-                        final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-                            loc.path.startsWith('/data/user/0');
-                        final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-                            ? loc.treeUri!
-                            : loc.path;
-                        onSelectContainer?.call(buildExternalStorageContainer(
-                          rootPath: targetUri,
-                          displayName: loc.displayName,
-                          volId: loc.volId,
-                        ));
+
+                    for (final loc in externalStorages) ...[
+                      ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                        selected: currentVolId == loc.volId,
+                        selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                        leading: Icon(
+                          loc.path.startsWith('content://') ? Icons.cloud_outlined : Icons.sd_card_rounded,
+                          color: currentVolId == loc.volId ? cs.primary : cs.secondary,
+                        ),
+                        title: Text(
+                          loc.displayName,
+                          style: textTheme.bodyLarge?.copyWith(
+                            fontWeight: currentVolId == loc.volId ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          loc.path.startsWith('content://')
+                              ? context.l10n.safProviderLabel
+                              : loc.path,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+                          onSelected: (action) {
+                            if (action == 'rename') {
+                              _promptRename(context, ref, loc);
+                            } else if (action == 'remove') {
+                              _confirmRemove(context, ref, loc);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
+                            PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          if (currentVolId == loc.volId) return;
+                          final isInternal = loc.path.startsWith('/storage/emulated/0') ||
+                              loc.path.startsWith('/data/user/0');
+                          final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
+                              ? loc.treeUri!
+                              : loc.path;
+                          onSelectContainer?.call(buildExternalStorageContainer(
+                            rootPath: targetUri,
+                            displayName: loc.displayName,
+                            volId: loc.volId,
+                          ));
+                        },
+                      ),
+                    ],
+
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      leading: Icon(Icons.add, color: cs.primary),
+                      title: Text(
+                        context.l10n.addStorageLocationTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onTap: () async {
+                        final notifier = ref.read(externalStorageLocationsProvider.notifier);
+                        final loc = await notifier.promptAndAddLocation();
+                        if (!context.mounted) return;
+                        if (loc != null) {
+                          Navigator.pop(context);
+                          onSelectContainer?.call(buildExternalStorageContainer(
+                            rootPath: loc.path,
+                            displayName: loc.displayName,
+                            volId: loc.volId,
+                          ));
+                        }
                       },
                     ),
                   ],
-
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    leading: Icon(Icons.add_to_drive_rounded, color: cs.primary),
-                    title: Text(
-                      context.l10n.addStorageLocationTitle,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onTap: () async {
-                      final notifier = ref.read(externalStorageLocationsProvider.notifier);
-                      final loc = await notifier.promptAndAddLocation();
-                      if (!context.mounted) return;
-                      if (loc != null) {
-                        Navigator.pop(context);
-                        onSelectContainer?.call(buildExternalStorageContainer(
-                          rootPath: loc.path,
-                          displayName: loc.displayName,
-                          volId: loc.volId,
-                        ));
-                      }
-                    },
-                  ),
 
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),

@@ -678,7 +678,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
-    final showLocalStorageCard = state.appSettings.showLocalStorageCard && _localStorageContainer != null;
 
     if (widget.mountedNotifier != null) {
       widget.mountedNotifier!.value = List.unmodifiable(state.mounted);

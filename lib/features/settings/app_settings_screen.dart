@@ -1494,21 +1494,17 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                     SwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       title: Text(
-                        context.l10n.showLocalStorageCardTitle,
+                        context.l10n.showStorageLocationsTitle,
                         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        state.hasAllStorageAccess
-                            ? context.l10n.showLocalStorageCardSubtitle
-                            : context.l10n.showLocalStorageCardDisabledSubtitle,
+                        context.l10n.showStorageLocationsSubtitle,
                         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      value: state.settings.showLocalStorageCard && state.hasAllStorageAccess,
-                      onChanged: state.hasAllStorageAccess
-                          ? (v) => ref.read(appSettingsControllerProvider.notifier).updateSettings(
-                                (s) => s.copyWith(showLocalStorageCard: v),
-                              )
-                          : null,
+                      value: state.settings.showStorageLocationsInDrawer,
+                      onChanged: (v) => ref.read(appSettingsControllerProvider.notifier).updateSettings(
+                            (s) => s.copyWith(showStorageLocationsInDrawer: v),
+                          ),
                     ),
                     OptionPickerTile<ContainerSortMode>(
                       label: context.l10n.sortContainersByLabel,

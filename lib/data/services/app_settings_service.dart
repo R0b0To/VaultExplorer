@@ -98,7 +98,7 @@ class AppSettings {
   bool debugLoggingEnabled;
   DeleteAfterImportMode deleteAfterImportMode;
   bool videoMuted;
-  bool showLocalStorageCard;
+  bool showStorageLocationsInDrawer;
   bool autoLockOnShareImport;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
@@ -131,7 +131,7 @@ class AppSettings {
     this.debugLoggingEnabled = false,
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
     this.videoMuted = false,
-    this.showLocalStorageCard = false,
+    this.showStorageLocationsInDrawer = true,
     this.autoLockOnShareImport = true,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
@@ -205,7 +205,7 @@ class AppSettings {
     bool? debugLoggingEnabled,
     DeleteAfterImportMode? deleteAfterImportMode,
     bool? videoMuted,
-    bool? showLocalStorageCard,
+    bool? showStorageLocationsInDrawer,
     bool? autoLockOnShareImport,
   }) {
     return AppSettings(
@@ -246,7 +246,7 @@ class AppSettings {
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
       deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
       videoMuted: videoMuted ?? this.videoMuted,
-      showLocalStorageCard: showLocalStorageCard ?? this.showLocalStorageCard,
+      showStorageLocationsInDrawer: showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
       autoLockOnShareImport: autoLockOnShareImport ?? this.autoLockOnShareImport,
     );
   }
@@ -283,7 +283,7 @@ class AppSettings {
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
     'videoMuted': videoMuted,
-    'showLocalStorageCard': showLocalStorageCard,
+    'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'autoLockOnShareImport': autoLockOnShareImport,
   };
 
@@ -333,7 +333,7 @@ class AppSettings {
       j['deleteAfterImportMode'] as String?,
     ),
     videoMuted: j['videoMuted'] as bool? ?? false,
-    showLocalStorageCard: j['showLocalStorageCard'] as bool? ?? false,
+    showStorageLocationsInDrawer: j['showStorageLocationsInDrawer'] as bool? ?? true,
     autoLockOnShareImport: j['autoLockOnShareImport'] as bool? ?? true,
   );
 }

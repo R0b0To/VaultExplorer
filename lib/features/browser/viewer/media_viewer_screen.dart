@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
@@ -100,7 +101,8 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   ConsumerState<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
-class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
+class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
+    with TickerProviderStateMixin {
   late final VaultFileIoApi _fileIoApi;
   late final VaultEngineEvents _engineEvents;
   late final MediaPrefetchController _prefetchController;
@@ -111,6 +113,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   late ScrollController _listScrollController;
   late final TransformationController _continuousTransformationController;
   double _continuousScale = 1.0;
+  AnimationController? _continuousZoomAnimationController;
+  Animation<Matrix4>? _continuousZoomAnimation;
+  TapDownDetails? _continuousDoubleTapDetails;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
@@ -211,7 +216,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _playbackManager = VideoPlaybackManager();
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
-    _continuousTransformationController = TransformationController();
+     _continuousTransformationController = TransformationController();
+    _continuousTransformationController.addListener(_onContinuousTransformationChanged);
+    _continuousZoomAnimationController = AnimationController(
+      vsync: this,
+      duration: MediaViewerConstants.animationDuration,
+    )..addListener(() {
+        if (_continuousZoomAnimation != null) {
+          _isClampingContinuous = true;
+          _continuousTransformationController.value =
+              _continuousZoomAnimation!.value;
+          _isClampingContinuous = false;
+        }
+      });
 
     _playlistController.addListener(_onPlaylistUpdate);
     _playbackManager.activeControllerNotifier.addListener(
@@ -710,14 +727,139 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   /// middle of the screen stays there, instead of the view snapping to a
   /// different item. Pass `false` when the caller is about to reposition the
   /// list itself anyway (e.g. after the viewport was resized).
-  void _resetContinuousZoom({bool keepCenter = true}) {
+  bool _isClampingContinuous = false;
+
+  void _onContinuousTransformationChanged() {
+    if (_isClampingContinuous || !mounted) return;
+    final vw = _viewportWidth;
+    final vh = _viewportHeight;
+    if (vw <= 0 || vh <= 0) return;
+
+    final matrix = _continuousTransformationController.value;
+    final s = _getMatrixScale(matrix);
+    if (s <= 0) return;
+
+    final config = ref.read(fileManagerToolbarSettingsProvider(null)).config.mediaViewerToolbarConfig;
+    final effectiveMinScale = config.pinchZoomOutEnabled
+        ? config.minVideoZoomScale.clamp(MediaViewerConstants.minVideoZoomFloor, 1.0)
+        : 1.0;
+
+    // Hard floor for zoom-out
+    if (s < effectiveMinScale) {
+      final clampedS = effectiveMinScale;
+      final dx = vw * (1.0 - clampedS) / 2.0;
+      final dy = vh * (1.0 - clampedS) / 2.0;
+      _isClampingContinuous = true;
+      _continuousTransformationController.value = Matrix4.identity()
+        ..setTranslationRaw(dx, dy, 0.0)
+        ..scale(clampedS, clampedS, clampedS);
+      _isClampingContinuous = false;
+      return;
+    }
+
+    // Lock borders when zoomed in (s >= 1.0) across both X and Y
+    if (s >= 1.0) {
+      final scaledW = vw * s;
+      final scaledH = vh * s;
+      final currentTx = matrix.storage[12];
+      final currentTy = matrix.storage[13];
+
+      final double clampedTx = scaledW > vw
+          ? currentTx.clamp(vw - scaledW, 0.0)
+          : (vw - scaledW) / 2.0;
+      final double clampedTy = scaledH > vh
+          ? currentTy.clamp(vh - scaledH, 0.0)
+          : (vh - scaledH) / 2.0;
+
+      if ((currentTx - clampedTx).abs() > 0.001 ||
+          (currentTy - clampedTy).abs() > 0.001) {
+        _isClampingContinuous = true;
+        _continuousTransformationController.value = Matrix4.identity()
+          ..setTranslationRaw(clampedTx, clampedTy, 0.0)
+          ..scale(s, s, s);
+        _isClampingContinuous = false;
+      }
+    }
+  }
+
+  void _animateContinuousZoomTo(Matrix4 targetMatrix, {required bool toBaseline}) {
+    final controller = _continuousZoomAnimationController;
+    if (controller == null) {
+      _continuousTransformationController.value = targetMatrix;
+      return;
+    }
+
+    controller.stop();
+    _continuousZoomAnimation = Matrix4Tween(
+      begin: _continuousTransformationController.value,
+      end: targetMatrix,
+    ).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+    );
+
+    controller.forward(from: 0.0).then((_) {
+      if (mounted) {
+        setState(() {
+          _continuousScale =
+              _getMatrixScale(_continuousTransformationController.value);
+        });
+        _onZoomInteractionChanged(toBaseline);
+      }
+    });
+  }
+
+  void _handleContinuousDoubleTap([TapDownDetails? details]) {
+    final currentScale =
+        _getMatrixScale(_continuousTransformationController.value);
+    final bool isDefaultZoom = (currentScale - 1.0).abs() < 0.01;
+
+    if (!isDefaultZoom) {
+      // Zoomed in or out: smoothly animate back to default 1.0x baseline
+      _animateContinuousZoomTo(Matrix4.identity(), toBaseline: true);
+      return;
+    }
+
+    // At default 1.0x: smoothly animate zoom in toward tapped point
+    const targetScale = 3.0;
+    final vw = _viewportWidth;
+    final vh = _viewportHeight;
+    if (vw <= 0 || vh <= 0) return;
+
+    final position = details?.localPosition ?? Offset(vw / 2, vh / 2);
+    final x = -position.dx * (targetScale - 1.0);
+    final y = -position.dy * (targetScale - 1.0);
+
+    final scaledW = vw * targetScale;
+    final scaledH = vh * targetScale;
+
+    final clampedTx =
+        scaledW > vw ? x.clamp(vw - scaledW, 0.0) : (vw - scaledW) / 2.0;
+    final clampedTy =
+        scaledH > vh ? y.clamp(vh - scaledH, 0.0) : (vh - scaledH) / 2.0;
+
+    final targetMatrix = Matrix4.identity()
+      ..setTranslationRaw(clampedTx, clampedTy, 0.0)
+      ..scale(targetScale, targetScale, targetScale);
+
+    _onZoomInteractionChanged(false);
+    _animateContinuousZoomTo(targetMatrix, toBaseline: false);
+  }
+
+  void _resetContinuousZoom({bool keepCenter = true, bool animate = false}) {
+    if (animate) {
+      _animateContinuousZoomTo(Matrix4.identity(), toBaseline: true);
+      return;
+    }
+
     final controller = _continuousTransformationController;
     if (controller.value.isIdentity()) {
       _continuousScale = 1.0;
       return;
     }
     final shift = keepCenter ? _continuousVisibleCenterShift() : 0.0;
+    _isClampingContinuous = true;
     controller.value = Matrix4.identity();
+    _isClampingContinuous = false;
     if (shift.abs() > 0.5 &&
         _listScrollController.hasClients &&
         _listScrollController.positions.length == 1) {
@@ -756,8 +898,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     );
   }
 
+  static double _getMatrixScale(Matrix4 matrix) {
+    final double x = matrix.storage[0];
+    final double y = matrix.storage[1];
+    return math.sqrt(x * x + y * y);
+  }
+
   double get _continuousZoomFactor {
-    final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+    final s = _getMatrixScale(_continuousTransformationController.value);
     return s > 0 ? s : 1.0;
   }
 
@@ -1671,7 +1819,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _cancelSlideshowTimer();
     _hideTimer?.cancel();
     _pageController.dispose();
-    _listScrollController.dispose();
+     _listScrollController.dispose();
+    _continuousZoomAnimationController?.dispose();
+    _continuousTransformationController.removeListener(_onContinuousTransformationChanged);
     _continuousTransformationController.dispose();
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
@@ -1952,97 +2102,70 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                 final listCanScroll =
                     physics is! NeverScrollableScrollPhysics;
 
-                final continuousView = RawGestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  gestures: <Type, GestureRecognizerFactory>{
-                    if (zoomed && listCanScroll)
-                      VerticalDragGestureRecognizer:
-                          GestureRecognizerFactoryWithHandlers<
-                            VerticalDragGestureRecognizer
-                          >(
-                            () => VerticalDragGestureRecognizer(),
-                            (recognizer) {
-                              recognizer
-                                ..onStart = _onMarginDragStart
-                                ..onUpdate = _onMarginDragUpdate
-                                ..onEnd = _onMarginDragEnd
-                                ..onCancel = _onMarginDragCancel;
-                            },
-                          ),
+              final effectiveMinScale = mediaViewerConfig.pinchZoomOutEnabled
+                    ? mediaViewerConfig.minVideoZoomScale.clamp(
+                        MediaViewerConstants.minVideoZoomFloor,
+                        1.0,
+                      )
+                    : 1.0;
+
+                  final continuousView = InteractiveViewer(
+                  transformationController:
+                      _continuousTransformationController,
+                  minScale: effectiveMinScale,
+                  maxScale: MediaViewerConstants.maxImageZoom,
+                  interactionEndFrictionCoefficient: 0.0005,
+                  boundaryMargin: mediaViewerConfig.pinchZoomOutEnabled
+                      ? const EdgeInsets.all(double.infinity)
+                      : EdgeInsets.zero,
+                  clipBehavior: Clip.none,
+                  // Only allow 1-finger panning when zoomed in; keep centered when zoomed out
+                  panEnabled: _continuousScale > 1.01,
+                  // Free 360° panning in all directions
+                  panAxis: PanAxis.free,
+                  onInteractionStart: (details) {
+                    if (details.pointerCount >= 2) {
+                      _continuousZoomAnimationController?.stop();
+                      _onZoomInteractionChanged(false);
+                    }
                   },
-                  child: InteractiveViewer(
-                    transformationController:
-                        _continuousTransformationController,
-                    minScale: mediaViewerConfig.pinchZoomOutEnabled
-                        ? mediaViewerConfig.minVideoZoomScale.clamp(
-                            MediaViewerConstants.minVideoZoomFloor,
-                            1.0,
-                          )
-                        : 1.0,
-                    maxScale: MediaViewerConstants.maxImageZoom,
-                    boundaryMargin: mediaViewerConfig.pinchZoomOutEnabled
-                        ? const EdgeInsets.all(double.infinity)
-                        : EdgeInsets.zero,
-                    clipBehavior: Clip.none,
-                    panEnabled: true,
-                    // Single-finger vertical drags belong to the list, at any
-                    // zoom level; the viewer only pans sideways (and pinches).
-                    panAxis: PanAxis.horizontal,
-                    onInteractionStart: (details) {
-                      if (details.pointerCount >= 2) {
-                        _onZoomInteractionChanged(false);
-                      }
-                    },
-                    onInteractionUpdate: (details) {
-                      final s = _continuousTransformationController.value
-                          .getMaxScaleOnAxis();
-                      if (s != _continuousScale) {
-                        setState(() => _continuousScale = s);
-                      }
-                    },
-                    onInteractionEnd: (details) {
-                      _continuousScale = _continuousTransformationController
-                          .value
-                          .getMaxScaleOnAxis();
-                      // Only an in-progress pinch takes scrolling away from
-                      // the list. Once it ends the list scrolls again at
-                      // whatever zoom the user stopped on.
-                      _onZoomInteractionChanged(true);
-                      if (mounted) setState(() {});
-                    },
-                    child: listWidget,
-                  ),
+                  onInteractionUpdate: (details) {
+                    final s = _getMatrixScale(_continuousTransformationController.value);
+                    if (s != _continuousScale) {
+                      _continuousScale = s;
+                    }
+                  },
+                  onInteractionEnd: (details) {
+                    final s = _getMatrixScale(_continuousTransformationController.value);
+                    final clampedS = s.clamp(effectiveMinScale, MediaViewerConstants.maxImageZoom);
+                    final vw = constraints.maxWidth;
+                    final vh = constraints.maxHeight;
+
+                    if (clampedS < 1.0 && vw > 0 && vh > 0) {
+                      // Keep continuous view centered horizontally and vertically when zoomed out
+                      final dx = vw * (1.0 - clampedS) / 2.0;
+                      final dy = vh * (1.0 - clampedS) / 2.0;
+                      _isClampingContinuous = true;
+                      _continuousTransformationController.value = Matrix4.identity()
+                        ..setTranslationRaw(dx, dy, 0.0)
+                        ..scale(clampedS, clampedS, clampedS);
+                      _isClampingContinuous = false;
+                    }
+
+                    _continuousScale = _getMatrixScale(_continuousTransformationController.value);
+                    _onZoomInteractionChanged(true);
+                    if (mounted) setState(() {});
+                  },
+                  child: listWidget,
                 );
 
-                // Always return the Stack so the widget tree structure remains stable.
-                // Keeping Stack as the root ensures the child ListView is never unmounted
-                // when transitioning between zoomed and unzoomed states, preserving
-                // the scroll offset and visible item position.
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    continuousView,
-                    if (zoomed)
-                      Positioned.fill(
-                        child: RawGestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          gestures: <Type, GestureRecognizerFactory>{
-                            DoubleTapGestureRecognizer:
-                                GestureRecognizerFactoryWithHandlers<
-                                  DoubleTapGestureRecognizer
-                                >(
-                                  () => DoubleTapGestureRecognizer(),
-                                  (recognizer) =>
-                                      recognizer.onDoubleTap = _resetContinuousZoom,
-                                ),
-                          },
-                          child: Listener(
-                            behavior: HitTestBehavior.translucent,
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
-                      ),
-                  ],
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onDoubleTapDown: (details) =>
+                      _continuousDoubleTapDetails = details,
+                  onDoubleTap: () =>
+                      _handleContinuousDoubleTap(_continuousDoubleTapDetails),
+                  child: continuousView,
                 );
               }
 

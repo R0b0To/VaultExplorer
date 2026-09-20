@@ -92,6 +92,7 @@ class VaultCardRow extends StatefulWidget {
   final bool triggerNudge;
   final VoidCallback? onNudgeComplete;
   final bool swapActions;
+  final bool swipeEnabled;
   final bool dragEnabled;
 
   const VaultCardRow({
@@ -108,6 +109,7 @@ class VaultCardRow extends StatefulWidget {
     this.triggerNudge = false,
     this.onNudgeComplete,
     this.swapActions = false,
+    this.swipeEnabled = true,
     this.dragEnabled = true,
   });
 
@@ -143,7 +145,7 @@ class _VaultCardRowState extends State<VaultCardRow>
         }
       });
     }
-    if (widget.triggerNudge && !widget.isInserting) {
+    if (widget.triggerNudge && !widget.isInserting && widget.swipeEnabled) {
       _hasTriggeredNudge = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _triggerPeekNudge();
@@ -158,12 +160,15 @@ class _VaultCardRowState extends State<VaultCardRow>
       oldWidget.group.removeListener(_onGroupChanged);
       widget.group.addListener(_onGroupChanged);
     }
-    if (widget.triggerNudge && !oldWidget.triggerNudge && !_hasTriggeredNudge) {
+    if (!widget.swipeEnabled && _openSide != _OpenSide.none) {
+      _animateTo(_OpenSide.none);
+    }
+    if (widget.triggerNudge && !oldWidget.triggerNudge && !_hasTriggeredNudge && widget.swipeEnabled) {
       _hasTriggeredNudge = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _triggerPeekNudge();
       });
-    } else if (!widget.triggerNudge) {
+    } else if (!widget.triggerNudge || !widget.swipeEnabled) {
       _hasTriggeredNudge = false;
     }
   }
@@ -183,7 +188,7 @@ class _VaultCardRowState extends State<VaultCardRow>
 
   Future<void> _triggerPeekNudge() async {
 
-    if (!mounted || _isDragging || _openSide != _OpenSide.none) return;
+    if (!mounted || _isDragging || _openSide != _OpenSide.none || !widget.swipeEnabled) return;
     await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
@@ -362,6 +367,24 @@ class _VaultCardRowState extends State<VaultCardRow>
     final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;
     final isHidden = widget.isRemoving || _isCurrentlyInserting;
 
+    if (!widget.swipeEnabled) {
+      return AnimatedSize(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: isHidden ? 0.0 : 1.0,
+          child: isHidden
+              ? const SizedBox(width: double.infinity, height: 0)
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _maybeDragWrap(child: card),
+                ),
+        ),
+      );
+    }
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -375,60 +398,64 @@ class _VaultCardRowState extends State<VaultCardRow>
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _maybeDragWrap(
                   child: Semantics(
-                    customSemanticsActions: {
-                      CustomSemanticsAction(label: context.l10n.edit): widget.onEdit,
-                      CustomSemanticsAction(label: context.l10n.delete): widget.onDelete,
-                    },
+                    customSemanticsActions: widget.swipeEnabled
+                        ? {
+                            CustomSemanticsAction(label: context.l10n.edit): widget.onEdit,
+                            CustomSemanticsAction(label: context.l10n.delete): widget.onDelete,
+                          }
+                        : const {},
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.xl),
                       child: Stack(
                         children: [
-                          Positioned.fill(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                SizedBox(
-                                  width: _revealExtent,
-                                  child: _SwipeActionButton(
-                                    icon: leftIcon,
-                                    label: leftLabel,
-                                    background: leftBackground,
-                                    foreground: leftForeground,
-                                    progress: leftSlotProgress,
-                                    onTap: leftOnTap,
+                          if (widget.swipeEnabled)
+                            Positioned.fill(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  SizedBox(
+                                    width: _revealExtent,
+                                    child: _SwipeActionButton(
+                                      icon: leftIcon,
+                                      label: leftLabel,
+                                      background: leftBackground,
+                                      foreground: leftForeground,
+                                      progress: leftSlotProgress,
+                                      onTap: leftOnTap,
+                                    ),
                                   ),
-                                ),
-                                const Spacer(),
-                                SizedBox(
-                                  width: _revealExtent,
-                                  child: _SwipeActionButton(
-                                    icon: rightIcon,
-                                    label: rightLabel,
-                                    background: rightBackground,
-                                    foreground: rightForeground,
-                                    progress: rightSlotProgress,
-                                    onTap: rightOnTap,
+                                  const Spacer(),
+                                  SizedBox(
+                                    width: _revealExtent,
+                                    child: _SwipeActionButton(
+                                      icon: rightIcon,
+                                      label: rightLabel,
+                                      background: rightBackground,
+                                      foreground: rightForeground,
+                                      progress: rightSlotProgress,
+                                      onTap: rightOnTap,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
                     Transform.translate(
                             offset: Offset(_dx, 0),
                             child: RawGestureDetector(
                               behavior: HitTestBehavior.opaque,
                               gestures: <Type, GestureRecognizerFactory>{
-                                StrictHorizontalDragGestureRecognizer:
-                                    GestureRecognizerFactoryWithHandlers<StrictHorizontalDragGestureRecognizer>(
-                                  () => StrictHorizontalDragGestureRecognizer(),
-                                  (StrictHorizontalDragGestureRecognizer instance) {
-                                    instance
-                                      ..onStart = _onDragStart
-                                      ..onUpdate = _onDragUpdate
-                                      ..onEnd = _onDragEnd
-                                      ..onCancel = _onDragCancel;
-                                  },
-                                ),
+                                if (widget.swipeEnabled)
+                                  StrictHorizontalDragGestureRecognizer:
+                                      GestureRecognizerFactoryWithHandlers<StrictHorizontalDragGestureRecognizer>(
+                                    () => StrictHorizontalDragGestureRecognizer(),
+                                    (StrictHorizontalDragGestureRecognizer instance) {
+                                      instance
+                                        ..onStart = _onDragStart
+                                        ..onUpdate = _onDragUpdate
+                                        ..onEnd = _onDragEnd
+                                        ..onCancel = _onDragCancel;
+                                    },
+                                  ),
                               },
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 220),

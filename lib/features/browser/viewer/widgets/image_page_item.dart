@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show PointerDeviceKind;
 import 'package:material_ui/material_ui.dart';
@@ -60,7 +61,8 @@ class ImagePageItem extends StatefulWidget {
   State<ImagePageItem> createState() => _ImagePageItemState();
 }
 
-class _ImagePageItemState extends State<ImagePageItem> {
+class _ImagePageItemState extends State<ImagePageItem>
+    with TickerProviderStateMixin {
   late final TransformationController _transformationController;
   double _scale = 1.0;
   TapDownDetails? _doubleTapDetails;
@@ -68,6 +70,8 @@ class _ImagePageItemState extends State<ImagePageItem> {
   BoxFit? _lastFit;
   int? _lastRotation;
   Size? _lastViewportSize;
+
+  AnimationController? _zoomAnimationController;
 
   // -- Edge-swipe brightness gesture --
   final Set<int> _activeTouchPointers = {};
@@ -77,7 +81,16 @@ class _ImagePageItemState extends State<ImagePageItem> {
   bool _isBrightnessDragging = false;
   EdgeSwipeClaimRecognizer? _brightnessClaim;
 
-  bool get _isZoomedIn => _scale > 1.01;
+  static double _getMatrixScale(Matrix4 matrix) {
+    final double x = matrix.storage[0];
+    final double y = matrix.storage[1];
+    return math.sqrt(x * x + y * y);
+  }
+
+  bool get _isZoomed =>
+      (_getMatrixScale(_transformationController.value) - 1.0).abs() > 0.01;
+  bool get _isZoomedIn =>
+      _getMatrixScale(_transformationController.value) > 1.01;
 
   double get _effectiveMinZoomScale => widget.pinchZoomOutEnabled
       ? widget.minZoomScale.clamp(
@@ -86,10 +99,23 @@ class _ImagePageItemState extends State<ImagePageItem> {
         )
       : 1.0;
 
+  Animation<Matrix4>? _zoomAnimation;
+
   @override
   void initState() {
     super.initState();
     _transformationController = TransformationController();
+    _transformationController.addListener(_onImageTransformationChanged);
+    _zoomAnimationController = AnimationController(
+      vsync: this,
+      duration: MediaViewerConstants.animationDuration,
+    )..addListener(() {
+        if (_zoomAnimation != null) {
+          _isClampingMatrix = true;
+          _transformationController.value = _zoomAnimation!.value;
+          _isClampingMatrix = false;
+        }
+      });
     _brightnessLevel = ScreenBrightnessBridge.lastKnownLevel;
     _initImageDimensions();
   }
@@ -189,29 +215,31 @@ class _ImagePageItemState extends State<ImagePageItem> {
       _transformationController.value = Matrix4.identity();
       _initImageDimensions();
     }
-    if (!widget.isActive && _isBrightnessDragging) {
+  if (!widget.isActive && _isBrightnessDragging) {
       _abortEdgeGestures();
+    }
+    if (oldWidget.isActive && !widget.isActive) {
+      _scale = 1.0;
+      _transformationController.value = Matrix4.identity();
+      widget.onZoomChanged(true);
     }
   }
 
-  void _centerImageInitially(BoxConstraints constraints) {
+  Matrix4 _getBaselineMatrix(BoxConstraints constraints) {
     double? ar;
     if (_imageSize != null && _imageSize!.height > 0) {
       ar = _imageSize!.width / _imageSize!.height;
     } else {
       ar = MediaAspectRatioCache.get(widget.container, widget.fileName);
     }
-    if (ar == null || ar <= 0) return;
+    if (ar == null || ar <= 0) return Matrix4.identity();
 
     if (widget.rotationQuarterTurns % 2 != 0) {
       ar = 1 / ar;
     }
 
     if (widget.imageFit == BoxFit.contain) {
-      _transformationController.value = Matrix4.identity();
-      _scale = 1.0;
-      widget.onZoomChanged(true);
-      return;
+      return Matrix4.identity();
     }
 
     double? childWidth;
@@ -235,21 +263,146 @@ class _ImagePageItemState extends State<ImagePageItem> {
       if (canvasHeight > constraints.maxHeight) {
         y = -(canvasHeight - constraints.maxHeight) / 2;
       }
-      _transformationController.value = Matrix4.translationValues(x, y, 0.0);
-      _scale = 1.0;
+      return Matrix4.translationValues(x, y, 0.0);
     }
+    return Matrix4.identity();
+  }
+
+  void _centerImageInitially(BoxConstraints constraints) {
+    _transformationController.value = _getBaselineMatrix(constraints);
+    _scale = 1.0;
+    widget.onZoomChanged(true);
+  }
+
+ void _animateImageZoomTo(Matrix4 targetMatrix, {required bool toBaseline}) {
+    final controller = _zoomAnimationController;
+    if (controller == null) {
+      _transformationController.value = targetMatrix;
+      return;
+    }
+
+    controller.stop();
+    _zoomAnimation = Matrix4Tween(
+      begin: _transformationController.value,
+      end: targetMatrix,
+    ).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+    );
+
+    controller.forward(from: 0.0).then((_) {
+      if (mounted) {
+        setState(() {
+          _scale = _getMatrixScale(_transformationController.value);
+        });
+        widget.onZoomChanged(toBaseline);
+      }
+    });
   }
 
   @override
   void dispose() {
     _brightnessHudTimer?.cancel();
+    _zoomAnimationController?.dispose();
+    _transformationController.removeListener(_onImageTransformationChanged);
     _transformationController.dispose();
     super.dispose();
   }
 
   // -- Brightness gesture handlers --
+bool _isClampingMatrix = false;
+  double? _activeCanvasWidth;
+  double? _activeCanvasHeight;
+
+  void _onImageTransformationChanged() {
+    if (_isClampingMatrix || !mounted) return;
+    final vw = _lastViewportSize?.width ?? 0.0;
+    final vh = _lastViewportSize?.height ?? 0.0;
+    if (vw <= 0 || vh <= 0) return;
+
+   final matrix = _transformationController.value;
+    final s = _getMatrixScale(matrix);
+    if (s <= 0) return;
+
+    if (s < _effectiveMinZoomScale) {
+      final clampedS = _effectiveMinZoomScale;
+      final cW = _activeCanvasWidth ?? vw;
+      final cH = _activeCanvasHeight ?? vh;
+      final dx = (vw - cW * clampedS) / 2.0;
+      final dy = (vh - cH * clampedS) / 2.0;
+      _isClampingMatrix = true;
+      _transformationController.value = Matrix4.identity()
+        ..translateByDouble(dx, dy, 0.0, 1.0)
+        ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+      _isClampingMatrix = false;
+      return;
+    }
+
+    if (s >= 1.0) {
+      final cW = _activeCanvasWidth ?? vw;
+      final cH = _activeCanvasHeight ?? vh;
+      final scaledW = cW * s;
+      final scaledH = cH * s;
+      final currentTx = matrix.storage[12];
+      final currentTy = matrix.storage[13];
+
+      final double clampedTx = scaledW > vw
+          ? currentTx.clamp(vw - scaledW, 0.0)
+          : (vw - scaledW) / 2.0;
+      final double clampedTy = scaledH > vh
+          ? currentTy.clamp(vh - scaledH, 0.0)
+          : (vh - scaledH) / 2.0;
+
+      if ((currentTx - clampedTx).abs() > 0.001 ||
+          (currentTy - clampedTy).abs() > 0.001) {
+        _isClampingMatrix = true;
+        _transformationController.value = Matrix4.identity()
+          ..translateByDouble(clampedTx, clampedTy, 0.0, 1.0)
+          ..scaleByDouble(s, s, 1.0, 1.0);
+        _isClampingMatrix = false;
+      }
+    }
+  }
+
+  Matrix4 _clampImageMatrix({
+    required Matrix4 matrix,
+    required double vw,
+    required double vh,
+    required double cW,
+    required double cH,
+  }) {
+    if (vw <= 0 || vh <= 0 || cW <= 0 || cH <= 0) return matrix;
+    final s = _getMatrixScale(matrix);
+    if (s <= 0) return matrix;
+    final clampedS = s.clamp(_effectiveMinZoomScale, MediaViewerConstants.maxImageZoom);
+
+    if (clampedS < 1.0) {
+      final dx = (vw - cW * clampedS) / 2.0;
+      final dy = (vh - cH * clampedS) / 2.0;
+      return Matrix4.identity()
+        ..translateByDouble(dx, dy, 0.0, 1.0)
+        ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+    }
+
+    final scaledW = cW * s;
+    final scaledH = cH * s;
+    final currentTx = matrix.storage[12];
+    final currentTy = matrix.storage[13];
+
+    final double clampedTx = scaledW > vw
+        ? currentTx.clamp(vw - scaledW, 0.0)
+        : (vw - scaledW) / 2.0;
+    final double clampedTy = scaledH > vh
+        ? currentTy.clamp(vh - scaledH, 0.0)
+        : (vh - scaledH) / 2.0;
+
+    return Matrix4.identity()
+      ..translateByDouble(clampedTx, clampedTy, 0.0, 1.0)
+      ..scaleByDouble(s, s, 1.0, 1.0);
+  }
+
+  // -- Brightness gesture handlers --
   bool _canStartEdgeSwipe() =>
-      widget.isActive && !_isZoomedIn && _activeTouchPointers.length <= 1;
+      widget.isActive && !_isZoomed && _activeTouchPointers.length <= 1;
 
   void _onGlobalPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch) return;
@@ -293,10 +446,10 @@ class _ImagePageItemState extends State<ImagePageItem> {
     unawaited(ScreenBrightnessBridge.setBrightness(newLevel));
   }
 
-  void _handleBrightnessDragEnd(DragEndDetails details) {
+ void _handleBrightnessDragEnd(DragEndDetails details) {
     if (_isBrightnessDragging) {
       _isBrightnessDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideBrightnessHudSoon();
     }
   }
@@ -304,7 +457,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
   void _handleBrightnessDragCancel() {
     if (_isBrightnessDragging) {
       _isBrightnessDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideBrightnessHudSoon();
     }
   }
@@ -519,58 +672,103 @@ class _ImagePageItemState extends State<ImagePageItem> {
                   onTap: () => widget.onToggleUI(!widget.showUI),
                   onDoubleTapDown: (d) => _doubleTapDetails = d,
                   onDoubleTap: () {
-                    final position = _doubleTapDetails?.localPosition;
-                    final bool atBaseline = (_scale - 1.0).abs() < 0.01;
-                    if (atBaseline) {
-                      _scale = 3.5;
-                      if (position != null) {
-                        final x = -position.dx * (_scale - 1);
-                        final y = -position.dy * (_scale - 1);
-                        _transformationController.value = Matrix4.identity()
-                          ..translateByDouble(x, y, 0.0, 1.0)
-                          ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-                      } else {
-                        _transformationController.value = Matrix4.identity()
-                          ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-                      }
-                      widget.onZoomChanged(true);
-                    } else {
-                      _scale = 1.0;
-                      _centerImageInitially(constraints);
-                      widget.onZoomChanged(true);
+                    // Strict live evaluation: reset if not at default 1.0x baseline
+                    if (_isZoomed) {
+                      final baselineMatrix = _getBaselineMatrix(constraints);
+                      _animateImageZoomTo(baselineMatrix, toBaseline: true);
+                      return;
                     }
+
+                    final position = _doubleTapDetails?.localPosition;
+                    if (position != null && childWidth != null && childHeight != null) {
+                      final imageLeft = (viewportWidth - childWidth!) / 2;
+                      final imageTop = (viewportHeight - childHeight!) / 2;
+                      final imageRect = Rect.fromLTWH(imageLeft, imageTop, childWidth!, childHeight!);
+                      if (!imageRect.contains(position)) {
+                        // In black-out area at default zoom; do not zoom in
+                        return;
+                      }
+                    }
+
+                    const targetScale = 3.5;
+                    final Matrix4 targetMatrix;
+                    if (position != null) {
+                      final x = -position.dx * (targetScale - 1);
+                      final y = -position.dy * (targetScale - 1);
+                      targetMatrix = Matrix4.identity()
+                        ..translateByDouble(x, y, 0.0, 1.0)
+                        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
+                    } else {
+                      targetMatrix = Matrix4.identity()
+                        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
+                    }
+
+                    final cW = canvasWidth ?? viewportWidth;
+                    final cH = canvasHeight ?? viewportHeight;
+                    final clampedMatrix = _clampImageMatrix(
+                      matrix: targetMatrix,
+                      vw: viewportWidth,
+                      vh: viewportHeight,
+                      cW: cW,
+                      cH: cH,
+                    );
+
+                    widget.onZoomChanged(false);
+                    _animateImageZoomTo(clampedMatrix, toBaseline: false);
                   },
                   child: SizedBox.expand(
-                    child: InteractiveViewer(
-                      transformationController: _transformationController,
-                      maxScale: MediaViewerConstants.maxImageZoom,
-                      minScale: _effectiveMinZoomScale,
-                      boundaryMargin: widget.pinchZoomOutEnabled
-                          ? const EdgeInsets.all(double.infinity)
-                          : EdgeInsets.zero,
-                      constrained: isConstrained,
-                      panEnabled: false,
-                      onInteractionStart: (details) {
-                        if (details.pointerCount >= 2) {
-                          widget.onZoomChanged(false);
-                        }
+                    child: Builder(
+                      builder: (context) {
+                        _activeCanvasWidth = canvasWidth;
+                        _activeCanvasHeight = canvasHeight;
+                        return InteractiveViewer(
+                          transformationController: _transformationController,
+                          maxScale: MediaViewerConstants.maxImageZoom,
+                          minScale: _effectiveMinZoomScale,
+                          interactionEndFrictionCoefficient: 0.0005,
+                          boundaryMargin: widget.pinchZoomOutEnabled
+                              ? const EdgeInsets.all(double.infinity)
+                              : EdgeInsets.zero,
+                          constrained: isConstrained,
+                          panEnabled: _isZoomedIn,
+                    onInteractionStart: (details) {
+                            if (details.pointerCount >= 2) {
+                              _zoomAnimationController?.stop();
+                            }
+                            widget.onZoomChanged(false);
+                          },
+                         onInteractionUpdate: (details) {
+                            final s = _getMatrixScale(_transformationController.value);
+                            if (s != _scale) {
+                              _scale = s;
+                            }
+                          },
+                         onInteractionEnd: (details) {
+                            final s = _getMatrixScale(_transformationController.value);
+                            final clampedS = s.clamp(_effectiveMinZoomScale, MediaViewerConstants.maxImageZoom);
+                            if (clampedS < 1.0 && viewportWidth > 0 && viewportHeight > 0) {
+                              final cW = canvasWidth ?? viewportWidth;
+                              final cH = canvasHeight ?? viewportHeight;
+                              final dx = (viewportWidth - cW * clampedS) / 2.0;
+                              final dy = (viewportHeight - cH * clampedS) / 2.0;
+                              _isClampingMatrix = true;
+                              _transformationController.value = Matrix4.identity()
+                                ..translateByDouble(dx, dy, 0.0, 1.0)
+                                ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+                              _isClampingMatrix = false;
+                            }
+                            setState(() {
+                              _scale = _getMatrixScale(_transformationController.value);
+                            });
+                            widget.onZoomChanged(!_isZoomed);
+                          },
+                          child: SizedBox(
+                            width: canvasWidth,
+                            height: canvasHeight,
+                            child: imageContent,
+                          ),
+                        );
                       },
-                      onInteractionUpdate: (details) {
-                        final s = _transformationController.value.getMaxScaleOnAxis();
-                        if (s != _scale) {
-                          _scale = s;
-                        }
-                      },
-                      onInteractionEnd: (details) {
-                        final s = _transformationController.value.getMaxScaleOnAxis();
-                        _scale = s;
-                        widget.onZoomChanged(true);
-                      },
-                      child: SizedBox(
-                        width: canvasWidth,
-                        height: canvasHeight,
-                        child: imageContent,
-                      ),
                     ),
                   ),
                 );

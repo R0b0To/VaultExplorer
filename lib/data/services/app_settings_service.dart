@@ -83,6 +83,7 @@ class AppSettings {
   int autoLockMins;
   bool hasSeenSwipeTutorial;
   ContainerSortMode containerSortMode;
+  bool enableCardSwipeActions;
   bool swapCardActions;
   ThemeMode themeMode;
   bool useDynamicColor;
@@ -118,6 +119,7 @@ class AppSettings {
     this.autoLockMins = 0,
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.containerSortMode = ContainerSortMode.manual,
+    this.enableCardSwipeActions = true,
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
@@ -184,6 +186,7 @@ class AppSettings {
     int? autoLockMins,
     bool? hasSeenSwipeTutorial,
     ContainerSortMode? containerSortMode,
+    bool? enableCardSwipeActions,
     bool? swapCardActions,
     ThemeMode? themeMode,
     bool? useDynamicColor,
@@ -221,6 +224,7 @@ class AppSettings {
       hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
+      enableCardSwipeActions: enableCardSwipeActions ?? this.enableCardSwipeActions,
       swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
@@ -264,6 +268,7 @@ class AppSettings {
     'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
     'defaultLayoutMode': defaultLayoutMode.toJson(),
     'containerSortMode': containerSortMode.toJson(),
+    'enableCardSwipeActions': enableCardSwipeActions,
     'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
     'useDynamicColor': useDynamicColor,
@@ -304,6 +309,7 @@ class AppSettings {
     hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),
+    enableCardSwipeActions: j['enableCardSwipeActions'] as bool? ?? true,
     swapCardActions: j['swapCardActions'] as bool? ?? false,
     themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
     useDynamicColor: j['useDynamicColor'] as bool? ?? false,

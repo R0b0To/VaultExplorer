@@ -34,6 +34,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/local_storage_card.dart
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
@@ -612,6 +613,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget _buildBody(
     List<VaultListItem> displayItems,
     VaultDashboardViewState state,
+    AppSettings appSettings,
   ) {
     if (displayItems.isEmpty && !state.isLoading) {
       return EmptyState(onAdd: _showAddOptionsSheet);
@@ -642,7 +644,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       },
       itemBuilder: (context, i) {
         final item = displayItems[i];
-        final triggerNudge = i == 0 && !state.appSettings.hasSeenSwipeTutorial;
+        final triggerNudge = i == 0 &&
+            !appSettings.hasSeenSwipeTutorial &&
+            appSettings.enableCardSwipeActions;
         return VaultCardRow(
           key: ValueKey(item.uri),
           index: i,
@@ -656,10 +660,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           isRemoving: state.animatingOutUris.contains(item.uri),
           isInserting: state.animatingInUris.contains(item.uri),
           triggerNudge: triggerNudge,
-          swapActions: state.appSettings.swapCardActions,
-          dragEnabled: state.appSettings.containerSortMode == ContainerSortMode.manual,
+          swapActions: appSettings.swapCardActions,
+          swipeEnabled: appSettings.enableCardSwipeActions,
+          dragEnabled: appSettings.containerSortMode == ContainerSortMode.manual,
           onNudgeComplete: () async {
-            final updated = state.appSettings.copyWith(hasSeenSwipeTutorial: true);
+            final updated = appSettings.copyWith(hasSeenSwipeTutorial: true);
             await ref.read(appSettingsServiceProvider).saveSettings(updated);
             ref.read(vaultDashboardControllerProvider.notifier).loadAll();
           },
@@ -678,6 +683,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
+    final appSettings = ref.watch(appSettingsControllerProvider).settings;
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
 
     if (widget.mountedNotifier != null) {
@@ -767,7 +773,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               children: [
                 // Auto-sync progress / attention; takes no space when idle.
                 const SyncStatusBanner(),
-                Expanded(child: _buildBody(displayItems, state)),
+                Expanded(child: _buildBody(displayItems, state, appSettings)),
               ],
             ),
           ),

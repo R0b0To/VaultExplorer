@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -139,7 +140,8 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   ConsumerState<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
 
-class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
+class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
+    with TickerProviderStateMixin {
   VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
 
   NativeVideoController? _boundController;
@@ -160,10 +162,6 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   int _captionsToken = 0;
   final TransformationController _videoTransformationController =
       TransformationController();
-  // The "at rest" scale double-tap resets to and zoom-lock coordination
-  // treats as "not interacting". Distinct from the InteractiveViewer's
-  // actual `minScale` bound, which can now sit below this when pinch
-  // zoom-out is enabled -- see [_effectiveMinZoomScale].
   static const double _baselineZoomScale = 1.0;
   static const double _maxZoomScale = 4.0;
   double _videoScale = _baselineZoomScale;
@@ -173,13 +171,9 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   Uint8List? _localPosterBytes;
   late final ThumbnailCacheService _thumbnailCache;
 
-  // -- Edge-swipe brightness/volume gestures --
-  // Every touch currently down anywhere on this widget, tracked via a raw
-  // Listener (fires regardless of which gesture recognizer -- tap,
-  // double-tap, InteractiveViewer's pan/scale -- ends up winning the
-  // arena for that pointer). Lets an edge drag abort the instant a second
-  // finger appears, mirroring the pinch-vs-swipe fix already used at the
-  // MediaViewerScreen level.
+  AnimationController? _zoomAnimationController;
+  Animation<Matrix4>? _zoomAnimation;
+
   final Set<int> _activeTouchPointers = {};
   int? _brightnessDragPointerId;
   double? _brightnessDragStartY;
@@ -195,21 +189,23 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   Timer? _volumeHudTimer;
   static const double _edgeSwipeSlop = 10.0;
   bool _isBrightnessDragging = false;
-  // Arena participants for the two strips (see EdgeSwipeClaimRecognizer);
-  // kept so a second finger can release them.
   EdgeSwipeClaimRecognizer? _brightnessClaim;
   EdgeSwipeClaimRecognizer? _volumeClaim;
   bool _isVolumeDragging = false;
   double _effectiveHoldSpeed = 2.0;
 
-  /// Whether the video is currently zoomed in beyond the 1.0x baseline.
-  /// Single-finger dragging (panning zoomed content, or an edge swipe) is
-  /// only meaningful in one of these two modes at a time, never both.
-  bool get _isZoomedIn => _videoScale > _baselineZoomScale + 0.001;
+  /// Accurately extracts 2D scale, ignoring the 3D Z-axis which is always 1.0
+  static double _getMatrixScale(Matrix4 matrix) {
+    final double x = matrix.storage[0];
+    final double y = matrix.storage[1];
+    return math.sqrt(x * x + y * y);
+  }
 
-  /// The InteractiveViewer's actual pinch-zoom floor: the configured
-  /// minimum when zoom-out is enabled, otherwise the historical hard
-  /// floor of 1.0x (no zoom-out at all).
+  bool get _isZoomed =>
+      (_getMatrixScale(_videoTransformationController.value) - _baselineZoomScale).abs() > 0.01;
+  bool get _isZoomedIn =>
+      _getMatrixScale(_videoTransformationController.value) > _baselineZoomScale + 0.001;
+
   double get _effectiveMinZoomScale => widget.pinchZoomOutEnabled
       ? widget.minVideoZoomScale.clamp(
           MediaViewerConstants.minVideoZoomFloor,
@@ -232,12 +228,25 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
     widget.playbackManager.currentFileNotifier.addListener(_onCurrentFileChanged);
     _knownAspectRatio =
         MediaAspectRatioCache.get(widget.container, widget.fileName);
-   _brightnessLevel = ScreenBrightnessBridge.lastKnownLevel;
+    _brightnessLevel = ScreenBrightnessBridge.lastKnownLevel;
     DeviceVolumeBridge.getVolume().then((vol) {
       if (mounted) {
         setState(() => _volumeLevel = vol);
       }
     });
+
+    _zoomAnimationController = AnimationController(
+      vsync: this,
+      duration: MediaViewerConstants.animationDuration,
+    )..addListener(() {
+        if (_zoomAnimation != null) {
+          _isClampingMatrix = true;
+          _videoTransformationController.value = _zoomAnimation!.value;
+          _isClampingMatrix = false;
+        }
+      });
+
+    _videoTransformationController.addListener(_onVideoTransformationChanged);
     _syncBoundController();
     _ensurePosterLoaded();
   }
@@ -458,6 +467,8 @@ Future<void> _ensurePosterLoaded() async {
     _boundController?.removeListener(_onControllerTick);
     widget.playbackManager.activeControllerNotifier.removeListener(_onSharedControllerChanged);
     widget.playbackManager.currentFileNotifier.removeListener(_onCurrentFileChanged);
+    _zoomAnimationController?.dispose();
+    _videoTransformationController.removeListener(_onVideoTransformationChanged);
     _videoTransformationController.dispose();
     super.dispose();
   }
@@ -501,44 +512,146 @@ Future<void> _ensurePosterLoaded() async {
     ..scaleByDouble(scale, scale, 1.0, 1.0);
 }
 
+     bool _isClampingMatrix = false;
+
+  void _onVideoTransformationChanged() {
+    if (_isClampingMatrix || !mounted) return;
+    final vpSize = MediaQuery.of(context).size;
+    if (vpSize.width <= 0 || vpSize.height <= 0) return;
+
+    final matrix = _videoTransformationController.value;
+    final s = _getMatrixScale(matrix);
+    if (s <= 0) return;
+
+    if (s < _effectiveMinZoomScale) {
+      final clampedS = _effectiveMinZoomScale;
+      final dx = vpSize.width * (1.0 - clampedS) / 2.0;
+      final dy = vpSize.height * (1.0 - clampedS) / 2.0;
+      _isClampingMatrix = true;
+      _videoTransformationController.value = Matrix4.identity()
+        ..translateByDouble(dx, dy, 0.0, 1.0)
+        ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+      _isClampingMatrix = false;
+      return;
+    }
+
+    // Constrain momentum flings & pans when zoomed in to lock borders
+    if (s >= 1.0) {
+      final scaledW = vpSize.width * s;
+      final scaledH = vpSize.height * s;
+      final currentTx = matrix.storage[12];
+      final currentTy = matrix.storage[13];
+
+      final double clampedTx = scaledW > vpSize.width
+          ? currentTx.clamp(vpSize.width - scaledW, 0.0)
+          : (vpSize.width - scaledW) / 2.0;
+      final double clampedTy = scaledH > vpSize.height
+          ? currentTy.clamp(vpSize.height - scaledH, 0.0)
+          : (vpSize.height - scaledH) / 2.0;
+
+      if ((currentTx - clampedTx).abs() > 0.001 ||
+          (currentTy - clampedTy).abs() > 0.001) {
+        _isClampingMatrix = true;
+        _videoTransformationController.value = Matrix4.identity()
+          ..translateByDouble(clampedTx, clampedTy, 0.0, 1.0)
+          ..scaleByDouble(s, s, 1.0, 1.0);
+        _isClampingMatrix = false;
+      }
+    }
+  }
+
+  Matrix4 _clampVideoMatrix(Matrix4 matrix, double vw, double vh) {
+    if (vw <= 0 || vh <= 0) return matrix;
+    final s = _getMatrixScale(matrix);
+    if (s <= 0) return matrix;
+    final clampedS = s.clamp(_effectiveMinZoomScale, MediaViewerConstants.maxVideoZoom);
+
+    if (clampedS < 1.0) {
+      final dx = vw * (1.0 - clampedS) / 2.0;
+      final dy = vh * (1.0 - clampedS) / 2.0;
+      return Matrix4.identity()
+        ..translateByDouble(dx, dy, 0.0, 1.0)
+        ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+    }
+
+    final scaledW = vw * s;
+    final scaledH = vh * s;
+    final currentTx = matrix.storage[12];
+    final currentTy = matrix.storage[13];
+
+    final double clampedTx = scaledW > vw
+        ? currentTx.clamp(vw - scaledW, 0.0)
+        : (vw - scaledW) / 2.0;
+    final double clampedTy = scaledH > vh
+        ? currentTy.clamp(vh - scaledH, 0.0)
+        : (vh - scaledH) / 2.0;
+
+    return Matrix4.identity()
+      ..translateByDouble(clampedTx, clampedTy, 0.0, 1.0)
+      ..scaleByDouble(s, s, 1.0, 1.0);
+  }
+
+  void _animateVideoZoomTo(Matrix4 targetMatrix, {required bool toBaseline}) {
+    final controller = _zoomAnimationController;
+    if (controller == null) {
+      _videoTransformationController.value = targetMatrix;
+      return;
+    }
+
+    controller.stop();
+    _zoomAnimation = Matrix4Tween(
+      begin: _videoTransformationController.value,
+      end: targetMatrix,
+    ).animate(
+      CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+    );
+
+    controller.forward(from: 0.0).then((_) {
+      if (mounted) {
+        setState(() {
+          _videoScale = _getMatrixScale(_videoTransformationController.value);
+        });
+        widget.onZoomChanged(toBaseline);
+      }
+    });
+  }
+
   void _handleVideoDoubleTap() {
     if (widget.isAudio) return;
+
+    // When zoom is not default (in or out), double-tap always resets to 1.0x baseline
+    if (_isZoomed) {
+      _animateVideoZoomTo(Matrix4.identity(), toBaseline: true);
+      return;
+    }
+
     final doubleTapDetails = _videoDoubleTapDetails;
     if (doubleTapDetails == null) return;
     final context = _interactiveViewerKey.currentContext;
     if (context == null || !context.mounted) return;
     final box = context.findRenderObject();
     if (box is! RenderBox) return;
-    final double targetScale;
+    final double targetScale = _maxZoomScale;
     final Matrix4 targetMatrix;
-    final bool atBaseline = (_videoScale - _baselineZoomScale).abs() < 0.001;
-    if (atBaseline) {
-      targetScale = _maxZoomScale;
-      if (box.hasSize) {
-        final position = box.globalToLocal(doubleTapDetails.globalPosition);
-        if (position.isFinite) {
-          targetMatrix = _calculateZoomMatrix(
-            localPosition: position,
-            scale: targetScale,
-          );
-        } else {
-          targetMatrix = Matrix4.identity()..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
-        }
+    if (box.hasSize) {
+      final position = box.globalToLocal(doubleTapDetails.globalPosition);
+      if (position.isFinite) {
+        targetMatrix = _calculateZoomMatrix(
+          localPosition: position,
+          scale: targetScale,
+        );
       } else {
         targetMatrix = Matrix4.identity()..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
       }
     } else {
-      // Whether the video was pinched in or out, double-tap always
-      // cleanly resets back to the 1.0x baseline rather than toggling
-      // toward whatever the current pinch-zoom-out floor happens to be.
-      targetScale = _baselineZoomScale;
-      targetMatrix = Matrix4.identity();
+      targetMatrix = Matrix4.identity()..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
     }
-    setState(() {
-      _videoScale = targetScale;
-      _videoTransformationController.value = targetMatrix;
-    });
-    widget.onZoomChanged(true);
+
+    final vpSize = MediaQuery.of(context).size;
+    final clampedMatrix = _clampVideoMatrix(targetMatrix, vpSize.width, vpSize.height);
+
+    widget.onZoomChanged(false);
+    _animateVideoZoomTo(clampedMatrix, toBaseline: false);
   }
 
   void _handleDoubleTapSkip({required bool backwards}) {
@@ -998,6 +1111,12 @@ Widget _buildVideoTexture(NativeVideoController controller) {
                       onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
                       onDoubleTap: () {
                         if (widget.isAudio) return;
+                        // Strict check: if not default zoom, double-tap anywhere on screen resets zoom
+                        if (_isZoomed) {
+                          _handleVideoDoubleTap();
+                          return;
+                        }
+                        // At default zoom, left/right 30% skips; center zooms in
                         final width = constraints.maxWidth;
                         final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
                         if (dx < width * 0.3) {
@@ -1026,33 +1145,69 @@ Widget _buildVideoTexture(NativeVideoController controller) {
           )
         : SizedBox.expand(child: stackContent);
 if (!widget.isAudio && widget.enableZoom) {
-      corePlayerWidget = InteractiveViewer(
+      final vpSize = MediaQuery.of(context).size;
+    corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
         transformationController: _videoTransformationController,
         maxScale: MediaViewerConstants.maxVideoZoom,
         minScale: _effectiveMinZoomScale,
-        boundaryMargin: const EdgeInsets.all(double.infinity),
-        panEnabled: false,
+        interactionEndFrictionCoefficient: 0.0005,
+        boundaryMargin: widget.pinchZoomOutEnabled
+            ? const EdgeInsets.all(double.infinity)
+            : EdgeInsets.zero,
+        panEnabled: _isZoomedIn,
         clipBehavior: Clip.none,
         onInteractionStart: (details) {
           if (details.pointerCount >= 2) {
-            widget.onZoomChanged(false);
+            _zoomAnimationController?.stop();
           }
+          widget.onZoomChanged(false);
         },
         onInteractionUpdate: (details) {
-          final s = _videoTransformationController.value.getMaxScaleOnAxis();
+          final s = _getMatrixScale(_videoTransformationController.value);
           if (s != _videoScale) {
             _videoScale = s;
           }
         },
         onInteractionEnd: (details) {
-          final s = _videoTransformationController.value.getMaxScaleOnAxis();
-          _videoScale = s;
-          widget.onZoomChanged(true);
+          final s = _getMatrixScale(_videoTransformationController.value);
+          final clampedS = s.clamp(_effectiveMinZoomScale, MediaViewerConstants.maxVideoZoom);
+          if (clampedS < 1.0 && vpSize.width > 0 && vpSize.height > 0) {
+            final dx = vpSize.width * (1.0 - clampedS) / 2.0;
+            final dy = vpSize.height * (1.0 - clampedS) / 2.0;
+            _isClampingMatrix = true;
+            _videoTransformationController.value = Matrix4.identity()
+              ..translateByDouble(dx, dy, 0.0, 1.0)
+              ..scaleByDouble(clampedS, clampedS, clampedS, 1.0);
+            _isClampingMatrix = false;
+          }
+          setState(() {
+            _videoScale = _getMatrixScale(_videoTransformationController.value);
+          });
+          widget.onZoomChanged(!_isZoomed);
         },
         child: corePlayerWidget,
       );
     }
+
+    // Outer detector captures double-taps anywhere across the entire viewport
+    // (including the black letterbox bars and out-of-bounds space) to reset zoom.
+    corePlayerWidget = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        if (_isSkipActive || _showLeftIndicator || _showRightIndicator) {
+          return;
+        }
+        widget.onToggleUI(!widget.showUI);
+      },
+      onDoubleTap: () {
+        if (_isZoomed) {
+          _handleVideoDoubleTap();
+        }
+      },
+      child: corePlayerWidget,
+    );
+
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: _onGlobalPointerDown,
@@ -1243,8 +1398,8 @@ if (!widget.isAudio && widget.enableZoom) {
   // whether they'll act on a touch. The claim recognizer asks this when a touch
   // lands, so a strip that wouldn't change anything (inactive video, zoomed in,
   // multi-touch) never blocks the surrounding list or pager from scrolling.
- bool _canStartEdgeSwipe() =>
-      _isActive && !_isZoomedIn && _activeTouchPointers.length <= 1;
+bool _canStartEdgeSwipe() =>
+      _isActive && !_isZoomed && _activeTouchPointers.length <= 1;
 
   Widget _edgeSwipeStrip({
     required void Function(EdgeSwipeClaimRecognizer) onClaimCreated,
@@ -1328,10 +1483,10 @@ if (!widget.isAudio && widget.enableZoom) {
     unawaited(ScreenBrightnessBridge.setBrightness(newLevel));
   }
 
-  void _handleBrightnessDragEnd(DragEndDetails details) {
+ void _handleBrightnessDragEnd(DragEndDetails details) {
     if (_isBrightnessDragging) {
       _isBrightnessDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideBrightnessHudSoon();
     }
     _brightnessDragStartY = null;
@@ -1341,7 +1496,7 @@ if (!widget.isAudio && widget.enableZoom) {
   void _handleBrightnessDragCancel() {
     if (_isBrightnessDragging) {
       _isBrightnessDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideBrightnessHudSoon();
     }
     _brightnessDragStartY = null;
@@ -1397,7 +1552,7 @@ if (!widget.isAudio && widget.enableZoom) {
   void _handleVolumeDragEnd(DragEndDetails details) {
     if (_isVolumeDragging) {
       _isVolumeDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideVolumeHudSoon();
     }
     _volumeDragStartY = null;
@@ -1407,7 +1562,7 @@ if (!widget.isAudio && widget.enableZoom) {
   void _handleVolumeDragCancel() {
     if (_isVolumeDragging) {
       _isVolumeDragging = false;
-      widget.onZoomChanged(true); // Restores scroll physics
+      widget.onZoomChanged(!_isZoomed); // Restores scroll physics only if not zoomed
       _hideVolumeHudSoon();
     }
     _volumeDragStartY = null;

@@ -673,6 +673,26 @@ than take this summary on faith:
   streams directly from the real document instead of blocking on a full
   pull first, so opening a large file for playback/seeking doesn't wait on
   downloading it in full.
+- **Auto-sync (`lib/features/sync/`) keeps its rules and ledger inside the
+  vault, compares each side with its own last-synced state, and never writes
+  a file in place.** Rules live in `/.vaultexplorer/sync_config.json` and the
+  ledger in `/.vaultexplorer/sync_ledger.json` (encrypted at rest; that folder
+  is never synced); a device's SAF/path target for a rule is kept in
+  `AppSecureStorage` under the vault's `vaultSyncId` + rule id. The ledger is
+  JSON, not SQLite: the app has no database dependency and a vault file has no
+  real path SQLite could open. `ThreeWayReconciler` decides per path from
+  (vault, target, ledger baseline); after every transfer the destination's
+  *real* post-write size/mtime is recorded, so storage that restamps mtimes on
+  write (SAF, cryptors) never causes a bounce. `SyncExecutor` copies to
+  `<name>.vexp_tmp` and swaps it in (`name → name.vexp_old`, `tmp → name`,
+  delete old) because a rename onto an occupied name must fail (§2 rule 4);
+  leftovers from an interrupted run are repaired at the next scan. A vault lock
+  reaches the engine through `SyncLockBarrier`, consulted from
+  `VaultLifecycleApi.lockContainer` next to `ActiveRecordingRegistry`; locks
+  that bypass `lockContainer` (force-lock, panic, USB unplug) can't wait, and
+  the engine tolerates the volume vanishing under it. Deletions are opt-in per
+  rule and held back when a listing looks incomplete (unreadable or truncated
+  folders, an unexpectedly empty side, or a mass deletion).
 
 ---
 

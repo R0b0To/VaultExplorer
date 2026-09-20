@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
+import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 
 import '../api/vault_archive_api.dart';
 import '../api/vault_automation_api.dart';
@@ -61,6 +62,7 @@ VaultLifecycleApi vaultLifecycleApi(Ref ref) => VaultLifecycleApi(
   ref.watch(vaultEngineChannelProvider),
   ref.watch(vaultEngineEventsProvider),
   ref.watch(activeRecordingRegistryProvider),
+  ref.watch(syncLockBarrierProvider),
 );
 
 @Riverpod(keepAlive: true)

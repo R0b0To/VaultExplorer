@@ -16,6 +16,7 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
 
 part 'vault_dashboard_controller.g.dart';
 
@@ -358,6 +359,8 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (record != null) {
       ref.read(containerRepositoryProvider).saveOrder(newOrder);
     }
+    // Auto-sync on unlock: returns at once, the sync runs in the background.
+    unawaited(ref.read(syncCoordinatorServiceProvider).onVaultUnlocked(container));
   }
 
   void onVaultForceLocked(int volId) {
@@ -426,6 +429,7 @@ class VaultDashboardController extends _$VaultDashboardController {
     _syncSecureScreen();
     scheduleAutoClose(container);
     ref.read(containerRepositoryProvider).saveOrder(newOrder);
+    unawaited(ref.read(syncCoordinatorServiceProvider).onVaultUnlocked(container));
   }
 
   void onContainerLocked(int volId) {

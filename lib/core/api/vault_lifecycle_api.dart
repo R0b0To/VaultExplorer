@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
+import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 
 import 'vault_engine_events.dart';
 import 'vault_engine_types.dart';
@@ -14,11 +15,13 @@ class VaultLifecycleApi {
   final MethodChannel _channel;
   final VaultEngineEvents _events;
   final ActiveRecordingRegistry? _activeRecordings;
+  final SyncLockBarrier? _syncLockBarrier;
 
   const VaultLifecycleApi(
     this._channel,
     this._events, [
     this._activeRecordings,
+    this._syncLockBarrier,
   ]);
 
   /// Returns the operation's success flag together with the SAF `content://`
@@ -1053,6 +1056,10 @@ class VaultLifecycleApi {
     // ignore: deprecated_member_use_from_same_package
     final activeRecordings = _activeRecordings ?? ActiveRecordingRegistry.instance;
     await activeRecordings.stopIfActive(filePath);
+    // Same idea for auto-sync: cancel it and let it clean up its temp files
+    // and commit its ledger while the container is still mounted. Never
+    // throws and is bounded in time, so it can't block a lock.
+    await _syncLockBarrier?.cancelAndWait(filePath);
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
       {'filePath': filePath},

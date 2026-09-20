@@ -42,7 +42,9 @@ class _Harness {
                                 canClaim: () => claimAllowed,
                               );
                               return recognizer!;
-                            }, (_) {}),
+                            }, (instance) {
+                              instance.onStart = (_) {};
+                            }),
                       },
                       child: Listener(
                         behavior: HitTestBehavior.translucent,

@@ -5,7 +5,9 @@ import 'package:flutter/gestures.dart';
 /// resolving eagerly in the gesture arena before parent scrollables can claim it.
 class EdgeSwipeClaimRecognizer extends VerticalDragGestureRecognizer {
   EdgeSwipeClaimRecognizer({required this.canClaim})
-    : super(supportedDevices: const {PointerDeviceKind.touch});
+    : super(supportedDevices: const {PointerDeviceKind.touch}) {
+    onStart = (_) {};
+  }
 
   final bool Function() canClaim;
 

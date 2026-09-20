@@ -374,9 +374,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         } else {
           _isProgrammaticScrolling = true;
           _listScrollController.jumpTo(target);
-          _isProgrammaticScrolling = false;
-          unawaited(_activateCurrentMedia());
-          _onScrollEnd();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _isProgrammaticScrolling = false;
+              unawaited(_activateCurrentMedia());
+              _onScrollEnd();
+            }
+          });
         }
       }
     } else {
@@ -588,6 +592,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           );
         } else {
           _listScrollController.jumpTo(target);
+          await WidgetsBinding.instance.endOfFrame;
         }
       }
     } else {
@@ -843,7 +848,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
     }
-    if (mounted) setState(() {});
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
     if (_showUI) {
       _startHideTimer();
     }
@@ -2065,8 +2074,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                                 );
                                 if (_playlistController.currentIndex !=
                                     newIndex) {
-                                  _playlistController.updateIndex(newIndex);
-                                  unawaited(_activateCurrentMedia());
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted &&
+                                        !_isProgrammaticScrolling &&
+                                        _playlistController.currentIndex !=
+                                            newIndex) {
+                                      _playlistController.updateIndex(newIndex);
+                                      unawaited(_activateCurrentMedia());
+                                    }
+                                  });
                                 }
                               }
                             } else if (notification is ScrollEndNotification) {

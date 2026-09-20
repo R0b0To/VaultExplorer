@@ -24,17 +24,22 @@ void main() {
         ),
       );
 
-      expect(find.text('A very long file name that exceeds container width.png'), findsOneWidget);
+      expect(
+        find.text('A very long file name that exceeds container width.png'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('ellipsizeMiddle truncates text and caches result', (tester) async {
+    testWidgets('ellipsizeMiddle splits text into ellipsized head and preserved tail', (tester) async {
+      const fileName = 'very_long_photo_filename_that_needs_middle_truncation.jpg';
+
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: SizedBox(
-              width: 80,
+              width: 200,
               child: FileNameLabel(
-                text: 'very_long_photo_filename_that_needs_middle_truncation.jpg',
+                text: fileName,
                 mode: LongFileNameDisplayMode.ellipsizeMiddle,
               ),
             ),
@@ -42,18 +47,22 @@ void main() {
         ),
       );
 
-      // Verify that text contains the ellipsis
       final textWidgets = tester.widgetList<Text>(find.byType(Text));
-      expect(textWidgets.any((t) => t.data?.contains('…') ?? false), isTrue);
 
-      // Re-pumping the same widget should reuse cached truncation without error
+      // Head is rendered with TextOverflow.ellipsis in an Expanded widget
+      expect(textWidgets.any((t) => t.overflow == TextOverflow.ellipsis), isTrue);
+
+      // Tail preserves the file extension
+      expect(textWidgets.any((t) => t.data?.endsWith('.jpg') ?? false), isTrue);
+
+      // Re-pumping the same widget renders cleanly without error
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: SizedBox(
-              width: 80,
+              width: 200,
               child: FileNameLabel(
-                text: 'very_long_photo_filename_that_needs_middle_truncation.jpg',
+                text: fileName,
                 mode: LongFileNameDisplayMode.ellipsizeMiddle,
               ),
             ),
@@ -64,7 +73,7 @@ void main() {
       expect(find.byType(FileNameLabel), findsOneWidget);
     });
 
-    testWidgets('ellipsizeStart truncates text with leading ellipsis', (tester) async {
+    testWidgets('ellipsizeStart truncates text with leading ellipsis and caches result', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -81,6 +90,23 @@ void main() {
 
       final textWidgets = tester.widgetList<Text>(find.byType(Text));
       expect(textWidgets.any((t) => t.data?.startsWith('…') ?? false), isTrue);
+
+      // Re-pumping reuses cached truncation without error
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 80,
+              child: FileNameLabel(
+                text: 'very_long_photo_filename_that_needs_start_truncation.jpg',
+                mode: LongFileNameDisplayMode.ellipsizeStart,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(FileNameLabel), findsOneWidget);
     });
   });
 }

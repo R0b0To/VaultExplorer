@@ -100,9 +100,9 @@ class SoftwareDecodeCursorTest {
     }
 
     @Test
-    fun `a frame past the target counts, e.g. a target before the first frame`() {
-        assertTrue(hasReachedTarget(framePtsUs = 66_000L, targetUs = 0L, toleranceUs = 0L))
-    }
+        fun `a frame past the target counts, eg a target before the first frame`() {
+            assertTrue(hasReachedTarget(framePtsUs = 66_000L, targetUs = 0L, toleranceUs = 0L))
+        }
 
     // ---- what it means for real clips ----
 

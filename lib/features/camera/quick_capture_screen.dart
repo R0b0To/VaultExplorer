@@ -818,7 +818,10 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                   color: Colors.white,
                   size: 28,
                 ),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  if (_phase == _Phase.saving) return;
+                  Navigator.pop(context);
+                },
               ),
             ),
             if (_isRecording || _isCountingDown)

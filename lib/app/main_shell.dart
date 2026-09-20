@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
@@ -166,11 +167,15 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   void _onQuickCaptureRequested() {
     if (!mounted || _handlingQuickCapture) return;
-    _handlingQuickCapture = true;
+    setState(() => _handlingQuickCapture = true);
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const QuickCaptureScreen()))
         .whenComplete(() {
+      if (!mounted) return;
       _handlingQuickCapture = false;
+      // When QuickCaptureScreen finishes (saved, cancelled via X, or backed out),
+      // cleanly finish and remove the isolated QuickCaptureActivity task window.
+      SystemNavigator.pop();
     });
   }
 
@@ -219,12 +224,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // While an incoming share handoff is being presented, keep the underlying
-    // dashboard hidden to avoid a momentary visual flash before the share sheet opens.
-    if (_hideDashboard) {
-      return Scaffold(
-        backgroundColor: cs.surface,
-        body: const SizedBox.expand(),
+   // Keep dashboard hidden if an incoming share or quick capture is active
+    // so the dashboard never flashes on screen.
+    if (_hideDashboard || _handlingQuickCapture) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
       );
     }
 

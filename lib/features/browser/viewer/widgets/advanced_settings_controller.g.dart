@@ -61,7 +61,7 @@ final class AdvancedSettingsControllerProvider
 }
 
 String _$advancedSettingsControllerHash() =>
-    r'1c34d314536d936bb5c45873e35e4cca14e2dddd';
+    r'5be517d3528101343d6d6c637b6c81f2ac848283';
 
 final class AdvancedSettingsControllerFamily extends $Family
     with

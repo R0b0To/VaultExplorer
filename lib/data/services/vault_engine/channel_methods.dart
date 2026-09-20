@@ -205,6 +205,15 @@ abstract final class ChannelMethods {
   static const returnToSharingApp = 'returnToSharingApp';
   static const prepareShareImport = 'prepareShareImport';
 
+  // Quick Capture: Quick Settings tile / pinned shortcut integration
+  // (see QuickCaptureSettingsHandlers.kt, QuickCaptureBridge.kt,
+  // lib/core/api/quick_capture_api.dart). Names match MainActivity.kt's
+  // own ChannelMethods object exactly.
+  static const checkPendingQuickCaptureRequest = 'checkPendingQuickCaptureRequest';
+  static const getQuickCaptureSettings = 'getQuickCaptureSettings';
+  static const setQuickCaptureTileEnabled = 'setQuickCaptureTileEnabled';
+  static const requestPinQuickCaptureShortcut = 'requestPinQuickCaptureShortcut';
+
   // Panic, PanicKit & Emergency Tile integration (see PanicSettingsHandlers.kt,
   // lib/core/api/vault_panic_api.dart). Names match MainActivity.kt's own
   // ChannelMethods object exactly -- this side and the native side are two

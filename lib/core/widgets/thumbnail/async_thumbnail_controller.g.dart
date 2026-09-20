@@ -119,7 +119,7 @@ final class AsyncThumbnailLoaderProvider
 }
 
 String _$asyncThumbnailLoaderHash() =>
-    r'ed3701fb7d9ddbb4fe0fca70f4d1eafabe21212f';
+    r'4e95537c1442aff18a7afc26395477eb84afb5ea';
 
 /// Family-scoped replacement for `_AsyncThumbnailState`'s manual
 /// load/cancel/retry/debounce logic. Family key is (volId, mountedAt,

@@ -15,6 +15,7 @@ import '../api/vault_pdf_api.dart';
 import '../api/vault_repair_api.dart';
 import '../api/vault_split_join_api.dart';
 import '../api/vault_composite_api.dart';
+import '../api/quick_capture_api.dart';
 
 part 'vault_engine_providers.g.dart';
 
@@ -93,3 +94,7 @@ VaultCompositeApi vaultCompositeApi(Ref ref) =>
 @Riverpod(keepAlive: true)
 VaultPanicApi vaultPanicApi(Ref ref) =>
     VaultPanicApi(ref.watch(vaultEngineChannelProvider));
+
+@Riverpod(keepAlive: true)
+QuickCaptureApi quickCaptureApi(Ref ref) =>
+    QuickCaptureApi(ref.watch(vaultEngineChannelProvider));

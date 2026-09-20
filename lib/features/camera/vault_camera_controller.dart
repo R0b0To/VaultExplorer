@@ -291,6 +291,28 @@ class VaultCameraController {
     return (success: ok, error: error);
   }
 
+  /// Same as [takePhoto], but the JPEG is encrypted under [sessionToken]'s
+  /// ephemeral key into [scratchpadPath] instead of a mounted vault --
+  /// used by the Quick Capture entry point, before any vault has been
+  /// chosen. See QuickCaptureApi.openSession for how the pair is created.
+  Future<({bool success, String? error})> takePhotoToScratchpad({
+    required String sessionToken,
+    required String scratchpadPath,
+  }) async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('takePhotoToScratchpad', {
+      'sessionId': sId,
+      'sessionToken': sessionToken,
+      'scratchpadPath': scratchpadPath,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final error = res?['error'] as String?;
+    return (success: ok, error: error);
+  }
+
   Future<({bool success, String? error})> startVideoRecording({
     required int volId,
     required String virtualPath,
@@ -308,6 +330,33 @@ class VaultCameraController {
     final error = res?['error'] as String?;
     return (success: ok, error: error);
   }
+
+  /// Same as [startVideoRecording], but scratchpad-targeted -- see
+  /// [takePhotoToScratchpad]'s doc comment. [stopVideoRecording] needs
+  /// no scratchpad-specific variant: the native side already tracks
+  /// whichever destination [startRecording]/[startRecordingToScratchpad]
+  /// used and drains it the same way either way.
+  Future<({bool success, String? error})> startVideoRecordingToScratchpad({
+    required String sessionToken,
+    required String scratchpadPath,
+  }) async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+      'startVideoRecordingToScratchpad',
+      {
+        'sessionId': sId,
+        'sessionToken': sessionToken,
+        'scratchpadPath': scratchpadPath,
+      },
+    );
+
+    final ok = res?['success'] as bool? ?? false;
+    final error = res?['error'] as String?;
+    return (success: ok, error: error);
+  }
+
 
   Future<({bool success, int durationMs, String? error})> stopVideoRecording() async {
     final sId = _sessionId;

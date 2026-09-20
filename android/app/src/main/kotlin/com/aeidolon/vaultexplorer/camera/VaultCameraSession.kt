@@ -21,6 +21,8 @@ import android.util.Range
 import android.util.Size
 import android.view.Surface
 import io.flutter.view.TextureRegistry
+import java.io.File
+import javax.crypto.SecretKey
 import kotlin.math.abs
 import com.aeidolon.vaultexplorer.VeLog
 
@@ -103,12 +105,16 @@ class VaultCameraSession(
     private var currentPreviewHeight: Int = 1080
 
     private var isRecording = false
-    private var recordingChunkWriter: VaultChunkWriter? = null
+    private var recordingChunkWriter: ChunkSink? = null
 
     private var pendingOpenResult: ((Boolean, String?) -> Unit)? = null
     private var pendingCloseCallback: (() -> Unit)? = null
     private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
-    private var pendingPhotoTarget: Pair<Int, String>? = null
+    // Set by takePhoto()/takePhotoToScratchpad() right before the capture
+    // request is submitted; consumed by onJpegAvailable() once the JPEG
+    // bytes actually arrive -- a ChunkSink rather than a (volId, path)
+    // pair so either capture destination flows through the same path.
+    private var pendingPhotoWriter: ChunkSink? = null
 
     val currentCameraId: String get() = activeCameraId
     val currentZoomMin: Float get() = zoomMinCurrent
@@ -505,6 +511,23 @@ class VaultCameraSession(
     // ── Photo capture ───────────────────────────────────────────────────
 
     fun takePhoto(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
+        capturePhotoInternal(VaultChunkWriter(volId, virtualPath), callback)
+    }
+
+    /** Same capture path as [takePhoto], but the JPEG bytes are encrypted
+     *  under an ephemeral key into [scratchpadFile] instead of being
+     *  written into a mounted vault -- see docs/architecture.md,
+     *  "Capture-First + Encrypted Scratchpad". Used by the Quick Capture
+     *  entry point, which runs before any vault has been chosen. */
+    fun takePhotoToScratchpad(
+        scratchpadFile: File,
+        key: SecretKey,
+        callback: (Boolean, String?) -> Unit,
+    ) {
+        capturePhotoInternal(ScratchpadChunkWriter(scratchpadFile, key), callback)
+    }
+
+    private fun capturePhotoInternal(writer: ChunkSink, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
             val device = cameraDevice
             val session = captureSession
@@ -514,7 +537,7 @@ class VaultCameraSession(
                 return@runOnCameraThread
             }
             pendingPhotoCallback = callback
-            pendingPhotoTarget = volId to virtualPath
+            pendingPhotoWriter = writer
             try {
                 val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
                 builder.addTarget(reader.surface)
@@ -523,7 +546,7 @@ class VaultCameraSession(
                 session.capture(builder.build(), null, bgHandler)
             } catch (e: Exception) {
                 pendingPhotoCallback = null
-                pendingPhotoTarget = null
+                pendingPhotoWriter = null
                 callback(false, e.message)
             }
         }
@@ -539,17 +562,15 @@ class VaultCameraSession(
             val buffer = image.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
-            val target = pendingPhotoTarget
+            val writer = pendingPhotoWriter
             val cb = pendingPhotoCallback
-            pendingPhotoTarget = null
+            pendingPhotoWriter = null
             pendingPhotoCallback = null
-            if (target == null) return
-            val (volId, virtualPath) = target
-            val writer = VaultChunkWriter(volId, virtualPath)
+            if (writer == null) return
             val memFile = MemFile()
-            val ok = memFile.writeAndDrain(bytes, writer)
+            val ok = memFile.writeAndDrain(bytes, writer) && writer.finish()
             memFile.close()
-            cb?.invoke(ok, if (ok) null else "vault write failed")
+            cb?.invoke(ok, if (ok) null else "write failed")
         } finally {
             image.close()
         }
@@ -558,6 +579,24 @@ class VaultCameraSession(
     // ── Video recording ─────────────────────────────────────────────────
 
     fun startRecording(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
+        startRecordingInternal(VaultChunkWriter(volId, virtualPath), callback)
+    }
+
+    /** Same recording path as [startRecording], but the finished clip is
+     *  encrypted under an ephemeral key into [scratchpadFile] instead of
+     *  being written into a mounted vault -- see [takePhotoToScratchpad]'s
+     *  doc comment. [stopRecording] needs no scratchpad-specific variant:
+     *  it already drains whatever [ChunkSink] was stored here and calls
+     *  its [ChunkSink.finish]. */
+    fun startRecordingToScratchpad(
+        scratchpadFile: File,
+        key: SecretKey,
+        callback: (Boolean, String?) -> Unit,
+    ) {
+        startRecordingInternal(ScratchpadChunkWriter(scratchpadFile, key), callback)
+    }
+
+    private fun startRecordingInternal(writer: ChunkSink, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
             val recorder = videoRecorder
             if (recorder == null || isRecording) {
@@ -568,7 +607,7 @@ class VaultCameraSession(
             try {
                 VeLog.d(TAG) { "startRecording" }
                 recorder.beginRecording()
-                recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
+                recordingChunkWriter = writer
                 isRecording = true
                 updateRepeatingRequest()
                 callback(true, null)

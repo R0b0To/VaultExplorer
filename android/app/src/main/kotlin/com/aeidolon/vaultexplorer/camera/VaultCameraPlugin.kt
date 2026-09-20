@@ -199,6 +199,17 @@ class VaultCameraPlugin(
                         mainHandler.post { result.success(mapOf("success" to ok, "error" to error)) }
                     }
                 }
+                "takePhotoToScratchpad" -> withSession(call, result) { session, args ->
+                    val scratchpadPath = args["scratchpadPath"] as? String
+                        ?: return@withSession result.error("bad_args", "scratchpadPath required", null)
+                    val token = args["sessionToken"] as? String
+                        ?: return@withSession result.error("bad_args", "sessionToken required", null)
+                    val key = ScratchpadKeyStore.get(token)
+                        ?: return@withSession result.error("no_such_session", "Scratchpad session expired", null)
+                    session.takePhotoToScratchpad(java.io.File(scratchpadPath), key) { ok, error ->
+                        mainHandler.post { result.success(mapOf("success" to ok, "error" to error)) }
+                    }
+                }
                 "startVideoRecording" -> withSession(call, result) { session, args ->
                     val volId = (args["volId"] as? Number)?.toInt() ?: return@withSession result.error("bad_args", "volId required", null)
                     val path = args["virtualPath"] as? String ?: return@withSession result.error("bad_args", "virtualPath required", null)
@@ -206,6 +217,21 @@ class VaultCameraPlugin(
                     session.startRecording(volId, path) { ok, error ->
                         mainHandler.post {
                             VeLog.d(TAG) { "startVideoRecording result: ok=$ok error=$error" }
+                            result.success(mapOf("success" to ok, "error" to error))
+                        }
+                    }
+                }
+                "startVideoRecordingToScratchpad" -> withSession(call, result) { session, args ->
+                    val scratchpadPath = args["scratchpadPath"] as? String
+                        ?: return@withSession result.error("bad_args", "scratchpadPath required", null)
+                    val token = args["sessionToken"] as? String
+                        ?: return@withSession result.error("bad_args", "sessionToken required", null)
+                    val key = ScratchpadKeyStore.get(token)
+                        ?: return@withSession result.error("no_such_session", "Scratchpad session expired", null)
+                    VeLog.d(TAG) { "startVideoRecordingToScratchpad" }
+                    session.startRecordingToScratchpad(java.io.File(scratchpadPath), key) { ok, error ->
+                        mainHandler.post {
+                            VeLog.d(TAG) { "startVideoRecordingToScratchpad result: ok=$ok error=$error" }
                             result.success(mapOf("success" to ok, "error" to error))
                         }
                     }

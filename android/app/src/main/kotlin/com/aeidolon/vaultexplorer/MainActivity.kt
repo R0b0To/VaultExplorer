@@ -61,6 +61,9 @@ import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
 import com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers
 import com.aeidolon.vaultexplorer.handlers.PanicSettingsHandlers
+import com.aeidolon.vaultexplorer.handlers.QuickCaptureSettingsHandlers
+import com.aeidolon.vaultexplorer.bridge.QuickCaptureBridge
+import com.aeidolon.vaultexplorer.quickcapture.QuickCaptureShortcuts
 import com.aeidolon.vaultexplorer.panic.PanicHooks
 import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
@@ -253,6 +256,12 @@ private object ChannelMethods {
     const val RETURN_TO_SHARING_APP = "returnToSharingApp"
     const val PREPARE_SHARE_IMPORT = "prepareShareImport"
 
+    // Quick Capture (Quick Settings tile / pinned shortcut) integration
+    const val CHECK_PENDING_QUICK_CAPTURE_REQUEST = "checkPendingQuickCaptureRequest"
+    const val GET_QUICK_CAPTURE_SETTINGS = "getQuickCaptureSettings"
+    const val SET_QUICK_CAPTURE_TILE_ENABLED = "setQuickCaptureTileEnabled"
+    const val REQUEST_PIN_QUICK_CAPTURE_SHORTCUT = "requestPinQuickCaptureShortcut"
+
     // Panic, PanicKit & Emergency Tile integration
     const val GET_PANIC_SETTINGS = "getPanicSettings"
     const val SET_PANIC_TIER = "setPanicTier"
@@ -307,6 +316,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
+    private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
     private val privacyCurtain = PrivacyCurtain(this)
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
@@ -340,6 +350,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
      private val panicSettingsHandlers = PanicSettingsHandlers(this, ioExecutor)
+    private val quickCaptureSettingsHandlers = QuickCaptureSettingsHandlers(this)
     internal val safStorageManager by lazy { com.aeidolon.vaultexplorer.saf.SafStorageManager(this) }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -352,7 +363,9 @@ open class MainActivity : FlutterFragmentActivity() {
         privacyCurtain.install()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
+            com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin.sweepOrphanedScratchpads(applicationContext)
             SecureFileWipe.sweepOrphanedFiles(cacheDir, listOf("thumb_", "export_"))
+            QuickCaptureShortcuts.refreshDynamicShortcut(applicationContext)
         }
 
         // Phase 4: let a panic trigger arriving with no Activity currently
@@ -443,6 +456,8 @@ open class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        quickCaptureScratchpadPlugin?.dispose()
+        quickCaptureScratchpadPlugin = null
         nativePlayerManager.release()
 
          if (this !is VaultShareActivity) {
@@ -549,6 +564,7 @@ open class MainActivity : FlutterFragmentActivity() {
         resizeExecutorPools()
         nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
+        quickCaptureScratchpadPlugin = com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
@@ -733,6 +749,13 @@ open class MainActivity : FlutterFragmentActivity() {
         } else {
             IncomingShareBridge.channel = null
             LocalIncomingShareBridge.channel = null
+        }
+
+        // ONLY VaultQuickCaptureActivity should receive Quick Capture pushes
+        if (this is VaultQuickCaptureActivity) {
+            QuickCaptureBridge.channel = channel
+        } else {
+            QuickCaptureBridge.channel = null
         }
         disguiseChannel.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -1139,6 +1162,14 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.IS_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleIsShareTargetEnabled(call, result)
                 ChannelMethods.CHECK_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCheckPendingShareRequest(call, result)
                 ChannelMethods.CANCEL_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCancelPendingShareRequest(call, result)
+                ChannelMethods.CHECK_PENDING_QUICK_CAPTURE_REQUEST ->
+                    quickCaptureSettingsHandlers.handleCheckPendingQuickCaptureRequest(call, result)
+                ChannelMethods.GET_QUICK_CAPTURE_SETTINGS ->
+                    quickCaptureSettingsHandlers.handleGetQuickCaptureSettings(call, result)
+                ChannelMethods.SET_QUICK_CAPTURE_TILE_ENABLED ->
+                    quickCaptureSettingsHandlers.handleSetQuickCaptureTileEnabled(call, result)
+                ChannelMethods.REQUEST_PIN_QUICK_CAPTURE_SHORTCUT ->
+                    quickCaptureSettingsHandlers.handleRequestPinQuickCaptureShortcut(call, result)
                 ChannelMethods.RETURN_TO_SHARING_APP -> shareIntentHandlers.handleReturnToSharingApp(call, result)
                 ChannelMethods.PREPARE_SHARE_IMPORT -> importExportHandlers.handlePrepareShareImport(call, result)
                 ChannelMethods.GET_PANIC_SETTINGS -> panicSettingsHandlers.handleGetPanicSettings(call, result)

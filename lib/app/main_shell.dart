@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
+import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
 class MainShell extends ConsumerStatefulWidget {
@@ -50,6 +51,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   IncomingShareRequest? _lastHandledShareRequest;
   final DateTime _shellCreatedAt = DateTime.now();
 
+  // Same narrow cold-start race as the share request above, but Quick
+  // Capture has no payload/route-tracking to deduplicate against -- a
+  // plain in-flight flag is enough since there's only ever one
+  // QuickCaptureScreen route to push.
+  bool _handlingQuickCapture = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,8 +70,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _checkPendingShareOnStart();
+      _checkPendingQuickCaptureOnStart();
     });
     _vaultEngineEvents.addIncomingShareRequestListener(_onIncomingShareRequest);
+    _vaultEngineEvents.addQuickCaptureRequestedListener(_onQuickCaptureRequested);
   }
 
   Future<void> _checkPendingShareOnStart() async {
@@ -147,10 +156,29 @@ class _MainShellState extends ConsumerState<MainShell> {
     });
   }
 
+  Future<void> _checkPendingQuickCaptureOnStart() async {
+    final pending = await ref
+        .read(quickCaptureApiProvider)
+        .checkPendingQuickCaptureRequest();
+    if (!pending || !mounted) return;
+    _onQuickCaptureRequested();
+  }
+
+  void _onQuickCaptureRequested() {
+    if (!mounted || _handlingQuickCapture) return;
+    _handlingQuickCapture = true;
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const QuickCaptureScreen()))
+        .whenComplete(() {
+      _handlingQuickCapture = false;
+    });
+  }
+
   @override
   void dispose() {
     _mountedNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(_onIncomingShareRequest);
+    _vaultEngineEvents.removeQuickCaptureRequestedListener(_onQuickCaptureRequested);
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
         // Safe: calling the cached service directly without using `ref`

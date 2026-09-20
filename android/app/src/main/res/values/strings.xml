@@ -34,5 +34,7 @@
     <string name="camera_recording_stop_action_decoy">Close</string>
 
     <string name="panic_tile_label">Panic Purge</string>
+    <string name="quick_capture_tile_label">Quick Capture</string>
+    <string name="quick_capture_shortcut_label">Quick Capture</string>
     <string name="panic_tile_active_description">Emergency Purge Active</string>
 </resources>

@@ -114,6 +114,19 @@ class VaultEngineEvents {
   void removePanicSessionPurgedListener(void Function() listener) =>
       _panicSessionPurgedListeners.remove(listener);
 
+  // Quick Capture: fired from QuickCaptureBridge.kt when the person taps
+  // the Quick Settings tile or the pinned shortcut while Dart's engine is
+  // already alive (VaultQuickCaptureActivity.onCreate/onNewIntent). No
+  // payload -- MainShell reacts by pushing QuickCaptureScreen; a
+  // cold-started request instead goes through
+  // QuickCaptureApi.checkPendingQuickCaptureRequest at startup, since
+  // this listener isn't registered yet for that case.
+  final List<void Function()> _quickCaptureRequestedListeners = [];
+  void addQuickCaptureRequestedListener(void Function() listener) =>
+      _quickCaptureRequestedListeners.add(listener);
+  void removeQuickCaptureRequestedListener(void Function() listener) =>
+      _quickCaptureRequestedListeners.remove(listener);
+
   final List<void Function()> _panicCredentialsPurgedListeners = [];
   void addPanicCredentialsPurgedListener(void Function() listener) =>
       _panicCredentialsPurgedListeners.add(listener);
@@ -316,6 +329,15 @@ class VaultEngineEvents {
           '${_panicSessionPurgedListeners.length} listener(s)',
         );
         for (final listener in List.of(_panicSessionPurgedListeners)) {
+          listener();
+        }
+      } else if (call.method == 'onQuickCaptureRequested') {
+        VeLog.i(
+          _kLogTag,
+          'native onQuickCaptureRequested received, notifying '
+          '${_quickCaptureRequestedListeners.length} listener(s)',
+        );
+        for (final listener in List.of(_quickCaptureRequestedListeners)) {
           listener();
         }
       } else if (call.method == 'onPanicCredentialsPurged') {

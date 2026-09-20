@@ -15,10 +15,10 @@ import com.aeidolon.vaultexplorer.VeLog
 class VaultChunkWriter(
     private val volId: Int,
     private val virtualPath: String
-) {
+) : ChunkSink {
     private var currentOffset: Long = 0L
 
-    fun write(data: ByteArray): Boolean {
+    override fun write(data: ByteArray): Boolean {
         if (data.isEmpty()) return true
         val ok = ContainerFileSystem.writeFileChunk(volId, virtualPath, currentOffset, data)
         if (ok) {
@@ -35,7 +35,7 @@ class VaultChunkWriter(
 }
 
 class MemFile {
-    fun writeAndDrain(bytes: ByteArray, writer: VaultChunkWriter): Boolean {
+    fun writeAndDrain(bytes: ByteArray, writer: ChunkSink): Boolean {
         val chunkSize = 64 * 1024
         var written = 0
         while (written < bytes.size) {
@@ -234,7 +234,7 @@ class VaultVideoRecorder(
         return RecordingResult(duration)
     }
 
-    fun writeTo(writer: VaultChunkWriter): Boolean {
+    fun writeTo(writer: ChunkSink): Boolean {
         val temp = tempFile ?: return false
         if (!temp.exists() || temp.length() == 0L) {
             VeLog.e(TAG) { "writeTo: temp file missing or empty (exists=${temp.exists()}, len=${temp.length()})" }
@@ -255,7 +255,10 @@ class VaultVideoRecorder(
                     }
                 }
             }
-            return true
+            // finish() is a no-op for VaultChunkWriter (nothing to
+            // finalize) and flushes the GCM auth tag for
+            // ScratchpadChunkWriter -- see ChunkSink's doc comment.
+            return writer.finish()
         } catch (e: Exception) {
             VeLog.e("VaultVideoRecorder", e) { "writeTo failed" }
             return false

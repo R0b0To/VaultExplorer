@@ -661,3 +661,45 @@ final class VaultPanicApiProvider
 }
 
 String _$vaultPanicApiHash() => r'a45c08092d7a7cebbe86e02fa5255275b0a07101';
+
+@ProviderFor(quickCaptureApi)
+final quickCaptureApiProvider = QuickCaptureApiProvider._();
+
+final class QuickCaptureApiProvider
+    extends
+        $FunctionalProvider<QuickCaptureApi, QuickCaptureApi, QuickCaptureApi>
+    with $Provider<QuickCaptureApi> {
+  QuickCaptureApiProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'quickCaptureApiProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$quickCaptureApiHash();
+
+  @$internal
+  @override
+  $ProviderElement<QuickCaptureApi> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  QuickCaptureApi create(Ref ref) {
+    return quickCaptureApi(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(QuickCaptureApi value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<QuickCaptureApi>(value),
+    );
+  }
+}
+
+String _$quickCaptureApiHash() => r'34ae813818b3ea78c17e5440f65400852de8f29b';

@@ -575,7 +575,11 @@ class UnlockController extends _$UnlockController {
         return;
       }
 
-      final picked = await lifecycle.pickCryptoFiles();
+      // requestSplitFolderAccess: if the user picks a split part (.001 /
+      // .part1) native re-opens the picker as a folder picker so the other
+      // parts become reachable -- see pickCryptoFiles's doc comment.
+      final picked =
+          await lifecycle.pickCryptoFiles(requestSplitFolderAccess: true);
       if (picked.isEmpty) return;
 
       if (picked.length > 1) {

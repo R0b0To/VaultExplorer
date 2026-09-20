@@ -448,9 +448,27 @@ class VaultLifecycleApi {
   /// channel method so the two pickers' intents can diverge later (e.g.
   /// filtering decrypt's picker to a specific extension) without one
   /// affecting the other.
-  Future<List<KeyfileRef>> pickCryptoFiles() async {
+  ///
+  /// The unlock sheet also uses this as its container picker (so composite
+  /// containers can be multi-selected). Set [requestSplitFolderAccess] there:
+  /// when exactly one document comes back and it looks like a split part
+  /// (`.001`/`.part1`/...) that native can't reach the siblings of -- i.e. it
+  /// isn't a raw local file and no folder grant already covers it -- the
+  /// native side re-opens the system picker as a folder picker so the user
+  /// can grant the parent folder, exactly like [pickContainer] does. Without
+  /// that grant a split container can't be mounted, because a single-document
+  /// pick never exposes the other parts. The extra prompt is invisible to
+  /// Dart (this future still completes once, with the original pick), and is
+  /// off by default so the crypto tool, hash verifier and composite builder
+  /// never ask for a folder they have no use for.
+  Future<List<KeyfileRef>> pickCryptoFiles({
+    bool requestSplitFolderAccess = false,
+  }) async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.pickCryptoFiles,
+      requestSplitFolderAccess
+          ? <String, Object?>{'requestSplitFolderAccess': true}
+          : null,
     );
     if (raw == null) return [];
     return raw

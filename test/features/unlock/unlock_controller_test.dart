@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/unlock/unlock_controller.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations_en.dart';
 
@@ -220,6 +221,64 @@ void main() {
       expect(state.compositeCarrierUris, ['file:///carrier.jpg']);
       expect(state.containerFormat, 'composite');
       sub.close();
+    });
+
+    // Regression: pickFile used to go through pickCryptoFiles() without the
+    // native side ever re-opening the picker as a folder picker for split
+    // parts, so a split container picked without folder access could never
+    // find its sibling parts. The opt-in flag is what makes native do that.
+    test('pickFile asks native to request split-part folder access', () async {
+      Object? pickArgs;
+      var pickCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        switch (call.method) {
+          case 'pickCryptoFiles':
+            pickCalls++;
+            pickArgs = call.arguments;
+            return [
+              {'uri': 'content://x/vault.001', 'displayName': 'vault.001'},
+            ];
+          case 'hasAllFilesAccess':
+            return true;
+          default:
+            return null;
+        }
+      });
+
+      const emptyParams = UnlockParams();
+      final sub = container.listen(unlockControllerProvider(emptyParams), (_, __) {});
+      final controller = container.read(unlockControllerProvider(emptyParams).notifier);
+      await controller.pickFile(AppLocalizationsEn());
+
+      expect(pickCalls, 1);
+      expect(pickArgs, isA<Map>());
+      expect((pickArgs as Map)['requestSplitFolderAccess'], isTrue);
+
+      // The result is still just the one picked file, untouched by the
+      // (native-only) follow-up prompt.
+      final state = container.read(unlockControllerProvider(emptyParams));
+      expect(state.selectedUri, 'content://x/vault.001');
+      expect(state.selectedName, 'vault.001');
+      expect(state.containerFormat, 'container');
+      sub.close();
+    });
+
+    test('pickCryptoFiles does not request folder access unless asked to', () async {
+      Object? pickArgs = 'unset';
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'pickCryptoFiles') {
+          pickArgs = call.arguments;
+          return <Object?>[];
+        }
+        return null;
+      });
+
+      // The hash verifier, crypto tool and composite builder all call it
+      // with no arguments and must never get a surprise folder prompt.
+      await container.read(vaultLifecycleApiProvider).pickCryptoFiles();
+      expect(pickArgs, isNull);
     });
   });
 }

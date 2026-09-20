@@ -80,6 +80,7 @@ import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
@@ -868,6 +869,34 @@ void _showItemActionsSheet(RawEntry entry) {
       onToggleDocProvider: entry.isDir && !widget.container.isLocalStorage
           ? () => _showFolderDocumentProviderSheet(entry)
           : null,
+      // Auto-sync is configured per vault folder: not for device storage
+      // browsers, and not inside an archive.
+      onSyncSettings:
+          entry.isDir && !widget.container.isLocalStorage && _archiveContext == null
+          ? () => _showSyncSettings(entry)
+          : null,
+    );
+  }
+
+  void _showSyncSettings(RawEntry entry) {
+    unawaited(
+      SyncRuleEditorSheet.show(
+        context,
+        vault: widget.container,
+        folderPath: _fullPathOf(entry),
+        folderName: entry.name,
+      ),
+    );
+  }
+
+  void _showRootSyncSettings() {
+    unawaited(
+      SyncRuleEditorSheet.show(
+        context,
+        vault: widget.container,
+        folderPath: '',
+        folderName: widget.container.displayName,
+      ),
     );
   }
   Future<void> _refreshMountedDocProviderFolders() =>
@@ -3222,6 +3251,8 @@ Future<void> _extractSelectedArchive() async {
         onShowOpenWithDialog: _showOpenWithDialog,
         onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
         onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
+        onSyncSettings: _showSyncSettings,
+        onSyncRoot: _showRootSyncSettings,
         onEditImage: _editImage,
         onSettingsClosed: _loadToolbarConfig,
         isFiltered: isFiltered,

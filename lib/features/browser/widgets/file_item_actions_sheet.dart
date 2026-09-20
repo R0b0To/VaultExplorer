@@ -45,6 +45,7 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onShare;
   final VoidCallback? onEditImage;
   final VoidCallback? onToggleDocProvider;
+  final VoidCallback? onSyncSettings;
 
   const FileItemActionsSheet({
     super.key,
@@ -71,6 +72,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onShare,
     this.onEditImage,
     this.onToggleDocProvider,
+    this.onSyncSettings,
   });
 
   static Future<void> show(
@@ -98,6 +100,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onShare,
     VoidCallback? onEditImage,
     VoidCallback? onToggleDocProvider,
+    VoidCallback? onSyncSettings,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -130,6 +133,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onShare: onShare,
         onEditImage: onEditImage,
         onToggleDocProvider: onToggleDocProvider,
+        onSyncSettings: onSyncSettings,
       ),
     );
   }
@@ -366,6 +370,15 @@ class FileItemActionsSheet extends ConsumerWidget {
                         onTap: () {
                           Navigator.pop(context);
                           onToggleDocProvider!();
+                        },
+                      ),
+                    if (onSyncSettings != null)
+                      _ActionTile(
+                        icon: Icons.sync_rounded,
+                        label: context.l10n.autoSyncMenuAction,
+                        onTap: () {
+                          Navigator.pop(context);
+                          onSyncSettings!();
                         },
                       ),
                     const SizedBox(height: 10),

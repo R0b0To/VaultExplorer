@@ -116,6 +116,11 @@ class SyncConfigStore {
 /// vault's own config is only the portable default; a binding, when
 /// present, wins.
 ///
+/// The folder *within* the target ([subPath]) is part of the binding too,
+/// not just the tree: two devices that picked different folders for the
+/// same rule must not rewrite each other's choice through the shared,
+/// in-vault config.
+///
 /// The persistable-permission grant itself is taken natively when the
 /// folder is picked (`VaultPickerHandlers.pickExtractFolder` calls
 /// `takePersistableUriPermission` with read+write), so nothing more is
@@ -124,10 +129,19 @@ class SyncConfigStore {
 class SyncTargetBinding {
   final String uri;
   final String displayName;
+  final String subPath;
 
-  const SyncTargetBinding({required this.uri, this.displayName = ''});
+  const SyncTargetBinding({
+    required this.uri,
+    this.displayName = '',
+    this.subPath = '',
+  });
 
-  Map<String, dynamic> toJson() => {'uri': uri, 'displayName': displayName};
+  Map<String, dynamic> toJson() => {
+    'uri': uri,
+    'displayName': displayName,
+    if (subPath.isNotEmpty) 'subPath': subPath,
+  };
 
   static SyncTargetBinding? tryParse(String? source) {
     if (source == null || source.isEmpty) return null;
@@ -137,7 +151,12 @@ class SyncTargetBinding {
       final uri = json['uri'];
       if (uri is! String || uri.isEmpty) return null;
       final name = json['displayName'];
-      return SyncTargetBinding(uri: uri, displayName: name is String ? name : '');
+      final sub = json['subPath'];
+      return SyncTargetBinding(
+        uri: uri,
+        displayName: name is String ? name : '',
+        subPath: sub is String ? sub : '',
+      );
     } catch (_) {
       return null;
     }

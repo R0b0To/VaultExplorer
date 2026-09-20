@@ -194,4 +194,14 @@ class SyncRunReport {
   /// the run was neither cancelled nor partial.
   bool get completedCleanly =>
       !cancelled && failed == 0 && !incompleteScan && !deletionsBlocked;
+
+  /// Whether the run changed anything (files, or what the ledger knows).
+  /// A run that only confirmed everything is in step is not "work" -- live
+  /// watching runs often, and shouldn't rewrite the config each time.
+  bool get didWork => copied + deleted + conflictsKeptBoth + adopted > 0;
+
+  /// Something the user may want to look at: a file failed, part of a side
+  /// couldn't be read, or deletions were held back as suspicious.
+  bool get needsAttention =>
+      !cancelled && (failed > 0 || incompleteScan || deletionsBlocked);
 }

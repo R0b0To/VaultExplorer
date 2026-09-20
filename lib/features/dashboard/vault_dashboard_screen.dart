@@ -35,6 +35,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sh
 import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
+import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 
@@ -762,9 +763,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             onHorizontalDragCancel: () {
               _drawerDragDistance = 0.0;
             },
-            child: Stack(
+            child: Column(
               children: [
-                _buildBody(displayItems, state),
+                // Auto-sync progress / attention; takes no space when idle.
+                const SyncStatusBanner(),
+                Expanded(child: _buildBody(displayItems, state)),
               ],
             ),
           ),

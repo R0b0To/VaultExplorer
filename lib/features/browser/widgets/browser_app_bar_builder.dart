@@ -69,6 +69,8 @@ PreferredSizeWidget buildBrowserAppBar(
   onShowOpenWithDialog,
   required Future<void> Function(RawEntry entry) onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
+  void Function(RawEntry entry)? onSyncSettings,
+  VoidCallback? onSyncRoot,
   required Future<void> Function(String fileName, String fullPath) onEditImage,
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
@@ -206,6 +208,12 @@ PreferredSizeWidget buildBrowserAppBar(
       await onEditImage(entry.name, path);
     }
 
+    void doSyncSettings() {
+      final entry = selectedItems.first;
+      onExitSelectionMode();
+      onSyncSettings?.call(entry);
+    }
+
     if (!isLandscape) {
       return SelectionAppBar(
         selectedCount: selectedItems.length,
@@ -243,6 +251,7 @@ PreferredSizeWidget buildBrowserAppBar(
         showShareOption: showShareOption,
         onShare: onShare,
         onToggleDocumentProvider: doToggleDocProvider,
+        onSyncSettings: doSyncSettings,
         onFileInfo: doShowFileInfo,
         showEditImageOption: showEditImageOption,
         onEditImage: doEditImage,
@@ -280,6 +289,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showShareOption: showShareOption,
       onShare: onShare,
       onToggleDocumentProvider: doToggleDocProvider,
+      onSyncSettings: doSyncSettings,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),
       onBookmark: () => onToggleBookmark(bookmark: true),
@@ -538,6 +548,15 @@ PreferredSizeWidget buildBrowserAppBar(
     ),
     actions: [
       const AppBarTransferButton(),
+      if (!container.isLocalStorage &&
+          !isInsideArchive &&
+          pathStack.length <= 1 &&
+          onSyncRoot != null)
+        IconButton(
+          icon: const Icon(Icons.sync_rounded),
+          tooltip: context.l10n.autoSyncMenuAction,
+          onPressed: onSyncRoot,
+        ),
       if (isLandscape && showActionBar) ...[
         ...toolbarConfig.visible
             .where((action) => actionBuilders.containsKey(action))

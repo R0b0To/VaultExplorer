@@ -692,7 +692,17 @@ than take this summary on faith:
   that bypass `lockContainer` (force-lock, panic, USB unplug) can't wait, and
   the engine tolerates the volume vanishing under it. Deletions are opt-in per
   rule and held back when a listing looks incomplete (unreadable or truncated
-  folders, an unexpectedly empty side, or a mass deletion).
+  folders, an unexpectedly empty side, or a mass deletion). "Keep in sync while
+  unlocked" (`live_watch_service.dart`, `rule_watcher.dart`) is a debounced
+  trigger plus a poll: there is no native change event for vault content, so the
+  vault side is signalled by finished in-app file operations and device folders
+  by `Directory.watch`, but the poll -- whose interval grows with the cost of the
+  last run -- is what guarantees the two sides converge. A run that finds
+  nothing to do is a scan and no writes, so a spurious trigger can't loop. Rules
+  are edited per vault folder from that folder's action sheet
+  (`sync_rule_editor_sheet.dart`); a run is only shown in the dashboard banner and
+  the keep-alive notification once it has files to transfer, and the notification
+  text is counts-only because Mask Mode shows it under the disguised identity.
 
 ---
 

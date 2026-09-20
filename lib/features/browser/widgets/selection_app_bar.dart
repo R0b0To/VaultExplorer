@@ -28,6 +28,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showEditImageOption;
   final VoidCallback onEditImage;
   final VoidCallback? onToggleDocumentProvider;
+  final VoidCallback? onSyncSettings;
   final bool readOnly;
   final bool showPinOption;
   final bool showUnpinOption;
@@ -69,6 +70,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showEditImageOption = false,
     required this.onEditImage,
     this.onToggleDocumentProvider,
+    this.onSyncSettings,
     this.readOnly = false,
     required this.showPinOption,
     required this.showUnpinOption,
@@ -245,6 +247,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'encrypt') onEncrypt();
                 if (value == 'decrypt') onDecrypt();
                 if (value == 'doc_provider') onToggleDocumentProvider?.call();
+                if (value == 'sync_settings') onSyncSettings?.call();
                 if (value == 'pin') onPin();
                 if (value == 'unpin') onUnpin();
                 if (value == 'bookmark') onBookmark();
@@ -390,6 +393,17 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         Text(folderDocumentProviderMounted
                             ? context.l10n.documentProviderSettingsMenu
                             : context.l10n.exposeAsDocumentProviderMenu),
+                      ],
+                    ),
+                  ),
+                if (!isInsideArchive && singleFolderSelected && !hideVaultOnlyActions)
+                  PopupMenuItem<String>(
+                    value: 'sync_settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.sync_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.autoSyncMenuAction),
                       ],
                     ),
                   ),

@@ -39,6 +39,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final bool showEditImageOption;
   final VoidCallback onEditImage;
   final VoidCallback onToggleDocumentProvider;
+  final VoidCallback? onSyncSettings;
   final VoidCallback onPin;
   final VoidCallback onUnpin;
   final VoidCallback onBookmark;
@@ -82,6 +83,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.showEditImageOption = false,
     required this.onEditImage,
     required this.onToggleDocumentProvider,
+    this.onSyncSettings,
     required this.onPin,
     required this.onUnpin,
     required this.onBookmark,
@@ -192,6 +194,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'encrypt') onEncrypt();
             if (value == 'decrypt') onDecrypt();
             if (value == 'doc_provider') onToggleDocumentProvider();
+            if (value == 'sync_settings') onSyncSettings?.call();
             if (value == 'pin') onPin();
             if (value == 'unpin') onUnpin();
             if (value == 'bookmark') onBookmark();
@@ -306,6 +309,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Text(folderDocumentProviderMounted
                         ? context.l10n.documentProviderSettingsMenu
                         : context.l10n.exposeAsDocumentProviderMenu),
+                  ],
+                ),
+              ),
+            if (!isInsideArchive && singleFolderSelected && !hideVaultOnlyActions)
+              PopupMenuItem<String>(
+                value: 'sync_settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.sync_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.autoSyncMenuAction),
                   ],
                 ),
               ),

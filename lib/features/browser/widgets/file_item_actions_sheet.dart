@@ -270,6 +270,16 @@ class FileItemActionsSheet extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.info_outline_rounded),
+                    iconSize: 22,
+                    color: cs.onSurfaceVariant,
+                    tooltip: context.l10n.fileInfoAction,
+                    onPressed: () {
+                      Navigator.pop(context);
+                      onInfo();
+                    },
+                  ),
                 ],
               ),
             ),
@@ -402,18 +412,7 @@ class FileItemActionsSheet extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-
-                    // Group 5: Properties / Info (The calm anchor at the very bottom)
-                    _ActionTile(
-                      icon: Icons.info_outline_rounded,
-                      label: context.l10n.fileInfoAction,
-                      onTap: () {
-                        Navigator.pop(context);
-                        onInfo();
-                      },
-                    ),
-                  ],
+                    ],
                 ),
               ),
             ),

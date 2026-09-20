@@ -114,25 +114,19 @@ class FileRowShell extends StatelessWidget {
     BuildContext context,
   ) {
     final double baseWidth = switch (col) {
-      FileDetailColumn.date => 54,
-      FileDetailColumn.size => 50,
-      FileDetailColumn.type => 46,
+      FileDetailColumn.date => 68,
+      FileDetailColumn.size => 60,
+      FileDetailColumn.type => 50,
     };
 
     final textScaler = MediaQuery.textScalerOf(context);
-    final effectiveMinWidth = textScaler.scale(baseWidth);
-    // Bounding maxWidth allows TextOverflow.ellipsis to actually activate
-    // on long dates or localized text, preventing horizontal row overflow.
-    final effectiveMaxWidth = textScaler.scale(baseWidth * 1.6);
+    final effectiveWidth = textScaler.scale(baseWidth);
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: effectiveMinWidth,
-        maxWidth: effectiveMaxWidth,
-      ),
+    return SizedBox(
+      width: effectiveWidth,
       child: Text(
         _columnText(col, context),
         textAlign: TextAlign.right,
@@ -252,14 +246,14 @@ class FileRowShell extends StatelessWidget {
                   (isSelectionMode || effectiveTrailing != null) ? 36.0 : 0.0;
               const leadingSpacing = 10.0;
 
-              // Estimate the minimum width detail columns need
+              // Width detail columns need
               double columnsRequiredWidth = 0.0;
               if (!isCompact && detailColumns.isNotEmpty) {
                 for (final col in detailColumns) {
                   final double colBaseWidth = switch (col) {
-                    FileDetailColumn.date => 54.0,
-                    FileDetailColumn.size => 50.0,
-                    FileDetailColumn.type => 46.0,
+                    FileDetailColumn.date => 68.0,
+                    FileDetailColumn.size => 60.0,
+                    FileDetailColumn.type => 50.0,
                   };
                   columnsRequiredWidth +=
                       textScaler.scale(colBaseWidth) + 8.0; // 8.0 for SizedBox

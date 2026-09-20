@@ -29,6 +29,12 @@ class FileNameLabel extends StatelessWidget {
 
   static const String _ellipsis = '…';
 
+  static final RegExp _rtlRegex = RegExp(
+    r'[\u0590-\u07FF\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]',
+  );
+
+  static bool _isRtl(String s) => _rtlRegex.hasMatch(s);
+
   @override
   Widget build(BuildContext context) {
     switch (mode) {
@@ -48,22 +54,100 @@ class FileNameLabel extends StatelessWidget {
         );
 
       case LongFileNameDisplayMode.ellipsizeStart:
-      case LongFileNameDisplayMode.ellipsizeMiddle:
         return LayoutBuilder(
           builder: (context, constraints) {
             final effectiveStyle = style ?? DefaultTextStyle.of(context).style;
+            final textScaler = MediaQuery.textScalerOf(context);
+            if (!constraints.hasBoundedWidth ||
+                constraints.maxWidth <= 0 ||
+                _measure(text, effectiveStyle, textScaler) <= constraints.maxWidth) {
+              return HighlightedText(
+                text: text,
+                query: query,
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+              );
+            }
+            final isRtl = _isRtl(text);
             final truncated = _truncate(
               text: text,
               style: effectiveStyle,
               maxWidth: constraints.maxWidth,
-              textScaler: MediaQuery.textScalerOf(context),
+              textScaler: textScaler,
             );
-            return HighlightedText(
-              text: truncated,
-              query: query,
-              style: style,
-              maxLines: 1,
-              overflow: TextOverflow.clip,
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: Align(
+                // In RTL, the text ends on the left; in LTR, on the right.
+                alignment: isRtl ? Alignment.centerLeft : Alignment.centerRight,
+                child: HighlightedText(
+                  text: truncated,
+                  query: query,
+                  style: style,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                ),
+              ),
+            );
+          },
+        );
+
+      case LongFileNameDisplayMode.ellipsizeMiddle:
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final effectiveStyle = style ?? DefaultTextStyle.of(context).style;
+            final textScaler = MediaQuery.textScalerOf(context);
+            if (!constraints.hasBoundedWidth ||
+                constraints.maxWidth <= 0 ||
+                _measure(text, effectiveStyle, textScaler) <= constraints.maxWidth) {
+              return HighlightedText(
+                text: text,
+                query: query,
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+              );
+            }
+            final isRtl = _isRtl(text);
+            final tail = _extractTail(
+              text,
+              effectiveStyle,
+              constraints.maxWidth,
+              textScaler,
+            );
+            // Trim trailing space so neutral whitespace does not flip in BiDi layout
+            final head = text.substring(0, text.length - tail.length).trimRight();
+
+            // Match directionality to the script so Arabic starts on the right
+            final textDir = isRtl ? TextDirection.rtl : Directionality.of(context);
+
+            return SizedBox(
+              width: constraints.maxWidth,
+              child: Directionality(
+                textDirection: textDir,
+                child: Row(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      child: HighlightedText(
+                        text: head,
+                        query: query,
+                        style: style,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    HighlightedText(
+                      text: tail,
+                      query: query,
+                      style: style,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                    ),
+                  ],
+                ),
+              ),
             );
           },
         );
@@ -109,6 +193,31 @@ class FileNameLabel extends StatelessWidget {
     }
     _truncationCache[cacheKey] = result;
     return result;
+  }
+
+  String _extractTail(
+    String text,
+    TextStyle style,
+    double maxWidth,
+    TextScaler textScaler,
+  ) {
+    final maxTailWidth = maxWidth * 0.38;
+    final dotIndex = text.lastIndexOf('.');
+    int targetTailLen = 0;
+    if (dotIndex > 0 && dotIndex < text.length - 1) {
+      final extLen = text.length - dotIndex;
+      targetTailLen = (extLen + 6).clamp(extLen, text.length - 1);
+    } else {
+      targetTailLen = 8.clamp(1, text.length - 1);
+    }
+
+    targetTailLen = targetTailLen.clamp(1, (text.length / 2).floor());
+
+    String tail = text.substring(text.length - targetTailLen);
+    while (tail.length > 1 && _measure(tail, style, textScaler) > maxTailWidth) {
+      tail = tail.substring(1);
+    }
+    return tail;
   }
 
   String _computeTruncate({
@@ -296,7 +405,9 @@ class _MarqueeFileNameState extends State<_MarqueeFileName>
                     top: 0,
                     bottom: 0,
                     child: Directionality(
-                      textDirection: TextDirection.ltr,
+                      textDirection: FileNameLabel._isRtl(widget.text)
+                          ? TextDirection.rtl
+                          : Directionality.of(context),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

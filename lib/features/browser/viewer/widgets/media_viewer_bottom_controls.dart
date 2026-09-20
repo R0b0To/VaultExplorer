@@ -181,6 +181,13 @@ class MediaViewerBottomControls extends StatelessWidget {
           return false;
         }
       }
+      // When the status chip is active on photos, it already handles delay configuration
+      if (isImage &&
+          isPlaylistMode &&
+          toolbarConfig.showStatusBadge &&
+          a == MediaViewerAction.slideshowDelay) {
+        return false;
+      }
       return a.isApplicable(
         isImage: isImage,
         isAudio: isAudio,
@@ -234,37 +241,11 @@ class MediaViewerBottomControls extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (isImage && isPlaylistMode && toolbarConfig.showStatusBadge) ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      autoAdvance
-                          ? Icons.slideshow_rounded
-                          : Icons.image_rounded,
-                      color: autoAdvance ? cs.primary : Colors.white70,
-                      size: AppIconSize.small,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      autoAdvance
-                          ? context.l10n.slideshowDelaySecondsValue(
-                              slideshowDelaySeconds)
-                          : context.l10n.staticLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+              _SlideshowStatusChip(
+                autoAdvance: autoAdvance,
+                slideshowDelaySeconds: slideshowDelaySeconds,
+                playlistController: playlistController,
+                onTap: () => onExecuteAction(MediaViewerAction.slideshowDelay),
               ),
               const SizedBox(width: 6),
             ],
@@ -274,6 +255,144 @@ class MediaViewerBottomControls extends StatelessWidget {
                 child: _buildActionItem(context, action, cs),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SlideshowStatusChip extends StatefulWidget {
+  final bool autoAdvance;
+  final int slideshowDelaySeconds;
+  final PlaylistController playlistController;
+  final VoidCallback onTap;
+
+  const _SlideshowStatusChip({
+    required this.autoAdvance,
+    required this.slideshowDelaySeconds,
+    required this.playlistController,
+    required this.onTap,
+  });
+
+  @override
+  State<_SlideshowStatusChip> createState() => _SlideshowStatusChipState();
+}
+
+class _SlideshowStatusChipState extends State<_SlideshowStatusChip>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  String? _lastFile;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: widget.slideshowDelaySeconds),
+    );
+    _lastFile = widget.playlistController.currentFile;
+    widget.playlistController.addListener(_onPlaylistChanged);
+    if (widget.autoAdvance) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlideshowStatusChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.slideshowDelaySeconds != widget.slideshowDelaySeconds) {
+      _controller.duration = Duration(seconds: widget.slideshowDelaySeconds);
+    }
+    if (oldWidget.autoAdvance != widget.autoAdvance) {
+      if (widget.autoAdvance) {
+        _controller.forward(from: 0.0);
+      } else {
+        _controller.stop();
+        _controller.reset();
+      }
+    }
+  }
+
+  void _onPlaylistChanged() {
+    if (_lastFile != widget.playlistController.currentFile) {
+      _lastFile = widget.playlistController.currentFile;
+      if (widget.autoAdvance && mounted) {
+        _controller.forward(from: 0.0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.playlistController.removeListener(_onPlaylistChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+
+    return Material(
+      color: Colors.white.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (widget.autoAdvance)
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, _) => CircularProgressIndicator(
+                          value: _controller.value,
+                          strokeWidth: 1.4,
+                          strokeCap: StrokeCap.round,
+                          backgroundColor:
+                              Colors.white.withValues(alpha: 0.08),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    Icon(
+                      widget.autoAdvance
+                          ? Icons.slideshow_rounded
+                          : Icons.image_rounded,
+                      color: widget.autoAdvance
+                          ? Colors.white.withValues(alpha: 0.85)
+                          : Colors.white60,
+                      size: 11,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.autoAdvance
+                    ? context.l10n.slideshowDelaySecondsValue(
+                        widget.slideshowDelaySeconds)
+                    : context.l10n.staticLabel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

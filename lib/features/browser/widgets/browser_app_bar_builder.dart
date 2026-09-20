@@ -373,10 +373,11 @@ PreferredSizeWidget buildBrowserAppBar(
     final style = textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
         const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
    if (!hasParents) {
-      return InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onOpenStorageSwitcher,
-        child: Padding(
+      final canSync = !container.isLocalStorage && !isInsideArchive && onSyncRoot != null;
+      final hasMenuActions = canSync || onOpenStorageSwitcher != null;
+
+      if (!hasMenuActions) {
+        return Padding(
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -389,17 +390,62 @@ PreferredSizeWidget buildBrowserAppBar(
                   style: style,
                 ),
               ),
-              if (onOpenStorageSwitcher != null) ...[
-                const SizedBox(width: 2),
-                Icon(Icons.arrow_drop_down_rounded, size: 22, color: cs.primary),
-              ],
               if (isReadOnly) ...[
                 const SizedBox(width: 8),
                 buildReadOnlyBadge(),
               ],
             ],
           ),
+        );
+      }
+
+      return MenuAnchor(
+        builder: (ctx, controller, child) => InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            if (controller.isOpen) {
+              controller.close();
+            } else {
+              controller.open();
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    container.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.arrow_drop_down_rounded, size: 22, color: cs.primary),
+                if (isReadOnly) ...[
+                  const SizedBox(width: 8),
+                  buildReadOnlyBadge(),
+                ],
+              ],
+            ),
+          ),
         ),
+        menuChildren: [
+          if (canSync)
+            MenuItemButton(
+              onPressed: onSyncRoot,
+              leadingIcon: Icon(Icons.sync_rounded, size: 18, color: cs.primary),
+              child: Text(context.l10n.autoSyncMenuAction),
+            ),
+          if (onOpenStorageSwitcher != null)
+            MenuItemButton(
+              onPressed: onOpenStorageSwitcher,
+              leadingIcon: Icon(Icons.swap_horiz_rounded, size: 18, color: cs.onSurfaceVariant),
+              child: Text(context.l10n.storageLocationsTitle),
+            ),
+        ],
       );
     }
     return LayoutBuilder(
@@ -548,15 +594,6 @@ PreferredSizeWidget buildBrowserAppBar(
     ),
     actions: [
       const AppBarTransferButton(),
-      if (!container.isLocalStorage &&
-          !isInsideArchive &&
-          pathStack.length <= 1 &&
-          onSyncRoot != null)
-        IconButton(
-          icon: const Icon(Icons.sync_rounded),
-          tooltip: context.l10n.autoSyncMenuAction,
-          onPressed: onSyncRoot,
-        ),
       if (isLandscape && showActionBar) ...[
         ...toolbarConfig.visible
             .where((action) => actionBuilders.containsKey(action))

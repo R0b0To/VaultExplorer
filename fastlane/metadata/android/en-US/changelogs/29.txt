@@ -1,0 +1,17 @@
+### Features
+• Automated Sync: Added background auto-sync support for vaults and folders to keep designated targets continuously updated, accessible from the vault root title bar and folder action menus
+• Quick Camera Access: Added a 1x1 home screen shortcut and a Quick Settings tile to launch directly into the in-app camera. Has to be enablet in the settings first.
+
+### Improvements
+• Image Viewer Gestures: Extended vertical brightness swipe gestures to image viewing alongside existing video playback controls
+• Media Carousel: Positioned the carousel above dock controls, allowing it to be toggled off by pressing the button again and shown/hide scrollbar using vertical swipe gestures
+• Vault Dashboard: Added an option to disable swipe-to-edit and swipe-to-remove gestures on vault cards, keeping these actions accessible via the sidebar drawer
+• Player Zoom & Pan: Reverted single-finger panning while zoomed in/out with a locked screen, restoring standard gesture availability at normal zoom levels
+• UI Polish: Refined overall interface styling, layout transitions, and UX interactions across the app
+
+### Bug Fixes
+• Gesture Conflicts: Fixed vertical playlist scrolling interfering with brightness and volume swipe controls in the media player
+• Zoomed Playlists: Fixed continuous vertical playlists locking up when zoomed in or out, allowing uninterrupted scrolling at any desired zoom level
+• Playlist Positioning: Fixed continuous vertical mode failing to center on items opened from the file manager when located toward the bottom of the list
+• In-Player Deletion: Fixed items deleted within the media player lingering in the session, ensuring immediate removal from the viewer and folder list
+• Split Container Picker: Fixed an issue preventing the file picker from accessing directories containing split container chunks

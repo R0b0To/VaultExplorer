@@ -7625,4 +7625,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get quickCaptureShortcutUnsupportedMessage => '您的启动器不支持固定快捷方式';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '已将 $name 保存至 $destination';
+  }
 }

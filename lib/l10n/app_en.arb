@@ -10307,5 +10307,17 @@
   "quickCaptureShortcutUnsupportedMessage": "Your launcher doesn't support pinning shortcuts",
   "@quickCaptureShortcutUnsupportedMessage": {
     "description": "Snackbar shown when the launcher does not support requestPinShortcut"
+  },
+  "quickCaptureSavedToast": "Saved {name} to {destination}",
+  "@quickCaptureSavedToast": {
+    "description": "Toast message shown after a photo or video is saved from quick capture",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
   }
 }

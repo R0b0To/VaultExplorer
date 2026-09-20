@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "Añadir a la pantalla de inicio",
   "quickCaptureAddShortcutSubtitle": "Fija un icono de Captura rápida en tu pantalla de inicio, si tu launcher lo permite",
   "quickCaptureShortcutRequestedMessage": "Solicitado: revisa tu pantalla de inicio",
-  "quickCaptureShortcutUnsupportedMessage": "Tu launcher no permite fijar accesos directos"
+  "quickCaptureShortcutUnsupportedMessage": "Tu launcher no permite fijar accesos directos",
+  "quickCaptureSavedToast": "{name} guardado en {destination}"
 }

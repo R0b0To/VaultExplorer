@@ -8235,4 +8235,9 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Ваш лончер не підтримує закріплення ярликів';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name збережено в $destination';
+  }
 }

@@ -8050,4 +8050,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Your launcher doesn\'t support pinning shortcuts';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return 'Saved $name to $destination';
+  }
 }

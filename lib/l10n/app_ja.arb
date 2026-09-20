@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "ホーム画面に追加",
   "quickCaptureAddShortcutSubtitle": "ランチャーが対応していれば、クイックキャプチャのアイコンをホーム画面に固定します",
   "quickCaptureShortcutRequestedMessage": "リクエストしました。ホーム画面を確認してください",
-  "quickCaptureShortcutUnsupportedMessage": "お使いのランチャーはショートカットの固定に対応していません"
+  "quickCaptureShortcutUnsupportedMessage": "お使いのランチャーはショートカットの固定に対応していません",
+  "quickCaptureSavedToast": "{name}を{destination}に保存しました"
 }

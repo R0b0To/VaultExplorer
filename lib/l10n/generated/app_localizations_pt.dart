@@ -8184,4 +8184,9 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Seu launcher não é compatível com a fixação de atalhos';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name salvo em $destination';
+  }
 }

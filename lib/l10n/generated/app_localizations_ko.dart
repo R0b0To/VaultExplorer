@@ -7733,4 +7733,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get quickCaptureShortcutUnsupportedMessage => '런처가 바로가기 고정을 지원하지 않습니다';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name을(를) $destination에 저장했습니다';
+  }
 }

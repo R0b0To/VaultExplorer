@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "Adicionar à Tela Inicial",
   "quickCaptureAddShortcutSubtitle": "Fixa um ícone de Captura Rápida na sua tela inicial, se o seu launcher for compatível",
   "quickCaptureShortcutRequestedMessage": "Solicitado — verifique sua tela inicial",
-  "quickCaptureShortcutUnsupportedMessage": "Seu launcher não é compatível com a fixação de atalhos"
+  "quickCaptureShortcutUnsupportedMessage": "Seu launcher não é compatível com a fixação de atalhos",
+  "quickCaptureSavedToast": "{name} salvo em {destination}"
 }

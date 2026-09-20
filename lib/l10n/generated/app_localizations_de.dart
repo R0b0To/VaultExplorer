@@ -8177,4 +8177,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Dein Launcher unterstützt das Anheften von Verknüpfungen nicht';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name in $destination gespeichert';
+  }
 }

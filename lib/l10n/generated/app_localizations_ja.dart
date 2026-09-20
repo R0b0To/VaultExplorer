@@ -7734,4 +7734,9 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'お使いのランチャーはショートカットの固定に対応していません';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$nameを$destinationに保存しました';
+  }
 }

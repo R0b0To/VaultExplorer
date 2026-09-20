@@ -8177,4 +8177,9 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Il tuo launcher non supporta il blocco dei collegamenti';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name salvato in $destination';
+  }
 }

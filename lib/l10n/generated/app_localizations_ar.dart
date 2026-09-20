@@ -8237,4 +8237,9 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'مشغّل التطبيقات لديك لا يدعم تثبيت الاختصارات';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return 'تم حفظ $name في $destination';
+  }
 }

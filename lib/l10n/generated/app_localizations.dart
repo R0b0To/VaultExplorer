@@ -13548,6 +13548,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your launcher doesn\'t support pinning shortcuts'**
   String get quickCaptureShortcutUnsupportedMessage;
+
+  /// Toast message shown after a photo or video is saved from quick capture
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name} to {destination}'**
+  String quickCaptureSavedToast(String name, String destination);
 }
 
 class _AppLocalizationsDelegate

@@ -8194,4 +8194,9 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Tu launcher no permite fijar accesos directos';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name guardado en $destination';
+  }
 }

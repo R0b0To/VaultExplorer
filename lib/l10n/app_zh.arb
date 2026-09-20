@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "添加到主屏幕",
   "quickCaptureAddShortcutSubtitle": "如果您的启动器支持，将\"快速捕获\"图标固定到主屏幕",
   "quickCaptureShortcutRequestedMessage": "已请求——请查看您的主屏幕",
-  "quickCaptureShortcutUnsupportedMessage": "您的启动器不支持固定快捷方式"
+  "quickCaptureShortcutUnsupportedMessage": "您的启动器不支持固定快捷方式",
+  "quickCaptureSavedToast": "已将 {name} 保存至 {destination}"
 }

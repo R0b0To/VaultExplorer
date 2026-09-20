@@ -8247,4 +8247,9 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
       'Votre launcher ne prend pas en charge l\'épinglage de raccourcis';
+
+  @override
+  String quickCaptureSavedToast(String name, String destination) {
+    return '$name enregistré dans $destination';
+  }
 }

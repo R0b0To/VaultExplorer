@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "홈 화면에 추가",
   "quickCaptureAddShortcutSubtitle": "런처가 지원하는 경우 빠른 캡처 아이콘을 홈 화면에 고정합니다",
   "quickCaptureShortcutRequestedMessage": "요청됨 — 홈 화면을 확인하세요",
-  "quickCaptureShortcutUnsupportedMessage": "런처가 바로가기 고정을 지원하지 않습니다"
+  "quickCaptureShortcutUnsupportedMessage": "런처가 바로가기 고정을 지원하지 않습니다",
+  "quickCaptureSavedToast": "{name}을(를) {destination}에 저장했습니다"
 }

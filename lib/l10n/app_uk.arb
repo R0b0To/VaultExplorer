@@ -2232,5 +2232,6 @@
   "quickCaptureAddShortcutTitle": "Додати на головний екран",
   "quickCaptureAddShortcutSubtitle": "Закріплює значок швидкого захоплення на головному екрані, якщо це підтримує ваш лончер",
   "quickCaptureShortcutRequestedMessage": "Запит надіслано — перевірте головний екран",
-  "quickCaptureShortcutUnsupportedMessage": "Ваш лончер не підтримує закріплення ярликів"
+  "quickCaptureShortcutUnsupportedMessage": "Ваш лончер не підтримує закріплення ярликів",
+  "quickCaptureSavedToast": "{name} збережено в {destination}"
 }

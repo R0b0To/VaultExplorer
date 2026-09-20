@@ -7956,4 +7956,200 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Centro';
+
+  @override
+  String get autoSyncMenuAction => 'Sincronização automática…';
+
+  @override
+  String get autoSyncSheetTitle => 'Sincronização automática';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Mantém esta pasta e outra pasta em sincronia automaticamente. Se o mesmo arquivo mudou nos dois lados, as duas versões são mantidas, a menos que você escolha outra opção abaixo.';
+
+  @override
+  String get autoSyncTargetSection => 'Sincronizar com';
+
+  @override
+  String get autoSyncChooseFolder => 'Escolher uma pasta';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Esta regra foi configurada em outro dispositivo. Escolha a pasta a usar neste dispositivo.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Destino de sincronização';
+
+  @override
+  String get autoSyncDirectionSection => 'Direção';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'Nos dois sentidos';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'As alterações de qualquer lado são copiadas para o outro.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Cofre para pasta';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Um backup: a pasta acompanha o cofre. As alterações feitas na pasta não são copiadas de volta.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Pasta para cofre';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Uma importação: o cofre acompanha a pasta. As alterações feitas no cofre não são copiadas de volta.';
+
+  @override
+  String get autoSyncConflictSection => 'Se os dois lados alteraram um arquivo';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Manter as duas versões';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'A outra versão é mantida como uma cópia renomeada nos dois lados.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Manter a mais recente';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Mantém as duas se não for possível saber qual é a mais recente.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'A versão do cofre prevalece';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'A versão da pasta é substituída.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'A versão da pasta prevalece';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'A versão do cofre é substituída.';
+
+  @override
+  String get autoSyncOptionsSection => 'Opções';
+
+  @override
+  String get autoSyncOnUnlockTitle => 'Sincronizar ao desbloquear o cofre';
+
+  @override
+  String get autoSyncLiveTitle => 'Manter sincronizado enquanto desbloqueado';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Verifica alterações de tempos em tempos enquanto o cofre está aberto. Nem toda alteração é percebida imediatamente.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Copiar também as exclusões';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Um arquivo excluído de um lado é excluído do outro. As exclusões são pausadas se uma pasta parecer inesperadamente vazia.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Ignorar arquivos que correspondam a';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Um padrão por linha, por exemplo *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Ainda não sincronizado';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Última sincronização: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied copiados · $deleted excluídos · $kept conflitos mantidos';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Arquivos que não puderam ser sincronizados: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'As exclusões foram pausadas porque uma pasta parecia inesperadamente vazia ou arquivos demais seriam excluídos.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Não foi possível ler uma parte de uma pasta, então esses arquivos foram deixados como estavam.';
+
+  @override
+  String get autoSyncSyncNow => 'Sincronizar agora';
+
+  @override
+  String get autoSyncRemove => 'Remover a sincronização automática';
+
+  @override
+  String get autoSyncRemoveTitle => 'Remover a sincronização automática?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'A sincronização desta pasta será interrompida. Os arquivos das duas pastas permanecem como estão.';
+
+  @override
+  String get autoSyncSaved => 'Sincronização automática salva';
+
+  @override
+  String get autoSyncStarted => 'Sincronização iniciada';
+
+  @override
+  String get autoSyncRemoved => 'Sincronização automática removida';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'Não foi possível salvar as configurações de sincronização automática';
+
+  @override
+  String get autoSyncUnavailable =>
+      'A sincronização não está disponível para este cofre no momento.';
+
+  @override
+  String get autoSyncProblemNoTarget => 'Escolha uma pasta para sincronizar.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'A pasta de sincronização não pode estar dentro desta pasta nem contê-la.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Esta pasta, ou uma acima ou dentro dela, já tem sincronização automática.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Este cofre é somente leitura, então a sincronização automática não pode ser salva.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'Não foi possível ler as configurações de sincronização automática salvas para este cofre.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Sincronizando com $target · $done de $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Algumas pastas não puderam ser totalmente sincronizadas. Abra as configurações de sincronização automática de uma pasta para ver os detalhes.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Sincronizando pastas';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done de $total arquivos';
+  }
 }

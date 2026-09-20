@@ -8015,4 +8015,204 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Centré';
+
+  @override
+  String get autoSyncMenuAction => 'Synchronisation automatique…';
+
+  @override
+  String get autoSyncSheetTitle => 'Synchronisation automatique';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Garde ce dossier et un autre dossier à jour automatiquement. Si le même fichier a changé des deux côtés, les deux versions sont conservées, sauf si vous choisissez autre chose ci-dessous.';
+
+  @override
+  String get autoSyncTargetSection => 'Synchroniser avec';
+
+  @override
+  String get autoSyncChooseFolder => 'Choisir un dossier';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Cette règle a été configurée sur un autre appareil. Choisissez le dossier à utiliser sur cet appareil.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Cible de synchronisation';
+
+  @override
+  String get autoSyncDirectionSection => 'Sens';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'Dans les deux sens';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Les modifications de chaque côté sont copiées de l\'autre côté.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Coffre vers dossier';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Une sauvegarde : le dossier suit le coffre. Les modifications faites dans le dossier ne sont pas recopiées.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Dossier vers coffre';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Une importation : le coffre suit le dossier. Les modifications faites dans le coffre ne sont pas recopiées.';
+
+  @override
+  String get autoSyncConflictSection =>
+      'Si les deux côtés ont modifié un fichier';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Garder les deux versions';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'L\'autre version est conservée sous forme de copie renommée des deux côtés.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Garder la plus récente';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Garde les deux si elle ne peut pas déterminer laquelle est la plus récente.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'La version du coffre l\'emporte';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'La version du dossier est remplacée.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'La version du dossier l\'emporte';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'La version du coffre est remplacée.';
+
+  @override
+  String get autoSyncOptionsSection => 'Options';
+
+  @override
+  String get autoSyncOnUnlockTitle =>
+      'Synchroniser au déverrouillage du coffre';
+
+  @override
+  String get autoSyncLiveTitle =>
+      'Garder synchronisé pendant le déverrouillage';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Vérifie les changements de temps en temps tant que le coffre est ouvert. Tous les changements ne sont pas détectés immédiatement.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Copier aussi les suppressions';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Un fichier supprimé d\'un côté est supprimé de l\'autre. Les suppressions sont suspendues si un dossier semble vide de façon inattendue.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Ignorer les fichiers correspondant à';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Un motif par ligne, par exemple *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Pas encore synchronisé';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Dernière synchronisation : $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied copiés · $deleted supprimés · $kept conflits conservés';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Fichiers qui n\'ont pas pu être synchronisés : $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Les suppressions ont été suspendues car un dossier semblait vide de façon inattendue ou trop de fichiers auraient été supprimés.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Une partie d\'un dossier n\'a pas pu être lue ; ces fichiers ont donc été laissés tels quels.';
+
+  @override
+  String get autoSyncSyncNow => 'Synchroniser maintenant';
+
+  @override
+  String get autoSyncRemove => 'Retirer la synchronisation automatique';
+
+  @override
+  String get autoSyncRemoveTitle => 'Retirer la synchronisation automatique ?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'La synchronisation de ce dossier s\'arrête. Les fichiers des deux dossiers restent tels quels.';
+
+  @override
+  String get autoSyncSaved => 'Synchronisation automatique enregistrée';
+
+  @override
+  String get autoSyncStarted => 'Synchronisation lancée';
+
+  @override
+  String get autoSyncRemoved => 'Synchronisation automatique retirée';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'Impossible d\'enregistrer les paramètres de synchronisation automatique';
+
+  @override
+  String get autoSyncUnavailable =>
+      'La synchronisation n\'est pas disponible pour ce coffre pour le moment.';
+
+  @override
+  String get autoSyncProblemNoTarget =>
+      'Choisissez un dossier avec lequel synchroniser.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'Le dossier de synchronisation ne peut pas se trouver dans ce dossier ni le contenir.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Ce dossier, ou un dossier qui le contient ou qui s\'y trouve, a déjà une synchronisation automatique.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Ce coffre est en lecture seule ; la synchronisation automatique ne peut donc pas être enregistrée.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'Les paramètres de synchronisation automatique enregistrés pour ce coffre n\'ont pas pu être lus.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Synchronisation avec $target · $done sur $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Certains dossiers n\'ont pas pu être entièrement synchronisés. Ouvrez les paramètres de synchronisation automatique d\'un dossier pour plus de détails.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Synchronisation des dossiers';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done sur $total fichiers';
+  }
 }

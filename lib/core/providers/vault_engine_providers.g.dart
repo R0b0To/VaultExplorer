@@ -305,7 +305,7 @@ final class VaultLifecycleApiProvider
   }
 }
 
-String _$vaultLifecycleApiHash() => r'a3e9982df794c9cb0081a87d11655ae5c66efcdc';
+String _$vaultLifecycleApiHash() => r'3086abedca7061fea1c7894fa5bf37d5a65e2629';
 
 @ProviderFor(vaultPdfApi)
 final vaultPdfApiProvider = VaultPdfApiProvider._();

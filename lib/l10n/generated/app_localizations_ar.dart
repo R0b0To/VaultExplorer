@@ -8013,4 +8013,196 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'توسيط';
+
+  @override
+  String get autoSyncMenuAction => 'المزامنة التلقائية…';
+
+  @override
+  String get autoSyncSheetTitle => 'المزامنة التلقائية';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'يُبقي هذا المجلد ومجلدًا آخر متطابقين تلقائيًا. إذا تغيّر الملف نفسه في الجانبين، يُحتفَظ بالنسختين ما لم تختر خلاف ذلك أدناه.';
+
+  @override
+  String get autoSyncTargetSection => 'المزامنة مع';
+
+  @override
+  String get autoSyncChooseFolder => 'اختر مجلدًا';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'أُعدّت هذه القاعدة على جهاز آخر. اختر المجلد الذي سيُستخدم على هذا الجهاز.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'وجهة المزامنة';
+
+  @override
+  String get autoSyncDirectionSection => 'الاتجاه';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'في الاتجاهين';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'تُنسخ التغييرات من أي جانب إلى الجانب الآخر.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'من الخزنة إلى المجلد';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'نسخ احتياطي: يتبع المجلد الخزنة. لا تُنسخ التغييرات التي تُجرى في المجلد إلى الخزنة.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'من المجلد إلى الخزنة';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'استيراد: تتبع الخزنة المجلد. لا تُنسخ التغييرات التي تُجرى في الخزنة إلى المجلد.';
+
+  @override
+  String get autoSyncConflictSection => 'إذا تغيّر ملف في الجانبين';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'الاحتفاظ بالنسختين';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'يُحتفَظ بالنسخة الأخرى كنسخة مُعاد تسميتها في الجانبين.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'الاحتفاظ بالأحدث';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'يُحتفَظ بالنسختين إذا تعذّر معرفة الأحدث.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'تُعتمد نسخة الخزنة';
+
+  @override
+  String get autoSyncConflictVaultWinsHint => 'تُستبدل نسخة المجلد.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'تُعتمد نسخة المجلد';
+
+  @override
+  String get autoSyncConflictTargetWinsHint => 'تُستبدل نسخة الخزنة.';
+
+  @override
+  String get autoSyncOptionsSection => 'خيارات';
+
+  @override
+  String get autoSyncOnUnlockTitle => 'المزامنة عند فتح قفل الخزنة';
+
+  @override
+  String get autoSyncLiveTitle => 'إبقاء المزامنة أثناء فتح القفل';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'يتحقق من التغييرات من حين لآخر أثناء فتح الخزنة. لا تُلاحَظ كل التغييرات فورًا.';
+
+  @override
+  String get autoSyncDeleteTitle => 'نسخ عمليات الحذف أيضًا';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'يُحذف الملف المحذوف في جانب من الجانب الآخر أيضًا. تُوقَف عمليات الحذف مؤقتًا إذا بدا مجلد فارغًا على نحو غير متوقع.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'تخطي الملفات المطابقة لـ';
+
+  @override
+  String get autoSyncIgnoreHelper => 'نمط واحد في كل سطر، مثل *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'لم تتم المزامنة بعد';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'آخر مزامنة: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied منسوخ · $deleted محذوف · $kept تعارضات محفوظة';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'ملفات تعذّرت مزامنتها: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'أُوقفت عمليات الحذف مؤقتًا لأن مجلدًا بدا فارغًا على نحو غير متوقع أو لأن عددًا كبيرًا من الملفات كان سيُحذف.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'تعذّرت قراءة جزء من مجلد، لذا تُركت تلك الملفات دون تغيير.';
+
+  @override
+  String get autoSyncSyncNow => 'مزامنة الآن';
+
+  @override
+  String get autoSyncRemove => 'إزالة المزامنة التلقائية';
+
+  @override
+  String get autoSyncRemoveTitle => 'إزالة المزامنة التلقائية؟';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'تتوقف مزامنة هذا المجلد. تبقى الملفات في المجلدين كما هي.';
+
+  @override
+  String get autoSyncSaved => 'تم حفظ المزامنة التلقائية';
+
+  @override
+  String get autoSyncStarted => 'بدأت المزامنة';
+
+  @override
+  String get autoSyncRemoved => 'أُزيلت المزامنة التلقائية';
+
+  @override
+  String get autoSyncSaveFailed => 'تعذّر حفظ إعدادات المزامنة التلقائية';
+
+  @override
+  String get autoSyncUnavailable => 'المزامنة غير متاحة لهذه الخزنة حاليًا.';
+
+  @override
+  String get autoSyncProblemNoTarget => 'اختر مجلدًا للمزامنة معه.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'لا يمكن أن يكون مجلد المزامنة داخل هذا المجلد أو أن يحتويه.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'هذا المجلد، أو مجلد أعلى منه أو بداخله، لديه مزامنة تلقائية بالفعل.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'هذه الخزنة للقراءة فقط، لذا لا يمكن حفظ المزامنة التلقائية.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'تعذّرت قراءة إعدادات المزامنة التلقائية المحفوظة لهذه الخزنة.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'جارٍ المزامنة مع $target · $done من $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'تعذّرت مزامنة بعض المجلدات بالكامل. افتح إعدادات المزامنة التلقائية لأحد المجلدات لمعرفة التفاصيل.';
+
+  @override
+  String get autoSyncNotificationTitle => 'جارٍ مزامنة المجلدات';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done من $total ملفات';
+  }
 }

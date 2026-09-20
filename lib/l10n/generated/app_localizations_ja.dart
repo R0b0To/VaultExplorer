@@ -7517,4 +7517,190 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => '中央表示';
+
+  @override
+  String get autoSyncMenuAction => '自動同期…';
+
+  @override
+  String get autoSyncSheetTitle => '自動同期';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'このフォルダと別のフォルダを自動的に同じ状態に保ちます。同じファイルが両側で変更された場合は、下で別の設定を選ばない限り、両方のバージョンが保持されます。';
+
+  @override
+  String get autoSyncTargetSection => '同期先';
+
+  @override
+  String get autoSyncChooseFolder => 'フォルダを選択';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'このルールは別のデバイスで設定されました。このデバイスで使うフォルダを選択してください。';
+
+  @override
+  String get autoSyncPickerSideLabel => '同期先';
+
+  @override
+  String get autoSyncDirectionSection => '方向';
+
+  @override
+  String get autoSyncDirectionTwoWay => '双方向';
+
+  @override
+  String get autoSyncDirectionTwoWayHint => 'どちらか一方の変更がもう一方にコピーされます。';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => '保管庫からフォルダへ';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'バックアップ用: フォルダが保管庫に追従します。フォルダ側の変更は戻されません。';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'フォルダから保管庫へ';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'インポート用: 保管庫がフォルダに追従します。保管庫側の変更は戻されません。';
+
+  @override
+  String get autoSyncConflictSection => '両側でファイルが変更された場合';
+
+  @override
+  String get autoSyncConflictKeepBoth => '両方のバージョンを保持';
+
+  @override
+  String get autoSyncConflictKeepBothHint => 'もう一方のバージョンは、名前を変えたコピーとして両側に残ります。';
+
+  @override
+  String get autoSyncConflictKeepNewer => '新しい方を保持';
+
+  @override
+  String get autoSyncConflictKeepNewerHint => 'どちらが新しいか判断できない場合は両方を保持します。';
+
+  @override
+  String get autoSyncConflictVaultWins => '保管庫側を優先';
+
+  @override
+  String get autoSyncConflictVaultWinsHint => 'フォルダ側のバージョンは置き換えられます。';
+
+  @override
+  String get autoSyncConflictTargetWins => 'フォルダ側を優先';
+
+  @override
+  String get autoSyncConflictTargetWinsHint => '保管庫側のバージョンは置き換えられます。';
+
+  @override
+  String get autoSyncOptionsSection => 'オプション';
+
+  @override
+  String get autoSyncOnUnlockTitle => '保管庫のロック解除時に同期';
+
+  @override
+  String get autoSyncLiveTitle => 'ロック解除中は同期を維持';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      '保管庫が開いている間、ときどき変更を確認します。すべての変更がすぐに検出されるわけではありません。';
+
+  @override
+  String get autoSyncDeleteTitle => '削除も反映';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      '片側で削除したファイルはもう一方でも削除されます。フォルダが予期せず空に見える場合、削除は一時停止されます。';
+
+  @override
+  String get autoSyncIgnoreLabel => '次に一致するファイルを除外';
+
+  @override
+  String get autoSyncIgnoreHelper => '1行に1パターン(例: *.tmp)';
+
+  @override
+  String get autoSyncNeverSynced => 'まだ同期されていません';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return '最終同期: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return 'コピー $copied 件 · 削除 $deleted 件 · 競合を保持 $kept 件';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return '同期できなかったファイル: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'フォルダが予期せず空に見えたか、削除されるファイルが多すぎるため、削除を一時停止しました。';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'フォルダの一部を読み取れなかったため、それらのファイルには手を付けていません。';
+
+  @override
+  String get autoSyncSyncNow => '今すぐ同期';
+
+  @override
+  String get autoSyncRemove => '自動同期を解除';
+
+  @override
+  String get autoSyncRemoveTitle => '自動同期を解除しますか?';
+
+  @override
+  String get autoSyncRemoveMessage => 'このフォルダの同期は停止します。両方のフォルダのファイルはそのまま残ります。';
+
+  @override
+  String get autoSyncSaved => '自動同期を保存しました';
+
+  @override
+  String get autoSyncStarted => '同期を開始しました';
+
+  @override
+  String get autoSyncRemoved => '自動同期を解除しました';
+
+  @override
+  String get autoSyncSaveFailed => '自動同期の設定を保存できませんでした';
+
+  @override
+  String get autoSyncUnavailable => '現在、この保管庫では同期を利用できません。';
+
+  @override
+  String get autoSyncProblemNoTarget => '同期するフォルダを選択してください。';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      '同期先のフォルダは、このフォルダの内側にあったり、このフォルダを含んでいたりしてはいけません。';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'このフォルダ、またはその上位や内側のフォルダには、すでに自動同期が設定されています。';
+
+  @override
+  String get autoSyncReadOnlyNotice => 'この保管庫は読み取り専用のため、自動同期を保存できません。';
+
+  @override
+  String get autoSyncConfigUnreadable => 'この保管庫に保存されている自動同期の設定を読み取れませんでした。';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return '$target と同期中 · $done/$total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      '完全に同期できなかったフォルダがあります。詳細はフォルダの自動同期設定で確認してください。';
+
+  @override
+  String get autoSyncNotificationTitle => 'フォルダを同期中';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done/$total ファイル';
+  }
 }

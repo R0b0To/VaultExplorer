@@ -8006,4 +8006,201 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'По центру';
+
+  @override
+  String get autoSyncMenuAction => 'Автосинхронізація…';
+
+  @override
+  String get autoSyncSheetTitle => 'Автосинхронізація';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Автоматично підтримує цю папку та іншу папку в однаковому стані. Якщо той самий файл змінено з обох боків, зберігаються обидві версії, доки нижче не вибрано інше.';
+
+  @override
+  String get autoSyncTargetSection => 'Синхронізувати з';
+
+  @override
+  String get autoSyncChooseFolder => 'Виберіть папку';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Це правило налаштовано на іншому пристрої. Виберіть папку для цього пристрою.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Ціль синхронізації';
+
+  @override
+  String get autoSyncDirectionSection => 'Напрямок';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'В обидва боки';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Зміни з будь-якого боку копіюються на інший.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Зі сховища в папку';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Резервна копія: папка слідує за сховищем. Зміни в папці не копіюються назад.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'З папки у сховище';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Імпорт: сховище слідує за папкою. Зміни у сховищі не копіюються назад.';
+
+  @override
+  String get autoSyncConflictSection => 'Якщо файл змінено з обох боків';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Зберегти обидві версії';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'Інша версія зберігається як перейменована копія з обох боків.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Зберегти новішу';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Якщо неможливо визначити, яка новіша, зберігає обидві.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'Перемагає версія зі сховища';
+
+  @override
+  String get autoSyncConflictVaultWinsHint => 'Версію в папці буде замінено.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'Перемагає версія з папки';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'Версію у сховищі буде замінено.';
+
+  @override
+  String get autoSyncOptionsSection => 'Параметри';
+
+  @override
+  String get autoSyncOnUnlockTitle =>
+      'Синхронізувати під час розблокування сховища';
+
+  @override
+  String get autoSyncLiveTitle =>
+      'Підтримувати синхронізацію, поки розблоковано';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Час від часу перевіряє зміни, поки сховище відкрите. Не кожна зміна помічається одразу.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Копіювати також видалення';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Файл, видалений з одного боку, видаляється і з іншого. Видалення призупиняються, якщо папка несподівано виглядає порожньою.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Пропускати файли, що відповідають';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Один шаблон на рядок, наприклад *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Ще не синхронізовано';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Остання синхронізація: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied скопійовано · $deleted видалено · $kept конфліктів збережено';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Файли, які не вдалося синхронізувати: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Видалення призупинено, бо папка несподівано виглядала порожньою або було б видалено забагато файлів.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Не вдалося прочитати частину папки, тому ці файли залишено без змін.';
+
+  @override
+  String get autoSyncSyncNow => 'Синхронізувати зараз';
+
+  @override
+  String get autoSyncRemove => 'Вилучити автосинхронізацію';
+
+  @override
+  String get autoSyncRemoveTitle => 'Вилучити автосинхронізацію?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'Синхронізацію цієї папки буде зупинено. Файли в обох папках залишаться без змін.';
+
+  @override
+  String get autoSyncSaved => 'Автосинхронізацію збережено';
+
+  @override
+  String get autoSyncStarted => 'Синхронізацію розпочато';
+
+  @override
+  String get autoSyncRemoved => 'Автосинхронізацію вилучено';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'Не вдалося зберегти налаштування автосинхронізації';
+
+  @override
+  String get autoSyncUnavailable =>
+      'Синхронізація для цього сховища зараз недоступна.';
+
+  @override
+  String get autoSyncProblemNoTarget => 'Виберіть папку для синхронізації.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'Папка для синхронізації не може бути всередині цієї папки або містити її.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Для цієї папки або вищої чи вкладеної в неї вже налаштовано автосинхронізацію.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Це сховище доступне лише для читання, тому автосинхронізацію не можна зберегти.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'Не вдалося прочитати збережені налаштування автосинхронізації для цього сховища.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Синхронізація з $target · $done з $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Деякі папки не вдалося синхронізувати повністю. Відкрийте налаштування автосинхронізації папки, щоб побачити подробиці.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Синхронізація папок';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done з $total файлів';
+  }
 }

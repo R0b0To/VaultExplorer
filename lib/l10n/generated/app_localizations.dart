@@ -13164,6 +13164,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Centre'**
   String get aspectRatioCentre;
+
+  /// Folder actions menu entry that opens the auto-sync settings for that folder
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-sync…'**
+  String get autoSyncMenuAction;
+
+  /// Title of the auto-sync settings sheet for a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-sync'**
+  String get autoSyncSheetTitle;
+
+  /// Introductory text at the top of the auto-sync settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.'**
+  String get autoSyncSheetIntro;
+
+  /// Section label above the folder an auto-sync rule syncs with
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with'**
+  String get autoSyncTargetSection;
+
+  /// Placeholder on the target tile before a folder has been chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder'**
+  String get autoSyncChooseFolder;
+
+  /// Hint shown when a sync rule came from another device and has no folder chosen on this device
+  ///
+  /// In en, this message translates to:
+  /// **'This rule was set up on another device. Choose the folder to use on this device.'**
+  String get autoSyncTargetNotSetHere;
+
+  /// Label passed to the folder picker title ('Select {side} Folder') when choosing the sync target
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Target'**
+  String get autoSyncPickerSideLabel;
+
+  /// Section label for the sync direction choice
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get autoSyncDirectionSection;
+
+  /// Sync direction option: changes flow both ways
+  ///
+  /// In en, this message translates to:
+  /// **'Both ways'**
+  String get autoSyncDirectionTwoWay;
+
+  /// Explanation of the two-way sync direction
+  ///
+  /// In en, this message translates to:
+  /// **'Changes on either side are copied to the other.'**
+  String get autoSyncDirectionTwoWayHint;
+
+  /// Sync direction option: the vault is the source and the folder is a backup
+  ///
+  /// In en, this message translates to:
+  /// **'Vault to folder'**
+  String get autoSyncDirectionVaultToTarget;
+
+  /// Explanation of the vault-to-folder sync direction
+  ///
+  /// In en, this message translates to:
+  /// **'A backup: the folder follows the vault. Changes made in the folder are not copied back.'**
+  String get autoSyncDirectionVaultToTargetHint;
+
+  /// Sync direction option: the folder is the source and the vault imports from it
+  ///
+  /// In en, this message translates to:
+  /// **'Folder to vault'**
+  String get autoSyncDirectionTargetToVault;
+
+  /// Explanation of the folder-to-vault sync direction
+  ///
+  /// In en, this message translates to:
+  /// **'An import: the vault follows the folder. Changes made in the vault are not copied back.'**
+  String get autoSyncDirectionTargetToVaultHint;
+
+  /// Section label for what to do when both sides changed the same file
+  ///
+  /// In en, this message translates to:
+  /// **'If both sides changed a file'**
+  String get autoSyncConflictSection;
+
+  /// Conflict option: keep both versions of the file
+  ///
+  /// In en, this message translates to:
+  /// **'Keep both versions'**
+  String get autoSyncConflictKeepBoth;
+
+  /// Explanation of the keep-both conflict option
+  ///
+  /// In en, this message translates to:
+  /// **'The other version is kept as a renamed copy on both sides.'**
+  String get autoSyncConflictKeepBothHint;
+
+  /// Conflict option: keep whichever version is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the newer one'**
+  String get autoSyncConflictKeepNewer;
+
+  /// Explanation of the keep-newer conflict option
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps both when it can\'t tell which is newer.'**
+  String get autoSyncConflictKeepNewerHint;
+
+  /// Conflict option: the vault's version replaces the folder's
+  ///
+  /// In en, this message translates to:
+  /// **'Vault version wins'**
+  String get autoSyncConflictVaultWins;
+
+  /// Explanation of the vault-wins conflict option
+  ///
+  /// In en, this message translates to:
+  /// **'The folder\'s version is replaced.'**
+  String get autoSyncConflictVaultWinsHint;
+
+  /// Conflict option: the folder's version replaces the vault's
+  ///
+  /// In en, this message translates to:
+  /// **'Folder version wins'**
+  String get autoSyncConflictTargetWins;
+
+  /// Explanation of the folder-wins conflict option
+  ///
+  /// In en, this message translates to:
+  /// **'The vault\'s version is replaced.'**
+  String get autoSyncConflictTargetWinsHint;
+
+  /// Section label for the auto-sync options switches
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get autoSyncOptionsSection;
+
+  /// Switch: run this sync every time the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Sync when the vault is unlocked'**
+  String get autoSyncOnUnlockTitle;
+
+  /// Switch: keep syncing while the vault stays unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Keep in sync while unlocked'**
+  String get autoSyncLiveTitle;
+
+  /// Explanation of the keep-in-sync-while-unlocked switch, including its limits
+  ///
+  /// In en, this message translates to:
+  /// **'Checks for changes from time to time while the vault is open. Not every change is noticed straight away.'**
+  String get autoSyncLiveSubtitle;
+
+  /// Switch: also propagate deletions to the other side
+  ///
+  /// In en, this message translates to:
+  /// **'Copy deletions too'**
+  String get autoSyncDeleteTitle;
+
+  /// Explanation of the copy-deletions switch, including the safety pause
+  ///
+  /// In en, this message translates to:
+  /// **'A file deleted on one side is deleted on the other. Deletions are paused if a folder looks unexpectedly empty.'**
+  String get autoSyncDeleteSubtitle;
+
+  /// Label of the text field listing file patterns that auto-sync skips
+  ///
+  /// In en, this message translates to:
+  /// **'Skip files matching'**
+  String get autoSyncIgnoreLabel;
+
+  /// Helper text under the skip-patterns field
+  ///
+  /// In en, this message translates to:
+  /// **'One pattern per line, for example *.tmp'**
+  String get autoSyncIgnoreHelper;
+
+  /// Status text when a sync rule has not completed a sync yet
+  ///
+  /// In en, this message translates to:
+  /// **'Not synced yet'**
+  String get autoSyncNeverSynced;
+
+  /// Status text with the date and time of the last completed sync
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced: {time}'**
+  String autoSyncLastSynced(String time);
+
+  /// Summary of the latest sync run: counts of copied files, deleted files and conflicts that kept both versions
+  ///
+  /// In en, this message translates to:
+  /// **'{copied} copied · {deleted} deleted · {kept} conflicts kept'**
+  String autoSyncReportSummary(int copied, int deleted, int kept);
+
+  /// Note on the latest sync run: how many files could not be synced
+  ///
+  /// In en, this message translates to:
+  /// **'Files that couldn\'t be synced: {count}'**
+  String autoSyncReportFailed(int count);
+
+  /// Note on the latest sync run: deletions were held back as a safety measure
+  ///
+  /// In en, this message translates to:
+  /// **'Deletions were paused because a folder looked unexpectedly empty or too many files would have been deleted.'**
+  String get autoSyncReportDeletionsPaused;
+
+  /// Note on the latest sync run: part of a folder could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'Part of a folder couldn\'t be read, so those files were left alone.'**
+  String get autoSyncReportIncomplete;
+
+  /// Button that starts a sync of this folder immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get autoSyncSyncNow;
+
+  /// Button that removes auto-sync from a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Remove auto-sync'**
+  String get autoSyncRemove;
+
+  /// Title of the confirmation dialog for removing auto-sync
+  ///
+  /// In en, this message translates to:
+  /// **'Remove auto-sync?'**
+  String get autoSyncRemoveTitle;
+
+  /// Body of the confirmation dialog for removing auto-sync
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing stops for this folder. The files in both folders stay as they are.'**
+  String get autoSyncRemoveMessage;
+
+  /// Snackbar shown after the auto-sync settings were saved
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-sync saved'**
+  String get autoSyncSaved;
+
+  /// Snackbar shown after a sync was started from the settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Sync started'**
+  String get autoSyncStarted;
+
+  /// Snackbar shown after auto-sync was removed from a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-sync removed'**
+  String get autoSyncRemoved;
+
+  /// Snackbar shown when the auto-sync settings could not be saved
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the auto-sync settings'**
+  String get autoSyncSaveFailed;
+
+  /// Snackbar shown when a sync can't be started because the vault has no active sync session
+  ///
+  /// In en, this message translates to:
+  /// **'Sync isn\'t available for this vault right now.'**
+  String get autoSyncUnavailable;
+
+  /// Validation message: no folder to sync with was chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder to sync with.'**
+  String get autoSyncProblemNoTarget;
+
+  /// Validation message: the chosen folder is inside the synced folder or contains it
+  ///
+  /// In en, this message translates to:
+  /// **'The folder to sync with can\'t be inside this folder or contain it.'**
+  String get autoSyncProblemOverlapsTarget;
+
+  /// Validation message: another auto-sync rule already covers this folder or a folder above/inside it
+  ///
+  /// In en, this message translates to:
+  /// **'This folder, or one above or inside it, already has auto-sync.'**
+  String get autoSyncProblemOverlapsOtherRule;
+
+  /// Notice shown when the vault is read-only so auto-sync settings can't be saved
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is read-only, so auto-sync can\'t be saved.'**
+  String get autoSyncReadOnlyNotice;
+
+  /// Error shown when the saved auto-sync settings of a vault could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'The saved auto-sync settings for this vault couldn\'t be read.'**
+  String get autoSyncConfigUnreadable;
+
+  /// Dashboard banner shown while a sync is transferring files: the folder name and progress
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing with {target} · {done} of {total}'**
+  String autoSyncBannerRunning(String target, int done, int total);
+
+  /// Dashboard banner shown when the latest sync of some folder needs the user's attention
+  ///
+  /// In en, this message translates to:
+  /// **'Some folders couldn\'t be fully synced. Open a folder\'s Auto-sync settings for details.'**
+  String get autoSyncBannerAttention;
+
+  /// Title of the background notification while folders are being synced (keep generic: no names)
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing folders'**
+  String get autoSyncNotificationTitle;
+
+  /// Text of the background notification while folders are being synced: files done out of total
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} files'**
+  String autoSyncNotificationProgress(int done, int total);
 }
 
 class _AppLocalizationsDelegate

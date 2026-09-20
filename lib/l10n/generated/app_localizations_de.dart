@@ -7946,4 +7946,203 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Zentriert';
+
+  @override
+  String get autoSyncMenuAction => 'Automatische Synchronisierung…';
+
+  @override
+  String get autoSyncSheetTitle => 'Automatische Synchronisierung';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Hält diesen Ordner und einen anderen Ordner automatisch auf demselben Stand. Wurde dieselbe Datei auf beiden Seiten geändert, bleiben beide Versionen erhalten, sofern Sie unten nichts anderes wählen.';
+
+  @override
+  String get autoSyncTargetSection => 'Synchronisieren mit';
+
+  @override
+  String get autoSyncChooseFolder => 'Ordner auswählen';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Diese Regel wurde auf einem anderen Gerät eingerichtet. Wählen Sie den Ordner, der auf diesem Gerät verwendet werden soll.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Synchronisierungsziel';
+
+  @override
+  String get autoSyncDirectionSection => 'Richtung';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'In beide Richtungen';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Änderungen auf einer Seite werden auf die andere übertragen.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Tresor zu Ordner';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Ein Backup: Der Ordner folgt dem Tresor. Änderungen im Ordner werden nicht zurückkopiert.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Ordner zu Tresor';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Ein Import: Der Tresor folgt dem Ordner. Änderungen im Tresor werden nicht zurückkopiert.';
+
+  @override
+  String get autoSyncConflictSection =>
+      'Wenn beide Seiten eine Datei geändert haben';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Beide Versionen behalten';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'Die andere Version bleibt als umbenannte Kopie auf beiden Seiten erhalten.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Die neuere behalten';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Behält beide, wenn nicht erkennbar ist, welche neuer ist.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'Version im Tresor gewinnt';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'Die Version im Ordner wird ersetzt.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'Version im Ordner gewinnt';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'Die Version im Tresor wird ersetzt.';
+
+  @override
+  String get autoSyncOptionsSection => 'Optionen';
+
+  @override
+  String get autoSyncOnUnlockTitle =>
+      'Beim Entsperren des Tresors synchronisieren';
+
+  @override
+  String get autoSyncLiveTitle => 'Im entsperrten Zustand synchron halten';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Prüft bei geöffnetem Tresor von Zeit zu Zeit auf Änderungen. Nicht jede Änderung wird sofort bemerkt.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Löschungen ebenfalls übernehmen';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Eine auf einer Seite gelöschte Datei wird auch auf der anderen gelöscht. Löschungen werden pausiert, wenn ein Ordner unerwartet leer aussieht.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Dateien überspringen, die passen zu';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Ein Muster pro Zeile, z. B. *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Noch nicht synchronisiert';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Zuletzt synchronisiert: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied kopiert · $deleted gelöscht · $kept Konflikte beibehalten';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Nicht synchronisierbare Dateien: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Löschungen wurden pausiert, weil ein Ordner unerwartet leer aussah oder zu viele Dateien gelöscht worden wären.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Ein Teil eines Ordners konnte nicht gelesen werden, daher wurden diese Dateien unverändert gelassen.';
+
+  @override
+  String get autoSyncSyncNow => 'Jetzt synchronisieren';
+
+  @override
+  String get autoSyncRemove => 'Automatische Synchronisierung entfernen';
+
+  @override
+  String get autoSyncRemoveTitle => 'Automatische Synchronisierung entfernen?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'Die Synchronisierung dieses Ordners wird beendet. Die Dateien in beiden Ordnern bleiben unverändert.';
+
+  @override
+  String get autoSyncSaved => 'Automatische Synchronisierung gespeichert';
+
+  @override
+  String get autoSyncStarted => 'Synchronisierung gestartet';
+
+  @override
+  String get autoSyncRemoved => 'Automatische Synchronisierung entfernt';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'Die Einstellungen für die automatische Synchronisierung konnten nicht gespeichert werden';
+
+  @override
+  String get autoSyncUnavailable =>
+      'Die Synchronisierung ist für diesen Tresor derzeit nicht verfügbar.';
+
+  @override
+  String get autoSyncProblemNoTarget =>
+      'Wählen Sie einen Ordner zum Synchronisieren.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'Der Ordner, mit dem synchronisiert wird, darf nicht in diesem Ordner liegen und ihn nicht enthalten.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Für diesen Ordner oder einen darüber oder darin liegenden Ordner ist die automatische Synchronisierung bereits eingerichtet.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Dieser Tresor ist schreibgeschützt, daher kann die automatische Synchronisierung nicht gespeichert werden.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'Die gespeicherten Einstellungen für die automatische Synchronisierung dieses Tresors konnten nicht gelesen werden.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Synchronisierung mit $target · $done von $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Einige Ordner konnten nicht vollständig synchronisiert werden. Details finden Sie in den Einstellungen für die automatische Synchronisierung des Ordners.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Ordner werden synchronisiert';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done von $total Dateien';
+  }
 }

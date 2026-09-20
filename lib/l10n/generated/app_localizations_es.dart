@@ -7964,4 +7964,202 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Centrado';
+
+  @override
+  String get autoSyncMenuAction => 'Sincronización automática…';
+
+  @override
+  String get autoSyncSheetTitle => 'Sincronización automática';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Mantiene esta carpeta y otra carpeta al día automáticamente. Si el mismo archivo cambió en ambos lados, se conservan las dos versiones, salvo que elijas otra opción abajo.';
+
+  @override
+  String get autoSyncTargetSection => 'Sincronizar con';
+
+  @override
+  String get autoSyncChooseFolder => 'Elegir una carpeta';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Esta regla se configuró en otro dispositivo. Elige la carpeta que se usará en este dispositivo.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Destino de sincronización';
+
+  @override
+  String get autoSyncDirectionSection => 'Dirección';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'En ambos sentidos';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Los cambios de cualquiera de los lados se copian al otro.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Bóveda a carpeta';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Una copia de seguridad: la carpeta sigue a la bóveda. Los cambios hechos en la carpeta no se copian de vuelta.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Carpeta a bóveda';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Una importación: la bóveda sigue a la carpeta. Los cambios hechos en la bóveda no se copian de vuelta.';
+
+  @override
+  String get autoSyncConflictSection => 'Si ambos lados cambiaron un archivo';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Conservar ambas versiones';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'La otra versión se conserva como copia renombrada en ambos lados.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Conservar la más reciente';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Conserva ambas si no puede saber cuál es más reciente.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'Gana la versión de la bóveda';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'Se reemplaza la versión de la carpeta.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'Gana la versión de la carpeta';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'Se reemplaza la versión de la bóveda.';
+
+  @override
+  String get autoSyncOptionsSection => 'Opciones';
+
+  @override
+  String get autoSyncOnUnlockTitle => 'Sincronizar al desbloquear la bóveda';
+
+  @override
+  String get autoSyncLiveTitle =>
+      'Mantener sincronizado mientras está desbloqueada';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Busca cambios de vez en cuando mientras la bóveda está abierta. No todos los cambios se detectan al instante.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Copiar también las eliminaciones';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Un archivo eliminado en un lado se elimina en el otro. Las eliminaciones se pausan si una carpeta parece vacía de forma inesperada.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Omitir archivos que coincidan con';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Un patrón por línea, por ejemplo *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Aún no sincronizado';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Última sincronización: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied copiados · $deleted eliminados · $kept conflictos conservados';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Archivos que no se pudieron sincronizar: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Se pausaron las eliminaciones porque una carpeta parecía vacía de forma inesperada o se habrían eliminado demasiados archivos.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'No se pudo leer una parte de una carpeta, así que esos archivos se dejaron como estaban.';
+
+  @override
+  String get autoSyncSyncNow => 'Sincronizar ahora';
+
+  @override
+  String get autoSyncRemove => 'Quitar la sincronización automática';
+
+  @override
+  String get autoSyncRemoveTitle => '¿Quitar la sincronización automática?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'La sincronización de esta carpeta se detiene. Los archivos de ambas carpetas se quedan como están.';
+
+  @override
+  String get autoSyncSaved => 'Sincronización automática guardada';
+
+  @override
+  String get autoSyncStarted => 'Sincronización iniciada';
+
+  @override
+  String get autoSyncRemoved => 'Sincronización automática quitada';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'No se pudieron guardar los ajustes de sincronización automática';
+
+  @override
+  String get autoSyncUnavailable =>
+      'La sincronización no está disponible para esta bóveda en este momento.';
+
+  @override
+  String get autoSyncProblemNoTarget =>
+      'Elige una carpeta con la que sincronizar.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'La carpeta con la que se sincroniza no puede estar dentro de esta carpeta ni contenerla.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Esta carpeta, o una que la contiene o está dentro de ella, ya tiene sincronización automática.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Esta bóveda es de solo lectura, así que no se puede guardar la sincronización automática.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'No se pudieron leer los ajustes de sincronización automática guardados para esta bóveda.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Sincronizando con $target · $done de $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Algunas carpetas no se pudieron sincronizar por completo. Abre los ajustes de sincronización automática de una carpeta para ver los detalles.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Sincronizando carpetas';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done de $total archivos';
+  }
 }

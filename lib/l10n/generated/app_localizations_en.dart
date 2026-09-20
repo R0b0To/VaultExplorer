@@ -7823,4 +7823,199 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Centre';
+
+  @override
+  String get autoSyncMenuAction => 'Auto-sync…';
+
+  @override
+  String get autoSyncSheetTitle => 'Auto-sync';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.';
+
+  @override
+  String get autoSyncTargetSection => 'Sync with';
+
+  @override
+  String get autoSyncChooseFolder => 'Choose a folder';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'This rule was set up on another device. Choose the folder to use on this device.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Sync Target';
+
+  @override
+  String get autoSyncDirectionSection => 'Direction';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'Both ways';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Changes on either side are copied to the other.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Vault to folder';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'A backup: the folder follows the vault. Changes made in the folder are not copied back.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Folder to vault';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'An import: the vault follows the folder. Changes made in the vault are not copied back.';
+
+  @override
+  String get autoSyncConflictSection => 'If both sides changed a file';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Keep both versions';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'The other version is kept as a renamed copy on both sides.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Keep the newer one';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Keeps both when it can\'t tell which is newer.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'Vault version wins';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'The folder\'s version is replaced.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'Folder version wins';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'The vault\'s version is replaced.';
+
+  @override
+  String get autoSyncOptionsSection => 'Options';
+
+  @override
+  String get autoSyncOnUnlockTitle => 'Sync when the vault is unlocked';
+
+  @override
+  String get autoSyncLiveTitle => 'Keep in sync while unlocked';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Checks for changes from time to time while the vault is open. Not every change is noticed straight away.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Copy deletions too';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'A file deleted on one side is deleted on the other. Deletions are paused if a folder looks unexpectedly empty.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Skip files matching';
+
+  @override
+  String get autoSyncIgnoreHelper => 'One pattern per line, for example *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Not synced yet';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Last synced: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied copied · $deleted deleted · $kept conflicts kept';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'Files that couldn\'t be synced: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Deletions were paused because a folder looked unexpectedly empty or too many files would have been deleted.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Part of a folder couldn\'t be read, so those files were left alone.';
+
+  @override
+  String get autoSyncSyncNow => 'Sync now';
+
+  @override
+  String get autoSyncRemove => 'Remove auto-sync';
+
+  @override
+  String get autoSyncRemoveTitle => 'Remove auto-sync?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'Syncing stops for this folder. The files in both folders stay as they are.';
+
+  @override
+  String get autoSyncSaved => 'Auto-sync saved';
+
+  @override
+  String get autoSyncStarted => 'Sync started';
+
+  @override
+  String get autoSyncRemoved => 'Auto-sync removed';
+
+  @override
+  String get autoSyncSaveFailed => 'Couldn\'t save the auto-sync settings';
+
+  @override
+  String get autoSyncUnavailable =>
+      'Sync isn\'t available for this vault right now.';
+
+  @override
+  String get autoSyncProblemNoTarget => 'Choose a folder to sync with.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'The folder to sync with can\'t be inside this folder or contain it.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'This folder, or one above or inside it, already has auto-sync.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'This vault is read-only, so auto-sync can\'t be saved.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'The saved auto-sync settings for this vault couldn\'t be read.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Syncing with $target · $done of $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Some folders couldn\'t be fully synced. Open a folder\'s Auto-sync settings for details.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Syncing folders';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done of $total files';
+  }
 }

@@ -7419,4 +7419,182 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => '居中';
+
+  @override
+  String get autoSyncMenuAction => '自动同步…';
+
+  @override
+  String get autoSyncSheetTitle => '自动同步';
+
+  @override
+  String get autoSyncSheetIntro =>
+      '自动让此文件夹与另一个文件夹保持一致。如果同一文件在两侧都被修改，则会保留两个版本，除非您在下方另行选择。';
+
+  @override
+  String get autoSyncTargetSection => '同步对象';
+
+  @override
+  String get autoSyncChooseFolder => '选择文件夹';
+
+  @override
+  String get autoSyncTargetNotSetHere => '此规则是在另一台设备上设置的。请选择要在此设备上使用的文件夹。';
+
+  @override
+  String get autoSyncPickerSideLabel => '同步目标';
+
+  @override
+  String get autoSyncDirectionSection => '方向';
+
+  @override
+  String get autoSyncDirectionTwoWay => '双向';
+
+  @override
+  String get autoSyncDirectionTwoWayHint => '任一侧的更改都会复制到另一侧。';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => '保险库到文件夹';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      '用于备份：文件夹跟随保险库。在文件夹中所做的更改不会复制回来。';
+
+  @override
+  String get autoSyncDirectionTargetToVault => '文件夹到保险库';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      '用于导入：保险库跟随文件夹。在保险库中所做的更改不会复制回来。';
+
+  @override
+  String get autoSyncConflictSection => '如果两侧都修改了同一文件';
+
+  @override
+  String get autoSyncConflictKeepBoth => '保留两个版本';
+
+  @override
+  String get autoSyncConflictKeepBothHint => '另一个版本会以重命名副本的形式保留在两侧。';
+
+  @override
+  String get autoSyncConflictKeepNewer => '保留较新的';
+
+  @override
+  String get autoSyncConflictKeepNewerHint => '无法判断哪个较新时，会同时保留两者。';
+
+  @override
+  String get autoSyncConflictVaultWins => '以保险库版本为准';
+
+  @override
+  String get autoSyncConflictVaultWinsHint => '文件夹中的版本将被替换。';
+
+  @override
+  String get autoSyncConflictTargetWins => '以文件夹版本为准';
+
+  @override
+  String get autoSyncConflictTargetWinsHint => '保险库中的版本将被替换。';
+
+  @override
+  String get autoSyncOptionsSection => '选项';
+
+  @override
+  String get autoSyncOnUnlockTitle => '保险库解锁时同步';
+
+  @override
+  String get autoSyncLiveTitle => '解锁期间保持同步';
+
+  @override
+  String get autoSyncLiveSubtitle => '在保险库打开期间会不时检查更改。并非每项更改都会立即被发现。';
+
+  @override
+  String get autoSyncDeleteTitle => '同时同步删除';
+
+  @override
+  String get autoSyncDeleteSubtitle => '在一侧删除的文件也会在另一侧删除。如果某个文件夹意外显示为空，则会暂停删除。';
+
+  @override
+  String get autoSyncIgnoreLabel => '跳过符合以下规则的文件';
+
+  @override
+  String get autoSyncIgnoreHelper => '每行一个规则，例如 *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => '尚未同步';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return '上次同步：$time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '已复制 $copied · 已删除 $deleted · 保留冲突 $kept';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return '无法同步的文件：$count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused => '由于某个文件夹意外显示为空，或将要删除的文件过多，已暂停删除。';
+
+  @override
+  String get autoSyncReportIncomplete => '无法读取文件夹的一部分，因此这些文件保持原样。';
+
+  @override
+  String get autoSyncSyncNow => '立即同步';
+
+  @override
+  String get autoSyncRemove => '移除自动同步';
+
+  @override
+  String get autoSyncRemoveTitle => '移除自动同步？';
+
+  @override
+  String get autoSyncRemoveMessage => '此文件夹将停止同步。两个文件夹中的文件保持原样。';
+
+  @override
+  String get autoSyncSaved => '自动同步已保存';
+
+  @override
+  String get autoSyncStarted => '已开始同步';
+
+  @override
+  String get autoSyncRemoved => '已移除自动同步';
+
+  @override
+  String get autoSyncSaveFailed => '无法保存自动同步设置';
+
+  @override
+  String get autoSyncUnavailable => '此保险库当前无法同步。';
+
+  @override
+  String get autoSyncProblemNoTarget => '请选择要同步的文件夹。';
+
+  @override
+  String get autoSyncProblemOverlapsTarget => '要同步的文件夹不能位于此文件夹内，也不能包含此文件夹。';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule => '此文件夹或其上级、下级文件夹已设置自动同步。';
+
+  @override
+  String get autoSyncReadOnlyNotice => '此保险库为只读，无法保存自动同步。';
+
+  @override
+  String get autoSyncConfigUnreadable => '无法读取此保险库已保存的自动同步设置。';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return '正在与 $target 同步 · $done/$total';
+  }
+
+  @override
+  String get autoSyncBannerAttention => '部分文件夹未能完全同步。请打开文件夹的自动同步设置查看详情。';
+
+  @override
+  String get autoSyncNotificationTitle => '正在同步文件夹';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done/$total 个文件';
+  }
 }

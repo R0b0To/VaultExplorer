@@ -7518,4 +7518,189 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => '가운데 정렬';
+
+  @override
+  String get autoSyncMenuAction => '자동 동기화…';
+
+  @override
+  String get autoSyncSheetTitle => '자동 동기화';
+
+  @override
+  String get autoSyncSheetIntro =>
+      '이 폴더와 다른 폴더를 자동으로 같은 상태로 유지합니다. 같은 파일이 양쪽에서 변경된 경우, 아래에서 다르게 선택하지 않는 한 두 버전이 모두 보존됩니다.';
+
+  @override
+  String get autoSyncTargetSection => '동기화 대상';
+
+  @override
+  String get autoSyncChooseFolder => '폴더 선택';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      '이 규칙은 다른 기기에서 설정되었습니다. 이 기기에서 사용할 폴더를 선택하세요.';
+
+  @override
+  String get autoSyncPickerSideLabel => '동기화 대상';
+
+  @override
+  String get autoSyncDirectionSection => '방향';
+
+  @override
+  String get autoSyncDirectionTwoWay => '양방향';
+
+  @override
+  String get autoSyncDirectionTwoWayHint => '어느 한쪽의 변경 사항이 다른 쪽으로 복사됩니다.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => '볼트에서 폴더로';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      '백업용: 폴더가 볼트를 따릅니다. 폴더에서 한 변경 사항은 다시 복사되지 않습니다.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => '폴더에서 볼트로';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      '가져오기용: 볼트가 폴더를 따릅니다. 볼트에서 한 변경 사항은 다시 복사되지 않습니다.';
+
+  @override
+  String get autoSyncConflictSection => '양쪽에서 파일이 변경된 경우';
+
+  @override
+  String get autoSyncConflictKeepBoth => '두 버전 모두 유지';
+
+  @override
+  String get autoSyncConflictKeepBothHint => '다른 버전은 이름이 바뀐 사본으로 양쪽에 보존됩니다.';
+
+  @override
+  String get autoSyncConflictKeepNewer => '최신 버전 유지';
+
+  @override
+  String get autoSyncConflictKeepNewerHint => '어느 쪽이 더 최신인지 알 수 없으면 둘 다 유지합니다.';
+
+  @override
+  String get autoSyncConflictVaultWins => '볼트 버전 우선';
+
+  @override
+  String get autoSyncConflictVaultWinsHint => '폴더의 버전이 대체됩니다.';
+
+  @override
+  String get autoSyncConflictTargetWins => '폴더 버전 우선';
+
+  @override
+  String get autoSyncConflictTargetWinsHint => '볼트의 버전이 대체됩니다.';
+
+  @override
+  String get autoSyncOptionsSection => '옵션';
+
+  @override
+  String get autoSyncOnUnlockTitle => '볼트 잠금 해제 시 동기화';
+
+  @override
+  String get autoSyncLiveTitle => '잠금 해제 중 동기화 유지';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      '볼트가 열려 있는 동안 가끔 변경 사항을 확인합니다. 모든 변경 사항이 즉시 감지되지는 않습니다.';
+
+  @override
+  String get autoSyncDeleteTitle => '삭제도 함께 반영';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      '한쪽에서 삭제한 파일은 다른 쪽에서도 삭제됩니다. 폴더가 예상치 않게 비어 있는 것처럼 보이면 삭제가 일시 중지됩니다.';
+
+  @override
+  String get autoSyncIgnoreLabel => '다음과 일치하는 파일 건너뛰기';
+
+  @override
+  String get autoSyncIgnoreHelper => '한 줄에 하나의 패턴 (예: *.tmp)';
+
+  @override
+  String get autoSyncNeverSynced => '아직 동기화되지 않음';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return '마지막 동기화: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '복사 $copied개 · 삭제 $deleted개 · 충돌 보존 $kept개';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return '동기화하지 못한 파일: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      '폴더가 예상치 않게 비어 있는 것처럼 보였거나 너무 많은 파일이 삭제될 예정이어서 삭제를 일시 중지했습니다.';
+
+  @override
+  String get autoSyncReportIncomplete => '폴더의 일부를 읽을 수 없어 해당 파일은 그대로 두었습니다.';
+
+  @override
+  String get autoSyncSyncNow => '지금 동기화';
+
+  @override
+  String get autoSyncRemove => '자동 동기화 제거';
+
+  @override
+  String get autoSyncRemoveTitle => '자동 동기화를 제거할까요?';
+
+  @override
+  String get autoSyncRemoveMessage => '이 폴더의 동기화가 중지됩니다. 두 폴더의 파일은 그대로 유지됩니다.';
+
+  @override
+  String get autoSyncSaved => '자동 동기화가 저장되었습니다';
+
+  @override
+  String get autoSyncStarted => '동기화를 시작했습니다';
+
+  @override
+  String get autoSyncRemoved => '자동 동기화가 제거되었습니다';
+
+  @override
+  String get autoSyncSaveFailed => '자동 동기화 설정을 저장할 수 없습니다';
+
+  @override
+  String get autoSyncUnavailable => '지금은 이 볼트에서 동기화를 사용할 수 없습니다.';
+
+  @override
+  String get autoSyncProblemNoTarget => '동기화할 폴더를 선택하세요.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      '동기화할 폴더는 이 폴더 안에 있거나 이 폴더를 포함할 수 없습니다.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      '이 폴더 또는 상위·하위 폴더에 이미 자동 동기화가 설정되어 있습니다.';
+
+  @override
+  String get autoSyncReadOnlyNotice => '이 볼트는 읽기 전용이므로 자동 동기화를 저장할 수 없습니다.';
+
+  @override
+  String get autoSyncConfigUnreadable => '이 볼트에 저장된 자동 동기화 설정을 읽을 수 없습니다.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return '$target과(와) 동기화 중 · $done/$total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      '일부 폴더를 완전히 동기화하지 못했습니다. 자세한 내용은 폴더의 자동 동기화 설정에서 확인하세요.';
+
+  @override
+  String get autoSyncNotificationTitle => '폴더 동기화 중';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done/$total개 파일';
+  }
 }

@@ -7947,4 +7947,202 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get aspectRatioCentre => 'Centro';
+
+  @override
+  String get autoSyncMenuAction => 'Sincronizzazione automatica…';
+
+  @override
+  String get autoSyncSheetTitle => 'Sincronizzazione automatica';
+
+  @override
+  String get autoSyncSheetIntro =>
+      'Mantiene automaticamente allineati questa cartella e un\'altra cartella. Se lo stesso file è cambiato su entrambi i lati, vengono conservate entrambe le versioni, a meno che tu non scelga diversamente qui sotto.';
+
+  @override
+  String get autoSyncTargetSection => 'Sincronizza con';
+
+  @override
+  String get autoSyncChooseFolder => 'Scegli una cartella';
+
+  @override
+  String get autoSyncTargetNotSetHere =>
+      'Questa regola è stata impostata su un altro dispositivo. Scegli la cartella da usare su questo dispositivo.';
+
+  @override
+  String get autoSyncPickerSideLabel => 'Destinazione di sincronizzazione';
+
+  @override
+  String get autoSyncDirectionSection => 'Direzione';
+
+  @override
+  String get autoSyncDirectionTwoWay => 'In entrambe le direzioni';
+
+  @override
+  String get autoSyncDirectionTwoWayHint =>
+      'Le modifiche su un lato vengono copiate sull\'altro.';
+
+  @override
+  String get autoSyncDirectionVaultToTarget => 'Da vault a cartella';
+
+  @override
+  String get autoSyncDirectionVaultToTargetHint =>
+      'Un backup: la cartella segue il vault. Le modifiche fatte nella cartella non vengono copiate indietro.';
+
+  @override
+  String get autoSyncDirectionTargetToVault => 'Da cartella a vault';
+
+  @override
+  String get autoSyncDirectionTargetToVaultHint =>
+      'Un\'importazione: il vault segue la cartella. Le modifiche fatte nel vault non vengono copiate indietro.';
+
+  @override
+  String get autoSyncConflictSection =>
+      'Se entrambi i lati hanno modificato un file';
+
+  @override
+  String get autoSyncConflictKeepBoth => 'Conserva entrambe le versioni';
+
+  @override
+  String get autoSyncConflictKeepBothHint =>
+      'L\'altra versione viene conservata come copia rinominata su entrambi i lati.';
+
+  @override
+  String get autoSyncConflictKeepNewer => 'Conserva la più recente';
+
+  @override
+  String get autoSyncConflictKeepNewerHint =>
+      'Le conserva entrambe se non riesce a capire quale sia più recente.';
+
+  @override
+  String get autoSyncConflictVaultWins => 'Vince la versione del vault';
+
+  @override
+  String get autoSyncConflictVaultWinsHint =>
+      'La versione della cartella viene sostituita.';
+
+  @override
+  String get autoSyncConflictTargetWins => 'Vince la versione della cartella';
+
+  @override
+  String get autoSyncConflictTargetWinsHint =>
+      'La versione del vault viene sostituita.';
+
+  @override
+  String get autoSyncOptionsSection => 'Opzioni';
+
+  @override
+  String get autoSyncOnUnlockTitle => 'Sincronizza allo sblocco del vault';
+
+  @override
+  String get autoSyncLiveTitle => 'Mantieni sincronizzato mentre è sbloccato';
+
+  @override
+  String get autoSyncLiveSubtitle =>
+      'Controlla le modifiche di tanto in tanto mentre il vault è aperto. Non tutte le modifiche vengono rilevate subito.';
+
+  @override
+  String get autoSyncDeleteTitle => 'Copia anche le eliminazioni';
+
+  @override
+  String get autoSyncDeleteSubtitle =>
+      'Un file eliminato su un lato viene eliminato anche sull\'altro. Le eliminazioni vengono sospese se una cartella sembra inaspettatamente vuota.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Ignora i file che corrispondono a';
+
+  @override
+  String get autoSyncIgnoreHelper => 'Un modello per riga, ad esempio *.tmp';
+
+  @override
+  String get autoSyncNeverSynced => 'Non ancora sincronizzato';
+
+  @override
+  String autoSyncLastSynced(String time) {
+    return 'Ultima sincronizzazione: $time';
+  }
+
+  @override
+  String autoSyncReportSummary(int copied, int deleted, int kept) {
+    return '$copied copiati · $deleted eliminati · $kept conflitti conservati';
+  }
+
+  @override
+  String autoSyncReportFailed(int count) {
+    return 'File che non è stato possibile sincronizzare: $count';
+  }
+
+  @override
+  String get autoSyncReportDeletionsPaused =>
+      'Le eliminazioni sono state sospese perché una cartella sembrava inaspettatamente vuota o sarebbero stati eliminati troppi file.';
+
+  @override
+  String get autoSyncReportIncomplete =>
+      'Non è stato possibile leggere una parte di una cartella, quindi quei file sono stati lasciati invariati.';
+
+  @override
+  String get autoSyncSyncNow => 'Sincronizza ora';
+
+  @override
+  String get autoSyncRemove => 'Rimuovi la sincronizzazione automatica';
+
+  @override
+  String get autoSyncRemoveTitle => 'Rimuovere la sincronizzazione automatica?';
+
+  @override
+  String get autoSyncRemoveMessage =>
+      'La sincronizzazione di questa cartella si interrompe. I file in entrambe le cartelle restano invariati.';
+
+  @override
+  String get autoSyncSaved => 'Sincronizzazione automatica salvata';
+
+  @override
+  String get autoSyncStarted => 'Sincronizzazione avviata';
+
+  @override
+  String get autoSyncRemoved => 'Sincronizzazione automatica rimossa';
+
+  @override
+  String get autoSyncSaveFailed =>
+      'Impossibile salvare le impostazioni di sincronizzazione automatica';
+
+  @override
+  String get autoSyncUnavailable =>
+      'La sincronizzazione non è al momento disponibile per questo vault.';
+
+  @override
+  String get autoSyncProblemNoTarget =>
+      'Scegli una cartella con cui sincronizzare.';
+
+  @override
+  String get autoSyncProblemOverlapsTarget =>
+      'La cartella con cui sincronizzare non può trovarsi in questa cartella né contenerla.';
+
+  @override
+  String get autoSyncProblemOverlapsOtherRule =>
+      'Questa cartella, o una che la contiene o si trova al suo interno, ha già la sincronizzazione automatica.';
+
+  @override
+  String get autoSyncReadOnlyNotice =>
+      'Questo vault è di sola lettura, quindi non è possibile salvare la sincronizzazione automatica.';
+
+  @override
+  String get autoSyncConfigUnreadable =>
+      'Non è stato possibile leggere le impostazioni di sincronizzazione automatica salvate per questo vault.';
+
+  @override
+  String autoSyncBannerRunning(String target, int done, int total) {
+    return 'Sincronizzazione con $target · $done di $total';
+  }
+
+  @override
+  String get autoSyncBannerAttention =>
+      'Non è stato possibile sincronizzare completamente alcune cartelle. Apri le impostazioni di sincronizzazione automatica di una cartella per i dettagli.';
+
+  @override
+  String get autoSyncNotificationTitle => 'Sincronizzazione delle cartelle';
+
+  @override
+  String autoSyncNotificationProgress(int done, int total) {
+    return '$done di $total file';
+  }
 }

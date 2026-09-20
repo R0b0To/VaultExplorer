@@ -10011,5 +10011,265 @@
   "aspectRatioCentre": "Centre",
   "@aspectRatioCentre": {
     "description": "Label for centre aspect ratio option"
+  },
+  "autoSyncMenuAction": "Auto-sync…",
+  "@autoSyncMenuAction": {
+    "description": "Folder actions menu entry that opens the auto-sync settings for that folder"
+  },
+  "autoSyncSheetTitle": "Auto-sync",
+  "@autoSyncSheetTitle": {
+    "description": "Title of the auto-sync settings sheet for a folder"
+  },
+  "autoSyncSheetIntro": "Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.",
+  "@autoSyncSheetIntro": {
+    "description": "Introductory text at the top of the auto-sync settings sheet"
+  },
+  "autoSyncTargetSection": "Sync with",
+  "@autoSyncTargetSection": {
+    "description": "Section label above the folder an auto-sync rule syncs with"
+  },
+  "autoSyncChooseFolder": "Choose a folder",
+  "@autoSyncChooseFolder": {
+    "description": "Placeholder on the target tile before a folder has been chosen"
+  },
+  "autoSyncTargetNotSetHere": "This rule was set up on another device. Choose the folder to use on this device.",
+  "@autoSyncTargetNotSetHere": {
+    "description": "Hint shown when a sync rule came from another device and has no folder chosen on this device"
+  },
+  "autoSyncPickerSideLabel": "Sync Target",
+  "@autoSyncPickerSideLabel": {
+    "description": "Label passed to the folder picker title ('Select {side} Folder') when choosing the sync target"
+  },
+  "autoSyncDirectionSection": "Direction",
+  "@autoSyncDirectionSection": {
+    "description": "Section label for the sync direction choice"
+  },
+  "autoSyncDirectionTwoWay": "Both ways",
+  "@autoSyncDirectionTwoWay": {
+    "description": "Sync direction option: changes flow both ways"
+  },
+  "autoSyncDirectionTwoWayHint": "Changes on either side are copied to the other.",
+  "@autoSyncDirectionTwoWayHint": {
+    "description": "Explanation of the two-way sync direction"
+  },
+  "autoSyncDirectionVaultToTarget": "Vault to folder",
+  "@autoSyncDirectionVaultToTarget": {
+    "description": "Sync direction option: the vault is the source and the folder is a backup"
+  },
+  "autoSyncDirectionVaultToTargetHint": "A backup: the folder follows the vault. Changes made in the folder are not copied back.",
+  "@autoSyncDirectionVaultToTargetHint": {
+    "description": "Explanation of the vault-to-folder sync direction"
+  },
+  "autoSyncDirectionTargetToVault": "Folder to vault",
+  "@autoSyncDirectionTargetToVault": {
+    "description": "Sync direction option: the folder is the source and the vault imports from it"
+  },
+  "autoSyncDirectionTargetToVaultHint": "An import: the vault follows the folder. Changes made in the vault are not copied back.",
+  "@autoSyncDirectionTargetToVaultHint": {
+    "description": "Explanation of the folder-to-vault sync direction"
+  },
+  "autoSyncConflictSection": "If both sides changed a file",
+  "@autoSyncConflictSection": {
+    "description": "Section label for what to do when both sides changed the same file"
+  },
+  "autoSyncConflictKeepBoth": "Keep both versions",
+  "@autoSyncConflictKeepBoth": {
+    "description": "Conflict option: keep both versions of the file"
+  },
+  "autoSyncConflictKeepBothHint": "The other version is kept as a renamed copy on both sides.",
+  "@autoSyncConflictKeepBothHint": {
+    "description": "Explanation of the keep-both conflict option"
+  },
+  "autoSyncConflictKeepNewer": "Keep the newer one",
+  "@autoSyncConflictKeepNewer": {
+    "description": "Conflict option: keep whichever version is newer"
+  },
+  "autoSyncConflictKeepNewerHint": "Keeps both when it can't tell which is newer.",
+  "@autoSyncConflictKeepNewerHint": {
+    "description": "Explanation of the keep-newer conflict option"
+  },
+  "autoSyncConflictVaultWins": "Vault version wins",
+  "@autoSyncConflictVaultWins": {
+    "description": "Conflict option: the vault's version replaces the folder's"
+  },
+  "autoSyncConflictVaultWinsHint": "The folder's version is replaced.",
+  "@autoSyncConflictVaultWinsHint": {
+    "description": "Explanation of the vault-wins conflict option"
+  },
+  "autoSyncConflictTargetWins": "Folder version wins",
+  "@autoSyncConflictTargetWins": {
+    "description": "Conflict option: the folder's version replaces the vault's"
+  },
+  "autoSyncConflictTargetWinsHint": "The vault's version is replaced.",
+  "@autoSyncConflictTargetWinsHint": {
+    "description": "Explanation of the folder-wins conflict option"
+  },
+  "autoSyncOptionsSection": "Options",
+  "@autoSyncOptionsSection": {
+    "description": "Section label for the auto-sync options switches"
+  },
+  "autoSyncOnUnlockTitle": "Sync when the vault is unlocked",
+  "@autoSyncOnUnlockTitle": {
+    "description": "Switch: run this sync every time the vault is unlocked"
+  },
+  "autoSyncLiveTitle": "Keep in sync while unlocked",
+  "@autoSyncLiveTitle": {
+    "description": "Switch: keep syncing while the vault stays unlocked"
+  },
+  "autoSyncLiveSubtitle": "Checks for changes from time to time while the vault is open. Not every change is noticed straight away.",
+  "@autoSyncLiveSubtitle": {
+    "description": "Explanation of the keep-in-sync-while-unlocked switch, including its limits"
+  },
+  "autoSyncDeleteTitle": "Copy deletions too",
+  "@autoSyncDeleteTitle": {
+    "description": "Switch: also propagate deletions to the other side"
+  },
+  "autoSyncDeleteSubtitle": "A file deleted on one side is deleted on the other. Deletions are paused if a folder looks unexpectedly empty.",
+  "@autoSyncDeleteSubtitle": {
+    "description": "Explanation of the copy-deletions switch, including the safety pause"
+  },
+  "autoSyncIgnoreLabel": "Skip files matching",
+  "@autoSyncIgnoreLabel": {
+    "description": "Label of the text field listing file patterns that auto-sync skips"
+  },
+  "autoSyncIgnoreHelper": "One pattern per line, for example *.tmp",
+  "@autoSyncIgnoreHelper": {
+    "description": "Helper text under the skip-patterns field"
+  },
+  "autoSyncNeverSynced": "Not synced yet",
+  "@autoSyncNeverSynced": {
+    "description": "Status text when a sync rule has not completed a sync yet"
+  },
+  "autoSyncLastSynced": "Last synced: {time}",
+  "@autoSyncLastSynced": {
+    "description": "Status text with the date and time of the last completed sync",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "autoSyncReportSummary": "{copied} copied · {deleted} deleted · {kept} conflicts kept",
+  "@autoSyncReportSummary": {
+    "description": "Summary of the latest sync run: counts of copied files, deleted files and conflicts that kept both versions",
+    "placeholders": {
+      "copied": {
+        "type": "int"
+      },
+      "deleted": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      }
+    }
+  },
+  "autoSyncReportFailed": "Files that couldn't be synced: {count}",
+  "@autoSyncReportFailed": {
+    "description": "Note on the latest sync run: how many files could not be synced",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "autoSyncReportDeletionsPaused": "Deletions were paused because a folder looked unexpectedly empty or too many files would have been deleted.",
+  "@autoSyncReportDeletionsPaused": {
+    "description": "Note on the latest sync run: deletions were held back as a safety measure"
+  },
+  "autoSyncReportIncomplete": "Part of a folder couldn't be read, so those files were left alone.",
+  "@autoSyncReportIncomplete": {
+    "description": "Note on the latest sync run: part of a folder could not be read"
+  },
+  "autoSyncSyncNow": "Sync now",
+  "@autoSyncSyncNow": {
+    "description": "Button that starts a sync of this folder immediately"
+  },
+  "autoSyncRemove": "Remove auto-sync",
+  "@autoSyncRemove": {
+    "description": "Button that removes auto-sync from a folder"
+  },
+  "autoSyncRemoveTitle": "Remove auto-sync?",
+  "@autoSyncRemoveTitle": {
+    "description": "Title of the confirmation dialog for removing auto-sync"
+  },
+  "autoSyncRemoveMessage": "Syncing stops for this folder. The files in both folders stay as they are.",
+  "@autoSyncRemoveMessage": {
+    "description": "Body of the confirmation dialog for removing auto-sync"
+  },
+  "autoSyncSaved": "Auto-sync saved",
+  "@autoSyncSaved": {
+    "description": "Snackbar shown after the auto-sync settings were saved"
+  },
+  "autoSyncStarted": "Sync started",
+  "@autoSyncStarted": {
+    "description": "Snackbar shown after a sync was started from the settings sheet"
+  },
+  "autoSyncRemoved": "Auto-sync removed",
+  "@autoSyncRemoved": {
+    "description": "Snackbar shown after auto-sync was removed from a folder"
+  },
+  "autoSyncSaveFailed": "Couldn't save the auto-sync settings",
+  "@autoSyncSaveFailed": {
+    "description": "Snackbar shown when the auto-sync settings could not be saved"
+  },
+  "autoSyncUnavailable": "Sync isn't available for this vault right now.",
+  "@autoSyncUnavailable": {
+    "description": "Snackbar shown when a sync can't be started because the vault has no active sync session"
+  },
+  "autoSyncProblemNoTarget": "Choose a folder to sync with.",
+  "@autoSyncProblemNoTarget": {
+    "description": "Validation message: no folder to sync with was chosen"
+  },
+  "autoSyncProblemOverlapsTarget": "The folder to sync with can't be inside this folder or contain it.",
+  "@autoSyncProblemOverlapsTarget": {
+    "description": "Validation message: the chosen folder is inside the synced folder or contains it"
+  },
+  "autoSyncProblemOverlapsOtherRule": "This folder, or one above or inside it, already has auto-sync.",
+  "@autoSyncProblemOverlapsOtherRule": {
+    "description": "Validation message: another auto-sync rule already covers this folder or a folder above/inside it"
+  },
+  "autoSyncReadOnlyNotice": "This vault is read-only, so auto-sync can't be saved.",
+  "@autoSyncReadOnlyNotice": {
+    "description": "Notice shown when the vault is read-only so auto-sync settings can't be saved"
+  },
+  "autoSyncConfigUnreadable": "The saved auto-sync settings for this vault couldn't be read.",
+  "@autoSyncConfigUnreadable": {
+    "description": "Error shown when the saved auto-sync settings of a vault could not be read"
+  },
+  "autoSyncBannerRunning": "Syncing with {target} · {done} of {total}",
+  "@autoSyncBannerRunning": {
+    "description": "Dashboard banner shown while a sync is transferring files: the folder name and progress",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "autoSyncBannerAttention": "Some folders couldn't be fully synced. Open a folder's Auto-sync settings for details.",
+  "@autoSyncBannerAttention": {
+    "description": "Dashboard banner shown when the latest sync of some folder needs the user's attention"
+  },
+  "autoSyncNotificationTitle": "Syncing folders",
+  "@autoSyncNotificationTitle": {
+    "description": "Title of the background notification while folders are being synced (keep generic: no names)"
+  },
+  "autoSyncNotificationProgress": "{done} of {total} files",
+  "@autoSyncNotificationProgress": {
+    "description": "Text of the background notification while folders are being synced: files done out of total",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
   }
 }

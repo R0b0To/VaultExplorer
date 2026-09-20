@@ -8182,4 +8182,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name in $destination gespeichert';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Karten-Wischgesten';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Tresorkarten wischen, um Bearbeiten- und Entfernen-Aktionen schnell anzuzeigen';
 }

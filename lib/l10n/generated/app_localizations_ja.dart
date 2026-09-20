@@ -7739,4 +7739,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$nameを$destinationに保存しました';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'カードのスワイプ操作';
+
+  @override
+  String get cardSwipeActionsSubtitle => '保管庫カードをスワイプして編集および削除アクションをすばやく表示します';
 }

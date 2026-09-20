@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "런처가 지원하는 경우 빠른 캡처 아이콘을 홈 화면에 고정합니다",
   "quickCaptureShortcutRequestedMessage": "요청됨 — 홈 화면을 확인하세요",
   "quickCaptureShortcutUnsupportedMessage": "런처가 바로가기 고정을 지원하지 않습니다",
-  "quickCaptureSavedToast": "{name}을(를) {destination}에 저장했습니다"
+  "quickCaptureSavedToast": "{name}을(를) {destination}에 저장했습니다",
+  "cardSwipeActionsTitle": "카드 스와이프 제스처",
+  "cardSwipeActionsSubtitle": "볼트 카드를 스와이프하여 편집 및 삭제 동작을 빠르게 표시합니다"
 }

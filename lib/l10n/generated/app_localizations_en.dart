@@ -8055,4 +8055,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return 'Saved $name to $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Card Swipe Actions';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Swipe vault cards to quickly reveal edit and remove actions';
 }

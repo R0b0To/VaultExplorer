@@ -8199,4 +8199,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name guardado en $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Gestos de deslizamiento en tarjetas';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar';
 }

@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "ランチャーが対応していれば、クイックキャプチャのアイコンをホーム画面に固定します",
   "quickCaptureShortcutRequestedMessage": "リクエストしました。ホーム画面を確認してください",
   "quickCaptureShortcutUnsupportedMessage": "お使いのランチャーはショートカットの固定に対応していません",
-  "quickCaptureSavedToast": "{name}を{destination}に保存しました"
+  "quickCaptureSavedToast": "{name}を{destination}に保存しました",
+  "cardSwipeActionsTitle": "カードのスワイプ操作",
+  "cardSwipeActionsSubtitle": "保管庫カードをスワイプして編集および削除アクションをすばやく表示します"
 }

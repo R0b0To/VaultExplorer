@@ -3,89 +3,56 @@ import 'dart:convert';
 import 'dart:io';
 
 const Map<String, dynamic> enMetadataAndValues = {
-  'contentsLabel': 'Contents',
-  '@contentsLabel': {
-    'description': 'Label for item count row in folder info sheet',
+  'cardSwipeActionsTitle': 'Card Swipe Actions',
+  '@cardSwipeActionsTitle': {
+    'description': 'Settings toggle title to enable or disable card swipe gestures on the dashboard',
   },
-  'totalSizeLabel': 'Total Size',
-  '@totalSizeLabel': {
-    'description': 'Label for total size row in folder info sheet',
-  },
-  'folderItemCount': '{count, plural, =0{Empty} =1{1 item} other{{count} items}}',
-  '@folderItemCount': {
-    'description': 'Formatted item count for folder contents',
-    'placeholders': {
-      'count': {
-        'type': 'num',
-      }
-    }
-  },
-  'calculatingFolderStats': 'Calculating…',
-  '@calculatingFolderStats': {
-    'description': 'Placeholder text while scanning folder contents',
+  'cardSwipeActionsSubtitle': 'Swipe vault cards to quickly reveal edit and remove actions',
+  '@cardSwipeActionsSubtitle': {
+    'description': 'Settings toggle subtitle explaining card swipe actions on the dashboard',
   },
 };
 
 const Map<String, Map<String, String>> localizedValues = {
   'it': {
-    'contentsLabel': 'Contenuto',
-    'totalSizeLabel': 'Dimensione totale',
-    'folderItemCount': '{count, plural, =0{Vuota} =1{1 elemento} other{{count} elementi}}',
-    'calculatingFolderStats': 'Calcolo in corso…',
+    'cardSwipeActionsTitle': 'Gesti di scorrimento delle schede',
+    'cardSwipeActionsSubtitle': 'Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione',
   },
   'de': {
-    'contentsLabel': 'Inhalt',
-    'totalSizeLabel': 'Gesamtgröße',
-    'folderItemCount': '{count, plural, =0{Leer} =1{1 Element} other{{count} Elemente}}',
-    'calculatingFolderStats': 'Wird berechnet…',
+    'cardSwipeActionsTitle': 'Karten-Wischgesten',
+    'cardSwipeActionsSubtitle': 'Tresorkarten wischen, um Bearbeiten- und Entfernen-Aktionen schnell anzuzeigen',
   },
   'es': {
-    'contentsLabel': 'Contenido',
-    'totalSizeLabel': 'Tamaño total',
-    'folderItemCount': '{count, plural, =0{Vacía} =1{1 elemento} other{{count} elementos}}',
-    'calculatingFolderStats': 'Calculando…',
+    'cardSwipeActionsTitle': 'Gestos de deslizamiento en tarjetas',
+    'cardSwipeActionsSubtitle': 'Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar',
   },
   'fr': {
-    'contentsLabel': 'Contenu',
-    'totalSizeLabel': 'Taille totale',
-    'folderItemCount': '{count, plural, =0{Vide} =1{1 élément} other{{count} éléments}}',
-    'calculatingFolderStats': 'Calcul en cours…',
+    'cardSwipeActionsTitle': 'Gestes de balayage des cartes',
+    'cardSwipeActionsSubtitle': 'Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer',
   },
   'ar': {
-    'contentsLabel': 'المحتويات',
-    'totalSizeLabel': 'الحجم الإجمالي',
-    'folderItemCount': '{count, plural, =0{فارغ} =1{عنصر واحد} =2{عنصران} few{{count} عناصر} many{{count} عنصر} other{{count} عنصر}}',
-    'calculatingFolderStats': 'جارٍ الحساب…',
+    'cardSwipeActionsTitle': 'إيماءات سحب البطاقات',
+    'cardSwipeActionsSubtitle': 'اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة',
   },
   'ja': {
-    'contentsLabel': 'コンテンツ',
-    'totalSizeLabel': '合計サイズ',
-    'folderItemCount': '{count, plural, =0{空} other{{count}個の項目}}',
-    'calculatingFolderStats': '計算中…',
+    'cardSwipeActionsTitle': 'カードのスワイプ操作',
+    'cardSwipeActionsSubtitle': '保管庫カードをスワイプして編集および削除アクションをすばやく表示します',
   },
   'ko': {
-    'contentsLabel': '콘텐츠',
-    'totalSizeLabel': '총 크기',
-    'folderItemCount': '{count, plural, =0{비어 있음} other{{count}개 항목}}',
-    'calculatingFolderStats': '계산 중…',
+    'cardSwipeActionsTitle': '카드 스와이프 제스처',
+    'cardSwipeActionsSubtitle': '볼트 카드를 스와이프하여 편집 및 삭제 동작을 빠르게 표시합니다',
   },
   'pt': {
-    'contentsLabel': 'Conteúdo',
-    'totalSizeLabel': 'Tamanho total',
-    'folderItemCount': '{count, plural, =0{Vazio} =1{1 item} other{{count} itens}}',
-    'calculatingFolderStats': 'Calculando…',
+    'cardSwipeActionsTitle': 'Gestos de deslize nos cartões',
+    'cardSwipeActionsSubtitle': 'Deslize os cartões de cofre para exibir rapidamente as ações de editar e remover',
   },
   'uk': {
-    'contentsLabel': 'Вміст',
-    'totalSizeLabel': 'Загальний розмір',
-    'folderItemCount': '{count, plural, =0{Порожньо} =1{1 елемент} few{{count} елементи} many{{count} елементів} other{{count} елементів}}',
-    'calculatingFolderStats': 'Обчислення…',
+    'cardSwipeActionsTitle': 'Жести змахування карток',
+    'cardSwipeActionsSubtitle': 'Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення',
   },
   'zh': {
-    'contentsLabel': '内容',
-    'totalSizeLabel': '总大小',
-    'folderItemCount': '{count, plural, =0{空} other{{count} 个项目}}',
-    'calculatingFolderStats': '正在计算…',
+    'cardSwipeActionsTitle': '卡片滑动操作',
+    'cardSwipeActionsSubtitle': '滑动保险库卡片以快速显示编辑和移除操作',
   },
 };
 
@@ -120,7 +87,7 @@ void main() async {
     final translations = localizedValues[lang] ?? {};
     final Map<String, dynamic> toInsert = {};
     for (final entry in enMetadataAndValues.entries) {
-      if (entry.key.startsWith('@')) continue; // Metadata only belongs in app_en.arb
+      if (entry.key.startsWith('@')) continue; // Metadata belongs only in app_en.arb
       toInsert[entry.key] = translations[entry.key] ?? entry.value;
     }
 
@@ -129,7 +96,7 @@ void main() async {
   }
 
   print('\nARB files updated successfully.');
-  print('Please run "flutter gen-l10n" to regenerate localization Dart bindings.');
+  print('Run "flutter gen-l10n" to regenerate localization Dart bindings.');
 }
 
 Directory? _findL10nDirectory() {

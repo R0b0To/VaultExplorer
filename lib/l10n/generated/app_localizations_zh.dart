@@ -7630,4 +7630,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '已将 $name 保存至 $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => '卡片滑动操作';
+
+  @override
+  String get cardSwipeActionsSubtitle => '滑动保险库卡片以快速显示编辑和移除操作';
 }

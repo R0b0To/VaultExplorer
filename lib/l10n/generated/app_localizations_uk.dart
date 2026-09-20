@@ -8240,4 +8240,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name збережено в $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Жести змахування карток';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення';
 }

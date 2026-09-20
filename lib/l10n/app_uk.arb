@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "Закріплює значок швидкого захоплення на головному екрані, якщо це підтримує ваш лончер",
   "quickCaptureShortcutRequestedMessage": "Запит надіслано — перевірте головний екран",
   "quickCaptureShortcutUnsupportedMessage": "Ваш лончер не підтримує закріплення ярликів",
-  "quickCaptureSavedToast": "{name} збережено в {destination}"
+  "quickCaptureSavedToast": "{name} збережено в {destination}",
+  "cardSwipeActionsTitle": "Жести змахування карток",
+  "cardSwipeActionsSubtitle": "Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення"
 }

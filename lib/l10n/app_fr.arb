@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "Épingle une icône Capture rapide sur votre écran d'accueil, si votre launcher le permet",
   "quickCaptureShortcutRequestedMessage": "Demandé : vérifiez votre écran d'accueil",
   "quickCaptureShortcutUnsupportedMessage": "Votre launcher ne prend pas en charge l'épinglage de raccourcis",
-  "quickCaptureSavedToast": "{name} enregistré dans {destination}"
+  "quickCaptureSavedToast": "{name} enregistré dans {destination}",
+  "cardSwipeActionsTitle": "Gestes de balayage des cartes",
+  "cardSwipeActionsSubtitle": "Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer"
 }

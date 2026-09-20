@@ -7738,4 +7738,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name을(를) $destination에 저장했습니다';
   }
+
+  @override
+  String get cardSwipeActionsTitle => '카드 스와이프 제스처';
+
+  @override
+  String get cardSwipeActionsSubtitle => '볼트 카드를 스와이프하여 편집 및 삭제 동작을 빠르게 표시합니다';
 }

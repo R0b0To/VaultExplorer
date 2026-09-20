@@ -8242,4 +8242,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return 'تم حفظ $name في $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'إيماءات سحب البطاقات';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة';
 }

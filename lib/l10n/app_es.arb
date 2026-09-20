@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "Fija un icono de Captura rápida en tu pantalla de inicio, si tu launcher lo permite",
   "quickCaptureShortcutRequestedMessage": "Solicitado: revisa tu pantalla de inicio",
   "quickCaptureShortcutUnsupportedMessage": "Tu launcher no permite fijar accesos directos",
-  "quickCaptureSavedToast": "{name} guardado en {destination}"
+  "quickCaptureSavedToast": "{name} guardado en {destination}",
+  "cardSwipeActionsTitle": "Gestos de deslizamiento en tarjetas",
+  "cardSwipeActionsSubtitle": "Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar"
 }

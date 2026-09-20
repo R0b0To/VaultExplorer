@@ -10319,5 +10319,13 @@
         "type": "String"
       }
     }
+  },
+  "cardSwipeActionsTitle": "Card Swipe Actions",
+  "@cardSwipeActionsTitle": {
+    "description": "Settings toggle title to enable or disable card swipe gestures on the dashboard"
+  },
+  "cardSwipeActionsSubtitle": "Swipe vault cards to quickly reveal edit and remove actions",
+  "@cardSwipeActionsSubtitle": {
+    "description": "Settings toggle subtitle explaining card swipe actions on the dashboard"
   }
 }

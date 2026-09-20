@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "Blocca un'icona di Cattura rapida nella schermata Home, se il launcher lo supporta",
   "quickCaptureShortcutRequestedMessage": "Richiesto: controlla la schermata Home",
   "quickCaptureShortcutUnsupportedMessage": "Il tuo launcher non supporta il blocco dei collegamenti",
-  "quickCaptureSavedToast": "{name} salvato in {destination}"
+  "quickCaptureSavedToast": "{name} salvato in {destination}",
+  "cardSwipeActionsTitle": "Gesti di scorrimento delle schede",
+  "cardSwipeActionsSubtitle": "Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione"
 }

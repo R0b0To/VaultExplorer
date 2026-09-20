@@ -13554,6 +13554,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved {name} to {destination}'**
   String quickCaptureSavedToast(String name, String destination);
+
+  /// Settings toggle title to enable or disable card swipe gestures on the dashboard
+  ///
+  /// In en, this message translates to:
+  /// **'Card Swipe Actions'**
+  String get cardSwipeActionsTitle;
+
+  /// Settings toggle subtitle explaining card swipe actions on the dashboard
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe vault cards to quickly reveal edit and remove actions'**
+  String get cardSwipeActionsSubtitle;
 }
 
 class _AppLocalizationsDelegate

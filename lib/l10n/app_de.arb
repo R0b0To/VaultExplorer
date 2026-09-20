@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "Pinnt ein Schnellaufnahme-Symbol an deinen Startbildschirm, sofern dein Launcher dies unterstützt",
   "quickCaptureShortcutRequestedMessage": "Angefragt – schau auf deinem Startbildschirm nach",
   "quickCaptureShortcutUnsupportedMessage": "Dein Launcher unterstützt das Anheften von Verknüpfungen nicht",
-  "quickCaptureSavedToast": "{name} in {destination} gespeichert"
+  "quickCaptureSavedToast": "{name} in {destination} gespeichert",
+  "cardSwipeActionsTitle": "Karten-Wischgesten",
+  "cardSwipeActionsSubtitle": "Tresorkarten wischen, um Bearbeiten- und Entfernen-Aktionen schnell anzuzeigen"
 }

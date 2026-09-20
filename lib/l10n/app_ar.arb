@@ -2233,5 +2233,7 @@
   "quickCaptureAddShortcutSubtitle": "تثبيت أيقونة الالتقاط السريع في شاشتك الرئيسية، إذا كان مشغّل التطبيقات يدعم ذلك",
   "quickCaptureShortcutRequestedMessage": "تم الطلب — تحقق من شاشتك الرئيسية",
   "quickCaptureShortcutUnsupportedMessage": "مشغّل التطبيقات لديك لا يدعم تثبيت الاختصارات",
-  "quickCaptureSavedToast": "تم حفظ {name} في {destination}"
+  "quickCaptureSavedToast": "تم حفظ {name} في {destination}",
+  "cardSwipeActionsTitle": "إيماءات سحب البطاقات",
+  "cardSwipeActionsSubtitle": "اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة"
 }

@@ -8182,4 +8182,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name salvato in $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Gesti di scorrimento delle schede';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione';
 }

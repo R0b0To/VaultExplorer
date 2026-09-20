@@ -8252,4 +8252,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String quickCaptureSavedToast(String name, String destination) {
     return '$name enregistré dans $destination';
   }
+
+  @override
+  String get cardSwipeActionsTitle => 'Gestes de balayage des cartes';
+
+  @override
+  String get cardSwipeActionsSubtitle =>
+      'Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer';
 }

@@ -562,7 +562,6 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           volId: container.volId,
           virtualPath: virtualPath,
         );
-        debugPrint('[PERF] Dart finalizeSession elapsed: ${sw.elapsedMilliseconds}ms');
 
         if (!result.success) {
           if (mounted) {
@@ -576,14 +575,15 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         }
 
         sw.reset();
-        await vaultService.finalizeVaultWrite(virtualPath);
-        debugPrint('[PERF] Dart finalizeVaultWrite elapsed: ${sw.elapsedMilliseconds}ms');
-
-        _pendingScratchpad = null;
-        _pendingIsVideo = null;
-        if (mounted) {
-          Navigator.pop(context, (savedName: name, isVideo: isVideo));
-        }
+          await vaultService.finalizeVaultWrite(virtualPath);
+      _pendingScratchpad = null;
+      _pendingIsVideo = null;
+      if (mounted) {
+       await _quickCaptureApi.showToast(
+          context.l10n.quickCaptureSavedToast(name, destination.displayName),
+        );
+        Navigator.pop(context, (savedName: name, isVideo: isVideo));
+      }
       } catch (e) {
       if (mounted) {
         setState(() {

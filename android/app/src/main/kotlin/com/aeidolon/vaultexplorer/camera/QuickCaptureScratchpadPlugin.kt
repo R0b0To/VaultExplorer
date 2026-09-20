@@ -84,30 +84,43 @@ class QuickCaptureScratchpadPlugin(
                         }
                     }
                 }
-                "discardSession" -> {
-                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
-                    val token = args["sessionToken"] as? String
-                    if (token == null) {
-                        result.error("bad_args", "sessionToken required", null)
-                        return
-                    }
-                    ioExecutor.execute {
-                        try {
-                            val file = ScratchpadTransfer.scratchpadFile(context.cacheDir, token)
-                            ScratchpadTransfer.discard(file)
-                            ScratchpadKeyStore.forget(token)
-                            mainHandler.post {
-                                result.success(null)
-                            }
-                        } catch (e: Exception) {
-                            VeLog.e(TAG, e) { "discardSession background task failed" }
-                            mainHandler.post {
-                                result.success(null)
+                  "discardSession" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                        val token = args["sessionToken"] as? String
+                        if (token == null) {
+                            result.error("bad_args", "sessionToken required", null)
+                            return
+                        }
+                        ioExecutor.execute {
+                            try {
+                                val file = ScratchpadTransfer.scratchpadFile(context.cacheDir, token)
+                                ScratchpadTransfer.discard(file)
+                                ScratchpadKeyStore.forget(token)
+                                mainHandler.post {
+                                    result.success(null)
+                                }
+                            } catch (e: Exception) {
+                                VeLog.e(TAG, e) { "discardSession background task failed" }
+                                mainHandler.post {
+                                    result.success(null)
+                                }
                             }
                         }
                     }
-                }
-                else -> result.notImplemented()
+                    "showToast" -> {
+                        val message = call.argument<String>("message") ?: ""
+                        if (message.isNotEmpty()) {
+                            mainHandler.post {
+                                android.widget.Toast.makeText(
+                                    context.applicationContext,
+                                    message,
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
             }
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "onMethodCall(${call.method}) failed" }

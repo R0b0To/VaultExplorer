@@ -150,7 +150,7 @@ class QuickCaptureApi {
     }
   }
 
-  /// Wipes the scratchpad for [sessionToken] unread and forgets its key.
+   /// Wipes the scratchpad for [sessionToken] unread and forgets its key.
   /// Safe to call even if the session already expired or was already
   /// finalized -- ScratchpadTransfer.discard is a no-op on a missing
   /// file.
@@ -161,6 +161,18 @@ class QuickCaptureApi {
       });
     } catch (e) {
       logSwallowed('discardSession', e, expected: true);
+    }
+  }
+
+  /// Displays an Android OS toast using the Application context so it
+  /// remains visible on the Home Screen even after this Activity is closed.
+  Future<void> showToast(String message) async {
+    try {
+      await _scratchpadChannel.invokeMethod<void>('showToast', {
+        'message': message,
+      });
+    } catch (e) {
+      logSwallowed('showToast', e);
     }
   }
 }

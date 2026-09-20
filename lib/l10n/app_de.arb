@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "Synchronisierung mit {target} · {done} von {total}",
   "autoSyncBannerAttention": "Einige Ordner konnten nicht vollständig synchronisiert werden. Details finden Sie in den Einstellungen für die automatische Synchronisierung des Ordners.",
   "autoSyncNotificationTitle": "Ordner werden synchronisiert",
-  "autoSyncNotificationProgress": "{done} von {total} Dateien"
+  "autoSyncNotificationProgress": "{done} von {total} Dateien",
+  "sectionQuickCapture": "Schnellaufnahme",
+  "quickCaptureSettingsTitle": "Schnellaufnahme",
+  "quickCaptureSettingsSubtitle": "Schnelleinstellungs-Kachel und Startbildschirm-Verknüpfung zum direkten Aufnehmen in einen Tresor",
+  "quickCaptureTileToggleTitle": "Schnelleinstellungs-Kachel",
+  "quickCaptureTileToggleSubtitle": "Öffnet die Kamera direkt aus den Schnelleinstellungen, ohne PIN- oder Muster-Abfrage. Vor dem Speichern wählst und entsperrst du weiterhin einen Tresor.",
+  "quickCaptureAddShortcutTitle": "Zum Startbildschirm hinzufügen",
+  "quickCaptureAddShortcutSubtitle": "Pinnt ein Schnellaufnahme-Symbol an deinen Startbildschirm, sofern dein Launcher dies unterstützt",
+  "quickCaptureShortcutRequestedMessage": "Angefragt – schau auf deinem Startbildschirm nach",
+  "quickCaptureShortcutUnsupportedMessage": "Dein Launcher unterstützt das Anheften von Verknüpfungen nicht"
 }

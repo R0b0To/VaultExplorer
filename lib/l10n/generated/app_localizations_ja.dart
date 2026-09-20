@@ -7703,4 +7703,35 @@ class AppLocalizationsJa extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done/$total ファイル';
   }
+
+  @override
+  String get sectionQuickCapture => 'クイックキャプチャ';
+
+  @override
+  String get quickCaptureSettingsTitle => 'クイックキャプチャ';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      '保管庫へ直接キャプチャするためのクイック設定タイルとホーム画面のショートカット';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'クイック設定タイル';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'PINやパターンの入力を求めずに、クイック設定からすぐにカメラを開きます。保存する前には、保管庫を選んでロックを解除する必要があります。';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'ホーム画面に追加';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'ランチャーが対応していれば、クイックキャプチャのアイコンをホーム画面に固定します';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage => 'リクエストしました。ホーム画面を確認してください';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'お使いのランチャーはショートカットの固定に対応していません';
 }

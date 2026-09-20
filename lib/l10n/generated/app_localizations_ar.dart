@@ -8205,4 +8205,36 @@ class AppLocalizationsAr extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done من $total ملفات';
   }
+
+  @override
+  String get sectionQuickCapture => 'التقاط سريع';
+
+  @override
+  String get quickCaptureSettingsTitle => 'التقاط سريع';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'مربّع الإعدادات السريعة واختصار الشاشة الرئيسية للالتقاط مباشرة إلى خزنة';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'مربّع الإعدادات السريعة';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'يفتح الكاميرا مباشرة من الإعدادات السريعة، دون طلب رمز PIN أو نمط. ستظل تختار وتفتح خزنة قبل حفظ أي شيء.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'إضافة إلى الشاشة الرئيسية';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'تثبيت أيقونة الالتقاط السريع في شاشتك الرئيسية، إذا كان مشغّل التطبيقات يدعم ذلك';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'تم الطلب — تحقق من شاشتك الرئيسية';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'مشغّل التطبيقات لديك لا يدعم تثبيت الاختصارات';
 }

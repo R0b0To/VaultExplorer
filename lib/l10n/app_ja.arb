@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "{target} と同期中 · {done}/{total}",
   "autoSyncBannerAttention": "完全に同期できなかったフォルダがあります。詳細はフォルダの自動同期設定で確認してください。",
   "autoSyncNotificationTitle": "フォルダを同期中",
-  "autoSyncNotificationProgress": "{done}/{total} ファイル"
+  "autoSyncNotificationProgress": "{done}/{total} ファイル",
+  "sectionQuickCapture": "クイックキャプチャ",
+  "quickCaptureSettingsTitle": "クイックキャプチャ",
+  "quickCaptureSettingsSubtitle": "保管庫へ直接キャプチャするためのクイック設定タイルとホーム画面のショートカット",
+  "quickCaptureTileToggleTitle": "クイック設定タイル",
+  "quickCaptureTileToggleSubtitle": "PINやパターンの入力を求めずに、クイック設定からすぐにカメラを開きます。保存する前には、保管庫を選んでロックを解除する必要があります。",
+  "quickCaptureAddShortcutTitle": "ホーム画面に追加",
+  "quickCaptureAddShortcutSubtitle": "ランチャーが対応していれば、クイックキャプチャのアイコンをホーム画面に固定します",
+  "quickCaptureShortcutRequestedMessage": "リクエストしました。ホーム画面を確認してください",
+  "quickCaptureShortcutUnsupportedMessage": "お使いのランチャーはショートカットの固定に対応していません"
 }

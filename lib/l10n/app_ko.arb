@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "{target}과(와) 동기화 중 · {done}/{total}",
   "autoSyncBannerAttention": "일부 폴더를 완전히 동기화하지 못했습니다. 자세한 내용은 폴더의 자동 동기화 설정에서 확인하세요.",
   "autoSyncNotificationTitle": "폴더 동기화 중",
-  "autoSyncNotificationProgress": "{done}/{total}개 파일"
+  "autoSyncNotificationProgress": "{done}/{total}개 파일",
+  "sectionQuickCapture": "빠른 캡처",
+  "quickCaptureSettingsTitle": "빠른 캡처",
+  "quickCaptureSettingsSubtitle": "볼트로 바로 캡처하기 위한 빠른 설정 타일 및 홈 화면 바로가기",
+  "quickCaptureTileToggleTitle": "빠른 설정 타일",
+  "quickCaptureTileToggleSubtitle": "PIN이나 패턴 입력 없이 빠른 설정에서 바로 카메라를 엽니다. 저장하기 전에는 여전히 볼트를 선택하고 잠금 해제해야 합니다.",
+  "quickCaptureAddShortcutTitle": "홈 화면에 추가",
+  "quickCaptureAddShortcutSubtitle": "런처가 지원하는 경우 빠른 캡처 아이콘을 홈 화면에 고정합니다",
+  "quickCaptureShortcutRequestedMessage": "요청됨 — 홈 화면을 확인하세요",
+  "quickCaptureShortcutUnsupportedMessage": "런처가 바로가기 고정을 지원하지 않습니다"
 }

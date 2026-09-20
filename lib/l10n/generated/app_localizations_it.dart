@@ -8145,4 +8145,36 @@ class AppLocalizationsIt extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done di $total file';
   }
+
+  @override
+  String get sectionQuickCapture => 'Cattura rapida';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Cattura rapida';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Riquadro Impostazioni rapide e collegamento nella schermata Home per catturare direttamente in un vault';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Riquadro Impostazioni rapide';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Apre la fotocamera direttamente dalle Impostazioni rapide, senza richiedere PIN o sequenza. Dovrai comunque scegliere e sbloccare un vault prima di salvare qualcosa.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Aggiungi alla schermata Home';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Blocca un\'icona di Cattura rapida nella schermata Home, se il launcher lo supporta';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Richiesto: controlla la schermata Home';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Il tuo launcher non supporta il blocco dei collegamenti';
 }

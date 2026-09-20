@@ -8145,4 +8145,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done von $total Dateien';
   }
+
+  @override
+  String get sectionQuickCapture => 'Schnellaufnahme';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Schnellaufnahme';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Schnelleinstellungs-Kachel und Startbildschirm-Verknüpfung zum direkten Aufnehmen in einen Tresor';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Schnelleinstellungs-Kachel';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Öffnet die Kamera direkt aus den Schnelleinstellungen, ohne PIN- oder Muster-Abfrage. Vor dem Speichern wählst und entsperrst du weiterhin einen Tresor.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Zum Startbildschirm hinzufügen';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Pinnt ein Schnellaufnahme-Symbol an deinen Startbildschirm, sofern dein Launcher dies unterstützt';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Angefragt – schau auf deinem Startbildschirm nach';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Dein Launcher unterstützt das Anheften von Verknüpfungen nicht';
 }

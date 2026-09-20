@@ -8162,4 +8162,36 @@ class AppLocalizationsEs extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done de $total archivos';
   }
+
+  @override
+  String get sectionQuickCapture => 'Captura rápida';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Captura rápida';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Mosaico de Ajustes rápidos y acceso directo en la pantalla de inicio para capturar directamente en una bóveda';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Mosaico de Ajustes rápidos';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Abre la cámara directamente desde Ajustes rápidos, sin solicitar PIN ni patrón. Igualmente eliges y desbloqueas una bóveda antes de guardar algo.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Añadir a la pantalla de inicio';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Fija un icono de Captura rápida en tu pantalla de inicio, si tu launcher lo permite';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Solicitado: revisa tu pantalla de inicio';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Tu launcher no permite fijar accesos directos';
 }

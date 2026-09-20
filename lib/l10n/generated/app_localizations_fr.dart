@@ -8215,4 +8215,36 @@ class AppLocalizationsFr extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done sur $total fichiers';
   }
+
+  @override
+  String get sectionQuickCapture => 'Capture rapide';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Capture rapide';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Tuile Réglages rapides et raccourci sur l\'écran d\'accueil pour capturer directement dans un coffre';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Tuile Réglages rapides';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Ouvre l\'appareil photo directement depuis les Réglages rapides, sans demande de code PIN ni de schéma. Vous choisissez et déverrouillez tout de même un coffre avant d\'enregistrer quoi que ce soit.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Ajouter à l\'écran d\'accueil';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Épingle une icône Capture rapide sur votre écran d\'accueil, si votre launcher le permet';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Demandé : vérifiez votre écran d\'accueil';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Votre launcher ne prend pas en charge l\'épinglage de raccourcis';
 }

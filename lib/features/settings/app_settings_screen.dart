@@ -24,6 +24,7 @@ import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
+import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -956,6 +957,22 @@ class _SecuritySettingsScreenState
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const EmergencySettingsScreen()),
+                      ),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.bolt_rounded, color: cs.primary),
+                      title: Text(
+                        context.l10n.quickCaptureSettingsTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        context.l10n.quickCaptureSettingsSubtitle,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const QuickCaptureSettingsScreen()),
                       ),
                     ),
                   ],

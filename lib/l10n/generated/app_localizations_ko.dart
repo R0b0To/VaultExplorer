@@ -7703,4 +7703,34 @@ class AppLocalizationsKo extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done/$total개 파일';
   }
+
+  @override
+  String get sectionQuickCapture => '빠른 캡처';
+
+  @override
+  String get quickCaptureSettingsTitle => '빠른 캡처';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      '볼트로 바로 캡처하기 위한 빠른 설정 타일 및 홈 화면 바로가기';
+
+  @override
+  String get quickCaptureTileToggleTitle => '빠른 설정 타일';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'PIN이나 패턴 입력 없이 빠른 설정에서 바로 카메라를 엽니다. 저장하기 전에는 여전히 볼트를 선택하고 잠금 해제해야 합니다.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => '홈 화면에 추가';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      '런처가 지원하는 경우 빠른 캡처 아이콘을 홈 화면에 고정합니다';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage => '요청됨 — 홈 화면을 확인하세요';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage => '런처가 바로가기 고정을 지원하지 않습니다';
 }

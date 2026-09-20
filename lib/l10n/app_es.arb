@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "Sincronizando con {target} · {done} de {total}",
   "autoSyncBannerAttention": "Algunas carpetas no se pudieron sincronizar por completo. Abre los ajustes de sincronización automática de una carpeta para ver los detalles.",
   "autoSyncNotificationTitle": "Sincronizando carpetas",
-  "autoSyncNotificationProgress": "{done} de {total} archivos"
+  "autoSyncNotificationProgress": "{done} de {total} archivos",
+  "sectionQuickCapture": "Captura rápida",
+  "quickCaptureSettingsTitle": "Captura rápida",
+  "quickCaptureSettingsSubtitle": "Mosaico de Ajustes rápidos y acceso directo en la pantalla de inicio para capturar directamente en una bóveda",
+  "quickCaptureTileToggleTitle": "Mosaico de Ajustes rápidos",
+  "quickCaptureTileToggleSubtitle": "Abre la cámara directamente desde Ajustes rápidos, sin solicitar PIN ni patrón. Igualmente eliges y desbloqueas una bóveda antes de guardar algo.",
+  "quickCaptureAddShortcutTitle": "Añadir a la pantalla de inicio",
+  "quickCaptureAddShortcutSubtitle": "Fija un icono de Captura rápida en tu pantalla de inicio, si tu launcher lo permite",
+  "quickCaptureShortcutRequestedMessage": "Solicitado: revisa tu pantalla de inicio",
+  "quickCaptureShortcutUnsupportedMessage": "Tu launcher no permite fijar accesos directos"
 }

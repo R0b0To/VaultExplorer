@@ -42,6 +42,7 @@ enum class VaultFlashMode { OFF, AUTO, ON, TORCH }
 const val TARGET_RECORDING_FPS = 30
 
 enum class VaultVideoQuality(val targetLongEdge: Int, val bitrateH264: Int, val bitrateHevc: Int) {
+    SD(720, 3_000_000, 1_800_000),
     HD(1280, 8_000_000, 5_000_000),
     FHD(1920, 16_000_000, 10_000_000),
     UHD(3840, 45_000_000, 25_000_000),

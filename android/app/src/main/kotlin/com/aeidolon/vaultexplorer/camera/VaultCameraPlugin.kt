@@ -283,6 +283,7 @@ class VaultCameraPlugin(
     }
 
     private fun parseQuality(wire: String?): VaultVideoQuality = when (wire) {
+        "sd", "480p", "420p" -> VaultVideoQuality.SD
         "hd" -> VaultVideoQuality.HD
         "uhd" -> VaultVideoQuality.UHD
         else -> VaultVideoQuality.FHD

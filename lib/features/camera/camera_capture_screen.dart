@@ -851,7 +851,14 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                     initialValue: _captureControls.videoQuality,
                     color: Colors.black87,
                     onSelected: _changeQuality,
-                    itemBuilder: (context) => const [
+                   itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'sd',
+                        child: Text(
+                          '480P (SD)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
                       PopupMenuItem(
                         value: 'hd',
                         child: Text(

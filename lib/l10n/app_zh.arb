@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "正在与 {target} 同步 · {done}/{total}",
   "autoSyncBannerAttention": "部分文件夹未能完全同步。请打开文件夹的自动同步设置查看详情。",
   "autoSyncNotificationTitle": "正在同步文件夹",
-  "autoSyncNotificationProgress": "{done}/{total} 个文件"
+  "autoSyncNotificationProgress": "{done}/{total} 个文件",
+  "sectionQuickCapture": "快速捕获",
+  "quickCaptureSettingsTitle": "快速捕获",
+  "quickCaptureSettingsSubtitle": "用于直接捕获到保险库的快捷设置磁贴和主屏幕快捷方式",
+  "quickCaptureTileToggleTitle": "快捷设置磁贴",
+  "quickCaptureTileToggleSubtitle": "直接从快捷设置打开相机，无需输入PIN码或图案。保存任何内容前，您仍需选择并解锁一个保险库。",
+  "quickCaptureAddShortcutTitle": "添加到主屏幕",
+  "quickCaptureAddShortcutSubtitle": "如果您的启动器支持，将\"快速捕获\"图标固定到主屏幕",
+  "quickCaptureShortcutRequestedMessage": "已请求——请查看您的主屏幕",
+  "quickCaptureShortcutUnsupportedMessage": "您的启动器不支持固定快捷方式"
 }

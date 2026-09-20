@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "جارٍ المزامنة مع {target} · {done} من {total}",
   "autoSyncBannerAttention": "تعذّرت مزامنة بعض المجلدات بالكامل. افتح إعدادات المزامنة التلقائية لأحد المجلدات لمعرفة التفاصيل.",
   "autoSyncNotificationTitle": "جارٍ مزامنة المجلدات",
-  "autoSyncNotificationProgress": "{done} من {total} ملفات"
+  "autoSyncNotificationProgress": "{done} من {total} ملفات",
+  "sectionQuickCapture": "التقاط سريع",
+  "quickCaptureSettingsTitle": "التقاط سريع",
+  "quickCaptureSettingsSubtitle": "مربّع الإعدادات السريعة واختصار الشاشة الرئيسية للالتقاط مباشرة إلى خزنة",
+  "quickCaptureTileToggleTitle": "مربّع الإعدادات السريعة",
+  "quickCaptureTileToggleSubtitle": "يفتح الكاميرا مباشرة من الإعدادات السريعة، دون طلب رمز PIN أو نمط. ستظل تختار وتفتح خزنة قبل حفظ أي شيء.",
+  "quickCaptureAddShortcutTitle": "إضافة إلى الشاشة الرئيسية",
+  "quickCaptureAddShortcutSubtitle": "تثبيت أيقونة الالتقاط السريع في شاشتك الرئيسية، إذا كان مشغّل التطبيقات يدعم ذلك",
+  "quickCaptureShortcutRequestedMessage": "تم الطلب — تحقق من شاشتك الرئيسية",
+  "quickCaptureShortcutUnsupportedMessage": "مشغّل التطبيقات لديك لا يدعم تثبيت الاختصارات"
 }

@@ -10271,5 +10271,41 @@
         "type": "int"
       }
     }
+  },
+  "sectionQuickCapture": "Quick Capture",
+  "@sectionQuickCapture": {
+    "description": "Section header for Quick Capture settings (Quick Settings tile / home screen shortcut)"
+  },
+  "quickCaptureSettingsTitle": "Quick Capture",
+  "@quickCaptureSettingsTitle": {
+    "description": "List tile title on the main settings screen that opens Quick Capture settings"
+  },
+  "quickCaptureSettingsSubtitle": "Quick Settings tile and home screen shortcut for capturing straight to a vault",
+  "@quickCaptureSettingsSubtitle": {
+    "description": "List tile subtitle on the main settings screen describing Quick Capture"
+  },
+  "quickCaptureTileToggleTitle": "Quick Settings Tile",
+  "@quickCaptureTileToggleTitle": {
+    "description": "Switch label to enable/disable the Quick Capture Quick Settings tile"
+  },
+  "quickCaptureTileToggleSubtitle": "Opens the camera straight from Quick Settings, with no PIN or pattern prompt. You still choose and unlock a vault before anything is saved.",
+  "@quickCaptureTileToggleSubtitle": {
+    "description": "Explains what the Quick Capture Quick Settings tile does and its no-unlock-prompt behavior"
+  },
+  "quickCaptureAddShortcutTitle": "Add to Home Screen",
+  "@quickCaptureAddShortcutTitle": {
+    "description": "Button that requests pinning the Quick Capture shortcut to the home screen"
+  },
+  "quickCaptureAddShortcutSubtitle": "Pin a Quick Capture icon to your home screen, if your launcher supports it",
+  "@quickCaptureAddShortcutSubtitle": {
+    "description": "Subtitle for the Add to Home Screen button"
+  },
+  "quickCaptureShortcutRequestedMessage": "Requested — check your home screen",
+  "@quickCaptureShortcutRequestedMessage": {
+    "description": "Snackbar shown after successfully requesting the pinned shortcut"
+  },
+  "quickCaptureShortcutUnsupportedMessage": "Your launcher doesn't support pinning shortcuts",
+  "@quickCaptureShortcutUnsupportedMessage": {
+    "description": "Snackbar shown when the launcher does not support requestPinShortcut"
   }
 }

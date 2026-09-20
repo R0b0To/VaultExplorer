@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "Sincronizzazione con {target} · {done} di {total}",
   "autoSyncBannerAttention": "Non è stato possibile sincronizzare completamente alcune cartelle. Apri le impostazioni di sincronizzazione automatica di una cartella per i dettagli.",
   "autoSyncNotificationTitle": "Sincronizzazione delle cartelle",
-  "autoSyncNotificationProgress": "{done} di {total} file"
+  "autoSyncNotificationProgress": "{done} di {total} file",
+  "sectionQuickCapture": "Cattura rapida",
+  "quickCaptureSettingsTitle": "Cattura rapida",
+  "quickCaptureSettingsSubtitle": "Riquadro Impostazioni rapide e collegamento nella schermata Home per catturare direttamente in un vault",
+  "quickCaptureTileToggleTitle": "Riquadro Impostazioni rapide",
+  "quickCaptureTileToggleSubtitle": "Apre la fotocamera direttamente dalle Impostazioni rapide, senza richiedere PIN o sequenza. Dovrai comunque scegliere e sbloccare un vault prima di salvare qualcosa.",
+  "quickCaptureAddShortcutTitle": "Aggiungi alla schermata Home",
+  "quickCaptureAddShortcutSubtitle": "Blocca un'icona di Cattura rapida nella schermata Home, se il launcher lo supporta",
+  "quickCaptureShortcutRequestedMessage": "Richiesto: controlla la schermata Home",
+  "quickCaptureShortcutUnsupportedMessage": "Il tuo launcher non supporta il blocco dei collegamenti"
 }

@@ -13494,6 +13494,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{done} of {total} files'**
   String autoSyncNotificationProgress(int done, int total);
+
+  /// Section header for Quick Capture settings (Quick Settings tile / home screen shortcut)
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Capture'**
+  String get sectionQuickCapture;
+
+  /// List tile title on the main settings screen that opens Quick Capture settings
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Capture'**
+  String get quickCaptureSettingsTitle;
+
+  /// List tile subtitle on the main settings screen describing Quick Capture
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Settings tile and home screen shortcut for capturing straight to a vault'**
+  String get quickCaptureSettingsSubtitle;
+
+  /// Switch label to enable/disable the Quick Capture Quick Settings tile
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Settings Tile'**
+  String get quickCaptureTileToggleTitle;
+
+  /// Explains what the Quick Capture Quick Settings tile does and its no-unlock-prompt behavior
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the camera straight from Quick Settings, with no PIN or pattern prompt. You still choose and unlock a vault before anything is saved.'**
+  String get quickCaptureTileToggleSubtitle;
+
+  /// Button that requests pinning the Quick Capture shortcut to the home screen
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Home Screen'**
+  String get quickCaptureAddShortcutTitle;
+
+  /// Subtitle for the Add to Home Screen button
+  ///
+  /// In en, this message translates to:
+  /// **'Pin a Quick Capture icon to your home screen, if your launcher supports it'**
+  String get quickCaptureAddShortcutSubtitle;
+
+  /// Snackbar shown after successfully requesting the pinned shortcut
+  ///
+  /// In en, this message translates to:
+  /// **'Requested — check your home screen'**
+  String get quickCaptureShortcutRequestedMessage;
+
+  /// Snackbar shown when the launcher does not support requestPinShortcut
+  ///
+  /// In en, this message translates to:
+  /// **'Your launcher doesn\'t support pinning shortcuts'**
+  String get quickCaptureShortcutUnsupportedMessage;
 }
 
 class _AppLocalizationsDelegate

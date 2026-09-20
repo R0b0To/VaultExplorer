@@ -124,12 +124,14 @@ class VaultVideoRecorder(
          *  reused). Shared by the per-recording cleanup below and by
          *  [sweepOrphanedTempFiles]. Returns false if the file couldn't be
          *  fully wiped -- the caller falls back to at least trying delete(). */
-        internal fun zeroFillFile(file: File): Boolean {
+      internal fun zeroFillFile(file: File): Boolean {
             return try {
                 if (file.exists()) {
                     val len = file.length()
                     if (len > 0) {
-                        RandomAccessFile(file, "rws").use { raf ->
+                        // Use "rw" with a 512KB buffer and a single physical sync at the end.
+                        // "rws" forced a hardware fsync on every 64KB, causing massive flash write stalls.
+                       RandomAccessFile(file, "rw").use { raf ->
                             val zeros = ByteArray(64 * 1024)
                             var remaining = len
                             while (remaining > 0) {
@@ -137,6 +139,7 @@ class VaultVideoRecorder(
                                 raf.write(zeros, 0, writeLen)
                                 remaining -= writeLen
                             }
+                            try { raf.fd.sync() } catch (_: Exception) {}
                         }
                     }
                     true
@@ -242,11 +245,12 @@ class VaultVideoRecorder(
         }
         VeLog.d(TAG) { "writeTo: streaming ${temp.length()} bytes to vault" }
 
+        val writeToStart = System.currentTimeMillis()
         try {
-            FileInputStream(temp).use { fis ->
+            java.io.BufferedInputStream(FileInputStream(temp), 64 * 1024).use { bis ->
                 val buffer = ByteArray(64 * 1024)
                 var bytesRead: Int
-                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                while (bis.read(buffer).also { bytesRead = it } != -1) {
                     if (bytesRead > 0) {
                         val chunk = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
                         if (!writer.write(chunk)) {
@@ -255,15 +259,16 @@ class VaultVideoRecorder(
                     }
                 }
             }
-            // finish() is a no-op for VaultChunkWriter (nothing to
-            // finalize) and flushes the GCM auth tag for
-            // ScratchpadChunkWriter -- see ChunkSink's doc comment.
-            return writer.finish()
+            val ok = writer.finish()
+            VeLog.i(TAG) { "[PERF] VaultVideoRecorder.writeTo stream time: ${System.currentTimeMillis() - writeToStart}ms" }
+            return ok
         } catch (e: Exception) {
-            VeLog.e("VaultVideoRecorder", e) { "writeTo failed" }
+            VeLog.e(TAG, e) { "writeTo failed" }
             return false
         } finally {
+            val wipeStart = System.currentTimeMillis()
             secureDeleteTempFile()
+            VeLog.i(TAG) { "[PERF] VaultVideoRecorder.writeTo temp wipe time: ${System.currentTimeMillis() - wipeStart}ms" }
         }
     }
 

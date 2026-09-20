@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "Синхронізація з {target} · {done} з {total}",
   "autoSyncBannerAttention": "Деякі папки не вдалося синхронізувати повністю. Відкрийте налаштування автосинхронізації папки, щоб побачити подробиці.",
   "autoSyncNotificationTitle": "Синхронізація папок",
-  "autoSyncNotificationProgress": "{done} з {total} файлів"
+  "autoSyncNotificationProgress": "{done} з {total} файлів",
+  "sectionQuickCapture": "Швидке захоплення",
+  "quickCaptureSettingsTitle": "Швидке захоплення",
+  "quickCaptureSettingsSubtitle": "Плитка швидких налаштувань і ярлик на головному екрані для захоплення одразу у сховище",
+  "quickCaptureTileToggleTitle": "Плитка швидких налаштувань",
+  "quickCaptureTileToggleSubtitle": "Відкриває камеру прямо зі швидких налаштувань, без запиту PIN-коду чи візерунка. Перед збереженням вам усе одно потрібно вибрати та розблокувати сховище.",
+  "quickCaptureAddShortcutTitle": "Додати на головний екран",
+  "quickCaptureAddShortcutSubtitle": "Закріплює значок швидкого захоплення на головному екрані, якщо це підтримує ваш лончер",
+  "quickCaptureShortcutRequestedMessage": "Запит надіслано — перевірте головний екран",
+  "quickCaptureShortcutUnsupportedMessage": "Ваш лончер не підтримує закріплення ярликів"
 }

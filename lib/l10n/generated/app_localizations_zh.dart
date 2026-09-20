@@ -7597,4 +7597,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done/$total 个文件';
   }
+
+  @override
+  String get sectionQuickCapture => '快速捕获';
+
+  @override
+  String get quickCaptureSettingsTitle => '快速捕获';
+
+  @override
+  String get quickCaptureSettingsSubtitle => '用于直接捕获到保险库的快捷设置磁贴和主屏幕快捷方式';
+
+  @override
+  String get quickCaptureTileToggleTitle => '快捷设置磁贴';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      '直接从快捷设置打开相机，无需输入PIN码或图案。保存任何内容前，您仍需选择并解锁一个保险库。';
+
+  @override
+  String get quickCaptureAddShortcutTitle => '添加到主屏幕';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle => '如果您的启动器支持，将\"快速捕获\"图标固定到主屏幕';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage => '已请求——请查看您的主屏幕';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage => '您的启动器不支持固定快捷方式';
 }

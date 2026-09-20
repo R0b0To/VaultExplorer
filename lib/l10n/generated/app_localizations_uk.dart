@@ -8203,4 +8203,36 @@ class AppLocalizationsUk extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done з $total файлів';
   }
+
+  @override
+  String get sectionQuickCapture => 'Швидке захоплення';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Швидке захоплення';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Плитка швидких налаштувань і ярлик на головному екрані для захоплення одразу у сховище';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Плитка швидких налаштувань';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Відкриває камеру прямо зі швидких налаштувань, без запиту PIN-коду чи візерунка. Перед збереженням вам усе одно потрібно вибрати та розблокувати сховище.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Додати на головний екран';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Закріплює значок швидкого захоплення на головному екрані, якщо це підтримує ваш лончер';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Запит надіслано — перевірте головний екран';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Ваш лончер не підтримує закріплення ярликів';
 }

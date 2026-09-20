@@ -2223,5 +2223,14 @@
   "autoSyncBannerRunning": "Sincronizando com {target} · {done} de {total}",
   "autoSyncBannerAttention": "Algumas pastas não puderam ser totalmente sincronizadas. Abra as configurações de sincronização automática de uma pasta para ver os detalhes.",
   "autoSyncNotificationTitle": "Sincronizando pastas",
-  "autoSyncNotificationProgress": "{done} de {total} arquivos"
+  "autoSyncNotificationProgress": "{done} de {total} arquivos",
+  "sectionQuickCapture": "Captura Rápida",
+  "quickCaptureSettingsTitle": "Captura Rápida",
+  "quickCaptureSettingsSubtitle": "Bloco de Configurações Rápidas e atalho na tela inicial para capturar diretamente para um cofre",
+  "quickCaptureTileToggleTitle": "Bloco de Configurações Rápidas",
+  "quickCaptureTileToggleSubtitle": "Abre a câmera diretamente das Configurações Rápidas, sem solicitar PIN ou padrão. Você ainda escolhe e desbloqueia um cofre antes de salvar qualquer coisa.",
+  "quickCaptureAddShortcutTitle": "Adicionar à Tela Inicial",
+  "quickCaptureAddShortcutSubtitle": "Fixa um ícone de Captura Rápida na sua tela inicial, se o seu launcher for compatível",
+  "quickCaptureShortcutRequestedMessage": "Solicitado — verifique sua tela inicial",
+  "quickCaptureShortcutUnsupportedMessage": "Seu launcher não é compatível com a fixação de atalhos"
 }

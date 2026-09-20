@@ -8018,4 +8018,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done of $total files';
   }
+
+  @override
+  String get sectionQuickCapture => 'Quick Capture';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Quick Capture';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Quick Settings tile and home screen shortcut for capturing straight to a vault';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Quick Settings Tile';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Opens the camera straight from Quick Settings, with no PIN or pattern prompt. You still choose and unlock a vault before anything is saved.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Add to Home Screen';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Pin a Quick Capture icon to your home screen, if your launcher supports it';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Requested — check your home screen';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Your launcher doesn\'t support pinning shortcuts';
 }

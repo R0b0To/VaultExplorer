@@ -8152,4 +8152,36 @@ class AppLocalizationsPt extends AppLocalizations {
   String autoSyncNotificationProgress(int done, int total) {
     return '$done de $total arquivos';
   }
+
+  @override
+  String get sectionQuickCapture => 'Captura Rápida';
+
+  @override
+  String get quickCaptureSettingsTitle => 'Captura Rápida';
+
+  @override
+  String get quickCaptureSettingsSubtitle =>
+      'Bloco de Configurações Rápidas e atalho na tela inicial para capturar diretamente para um cofre';
+
+  @override
+  String get quickCaptureTileToggleTitle => 'Bloco de Configurações Rápidas';
+
+  @override
+  String get quickCaptureTileToggleSubtitle =>
+      'Abre a câmera diretamente das Configurações Rápidas, sem solicitar PIN ou padrão. Você ainda escolhe e desbloqueia um cofre antes de salvar qualquer coisa.';
+
+  @override
+  String get quickCaptureAddShortcutTitle => 'Adicionar à Tela Inicial';
+
+  @override
+  String get quickCaptureAddShortcutSubtitle =>
+      'Fixa um ícone de Captura Rápida na sua tela inicial, se o seu launcher for compatível';
+
+  @override
+  String get quickCaptureShortcutRequestedMessage =>
+      'Solicitado — verifique sua tela inicial';
+
+  @override
+  String get quickCaptureShortcutUnsupportedMessage =>
+      'Seu launcher não é compatível com a fixação de atalhos';
 }

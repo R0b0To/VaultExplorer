@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' show PointerDeviceKind;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
 
 class ImagePageItem extends StatefulWidget {
@@ -24,6 +28,10 @@ class ImagePageItem extends StatefulWidget {
   final double minZoomScale;
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
+  final bool edgeSwipeBrightnessEnabled;
+  final bool edgeSwipeHudEnabled;
+  final double edgeSwipeWidthFraction;
+  final bool isActive;
 
   const ImagePageItem({
     super.key,
@@ -42,6 +50,10 @@ class ImagePageItem extends StatefulWidget {
     this.minZoomScale = 0.25,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.edgeSwipeBrightnessEnabled = true,
+    this.edgeSwipeHudEnabled = true,
+    this.edgeSwipeWidthFraction = 0.25,
+    this.isActive = true,
   });
 
   @override
@@ -52,10 +64,18 @@ class _ImagePageItemState extends State<ImagePageItem> {
   late final TransformationController _transformationController;
   double _scale = 1.0;
   TapDownDetails? _doubleTapDetails;
- Size? _imageSize;
+  Size? _imageSize;
   BoxFit? _lastFit;
   int? _lastRotation;
   Size? _lastViewportSize;
+
+  // -- Edge-swipe brightness gesture --
+  final Set<int> _activeTouchPointers = {};
+  double _brightnessLevel = 0.5;
+  bool _showBrightnessHud = false;
+  Timer? _brightnessHudTimer;
+  bool _isBrightnessDragging = false;
+  EdgeSwipeClaimRecognizer? _brightnessClaim;
 
   bool get _isZoomedIn => _scale > 1.01;
 
@@ -70,6 +90,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
   void initState() {
     super.initState();
     _transformationController = TransformationController();
+    _brightnessLevel = ScreenBrightnessBridge.lastKnownLevel;
     _initImageDimensions();
   }
 
@@ -108,7 +129,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
       final h = bytes[8] | (bytes[9] << 8);
       if (w > 0 && h > 0) return (w, h);
     }
-     // WebP (RIFF....WEBP)
+    // WebP (RIFF....WEBP)
     if (bytes.length >= 30 &&
         bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
         bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
@@ -157,9 +178,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
     }
   }
 
-   
-
-   @override
+  @override
   void didUpdateWidget(covariant ImagePageItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.prefetchedBytes != widget.prefetchedBytes ||
@@ -169,6 +188,9 @@ class _ImagePageItemState extends State<ImagePageItem> {
       _scale = 1.0;
       _transformationController.value = Matrix4.identity();
       _initImageDimensions();
+    }
+    if (!widget.isActive && _isBrightnessDragging) {
+      _abortEdgeGestures();
     }
   }
 
@@ -220,168 +242,376 @@ class _ImagePageItemState extends State<ImagePageItem> {
 
   @override
   void dispose() {
+    _brightnessHudTimer?.cancel();
     _transformationController.dispose();
     super.dispose();
   }
 
- @override
+  // -- Brightness gesture handlers --
+  bool _canStartEdgeSwipe() =>
+      widget.isActive && !_isZoomedIn && _activeTouchPointers.length <= 1;
+
+  void _onGlobalPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _activeTouchPointers.add(event.pointer);
+    if (_activeTouchPointers.length >= 2) {
+      _abortEdgeGestures();
+    }
+  }
+
+  void _onGlobalPointerUp(PointerEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _activeTouchPointers.remove(event.pointer);
+  }
+
+  void _abortEdgeGestures() {
+    _brightnessClaim?.abort();
+    _handleBrightnessDragCancel();
+  }
+
+  void _handleBrightnessDragStart(DragStartDetails details) {
+    if (!_canStartEdgeSwipe()) return;
+    widget.onZoomChanged(false); // Locks scroll physics so the page cannot swipe
+    _isBrightnessDragging = true;
+    _brightnessLevel = ScreenBrightnessBridge.lastKnownLevel;
+    _brightnessHudTimer?.cancel();
+    setState(() => _showBrightnessHud = true);
+  }
+
+  void _handleBrightnessDragUpdate(DragUpdateDetails details) {
+    if (!_isBrightnessDragging) return;
+    if (_activeTouchPointers.length > 1) {
+      _abortEdgeGestures();
+      return;
+    }
+    final dy = details.primaryDelta ?? details.delta.dy;
+    final delta = -dy; // Dragging upward increases brightness
+    final change = delta / MediaViewerConstants.edgeSwipeFullRangeDistance;
+    final newLevel = (_brightnessLevel + change).clamp(0.0, 1.0);
+    if ((newLevel - _brightnessLevel).abs() < 0.002) return;
+    setState(() => _brightnessLevel = newLevel);
+    unawaited(ScreenBrightnessBridge.setBrightness(newLevel));
+  }
+
+  void _handleBrightnessDragEnd(DragEndDetails details) {
+    if (_isBrightnessDragging) {
+      _isBrightnessDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
+      _hideBrightnessHudSoon();
+    }
+  }
+
+  void _handleBrightnessDragCancel() {
+    if (_isBrightnessDragging) {
+      _isBrightnessDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
+      _hideBrightnessHudSoon();
+    }
+  }
+
+  void _hideBrightnessHudSoon() {
+    _brightnessHudTimer?.cancel();
+    _brightnessHudTimer = Timer(
+      MediaViewerConstants.edgeSwipeHudHideDelay,
+      () {
+        if (mounted) setState(() => _showBrightnessHud = false);
+      },
+    );
+  }
+
+  Widget _edgeSwipeStrip({
+    required void Function(EdgeSwipeClaimRecognizer) onClaimCreated,
+    required GestureDragStartCallback onDragStart,
+    required GestureDragUpdateCallback onDragUpdate,
+    required GestureDragEndCallback onDragEnd,
+    required VoidCallback onDragCancel,
+  }) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        EdgeSwipeClaimRecognizer:
+            GestureRecognizerFactoryWithHandlers<EdgeSwipeClaimRecognizer>(
+              () {
+                final recognizer = EdgeSwipeClaimRecognizer(
+                  canClaim: _canStartEdgeSwipe,
+                );
+                onClaimCreated(recognizer);
+                return recognizer;
+              },
+              (recognizer) {
+                recognizer
+                  ..onStart = onDragStart
+                  ..onUpdate = onDragUpdate
+                  ..onEnd = onDragEnd
+                  ..onCancel = onDragCancel;
+              },
+            ),
+      },
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+
+  Widget _buildEdgeGestureHud({
+    required bool isLeft,
+    required IconData icon,
+    required double level,
+  }) {
+    final clampedLevel = level.clamp(0.0, 1.0);
+    final percent = (clampedLevel * 100).round();
+    return Positioned(
+      left: isLeft ? 40 : null,
+      right: isLeft ? null : 40,
+      child: IgnorePointer(
+        child: Container(
+          width: 56,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(height: 8),
+              Container(
+                height: 72,
+                width: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: FractionallySizedBox(
+                    widthFactor: 1.0,
+                    heightFactor: clampedLevel,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$percent%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final viewportWidth = constraints.maxWidth;
-        final viewportHeight = constraints.maxHeight;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onGlobalPointerDown,
+      onPointerUp: _onGlobalPointerUp,
+      onPointerCancel: _onGlobalPointerUp,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final viewportWidth = constraints.maxWidth;
+          final viewportHeight = constraints.maxHeight;
 
-        double? rawAr;
-        if (_imageSize != null && _imageSize!.height > 0) {
-          rawAr = _imageSize!.width / _imageSize!.height;
-        } else {
-          rawAr = MediaAspectRatioCache.get(widget.container, widget.fileName);
-        }
-
-        double? childWidth;
-        double? childHeight;
-        double? canvasWidth;
-        double? canvasHeight;
-        bool isConstrained = true;
-
-        if (rawAr != null && rawAr > 0 && viewportWidth > 0 && viewportHeight > 0) {
-          final isRotated = widget.rotationQuarterTurns % 2 != 0;
-          final ar = isRotated ? (1.0 / rawAr) : rawAr;
-
-          if (widget.imageFit == BoxFit.fitWidth) {
-            childWidth = viewportWidth;
-            childHeight = viewportWidth / ar;
-            isConstrained = false;
-          } else if (widget.imageFit == BoxFit.fitHeight) {
-            childHeight = viewportHeight;
-            childWidth = viewportHeight * ar;
-            isConstrained = false;
+          double? rawAr;
+          if (_imageSize != null && _imageSize!.height > 0) {
+            rawAr = _imageSize!.width / _imageSize!.height;
           } else {
-            // BoxFit.contain: calculate exact image boundaries so Hero only wraps the actual image
-            if ((viewportWidth / viewportHeight) > ar) {
-              childHeight = viewportHeight;
-              childWidth = viewportHeight * ar;
-            } else {
+            rawAr = MediaAspectRatioCache.get(widget.container, widget.fileName);
+          }
+
+          double? childWidth;
+          double? childHeight;
+          double? canvasWidth;
+          double? canvasHeight;
+          bool isConstrained = true;
+
+          if (rawAr != null && rawAr > 0 && viewportWidth > 0 && viewportHeight > 0) {
+            final isRotated = widget.rotationQuarterTurns % 2 != 0;
+            final ar = isRotated ? (1.0 / rawAr) : rawAr;
+
+            if (widget.imageFit == BoxFit.fitWidth) {
               childWidth = viewportWidth;
               childHeight = viewportWidth / ar;
+              isConstrained = false;
+            } else if (widget.imageFit == BoxFit.fitHeight) {
+              childHeight = viewportHeight;
+              childWidth = viewportHeight * ar;
+              isConstrained = false;
+            } else {
+              // BoxFit.contain: calculate exact image boundaries so Hero only wraps the actual image
+              if ((viewportWidth / viewportHeight) > ar) {
+                childHeight = viewportHeight;
+                childWidth = viewportHeight * ar;
+              } else {
+                childWidth = viewportWidth;
+                childHeight = viewportWidth / ar;
+              }
+            }
+
+            canvasWidth = max(viewportWidth, childWidth);
+            canvasHeight = max(viewportHeight, childHeight);
+
+            final viewportSize = Size(viewportWidth, viewportHeight);
+            if (_lastFit != widget.imageFit ||
+                _lastRotation != widget.rotationQuarterTurns ||
+                _lastViewportSize != viewportSize) {
+              _lastFit = widget.imageFit;
+              _lastRotation = widget.rotationQuarterTurns;
+              _lastViewportSize = viewportSize;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  _centerImageInitially(constraints);
+                }
+              });
             }
           }
 
-          canvasWidth = max(viewportWidth, childWidth);
-          canvasHeight = max(viewportHeight, childHeight);
-
-          final viewportSize = Size(viewportWidth, viewportHeight);
-          if (_lastFit != widget.imageFit ||
-              _lastRotation != widget.rotationQuarterTurns ||
-              _lastViewportSize != viewportSize) {
-            _lastFit = widget.imageFit;
-            _lastRotation = widget.rotationQuarterTurns;
-            _lastViewportSize = viewportSize;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _centerImageInitially(constraints);
-              }
-            });
-          }
-        }
-
-        Widget imageContent = Center(
-          child: SizedBox(
-            width: childWidth,
-            height: childHeight,
-            child: Hero(
-              tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
-              createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
-              child: Material(
-                type: MaterialType.transparency,
-                child: RotatedBox(
-                  quarterTurns: widget.rotationQuarterTurns,
-                  child: EncryptedImageWidget(
-                    container: widget.container,
-                    fileName: widget.fileName,
-                    prefetchedBytes: widget.prefetchedBytes,
-                    fit: BoxFit.contain,
-                    onError: widget.onError,
-                    thumbnailQuality: widget.thumbnailQuality,
-                    thumbnailCacheMode: widget.thumbnailCacheMode,
+          Widget imageContent = Center(
+            child: SizedBox(
+              width: childWidth,
+              height: childHeight,
+              child: Hero(
+                tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+                createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: RotatedBox(
+                    quarterTurns: widget.rotationQuarterTurns,
+                    child: EncryptedImageWidget(
+                      container: widget.container,
+                      fileName: widget.fileName,
+                      prefetchedBytes: widget.prefetchedBytes,
+                      fit: BoxFit.contain,
+                      onError: widget.onError,
+                      thumbnailQuality: widget.thumbnailQuality,
+                      thumbnailCacheMode: widget.thumbnailCacheMode,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
+          );
 
-        if (!widget.enableZoom) {
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => widget.onToggleUI(!widget.showUI),
-            child: SizedBox.expand(
-              child: imageContent,
+          final Widget coreImageWidget = !widget.enableZoom
+              ? GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => widget.onToggleUI(!widget.showUI),
+                  child: SizedBox.expand(
+                    child: imageContent,
+                  ),
+                )
+              : GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => widget.onToggleUI(!widget.showUI),
+                  onDoubleTapDown: (d) => _doubleTapDetails = d,
+                  onDoubleTap: () {
+                    final position = _doubleTapDetails?.localPosition;
+                    final bool atBaseline = (_scale - 1.0).abs() < 0.01;
+                    if (atBaseline) {
+                      _scale = 3.5;
+                      if (position != null) {
+                        final x = -position.dx * (_scale - 1);
+                        final y = -position.dy * (_scale - 1);
+                        _transformationController.value = Matrix4.identity()
+                          ..translateByDouble(x, y, 0.0, 1.0)
+                          ..scaleByDouble(_scale, _scale, 1.0, 1.0);
+                      } else {
+                        _transformationController.value = Matrix4.identity()
+                          ..scaleByDouble(_scale, _scale, 1.0, 1.0);
+                      }
+                      widget.onZoomChanged(true);
+                    } else {
+                      _scale = 1.0;
+                      _centerImageInitially(constraints);
+                      widget.onZoomChanged(true);
+                    }
+                  },
+                  child: SizedBox.expand(
+                    child: InteractiveViewer(
+                      transformationController: _transformationController,
+                      maxScale: MediaViewerConstants.maxImageZoom,
+                      minScale: _effectiveMinZoomScale,
+                      boundaryMargin: widget.pinchZoomOutEnabled
+                          ? const EdgeInsets.all(double.infinity)
+                          : EdgeInsets.zero,
+                      constrained: isConstrained,
+                      panEnabled: false,
+                      onInteractionStart: (details) {
+                        if (details.pointerCount >= 2) {
+                          widget.onZoomChanged(false);
+                        }
+                      },
+                      onInteractionUpdate: (details) {
+                        final s = _transformationController.value.getMaxScaleOnAxis();
+                        if (s != _scale) {
+                          _scale = s;
+                        }
+                      },
+                      onInteractionEnd: (details) {
+                        final s = _transformationController.value.getMaxScaleOnAxis();
+                        _scale = s;
+                        widget.onZoomChanged(true);
+                      },
+                      child: SizedBox(
+                        width: canvasWidth,
+                        height: canvasHeight,
+                        child: imageContent,
+                      ),
+                    ),
+                  ),
+                );
+
+          final rawEdgeWidth = viewportWidth * widget.edgeSwipeWidthFraction;
+          final edgeWidth = rawEdgeWidth.clamp(
+            viewportWidth * MediaViewerConstants.edgeSwipeWidthMin,
+            viewportWidth * MediaViewerConstants.edgeSwipeWidthMax,
+          );
+
+          return ClipRect(
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                coreImageWidget,
+                if (widget.edgeSwipeBrightnessEnabled)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: edgeWidth,
+                    child: _edgeSwipeStrip(
+                      onClaimCreated: (r) => _brightnessClaim = r,
+                      onDragStart: _handleBrightnessDragStart,
+                      onDragUpdate: _handleBrightnessDragUpdate,
+                      onDragEnd: _handleBrightnessDragEnd,
+                      onDragCancel: _handleBrightnessDragCancel,
+                    ),
+                  ),
+                if (widget.edgeSwipeHudEnabled && _showBrightnessHud)
+                  _buildEdgeGestureHud(
+                    isLeft: true,
+                    icon: Icons.wb_sunny_rounded,
+                    level: _brightnessLevel,
+                  ),
+              ],
             ),
           );
-        }
-
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => widget.onToggleUI(!widget.showUI),
-          onDoubleTapDown: (d) => _doubleTapDetails = d,
-       onDoubleTap: () {
-            final position = _doubleTapDetails?.localPosition;
-            final bool atBaseline = (_scale - 1.0).abs() < 0.01;
-            if (atBaseline) {
-              _scale = 3.5;
-              if (position != null) {
-                final x = -position.dx * (_scale - 1);
-                final y = -position.dy * (_scale - 1);
-                _transformationController.value = Matrix4.identity()
-                  ..translateByDouble(x, y, 0.0, 1.0)
-                  ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-              } else {
-                _transformationController.value = Matrix4.identity()
-                  ..scaleByDouble(_scale, _scale, 1.0, 1.0);
-              }
-              widget.onZoomChanged(true);
-            } else {
-              _scale = 1.0;
-              _centerImageInitially(constraints);
-              widget.onZoomChanged(true);
-            }
-          },
-          child: SizedBox.expand(
-            child: InteractiveViewer(
-              transformationController: _transformationController,
-              maxScale: MediaViewerConstants.maxImageZoom,
-              minScale: _effectiveMinZoomScale,
-              boundaryMargin: widget.pinchZoomOutEnabled
-                  ? const EdgeInsets.all(double.infinity)
-                  : EdgeInsets.zero,
-              constrained: isConstrained,
-              panEnabled: false,
-              onInteractionStart: (details) {
-                if (details.pointerCount >= 2) {
-                  widget.onZoomChanged(false);
-                }
-              },
-              onInteractionUpdate: (details) {
-                final s = _transformationController.value.getMaxScaleOnAxis();
-                if (s != _scale) {
-                  _scale = s;
-                }
-              },
-              onInteractionEnd: (details) {
-                final s = _transformationController.value.getMaxScaleOnAxis();
-                _scale = s;
-                widget.onZoomChanged(true);
-              },
-              child: SizedBox(
-                width: canvasWidth,
-                height: canvasHeight,
-                child: imageContent,
-              ),
-            ),
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 }

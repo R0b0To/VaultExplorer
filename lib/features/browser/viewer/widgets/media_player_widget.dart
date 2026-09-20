@@ -152,7 +152,11 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
   final GlobalKey _interactiveViewerKey = GlobalKey();
-  Timer? _indicatorTimer;
+  Timer? _skipDebounceTimer;
+  bool _isSkipActive = false;
+  bool _skipBackwards = false;
+  int _accumulatedSkipSeconds = 0;
+  Duration? _baseSeekPosition;
   int _captionsToken = 0;
   final TransformationController _videoTransformationController =
       TransformationController();
@@ -448,7 +452,7 @@ Future<void> _ensurePosterLoaded() async {
 
   @override
   void dispose() {
-    _indicatorTimer?.cancel();
+    _skipDebounceTimer?.cancel();
     _brightnessHudTimer?.cancel();
     _volumeHudTimer?.cancel();
     _boundController?.removeListener(_onControllerTick);
@@ -537,38 +541,93 @@ Future<void> _ensurePosterLoaded() async {
     widget.onZoomChanged(true);
   }
 
-  Future<void> _skip({required bool backwards}) async {
+  void _handleDoubleTapSkip({required bool backwards}) {
+    if (_isSkipActive) {
+      if (_skipBackwards == backwards) return;
+      _executePendingSeek();
+    }
     final controller = _boundController;
-    if (controller == null || _isSeeking) return;
-    _isSeeking = true;
+    if (controller == null) return;
+
+    _isSkipActive = true;
+    _skipBackwards = backwards;
+    _baseSeekPosition = controller.value.position;
+    _accumulatedSkipSeconds = widget.skipSeconds;
+
     HapticFeedback.lightImpact();
-    final currentPos = controller.value.position;
-    final duration = controller.value.duration;
-    final targetPos = backwards
-        ? currentPos - Duration(seconds: widget.skipSeconds)
-        : currentPos + Duration(seconds: widget.skipSeconds);
-    final clampedPos = targetPos < Duration.zero
-        ? Duration.zero
-        : (targetPos > duration ? duration : targetPos);
     setState(() {
       if (backwards) {
         _showLeftIndicator = true;
+        _showRightIndicator = false;
       } else {
         _showRightIndicator = true;
+        _showLeftIndicator = false;
       }
     });
-    await controller.seekTo(clampedPos);
-    if (!mounted) return;
-    _isSeeking = false;
-    _indicatorTimer?.cancel();
-    _indicatorTimer = Timer(MediaViewerConstants.doubleTapIndicatorDelay, () {
-      if (mounted) {
-        setState(() {
-          _showLeftIndicator = false;
-          _showRightIndicator = false;
-        });
-      }
-    });
+
+    _restartSkipTimer();
+  }
+
+  void _onSkipPointerDown(PointerDownEvent event, double width) {
+    if (!_isSkipActive) return;
+    final dx = event.localPosition.dx;
+    final isLeft = dx < width * 0.3;
+    final isRight = dx > width * 0.7;
+
+    if ((_skipBackwards && isLeft) || (!_skipBackwards && isRight)) {
+      HapticFeedback.lightImpact();
+      setState(() {
+        _accumulatedSkipSeconds += widget.skipSeconds;
+      });
+      _restartSkipTimer();
+    } else {
+      _executePendingSeek();
+    }
+  }
+
+  void _restartSkipTimer() {
+    _skipDebounceTimer?.cancel();
+    _skipDebounceTimer = Timer(
+      MediaViewerConstants.doubleTapIndicatorDelay,
+      _executePendingSeek,
+    );
+  }
+
+  Future<void> _executePendingSeek() async {
+    _skipDebounceTimer?.cancel();
+    _skipDebounceTimer = null;
+
+    if (!_isSkipActive) return;
+    _isSkipActive = false;
+
+    final controller = _boundController;
+    final basePos = _baseSeekPosition;
+    final skipSec = _accumulatedSkipSeconds;
+    final backwards = _skipBackwards;
+
+    _baseSeekPosition = null;
+    _accumulatedSkipSeconds = 0;
+
+    if (controller != null && basePos != null && skipSec > 0) {
+      final duration = controller.value.duration;
+      final target = backwards
+          ? basePos - Duration(seconds: skipSec)
+          : basePos + Duration(seconds: skipSec);
+      final clampedPos = target < Duration.zero
+          ? Duration.zero
+          : (target > duration ? duration : target);
+
+      _isSeeking = true;
+      await controller.seekTo(clampedPos);
+      _isSeeking = false;
+    }
+
+    if (mounted) {
+      setState(() {
+        _showLeftIndicator = false;
+        _showRightIndicator = false;
+      });
+    }
   }
 
 Widget _buildVideoTexture(NativeVideoController controller) {
@@ -924,24 +983,34 @@ Widget _buildVideoTexture(NativeVideoController controller) {
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  return GestureDetector(
+                  return Listener(
                     behavior: HitTestBehavior.translucent,
-                    onTap: () => widget.onToggleUI(!widget.showUI),
-                    onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
-                    onDoubleTap: () {
-                      if (widget.isAudio) return;
-                      final width = constraints.maxWidth;
-                      final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
-                      if (dx < width * 0.3) {
-                        _skip(backwards: true);
-                      } else if (dx > width * 0.7) {
-                        _skip(backwards: false);
-                      } else {
-                        _handleVideoDoubleTap();
-                      }
-                    },
-                    onLongPressStart: _onSpeedHoldStart,
-                    onLongPressEnd: _onSpeedHoldEnd,
+                    onPointerDown: (event) =>
+                        _onSkipPointerDown(event, constraints.maxWidth),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (_isSkipActive || _showLeftIndicator || _showRightIndicator) {
+                          return;
+                        }
+                        widget.onToggleUI(!widget.showUI);
+                      },
+                      onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
+                      onDoubleTap: () {
+                        if (widget.isAudio) return;
+                        final width = constraints.maxWidth;
+                        final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
+                        if (dx < width * 0.3) {
+                          _handleDoubleTapSkip(backwards: true);
+                        } else if (dx > width * 0.7) {
+                          _handleDoubleTapSkip(backwards: false);
+                        } else {
+                          _handleVideoDoubleTap();
+                        }
+                      },
+                      onLongPressStart: _onSpeedHoldStart,
+                      onLongPressEnd: _onSpeedHoldEnd,
+                    ),
                   );
                 },
               ),
@@ -1034,13 +1103,13 @@ if (!widget.isAudio && widget.enableZoom) {
                 if (_showLeftIndicator)
                   _buildIndicator(
                     Icons.fast_rewind_rounded,
-                    '-${widget.skipSeconds}s',
+                    '-${_accumulatedSkipSeconds}s',
                     true,
                   ),
                 if (_showRightIndicator)
                   _buildIndicator(
                     Icons.fast_forward_rounded,
-                    '+${widget.skipSeconds}s',
+                    '+${_accumulatedSkipSeconds}s',
                     false,
                   ),
               if (_isSpeedHeld)

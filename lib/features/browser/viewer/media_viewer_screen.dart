@@ -1713,7 +1713,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
               imageFit: _scrollMode.isContinuous ? BoxFit.contain : _imageFit,
-             rotationQuarterTurns: _rotations[fileName] ?? 0,
+              rotationQuarterTurns: _rotations[fileName] ?? 0,
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,
               pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
@@ -1722,6 +1722,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               onZoomChanged: _onZoomInteractionChanged,
               thumbnailQuality: widget.thumbnailQuality,
               thumbnailCacheMode: widget.thumbnailCacheMode,
+              edgeSwipeBrightnessEnabled:
+                  gestureConfig.edgeSwipeBrightnessEnabled,
+              edgeSwipeHudEnabled: gestureConfig.edgeSwipeHudEnabled,
+              edgeSwipeWidthFraction: gestureConfig.edgeSwipeWidthFraction,
+              isActive: _playlistController.currentFile == fileName,
               onSizeKnown: (w, h) {
                 if (_scrollMode.isContinuous) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1947,18 +1952,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                 final listCanScroll =
                     physics is! NeverScrollableScrollPhysics;
 
-                return RawGestureDetector(
+                final continuousView = RawGestureDetector(
                   behavior: HitTestBehavior.translucent,
                   gestures: <Type, GestureRecognizerFactory>{
-                    if (zoomed)
-                      DoubleTapGestureRecognizer:
-                          GestureRecognizerFactoryWithHandlers<
-                            DoubleTapGestureRecognizer
-                          >(
-                            () => DoubleTapGestureRecognizer(),
-                            (recognizer) =>
-                                recognizer.onDoubleTap = _resetContinuousZoom,
-                          ),
                     if (zoomed && listCanScroll)
                       VerticalDragGestureRecognizer:
                           GestureRecognizerFactoryWithHandlers<
@@ -2010,14 +2006,43 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           .getMaxScaleOnAxis();
                       // Only an in-progress pinch takes scrolling away from
                       // the list. Once it ends the list scrolls again at
-                      // whatever zoom the user stopped on (previously any zoom
-                      // above 1x left it locked, with no way to continue).
+                      // whatever zoom the user stopped on.
                       _onZoomInteractionChanged(true);
-                      // Refresh which zoom-only gestures are registered.
                       if (mounted) setState(() {});
                     },
                     child: listWidget,
                   ),
+                );
+
+                // Always return the Stack so the widget tree structure remains stable.
+                // Keeping Stack as the root ensures the child ListView is never unmounted
+                // when transitioning between zoomed and unzoomed states, preserving
+                // the scroll offset and visible item position.
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    continuousView,
+                    if (zoomed)
+                      Positioned.fill(
+                        child: RawGestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          gestures: <Type, GestureRecognizerFactory>{
+                            DoubleTapGestureRecognizer:
+                                GestureRecognizerFactoryWithHandlers<
+                                  DoubleTapGestureRecognizer
+                                >(
+                                  () => DoubleTapGestureRecognizer(),
+                                  (recognizer) =>
+                                      recognizer.onDoubleTap = _resetContinuousZoom,
+                                ),
+                          },
+                          child: Listener(
+                            behavior: HitTestBehavior.translucent,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               }
 

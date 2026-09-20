@@ -38,7 +38,9 @@ import androidx.media3.extractor.mp4.Mp4Extractor
 import com.aeidolon.vaultexplorer.DeviceCapabilityProfiler
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
+import com.aeidolon.vaultexplorer.container.SoftwareDecodeCursor
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
+import com.aeidolon.vaultexplorer.container.scrubToleranceUs
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
@@ -54,6 +56,12 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         private const val TAG = "NativePlayerManager"
         private const val POSITION_UPDATE_INTERVAL_MS = 200L
         private const val DIAGNOSTICS_EMIT_INTERVAL_MS = 1000L
+
+        // How long one scrub-preview request may spend decoding forward from
+        // a keyframe to reach the exact frame before it settles for the
+        // closest one it has (the next request then carries on from there).
+        // Bounds worst-case latency on slow decoders / high resolutions.
+        private const val SCRUB_DECODE_BUDGET_MS = 150L
     }
 
     private var textureRegistry: TextureRegistry? = null
@@ -112,6 +120,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     // this itself. Only touched on previewFrameExecutor's thread, like the
     // fields above.
     private var previewRotationDegrees: Int = 0
+    // Where the preview decoder stands between requests, so a forward drag
+    // can keep decoding instead of re-seeking every time. Same threading
+    // rule as the fields above; reset whenever the codec is (re)opened,
+    // closed, or a decode throws.
+    private val previewCursor = SoftwareDecodeCursor()
 
     private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
         val factory = DefaultExtractorsFactory()
@@ -600,8 +613,16 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 positionMs.coerceAtLeast(0L)
             }
             val rotation = previewRotationDegrees
+            val toleranceUs = scrubToleranceUs(previewDurationUs)
             val bytes = try {
-                val frame = VideoThumbnailCoordinator.decodeSoftwareFrameAt(extractor, codec, clampedMs * 1000L)
+                val frame = VideoThumbnailCoordinator.decodeSoftwareFrameNear(
+                    extractor,
+                    codec,
+                    clampedMs * 1000L,
+                    toleranceUs,
+                    previewCursor,
+                    SCRUB_DECODE_BUDGET_MS,
+                )
                 if (frame != null) {
                     val scaled = VideoThumbnailCoordinator.scaledToFit(frame, maxSize)
                     // Rotate *after* scaling: same result, but the bitmap being
@@ -618,6 +639,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                     null
                 }
             } catch (e: Exception) {
+                // The codec may be part-way through a stream now; forget where
+                // we thought it was so the next request re-seeks from scratch.
+                previewCursor.reset()
                 VeLog.w(TAG) { "Scrub preview frame decode failed: ${e.message}" }
                 null
             }
@@ -718,6 +742,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             } else {
                 0
             }
+            previewCursor.reset()
             success = true
             return true
         } finally {
@@ -738,6 +763,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         previewExtractor = null
         previewDurationUs = 0L
         previewRotationDegrees = 0
+        previewCursor.reset()
     }
 
     fun release() {

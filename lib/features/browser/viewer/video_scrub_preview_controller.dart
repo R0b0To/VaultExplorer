@@ -28,31 +28,43 @@ typedef VideoScrubPreviewHost = ValueNotifier<VideoScrubPreviewController?>;
 ///  - **Coalescing**: only one native decode is ever in flight. A position
 ///    requested while one is already running just replaces whatever was
 ///    pending; superseded positions are never decoded at all.
-///  - **Caching**: decoded frames are kept in a small bucketed LRU, so
-///    re-crossing the same rough spot on the timeline -- a common
-///    scrubbing motion, overshoot then correct -- reuses the earlier
-///    frame instead of asking the native side to decode it again.
+///  - **Caching**: decoded frames are kept in a small byte-budgeted cache,
+///    bucketed by position, so re-crossing a spot on the timeline -- a
+///    common scrubbing motion, overshoot then correct -- shows the earlier
+///    frame at once while a fresh decode refines it. A bucket is at most
+///    ~1/240 of the video wide ([bucketMsFor]): a whole second-scale span
+///    on a long video, but a single frame's worth on a short clip, so the
+///    instantly-shown frame is never noticeably the wrong one.
 class VideoScrubPreviewController {
   VideoScrubPreviewController(
     this._controller, {
     this.frameMaxSize = _miniBoxFrameMaxSize,
     this.frameQuality = _miniBoxFrameQuality,
-  });
+    Duration videoDuration = Duration.zero,
+  }) : _bucketMs = bucketMsFor(videoDuration);
 
   /// Sizes the decoded frames for how [style] will show them. The ~200 px
   /// JPEG that is plenty for the mini box would be a blurry smear stretched
   /// across the screen, so fullscreen asks the native side for a much
   /// larger (and correspondingly costlier) frame.
+  ///
+  /// [videoDuration] sets how finely positions are bucketed for the cache;
+  /// leave it at zero if unknown.
   factory VideoScrubPreviewController.forStyle(
     NativeVideoController? controller,
-    ScrubPreviewStyle style,
-  ) =>
+    ScrubPreviewStyle style, {
+    Duration videoDuration = Duration.zero,
+  }) =>
       switch (style) {
-        ScrubPreviewStyle.miniBox => VideoScrubPreviewController(controller),
+        ScrubPreviewStyle.miniBox => VideoScrubPreviewController(
+            controller,
+            videoDuration: videoDuration,
+          ),
         ScrubPreviewStyle.fullscreen => VideoScrubPreviewController(
             controller,
             frameMaxSize: _fullscreenFrameMaxSize,
             frameQuality: _fullscreenFrameQuality,
+            videoDuration: videoDuration,
           ),
       };
 
@@ -65,13 +77,24 @@ class VideoScrubPreviewController {
   static const _fullscreenFrameMaxSize = 1280;
   static const _fullscreenFrameQuality = 70;
 
-  // Coarse enough that hovering back and forth over roughly the same spot
-  // reuses a cached frame; fine enough that the preview still visibly
-  // advances as the finger moves across the track.
-  static const _bucketMs = 750;
-  static const _maxCacheEntries = 40;
+  // Bucket width bounds, in ms. Coarse enough that hovering back and forth
+  // over roughly the same spot reuses a cached frame; fine enough that the
+  // preview still visibly advances as the finger moves across the track.
+  // The floor is about one frame at 30 fps -- nothing to gain below it.
+  static const _minBucketMs = 33;
+  static const _maxBucketMs = 750;
+
+  // A bucket spans about one slider pixel's worth of the video.
+  static const _bucketsPerVideo = 240;
+
+  // Frames vary from ~10 KB (mini box) to ~100 KB (fullscreen), so the
+  // cache is capped by size rather than by entry count.
+  static const _maxCacheBytes = 6 * 1024 * 1024;
 
   final NativeVideoController? _controller;
+
+  /// Width of one position bucket, in milliseconds.
+  final int _bucketMs;
 
   /// Longest edge, in pixels, of each frame requested from the native side.
   final int frameMaxSize;
@@ -85,6 +108,7 @@ class VideoScrubPreviewController {
   final ValueNotifier<Uint8List?> frameNotifier = ValueNotifier<Uint8List?>(null);
 
   final Map<int, Uint8List> _cache = <int, Uint8List>{};
+  int _cacheBytes = 0;
 
   bool _available = false;
   bool _fetching = false;
@@ -99,7 +123,38 @@ class VideoScrubPreviewController {
   /// True once [dispose] has run; [frameNotifier] is unusable after that.
   bool get isDisposed => _disposed;
 
+  /// Width of a position bucket, in ms, for a video of [duration]: about
+  /// 1/240 of it (roughly a slider pixel), but never coarser than 750 ms --
+  /// the old fixed width, and still right for long videos -- nor finer than
+  /// ~one frame. A short clip gets fine buckets, so its many distinct
+  /// frames aren't collapsed into a handful of cache slots. An unknown
+  /// duration gets the coarse default.
+  @visibleForTesting
+  static int bucketMsFor(Duration duration) {
+    final ms = duration.inMilliseconds;
+    if (ms <= 0) return _maxBucketMs;
+    return (ms / _bucketsPerVideo).round().clamp(_minBucketMs, _maxBucketMs).toInt();
+  }
+
+  /// How many frames are currently cached.
+  @visibleForTesting
+  int get cachedFrameCount => _cache.length;
+
   int _bucketFor(Duration position) => (position.inMilliseconds / _bucketMs).round();
+
+  void _remember(int bucket, Uint8List bytes) {
+    // Remove first so a re-fetched bucket moves to the back of the
+    // eviction order instead of keeping its original place in line.
+    final replaced = _cache.remove(bucket);
+    if (replaced != null) _cacheBytes -= replaced.length;
+    _cache[bucket] = bytes;
+    _cacheBytes += bytes.length;
+    // Always keep the newest frame, however large.
+    while (_cacheBytes > _maxCacheBytes && _cache.length > 1) {
+      final oldest = _cache.keys.first;
+      _cacheBytes -= _cache.remove(oldest)!.length;
+    }
+  }
 
   /// Opens the native decode session. Call once, before the first
   /// [requestFrame] of a drag gesture.
@@ -137,11 +192,7 @@ class VideoScrubPreviewController {
       );
       if (_disposed) return;
       if (bytes != null) {
-        final bucket = _bucketFor(position);
-        _cache[bucket] = bytes;
-        if (_cache.length > _maxCacheEntries) {
-          _cache.remove(_cache.keys.first);
-        }
+        _remember(_bucketFor(position), bytes);
         frameNotifier.value = bytes;
       }
     } catch (e) {
@@ -183,5 +234,6 @@ class VideoScrubPreviewController {
     _disposed = true;
     frameNotifier.dispose();
     _cache.clear();
+    _cacheBytes = 0;
   }
 }

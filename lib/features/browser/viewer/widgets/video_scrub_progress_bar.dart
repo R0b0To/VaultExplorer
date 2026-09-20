@@ -81,6 +81,7 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
     final preview = VideoScrubPreviewController.forStyle(
       widget.playbackManager.activeController,
       widget.previewStyle,
+      videoDuration: widget.videoProgressNotifier.value.duration,
     );
     _preview = preview;
     unawaited(preview.begin().then((_) {

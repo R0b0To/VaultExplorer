@@ -413,6 +413,139 @@ object VideoThumbnailCoordinator {
         return outputFrame
     }
 
+    // How long the decode loop may go without the codec producing anything
+    // before it gives up. Matches the ~1s worst case the fixed attempt
+    // budget in decodeSoftwareFrameAt works out to.
+    private const val DECODE_STALL_LIMIT_NS = 1_000_000_000L
+
+    /**
+     * Like [decodeSoftwareFrameAt], but returns the frame at [targetUs]
+     * (to within [toleranceUs]) instead of just the keyframe the seek
+     * lands on.
+     *
+     * [decodeSoftwareFrameAt] hands back the first frame the decoder
+     * produces after a seek, which is always a keyframe. That's plenty for
+     * a browser thumbnail, and for scrubbing a long video where a slider
+     * pixel spans many seconds -- but for a short clip, whose keyframes
+     * may be a second apart, the preview can only ever show a handful of
+     * distinct frames however finely the user drags.
+     *
+     * This keeps decoding forward from the keyframe and *drops* every frame
+     * before the target without converting it, so the extra cost per
+     * request is decoding, not the (much heavier) YUV -> Bitmap conversion.
+     * Two things keep that cost bounded:
+     *  - [budgetMs]: once it has been spent, the next frame out is returned
+     *    even if it is still short of the target. The [cursor] remembers
+     *    where the decoder got to, so the following request carries on from
+     *    there and closes the gap.
+     *  - [cursor]: a request at or just past the previous one keeps
+     *    decoding forward instead of seeking and flushing, which makes a
+     *    steady forward drag cost only the handful of frames between
+     *    requests.
+     *
+     * [cursor] must be reset by the caller whenever the codec is torn down
+     * or this throws.
+     */
+    fun decodeSoftwareFrameNear(
+        extractor: MediaExtractor,
+        codec: MediaCodec,
+        targetUs: Long,
+        toleranceUs: Long,
+        cursor: SoftwareDecodeCursor,
+        budgetMs: Long,
+    ): Bitmap? = decodeNear(
+        extractor, codec, targetUs, toleranceUs, cursor, budgetMs, allowEndRetry = true,
+    )
+
+    private fun decodeNear(
+        extractor: MediaExtractor,
+        codec: MediaCodec,
+        targetUs: Long,
+        toleranceUs: Long,
+        cursor: SoftwareDecodeCursor,
+        budgetMs: Long,
+        allowEndRetry: Boolean,
+    ): Bitmap? {
+        if (!cursor.canContinueTo(targetUs)) {
+            extractor.seekTo(targetUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            codec.flush()
+            cursor.reset()
+        }
+
+        val info = MediaCodec.BufferInfo()
+        val timeoutUs = 10_000L
+        val startNs = System.nanoTime()
+        val budgetNs = budgetMs * 1_000_000L
+        var lastProgressNs = startNs
+        var newestPtsUs = SoftwareDecodeCursor.NONE
+        var reachedEnd = false
+
+        while (System.nanoTime() - lastProgressNs < DECODE_STALL_LIMIT_NS) {
+            if (!cursor.inputDone) {
+                val inputIndex = codec.dequeueInputBuffer(timeoutUs)
+                if (inputIndex >= 0) {
+                    val inputBuffer = codec.getInputBuffer(inputIndex)
+                    if (inputBuffer != null) {
+                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                        if (sampleSize < 0) {
+                            codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            cursor.inputDone = true
+                        } else {
+                            val presentationTimeUs = extractor.sampleTime
+                            codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+            }
+
+            val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
+            if (outputIndex < 0) continue
+            lastProgressNs = System.nanoTime()
+
+            var frame: Bitmap? = null
+            if (info.size > 0) {
+                val ptsUs = info.presentationTimeUs
+                cursor.lastOutputPtsUs = ptsUs
+                if (ptsUs > newestPtsUs) newestPtsUs = ptsUs
+                val outOfTime = lastProgressNs - startNs >= budgetNs
+                if (hasReachedTarget(ptsUs, targetUs, toleranceUs) || outOfTime) {
+                    frame = outputToBitmap(codec, outputIndex)
+                }
+            }
+            val endOfStream = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+            codec.releaseOutputBuffer(outputIndex, false)
+
+            if (frame != null) return frame
+            if (endOfStream) {
+                reachedEnd = true
+                break
+            }
+        }
+
+        // The stream ended before any frame got to the target, i.e. the
+        // target is past the last frame -- a container's reported duration
+        // usually runs a little longer than its final video frame, so
+        // dragging to the very end of the slider lands here. Show that last
+        // frame rather than nothing, now that we know its time.
+        if (reachedEnd && allowEndRetry && newestPtsUs != SoftwareDecodeCursor.NONE) {
+            return decodeNear(
+                extractor, codec, newestPtsUs, 0L, cursor, budgetMs, allowEndRetry = false,
+            )
+        }
+        return null
+    }
+
+    /** Converts the decoder output buffer at [outputIndex] to a [Bitmap], or null if it has no image. */
+    private fun outputToBitmap(codec: MediaCodec, outputIndex: Int): Bitmap? {
+        val image = codec.getOutputImage(outputIndex) ?: return null
+        return try {
+            yuv420ToBitmap(image)
+        } finally {
+            image.close()
+        }
+    }
+
     /** Converts a YUV_420_888 [android.media.Image] (the output format of
      *  an explicit software [MediaCodec] decoder) to a [Bitmap] via an
      *  intermediate NV21 buffer + JPEG round-trip -- there's no direct

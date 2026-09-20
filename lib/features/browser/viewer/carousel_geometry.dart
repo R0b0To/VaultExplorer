@@ -82,6 +82,31 @@ class CarouselGeometry {
     return padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
   }
 
+  /// While the list is pinch-zoomed (or shrunk) inside its `InteractiveViewer`,
+  /// the part of it that is actually on screen is not necessarily centered on
+  /// the list's own viewport. This returns, in list pixels, how far the middle
+  /// of the *visible* part is from the middle of the viewport (0 at 1x).
+  ///
+  /// [sceneTop] / [sceneBottom] are the list-space y coordinates that the top
+  /// and bottom edges of the screen map to (`TransformationController.toScene`
+  /// of `(0, 0)` and `(0, viewportHeight)`).
+  ///
+  /// Adding this to the scroll offset before calling [indexForOffset] makes
+  /// the "current item" the one the user is looking at rather than the one at
+  /// the centre of an off-screen viewport. That matters because delete, rename,
+  /// share and info all act on the current item.
+  static double visibleCenterShift({
+    required double viewportHeight,
+    required double sceneTop,
+    required double sceneBottom,
+  }) {
+    if (viewportHeight <= 0) return 0.0;
+    final visibleTop = math.max(0.0, sceneTop);
+    final visibleBottom = math.min(viewportHeight, sceneBottom);
+    if (visibleBottom <= visibleTop) return 0.0;
+    return (visibleTop + visibleBottom) / 2.0 - viewportHeight / 2.0;
+  }
+
   int indexForOffset(double offset, double viewportWidth, double viewportHeight) {
     if (playlist.isEmpty) return 0;
     if (playlist.length == 1) return 0;

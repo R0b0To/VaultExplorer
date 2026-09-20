@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart'
     show DeviceVolumeBridge;
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
@@ -190,6 +191,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   Timer? _volumeHudTimer;
   static const double _edgeSwipeSlop = 10.0;
   bool _isBrightnessDragging = false;
+  // Arena participants for the two strips (see EdgeSwipeClaimRecognizer);
+  // kept so a second finger can release them.
+  EdgeSwipeClaimRecognizer? _brightnessClaim;
+  EdgeSwipeClaimRecognizer? _volumeClaim;
   bool _isVolumeDragging = false;
   double _effectiveHoldSpeed = 2.0;
 
@@ -1004,12 +1009,12 @@ if (!widget.isAudio && widget.enableZoom) {
                     top: 0,
                     bottom: 0,
                     width: edgeWidth,
-                    child: Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: _onBrightnessPointerDown,
-                      onPointerMove: _onBrightnessPointerMove,
-                      onPointerUp: _onBrightnessPointerUp,
-                      onPointerCancel: _onBrightnessPointerUp,
+                    child: _edgeSwipeStrip(
+                      onClaimCreated: (r) => _brightnessClaim = r,
+                      onDragStart: _handleBrightnessDragStart,
+                      onDragUpdate: _handleBrightnessDragUpdate,
+                      onDragEnd: _handleBrightnessDragEnd,
+                      onDragCancel: _handleBrightnessDragCancel,
                     ),
                   ),
                 if (widget.edgeSwipeVolumeEnabled)
@@ -1018,12 +1023,12 @@ if (!widget.isAudio && widget.enableZoom) {
                     top: 0,
                     bottom: 0,
                     width: edgeWidth,
-                    child: Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: _onVolumePointerDown,
-                      onPointerMove: _onVolumePointerMove,
-                      onPointerUp: _onVolumePointerUp,
-                      onPointerCancel: _onVolumePointerUp,
+                    child: _edgeSwipeStrip(
+                      onClaimCreated: (r) => _volumeClaim = r,
+                      onDragStart: _handleVolumeDragStart,
+                      onDragUpdate: _handleVolumeDragUpdate,
+                      onDragEnd: _handleVolumeDragEnd,
+                      onDragCancel: _handleVolumeDragCancel,
                     ),
                   ),
                 if (_showLeftIndicator)
@@ -1165,11 +1170,50 @@ if (!widget.isAudio && widget.enableZoom) {
     );
   }
 
-  // Fires for every raw touch down/up on this widget, regardless of which
-  // gesture recognizer ends up winning the arena for it. Mirrors the
-  // pinch-vs-swipe fix in MediaViewerScreen, scoped locally here so an
-  // edge-swipe gesture can abort the instant a second finger appears
-  // without threading state through the screen level.
+  // The same conditions the strips' pointer-down handlers use to decide
+  // whether they'll act on a touch. The claim recognizer asks this when a touch
+  // lands, so a strip that wouldn't change anything (inactive video, zoomed in,
+  // multi-touch) never blocks the surrounding list or pager from scrolling.
+ bool _canStartEdgeSwipe() =>
+      _isActive && !_isZoomedIn && _activeTouchPointers.length <= 1;
+
+  Widget _edgeSwipeStrip({
+    required void Function(EdgeSwipeClaimRecognizer) onClaimCreated,
+    required GestureDragStartCallback onDragStart,
+    required GestureDragUpdateCallback onDragUpdate,
+    required GestureDragEndCallback onDragEnd,
+    required VoidCallback onDragCancel,
+  }) {
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: <Type, GestureRecognizerFactory>{
+        EdgeSwipeClaimRecognizer:
+            GestureRecognizerFactoryWithHandlers<EdgeSwipeClaimRecognizer>(
+              () {
+                final recognizer = EdgeSwipeClaimRecognizer(
+                  canClaim: _canStartEdgeSwipe,
+                );
+                onClaimCreated(recognizer);
+                return recognizer;
+              },
+              (recognizer) {
+                recognizer
+                  ..onStart = onDragStart
+                  ..onUpdate = onDragUpdate
+                  ..onEnd = onDragEnd
+                  ..onCancel = onDragCancel;
+              },
+            ),
+      },
+      // Listener with translucent behavior ensures the hit-test tree registers
+      // this strip across its entire bounds while allowing taps underneath.
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+
   void _onGlobalPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch) return;
     _activeTouchPointers.add(event.pointer);
@@ -1184,72 +1228,55 @@ if (!widget.isAudio && widget.enableZoom) {
   }
 
   void _abortEdgeGestures() {
-    if (_brightnessDragPointerId != null) {
-      _brightnessDragPointerId = null;
-      _brightnessDragStartY = null;
-      _brightnessDragStartLevel = null;
-      if (_isBrightnessDragging) {
-        _isBrightnessDragging = false;
-        _hideBrightnessHudSoon();
-      }
-    }
-    if (_volumeDragPointerId != null) {
-      _volumeDragPointerId = null;
-      _volumeDragStartY = null;
-      _volumeDragStartLevel = null;
-      if (_isVolumeDragging) {
-        _isVolumeDragging = false;
-        _hideVolumeHudSoon();
-      }
-    }
+    _brightnessClaim?.abort();
+    _volumeClaim?.abort();
+    _handleBrightnessDragCancel();
+    _handleVolumeDragCancel();
   }
 
-  void _onBrightnessPointerDown(PointerDownEvent event) {
-    if (event.kind != PointerDeviceKind.touch || !_isActive) return;
-    if (_activeTouchPointers.length > 1 || _isZoomedIn) return;
-    _brightnessDragPointerId = event.pointer;
-    _brightnessDragStartY = event.position.dy;
+  void _handleBrightnessDragStart(DragStartDetails details) {
+    if (!_canStartEdgeSwipe()) return;
+    widget.onZoomChanged(false); // Freezes scroll physics so list/page cannot scroll
     _brightnessDragStartLevel = ScreenBrightnessBridge.lastKnownLevel;
-    _isBrightnessDragging = false;
+    _brightnessLevel = _brightnessDragStartLevel!;
+    _isBrightnessDragging = true;
+    _brightnessHudTimer?.cancel();
+    setState(() => _showBrightnessHud = true);
   }
 
-  void _onBrightnessPointerMove(PointerMoveEvent event) {
-    if (_brightnessDragPointerId != event.pointer) return;
+  void _handleBrightnessDragUpdate(DragUpdateDetails details) {
+    if (!_isBrightnessDragging) return;
     if (_activeTouchPointers.length > 1) {
       _abortEdgeGestures();
       return;
     }
-    final startY = _brightnessDragStartY;
-    final startLevel = _brightnessDragStartLevel;
-    if (startY == null || startLevel == null) return;
-    final totalDelta = startY - event.position.dy;
-    if (!_isBrightnessDragging) {
-      if (totalDelta.abs() < _edgeSwipeSlop) return;
-      _isBrightnessDragging = true;
-      _brightnessHudTimer?.cancel();
-      setState(() {
-        _brightnessLevel = startLevel;
-        _showBrightnessHud = true;
-      });
-    }
-    final effectiveDelta = totalDelta - (totalDelta.isNegative ? -_edgeSwipeSlop : _edgeSwipeSlop);
-    final newLevel = (startLevel +
-            effectiveDelta / MediaViewerConstants.edgeSwipeFullRangeDistance)
-        .clamp(0.0, 1.0);
+    final dy = details.primaryDelta ?? details.delta.dy;
+    final delta = -dy; // Dragging upward increases brightness
+    final change = delta / MediaViewerConstants.edgeSwipeFullRangeDistance;
+    final newLevel = (_brightnessLevel + change).clamp(0.0, 1.0);
     if ((newLevel - _brightnessLevel).abs() < 0.002) return;
     setState(() => _brightnessLevel = newLevel);
     unawaited(ScreenBrightnessBridge.setBrightness(newLevel));
   }
 
-  void _onBrightnessPointerUp(PointerEvent event) {
-    if (_brightnessDragPointerId != event.pointer) return;
-    _brightnessDragPointerId = null;
-    _brightnessDragStartY = null;
-    _brightnessDragStartLevel = null;
+  void _handleBrightnessDragEnd(DragEndDetails details) {
     if (_isBrightnessDragging) {
       _isBrightnessDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
       _hideBrightnessHudSoon();
     }
+    _brightnessDragStartY = null;
+    _brightnessDragStartLevel = null;
+  }
+
+  void _handleBrightnessDragCancel() {
+    if (_isBrightnessDragging) {
+      _isBrightnessDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
+      _hideBrightnessHudSoon();
+    }
+    _brightnessDragStartY = null;
+    _brightnessDragStartLevel = null;
   }
 
   void _hideBrightnessHudSoon() {
@@ -1262,38 +1289,26 @@ if (!widget.isAudio && widget.enableZoom) {
     );
   }
 
-  void _onVolumePointerDown(PointerDownEvent event) {
-    if (event.kind != PointerDeviceKind.touch || !_isActive) return;
-    if (_activeTouchPointers.length > 1 || _isZoomedIn) return;
-    _volumeDragPointerId = event.pointer;
-    _volumeDragStartY = event.position.dy;
+  void _handleVolumeDragStart(DragStartDetails details) {
+    if (!_canStartEdgeSwipe()) return;
+    widget.onZoomChanged(false); // Freezes scroll physics so list/page cannot scroll
     _volumeDragStartLevel = widget.isMuted ? 0.0 : _volumeLevel;
-    _isVolumeDragging = false;
+    _volumeLevel = _volumeDragStartLevel!;
+    _isVolumeDragging = true;
+    _volumeHudTimer?.cancel();
+    setState(() => _showVolumeHud = true);
   }
 
-  void _onVolumePointerMove(PointerMoveEvent event) {
-    if (_volumeDragPointerId != event.pointer) return;
+  void _handleVolumeDragUpdate(DragUpdateDetails details) {
+    if (!_isVolumeDragging) return;
     if (_activeTouchPointers.length > 1) {
       _abortEdgeGestures();
       return;
     }
-    final startY = _volumeDragStartY;
-    final startLevel = _volumeDragStartLevel;
-    if (startY == null || startLevel == null) return;
-    final totalDelta = startY - event.position.dy;
-    if (!_isVolumeDragging) {
-      if (totalDelta.abs() < _edgeSwipeSlop) return;
-      _isVolumeDragging = true;
-      _volumeHudTimer?.cancel();
-      setState(() {
-        _volumeLevel = startLevel;
-        _showVolumeHud = true;
-      });
-    }
-    final effectiveDelta = totalDelta - (totalDelta.isNegative ? -_edgeSwipeSlop : _edgeSwipeSlop);
-    final newLevel = (startLevel +
-            effectiveDelta / MediaViewerConstants.edgeSwipeFullRangeDistance)
-        .clamp(0.0, 1.0);
+    final dy = details.primaryDelta ?? details.delta.dy;
+    final delta = -dy; // Dragging upward increases volume
+    final change = delta / MediaViewerConstants.edgeSwipeFullRangeDistance;
+    final newLevel = (_volumeLevel + change).clamp(0.0, 1.0);
     if ((newLevel - _volumeLevel).abs() < 0.002) return;
     setState(() => _volumeLevel = newLevel);
     unawaited(DeviceVolumeBridge.setVolume(newLevel));
@@ -1310,17 +1325,25 @@ if (!widget.isAudio && widget.enableZoom) {
     }
   }
 
-  void _onVolumePointerUp(PointerEvent event) {
-    if (_volumeDragPointerId != event.pointer) return;
-    _volumeDragPointerId = null;
-    _volumeDragStartY = null;
-    _volumeDragStartLevel = null;
+  void _handleVolumeDragEnd(DragEndDetails details) {
     if (_isVolumeDragging) {
       _isVolumeDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
       _hideVolumeHudSoon();
     }
+    _volumeDragStartY = null;
+    _volumeDragStartLevel = null;
   }
 
+  void _handleVolumeDragCancel() {
+    if (_isVolumeDragging) {
+      _isVolumeDragging = false;
+      widget.onZoomChanged(true); // Restores scroll physics
+      _hideVolumeHudSoon();
+    }
+    _volumeDragStartY = null;
+    _volumeDragStartLevel = null;
+  }
   void _hideVolumeHudSoon() {
     _volumeHudTimer?.cancel();
     _volumeHudTimer = Timer(MediaViewerConstants.edgeSwipeHudHideDelay, () {

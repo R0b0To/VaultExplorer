@@ -2,6 +2,12 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/gestures.dart'
+    show
+        Drag,
+        DoubleTapGestureRecognizer,
+        VerticalDragGestureRecognizer,
+        Velocity;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -123,6 +129,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   // or mid-interaction (reported via onZoomChanged). Kept separate from
   // _multiTouchLock so either source can hold the lock independently.
   bool _zoomInteractionLock = false;
+  // Scroll drag forwarded to the continuous list from outside its bounds
+  // (see _onMarginDragStart).
+  Drag? _marginDrag;
 
   int _activeMenuCount = 0;
   late bool _wasEmpty;
@@ -340,6 +349,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
+        // Target offsets assume an un-zoomed list.
+        _resetContinuousZoom();
         final target = _geometry.offsetForIndex(
           index,
           _viewportWidth,
@@ -562,6 +573,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
+        // Target offsets assume an un-zoomed list.
+        _resetContinuousZoom();
         final target = _geometry.offsetForIndex(
           index,
           _viewportWidth,
@@ -668,6 +681,119 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _updateSwipePhysics();
   }
 
+  // ---- Continuous-mode zoom ------------------------------------------------
+  //
+  // The continuous list is zoomed by an InteractiveViewer wrapped around the
+  // ListView: "zoomed" means the list is drawn through a transform, it is not
+  // re-laid out. The list keeps scrolling normally underneath that transform.
+
+  /// See [CarouselGeometry.visibleCenterShift].
+  double _continuousVisibleCenterShift() {
+    final h = _viewportHeight;
+    final controller = _continuousTransformationController;
+    if (h <= 0 || controller.value.isIdentity()) return 0.0;
+    return CarouselGeometry.visibleCenterShift(
+      viewportHeight: h,
+      sceneTop: controller.toScene(Offset.zero).dy,
+      sceneBottom: controller.toScene(Offset(0, h)).dy,
+    );
+  }
+
+  /// Puts the continuous list back at 1x.
+  ///
+  /// With [keepCenter] the list is also scrolled so that whatever was in the
+  /// middle of the screen stays there, instead of the view snapping to a
+  /// different item. Pass `false` when the caller is about to reposition the
+  /// list itself anyway (e.g. after the viewport was resized).
+  void _resetContinuousZoom({bool keepCenter = true}) {
+    final controller = _continuousTransformationController;
+    if (controller.value.isIdentity()) {
+      _continuousScale = 1.0;
+      return;
+    }
+    final shift = keepCenter ? _continuousVisibleCenterShift() : 0.0;
+    controller.value = Matrix4.identity();
+    if (shift.abs() > 0.5 &&
+        _listScrollController.hasClients &&
+        _listScrollController.positions.length == 1) {
+      final position = _listScrollController.position;
+      position.jumpTo(
+        (position.pixels + shift)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+    }
+    _onZoomInteractionChanged(true);
+    if (mounted) setState(() => _continuousScale = 1.0);
+  }
+
+  // When the list is zoomed out it only covers part of the screen, and a
+  // drag that starts on the empty area around it never reaches the list. These
+  // handlers forward such vertical drags to the list's scroll position so it
+  // keeps scrolling from anywhere on screen. Drags that start on the list
+  // itself are still handled by the list (it is deeper in the gesture arena).
+  //
+  // Drag deltas and velocities are screen pixels; the list lives in
+  // pre-transform pixels, so both are divided by the current zoom to keep the
+  // content under the finger (this is the same conversion Flutter does for
+  // drags that land on the list directly).
+  void _onMarginDragStart(DragStartDetails details) {
+    // If zoom interaction lock is active (an edge swipe or pinch is claiming the gesture),
+    // do not forward margin drags to the list.
+    if (_zoomInteractionLock ||
+        !_listScrollController.hasClients ||
+        _listScrollController.positions.length != 1) {
+      return;
+    }
+    _marginDrag = _listScrollController.position.drag(
+      details,
+      () => _marginDrag = null,
+    );
+  }
+
+  double get _continuousZoomFactor {
+    final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+    return s > 0 ? s : 1.0;
+  }
+
+  void _onMarginDragUpdate(DragUpdateDetails details) {
+    final drag = _marginDrag;
+    if (drag == null) return;
+    final dy = (details.primaryDelta ?? details.delta.dy) / _continuousZoomFactor;
+    drag.update(
+      DragUpdateDetails(
+        sourceTimeStamp: details.sourceTimeStamp,
+        delta: Offset(0, dy),
+        primaryDelta: dy,
+        globalPosition: details.globalPosition,
+        localPosition: details.localPosition,
+      ),
+    );
+  }
+
+  void _onMarginDragEnd(DragEndDetails details) {
+    final drag = _marginDrag;
+    _marginDrag = null;
+    if (drag == null) return;
+    final vy =
+        (details.primaryVelocity ?? details.velocity.pixelsPerSecond.dy) /
+        _continuousZoomFactor;
+    drag.end(
+      DragEndDetails(
+        velocity: Velocity(pixelsPerSecond: Offset(0, vy)),
+        primaryVelocity: vy,
+        globalPosition: details.globalPosition,
+        localPosition: details.localPosition,
+      ),
+    );
+  }
+
+  void _onMarginDragCancel() {
+    final drag = _marginDrag;
+    _marginDrag = null;
+    drag?.cancel();
+  }
+
   // Called on every raw pointer down, regardless of which gesture
   // recognizer ends up winning the arena. This lets us lock out
   // swipe-to-next-item the instant a second finger touches the screen,
@@ -688,6 +814,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _activeTouchPointers.remove(event.pointer);
     if (_activeTouchPointers.isEmpty && _multiTouchLock) {
       _multiTouchLock = false;
+      // In continuous mode the zoom lock only covers an active pinch (the
+      // list scrolls at any zoom level), so it must not outlive the fingers
+      // even if the pinch never reported its end.
+      if (_scrollMode.isContinuous) _zoomInteractionLock = false;
       _updateSwipePhysics();
     }
   }
@@ -1629,7 +1759,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               },
               edgeSwipeBrightnessEnabled:
                   gestureConfig.edgeSwipeBrightnessEnabled,
-              edgeSwipeVolumeEnabled: gestureConfig.edgeSwipeVolumeEnabled,
+              edgeSwipeVolumeEnabled:
+                  gestureConfig.edgeSwipeVolumeEnabled,
               edgeSwipeHudEnabled: gestureConfig.edgeSwipeHudEnabled,
               edgeSwipeWidthFraction: gestureConfig.edgeSwipeWidthFraction,
               pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
@@ -1735,6 +1866,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   oldController.dispose();
                   if (mounted) {
+                    // The new list is positioned for an un-zoomed viewport.
+                    _resetContinuousZoom(keepCenter: false);
                     unawaited(_activateCurrentMedia());
                     _onScrollEnd();
                   }
@@ -1798,39 +1931,84 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   },
                 );
 
-               return InteractiveViewer(
-                  transformationController: _continuousTransformationController,
-                  minScale: mediaViewerConfig.pinchZoomOutEnabled
-                      ? mediaViewerConfig.minVideoZoomScale.clamp(
-                          MediaViewerConstants.minVideoZoomFloor,
-                          1.0,
-                        )
-                      : 1.0,
-                  maxScale: MediaViewerConstants.maxImageZoom,
-                  boundaryMargin: mediaViewerConfig.pinchZoomOutEnabled
-                      ? const EdgeInsets.all(double.infinity)
-                      : EdgeInsets.zero,
-                  clipBehavior: Clip.none,
-                  panEnabled: true,
-                  onInteractionStart: (details) {
-                    if (details.pointerCount >= 2) {
-                      _onZoomInteractionChanged(false);
-                    }
+                // Only registered while the list is transformed, so a plain
+                // tap at 1x isn't held back waiting to rule out a double tap.
+                final zoomed =
+                    !_continuousTransformationController.value.isIdentity();
+                final listCanScroll =
+                    physics is! NeverScrollableScrollPhysics;
+
+                return RawGestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  gestures: <Type, GestureRecognizerFactory>{
+                    if (zoomed)
+                      DoubleTapGestureRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                            DoubleTapGestureRecognizer
+                          >(
+                            () => DoubleTapGestureRecognizer(),
+                            (recognizer) =>
+                                recognizer.onDoubleTap = _resetContinuousZoom,
+                          ),
+                    if (zoomed && listCanScroll)
+                      VerticalDragGestureRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                            VerticalDragGestureRecognizer
+                          >(
+                            () => VerticalDragGestureRecognizer(),
+                            (recognizer) {
+                              recognizer
+                                ..onStart = _onMarginDragStart
+                                ..onUpdate = _onMarginDragUpdate
+                                ..onEnd = _onMarginDragEnd
+                                ..onCancel = _onMarginDragCancel;
+                            },
+                          ),
                   },
-                  onInteractionUpdate: (details) {
-                    final s = _continuousTransformationController.value
-                        .getMaxScaleOnAxis();
-                    if (s != _continuousScale) {
-                      setState(() => _continuousScale = s);
-                    }
-                  },
-                   onInteractionEnd: (details) {
-                    final s = _continuousTransformationController.value
-                        .getMaxScaleOnAxis();
-                    _continuousScale = s;
-                    _onZoomInteractionChanged(s <= 1.01);
-                  },
-                  child: listWidget,
+                  child: InteractiveViewer(
+                    transformationController:
+                        _continuousTransformationController,
+                    minScale: mediaViewerConfig.pinchZoomOutEnabled
+                        ? mediaViewerConfig.minVideoZoomScale.clamp(
+                            MediaViewerConstants.minVideoZoomFloor,
+                            1.0,
+                          )
+                        : 1.0,
+                    maxScale: MediaViewerConstants.maxImageZoom,
+                    boundaryMargin: mediaViewerConfig.pinchZoomOutEnabled
+                        ? const EdgeInsets.all(double.infinity)
+                        : EdgeInsets.zero,
+                    clipBehavior: Clip.none,
+                    panEnabled: true,
+                    // Single-finger vertical drags belong to the list, at any
+                    // zoom level; the viewer only pans sideways (and pinches).
+                    panAxis: PanAxis.horizontal,
+                    onInteractionStart: (details) {
+                      if (details.pointerCount >= 2) {
+                        _onZoomInteractionChanged(false);
+                      }
+                    },
+                    onInteractionUpdate: (details) {
+                      final s = _continuousTransformationController.value
+                          .getMaxScaleOnAxis();
+                      if (s != _continuousScale) {
+                        setState(() => _continuousScale = s);
+                      }
+                    },
+                    onInteractionEnd: (details) {
+                      _continuousScale = _continuousTransformationController
+                          .value
+                          .getMaxScaleOnAxis();
+                      // Only an in-progress pinch takes scrolling away from
+                      // the list. Once it ends the list scrolls again at
+                      // whatever zoom the user stopped on (previously any zoom
+                      // above 1x left it locked, with no way to continue).
+                      _onZoomInteractionChanged(true);
+                      // Refresh which zoom-only gestures are registered.
+                      if (mounted) setState(() {});
+                    },
+                    child: listWidget,
+                  ),
                 );
               }
 
@@ -1879,7 +2057,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                                   _listScrollController.hasClients) {
                                 final offset = _listScrollController.offset;
                                 final newIndex = _geometry.indexForOffset(
-                                  offset,
+                                  // Zoomed: use the middle of what's actually
+                                  // on screen, not of the list's viewport.
+                                  offset + _continuousVisibleCenterShift(),
                                   _viewportWidth,
                                   _viewportHeight,
                                 );

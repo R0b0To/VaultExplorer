@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
@@ -192,18 +193,7 @@ class MediaViewerBottomControls extends StatelessWidget {
         left: AppSpacing.sm,
         right: AppSpacing.sm,
         bottom: bottomInset + AppSpacing.md,
-        top: AppSpacing.lg,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.9),
-            Colors.black.withValues(alpha: 0.45),
-            Colors.transparent,
-          ],
-        ),
+        top: isCarouselVisible ? AppSpacing.xs : AppSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

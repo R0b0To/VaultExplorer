@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -20,7 +21,7 @@ class PlaylistCarouselOverlay extends StatefulWidget {
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ValueChanged<int> onSelect;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
 
   const PlaylistCarouselOverlay({
     super.key,
@@ -30,10 +31,12 @@ class PlaylistCarouselOverlay extends StatefulWidget {
     required this.thumbnailQuality,
     required this.thumbnailCacheMode,
     required this.onSelect,
-    required this.onClose,
+    this.onClose,
   });
 
-  static const double height = 230;
+  static const double heightCollapsed = 140;
+  static const double heightWithScrubber = 182;
+  static const double height = heightWithScrubber;
 
   @override
   State<PlaylistCarouselOverlay> createState() =>
@@ -45,13 +48,42 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   final ValueNotifier<double> _sliderProportion = ValueNotifier<double>(0.0);
 
   bool _isDraggingSlider = false;
+  bool _showScrubber = false;
+  double _verticalDragDistance = 0.0;
 
-  /// The carousel row's actual rendered width, captured from LayoutBuilder
-  /// in build() below. Deliberately NOT MediaQuery.of(context).size.width:
-  /// this row sits inside `SafeArea(top: false, ...)`, which still applies
-  /// left/right insets by default, so the two can differ on devices with
-  /// side safe-area insets (rounded corners in landscape, a side notch) —
-  /// centering against the full screen width would be off by that amount.
+  void _toggleScrubber(bool show) {
+    if (_showScrubber == show || widget.playlist.length <= 1) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _showScrubber = show;
+    });
+  }
+
+  void _handleVerticalDragStart(DragStartDetails details) {
+    _verticalDragDistance = 0.0;
+  }
+
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    _verticalDragDistance += details.primaryDelta ?? 0;
+    if (_verticalDragDistance < -12 && !_showScrubber) {
+      _toggleScrubber(true);
+      _verticalDragDistance = 0.0;
+    } else if (_verticalDragDistance > 12 && _showScrubber) {
+      _toggleScrubber(false);
+      _verticalDragDistance = 0.0;
+    }
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    final vy = details.primaryVelocity ?? 0;
+    if (vy < -100 && !_showScrubber) {
+      _toggleScrubber(true);
+    } else if (vy > 100 && _showScrubber) {
+      _toggleScrubber(false);
+    }
+    _verticalDragDistance = 0.0;
+  }
+
   double? _viewportWidth;
 
   static const double _tileWidth = 108;
@@ -91,12 +123,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
     }
   }
 
-  /// Called from the LayoutBuilder in build() below with the carousel
-  /// row's real width. Re-centers whenever that width changes — this
-  /// covers both the very first layout (old value null → always "changed")
-  /// and later changes like device rotation or entering split-screen,
-  /// which previously left the carousel centered on a stale width until
-  /// the user manually scrolled.
   void _onViewportWidthKnown(double width) {
     if (_viewportWidth == width) return;
     _viewportWidth = width;
@@ -141,183 +167,168 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final currentHeight = _showScrubber && widget.playlist.length > 1
+        ? PlaylistCarouselOverlay.heightWithScrubber
+        : PlaylistCarouselOverlay.heightCollapsed;
 
-    return Container(
-      height: PlaylistCarouselOverlay.height,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.95),
-            Colors.black.withValues(alpha: 0.95),
-            Colors.transparent,
-          ],
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Close Carousel Top Action
-            Padding(
-              padding: const EdgeInsets.only(right: 12, top: 8),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Tooltip(
-                  message: context.l10n.closeCarouselTooltip,
-                  child: Material(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: widget.onClose,
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white,
-                          size: 20,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      height: currentHeight,
+      child: ClipRect(
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onVerticalDragStart: _handleVerticalDragStart,
+          onVerticalDragUpdate: _handleVerticalDragUpdate,
+          onVerticalDragEnd: _handleVerticalDragEnd,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                // Horizontal Expressive Thumbnail List
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _onViewportWidthKnown(constraints.maxWidth);
+                      return ListView.builder(
+                        controller: _scrollController,
+                        scrollDirection: Axis.horizontal,
+                        itemExtent: _tileWidth + _tileSpacing,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Horizontal Expressive Thumbnail List
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  _onViewportWidthKnown(constraints.maxWidth);
-                  return ListView.builder(
-                    controller: _scrollController,
-                    scrollDirection: Axis.horizontal,
-                    itemExtent: _tileWidth + _tileSpacing,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    itemCount: widget.playlist.length,
-                    itemBuilder: (context, index) {
-                      final fileName = widget.playlist[index];
-                      final isSelected = index == widget.currentIndex;
-                      return GestureDetector(
-                        onTap: () => widget.onSelect(index),
-                        child: Container(
-                          width: _tileWidth,
-                          margin: const EdgeInsets.only(right: _tileSpacing),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected ? cs.primary : Colors.white24,
-                              width: isSelected ? 3 : 1,
+                        itemCount: widget.playlist.length,
+                        itemBuilder: (context, index) {
+                          final fileName = widget.playlist[index];
+                          final isSelected = index == widget.currentIndex;
+                          return GestureDetector(
+                            onTap: () => widget.onSelect(index),
+                            child: Container(
+                              width: _tileWidth,
+                              margin:
+                                  const EdgeInsets.only(right: _tileSpacing),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? cs.primary
+                                      : Colors.white24,
+                                  width: isSelected ? 3 : 1,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  isSelected ? 13 : 15,
+                                ),
+                                child: _CarouselThumb(
+                                  key: ValueKey(fileName),
+                                  container: widget.container,
+                                  fileName: fileName,
+                                  thumbnailQuality: widget.thumbnailQuality,
+                                  thumbnailCacheMode:
+                                      widget.thumbnailCacheMode,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              isSelected ? 13 : 15,
-                            ),
-                            child: _CarouselThumb(
-                              key: ValueKey(fileName),
-                              container: widget.container,
-                              fileName: fileName,
-                              thumbnailQuality: widget.thumbnailQuality,
-                              thumbnailCacheMode: widget.thumbnailCacheMode,
-                            ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            ),
-            // Position Scrubber Row
-            if (widget.playlist.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  bottom: 12,
-                  top: 4,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Text(
-                      '${widget.currentIndex + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                // Collapsible Position Scrubber Row
+                if (_showScrubber && widget.playlist.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 10,
+                      top: 4,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 24,
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3.0,
-                            thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6.0,
-                            ),
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 14.0,
-                            ),
-                            activeTrackColor: cs.primary,
-                            inactiveTrackColor: Colors.white24,
-                            thumbColor: cs.primary,
-                            overlayColor: cs.primary.withValues(alpha: 0.2),
-                          ),
-                          child: ValueListenableBuilder<double>(
-                            valueListenable: _sliderProportion,
-                            builder: (context, proportion, child) {
-                              return Slider(
-                                value: proportion,
-                                min: 0.0,
-                                max: 1.0,
-                                onChanged: (val) {
-                                  if (!_scrollController.hasClients) return;
-                                  final maxExt = _scrollController
-                                      .position
-                                      .maxScrollExtent;
-                                  if (maxExt <= 0) return;
-
-                                  _isDraggingSlider = true;
-                                  _sliderProportion.value = val;
-                                  _scrollController.jumpTo(val * maxExt);
-                                },
-                                onChangeEnd: (val) {
-                                  _isDraggingSlider = false;
-                                  if (_scrollController.hasClients &&
-                                      _scrollController
-                                              .position
-                                              .maxScrollExtent <=
-                                          0) {
-                                    _sliderProportion.value = 0.0;
-                                  }
-                                },
-                              );
-                            },
+                    child: Row(
+                      children: [
+                        Text(
+                          '${widget.currentIndex + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 24,
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3.0,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6.0,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 14.0,
+                                ),
+                                activeTrackColor: cs.primary,
+                                inactiveTrackColor: Colors.white24,
+                                thumbColor: cs.primary,
+                                overlayColor:
+                                    cs.primary.withValues(alpha: 0.2),
+                              ),
+                              child: ValueListenableBuilder<double>(
+                                valueListenable: _sliderProportion,
+                                builder: (context, proportion, child) {
+                                  return Slider(
+                                    value: proportion,
+                                    min: 0.0,
+                                    max: 1.0,
+                                    onChanged: (val) {
+                                      if (!_scrollController.hasClients) {
+                                        return;
+                                      }
+                                      final maxExt = _scrollController
+                                          .position
+                                          .maxScrollExtent;
+                                      if (maxExt <= 0) return;
+
+                                      _isDraggingSlider = true;
+                                      _sliderProportion.value = val;
+                                      _scrollController
+                                          .jumpTo(val * maxExt);
+                                    },
+                                    onChangeEnd: (val) {
+                                      _isDraggingSlider = false;
+                                      if (_scrollController.hasClients &&
+                                          _scrollController
+                                                  .position
+                                                  .maxScrollExtent <=
+                                              0) {
+                                        _sliderProportion.value = 0.0;
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${widget.playlist.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${widget.playlist.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -391,17 +402,18 @@ class _CarouselThumb extends ConsumerWidget {
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
-  ) => VideoThumbnailFetcher.fetch(
-    thumbnailCache,
-    fileIoApi,
-    container,
-    path,
-    mode: mode,
-    quality: quality,
-    targetSize: quality.scaledSize(
-      MediaViewerConstants.carouselThumbnailTargetSize,
-    ),
-  );
+  ) =>
+      VideoThumbnailFetcher.fetch(
+        thumbnailCache,
+        fileIoApi,
+        container,
+        path,
+        mode: mode,
+        quality: quality,
+        targetSize: quality.scaledSize(
+          MediaViewerConstants.carouselThumbnailTargetSize,
+        ),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

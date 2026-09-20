@@ -2214,53 +2214,77 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         final isImg = MediaViewerConstants.isImage(
                           _playlistController.currentFile,
                         );
-                        return MediaViewerBottomControls(
-                          playlistController: _playlistController,
-                          playbackManager: _playbackManager,
-                          videoProgressNotifier: _videoProgressNotifier,
-                          scrubPreviewHost: _scrubPreviewHost,
-                          toolbarConfig: mediaViewerConfig,
-                          isImage: isImg,
-                          isAudio: MediaViewerConstants.isAudio(_playlistController.currentFile),
-                          showUI: _showUI,
-                          isPlaylistMode: _playlistController.isPlaylistMode,
-                          autoAdvance: _autoAdvance,
-                          slideshowDelaySeconds: _slideshowDelaySeconds,
-                          isMuted: _isMuted,
-                          videoPlaybackMode: _videoPlaybackMode,
-                          onExecuteAction: _executeMediaAction,
-                          onStartHideTimer: _startHideTimer,
-                          onShowUIChanged: _setUIVisibility,
-                          isCarouselVisible: _isCarouselVisible,
-                          onMenuOpened: _menuOpened,
-                          onMenuClosed: _menuClosed,
+                        final showCarousel =
+                            _enableCarousel && _isCarouselVisible && _showUI;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.85),
+                                Colors.black.withValues(alpha: 0.35),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Docked filmstrip carousel expands/collapses smoothly above controls
+                              AnimatedSize(
+                                duration:
+                                    MediaViewerConstants.animationDuration,
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.bottomCenter,
+                                child: showCarousel
+                                    ? PlaylistCarouselOverlay(
+                                        container: widget.container,
+                                        playlist:
+                                            _playlistController.playlist,
+                                        currentIndex:
+                                            _playlistController.currentIndex,
+                                        thumbnailQuality:
+                                            widget.thumbnailQuality,
+                                        thumbnailCacheMode:
+                                            widget.thumbnailCacheMode,
+                                        onSelect: _selectFromCarousel,
+                                        onClose: _toggleCarousel,
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                              MediaViewerBottomControls(
+                                playlistController: _playlistController,
+                                playbackManager: _playbackManager,
+                                videoProgressNotifier: _videoProgressNotifier,
+                                scrubPreviewHost: _scrubPreviewHost,
+                                toolbarConfig: mediaViewerConfig,
+                                isImage: isImg,
+                                isAudio: MediaViewerConstants.isAudio(
+                                    _playlistController.currentFile),
+                                showUI: _showUI,
+                                isPlaylistMode:
+                                    _playlistController.isPlaylistMode,
+                                autoAdvance: _autoAdvance,
+                                slideshowDelaySeconds: _slideshowDelaySeconds,
+                                isMuted: _isMuted,
+                                videoPlaybackMode: _videoPlaybackMode,
+                                onExecuteAction: _executeMediaAction,
+                                onStartHideTimer: _startHideTimer,
+                                onShowUIChanged: _setUIVisibility,
+                                isCarouselVisible: _isCarouselVisible,
+                                onMenuOpened: _menuOpened,
+                                onMenuClosed: _menuClosed,
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),
                   ),
                 ),
-                if (_enableCarousel && _isCarouselVisible && _showUI)
-                  AnimatedPositioned(
-                    duration: MediaViewerConstants.animationDuration,
-                    curve: Curves.easeOut,
-                    left: 0,
-                    right: 0,
-                    bottom: (_isCarouselVisible && _showUI)
-                        ? ((MediaQuery.paddingOf(context).bottom > 0
-                                ? MediaQuery.paddingOf(context).bottom
-                                : 16.0) +
-                            12.0)
-                        : -(PlaylistCarouselOverlay.height + 60),
-                    child: PlaylistCarouselOverlay(
-                      container: widget.container,
-                      playlist: _playlistController.playlist,
-                      currentIndex: _playlistController.currentIndex,
-                      thumbnailQuality: widget.thumbnailQuality,
-                      thumbnailCacheMode: widget.thumbnailCacheMode,
-                      onSelect: _selectFromCarousel,
-                      onClose: _toggleCarousel,
-                    ),
-                  ),
               ],
             );
           },

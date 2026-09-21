@@ -160,8 +160,6 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  double _drawerDragDistance = 0.0;
-  bool _isTouchFromEdge = false;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -470,39 +468,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   DateTime? _lastOpReloadTime;
   Timer? _opReloadTimer;
 
-  int _pointerCount = 0;
-  bool _isMultiTouch = false;
-
-  void _handlePointerDown(PointerDownEvent event) {
-    _pointerCount++;
-    if (_pointerCount >= 2 && !_isMultiTouch) {
-      setState(() => _isMultiTouch = true);
-    }
-    final edgeInset = math.max(
-      72.0,
-      MediaQuery.systemGestureInsetsOf(context).left,
-    );
-    _isTouchFromEdge = event.position.dx <= edgeInset;
-    _drawerDragDistance = 0.0;
-  }
-
-  void _handlePointerUp(PointerEvent event) {
-    _pointerCount = math.max(0, _pointerCount - 1);
-    if (_pointerCount < 2 && _isMultiTouch) {
-      setState(() => _isMultiTouch = false);
-    }
-    if (_pointerCount == 0) {
-      _drawerDragDistance = 0.0;
-    }
-  }
-
-  void _handlePointerCancel(PointerCancelEvent event) {
-    _pointerCount = 0;
-    if (_isMultiTouch) {
-      setState(() => _isMultiTouch = false);
-    }
-    _drawerDragDistance = 0.0;
-  }
+  
 
   void _onOperationsChanged() {
     if (!mounted) return;
@@ -1251,9 +1217,6 @@ void _navigateUp() {
 
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
-    _drawerDragDistance = 0.0;
-    _isTouchFromEdge = true;
-
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
     final targetSegment =
@@ -1272,22 +1235,18 @@ void _navigateUp() {
 
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
-    _drawerDragDistance = 0.0;
-    _isTouchFromEdge = true;
     if (!_isOwnRouteCurrent) return;
     _navNotifier.updateBackGestureProgress(backEvent.progress);
   }
 
   @override
   void handleCancelBackGesture() {
-    _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
     _navNotifier.cancelBackGesture();
   }
 
   @override
   void handleCommitBackGesture() {
-    _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
@@ -3281,9 +3240,7 @@ Future<void> _extractSelectedArchive() async {
         _atRoot && !isSelectionMode && !_searchActive;
 
     return Listener(
-      onPointerDown: _handlePointerDown,
-      onPointerUp: _handlePointerUp,
-      onPointerCancel: _handlePointerCancel,
+      onPointerDown: (_) => _signalActivity(),
       child: PopScope(
         canPop: canPop,
         onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -3299,7 +3256,10 @@ Future<void> _extractSelectedArchive() async {
         child: Scaffold(
           key: _scaffoldKey,
           resizeToAvoidBottomInset: false,
-          drawerEnableOpenDragGesture: false,
+          drawerEnableOpenDragGesture: widget.drawer != null,
+          drawerEdgeDragWidth: widget.drawer != null
+              ? MediaQuery.sizeOf(context).width
+              : null,
           drawer: widget.drawer,
           bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
@@ -3328,46 +3288,8 @@ Future<void> _extractSelectedArchive() async {
           bottom: false,
           child: NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              dragStartBehavior: DragStartBehavior.down,
-              onHorizontalDragStart: (details) {
-                final edgeInset = math.max(
-                  72.0,
-                  MediaQuery.systemGestureInsetsOf(context).left,
-                );
-                if (_isTouchFromEdge ||
-                    details.globalPosition.dx <= edgeInset ||
-                    _backGestureProgress != null) {
-                  _isTouchFromEdge = true;
-                  _drawerDragDistance = 0.0;
-                  return;
-                }
-                _drawerDragDistance = 0.0;
-              },
-              onHorizontalDragUpdate: (details) {
-                if (_isTouchFromEdge ||
-                    _backGestureProgress != null ||
-                    _isMultiTouch ||
-                    widget.drawer == null) {
-                  _drawerDragDistance = 0.0;
-                  return;
-                }
-                _drawerDragDistance += details.primaryDelta ?? 0.0;
-                if (_drawerDragDistance > 60.0) {
-                  _scaffoldKey.currentState?.openDrawer();
-                  _drawerDragDistance = 0.0;
-                  _isTouchFromEdge = true;
-                }
-              },
-              onHorizontalDragEnd: (_) {
-                _drawerDragDistance = 0.0;
-              },
-              onHorizontalDragCancel: () {
-                _drawerDragDistance = 0.0;
-              },
-              child: Stack(
-                children: [
+            child: Stack(
+              children: [
                   Column(
                     children: [
                    ClipRect(
@@ -3717,20 +3639,19 @@ Future<void> _extractSelectedArchive() async {
     ),
     
 
-  // ── Clipboard Paste FAB ────────────────────────────────────────────────
-  if (!isSelectionMode && !_searchActive)
-    Positioned(
-      right: 16.0 + MediaQuery.paddingOf(context).right,
-      bottom: useFab
-          ? (baseBottomOffset + 68.0)
-          : baseBottomOffset,
-      child: ClipboardFab(
-        onPaste: _isReadOnly ? null : _paste,
-        heroTag: 'browser_clipboard_fab_${widget.container.volId}',
+ // ── Clipboard Paste FAB ────────────────────────────────────────────────
+    if (!isSelectionMode && !_searchActive)
+      Positioned(
+        right: 16.0 + MediaQuery.paddingOf(context).right,
+        bottom: useFab
+            ? (baseBottomOffset + 68.0)
+            : baseBottomOffset,
+        child: ClipboardFab(
+          onPaste: _isReadOnly ? null : _paste,
+          heroTag: 'browser_clipboard_fab_${widget.container.volId}',
+        ),
       ),
-    ),
 ],
-),
 ),
 ),
 ),

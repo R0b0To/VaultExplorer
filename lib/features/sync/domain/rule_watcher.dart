@@ -74,14 +74,21 @@ class RuleWatcher {
   void start() {
     if (_started) return;
     _started = true;
-    _hostSub = hostPaths?.listen(
-      _onHostPath,
-      // A watcher that dies (inotify limits, folder removed) just stops
-      // accelerating; the poll keeps the rule converging.
-      onError: (Object _) => _dropHostSubscription(),
-      onDone: _dropHostSubscription,
-      cancelOnError: true,
-    );
+    try {
+      _hostSub = hostPaths?.listen(
+        _onHostPath,
+        // A watcher that dies (inotify limits, folder removed) just stops
+        // accelerating; the poll keeps the rule converging.
+        onError: (Object _) => _dropHostSubscription(),
+        onDone: _dropHostSubscription,
+        cancelOnError: true,
+      );
+    } catch (_) {
+      // Directory.watch() on Android can throw a dart:io assertion inside the
+      // internal _MultiplexingFileSystemWatcher._startWatching when .listen()
+      // is first called (e.g. paths with special characters or certain storage
+      // providers). Fall back to poll-only; _hostSub stays null.
+    }
     _armPoll(basePoll);
   }
 

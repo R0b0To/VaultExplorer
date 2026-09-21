@@ -224,16 +224,9 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-   // Keep dashboard hidden if an incoming share or quick capture is active
-    // so the dashboard never flashes on screen.
-    if (_hideDashboard || _handlingQuickCapture) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: SizedBox.expand(),
-      );
-    }
-
     final destinations = _destinations(context);
+    final isHidden = _hideDashboard || _handlingQuickCapture;
+
     final body = IndexedStack(
       index: _index,
       children: [
@@ -283,9 +276,24 @@ class _MainShellState extends ConsumerState<MainShell> {
      final Widget scaffold = Scaffold(
       drawerEdgeDragWidth: double.maxFinite,
       drawerEnableOpenDragGesture: _index != 0,
-      drawer: buildDrawer(),
+      drawer: isHidden ? null : buildDrawer(),
       body: body,
     );
+
+    // Keep the IndexedStack (and its GlobalKey-ed VaultDashboard) always in
+    // the tree so Flutter never deactivates the element.  When a share or
+    // quick-capture is active we just paint over it with a black screen.
+    final Widget content = isHidden
+        ? Stack(
+            children: [
+              Offstage(child: scaffold),
+              const ColoredBox(
+                color: Colors.black,
+                child: SizedBox.expand(),
+              ),
+            ],
+          )
+        : scaffold;
 
     return PopScope(
       canPop: _index == 0,
@@ -293,7 +301,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         if (didPop) return;
         _onTabTap(0);
       },
-      child: scaffold,
+      child: content,
     );
   }
 }

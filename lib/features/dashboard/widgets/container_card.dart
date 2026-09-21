@@ -42,7 +42,7 @@ class BaseContainerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final effectiveRadius = borderRadius ?? BorderRadius.circular(24);
+    final effectiveRadius = borderRadius ?? BorderRadius.circular(18);
     return Card(
       elevation: 0,
       color: backgroundColor ?? cs.surfaceContainer,
@@ -61,7 +61,7 @@ class BaseContainerCard extends StatelessWidget {
                 height: 52,
                 decoration: BoxDecoration(
                   color: iconBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Center(child: icon),
               ),

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -184,7 +185,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                 children: [
                   // 1. Dashboard (Home)
                   ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     selected: isDashboard,
                     selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
                     leading: Icon(
@@ -576,7 +577,7 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
         : cs.surfaceContainerHigh;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(18),
       child: Stack(
         children: [
           // Background action buttons placed on the START/LEFT side
@@ -613,19 +614,37 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
           ),
 
           // Front ListTile that translates RIGHT on drag
-          GestureDetector(
-            onHorizontalDragUpdate: (details) {
-              setState(() {
-                // Allow positive drag (to the right) up to _revealWidth
-                _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
-              });
-            },
-            onHorizontalDragEnd: (details) {
-              if (_dx > _revealWidth / 2) {
-                _animateTo(_revealWidth);
-              } else {
-                _animateTo(0.0);
-              }
+          RawGestureDetector(
+            behavior: HitTestBehavior.opaque,
+            gestures: <Type, GestureRecognizerFactory>{
+              _RightHorizontalDragGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<_RightHorizontalDragGestureRecognizer>(
+                () => _RightHorizontalDragGestureRecognizer(),
+                (_RightHorizontalDragGestureRecognizer instance) {
+                  instance.dragStartBehavior = DragStartBehavior.start;
+                  instance.canDragLeft = () => _dx > 1.0;
+                  instance.onDown = (_) {};
+                  instance.onStart = (_) {};
+                  instance.onUpdate = (details) {
+                    setState(() {
+                      // Allow positive drag (to the right) up to _revealWidth
+                      _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
+                    });
+                  };
+                  instance.onEnd = (details) {
+                    if (_dx > _revealWidth / 2) {
+                      _animateTo(_revealWidth);
+                    } else {
+                      _animateTo(0.0);
+                    }
+                  };
+                  instance.onCancel = () {
+                    if (_dx > 0.0 && _dx < _revealWidth) {
+                      _animateTo(0.0);
+                    }
+                  };
+                },
+              ),
             },
             child: Transform.translate(
               offset: Offset(_dx, 0.0),
@@ -685,5 +704,84 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
         ],
       ),
     );
+  }
+}
+
+/// A horizontal drag gesture recognizer that yields to parent gestures (such as
+/// the drawer close swipe) when a drag starts to the left while the card is closed.
+class _RightHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
+  bool Function()? canDragLeft;
+  double _accumulatedDx = 0.0;
+  bool _isAccepted = false;
+
+  _RightHorizontalDragGestureRecognizer({
+    super.debugOwner,
+    super.supportedDevices,
+    super.allowedButtonsFilter,
+  });
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _accumulatedDx = 0.0;
+    _isAccepted = false;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void acceptGesture(int pointer) {
+    _isAccepted = true;
+    super.acceptGesture(pointer);
+  }
+
+  @override
+  void rejectGesture(int pointer) {
+    _isAccepted = false;
+    super.rejectGesture(pointer);
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _isAccepted = false;
+    _accumulatedDx = 0.0;
+    super.didStopTrackingLastPointer(pointer);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) {
+      _accumulatedDx += event.delta.dx;
+      // If the card is closed and dragging left past 4px, yield immediately
+      // so DrawerController can close the drawer smoothly.
+      if (!_isAccepted && _accumulatedDx < -4.0 && (canDragLeft == null || !canDragLeft!())) {
+        resolve(GestureDisposition.rejected);
+        return;
+      }
+    }
+    super.handleEvent(event);
+  }
+
+  @override
+  bool isFlingGesture(VelocityEstimate estimate, PointerDeviceKind kind) {
+    if ((canDragLeft == null || !canDragLeft!()) && estimate.pixelsPerSecond.dx < 0) {
+      return false;
+    }
+    return super.isFlingGesture(estimate, kind);
+  }
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    final slop = deviceTouchSlop ?? computeHitSlop(pointerDeviceKind, gestureSettings);
+    // Accept right drag when opening
+    if (_accumulatedDx > slop) {
+      return true;
+    }
+    // Accept left drag only when card is already open and needs to be closed
+    if (_accumulatedDx < -slop && (canDragLeft != null && canDragLeft!())) {
+      return true;
+    }
+    return false;
   }
 }

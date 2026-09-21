@@ -701,11 +701,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
      return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _lockController.scheduleAutoLock(),
+      onPointerDown: (event) {
+        _lockController.scheduleAutoLock();
+        final edgeInset = math.max(
+          72.0,
+          MediaQuery.systemGestureInsetsOf(context).left,
+        );
+        _isTouchFromEdge = event.position.dx <= edgeInset;
+        _drawerDragDistance = 0.0;
+      },
       child: Scaffold(
         key: _scaffoldKey,
-        drawerEnableOpenDragGesture: true,
-        drawerEdgeDragWidth: MediaQuery.sizeOf(context).width,
+        drawerEnableOpenDragGesture: false,
         drawer: _buildDrawer(),
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -735,12 +742,46 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             }
             return false;
           },
-          child: Column(
-            children: [
-              // Auto-sync progress / attention; takes no space when idle.
-              const SyncStatusBanner(),
-              Expanded(child: _buildBody(displayItems, state, appSettings)),
-            ],
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            dragStartBehavior: DragStartBehavior.down,
+            onHorizontalDragStart: (details) {
+              final edgeInset = math.max(
+                72.0,
+                MediaQuery.systemGestureInsetsOf(context).left,
+              );
+              if (_isTouchFromEdge || details.globalPosition.dx <= edgeInset) {
+                _isTouchFromEdge = true;
+                _drawerDragDistance = 0.0;
+                return;
+              }
+              _drawerDragDistance = 0.0;
+            },
+            onHorizontalDragUpdate: (details) {
+              if (_isTouchFromEdge) {
+                _drawerDragDistance = 0.0;
+                return;
+              }
+              _drawerDragDistance += details.primaryDelta ?? 0.0;
+              if (_drawerDragDistance > 60.0) {
+                _scaffoldKey.currentState?.openDrawer();
+                _drawerDragDistance = 0.0;
+                _isTouchFromEdge = true;
+              }
+            },
+            onHorizontalDragEnd: (_) {
+              _drawerDragDistance = 0.0;
+            },
+            onHorizontalDragCancel: () {
+              _drawerDragDistance = 0.0;
+            },
+            child: Column(
+              children: [
+                // Auto-sync progress / attention; takes no space when idle.
+                const SyncStatusBanner(),
+                Expanded(child: _buildBody(displayItems, state, appSettings)),
+              ],
+            ),
           ),
         ),
         floatingActionButton: AnimatedSlide(

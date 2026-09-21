@@ -5124,7 +5124,7 @@
   "@aboutPrivacySecurityTitle": {
     "description": "List tile title on the about screen opening the privacy details sheet"
   },
-  "aboutPrivacySecuritySubtitle": "No network access, nothing unencrypted ever written to disk",
+  "aboutPrivacySecuritySubtitle": "No network access, decryption happens in memory",
   "@aboutPrivacySecuritySubtitle": {
     "description": "List tile subtitle on the about screen for the privacy & security entry"
   },
@@ -5290,11 +5290,11 @@
   "@privacyPointNoNetworkBody": {
     "description": "Privacy sheet point body: no network access"
   },
-  "privacyPointNoDiskLeaksTitle": "Zero unencrypted disk leaks",
+  "privacyPointNoDiskLeaksTitle": "Decrypted in memory",
   "@privacyPointNoDiskLeaksTitle": {
     "description": "Privacy sheet point title: no unencrypted disk leaks"
   },
-  "privacyPointNoDiskLeaksBody": "Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.",
+  "privacyPointNoDiskLeaksBody": "Decryption and re-encryption happen in system memory. The few operations that need a scratch file, such as recording video or exporting, keep it in private app storage and overwrite it with zeros when done.",
   "@privacyPointNoDiskLeaksBody": {
     "description": "Privacy sheet point body: no unencrypted disk leaks"
   },
@@ -5310,7 +5310,7 @@
   "@privacyPointKeystoreTitle": {
     "description": "Privacy sheet point title: secrets stay in Android Keystore"
   },
-  "privacyPointKeystoreBody": "Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.",
+  "privacyPointKeystoreBody": "Remembered passwords, patterns, and cached derived keys are encrypted with AES-GCM using a key held in the Android Keystore (hardware-backed where supported).",
   "@privacyPointKeystoreBody": {
     "description": "Privacy sheet point body: secrets stay in Android Keystore"
   },
@@ -5326,7 +5326,7 @@
   "@privacyPointScreenClipboardTitle": {
     "description": "Privacy sheet point title: screen and clipboard protection"
   },
-  "privacyPointScreenClipboardBody": "Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.",
+  "privacyPointScreenClipboardBody": "Task-switcher preview blocking, optional screenshot blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.",
   "@privacyPointScreenClipboardBody": {
     "description": "Privacy sheet point body: screen and clipboard protection"
   },
@@ -10020,7 +10020,7 @@
   "@autoSyncSheetTitle": {
     "description": "Title of the auto-sync settings sheet for a folder"
   },
-  "autoSyncSheetIntro": "Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.",
+  "autoSyncSheetIntro": "Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.",
   "@autoSyncSheetIntro": {
     "description": "Introductory text at the top of the auto-sync settings sheet"
   },

@@ -43,6 +43,7 @@ class FileListView extends StatefulWidget {
   final bool Function(RawEntry entry)? isFolderMounted;
   final bool Function(RawEntry entry)? isPinned;
   final bool Function(RawEntry entry)? isBookmark;
+  final bool Function(RawEntry entry)? isFolderSynced;
   final MountedContainer? container;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
@@ -79,6 +80,7 @@ class FileListView extends StatefulWidget {
     this.isFolderMounted,
     this.isPinned,
     this.isBookmark,
+    this.isFolderSynced,
     this.container,
     this.currentDirPath = '',
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
@@ -224,6 +226,7 @@ class _FileListViewState extends State<FileListView> {
                                   widget.isFolderMounted?.call(entry) ?? false,
                               isPinned: isPinned,
                               isBookmark: isBookmark,
+                              isSynced: widget.isFolderSynced?.call(entry) ?? false,
                               container: widget.container,
                               currentDirPath: widget.currentDirPath,
                               cacheMode: widget.thumbnailCacheMode,
@@ -317,6 +320,7 @@ class _FileListViewState extends State<FileListView> {
                                     widget.isFolderMounted?.call(entry) ?? false,
                                 isPinned: isPinned,
                                 isBookmark: isBookmark,
+                                isSynced: widget.isFolderSynced?.call(entry) ?? false,
                                 container: widget.container,
                                 currentDirPath: widget.currentDirPath,
                                 cacheMode: widget.thumbnailCacheMode,

@@ -17,8 +17,10 @@ import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_scr
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
+import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
@@ -78,6 +80,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         currentLabel: widget.currentLabel,
         containerFormat: _containerFormat,
       );
+
+  MountedContainer? get _effectiveMounted {
+    if (widget.mountedContainer != null) return widget.mountedContainer;
+    return ref
+        .read(vaultDashboardControllerProvider)
+        .mounted
+        .where((c) => c.uri == widget.uri)
+        .firstOrNull;
+  }
 
   @override
   void initState() {
@@ -892,6 +903,35 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               onChanged: (v) => ref
                   .read(containerConfigControllerProvider(_params).notifier)
                   .setDocumentProvider(v),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              title: Text(
+                context.l10n.autoSyncMenuAction,
+                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                context.l10n.autoSyncSheetIntro,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              onTap: () {
+                final mountedVault = _effectiveMounted;
+                if (mountedVault != null) {
+                  SyncRuleEditorSheet.show(
+                    context,
+                    vault: mountedVault,
+                    folderPath: '',
+                    folderName: mountedVault.displayName,
+                  );
+                } else {
+                  showAppSnackBar(
+                    context,
+                    message: context.l10n.autoSyncUnavailable,
+                    tone: AppBannerTone.warning,
+                  );
+                }
+              },
             ),
           ],
         ),

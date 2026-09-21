@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
@@ -41,6 +42,15 @@ final syncCoordinatorServiceProvider = Provider<SyncCoordinatorService>((ref) {
   );
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Returns the set of vault-relative folder paths that have auto-sync configured.
+final vaultSyncedFolderPathsProvider =
+    FutureProvider.family<Set<String>, MountedContainer>((ref, vault) async {
+  final configStore = ref.watch(syncConfigStoreProvider);
+  final config = await configStore.load(vault);
+  if (config == null) return const {};
+  return config.rules.map((r) => r.vaultRelativePath).toSet();
 });
 
 /// Live sync status for the dashboard banner. Rebuilds only when the status

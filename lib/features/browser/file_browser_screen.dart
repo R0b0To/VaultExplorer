@@ -80,6 +80,7 @@ import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
@@ -410,6 +411,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       isFolderMounted(entry, _currentDirPath, _mountedDocProviderFolders);
   bool _isPinned(RawEntry entry) => isPinned(entry, _currentDirPath, _pinnedPaths);
   bool _isBookmark(RawEntry entry) => isBookmark(entry, _currentDirPath, _bookmarkPaths);
+  bool _isFolderSynced(RawEntry entry) {
+    if (!entry.isDir || widget.container.isLocalStorage) return false;
+    final path = _fullPathOf(entry);
+    final synced = ref.watch(vaultSyncedFolderPathsProvider(widget.container)).value ?? const {};
+    return synced.contains(path);
+  }
 
   /// Pinned items first, then folders before files, then [compareItems]'s
   /// sort order within each group. Was independently redefined as a local
@@ -867,7 +874,13 @@ void _showItemActionsSheet(RawEntry entry) {
           ? () => _editImage(entry.name, fullPath)
           : null,
       onToggleDocProvider: entry.isDir && !widget.container.isLocalStorage
-          ? () => _showFolderDocumentProviderSheet(entry)
+          ? () {
+              if (_isFolderMounted(entry)) {
+                _showFolderDocumentProviderSheet(entry);
+              } else {
+                _toggleFolderDocumentProvider(entry);
+              }
+            }
           : null,
       // Auto-sync is configured per vault folder: not for device storage
       // browsers, and not inside an archive.
@@ -3440,6 +3453,7 @@ Future<void> _extractSelectedArchive() async {
                                 isFolderMounted: _isFolderMounted,
                                 isPinned: _isPinned,
                                 isBookmark: _isBookmark,
+                                isFolderSynced: _isFolderSynced,
                                 onDirTap: _handleDirTap,
                                 onFileTap: _handleFileTap,
                                 onItemLongPress: _handleItemLongPress,
@@ -3534,6 +3548,7 @@ Future<void> _extractSelectedArchive() async {
                                             previewDirPath,
                                             _bookmarkPaths,
                                           ),
+                                          isFolderSynced: _isFolderSynced,
                                           onDirTap: (_) {},
                                           onFileTap: (_) {},
                                           onItemLongPress: (_) {},

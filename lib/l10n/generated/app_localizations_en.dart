@@ -3883,7 +3883,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'No network access, nothing unencrypted ever written to disk';
+      'No network access, decryption happens in memory';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
@@ -4018,11 +4018,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => 'Zero unencrypted disk leaks';
+  String get privacyPointNoDiskLeaksTitle => 'Decrypted in memory';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.';
+      'Decryption and re-encryption happen in system memory. The few operations that need a scratch file, such as recording video or exporting, keep it in private app storage and overwrite it with zeros when done.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'No analytics or telemetry';
@@ -4036,7 +4036,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.';
+      'Remembered passwords, patterns, and cached derived keys are encrypted with AES-GCM using a key held in the Android Keystore (hardware-backed where supported).';
 
   @override
   String get privacyPointPosixTitle => 'POSIX Acceleration & Storage Access';
@@ -4051,7 +4051,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.';
+      'Task-switcher preview blocking, optional screenshot blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.';
 
   @override
   String get privacyPointMaskModeTitle => 'Mask Mode';
@@ -7832,7 +7832,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoSyncSheetIntro =>
-      'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.';
+      'Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.';
 
   @override
   String get autoSyncTargetSection => 'Sync with';

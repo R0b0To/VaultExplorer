@@ -1,0 +1,138 @@
+name: Build & Publish (Play Store)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (tag/branch) to build from — defaults to whatever ref this was run on'
+        required: false
+        default: ''
+      track:
+        description: 'Play Console track to publish to'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      publish:
+        description: 'Actually upload to Play Console (leave OFF for a build-only dry run)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: '21'
+
+jobs:
+  build-and-publish:
+    name: Build AAB${{ inputs.publish && ' & publish' || '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install Android NDK r28c
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
+      - name: Set up signing credentials
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=release.keystore
+          EOF
+
+      - name: Resolve dependencies
+        run: |
+          .flutter/bin/flutter config --no-analytics
+          .flutter/bin/flutter pub get --enforce-lockfile
+
+      - name: Build release App Bundle
+        run: |
+          # A single AAB carries every ABI -- Play's Dynamic Delivery does the
+          # per-device splitting on its end. Unlike the APK matrix build in
+          # build-release.yml, this must NOT set --target-platform /
+          # VAULTEXPLORER_TARGET_ABI, or the bundle will be missing ABIs.
+          BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
+          .flutter/bin/flutter build appbundle --release --build-number="$BUILD_NUMBER"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultExplorer-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      # ----------------------------------------------------------------------
+      # Everything below talks to Play Console via the Google Play Developer
+      # API through fastlane supply. It reuses the exact
+      # fastlane/metadata/android/en-US/ directory already maintained for
+      # F-Droid (title, descriptions, changelogs, screenshots) -- that layout
+      # is fastlane's default expected format, so no restructuring needed.
+      #
+      # One-time setup before this can do anything, none of which a workflow
+      # can do on its own:
+      #   1. Create the app listing once by hand in Play Console -- the API
+      #      cannot create a brand-new app listing from scratch.
+      #   2. Play Console -> Setup -> API access -> create a service account
+      #      in Google Cloud, grant it "Release manager" access to the app.
+      #   3. Download that service account's JSON key and add it as the repo
+      #      secret GOOGLE_PLAY_JSON_KEY.
+      #   4. Do one manual upload/release in Play Console with some build
+      #      first -- Google only allows API uploads once an app has left
+      #      "draft" status.
+      #   5. Check the existing phoneScreenshots/ images against Play's
+      #      requirements (PNG/JPEG, no alpha channel, 320-3840px per side,
+      #      at least 2 images) -- they were sized for F-Droid and may not
+      #      automatically qualify for Play.
+      #
+      # Until all five are done, leave the `publish` input off: the steps
+      # above still build and upload the AAB as a workflow artifact you can
+      # upload to Play Console by hand.
+      # ----------------------------------------------------------------------
+      - name: Set up Ruby (for fastlane)
+        if: ${{ inputs.publish }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: false
+
+      - name: Install fastlane
+        if: ${{ inputs.publish }}
+        run: gem install fastlane --no-document
+
+      - name: Publish to Play Console (${{ inputs.track }})
+        if: ${{ inputs.publish }}
+        env:
+          GOOGLE_PLAY_JSON_KEY: ${{ secrets.GOOGLE_PLAY_JSON_KEY }}
+        run: |
+          echo "$GOOGLE_PLAY_JSON_KEY" > play-key.json
+          fastlane supply \
+            --aab build/app/outputs/bundle/release/app-release.aab \
+            --package_name com.aeidolon.vaultexplorer \
+            --track "${{ inputs.track }}" \
+            --json_key play-key.json \
+            --metadata_path fastlane/metadata/android \
+            --release_status draft
+          rm -f play-key.json

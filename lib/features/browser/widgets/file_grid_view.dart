@@ -48,6 +48,7 @@ class FileGridView extends StatefulWidget {
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
   final bool Function(RawEntry entry)? isBookmark;
+  final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
 
   final ArchiveContext? archiveContext;
@@ -77,6 +78,7 @@ class FileGridView extends StatefulWidget {
     this.mountedFolderPaths = const {},
     this.isPinned,
     this.isBookmark,
+    this.isFolderSynced,
     this.scrollController,
     this.archiveContext,
     this.archiveRootPath,
@@ -289,21 +291,21 @@ class _FileGridViewState extends State<FileGridView> {
 
     final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
     final folderIcon = Icon(
-      isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
+      Icons.folder_rounded,
       size: iconSize,
-      color: isSelected
-          ? cs.primary
-          : (isMounted ? cs.tertiary : cs.secondary),
+      color: isSelected ? cs.primary : cs.secondary,
     );
 
     return GridCardShell(
-      cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: true,
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isDocumentProviderMounted: isMounted,
+      isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
       onLongPress: entry.isPlaceholder

@@ -6627,7 +6627,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen for the privacy & security entry
   ///
   /// In en, this message translates to:
-  /// **'No network access, nothing unencrypted ever written to disk'**
+  /// **'No network access, decryption happens in memory'**
   String get aboutPrivacySecuritySubtitle;
 
   /// Section header on the about screen listing supported container formats
@@ -6699,7 +6699,7 @@ abstract class AppLocalizations {
   /// Bulleted list of compiled native libraries and versions used by the app
   ///
   /// In en, this message translates to:
-  /// **'• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• libavif & libgav1 (Native AVIF Image Decoder)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)'**
+  /// **'• mbedTLS v3.6.7 (ARMv8 Hardware Crypto & SHA-2)\n• libavif & libgav1 (Native AVIF Image Decoder)\n• libarchive v3.8.9 (ZIP, 7-Zip, RAR & TAR Archive Engine)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)'**
   String get aboutCompiledLibrariesBody;
 
   /// Section header on the about screen for community/legal links
@@ -6861,13 +6861,13 @@ abstract class AppLocalizations {
   /// Privacy sheet point title: no unencrypted disk leaks
   ///
   /// In en, this message translates to:
-  /// **'Zero unencrypted disk leaks'**
+  /// **'Decrypted in memory'**
   String get privacyPointNoDiskLeaksTitle;
 
   /// Privacy sheet point body: no unencrypted disk leaks
   ///
   /// In en, this message translates to:
-  /// **'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.'**
+  /// **'Decryption and re-encryption happen in system memory. The few operations that need a scratch file, such as recording video or exporting, keep it in private app storage and overwrite it with zeros when done.'**
   String get privacyPointNoDiskLeaksBody;
 
   /// Privacy sheet point title: no analytics or telemetry
@@ -6891,7 +6891,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: secrets stay in Android Keystore
   ///
   /// In en, this message translates to:
-  /// **'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.'**
+  /// **'Remembered passwords, patterns, and cached derived keys are encrypted with AES-GCM using a key held in the Android Keystore (hardware-backed where supported).'**
   String get privacyPointKeystoreBody;
 
   /// Privacy sheet point title: POSIX acceleration and storage access
@@ -6915,7 +6915,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: screen and clipboard protection
   ///
   /// In en, this message translates to:
-  /// **'Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.'**
+  /// **'Task-switcher preview blocking, optional screenshot blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.'**
   String get privacyPointScreenClipboardBody;
 
   /// Privacy sheet point title: Mask Mode disguise
@@ -6927,7 +6927,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: Mask Mode disguise
   ///
   /// In en, this message translates to:
-  /// **'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 2 seconds to reach your real vault.'**
+  /// **'Optionally disguises the app as a working local file manager, with a different icon and name. Hold the title for 2 seconds to reach your real vault.'**
   String get privacyPointMaskModeBody;
 
   /// Privacy sheet point title: external links open in browser
@@ -13180,7 +13180,7 @@ abstract class AppLocalizations {
   /// Introductory text at the top of the auto-sync settings sheet
   ///
   /// In en, this message translates to:
-  /// **'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.'**
+  /// **'Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.'**
   String get autoSyncSheetIntro;
 
   /// Section label above the folder an auto-sync rule syncs with

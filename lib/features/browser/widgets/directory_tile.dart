@@ -32,6 +32,7 @@ class DirectoryTile extends StatelessWidget {
   final bool isDocumentProviderMounted;
   final bool isPinned;
   final bool isBookmark;
+  final bool isSynced;
 
   /// When provided (together with [container]), the folder icon shows a
   /// collage of already-cached thumbnails from this folder's contents
@@ -66,6 +67,7 @@ class DirectoryTile extends StatelessWidget {
     this.isDocumentProviderMounted = false,
     this.isPinned = false,
     this.isBookmark = false,
+    this.isSynced = false,
     this.container,
     this.currentDirPath = '',
     this.cacheMode = ThumbnailCacheMode.appCache,
@@ -76,21 +78,18 @@ class DirectoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final iconColor = isDocumentProviderMounted ? cs.tertiary : cs.secondary;
-    final iconBackground = isDocumentProviderMounted
-        ? cs.tertiaryContainer.withValues(alpha: 0.4)
-        : cs.secondaryContainer.withValues(alpha: 0.4);
-
+    final iconColor = cs.secondary;
+    final iconBackground = cs.secondaryContainer.withValues(alpha: 0.4);
 
     final folderIconSize = (AppIconSize.action + 4) * zoomLevel;
 
     Widget? badge;
-    if ((isPinned || isBookmark) && !isSelected) {
+    if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected) {
       badge = Container(
-        padding: const EdgeInsets.all(2),
+        padding: EdgeInsets.symmetric(horizontal: 3 * zoomLevel, vertical: 1.5 * zoomLevel),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-          shape: BoxShape.circle,
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -99,14 +98,32 @@ class DirectoryTile extends StatelessWidget {
               Icon(
                 Icons.push_pin_rounded,
                 size: 10 * zoomLevel,
-                color: cs.onPrimaryContainer,
+                color: cs.primary,
               ),
-            if (isBookmark)
+            if (isBookmark) ...[
+              if (isPinned) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.star_rounded,
                 size: 10 * zoomLevel,
                 color: context.semanticColors.bookmark,
               ),
+            ],
+            if (isDocumentProviderMounted) ...[
+              if (isPinned || isBookmark) SizedBox(width: 2 * zoomLevel),
+              Icon(
+                Icons.folder_shared_rounded,
+                size: 10 * zoomLevel,
+                color: cs.tertiary,
+              ),
+            ],
+            if (isSynced) ...[
+              if (isPinned || isBookmark || isDocumentProviderMounted) SizedBox(width: 2 * zoomLevel),
+              Icon(
+                Icons.sync_rounded,
+                size: 10 * zoomLevel,
+                color: cs.primary,
+              ),
+            ],
           ],
         ),
       );
@@ -128,9 +145,7 @@ class DirectoryTile extends StatelessWidget {
         quality: quality,
         iconSize: folderIconSize,
         child: Icon(
-          isDocumentProviderMounted
-              ? Icons.folder_shared_rounded
-              : Icons.folder_rounded,
+          Icons.folder_rounded,
           size: folderIconSize,
           color: iconColor,
         ),
@@ -153,9 +168,7 @@ class DirectoryTile extends StatelessWidget {
     }
 
     return FileRowShell(
-      icon: isDocumentProviderMounted
-          ? Icons.folder_shared_rounded
-          : Icons.folder_rounded,
+      icon: Icons.folder_rounded,
       iconColor: iconColor,
       unselectedIconBackground: iconBackground,
       customLeading: customLeading,

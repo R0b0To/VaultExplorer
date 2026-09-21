@@ -5,9 +5,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
-import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
@@ -50,15 +50,14 @@ class SyncRuleEditorSheet extends ConsumerStatefulWidget {
     required String folderPath,
     required String folderName,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => SyncRuleEditorSheet(
-        vault: vault,
-        folderPath: folderPath,
-        folderName: folderName,
+    return Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SyncRuleEditorSheet(
+          vault: vault,
+          folderPath: folderPath,
+          folderName: folderName,
+        ),
       ),
     );
   }
@@ -102,19 +101,52 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _live = false;
   bool _deletes = false;
 
+  String _initialTargetUri = '';
+  String _initialTargetSub = '';
+  SyncDirection _initialDirection = SyncDirection.twoWay;
+  ConflictStrategy _initialConflict = ConflictStrategy.renameConflict;
+  bool _initialOnUnlock = true;
+  bool _initialLive = false;
+  bool _initialDeletes = false;
+  String _initialIgnore = '';
+
   bool get _readOnly => widget.vault.readOnly;
-  // Enabled even before a folder is chosen, so that pressing Save explains
-  // what is missing instead of silently doing nothing.
   bool get _canSave => !_readOnly && !_saving;
+
+  bool get _isDirty {
+    if (_existing == null) {
+      return _targetUri.isNotEmpty ||
+          _direction != _initialDirection ||
+          _conflict != _initialConflict ||
+          _onUnlock != _initialOnUnlock ||
+          _live != _initialLive ||
+          _deletes != _initialDeletes ||
+          _ignore.text.trim() != _initialIgnore.trim();
+    }
+    return _targetUri != _initialTargetUri ||
+        _targetSub != _initialTargetSub ||
+        _direction != _initialDirection ||
+        _conflict != _initialConflict ||
+        _onUnlock != _initialOnUnlock ||
+        _live != _initialLive ||
+        _deletes != _initialDeletes ||
+        _ignore.text.trim() != _initialIgnore.trim();
+  }
+
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
+    _ignore.addListener(_onFieldChanged);
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    _ignore.removeListener(_onFieldChanged);
     _ignore.dispose();
     super.dispose();
   }
@@ -124,8 +156,6 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     try {
       config = await ref.read(syncConfigStoreProvider).loadOrCreate(widget.vault);
     } catch (_) {
-      // Unreadable config: show that, and never offer to write a new one
-      // over it.
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -159,7 +189,6 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _targetName = (binding?.displayName.isNotEmpty ?? false)
             ? binding!.displayName
             : existing.targetDisplayName;
-        // A document-provider URI from another phone means nothing here.
         _targetNotSetHere =
             binding == null && existing.targetEndpointUri.startsWith('content://');
         _direction = existing.direction;
@@ -169,6 +198,14 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _deletes = existing.deleteOrphans;
         _ignore.text = existing.ignorePatterns.join('\n');
       }
+      _initialTargetUri = _targetUri;
+      _initialTargetSub = _targetSub;
+      _initialDirection = _direction;
+      _initialConflict = _conflict;
+      _initialOnUnlock = _onUnlock;
+      _initialLive = _live;
+      _initialDeletes = _deletes;
+      _initialIgnore = _ignore.text;
       _loading = false;
     });
   }
@@ -372,222 +409,335 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final cs = context.colors;
-    final text = context.typography;
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     if (_loading) {
-      return const AppBottomSheet(
-        child: SizedBox(height: 160, child: Center(child: CircularProgressIndicator())),
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(
+            l10n.autoSyncSheetTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
       );
     }
     if (_configBroken) {
-      return AppBottomSheet(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _header(text, cs),
-            const SizedBox(height: 16),
-            InlineBanner(l10n.autoSyncConfigUnreadable, tone: AppBannerTone.error),
-          ],
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(
+            l10n.autoSyncSheetTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: InlineBanner(l10n.autoSyncConfigUnreadable, tone: AppBannerTone.error),
         ),
       );
     }
 
-    return AppBottomSheet(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _header(text, cs),
-            const SizedBox(height: 8),
-            Text(
-              l10n.autoSyncSheetIntro,
-              style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            if (_readOnly) ...[
-              const SizedBox(height: 12),
-              InlineBanner(l10n.autoSyncReadOnlyNotice, tone: AppBannerTone.warning),
-            ],
+    final isDirty = _isDirty;
 
-            _section(l10n.autoSyncTargetSection),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(_targetIcon, color: cs.primary),
-              title: Text(
-                _targetUri.isEmpty ? l10n.autoSyncChooseFolder : _targetLabel,
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.autoSyncSheetTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (widget.folderName.isNotEmpty)
+              Text(
+                widget.folderName,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: (_targetUri.isEmpty || _targetSub.isEmpty)
-                  ? null
-                  : Text(_targetSub, maxLines: 1, overflow: TextOverflow.ellipsis),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: _saving ? null : _pickTarget,
-            ),
-            if (_targetNotSetHere)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  l10n.autoSyncTargetNotSetHere,
-                  style: text.bodySmall?.copyWith(color: cs.error),
-                ),
-              ),
-
-            _section(l10n.autoSyncDirectionSection),
-            RadioGroup<SyncDirection>(
-              groupValue: _direction,
-              onChanged: (v) {
-                if (v != null) setState(() => _direction = v);
-              },
-              child: Column(
-                children: [
-                  for (final d in SyncDirection.values)
-                    RadioListTile<SyncDirection>(
-                      value: d,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(d.label(l10n)),
-                      subtitle: Text(d.hint(l10n)),
-                    ),
-                ],
-              ),
-            ),
-
-            _section(l10n.autoSyncConflictSection),
-            RadioGroup<ConflictStrategy>(
-              groupValue: _conflict,
-              onChanged: (v) {
-                if (v != null) setState(() => _conflict = v);
-              },
-              child: Column(
-                children: [
-                  for (final c in _conflictOrder)
-                    RadioListTile<ConflictStrategy>(
-                      value: c,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(c.label(l10n)),
-                      subtitle: Text(c.hint(l10n)),
-                    ),
-                ],
-              ),
-            ),
-
-            _section(l10n.autoSyncOptionsSection),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.autoSyncOnUnlockTitle),
-              value: _onUnlock,
-              onChanged: (v) => setState(() => _onUnlock = v),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.autoSyncLiveTitle),
-              subtitle: Text(l10n.autoSyncLiveSubtitle),
-              value: _live,
-              onChanged: (v) => setState(() => _live = v),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.autoSyncDeleteTitle),
-              subtitle: Text(l10n.autoSyncDeleteSubtitle),
-              value: _deletes,
-              onChanged: (v) => setState(() => _deletes = v),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _ignore,
-              minLines: 2,
-              maxLines: 6,
-              keyboardType: TextInputType.multiline,
-              autocorrect: false,
-              decoration: InputDecoration(
-                labelText: l10n.autoSyncIgnoreLabel,
-                helperText: l10n.autoSyncIgnoreHelper,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-
-            if (_existing != null) ...[
-              const SizedBox(height: 16),
-              _lastRun(text, cs),
-            ],
-            if (_problem != null) ...[
-              const SizedBox(height: 12),
-              InlineBanner(_problemText(_problem!), tone: AppBannerTone.error),
-            ],
-
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _canSave ? () => _save(syncAfter: true) : null,
-                    icon: const Icon(Icons.sync_rounded),
-                    label: Text(l10n.autoSyncSyncNow),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _canSave ? () => _save(syncAfter: false) : null,
-                    child: Text(l10n.save),
-                  ),
-                ),
-              ],
-            ),
-            if (_existing != null)
-              Align(
-                alignment: Alignment.center,
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: cs.error),
-                  onPressed: (_readOnly || _saving) ? null : _remove,
-                  icon: const Icon(Icons.sync_disabled_rounded),
-                  label: Text(l10n.autoSyncRemove),
-                ),
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _header(TextTheme text, ColorScheme cs) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Icon(Icons.sync_rounded, color: cs.primary),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(context.l10n.autoSyncSheetTitle, style: text.titleMedium),
-              Text(
-                widget.folderName,
-                style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                onPressed: _canSave ? () => _save(syncAfter: true) : null,
+                icon: const Icon(Icons.sync_rounded, size: 18),
+                label: Text(l10n.autoSyncSyncNow),
               ),
-            ],
+            ),
           ),
-        ),
-      ],
-    );
-  }
+        ],
+      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, isDirty ? 96 : 24),
+                  children: [
+                    Text(
+                      l10n.autoSyncSheetIntro,
+                      style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    if (_readOnly) ...[
+                      const SizedBox(height: 12),
+                      InlineBanner(l10n.autoSyncReadOnlyNotice, tone: AppBannerTone.warning),
+                    ],
+                    const SizedBox(height: 12),
 
-  Widget _section(String label) {
-    final cs = context.colors;
-    return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 4),
-      child: Text(
-        label,
-        style: context.typography.labelLarge?.copyWith(color: cs.primary),
+                    // Target Folder Selection
+                    SectionHeader(l10n.autoSyncTargetSection),
+                    SectionCard(
+                      children: [
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(_targetIcon, color: cs.primary, size: 22),
+                          ),
+                          title: Text(
+                            _targetUri.isEmpty ? l10n.autoSyncChooseFolder : _targetLabel,
+                            style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: (_targetUri.isEmpty || _targetSub.isEmpty)
+                              ? null
+                              : Text(
+                                  _targetSub,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                          trailing: Icon(
+                            Icons.chevron_right_rounded,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                          ),
+                          onTap: _saving ? null : _pickTarget,
+                        ),
+                        if (_targetNotSetHere)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: Text(
+                              l10n.autoSyncTargetNotSetHere,
+                              style: textTheme.bodySmall?.copyWith(color: cs.error),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Direction & Conflicts (Unified into OptionPickerTiles)
+                    SectionHeader(l10n.autoSyncDirectionSection),
+                    SectionCard(
+                      children: [
+                        OptionPickerTile<SyncDirection>(
+                          label: l10n.autoSyncDirectionSection,
+                          value: _direction,
+                          subtitle: _direction.label(l10n),
+                          options: SyncDirection.values.map((d) {
+                            return SelectOption(
+                              value: d,
+                              label: d.label(l10n),
+                              subtitle: d.hint(l10n),
+                            );
+                          }).toList(),
+                          onChanged: (v) => setState(() => _direction = v),
+                        ),
+                        OptionPickerTile<ConflictStrategy>(
+                          label: l10n.autoSyncConflictSection,
+                          value: _conflict,
+                          subtitle: _conflict.label(l10n),
+                          options: _conflictOrder.map((c) {
+                            return SelectOption(
+                              value: c,
+                              label: c.label(l10n),
+                              subtitle: c.hint(l10n),
+                            );
+                          }).toList(),
+                          onChanged: (v) => setState(() => _conflict = v),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Sync Options & Rules
+                    SectionHeader(l10n.autoSyncOptionsSection),
+                    SectionCard(
+                      children: [
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text(
+                            l10n.autoSyncOnUnlockTitle,
+                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          value: _onUnlock,
+                          onChanged: (v) => setState(() => _onUnlock = v),
+                        ),
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text(
+                            l10n.autoSyncLiveTitle,
+                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            l10n.autoSyncLiveSubtitle,
+                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          value: _live,
+                          onChanged: (v) => setState(() => _live = v),
+                        ),
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: Text(
+                            l10n.autoSyncDeleteTitle,
+                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            l10n.autoSyncDeleteSubtitle,
+                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          value: _deletes,
+                          onChanged: (v) => setState(() => _deletes = v),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          child: TextField(
+                            controller: _ignore,
+                            minLines: 2,
+                            maxLines: 6,
+                            keyboardType: TextInputType.multiline,
+                            autocorrect: false,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: cs.surfaceContainerHighest,
+                              labelText: l10n.autoSyncIgnoreLabel,
+                              helperText: l10n.autoSyncIgnoreHelper,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (_existing != null) ...[
+                      const SizedBox(height: 16),
+                      SectionCard(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: _lastRun(textTheme, cs),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    if (_problem != null) ...[
+                      const SizedBox(height: 12),
+                      InlineBanner(_problemText(_problem!), tone: AppBannerTone.error),
+                    ],
+
+                    if (_existing != null) ...[
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.center,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(foregroundColor: cs.error),
+                          onPressed: (_readOnly || _saving) ? null : _remove,
+                          icon: const Icon(Icons.sync_disabled_rounded),
+                          label: Text(l10n.autoSyncRemove),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Floating Overlay Save Button (Appears when changes are made)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              left: 16,
+              right: 16,
+              bottom: isDirty ? 16 : -80,
+              child: IgnorePointer(
+                ignoring: !isDirty,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Material(
+                      elevation: 4,
+                      shadowColor: Colors.black26,
+                      borderRadius: BorderRadius.circular(28),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        onPressed: _canSave ? () => _save(syncAfter: false) : null,
+                        icon: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save_rounded),
+                        label: Text(
+                          l10n.save,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

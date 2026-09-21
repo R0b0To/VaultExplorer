@@ -49,6 +49,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
   final bool Function(RawEntry entry)? isBookmark;
+  final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
 
   final ArchiveContext? archiveContext;
@@ -77,6 +78,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.mountedFolderPaths = const {},
     this.isPinned,
     this.isBookmark,
+    this.isFolderSynced,
     this.scrollController,
     this.archiveContext,
     this.archiveRootPath,
@@ -441,24 +443,24 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
 
     final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
     final folderIcon = Icon(
-      isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
+      Icons.folder_rounded,
       size: iconSize,
-      color: isSelected
-          ? cs.primary
-          : (isMounted ? cs.tertiary : cs.secondary),
+      color: isSelected ? cs.primary : cs.secondary,
     );
 
     return GridCardShell(
       key: ValueKey(
-          'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}'),
+          'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}:$isMounted'),
       aspectRatio: ratio,
-      cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: true,
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isDocumentProviderMounted: isMounted,
+      isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
       onLongPress: entry.isPlaceholder

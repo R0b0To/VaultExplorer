@@ -84,6 +84,8 @@ class GridCardShell extends StatelessWidget {
   final VoidCallback? onMoreTap;
   final bool isPinned;
   final bool isBookmark;
+  final bool isDocumentProviderMounted;
+  final bool isSynced;
   final bool isPlaceholder;
   final Color? cardColor;
 
@@ -104,6 +106,8 @@ class GridCardShell extends StatelessWidget {
     this.onMoreTap,
     this.isPinned = false,
     this.isBookmark = false,
+    this.isDocumentProviderMounted = false,
+    this.isSynced = false,
     this.isPlaceholder = false,
     this.cardColor,
     this.aspectRatio,
@@ -124,16 +128,16 @@ class GridCardShell extends StatelessWidget {
               color: cs.primary.withValues(alpha: 0.12),
             ),
           ),
-        if ((isPinned || isBookmark) && !isSelected)
+        if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected)
           Align(
             alignment: Alignment.topLeft,
             child: Padding(
               padding: const EdgeInsets.all(6),
               child: Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                 decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-                  shape: BoxShape.circle,
+                  color: cs.surfaceContainerHigh.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -141,15 +145,34 @@ class GridCardShell extends StatelessWidget {
                     if (isPinned)
                       Icon(
                         Icons.push_pin_rounded,
-                        size: 14,
+                        size: 13,
                         color: cs.primary,
                       ),
-                    if (isBookmark)
+                    if (isBookmark) ...[
+                      if (isPinned) const SizedBox(width: 3),
                       Icon(
                         Icons.star_rounded,
-                        size: 14,
+                        size: 13,
                         color: context.semanticColors.bookmark,
                       ),
+                    ],
+                    if (isDocumentProviderMounted) ...[
+                      if (isPinned || isBookmark) const SizedBox(width: 3),
+                      Icon(
+                        Icons.folder_shared_rounded,
+                        size: 13,
+                        color: cs.tertiary,
+                      ),
+                    ],
+                    if (isSynced) ...[
+                      if (isPinned || isBookmark || isDocumentProviderMounted)
+                        const SizedBox(width: 3),
+                      Icon(
+                        Icons.sync_rounded,
+                        size: 13,
+                        color: cs.primary,
+                      ),
+                    ],
                   ],
                 ),
               ),

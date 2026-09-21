@@ -3951,7 +3951,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Kein Netzwerkzugriff, nie unverschlüsselte Daten auf die Festplatte geschrieben';
+      'Kein Netzwerkzugriff, Entschlüsselung erfolgt im Speicher';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Unterstützte Formate';
@@ -3992,7 +3992,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (ARMv8-Hardwarekryptografie & SHA-2)\n• libavif & libgav1 (nativer AVIF-Bilddecoder)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & eingebettetes mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2- & Cryptomator-Metadaten)';
+      '• mbedTLS v3.6.7 (ARMv8-Hardwarekryptografie & SHA-2)\n• libavif & libgav1 (nativer AVIF-Bilddecoder)\n• libarchive v3.8.9 (Archiv-Engine für ZIP, 7-Zip, RAR & TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & eingebettetes mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2- & Cryptomator-Metadaten)';
 
   @override
   String get aboutCommunitySectionHeader => 'Community & Open Source';
@@ -4088,12 +4088,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'VaultExplorer fordert unter Android nicht die Berechtigung android.permission.INTERNET an. Es kann über kein Netzwerk kommunizieren.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Keine unverschlüsselten Datenlecks auf dem Datenträger';
+  String get privacyPointNoDiskLeaksTitle => 'Im Speicher entschlüsselt';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Entschlüsselung und erneute Verschlüsselung erfolgen ausschließlich im Systemspeicher. Temporäre unverschlüsselte Dateien werden niemals auf dem Gerätespeicher gespeichert.';
+      'Entschlüsselung und erneute Verschlüsselung erfolgen im Systemspeicher. Die wenigen Vorgänge, die eine temporäre Datei benötigen, etwa Videoaufnahme oder Export, legen diese im privaten App-Speicher ab und überschreiben sie danach mit Nullen.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Keine Analyse oder Telemetrie';
@@ -4108,7 +4107,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Gespeicherte Passwörter, Muster und zwischengespeicherte abgeleitete Schlüssel werden mit AES-256-GCM im hardwaregestützten Android Keystore versiegelt.';
+      'Gespeicherte Passwörter, Muster und zwischengespeicherte abgeleitete Schlüssel werden mit AES-GCM verschlüsselt; der Schlüssel liegt im Android Keystore (hardwaregestützt, sofern unterstützt).';
 
   @override
   String get privacyPointPosixTitle => 'POSIX-Beschleunigung & Speicherzugriff';
@@ -4123,14 +4122,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Blockierung der Screenshot-/Task-Switcher-Vorschau (FLAG_SECURE) sowie automatische Bereinigung beschädigter Zwischenablagen bei Fensterfokus.';
+      'Blockierung der Task-Switcher-Vorschau, optionale Screenshot-Blockierung (FLAG_SECURE) sowie automatische Bereinigung beschädigter Zwischenablagen bei Fensterfokus. Aus Tresor-Elementen kopierte Passwörter werden ab Android 13 als sensibel markiert und nach 30 Sekunden automatisch gelöscht, wenn sie unangetastet bleiben.';
 
   @override
   String get privacyPointMaskModeTitle => 'Maskenmodus';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Tarnung der App wahlweise als funktionierender ZIP-Archiv-Browser mit anderem Symbol und Namen. Halten Sie den Titel 3 Sekunden lang gedrückt, um zu Ihrem echten Tresor zu gelangen.';
+      'Tarnung der App wahlweise als funktionierender lokaler Dateimanager mit anderem Symbol und Namen. Halten Sie den Titel 2 Sekunden lang gedrückt, um zu Ihrem echten Tresor zu gelangen.';
 
   @override
   String get privacyPointExternalLinksTitle =>

@@ -10020,7 +10020,7 @@
   "@autoSyncSheetTitle": {
     "description": "Title of the auto-sync settings sheet for a folder"
   },
-  "autoSyncSheetIntro": "Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.",
+  "autoSyncSheetIntro": "Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.",
   "@autoSyncSheetIntro": {
     "description": "Introductory text at the top of the auto-sync settings sheet"
   },

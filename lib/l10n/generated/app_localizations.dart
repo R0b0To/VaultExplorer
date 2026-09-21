@@ -13180,7 +13180,7 @@ abstract class AppLocalizations {
   /// Introductory text at the top of the auto-sync settings sheet
   ///
   /// In en, this message translates to:
-  /// **'Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.'**
+  /// **'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.'**
   String get autoSyncSheetIntro;
 
   /// Section label above the folder an auto-sync rule syncs with

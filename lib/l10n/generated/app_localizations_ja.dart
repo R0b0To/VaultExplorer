@@ -3749,8 +3749,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get aboutPrivacySecurityTitle => 'プライバシーとセキュリティ';
 
   @override
-  String get aboutPrivacySecuritySubtitle =>
-      'ネットワークアクセスなし、暗号化されていないデータをディスクに書き込むことは一切ありません';
+  String get aboutPrivacySecuritySubtitle => 'ネットワークアクセスなし、復号はメモリ内で行われます';
 
   @override
   String get aboutSupportedFormatsSectionHeader => '対応形式';
@@ -3789,7 +3788,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0（ARMv8ハードウェア暗号化 & SHA-2）\n• libavif & libgav1（ネイティブAVIF画像デコーダー）\n• ChaN FatFs v4.0.4（FAT12/16/32 & exFAT）\n• Tuxera NTFS-3G & 組み込みmkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 & Cryptomatorのメタデータ）';
+      '• mbedTLS v3.6.7（ARMv8ハードウェア暗号化 & SHA-2）\n• libavif & libgav1（ネイティブAVIF画像デコーダー）\n• libarchive v3.8.9（ZIP、7-Zip、RAR、TARアーカイブエンジン）\n• ChaN FatFs v4.0.4（FAT12/16/32 & exFAT）\n• Tuxera NTFS-3G & 組み込みmkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 & Cryptomatorのメタデータ）';
 
   @override
   String get aboutCommunitySectionHeader => 'コミュニティとオープンソース';
@@ -3876,11 +3875,11 @@ class AppLocalizationsJa extends AppLocalizations {
       'VaultExplorerはAndroidでandroid.permission.INTERNET権限を要求しません。いかなるネットワークとも通信できません。';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => '暗号化されていないディスク漏洩ゼロ';
+  String get privacyPointNoDiskLeaksTitle => 'メモリ内で復号';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      '復号と再暗号化はすべてシステムメモリ内で行われます。暗号化されていない一時ファイルがデバイスストレージに保存されることは一切ありません。';
+      '復号と再暗号化はシステムメモリ内で行われます。ビデオ録画やエクスポートなど、一時ファイルが必要な一部の操作では、アプリ専用のストレージにそれを保持し、完了後にゼロで上書きします。';
 
   @override
   String get privacyPointNoAnalyticsTitle => '分析・テレメトリなし';
@@ -3894,7 +3893,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      '記憶されたパスワード、パターン、キャッシュされた導出鍵は、ハードウェアに支えられたAndroid Keystore内でAES-256-GCMを使って封印されます。';
+      '記憶されたパスワード、パターン、キャッシュされた導出鍵は、Android Keystoreに保管された鍵を使ってAES-GCMで暗号化されます（対応する端末ではハードウェアに支えられます）。';
 
   @override
   String get privacyPointPosixTitle => 'POSIXアクセラレーションとストレージアクセス';
@@ -3908,14 +3907,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'スクリーンショット／タスク切り替えプレビューのブロック（FLAG_SECURE）に加え、ウィンドウがフォーカスされた際に破損したクリップボードを自動的にサニタイズします。アイテムボールトからコピーされたパスワードはAndroid 13以降で機密情報としてマークされ、未使用の場合は30秒後に自動的に消去されます。';
+      'タスク切り替えプレビューのブロックと任意のスクリーンショットブロック（FLAG_SECURE）に加え、ウィンドウがフォーカスされた際に破損したクリップボードを自動的にサニタイズします。アイテムボールトからコピーされたパスワードはAndroid 13以降で機密情報としてマークされ、未使用の場合は30秒後に自動的に消去されます。';
 
   @override
   String get privacyPointMaskModeTitle => 'マスクモード';
 
   @override
   String get privacyPointMaskModeBody =>
-      'アプリを、動作するzipアーカイブブラウザとして異なるアイコンと名前で偽装できます（任意）。タイトルを2秒間長押しすると、実際の保管庫にアクセスできます。';
+      'アプリを、動作するローカルファイルマネージャーとして異なるアイコンと名前で偽装できます（任意）。タイトルを2秒間長押しすると、実際の保管庫にアクセスできます。';
 
   @override
   String get privacyPointExternalLinksTitle => '外部リンクはブラウザで開きます';

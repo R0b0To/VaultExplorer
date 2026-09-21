@@ -3977,7 +3977,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Aucun accès réseau, rien d\'écrit non chiffré sur le disque';
+      'Aucun accès réseau, le déchiffrement se fait en mémoire';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Formats pris en charge';
@@ -4018,7 +4018,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (cryptographie matérielle ARMv8 et SHA-2)\n• libavif et libgav1 (décodeur d\'image AVIF natif)\n• ChaN FatFs v4.0.4 (FAT12/16/32 et exFAT)\n• Tuxera NTFS-3G et mkntfs embarqué\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (métadonnées LUKS2 et Cryptomator)';
+      '• mbedTLS v3.6.7 (cryptographie matérielle ARMv8 et SHA-2)\n• libavif et libgav1 (décodeur d\'image AVIF natif)\n• libarchive v3.8.9 (moteur d\'archives ZIP, 7-Zip, RAR et TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 et exFAT)\n• Tuxera NTFS-3G et mkntfs embarqué\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (métadonnées LUKS2 et Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Communauté et open source';
@@ -4116,12 +4116,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'VaultExplorer ne demande pas l\'autorisation android.permission.INTERNET sur Android. L\'application ne peut communiquer sur aucun réseau.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Zéro fuite non chiffrée sur le disque';
+  String get privacyPointNoDiskLeaksTitle => 'Déchiffré en mémoire';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Le déchiffrement et le rechiffrement se font entièrement en mémoire système. Aucun fichier temporaire non chiffré n\'est jamais enregistré sur le stockage de l\'appareil.';
+      'Le déchiffrement et le rechiffrement se font en mémoire système. Les rares opérations qui nécessitent un fichier temporaire, comme l\'enregistrement vidéo ou l\'exportation, le conservent dans le stockage privé de l\'application et l\'écrasent avec des zéros à la fin.';
 
   @override
   String get privacyPointNoAnalyticsTitle =>
@@ -4137,7 +4136,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Les mots de passe mémorisés, les schémas et les clés dérivées mises en cache sont scellés avec AES-256-GCM dans l\'Android Keystore matériel.';
+      'Les mots de passe mémorisés, les schémas et les clés dérivées mises en cache sont chiffrés avec AES-GCM à l\'aide d\'une clé conservée dans l\'Android Keystore (matériel lorsque pris en charge).';
 
   @override
   String get privacyPointPosixTitle =>
@@ -4153,14 +4152,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Blocage de l\'aperçu dans les captures d\'écran/le sélecteur de tâches (FLAG_SECURE), plus une désinfection automatique du presse-papiers corrompu lors de la mise au point de la fenêtre. Les mots de passe copiés depuis la Item Vault sont marqués comme sensibles sur Android 13+ et effacés automatiquement 30 secondes plus tard s\'ils ne sont pas utilisés.';
+      'Blocage de l\'aperçu dans le sélecteur de tâches, blocage facultatif des captures d\'écran (FLAG_SECURE), plus une désinfection automatique du presse-papiers corrompu lors de la mise au point de la fenêtre. Les mots de passe copiés depuis la Item Vault sont marqués comme sensibles sur Android 13+ et effacés automatiquement 30 secondes plus tard s\'ils ne sont pas utilisés.';
 
   @override
   String get privacyPointMaskModeTitle => 'Mode Masque';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Déguise éventuellement l\'application en un explorateur d\'archives zip fonctionnel, avec une icône et un nom différents. Maintenez le titre appuyé pendant 2 secondes pour accéder à votre véritable coffre.';
+      'Déguise éventuellement l\'application en un gestionnaire de fichiers local fonctionnel, avec une icône et un nom différents. Maintenez le titre appuyé pendant 2 secondes pour accéder à votre véritable coffre.';
 
   @override
   String get privacyPointExternalLinksTitle =>

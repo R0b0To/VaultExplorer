@@ -3952,7 +3952,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Sin acceso a la red, nada sin cifrar se escribe jamás en el disco';
+      'Sin acceso a la red, el descifrado ocurre en memoria';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Formatos compatibles';
@@ -3993,7 +3993,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (criptografía por hardware ARMv8 y SHA-2)\n• libavif y libgav1 (decodificador nativo de imágenes AVIF)\n• ChaN FatFs v4.0.4 (FAT12/16/32 y exFAT)\n• Tuxera NTFS-3G y mkntfs integrado\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• E/S virtual de Dislocker (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadatos de LUKS2 y Cryptomator)';
+      '• mbedTLS v3.6.7 (criptografía por hardware ARMv8 y SHA-2)\n• libavif y libgav1 (decodificador nativo de imágenes AVIF)\n• libarchive v3.8.9 (motor de archivos ZIP, 7-Zip, RAR y TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 y exFAT)\n• Tuxera NTFS-3G y mkntfs integrado\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• E/S virtual de Dislocker (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadatos de LUKS2 y Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Comunidad y código abierto';
@@ -4089,12 +4089,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'VaultExplorer no solicita el permiso android.permission.INTERNET en Android. No puede comunicarse por ninguna red.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Cero filtraciones sin cifrar al disco';
+  String get privacyPointNoDiskLeaksTitle => 'Descifrado en memoria';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'El descifrado y el recifrado ocurren completamente en la memoria del sistema. Los archivos temporales sin cifrar nunca se guardan en el almacenamiento del dispositivo.';
+      'El descifrado y el recifrado ocurren en la memoria del sistema. Las pocas operaciones que necesitan un archivo temporal, como grabar vídeo o exportar, lo guardan en el almacenamiento privado de la app y lo sobrescriben con ceros al terminar.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Sin análisis ni telemetría';
@@ -4109,7 +4108,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Las contraseñas recordadas, los patrones y las claves derivadas en caché se sellan con AES-256-GCM en el Android Keystore respaldado por hardware.';
+      'Las contraseñas recordadas, los patrones y las claves derivadas en caché se cifran con AES-GCM usando una clave guardada en el Android Keystore (respaldado por hardware cuando es compatible).';
 
   @override
   String get privacyPointPosixTitle =>
@@ -4125,14 +4124,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Bloqueo de vista previa de capturas de pantalla/selector de tareas (FLAG_SECURE) y limpieza automática del portapapeles corrupto al recuperar el foco de la ventana.';
+      'Bloqueo de la vista previa del selector de tareas, bloqueo opcional de capturas de pantalla (FLAG_SECURE) y limpieza automática del portapapeles corrupto al recuperar el foco de la ventana. Las contraseñas copiadas de los elementos de la bóveda se marcan como sensibles en Android 13+ y se borran automáticamente 30 segundos después si no se usan.';
 
   @override
   String get privacyPointMaskModeTitle => 'Modo Máscara';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Disfraza opcionalmente la app como un explorador de archivos zip funcional, con un icono y nombre distintos. Mantén pulsado el título durante 3 segundos para acceder a tu bóveda real.';
+      'Disfraza opcionalmente la app como un administrador de archivos local funcional, con un icono y nombre distintos. Mantén pulsado el título durante 2 segundos para acceder a tu bóveda real.';
 
   @override
   String get privacyPointExternalLinksTitle =>

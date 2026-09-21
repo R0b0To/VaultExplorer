@@ -3700,7 +3700,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPrivacySecurityTitle => '隐私与安全';
 
   @override
-  String get aboutPrivacySecuritySubtitle => '无网络访问，绝不将未加密内容写入磁盘';
+  String get aboutPrivacySecuritySubtitle => '无网络访问，解密在内存中进行';
 
   @override
   String get aboutSupportedFormatsSectionHeader => '支持的格式';
@@ -3739,7 +3739,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0（ARMv8硬件加密与SHA-2）\n• libavif 与 libgav1（原生AVIF图像解码器）\n• ChaN FatFs v4.0.4（FAT12/16/32 与 exFAT）\n• Tuxera NTFS-3G 与内置mkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 与 Cryptomator 元数据）';
+      '• mbedTLS v3.6.7（ARMv8硬件加密与SHA-2）\n• libavif 与 libgav1（原生AVIF图像解码器）\n• libarchive v3.8.9（ZIP、7-Zip、RAR 与 TAR 归档引擎）\n• ChaN FatFs v4.0.4（FAT12/16/32 与 exFAT）\n• Tuxera NTFS-3G 与内置mkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 与 Cryptomator 元数据）';
 
   @override
   String get aboutCommunitySectionHeader => '社区与开源';
@@ -3825,11 +3825,11 @@ class AppLocalizationsZh extends AppLocalizations {
       'VaultExplorer在Android上不请求android.permission.INTERNET权限。它无法通过任何网络进行通信。';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => '零未加密磁盘泄露';
+  String get privacyPointNoDiskLeaksTitle => '在内存中解密';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      '解密和重新加密完全在系统内存中进行。未加密的临时文件永远不会保存到设备存储中。';
+      '解密和重新加密在系统内存中进行。少数需要临时文件的操作（例如录制视频或导出）会将其保存在应用的私有存储中，并在完成后用零覆盖。';
 
   @override
   String get privacyPointNoAnalyticsTitle => '无分析或遥测';
@@ -3843,7 +3843,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      '记住的密码、图案以及缓存的派生密钥均使用AES-256-GCM在硬件支持的Android Keystore中加密封存。';
+      '记住的密码、图案以及缓存的派生密钥使用AES-GCM加密，密钥保存在Android Keystore中（设备支持时由硬件提供保护）。';
 
   @override
   String get privacyPointPosixTitle => 'POSIX加速与存储访问';
@@ -3857,14 +3857,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      '阻止截屏/任务切换器预览（FLAG_SECURE），并在窗口获得焦点时自动清理损坏的剪贴板内容。从项目保险库复制的密码在Android 13及以上版本中会被标记为敏感信息，若30秒内未使用则会自动清除。';
+      '阻止任务切换器预览，可选阻止截屏（FLAG_SECURE），并在窗口获得焦点时自动清理损坏的剪贴板内容。从项目保险库复制的密码在Android 13及以上版本中会被标记为敏感信息，若30秒内未使用则会自动清除。';
 
   @override
   String get privacyPointMaskModeTitle => '伪装模式';
 
   @override
   String get privacyPointMaskModeBody =>
-      '可选择将应用伪装成一个可正常使用的zip压缩包浏览器，使用不同的图标和名称。长按标题2秒即可进入您的真实保险库。';
+      '可选择将应用伪装成一个可正常使用的本地文件管理器，使用不同的图标和名称。长按标题2秒即可进入您的真实保险库。';
 
   @override
   String get privacyPointExternalLinksTitle => '外部链接在浏览器中打开';

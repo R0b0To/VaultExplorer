@@ -7832,7 +7832,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoSyncSheetIntro =>
-      'Keeps this folder and another folder in sync automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.';
+      'Keeps this folder and another folder in step automatically. If the same file changed on both sides, both versions are kept unless you choose otherwise below.';
 
   @override
   String get autoSyncTargetSection => 'Sync with';

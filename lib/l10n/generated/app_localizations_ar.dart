@@ -3988,7 +3988,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'لا وصول للشبكة، ولا يُكتب أي شيء غير مشفّر على القرص';
+      'لا وصول للشبكة، وفك التشفير يتم داخل الذاكرة';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'التنسيقات المدعومة';
@@ -4029,7 +4029,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (تشفير الأجهزة ARMv8 و SHA-2)\n• libavif و libgav1 (وحدة فك ترميز صور AVIF الأصلية)\n• ChaN FatFs v4.0.4 (FAT12/16/32 و exFAT)\n• Tuxera NTFS-3G و mkntfs المدمج\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish، Serpent، Camellia، Kuznyechik، Whirlpool، Streebog، BLAKE2s، Argon2id/i)\n• cJSON v1.7.18 (بيانات وصفية لـ LUKS2 و Cryptomator)';
+      '• mbedTLS v3.6.7 (تشفير الأجهزة ARMv8 و SHA-2)\n• libavif و libgav1 (وحدة فك ترميز صور AVIF الأصلية)\n• libarchive v3.8.9 (محرك الأرشيفات ZIP و 7-Zip و RAR و TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 و exFAT)\n• Tuxera NTFS-3G و mkntfs المدمج\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish، Serpent، Camellia، Kuznyechik، Whirlpool، Streebog، BLAKE2s، Argon2id/i)\n• cJSON v1.7.18 (بيانات وصفية لـ LUKS2 و Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'المجتمع والمصادر المفتوحة';
@@ -4122,11 +4122,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'لا يطلب VaultExplorer إذن android.permission.INTERNET على Android. ولا يمكنه التواصل عبر أي شبكة.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => 'صفر تسريبات غير مشفّرة على القرص';
+  String get privacyPointNoDiskLeaksTitle => 'فك التشفير داخل الذاكرة';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'يتم فك التشفير وإعادة التشفير بالكامل داخل ذاكرة النظام. لا يتم أبدًا حفظ ملفات مؤقتة غير مشفّرة على تخزين الجهاز.';
+      'يتم فك التشفير وإعادة التشفير داخل ذاكرة النظام. أما العمليات القليلة التي تحتاج إلى ملف مؤقت، مثل تسجيل الفيديو أو التصدير، فتحتفظ به في مساحة التخزين الخاصة بالتطبيق وتكتب فوقه أصفارًا عند الانتهاء.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'لا تحليلات ولا قياس عن بُعد';
@@ -4140,7 +4140,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'يتم إحكام إغلاق كلمات المرور المحفوظة والأنماط والمفاتيح المشتقة المخزَّنة مؤقتًا باستخدام AES-256-GCM داخل Android Keystore المدعوم بالأجهزة.';
+      'يتم تشفير كلمات المرور المحفوظة والأنماط والمفاتيح المشتقة المخزَّنة مؤقتًا باستخدام AES-GCM بمفتاح محفوظ في Android Keystore (مدعوم بالأجهزة حيثما كان ذلك متاحًا).';
 
   @override
   String get privacyPointPosixTitle => 'تسريع POSIX والوصول إلى وحدة التخزين';
@@ -4154,14 +4154,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'حظر معاينة لقطات الشاشة/مبدّل المهام (FLAG_SECURE)، بالإضافة إلى تعقيم تلقائي للحافظة التالفة عند تركيز النافذة. تُوسَم كلمات المرور المنسوخة من خزنة العناصر كحساسة على Android 13 فأعلى وتُمسح تلقائيًا بعد 30 ثانية إذا لم تُستخدم.';
+      'حظر معاينة مبدّل المهام، وحظر اختياري للقطات الشاشة (FLAG_SECURE)، بالإضافة إلى تعقيم تلقائي للحافظة التالفة عند تركيز النافذة. تُوسَم كلمات المرور المنسوخة من خزنة العناصر كحساسة على Android 13 فأعلى وتُمسح تلقائيًا بعد 30 ثانية إذا لم تُستخدم.';
 
   @override
   String get privacyPointMaskModeTitle => 'وضع التمويه';
 
   @override
   String get privacyPointMaskModeBody =>
-      'يموّه التطبيق اختياريًا كمتصفح أرشيف zip يعمل فعليًا، بأيقونة واسم مختلفين. اضغط مطولاً على العنوان لمدة ثانيتين للوصول إلى خزنتك الحقيقية.';
+      'يموّه التطبيق اختياريًا كمدير ملفات محلي يعمل فعليًا، بأيقونة واسم مختلفين. اضغط مطولاً على العنوان لمدة ثانيتين للوصول إلى خزنتك الحقيقية.';
 
   @override
   String get privacyPointExternalLinksTitle =>

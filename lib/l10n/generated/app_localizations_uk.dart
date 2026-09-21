@@ -3967,7 +3967,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Zero-trust, 100% офлайн, локальна безпека в пам\'яті';
+      'Без доступу до мережі, дешифрування відбувається в пам\'яті';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Підтримувані формати';
@@ -4008,7 +4008,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (Апаратне шифрування ARMv8 та SHA-2)\n• libavif & libgav1 (Нативний декодер AVIF)\n• ChaN FatFs v4.0.4 (FAT12/16/32 та exFAT)\n• Tuxera NTFS-3G & вбудований mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (метадані LUKS2 та Cryptomator)';
+      '• mbedTLS v3.6.7 (Апаратне шифрування ARMv8 та SHA-2)\n• libavif & libgav1 (Нативний декодер AVIF)\n• libarchive v3.8.9 (Рушій архівів ZIP, 7-Zip, RAR та TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 та exFAT)\n• Tuxera NTFS-3G & вбудований mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (метадані LUKS2 та Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Спільнота та відкритий код';
@@ -4102,12 +4102,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'VaultExplorer взагалі не запитує дозвіл android.permission.INTERNET на Android і фізично не може надсилати чи отримувати дані мережею.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Жодних витоків незашифрованих даних на диск';
+  String get privacyPointNoDiskLeaksTitle => 'Дешифрування в пам\'яті';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Дешифрування та шифрування відбуваються виключно в оперативній пам\'яті. Тимчасові незашифровані файли ніколи не зберігаються на внутрішньому накопичувачі.';
+      'Дешифрування та повторне шифрування відбуваються в оперативній пам\'яті. Кілька операцій, яким потрібен тимчасовий файл, наприклад запис відео чи експорт, зберігають його у приватному сховищі застосунку та перезаписують нулями після завершення.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Без аналітики та телеметрії';
@@ -4121,7 +4120,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Збережені паролі, графічні ключі та похідні ключі шифруються за допомогою AES-256-GCM в апаратно захищеному сховищі Android Keystore.';
+      'Збережені паролі, графічні ключі та похідні ключі шифруються за допомогою AES-GCM із ключем, що зберігається в Android Keystore (апаратно захищеному, якщо підтримується).';
 
   @override
   String get privacyPointPosixTitle => 'Прискорення POSIX та прямий доступ';
@@ -4136,14 +4135,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Блокування знімків екрана та мініатюр у списку додатків (FLAG_SECURE), а також автоматичне очищення буфера обміну.';
+      'Блокування мініатюр у списку додатків, необов\'язкове блокування знімків екрана (FLAG_SECURE), а також автоматичне очищення пошкодженого буфера обміну під час фокусування вікна. Паролі, скопійовані з елементів сховища, позначаються як конфіденційні в Android 13+ і автоматично стираються через 30 секунд, якщо ними не скористалися.';
 
   @override
   String get privacyPointMaskModeTitle => 'Режим маскування';
 
   @override
   String get privacyPointMaskModeBody =>
-      'За бажанням маскує програму під повноцінний переглядач zip-архівів із іншою назвою та іконкою. Затисніть заголовок на 3 секунди, щоб відкрити справжнє сховище.';
+      'За бажанням маскує програму під повноцінний локальний файловий менеджер із іншою назвою та іконкою. Затисніть заголовок на 2 секунди, щоб відкрити справжнє сховище.';
 
   @override
   String get privacyPointExternalLinksTitle =>

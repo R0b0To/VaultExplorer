@@ -3952,7 +3952,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Sem acesso à rede, nada não criptografado é gravado no disco';
+      'Sem acesso à rede, a descriptografia ocorre na memória';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Formatos Suportados';
@@ -3993,7 +3993,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (Criptografia por Hardware ARMv8 e SHA-2)\n• libavif e libgav1 (Decodificador Nativo de Imagem AVIF)\n• ChaN FatFs v4.0.4 (FAT12/16/32 e exFAT)\n• Tuxera NTFS-3G e mkntfs embutido\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadados LUKS2 e Cryptomator)';
+      '• mbedTLS v3.6.7 (Criptografia por Hardware ARMv8 e SHA-2)\n• libavif e libgav1 (Decodificador Nativo de Imagem AVIF)\n• libarchive v3.8.9 (Mecanismo de Arquivos ZIP, 7-Zip, RAR e TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 e exFAT)\n• Tuxera NTFS-3G e mkntfs embutido\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadados LUKS2 e Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Comunidade e Código Aberto';
@@ -4088,12 +4088,11 @@ class AppLocalizationsPt extends AppLocalizations {
       'O VaultExplorer não solicita a permissão android.permission.INTERNET no Android. Ele não pode se comunicar por nenhuma rede.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Zero vazamentos não criptografados em disco';
+  String get privacyPointNoDiskLeaksTitle => 'Descriptografado na memória';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'A descriptografia e a recriptografia ocorrem inteiramente na memória do sistema. Arquivos temporários não criptografados nunca são salvos no armazenamento do dispositivo.';
+      'A descriptografia e a recriptografia ocorrem na memória do sistema. As poucas operações que precisam de um arquivo temporário, como gravar vídeo ou exportar, o mantêm no armazenamento privado do app e o sobrescrevem com zeros ao terminar.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Sem análises ou telemetria';
@@ -4108,7 +4107,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Senhas memorizadas, padrões e chaves derivadas em cache são selados usando AES-256-GCM no Android Keystore protegido por hardware.';
+      'Senhas memorizadas, padrões e chaves derivadas em cache são criptografados com AES-GCM usando uma chave mantida no Android Keystore (protegido por hardware quando compatível).';
 
   @override
   String get privacyPointPosixTitle =>
@@ -4124,14 +4123,14 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Bloqueio de prévia em capturas de tela/alternador de tarefas (FLAG_SECURE), além de sanitização automática de área de transferência corrompida ao focar a janela. Senhas copiadas do Cofre de Itens são marcadas como sensíveis no Android 13+ e apagadas automaticamente após 30 segundos se não forem usadas.';
+      'Bloqueio de prévia no alternador de tarefas, bloqueio opcional de capturas de tela (FLAG_SECURE), além de sanitização automática de área de transferência corrompida ao focar a janela. Senhas copiadas do Cofre de Itens são marcadas como sensíveis no Android 13+ e apagadas automaticamente após 30 segundos se não forem usadas.';
 
   @override
   String get privacyPointMaskModeTitle => 'Modo Disfarce';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Disfarça opcionalmente o app como um navegador de arquivos zip funcional, com um ícone e nome diferentes. Mantenha o título pressionado por 2 segundos para acessar seu cofre real.';
+      'Disfarça opcionalmente o app como um gerenciador de arquivos local funcional, com um ícone e nome diferentes. Mantenha o título pressionado por 2 segundos para acessar seu cofre real.';
 
   @override
   String get privacyPointExternalLinksTitle =>

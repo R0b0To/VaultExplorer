@@ -3942,7 +3942,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Nessun accesso alla rete, nulla di non cifrato viene mai scritto su disco';
+      'Nessun accesso alla rete, la decifratura avviene in memoria';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Formati supportati';
@@ -3983,7 +3983,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (crittografia hardware ARMv8 e SHA-2)\n• libavif e libgav1 (decodificatore immagini AVIF nativo)\n• ChaN FatFs v4.0.4 (FAT12/16/32 ed exFAT)\n• Tuxera NTFS-3G e mkntfs integrato\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadati LUKS2 e Cryptomator)';
+      '• mbedTLS v3.6.7 (crittografia hardware ARMv8 e SHA-2)\n• libavif e libgav1 (decodificatore immagini AVIF nativo)\n• libarchive v3.8.9 (motore per archivi ZIP, 7-Zip, RAR e TAR)\n• ChaN FatFs v4.0.4 (FAT12/16/32 ed exFAT)\n• Tuxera NTFS-3G e mkntfs integrato\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadati LUKS2 e Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Community e open source';
@@ -4079,12 +4079,11 @@ class AppLocalizationsIt extends AppLocalizations {
       'VaultExplorer non richiede l\'autorizzazione android.permission.INTERNET su Android. Non può comunicare tramite alcuna rete.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle =>
-      'Zero fughe di dati non cifrati su disco';
+  String get privacyPointNoDiskLeaksTitle => 'Decifrato in memoria';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'La decifratura e la ricifratura avvengono interamente nella memoria di sistema. I file temporanei non cifrati non vengono mai salvati nell\'archiviazione del dispositivo.';
+      'La decifratura e la ricifratura avvengono nella memoria di sistema. Le poche operazioni che richiedono un file temporaneo, come la registrazione video o l\'esportazione, lo conservano nell\'archiviazione privata dell\'app e lo sovrascrivono con zeri al termine.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Nessuna analisi o telemetria';
@@ -4099,7 +4098,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Password memorizzate, schemi e chiavi derivate nella cache sono sigillati con AES-256-GCM nell\'Android Keystore basato su hardware.';
+      'Password memorizzate, schemi e chiavi derivate nella cache sono cifrati con AES-GCM usando una chiave custodita nell\'Android Keystore (basato su hardware ove supportato).';
 
   @override
   String get privacyPointPosixTitle =>
@@ -4114,14 +4113,14 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Blocco dell\'anteprima screenshot/app recenti (FLAG_SECURE) e pulizia automatica di appunti corrotti quando la finestra ottiene il focus.';
+      'Blocco dell\'anteprima delle app recenti, blocco facoltativo degli screenshot (FLAG_SECURE) e pulizia automatica degli appunti corrotti quando la finestra ottiene il focus. Le password copiate dagli elementi del vault vengono contrassegnate come sensibili su Android 13+ e cancellate automaticamente dopo 30 secondi se non utilizzate.';
 
   @override
   String get privacyPointMaskModeTitle => 'Modalità mascherata';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Maschera facoltativamente l\'app come un funzionante browser di archivi zip, con un\'icona e un nome diversi. Tieni premuto il titolo per 3 secondi per raggiungere il tuo vault reale.';
+      'Maschera facoltativamente l\'app come un funzionante file manager locale, con un\'icona e un nome diversi. Tieni premuto il titolo per 2 secondi per raggiungere il tuo vault reale.';
 
   @override
   String get privacyPointExternalLinksTitle =>

@@ -6,9 +6,11 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -192,322 +194,322 @@ class AppNavigationDrawer extends ConsumerWidget {
                       child: ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         children: [
-                  // 1. Dashboard (Home)
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    selected: isDashboard,
-                    selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                    leading: Icon(
-                      Icons.dashboard_rounded,
-                      color: isDashboard ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.dashboardNavLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isDashboard ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () => _navigateToTab(context, 0),
-                  ),
+                          // 1. Dashboard (Home)
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            selected: isDashboard,
+                            selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                            leading: Icon(
+                              Icons.dashboard_rounded,
+                              color: isDashboard ? cs.primary : cs.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              context.l10n.dashboardNavLabel,
+                              style: textTheme.bodyLarge?.copyWith(
+                                fontWeight: isDashboard ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                            onTap: () => _navigateToTab(context, 0),
+                          ),
 
-                  // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
-                  if (displayItems.isNotEmpty || onAddVault != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                      child: Text(
-                        context.l10n.vaultsSectionTitle,
-                        style: textTheme.labelMedium?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    for (final item in displayItems) ...[
-                      (() {
-                        final isMounted = item.isMounted;
-                        final volId = item is MountedVaultItem ? item.container.volId : null;
-                        final isCurrent = volId != null && volId == currentVolId;
+                          // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
+                          if (displayItems.isNotEmpty || onAddVault != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
+                              child: Text(
+                                context.l10n.vaultsSectionTitle,
+                                style: textTheme.labelMedium?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            for (final item in displayItems) ...[
+                              (() {
+                                final isMounted = item.isMounted;
+                                final volId = item is MountedVaultItem ? item.container.volId : null;
+                                final isCurrent = volId != null && volId == currentVolId;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: _DrawerSwipeableVaultRow(
-                            key: ValueKey('drawer_vault_${item.uri}'),
-                            item: item,
-                            isCurrent: isCurrent,
-                            onTap: () {
-                              Navigator.pop(context); // Close drawer
-                              if (isCurrent) return;
-                              if (item is MountedVaultItem) {
-                                onSelectContainer?.call(item.container);
-                              } else {
-                                // If inside a vault browser, pop back to Dashboard
-                                if (currentVolId != null && Navigator.of(context).canPop()) {
-                                  Navigator.of(context).pop();
-                                }
-                                onSelectTab?.call(0);
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  onUnlockVault?.call(item);
-                                });
-                              }
-                            },
-                            onLock: isMounted
-                                ? () async {
-                                    final container = (item as MountedVaultItem).container;
-                                    Navigator.pop(context); // Close drawer only
-                                    await _lockSingleVault(context, ref, container);
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: _DrawerSwipeableVaultRow(
+                                    key: ValueKey('drawer_vault_${item.uri}'),
+                                    item: item,
+                                    isCurrent: isCurrent,
+                                    onTap: () {
+                                      Navigator.pop(context); // Close drawer
+                                      if (isCurrent) return;
+                                      if (item is MountedVaultItem) {
+                                        onSelectContainer?.call(item.container);
+                                      } else {
+                                        // If inside a vault browser, pop back to Dashboard
+                                        if (currentVolId != null && Navigator.of(context).canPop()) {
+                                          Navigator.of(context).pop();
+                                        }
+                                        onSelectTab?.call(0);
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          onUnlockVault?.call(item);
+                                        });
+                                      }
+                                    },
+                                    onLock: isMounted
+                                        ? () async {
+                                            final container = (item as MountedVaultItem).container;
+                                            Navigator.pop(context); // Close drawer only
+                                            await _lockSingleVault(context, ref, container);
+                                          }
+                                        : null,
+                                    onEdit: () {
+                                      Navigator.pop(context);
+                                      _handleEditVault(context, ref, item);
+                                    },
+                                    onDelete: () {
+                                      Navigator.pop(context);
+                                      _handleDeleteVault(context, ref, item);
+                                    },
+                                  ),
+                                );
+                              })(),
+                            ],
+                            if (onAddVault != null)
+                              ListTile(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                                leading: Icon(Icons.add, color: cs.primary),
+                                title: Text(
+                                  context.l10n.addAVaultTitle,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  if (currentVolId != null && Navigator.of(context).canPop()) {
+                                    Navigator.of(context).pop();
                                   }
-                                : null,
-                            onEdit: () {
-                              Navigator.pop(context);
-                              _handleEditVault(context, ref, item);
-                            },
-                            onDelete: () {
-                              Navigator.pop(context);
-                              _handleDeleteVault(context, ref, item);
-                            },
-                          ),
-                        );
-                      })(),
-                    ],
-                    if (onAddVault != null)
-                      ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                        leading: Icon(Icons.add, color: cs.primary),
-                        title: Text(
-                          context.l10n.addAVaultTitle,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          if (currentVolId != null && Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          }
-                          onSelectTab?.call(0);
-                          onAddVault!();
-                        },
-                      ),
-                  ],
-
-                  if (showStorageLocations) ...[
-                    // 3. Storage Locations Section
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                      child: Text(
-                        context.l10n.storageLocationsTitle,
-                        style: textTheme.labelMedium?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-                    if (primary != null)
-                      ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                        selected: currentVolId == kDecoyLocalVolId,
-                        selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                        leading: Icon(
-                          Icons.phone_android_rounded,
-                          color: currentVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
-                        ),
-                        title: Text(
-                          context.l10n.localStorageCardTitle,
-                          style: textTheme.bodyLarge?.copyWith(
-                            fontWeight: currentVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          context.l10n.internalStorageSubtitle,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          if (currentVolId == kDecoyLocalVolId) return;
-                          onSelectContainer?.call(primary);
-                        },
-                      ),
-
-                    for (final loc in externalStorages) ...[
-                      ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                        selected: currentVolId == loc.volId,
-                        selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                        leading: Icon(
-                          loc.path.startsWith('content://') ? Icons.cloud_outlined : Icons.sd_card_rounded,
-                          color: currentVolId == loc.volId ? cs.primary : cs.secondary,
-                        ),
-                        title: Text(
-                          loc.displayName,
-                          style: textTheme.bodyLarge?.copyWith(
-                            fontWeight: currentVolId == loc.volId ? FontWeight.bold : FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          loc.path.startsWith('content://')
-                              ? context.l10n.safProviderLabel
-                              : loc.path,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-                          onSelected: (action) {
-                            if (action == 'rename') {
-                              _promptRename(context, ref, loc);
-                            } else if (action == 'remove') {
-                              _confirmRemove(context, ref, loc);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
-                            PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
+                                  onSelectTab?.call(0);
+                                  onAddVault!();
+                                },
+                              ),
                           ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          if (currentVolId == loc.volId) return;
-                          final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-                              loc.path.startsWith('/data/user/0');
-                          final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-                              ? loc.treeUri!
-                              : loc.path;
-                          onSelectContainer?.call(buildExternalStorageContainer(
-                            rootPath: targetUri,
-                            displayName: loc.displayName,
-                            volId: loc.volId,
-                          ));
-                        },
-                      ),
-                    ],
 
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      leading: Icon(Icons.add, color: cs.primary),
-                      title: Text(
-                        context.l10n.addStorageLocationTitle,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onTap: () async {
-                        final notifier = ref.read(externalStorageLocationsProvider.notifier);
-                        final loc = await notifier.promptAndAddLocation();
-                        if (!context.mounted) return;
-                        if (loc != null) {
-                          Navigator.pop(context);
-                          onSelectContainer?.call(buildExternalStorageContainer(
-                            rootPath: loc.path,
-                            displayName: loc.displayName,
-                            volId: loc.volId,
-                          ));
-                        }
-                      },
-                    ),
-                  ],
+                          if (showStorageLocations) ...[
+                            // 3. Storage Locations Section
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
+                              child: Text(
+                                context.l10n.storageLocationsTitle,
+                                style: textTheme.labelMedium?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Divider(),
-                  ),
+                            if (primary != null)
+                              ListTile(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                                selected: currentVolId == kDecoyLocalVolId,
+                                selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                                leading: Icon(
+                                  Icons.phone_android_rounded,
+                                  color: currentVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
+                                ),
+                                title: Text(
+                                  context.l10n.localStorageCardTitle,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: currentVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  context.l10n.internalStorageSubtitle,
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  if (currentVolId == kDecoyLocalVolId) return;
+                                  onSelectContainer?.call(primary);
+                                },
+                              ),
 
-                  // 4. Tools Destination
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    selected: isTools,
-                    selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                    leading: Icon(
-                      Icons.build_rounded,
-                      color: isTools ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.navBarToolsLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isTools ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ToolsScreen(
-                            mountedContainers: ValueNotifier(dashboardState.mounted),
+                            for (final loc in externalStorages) ...[
+                              ListTile(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                                selected: currentVolId == loc.volId,
+                                selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                                leading: Icon(
+                                  loc.path.startsWith('content://') ? Icons.cloud_outlined : Icons.sd_card_rounded,
+                                  color: currentVolId == loc.volId ? cs.primary : cs.secondary,
+                                ),
+                                title: Text(
+                                  loc.displayName,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: currentVolId == loc.volId ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  loc.path.startsWith('content://')
+                                      ? context.l10n.safProviderLabel
+                                      : loc.path,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+                                  onSelected: (action) {
+                                    if (action == 'rename') {
+                                      _promptRename(context, ref, loc);
+                                    } else if (action == 'remove') {
+                                      _confirmRemove(context, ref, loc);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
+                                    PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  if (currentVolId == loc.volId) return;
+                                  final isInternal = loc.path.startsWith('/storage/emulated/0') ||
+                                      loc.path.startsWith('/data/user/0');
+                                  final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
+                                      ? loc.treeUri!
+                                      : loc.path;
+                                  onSelectContainer?.call(buildExternalStorageContainer(
+                                    rootPath: targetUri,
+                                    displayName: loc.displayName,
+                                    volId: loc.volId,
+                                  ));
+                                },
+                              ),
+                            ],
+
+                            ListTile(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                              leading: Icon(Icons.add, color: cs.primary),
+                              title: Text(
+                                context.l10n.addStorageLocationTitle,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              onTap: () async {
+                                final notifier = ref.read(externalStorageLocationsProvider.notifier);
+                                final loc = await notifier.promptAndAddLocation();
+                                if (!context.mounted) return;
+                                if (loc != null) {
+                                  Navigator.pop(context);
+                                  onSelectContainer?.call(buildExternalStorageContainer(
+                                    rootPath: loc.path,
+                                    displayName: loc.displayName,
+                                    volId: loc.volId,
+                                  ));
+                                }
+                              },
+                            ),
+                          ],
+
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(),
                           ),
-                        ),
-                      );
-                    },
-                  ),
 
-                  // 5A. File Manager Settings (Toolbar, layout, thumbnails)
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    leading: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
-                    title: Text(context.l10n.fileManagerSettingsTitle),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const FileManagerToolbarSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                          // 4. Tools Destination
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            selected: isTools,
+                            selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                            leading: Icon(
+                              Icons.build_rounded,
+                              color: isTools ? cs.primary : cs.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              context.l10n.navBarToolsLabel,
+                              style: textTheme.bodyLarge?.copyWith(
+                                fontWeight: isTools ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ToolsScreen(
+                                    mountedContainers: ValueNotifier(dashboardState.mounted),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
 
-                  // 5B. App & Security Settings (Master password, auto-lock, backup)
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    selected: isSettings,
-                    selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                    leading: Icon(
-                      Icons.settings,
-                      color: isSettings ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.settingsMenuItem,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isSettings ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AppSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                          // 5A. File Manager Settings (Toolbar, layout, thumbnails)
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            leading: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
+                            title: Text(context.l10n.fileManagerSettingsTitle),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FileManagerToolbarSettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
 
-                  const SizedBox(height: 8),
+                          // 5B. App & Security Settings (Master password, auto-lock, backup)
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            selected: isSettings,
+                            selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                            leading: Icon(
+                              Icons.settings,
+                              color: isSettings ? cs.primary : cs.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              context.l10n.settingsMenuItem,
+                              style: textTheme.bodyLarge?.copyWith(
+                                fontWeight: isSettings ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AppSettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
 
-                  // 6. Quick Action: Lock All Vaults
-                  if (dashboardState.mounted.isNotEmpty)
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                      leading: Icon(Icons.lock_rounded, color: cs.error),
-                      title: Text(
-                        context.l10n.lockAllVaultsTitle,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: cs.error,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        for (final c in dashboardState.mounted) {
-                          ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
-                          ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(c.volId);
-                        }
-                      },
-                    ),
-                ],
+                          const SizedBox(height: 8),
+
+                          // 6. Quick Action: Lock All Vaults
+                          if (dashboardState.mounted.isNotEmpty)
+                            ListTile(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                              leading: Icon(Icons.lock_rounded, color: cs.error),
+                              title: Text(
+                                context.l10n.lockAllVaultsTitle,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: cs.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.pop(context);
+                                for (final c in dashboardState.mounted) {
+                                  ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
+                                  ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(c.volId);
+                                }
+                              },
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -663,6 +665,11 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isMounted = widget.item.isMounted;
+    final isUsb = widget.item.uri.startsWith('usb:');
+    final format = switch (widget.item) {
+      MountedVaultItem(:final container) => container.format,
+      LockedVaultItem(:final record) => record.format,
+    };
 
     // Fix: Use an opaque solid color so underlying buttons never bleed through
     final tileColor = widget.isCurrent
@@ -677,31 +684,34 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
           Positioned.fill(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                InkWell(
-                  onTap: () {
-                    _DrawerSwipeGroup.of(context)?.registerClose(this);
-                    _animateTo(0.0);
-                    widget.onEdit();
-                  },
-                  child: Container(
-                    width: 52,
-                    color: cs.secondaryContainer,
-                    alignment: Alignment.center,
-                    child: Icon(Icons.edit_outlined, size: 20, color: cs.onSecondaryContainer),
+                Material(
+                  color: cs.secondaryContainer,
+                  child: InkWell(
+                    onTap: () {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
+                      _animateTo(0.0);
+                      widget.onEdit();
+                    },
+                    child: SizedBox(
+                      width: 52,
+                      child: Icon(Icons.edit_outlined, size: 20, color: cs.onSecondaryContainer),
+                    ),
                   ),
                 ),
-                InkWell(
-                  onTap: () {
-                    _DrawerSwipeGroup.of(context)?.registerClose(this);
-                    _animateTo(0.0);
-                    widget.onDelete();
-                  },
-                  child: Container(
-                    width: 52,
-                    color: cs.errorContainer,
-                    alignment: Alignment.center,
-                    child: Icon(Icons.delete_outline_rounded, size: 20, color: cs.onErrorContainer),
+                Material(
+                  color: cs.errorContainer,
+                  child: InkWell(
+                    onTap: () {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
+                      _animateTo(0.0);
+                      widget.onDelete();
+                    },
+                    child: SizedBox(
+                      width: 52,
+                      child: Icon(Icons.delete_outline_rounded, size: 20, color: cs.onErrorContainer),
+                    ),
                   ),
                 ),
               ],
@@ -709,56 +719,56 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
           ),
 
           // Front ListTile that translates RIGHT on drag
-          RawGestureDetector(
-            behavior: HitTestBehavior.opaque,
-            gestures: <Type, GestureRecognizerFactory>{
-              _CardHorizontalDragGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<_CardHorizontalDragGestureRecognizer>(
-                () => _CardHorizontalDragGestureRecognizer(),
-                (_CardHorizontalDragGestureRecognizer instance) {
-                  instance.gestureSettings = MediaQuery.maybeGestureSettingsOf(context);
-                  instance.canDragLeft = () => _dx > 0.5;
-                  instance.onDown = (_) {
-                    if (_animController.isAnimating) {
-                      _animController.stop();
-                    }
-                  };
-                  instance.onStart = (_) {
-                    // Close any other open row as soon as this row starts swiping
-                    _DrawerSwipeGroup.of(context)?.registerOpen(this);
-                  };
-                  instance.onUpdate = (details) {
-                    setState(() {
-                      _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
-                    });
-                  };
-                  instance.onEnd = (details) {
-                    final velocity = details.primaryVelocity ?? 0.0;
-                    if (velocity > 300) {
+          Transform.translate(
+            offset: Offset(_dx, 0.0),
+            child: RawGestureDetector(
+              behavior: HitTestBehavior.opaque,
+              gestures: <Type, GestureRecognizerFactory>{
+                _CardHorizontalDragGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<_CardHorizontalDragGestureRecognizer>(
+                  () => _CardHorizontalDragGestureRecognizer(),
+                  (_CardHorizontalDragGestureRecognizer instance) {
+                    instance.gestureSettings = MediaQuery.maybeGestureSettingsOf(context);
+                    instance.canDragLeft = () => _dx > 0.5;
+                    instance.onDown = (_) {
+                      if (_animController.isAnimating) {
+                        _animController.stop();
+                      }
+                    };
+                    instance.onStart = (_) {
+                      // Close any other open row as soon as this row starts swiping
                       _DrawerSwipeGroup.of(context)?.registerOpen(this);
-                      _animateTo(_revealWidth);
-                    } else if (velocity < -300) {
-                      _DrawerSwipeGroup.of(context)?.registerClose(this);
-                      _animateTo(0.0);
-                    } else if (_dx > _revealWidth / 2) {
-                      _DrawerSwipeGroup.of(context)?.registerOpen(this);
-                      _animateTo(_revealWidth);
-                    } else {
-                      _DrawerSwipeGroup.of(context)?.registerClose(this);
-                      _animateTo(0.0);
-                    }
-                  };
-                  instance.onCancel = () {
-                    if (_dx < _revealWidth / 2) {
-                      _DrawerSwipeGroup.of(context)?.registerClose(this);
-                      _animateTo(0.0);
-                    }
-                  };
-                },
-              ),
-            },
-            child: Transform.translate(
-              offset: Offset(_dx, 0.0),
+                    };
+                    instance.onUpdate = (details) {
+                      setState(() {
+                        _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
+                      });
+                    };
+                    instance.onEnd = (details) {
+                      final velocity = details.primaryVelocity ?? 0.0;
+                      if (velocity > 300) {
+                        _DrawerSwipeGroup.of(context)?.registerOpen(this);
+                        _animateTo(_revealWidth);
+                      } else if (velocity < -300) {
+                        _DrawerSwipeGroup.of(context)?.registerClose(this);
+                        _animateTo(0.0);
+                      } else if (_dx > _revealWidth / 2) {
+                        _DrawerSwipeGroup.of(context)?.registerOpen(this);
+                        _animateTo(_revealWidth);
+                      } else {
+                        _DrawerSwipeGroup.of(context)?.registerClose(this);
+                        _animateTo(0.0);
+                      }
+                    };
+                    instance.onCancel = () {
+                      if (_dx < _revealWidth / 2) {
+                        _DrawerSwipeGroup.of(context)?.registerClose(this);
+                        _animateTo(0.0);
+                      }
+                    };
+                  },
+                ),
+              },
               child: Material(
                 color: tileColor,
                 child: ListTile(
@@ -772,11 +782,17 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
                           : (isMounted ? cs.primary.withValues(alpha: 0.1) : cs.surfaceContainerHighest),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
-                      isMounted ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                      size: 18,
-                      color: isMounted ? cs.primary : cs.onSurfaceVariant,
-                    ),
+                    child: isUsb
+                        ? Icon(
+                            Icons.usb_rounded,
+                            size: 18,
+                            color: isMounted ? cs.primary : cs.onSurfaceVariant,
+                          )
+                        : ContainerFormatIcon(
+                            format: format,
+                            size: 18,
+                            color: isMounted ? cs.primary : cs.onSurfaceVariant,
+                          ),
                   ),
                   title: Text(
                     widget.item.name,

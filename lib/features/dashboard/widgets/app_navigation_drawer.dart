@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -13,7 +14,6 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
-import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 
 class AppNavigationDrawer extends ConsumerWidget {
@@ -179,12 +179,22 @@ class AppNavigationDrawer extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
+              child: _DrawerSwipeGroup(
+                child: Builder(
+                  builder: (groupCtx) {
+                    return NotificationListener<ScrollStartNotification>(
+                      onNotification: (notification) {
+                        if (notification.dragDetails != null) {
+                          _DrawerSwipeGroup.of(groupCtx)?.closeAll();
+                        }
+                        return false;
+                      },
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        children: [
                   // 1. Dashboard (Home)
                   ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     selected: isDashboard,
                     selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
                     leading: Icon(
@@ -498,12 +508,90 @@ class AppNavigationDrawer extends ConsumerWidget {
                       },
                     ),
                 ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+// ── SWIPE GROUP MANAGER (Ensures only one drawer card is open at a time) ────
+
+class _DrawerSwipeGroup extends StatefulWidget {
+  final Widget child;
+  const _DrawerSwipeGroup({required this.child});
+
+  static _DrawerSwipeGroupState? of(BuildContext context) {
+    return context.findAncestorStateOfType<_DrawerSwipeGroupState>();
+  }
+
+  @override
+  State<_DrawerSwipeGroup> createState() => _DrawerSwipeGroupState();
+}
+
+class _DrawerSwipeGroupState extends State<_DrawerSwipeGroup> {
+  _DrawerSwipeableVaultRowState? _activeRow;
+
+  void registerOpen(_DrawerSwipeableVaultRowState row) {
+    if (_activeRow != null && _activeRow != row) {
+      if (_activeRow!.mounted) {
+        _activeRow!.close();
+      }
+    }
+    _activeRow = row;
+  }
+
+  void registerClose(_DrawerSwipeableVaultRowState row) {
+    if (_activeRow == row) {
+      _activeRow = null;
+    }
+  }
+
+  void closeAll() {
+    if (_activeRow != null && _activeRow!.mounted) {
+      _activeRow!.close();
+    }
+    _activeRow = null;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+// ── DIRECTIONAL DRAG RECOGNIZER FOR DRAWER ROW ──────────────────────────────
+
+class _CardHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
+  _CardHorizontalDragGestureRecognizer({super.debugOwner});
+
+  bool Function()? canDragLeft;
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    final slop = deviceTouchSlop ?? computeHitSlop(pointerDeviceKind, gestureSettings);
+    final threshold = slop * 0.5;
+    final canLeft = canDragLeft?.call() ?? false;
+
+    if (!canLeft) {
+      // If card is closed and dragged left, reject so the drawer drags closed
+      if (globalDistanceMoved <= -threshold) {
+        resolve(GestureDisposition.rejected);
+        return false;
+      }
+      // Accept rightward drag early so the card wins the arena
+      return globalDistanceMoved > threshold;
+    }
+
+    // Card is open: allow dragging in either direction
+    return globalDistanceMoved.abs() > threshold;
   }
 }
 
@@ -552,6 +640,12 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
     super.dispose();
   }
 
+  void close() {
+    if (mounted && _dx > 0.0) {
+      _animateTo(0.0);
+    }
+  }
+
   void _animateTo(double target) {
     final start = _dx;
     _animController.stop();
@@ -576,7 +670,7 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
         : cs.surfaceContainerHigh;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(18),
       child: Stack(
         children: [
           // Background action buttons placed on the START/LEFT side
@@ -586,6 +680,7 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
               children: [
                 InkWell(
                   onTap: () {
+                    _DrawerSwipeGroup.of(context)?.registerClose(this);
                     _animateTo(0.0);
                     widget.onEdit();
                   },
@@ -598,6 +693,7 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
                 ),
                 InkWell(
                   onTap: () {
+                    _DrawerSwipeGroup.of(context)?.registerClose(this);
                     _animateTo(0.0);
                     widget.onDelete();
                   },
@@ -613,24 +709,58 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
           ),
 
           // Front ListTile that translates RIGHT on drag
-          GestureDetector(
-            onHorizontalDragUpdate: (details) {
-              setState(() {
-                // Allow positive drag (to the right) up to _revealWidth
-                _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
-              });
-            },
-            onHorizontalDragEnd: (details) {
-              if (_dx > _revealWidth / 2) {
-                _animateTo(_revealWidth);
-              } else {
-                _animateTo(0.0);
-              }
+          RawGestureDetector(
+            behavior: HitTestBehavior.opaque,
+            gestures: <Type, GestureRecognizerFactory>{
+              _CardHorizontalDragGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<_CardHorizontalDragGestureRecognizer>(
+                () => _CardHorizontalDragGestureRecognizer(),
+                (_CardHorizontalDragGestureRecognizer instance) {
+                  instance.gestureSettings = MediaQuery.maybeGestureSettingsOf(context);
+                  instance.canDragLeft = () => _dx > 0.5;
+                  instance.onDown = (_) {
+                    if (_animController.isAnimating) {
+                      _animController.stop();
+                    }
+                  };
+                  instance.onStart = (_) {
+                    // Close any other open row as soon as this row starts swiping
+                    _DrawerSwipeGroup.of(context)?.registerOpen(this);
+                  };
+                  instance.onUpdate = (details) {
+                    setState(() {
+                      _dx = (_dx + details.delta.dx).clamp(0.0, _revealWidth);
+                    });
+                  };
+                  instance.onEnd = (details) {
+                    final velocity = details.primaryVelocity ?? 0.0;
+                    if (velocity > 300) {
+                      _DrawerSwipeGroup.of(context)?.registerOpen(this);
+                      _animateTo(_revealWidth);
+                    } else if (velocity < -300) {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
+                      _animateTo(0.0);
+                    } else if (_dx > _revealWidth / 2) {
+                      _DrawerSwipeGroup.of(context)?.registerOpen(this);
+                      _animateTo(_revealWidth);
+                    } else {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
+                      _animateTo(0.0);
+                    }
+                  };
+                  instance.onCancel = () {
+                    if (_dx < _revealWidth / 2) {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
+                      _animateTo(0.0);
+                    }
+                  };
+                },
+              ),
             },
             child: Transform.translate(
               offset: Offset(_dx, 0.0),
               child: Material(
-                color: tileColor, // Opaque solid color
+                color: tileColor,
                 child: ListTile(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                   contentPadding: const EdgeInsets.only(left: 12, right: 6),
@@ -673,8 +803,10 @@ class _DrawerSwipeableVaultRowState extends State<_DrawerSwipeableVaultRow>
                       : null,
                   onTap: () {
                     if (_dx != 0.0) {
+                      _DrawerSwipeGroup.of(context)?.registerClose(this);
                       _animateTo(0.0);
                     } else {
+                      _DrawerSwipeGroup.of(context)?.closeAll();
                       widget.onTap();
                     }
                   },

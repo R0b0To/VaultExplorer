@@ -1,21 +1,30 @@
 Vault Explorer opens and browses encrypted containers and vaults directly
 on your device -- VeraCrypt/TrueCrypt, LUKS, BitLocker, Cryptomator,
-gocryptfs, and CryFS, plus raw VHD/VHDX images -- without exporting your
+gocryptfs, and CryFS, plus VHD/VHDX images -- without exporting your
 files unencrypted to shared storage.
  
 Features:
 * Read/write NTFS, FAT/exFAT, and ext2/3/4 filesystems inside a container
 * VeraCrypt/LUKS/BitLocker unlock, including cascaded ciphers and hidden volumes
 * Cryptomator, gocryptfs, and CryFS directory-vault support
-* Built-in viewers for photos, video/audio, PDF, HTML, and text/code, plus ZIP browsing
-* Vault camera -- shoot photos and video straight into a container
+* Built-in viewers and editors for photos, video/audio, PDF, HTML, Markdown, and text/code, plus an image editor and archive browser (ZIP, 7-Zip, RAR, TAR and more)
+* Vault camera -- shoot photos and video straight into a container, with background recording and a Quick Settings tile/shortcut
 * Item Vault -- an encrypted password manager built into your container
 * Create new encrypted containers and USB volumes, up to 8 mounted at once
 * Password, PIN, pattern, or biometric unlock
+* Storage locations for device storage, SD cards, and cloud document providers, plus auto-sync between a vault and a folder
+* Emergency panic and duress unlock -- lock vaults, wipe credentials, or wipe the app's own data
+* Mask Mode -- optionally disguise the app as a real, working local file manager on the home screen; hold the title for 2 seconds to reach your real vault
 * Optional local automation for Tasker/MacroDroid (Beta) -- no network involved
-* Tools: keyfile/passphrase generator, file encryptor, hash verifier, vault sync, storage analyzer, duplicate finder, split & join, and container repair
+* Tools: keyfile/passphrase generator, file encryptor, hash verifier, vault sync, storage analyzer, duplicate finder, split & join, header backup, and container repair
  
 Vault Explorer does not collect or transmit any data -- it has no INTERNET
-permission at all. All decryption happens locally on your device, and
-nothing unencrypted is ever written to disk.
+permission at all. All decryption happens locally on your device, in
+memory wherever possible. The few operations that need a scratch file keep it
+in private app storage and wipe it afterwards. Files only leave a vault when
+you (or an automation you enabled) export, share, or sync them.
  
+Mask Mode only changes the app's home-screen name, icon, and front screen for
+situations where someone else may pick up your device. The disguised file
+manager is a genuine, working browser for your device's own storage, not a
+way to hide activity from other people.

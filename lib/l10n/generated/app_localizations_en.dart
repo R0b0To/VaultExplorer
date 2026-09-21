@@ -3924,7 +3924,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• libavif & libgav1 (Native AVIF Image Decoder)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)';
+      '• mbedTLS v3.6.7 (ARMv8 Hardware Crypto & SHA-2)\n• libavif & libgav1 (Native AVIF Image Decoder)\n• libarchive v3.8.9 (ZIP, 7-Zip, RAR & TAR Archive Engine)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)';
 
   @override
   String get aboutCommunitySectionHeader => 'Community & Open Source';
@@ -4058,7 +4058,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointMaskModeBody =>
-      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 2 seconds to reach your real vault.';
+      'Optionally disguises the app as a working local file manager, with a different icon and name. Hold the title for 2 seconds to reach your real vault.';
 
   @override
   String get privacyPointExternalLinksTitle => 'External links open in browser';

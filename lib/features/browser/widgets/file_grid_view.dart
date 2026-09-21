@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -89,17 +91,38 @@ class FileGridView extends StatefulWidget {
   State<FileGridView> createState() => _FileGridViewState();
 }
 
-class _FileGridViewState extends State<FileGridView> {
+class _FileGridViewState extends State<FileGridView>
+    with SingleTickerProviderStateMixin {
   Orientation? _lastOrientation;
   late int _crossAxisCount;
   double _baselineScale = 1.0;
   final Map<Key, int> _keyIndexMap = {};
+
+  int? _anchorItemIndex;
+
+  // Animation controller for clearly visible column morph transition
+  late final AnimationController _morphController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _crossAxisCount = widget.initialColumns;
     _updateKeyIndexMap();
+
+    _morphController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      value: 1.0,
+    );
+    _scaleAnimation = const AlwaysStoppedAnimation<double>(1.0);
+  }
+
+  @override
+  void dispose() {
+    _morphController.dispose();
+    super.dispose();
   }
 
   void _updateKeyIndexMap() {
@@ -123,7 +146,10 @@ class _FileGridViewState extends State<FileGridView> {
   void didUpdateWidget(covariant FileGridView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialColumns != widget.initialColumns) {
-      _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      final newCols = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      if (newCols != _crossAxisCount) {
+        _changeColumns(newCols, 1.0);
+      }
     }
     if (oldWidget.items != widget.items) {
       _updateKeyIndexMap();
@@ -155,30 +181,90 @@ class _FileGridViewState extends State<FileGridView> {
     return tileWidth / totalHeight;
   }
 
+  double _getTileHeight(int columns) {
+    final width = MediaQuery.sizeOf(context).width;
+    final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
+    final previewRatio = widget.gridAspectRatio.ratio;
+    final labelHeight = widget.showFileNames ? 36.0 : 0.0;
+    return (tileWidth / previewRatio) + labelHeight;
+  }
+
   void _handleScaleStart(ScaleStartDetails details) {
     _baselineScale = 1.0;
+
+    final controller = widget.scrollController;
+    if (controller != null && controller.hasClients) {
+      final currentTileHeight = _getTileHeight(_crossAxisCount);
+      final rowHeight = currentTileHeight + 8.0;
+      final viewport = controller.position.viewportDimension;
+      final viewportCenter = controller.offset + (viewport / 2.0);
+      final centerRow = math.max(0, ((viewportCenter - 12.0) / rowHeight).round());
+      // Lock the center item index ONCE for the whole gesture so continuous zooming never drifts to 0
+      _anchorItemIndex = (centerRow * _crossAxisCount).clamp(0, widget.items.length - 1);
+    }
+  }
+
+  void _changeColumns(int newColumns, double newBaseline) {
+    HapticFeedback.selectionClick();
+
+    final oldColumns = _crossAxisCount;
+    final isZoomIn = newColumns < oldColumns;
+
+    setState(() {
+      _crossAxisCount = newColumns;
+      _baselineScale = newBaseline;
+    });
+    widget.onColumnCountChanged?.call(_crossAxisCount);
+
+    // Snappy physical pop — NO black fade, 100% solid & bright at all times!
+    final startScale = isZoomIn ? 0.90 : 1.10;
+    _scaleAnimation = Tween<double>(begin: startScale, end: 1.0).animate(
+      CurvedAnimation(parent: _morphController, curve: Curves.easeOutCubic),
+    );
+    _morphController.forward(from: 0.0);
+
+    final controller = widget.scrollController;
+    final anchor = _anchorItemIndex;
+    if (controller != null && controller.hasClients && anchor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!controller.hasClients) return;
+        final newTileHeight = _getTileHeight(newColumns);
+        final newRowHeight = newTileHeight + 8.0;
+        final targetRow = anchor ~/ newColumns;
+        final targetRowCenter = 12.0 + (targetRow * newRowHeight) + (newTileHeight / 2.0);
+        final viewport = controller.position.viewportDimension;
+        final maxScroll = controller.position.maxScrollExtent;
+        final targetOffset = (targetRowCenter - (viewport / 2.0))
+            .clamp(0.0, math.max<double>(0.0, maxScroll))
+            .toDouble();
+        controller.jumpTo(targetOffset);
+      });
+    }
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
+    if (details.pointerCount < 2) return;
+    if (_anchorItemIndex == null) {
+      _handleScaleStart(ScaleStartDetails(
+        focalPoint: details.focalPoint,
+        localFocalPoint: details.localFocalPoint,
+        pointerCount: details.pointerCount,
+      ));
+    }
+
     final scale = details.scale;
     final factor = scale / _baselineScale;
-    if (factor > 1.35) {
-      if (_crossAxisCount > _minColumns) {
-        setState(() {
-          _crossAxisCount--;
-          _baselineScale = scale;
-        });
-        widget.onColumnCountChanged?.call(_crossAxisCount);
-      }
-    } else if (factor < 0.75) {
-      if (_crossAxisCount < _maxColumns) {
-        setState(() {
-          _crossAxisCount++;
-          _baselineScale = scale;
-        });
-        widget.onColumnCountChanged?.call(_crossAxisCount);
-      }
+
+    // Trigger column shift only on crossing threshold; no pre-threshold jitter
+    if (factor > 1.18 && _crossAxisCount > _minColumns) {
+      _changeColumns(_crossAxisCount - 1, scale);
+    } else if (factor < 0.82 && _crossAxisCount < _maxColumns) {
+      _changeColumns(_crossAxisCount + 1, scale);
     }
+  }
+
+  void _handleScaleEnd(ScaleEndDetails details) {
+    _anchorItemIndex = null;
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
@@ -192,9 +278,55 @@ class _FileGridViewState extends State<FileGridView> {
     return false;
   }
 
+  Widget _buildAnimatedGridView(ScrollController? controller, int total) {
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: GridView.builder(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
+        findChildIndexCallback: (Key key) => _keyIndexMap[key],
+        padding: EdgeInsets.fromLTRB(
+          10,
+          12,
+          10,
+          AppSpacing.floatingStackClearance +
+              MediaQuery.paddingOf(context).bottom,
+        ),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _crossAxisCount,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: _getAspectRatio(_crossAxisCount),
+        ),
+        itemCount: total,
+        itemBuilder: (context, index) {
+          final entry = widget.items[index];
+          return HoldSelectableItem(
+            key: ValueKey(entry),
+            index: index,
+            entry: entry,
+            child: entry.isDir
+                ? _buildDirCell(context, entry)
+                : _buildFileCell(context, entry),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = widget.items.length;
+
     return HoldRangeSelectContainer(
       items: widget.items,
       selectedItems: widget.selectedItems,
@@ -204,39 +336,11 @@ class _FileGridViewState extends State<FileGridView> {
       onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
+      onScaleEnd: _handleScaleEnd,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: widget.scrollController == null
-            ? GridView.builder(
-                controller: widget.scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                findChildIndexCallback: (Key key) => _keyIndexMap[key],
-                padding: EdgeInsets.fromLTRB(
-                  10,
-                  12,
-                  10,
-                  AppSpacing.floatingStackClearance +
-                      MediaQuery.paddingOf(context).bottom,
-                ),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _crossAxisCount,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: _getAspectRatio(_crossAxisCount),
-                ),
-                itemCount: total,
-                itemBuilder: (context, index) {
-                  final entry = widget.items[index];
-                  return HoldSelectableItem(
-                    key: ValueKey(entry),
-                    index: index,
-                    entry: entry,
-                    child: entry.isDir
-                        ? _buildDirCell(context, entry)
-                        : _buildFileCell(context, entry),
-                  );
-                },
-              )
+            ? _buildAnimatedGridView(null, total)
             : FastScrollbar(
                 controller: widget.scrollController!,
                 items: widget.items,
@@ -246,36 +350,7 @@ class _FileGridViewState extends State<FileGridView> {
                   bottom: AppSpacing.floatingStackClearance +
                       MediaQuery.paddingOf(context).bottom,
                 ),
-                child: GridView.builder(
-                  controller: widget.scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  findChildIndexCallback: (Key key) => _keyIndexMap[key],
-                  padding: EdgeInsets.fromLTRB(
-                    10,
-                    12,
-                    10,
-                    AppSpacing.floatingStackClearance +
-                        MediaQuery.paddingOf(context).bottom,
-                  ),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: _crossAxisCount,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: _getAspectRatio(_crossAxisCount),
-                  ),
-                  itemCount: total,
-                  itemBuilder: (context, index) {
-                    final entry = widget.items[index];
-                    return HoldSelectableItem(
-                      key: ValueKey(entry),
-                      index: index,
-                      entry: entry,
-                      child: entry.isDir
-                          ? _buildDirCell(context, entry)
-                          : _buildFileCell(context, entry),
-                    );
-                  },
-                ),
+                child: _buildAnimatedGridView(widget.scrollController, total),
               ),
       ),
     );
@@ -392,17 +467,6 @@ class _FileGridViewState extends State<FileGridView> {
         ),
       );
     } else if (isApk && widget.archiveContext == null) {
-      // Same restriction as video above -- see fetchApkIconForThumbnail's
-      // doc comment for why an APK nested inside an open archive falls
-      // through to the plain icon instead.
-      //
-      // Sized and centred exactly like the plain file-type icon in the
-      // `else` branch below rather than filled into the cell the way a
-      // photo or video frame is. An app icon is a piece of artwork with
-      // its own shape and padding, so blown up to the full cell it reads
-      // as a picture of an icon boxed inside a square; at icon size it
-      // reads as what it is -- the icon this file would have once
-      // installed.
       previewWidget = Center(
         child: SizedBox(
           width: iconSize,
@@ -695,10 +759,6 @@ class _ApkIconGridThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
 
-  /// Shown while loading fails or the APK turns out to have no resolvable
-  /// launcher icon -- the same plain file-type icon the cell would have
-  /// drawn had it never tried, which is the fallback
-  /// `fetchApkIconForThumbnail`'s doc comment asks callers for.
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double fallbackIconSize;
@@ -713,9 +773,6 @@ class _ApkIconGridThumb extends ConsumerWidget {
     required this.fallbackIconSize,
   });
 
-  /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
-  /// the same three-tier cache real image thumbnails use, keyed by
-  /// [filePath] like any other file.
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -769,12 +826,6 @@ class _ApkIconGridThumb extends ConsumerWidget {
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
-      // Contain rather than image/video's cover -- an app icon is meant
-      // to be seen whole, never cropped. No filled placeholder behind
-      // any of the three states either: the caller sizes this to the
-      // icon box, so a coloured rectangle here would be a square drawn
-      // around the icon rather than the cell's own background showing
-      // through.
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,

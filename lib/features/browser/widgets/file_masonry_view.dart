@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -89,7 +91,8 @@ class FileMasonryView extends ConsumerStatefulWidget {
   ConsumerState<FileMasonryView> createState() => _FileMasonryViewState();
 }
 
-class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
+class _FileMasonryViewState extends ConsumerState<FileMasonryView>
+    with SingleTickerProviderStateMixin {
   Orientation? _lastOrientation;
   late int _columnCount;
   double _baselineScale = 1.0;
@@ -97,6 +100,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
 
   final Map<String, double> _renderedRatios = {};
   bool _hasPendingRebuild = false;
+  int? _anchorItemIndex;
+
+  // Animation controller for smooth column transition morph
+  late final AnimationController _morphController;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
@@ -105,6 +113,19 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     _columnCount = widget.initialColumns;
     _prewarmMemoryCache();
     _preloadDiskAspectRatios();
+
+    _morphController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      value: 1.0,
+    );
+    _scaleAnimation = const AlwaysStoppedAnimation<double>(1.0);
+  }
+
+  @override
+  void dispose() {
+    _morphController.dispose();
+    super.dispose();
   }
 
   @override
@@ -121,7 +142,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   void didUpdateWidget(covariant FileMasonryView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialColumns != widget.initialColumns) {
-      _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      final newCols = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      if (newCols != _columnCount) {
+        _changeColumns(newCols, 1.0);
+      }
     }
     if (oldWidget.currentDirPath != widget.currentDirPath ||
         oldWidget.items != widget.items) {
@@ -145,28 +169,82 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
 
   void _handleScaleStart(ScaleStartDetails details) {
     _baselineScale = 1.0;
+
+    final controller = widget.scrollController;
+    if (controller != null && controller.hasClients) {
+      final width = MediaQuery.sizeOf(context).width;
+      final colWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
+      final avgRowHeight = colWidth + 44.0;
+      final viewport = controller.position.viewportDimension;
+      final viewportCenter = controller.offset + (viewport / 2.0);
+      final centerRow = math.max(0, ((viewportCenter - 12.0) / avgRowHeight).round());
+      // Lock center item index ONCE for the whole gesture so continuous zooming never drifts to 0
+      _anchorItemIndex = (centerRow * _columnCount).clamp(0, widget.items.length - 1);
+    }
+  }
+
+  void _changeColumns(int newColumns, double newBaseline) {
+    HapticFeedback.selectionClick();
+
+    final oldColumns = _columnCount;
+    setState(() {
+      _columnCount = newColumns;
+      _baselineScale = newBaseline;
+    });
+    widget.onColumnCountChanged?.call(_columnCount);
+
+    // Snappy physical pop — NO black fade, 100% solid & bright at all times!
+    final isZoomIn = newColumns < oldColumns;
+    final startScale = isZoomIn ? 0.90 : 1.10;
+
+    _scaleAnimation = Tween<double>(begin: startScale, end: 1.0).animate(
+      CurvedAnimation(parent: _morphController, curve: Curves.easeOutCubic),
+    );
+    _morphController.forward(from: 0.0);
+
+    final controller = widget.scrollController;
+    final anchor = _anchorItemIndex;
+    if (controller != null && controller.hasClients && anchor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!controller.hasClients) return;
+        final width = MediaQuery.sizeOf(context).width;
+        final newColWidth = (width - 20 - (newColumns - 1) * 8) / newColumns;
+        final newAvgRowHeight = newColWidth + 44.0;
+        final targetRow = anchor ~/ newColumns;
+        final targetRowCenter = 12.0 + (targetRow * newAvgRowHeight) + (newAvgRowHeight / 2.0);
+        final viewport = controller.position.viewportDimension;
+        final maxScroll = controller.position.maxScrollExtent;
+        final targetOffset = (targetRowCenter - (viewport / 2.0))
+            .clamp(0.0, math.max<double>(0.0, maxScroll))
+            .toDouble();
+        controller.jumpTo(targetOffset);
+      });
+    }
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
+    if (details.pointerCount < 2) return;
+    if (_anchorItemIndex == null) {
+      _handleScaleStart(ScaleStartDetails(
+        focalPoint: details.focalPoint,
+        localFocalPoint: details.localFocalPoint,
+        pointerCount: details.pointerCount,
+      ));
+    }
+
     final scale = details.scale;
     final factor = scale / _baselineScale;
-    if (factor > 1.35) {
-      if (_columnCount > _minColumns) {
-        setState(() {
-          _columnCount--;
-          _baselineScale = scale;
-        });
-        widget.onColumnCountChanged?.call(_columnCount);
-      }
-    } else if (factor < 0.75) {
-      if (_columnCount < _maxColumns) {
-        setState(() {
-          _columnCount++;
-          _baselineScale = scale;
-        });
-        widget.onColumnCountChanged?.call(_columnCount);
-      }
+
+    // Trigger column shift only on crossing threshold; no pre-threshold jitter
+    if (factor > 1.18 && _columnCount > _minColumns) {
+      _changeColumns(_columnCount - 1, scale);
+    } else if (factor < 0.82 && _columnCount < _maxColumns) {
+      _changeColumns(_columnCount + 1, scale);
     }
+  }
+
+  void _handleScaleEnd(ScaleEndDetails details) {
+    _anchorItemIndex = null;
   }
 
   static const _minRatio = 0.5;
@@ -308,6 +386,59 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     return false;
   }
 
+  Widget _buildAnimatedMasonryView(ScrollController? controller, int total) {
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: MasonryGridView.count(
+        controller: controller,
+        crossAxisCount: _columnCount,
+        physics: const AlwaysScrollableScrollPhysics(), // Native physics that cannot freeze
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        cacheExtent: 800,
+        padding: EdgeInsets.fromLTRB(
+          10,
+          12,
+          10,
+          AppSpacing.floatingStackClearance +
+              MediaQuery.paddingOf(context).bottom,
+        ),
+        itemCount: total,
+        itemBuilder: (context, i) {
+          final entry = widget.items[i];
+          final isDir = entry.isDir;
+          final isPinned = widget.isPinned?.call(entry) ?? false;
+          final isBookmark = widget.isBookmark?.call(entry) ?? false;
+          final fullPath = widget.currentDirPath.isEmpty
+              ? entry.name
+              : '${widget.currentDirPath}/${entry.name}';
+          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+          final ratio = _aspectRatioFor(entry, fullPath,
+              hasVisualPreview: hasVisualPreview);
+
+          final cell = isDir
+              ? _buildDirCell(context, entry, fullPath, ratio)
+              : _buildFileCell(context, entry, fullPath, ratio);
+
+          return HoldSelectableItem(
+            index: i,
+            entry: entry,
+            child: cell,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = widget.items.length;
@@ -322,47 +453,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
+      onScaleEnd: _handleScaleEnd,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: widget.scrollController == null
-            ? MasonryGridView.count(
-                controller: widget.scrollController,
-                crossAxisCount: _columnCount,
-                physics: const AlwaysScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                cacheExtent: 800,
-                padding: EdgeInsets.fromLTRB(
-                  10,
-                  12,
-                  10,
-                  AppSpacing.floatingStackClearance +
-                      MediaQuery.paddingOf(context).bottom,
-                ),
-                itemCount: total,
-                itemBuilder: (context, i) {
-                  final entry = widget.items[i];
-                  final isDir = entry.isDir;
-                  final isPinned = widget.isPinned?.call(entry) ?? false;
-                  final isBookmark = widget.isBookmark?.call(entry) ?? false;
-                  final fullPath = widget.currentDirPath.isEmpty
-                      ? entry.name
-                      : '${widget.currentDirPath}/${entry.name}';
-                  final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-                  final ratio = _aspectRatioFor(entry, fullPath,
-                      hasVisualPreview: hasVisualPreview);
-
-                  final cell = isDir
-                      ? _buildDirCell(context, entry, fullPath, ratio)
-                      : _buildFileCell(context, entry, fullPath, ratio);
-
-                  return HoldSelectableItem(
-                    index: i,
-                    entry: entry,
-                    child: cell,
-                  );
-                },
-              )
+            ? _buildAnimatedMasonryView(null, total)
             : FastScrollbar(
                 controller: widget.scrollController!,
                 items: widget.items,
@@ -372,44 +467,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
                   bottom: AppSpacing.floatingStackClearance +
                       MediaQuery.paddingOf(context).bottom,
                 ),
-                child: MasonryGridView.count(
-                  controller: widget.scrollController,
-                  crossAxisCount: _columnCount,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  cacheExtent: 800,
-                  padding: EdgeInsets.fromLTRB(
-                    10,
-                    12,
-                    10,
-                    AppSpacing.floatingStackClearance +
-                        MediaQuery.paddingOf(context).bottom,
-                  ),
-                  itemCount: total,
-                  itemBuilder: (context, i) {
-                    final entry = widget.items[i];
-                    final isDir = entry.isDir;
-                    final isPinned = widget.isPinned?.call(entry) ?? false;
-                    final isBookmark = widget.isBookmark?.call(entry) ?? false;
-                    final fullPath = widget.currentDirPath.isEmpty
-                        ? entry.name
-                        : '${widget.currentDirPath}/${entry.name}';
-                    final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-                    final ratio = _aspectRatioFor(entry, fullPath,
-                        hasVisualPreview: hasVisualPreview);
-
-                    final cell = isDir
-                        ? _buildDirCell(context, entry, fullPath, ratio)
-                        : _buildFileCell(context, entry, fullPath, ratio);
-
-                    return HoldSelectableItem(
-                      index: i,
-                      entry: entry,
-                      child: cell,
-                    );
-                  },
-                ),
+                child: _buildAnimatedMasonryView(widget.scrollController, total),
               ),
       ),
     );
@@ -417,13 +475,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
 
   /// Whether this file's cell is sized by decoded artwork (and so needs a
   /// real aspect ratio) rather than by a centred icon.
-  ///
-  /// An APK is deliberately *not* one of these, even though it does get a
-  /// thumbnail: its launcher icon is drawn at icon size inside the cell
-  /// rather than filling it (see `_buildFileCell`), so the cell should
-  /// take the same square icon ratio a PDF or an archive does. Sizing the
-  /// cell to the icon's own dimensions instead would let an APK stretch a
-  /// masonry row for artwork that isn't actually filling it.
   bool _hasVisualPreview(String fileName) {
     final ext = fileName.split('.').last;
     if (vaultIconForExt(ext) != null) return false;
@@ -547,15 +598,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         ),
       );
     } else if (isApk && widget.archiveContext == null) {
-      // Same restriction as video above -- see fetchApkIconForThumbnail's
-      // doc comment for why an APK nested inside an open archive falls
-      // through to the plain icon instead.
-      //
-      // Sized and centred exactly like the plain file-type icon in the
-      // `else` branch below rather than filled into the cell the way a
-      // photo or video frame is -- see `_hasVisualPreview` for why the
-      // cell's own ratio follows the same rule, and no size is reported
-      // back from here anymore.
       previewWidget = Center(
         child: SizedBox(
           width: iconSize,
@@ -980,10 +1022,6 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
 
-  /// Shown while loading fails or the APK turns out to have no resolvable
-  /// launcher icon -- the same plain file-type icon the cell would have
-  /// drawn had it never tried, which is the fallback
-  /// `fetchApkIconForThumbnail`'s doc comment asks callers for.
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double fallbackIconSize;
@@ -998,15 +1036,6 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
     required this.fallbackIconSize,
   });
 
-  /// See `_ListApkIconThumb._fetch` in file_tile.dart -- persisted through
-  /// the same three-tier cache real image thumbnails use, keyed by
-  /// [filePath] like any other file.
-  ///
-  /// No decoded width/height is reported back to the masonry layout here,
-  /// unlike the image/video thumbs in this file: the icon is drawn at a
-  /// fixed icon size inside its cell rather than filling it, so the cell
-  /// takes the plain square icon ratio (see `_hasVisualPreview`) and has
-  /// nothing to learn from the icon's own dimensions.
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -1061,11 +1090,6 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
-      // Contain rather than image/video's cover -- an app icon is meant
-      // to be seen whole, never cropped. No filled placeholder behind any
-      // of the three states either: the caller sizes this to the icon
-      // box, so a coloured rectangle here would be a square drawn around
-      // the icon rather than the cell's own background showing through.
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,

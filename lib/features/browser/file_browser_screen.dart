@@ -262,6 +262,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    // Freeze app bar collapse while 2 fingers are on screen so it doesn't fight pinch gestures
+    if (_isMultiTouch || _pointerCount >= 2) return false;
 
     // Keep app bar locked open if disabled in settings, or when in selection/search
     if (!_toolbarConfig.autoHideAppBar) {
@@ -475,8 +477,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _handlePointerDown(PointerDownEvent event) {
     _pointerCount++;
-    if (_pointerCount >= 2 && !_isMultiTouch) {
-      setState(() => _isMultiTouch = true);
+    if (_pointerCount >= 2) {
+      _isMultiTouch = true;
     }
     final edgeInset = math.max(
       72.0,
@@ -488,8 +490,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _handlePointerUp(PointerEvent event) {
     _pointerCount = math.max(0, _pointerCount - 1);
-    if (_pointerCount < 2 && _isMultiTouch) {
-      setState(() => _isMultiTouch = false);
+    if (_pointerCount < 2) {
+      _isMultiTouch = false;
     }
     if (_pointerCount == 0) {
       _drawerDragDistance = 0.0;
@@ -498,9 +500,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _pointerCount = 0;
-    if (_isMultiTouch) {
-      setState(() => _isMultiTouch = false);
-    }
+    _isMultiTouch = false;
     _drawerDragDistance = 0.0;
   }
 
@@ -3330,42 +3330,51 @@ Future<void> _extractSelectedArchive() async {
             onNotification: _handleScrollNotification,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              dragStartBehavior: DragStartBehavior.down,
-              onHorizontalDragStart: (details) {
-                final edgeInset = math.max(
-                  72.0,
-                  MediaQuery.systemGestureInsetsOf(context).left,
-                );
-                if (_isTouchFromEdge ||
-                    details.globalPosition.dx <= edgeInset ||
-                    _backGestureProgress != null) {
-                  _isTouchFromEdge = true;
-                  _drawerDragDistance = 0.0;
-                  return;
-                }
-                _drawerDragDistance = 0.0;
-              },
-              onHorizontalDragUpdate: (details) {
-                if (_isTouchFromEdge ||
-                    _backGestureProgress != null ||
-                    _isMultiTouch ||
-                    widget.drawer == null) {
-                  _drawerDragDistance = 0.0;
-                  return;
-                }
-                _drawerDragDistance += details.primaryDelta ?? 0.0;
-                if (_drawerDragDistance > 60.0) {
-                  _scaffoldKey.currentState?.openDrawer();
-                  _drawerDragDistance = 0.0;
-                  _isTouchFromEdge = true;
-                }
-              },
-              onHorizontalDragEnd: (_) {
-                _drawerDragDistance = 0.0;
-              },
-              onHorizontalDragCancel: () {
-                _drawerDragDistance = 0.0;
-              },
+              dragStartBehavior: DragStartBehavior.start,
+              onHorizontalDragStart: widget.drawer == null
+                  ? null
+                  : (details) {
+                      final edgeInset = math.max(
+                        72.0,
+                        MediaQuery.systemGestureInsetsOf(context).left,
+                      );
+                      if (_isMultiTouch ||
+                          _isTouchFromEdge ||
+                          details.globalPosition.dx <= edgeInset ||
+                          _backGestureProgress != null) {
+                        _isTouchFromEdge = true;
+                        _drawerDragDistance = 0.0;
+                        return;
+                      }
+                      _drawerDragDistance = 0.0;
+                    },
+              onHorizontalDragUpdate: widget.drawer == null
+                  ? null
+                  : (details) {
+                      if (_isMultiTouch ||
+                          _isTouchFromEdge ||
+                          _backGestureProgress != null ||
+                          widget.drawer == null) {
+                        _drawerDragDistance = 0.0;
+                        return;
+                      }
+                      _drawerDragDistance += details.primaryDelta ?? 0.0;
+                      if (_drawerDragDistance > 60.0) {
+                        _scaffoldKey.currentState?.openDrawer();
+                        _drawerDragDistance = 0.0;
+                        _isTouchFromEdge = true;
+                      }
+                    },
+              onHorizontalDragEnd: widget.drawer == null
+                  ? null
+                  : (_) {
+                      _drawerDragDistance = 0.0;
+                    },
+              onHorizontalDragCancel: widget.drawer == null
+                  ? null
+                  : () {
+                      _drawerDragDistance = 0.0;
+                    },
               child: Stack(
                 children: [
                   Column(

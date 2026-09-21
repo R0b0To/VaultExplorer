@@ -1,9 +1,61 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+
+/// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling.
+/// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling
+/// without leaking pointer IDs.
+class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
+  _PinchScaleGestureRecognizer({super.debugOwner});
+
+  final Set<int> _activePointers = <int>{};
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    _activePointers.add(event.pointer);
+    if (_activePointers.length >= 2) {
+      resolve(GestureDisposition.accepted);
+    }
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _activePointers.remove(event.pointer);
+    }
+    super.handleEvent(event);
+  }
+
+  @override
+  void stopTrackingPointer(int pointer) {
+    // CRITICAL: Clean up pointer immediately if tracking was stopped/rejected
+    // so dead pointer IDs never leak into future touches.
+    _activePointers.remove(pointer);
+    super.stopTrackingPointer(pointer);
+  }
+
+  @override
+  void rejectGesture(int pointer) {
+    // ONLY refuse rejection if 2 or more fingers are on screen (a real pinch).
+    // If there is only 1 finger, allow rejection so normal scrolling works 100%!
+    if (_activePointers.length >= 2) {
+      acceptGesture(pointer);
+    } else {
+      super.rejectGesture(pointer);
+    }
+  }
+
+  @override
+  void dispose() {
+    _activePointers.clear();
+    super.dispose();
+  }
+}
 
 /// Carries the item index and [RawEntry] model in the render tree for
 /// high-performance hit testing during hold range selection.
@@ -241,8 +293,11 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     _hasMoved = false;
   }
 
+  bool _scaleStarted = false;
+
   void _handleScaleStart(ScaleStartDetails details) {
     if (details.pointerCount >= 2) {
+      _scaleStarted = true;
       _cancelHoldTimer();
       widget.onScaleStart?.call(details);
     }
@@ -251,12 +306,27 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount >= 2) {
       _cancelHoldTimer();
+      // If finger 1 started pan before finger 2 landed, onScaleStart was dropped.
+      // Synthesize onScaleStart now that both fingers are confirmed on screen.
+      if (!_scaleStarted) {
+        _scaleStarted = true;
+        widget.onScaleStart?.call(
+          ScaleStartDetails(
+            focalPoint: details.focalPoint,
+            localFocalPoint: details.localFocalPoint,
+            pointerCount: details.pointerCount,
+          ),
+        );
+      }
       widget.onScaleUpdate?.call(details);
     }
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
-    widget.onScaleEnd?.call(details);
+    if (_scaleStarted) {
+      _scaleStarted = false;
+      widget.onScaleEnd?.call(details);
+    }
   }
 
   @override
@@ -267,12 +337,21 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
       onPointerMove: _handlePointerMove,
       onPointerUp: _handlePointerUp,
       onPointerCancel: _handlePointerCancel,
-      child: GestureDetector(
+      child: RawGestureDetector(
         key: _containerKey,
         behavior: HitTestBehavior.translucent,
-        onScaleStart: _handleScaleStart,
-        onScaleUpdate: _handleScaleUpdate,
-        onScaleEnd: _handleScaleEnd,
+        gestures: <Type, GestureRecognizerFactory>{
+          _PinchScaleGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<_PinchScaleGestureRecognizer>(
+            () => _PinchScaleGestureRecognizer(),
+            (_PinchScaleGestureRecognizer instance) {
+              instance
+                ..onStart = _handleScaleStart
+                ..onUpdate = _handleScaleUpdate
+                ..onEnd = _handleScaleEnd;
+            },
+          ),
+        },
         child: widget.child,
       ),
     );

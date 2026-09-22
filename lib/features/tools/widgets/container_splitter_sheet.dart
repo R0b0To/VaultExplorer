@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_controller.dart';
 
@@ -21,6 +22,9 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
   final _customSizeCtrl = TextEditingController();
   final _outputNameCtrl = TextEditingController();
 
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
+
   @override
   void dispose() {
     _customSizeCtrl.dispose();
@@ -28,20 +32,25 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
     super.dispose();
   }
 
-  Future<void> _pickSplitSource() =>
-      ref.read(containerSplitterProvider.notifier).pickSplitSource();
+  Future<void> _pickSplitSource() => _suppressLock(
+        () => ref.read(containerSplitterProvider.notifier).pickSplitSource(),
+      );
 
-  Future<void> _pickSplitDestination() =>
-      ref.read(containerSplitterProvider.notifier).pickSplitDestination();
+  Future<void> _pickSplitDestination() => _suppressLock(
+        () => ref.read(containerSplitterProvider.notifier).pickSplitDestination(),
+      );
 
   Future<void> _pickFirstPart() async {
-    final stripped = await ref.read(containerSplitterProvider.notifier).pickFirstPart();
+    final stripped = await _suppressLock(
+      () => ref.read(containerSplitterProvider.notifier).pickFirstPart(),
+    );
     if (!mounted || stripped == null) return;
     _outputNameCtrl.text = stripped;
   }
 
-  Future<void> _pickJoinDestination() =>
-      ref.read(containerSplitterProvider.notifier).pickJoinDestination();
+  Future<void> _pickJoinDestination() => _suppressLock(
+        () => ref.read(containerSplitterProvider.notifier).pickJoinDestination(),
+      );
 
   Future<void> _runSplit() async {
     final l10n = context.l10n;

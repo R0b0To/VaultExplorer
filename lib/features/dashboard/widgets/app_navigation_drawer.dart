@@ -11,6 +11,7 @@ import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -391,9 +392,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              onTap: () async {
+                           onTap: () async {
                                 final notifier = ref.read(externalStorageLocationsProvider.notifier);
-                                final loc = await notifier.promptAndAddLocation();
+                                final loc = await ref.read(sessionLockControllerProvider).withLockSuppression(
+                                  () => notifier.promptAndAddLocation(),
+                                );
                                 if (!context.mounted) return;
                                 if (loc != null) {
                                   Navigator.pop(context);

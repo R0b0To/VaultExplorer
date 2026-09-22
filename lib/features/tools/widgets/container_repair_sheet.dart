@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_controller.dart';
@@ -22,6 +23,9 @@ class ContainerRepairSheet extends ConsumerStatefulWidget {
 
 class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
   final ScrollController _logScrollController = ScrollController();
+
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
 
   @override
   void dispose() {
@@ -42,9 +46,11 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
 
   Future<void> _pickFolderVault() async {
     try {
-      final picked = await ref
-          .read(containerToolServiceProvider)
-          .pickFolderVaultForRepair();
+      final picked = await _suppressLock(
+        () => ref
+            .read(containerToolServiceProvider)
+            .pickFolderVaultForRepair(),
+      );
       if (picked == null || !mounted) return;
       ref.read(containerRepairProvider.notifier).setFolderVaultTarget(picked);
     } on FolderVaultInvalidException catch (e) {
@@ -172,11 +178,13 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
           ),
           child: Column(
             children: [
-              SheetOptionTile(
+               SheetOptionTile(
                 icon: Icons.insert_drive_file_outlined,
                 title: context.l10n.repairTargetUnmountedFileOption,
                 subtitle: context.l10n.repairTargetUnmountedFileSubtitle,
-                onTap: () => ref.read(containerRepairProvider.notifier).pickUnmountedFile(),
+                onTap: () => _suppressLock(
+                  () => ref.read(containerRepairProvider.notifier).pickUnmountedFile(),
+                ),
               ),
               Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
               SheetOptionTile(

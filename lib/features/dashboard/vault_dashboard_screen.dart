@@ -54,10 +54,12 @@ class VaultDashboard extends ConsumerStatefulWidget {
 class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBindingObserver {
   SessionLockController get _lockController => ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
+ final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
   double _drawerDragDistance = 0.0;
   bool _isTouchFromEdge = false;
+  bool _isEnforcingLock = false;
+  late final ProviderContainer _container;
 
   // Cached stand-in [MountedContainer] for real device storage (see
   // buildLocalStorageContainer), refreshed whenever all-files access is
@@ -112,20 +114,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     return null;
   }
 
-  @override
+ @override
   void initState() {
     super.initState();
-    // Grab the ProviderContainer – it outlives this widget, so the callback
-    // stays safe even after the screen is unmounted (the ShareDestinationSheet
-    // flow pops VaultDashboard before _performLoadAll → scheduleAutoLock
-    // finishes, which previously crashed with "Using ref when a widget is
-    // about to or has been unmounted").
-    final container = ProviderScope.containerOf(context, listen: false);
+    // Cache the ProviderContainer so asynchronous callbacks (like auto-lock
+    // and container unmounting) remain safe even after this widget is unmounted.
+    _container = ProviderScope.containerOf(context, listen: false);
     _lockController.configure(
-      settings: () => container.read(vaultDashboardControllerProvider).appSettings,
+      settings: () => _container.read(appSettingsControllerProvider).settings,
       lockAllMountedContainers: _lockAllMountedContainers,
       enforceAppLock: _enforceAppLock,
     );
+    _lockController.notifyAppUnlocked();
     WidgetsBinding.instance.addObserver(this);
     _checkStorageAccess();
   }
@@ -205,41 +205,47 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Future<void> _enforceAppLock() async {
-    VeLog.i(_kLogTag, '_enforceAppLock: called');
-    if (!mounted) return;
-    final mode = await disguiseModeApi.getMode();
-    if (!mounted) return;
+    VeLog.i(_kLogTag, '_enforceAppLock: called (isEnforcingLock=$_isEnforcingLock)');
+    if (!mounted || _isEnforcingLock) return;
+    _isEnforcingLock = true;
+    try {
+      final mode = await disguiseModeApi.getMode();
+      if (!mounted) return;
 
-    final navigator = Navigator.of(context);
-    navigator.popUntil((route) => route.isFirst);
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
 
-    if (mode == DisguiseMode.decoy) {
-      VeLog.i(_kLogTag, '_enforceAppLock: decoy mode active, disabling secure screen instead of locking');
-      await ref.read(secureScreenPolicyProvider).disableForDecoy();
-      return;
-    }
+      if (mode == DisguiseMode.decoy) {
+        VeLog.i(_kLogTag, '_enforceAppLock: decoy mode active, disabling secure screen instead of locking');
+        await _container.read(secureScreenPolicyProvider).disableForDecoy();
+        return;
+      }
 
-    final settings = ref.read(vaultDashboardControllerProvider).appSettings;
-    if (settings.useMasterPassword && settings.masterPasswordHash != null) {
-      VeLog.i(_kLogTag, '_enforceAppLock: master password set -> pushing LockGateScreen');
-      navigator.pushAndRemoveUntil(
-        PageRouteBuilder(
-          pageBuilder: (_, _, _) => const LockGateScreen(),
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        ),
-        (route) => false,
-      );
-    } else {
-      VeLog.d(_kLogTag, '_enforceAppLock: no master password set, nothing to push');
+      final settings = _container.read(appSettingsControllerProvider).settings;
+      if (settings.useMasterPassword && settings.masterPasswordHash != null) {
+        VeLog.i(_kLogTag, '_enforceAppLock: master password set -> pushing LockGateScreen');
+        navigator.pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (_, _, _) => const LockGateScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+          (route) => false,
+        );
+      } else {
+        VeLog.d(_kLogTag, '_enforceAppLock: no master password set, nothing to push');
+        _container.read(sessionLockControllerProvider).notifyAppUnlocked();
+      }
+    } finally {
+      _isEnforcingLock = false;
     }
   }
 
   Future<void> _lockAllMountedContainers() async {
-    final state = ref.read(vaultDashboardControllerProvider);
+    final state = _container.read(vaultDashboardControllerProvider);
     final mountedList = state.mounted;
-    final lifecycle = ref.read(vaultLifecycleApiProvider);
-    final controller = ref.read(vaultDashboardControllerProvider.notifier);
+    final lifecycle = _container.read(vaultLifecycleApiProvider);
+    final controller = _container.read(vaultDashboardControllerProvider.notifier);
 
     VeLog.i(
       _kLogTag,

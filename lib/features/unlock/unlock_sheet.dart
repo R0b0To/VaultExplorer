@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/unlock/unlock_controller.dart';
@@ -80,6 +81,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         mountedUris: widget.mountedUris,
         initialCompositeCarriers: widget.initialCompositeCarriers,
       );
+
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
 
   bool get _passwordPrefilled =>
       widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
@@ -212,11 +216,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         }
       },
     );
-    ref.listen(
+     ref.listen(
       unlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick),
       (prev, next) {
         if (mounted) {
-          ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n);
+          _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n));
         }
       },
     );
@@ -563,9 +567,9 @@ Widget _buildVaultKindSegmentedButton(
                   : (widget.initialUri == null && widget.initialCompositeCarriers == null
                       ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant)
                       : null),
-              onTap: state.loading || widget.initialUri != null || widget.initialCompositeCarriers != null
+           onTap: state.loading || widget.initialUri != null || widget.initialCompositeCarriers != null
                   ? null
-                  : () => ref.read(unlockControllerProvider(_params).notifier).pickFile(context.l10n),
+                  : () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickFile(context.l10n)),
             ),
           ],
         ),
@@ -576,7 +580,7 @@ Widget _buildVaultKindSegmentedButton(
             tone: AppBannerTone.info,
             icon: Icons.layers_rounded,
             trailing: TextButton(
-              onPressed: () => ref.read(unlockControllerProvider(_params).notifier).pickCompositeCarriers(),
+              onPressed: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickCompositeCarriers()),
               child: Text(context.l10n.compositeSelectAllCarriersButton),
             ),
           ),
@@ -590,7 +594,7 @@ Widget _buildVaultKindSegmentedButton(
             tone: AppBannerTone.warning,
             icon: Icons.speed_rounded,
             trailing: TextButton(
-              onPressed: () => ref.read(unlockControllerProvider(_params).notifier).requestStoragePermission(),
+              onPressed: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).requestStoragePermission()),
               child: Text(context.l10n.enableButtonLabel),
             ),
           ),
@@ -650,11 +654,13 @@ Widget _buildVaultKindSegmentedButton(
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 12),
-                    Row(
+                      Row(
                       children: [
                         Expanded(
                           child: FilledButton(
-                            onPressed: () => ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
+                            onPressed: () => _suppressLock(
+                              () async => ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
+                            ),
                             child: Text(
                               state.isComposite
                                   ? context.l10n.compositeRelocateCarriersButton
@@ -703,11 +709,12 @@ Widget _buildVaultKindSegmentedButton(
                             child: Text(context.l10n.usePasswordButtonLabel),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                           const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
-                            onPressed: () =>
-                                ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
+                            onPressed: () => _suppressLock(
+                              () async => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
+                            ),
                             child: Text(context.l10n.authenticateButtonLabel),
                           ),
                         ),
@@ -860,14 +867,14 @@ case _UnlockCredentialState.password:
                   onSubmitted: (_) => _onUnlock(),
                 ),
               ],
-              if (hasDirectOptions) ...[
+            if (hasDirectOptions) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 1),
                   child: KeyfilesPicker(
                     keyfiles: state.keyfiles,
                     picking: state.pickingKeyfiles,
                     enabled: canConfigure,
-                    onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
+                    onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles()),
                     onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
                   ),
                 ),
@@ -959,13 +966,13 @@ List<Widget> _buildAdvancedOptionsSection(
           ),
         
         ],
-        Padding(
+         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
           child: KeyfilesPicker(
             keyfiles: state.keyfiles,
             picking: state.pickingKeyfiles,
             enabled: canConfigure,
-            onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
+            onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles()),
             onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
           ),
         ),
@@ -1053,7 +1060,7 @@ List<Widget> _buildAdvancedOptionsSection(
               keyfiles: state.hiddenKeyfiles,
               picking: state.pickingHiddenKeyfiles,
               enabled: canConfigure,
-              onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickHiddenKeyfiles(),
+              onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickHiddenKeyfiles()),
               onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeHiddenKeyfile(k),
             ),
           ),

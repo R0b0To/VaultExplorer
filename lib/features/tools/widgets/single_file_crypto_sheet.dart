@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dart';
@@ -37,6 +38,9 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
 
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
+
   @override
   void dispose() {
     _passwordCtrl.dispose();
@@ -64,9 +68,11 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     }
   }
 
-  Future<void> _addExternalSources() => ref
-      .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
-      .addExternalSources();
+  Future<void> _addExternalSources() => _suppressLock(
+        () => ref
+            .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+            .addExternalSources(),
+      );
 
   Future<void> _addVaultSources(List<MountedContainer> mountedVaults) async {
     final result = await Navigator.push<List<CryptoSourceItem>>(
@@ -116,9 +122,11 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     }
   }
 
-  Future<void> _pickExternalDestination() => ref
-      .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
-      .pickExternalDestination();
+ Future<void> _pickExternalDestination() => _suppressLock(
+        () => ref
+            .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+            .pickExternalDestination(),
+      );
 
   Future<void> _pickVaultDestination(List<MountedContainer> mountedVaults) async {
     final result = await Navigator.push<CryptoDestination>(
@@ -563,9 +571,11 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
         KeyfilesPicker(
           keyfiles: state.keyfiles,
           picking: state.pickingKeyfiles,
-          onPick: () => ref
-              .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
-              .pickKeyfiles(),
+          onPick: () => _suppressLock(
+            () => ref
+                .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+                .pickKeyfiles(),
+          ),
           onRemove: (k) => ref
               .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
               .removeKeyfile(k),

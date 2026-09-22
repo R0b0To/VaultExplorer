@@ -23,6 +23,7 @@ class LockGateScreen extends ConsumerStatefulWidget {
 class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   final _pwCtrl = TextEditingController();
   bool _obscure = true;
+  bool _navigating = false;
 
   @override
   void dispose() {
@@ -31,6 +32,8 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   }
 
   void _goToDashboard() {
+    if (_navigating) return;
+    _navigating = true;
     if (widget.popOnSuccess) {
       Navigator.of(context).pop(true);
       return;
@@ -368,7 +371,11 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
           ),
         );
 
-      case _LockGateCredential.password:
+     case _LockGateCredential.password:
+        final method = state.settings?.masterUnlockMethod;
+        final canSwitchBack = state.showPasswordFallback &&
+            method != null &&
+            method != MasterUnlockMethod.password;
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 340),
           child: AutofillGroup(
@@ -423,6 +430,24 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
                         )
                       : Text(context.l10n.unlock),
                 ),
+                if (canSwitchBack) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      _pwCtrl.clear();
+                      ref
+                          .read(lockGateProvider.notifier)
+                          .setShowPasswordFallback(false);
+                      if (method == MasterUnlockMethod.biometrics) {
+                        ref
+                            .read(lockGateProvider.notifier)
+                            .tryBiometric(context.l10n);
+                      }
+                    },
+                    icon: Icon(method.icon, size: 18),
+                    label: Text(method.getLocalizedLabel(context.l10n)),
+                  ),
+                ],
               ],
             ),
           ),
@@ -567,6 +592,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
         ];
 
       case _LockGateCredential.password:
+        final method = state.settings?.masterUnlockMethod;
+        final canSwitchBack = state.showPasswordFallback &&
+            method != null &&
+            method != MasterUnlockMethod.password;
         return [
           TextField(
             controller: _pwCtrl,
@@ -616,6 +645,24 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
                   )
                 : Text(context.l10n.unlock),
           ),
+          if (canSwitchBack) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                _pwCtrl.clear();
+                ref
+                    .read(lockGateProvider.notifier)
+                    .setShowPasswordFallback(false);
+                if (method == MasterUnlockMethod.biometrics) {
+                  ref
+                      .read(lockGateProvider.notifier)
+                      .tryBiometric(context.l10n);
+                }
+              },
+              icon: Icon(method.icon, size: 18),
+              label: Text(method.getLocalizedLabel(context.l10n)),
+            ),
+          ],
         ];
     }
   }

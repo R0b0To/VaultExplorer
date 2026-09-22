@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_pin_verify_sheet.dart';
@@ -971,7 +972,60 @@ class _SecuritySettingsScreenState
                 ),
                 const SizedBox(height: 16),
 
-                // 2. Auto-Lock & Screen Privacy
+                // 2. App Lock Behavior -- independent of vault auto-lock
+                // below: only controls how often the lock gate is re-shown,
+                // never whether mounted containers get unmounted.
+                if (state.settings.useMasterPassword &&
+                    state.settings.masterPasswordHash != null &&
+                    !state.showPwFields) ...[
+                  SectionHeader(context.l10n.appLockBehaviorTitle),
+                  SectionCard(
+                    children: [
+                      OptionPickerTile<int>(
+                        label: context.l10n.autoLockTimeoutLabel,
+                        value: state.settings.appLockAfterMins,
+                        options: autoLockDurationOptions(
+                          context,
+                          zeroOption: SelectOption(value: 0, label: context.l10n.immediately),
+                          currentMinutes: state.settings.appLockAfterMins,
+                        ),
+                        onChanged: (v) {
+                          if (v == kCustomAutoLockDuration) {
+                            pickCustomAutoLockDuration(
+                              context,
+                              currentMinutes: state.settings.appLockAfterMins,
+                              onPicked: (mins) => ref
+                                  .read(appSettingsControllerProvider.notifier)
+                                  .updateSettings((s) => s.copyWith(appLockAfterMins: mins)),
+                            );
+                          } else {
+                            ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings((s) => s.copyWith(appLockAfterMins: v));
+                          }
+                        },
+                      ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: Text(
+                          context.l10n.lockAppOnScreenOffTitle,
+                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          context.l10n.lockAppOnScreenOffSubtitle,
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        value: state.settings.lockAppOnScreenLock,
+                        onChanged: (v) => ref
+                            .read(appSettingsControllerProvider.notifier)
+                            .updateSettings((s) => s.copyWith(lockAppOnScreenLock: v)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 3. Auto-Lock & Screen Privacy (vault containers)
                 SectionHeader(context.l10n.autoLockContainersTitle),
                 SectionCard(
                   children: [
@@ -1801,7 +1855,9 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     if (state.backupBusy) return;
     ref.read(appSettingsControllerProvider.notifier).setExportBusy(true);
     try {
-      final ok = await ref.read(settingsBackupServiceProvider).exportToFile();
+      final ok = await ref.read(sessionLockControllerProvider).withLockSuppression(
+        () => ref.read(settingsBackupServiceProvider).exportToFile(),
+      );
       if (!context.mounted) return;
       if (ok) {
         showAppSnackBar(
@@ -1830,7 +1886,9 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     ref.read(appSettingsControllerProvider.notifier).setImportBusy(true);
     ImportedSettingsBundle? bundle;
     try {
-      bundle = await ref.read(settingsBackupServiceProvider).pickAndParseFile();
+      bundle = await ref.read(sessionLockControllerProvider).withLockSuppression(
+        () => ref.read(settingsBackupServiceProvider).pickAndParseFile(),
+      );
     } on InvalidSettingsBackupException {
       if (context.mounted) {
         showAppSnackBar(

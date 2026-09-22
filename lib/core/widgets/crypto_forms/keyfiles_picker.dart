@@ -1,13 +1,16 @@
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart' show KeyfileRef;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 
 /// The "keyfiles" picker card — backs unlock sheets, container config, and creation flows.
-class KeyfilesPicker extends StatelessWidget {
+class KeyfilesPicker extends ConsumerWidget {
   final List<KeyfileRef> keyfiles;
   final bool picking;
-  final VoidCallback onPick;
+  final FutureOr<void> Function() onPick;
   final ValueChanged<KeyfileRef> onRemove;
   final bool enabled;
 
@@ -21,7 +24,7 @@ class KeyfilesPicker extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.colors;
     final textTheme = context.typography;
 
@@ -50,8 +53,12 @@ class KeyfilesPicker extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: (enabled && !picking) ? onPick : null,
+               FilledButton.tonalIcon(
+                onPressed: (enabled && !picking)
+                    ? () => ref
+                        .read(sessionLockControllerProvider)
+                        .withLockSuppression(() async => await onPick())
+                    : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,

@@ -1,5 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -12,7 +14,7 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 /// `ArchiveContext?` value: the original method only ever null-checked it
 /// (`if (_archiveContext != null)`), never read a property off it, so
 /// there's nothing else this widget needs from that type.
-class AddItemMenuButton extends StatefulWidget {
+class AddItemMenuButton extends ConsumerStatefulWidget {
   final bool isReadOnly;
   final bool hasArchiveContext;
   final MountedContainer container;
@@ -62,11 +64,11 @@ class AddItemMenuButton extends StatefulWidget {
     this.asFab = false,
   });
 
-  @override
-  State<AddItemMenuButton> createState() => _AddItemMenuButtonState();
+   @override
+  ConsumerState<AddItemMenuButton> createState() => _AddItemMenuButtonState();
 }
 
-class _AddItemMenuButtonState extends State<AddItemMenuButton> {
+class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
   // Was `_menuIsOpen` on the parent's State, shared (and never actually
   // read) across three different popup buttons -- see the identical note
   // in sort_menu_button.dart. Kept local here for the same reason.
@@ -118,12 +120,14 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
         ),
       );
     }
-    if (widget.hasArchiveContext) {
+     if (widget.hasArchiveContext) {
       return _anchorButton(
         cs,
         icon: Icons.unarchive_rounded,
         tooltip: context.l10n.extractArchive,
-        onPressed: widget.onExtractArchive,
+        onPressed: () => ref
+            .read(sessionLockControllerProvider)
+            .withLockSuppression(widget.onExtractArchive),
       );
     }
     return MenuAnchor(
@@ -174,18 +178,24 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
         if (!widget.hideVaultOnlyActions) ...[
           MenuItemButton(
             leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-            onPressed: widget.onCaptureFromCamera,
+            onPressed: () => ref
+                .read(sessionLockControllerProvider)
+                .withLockSuppression(widget.onCaptureFromCamera),
             child: Text(context.l10n.camera),
           ),
           const PopupMenuDivider(),
           MenuItemButton(
             leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-            onPressed: widget.onImportFilesFromDevice,
+            onPressed: () => ref
+                .read(sessionLockControllerProvider)
+                .withLockSuppression(widget.onImportFilesFromDevice),
             child: Text(context.l10n.importFiles),
           ),
           MenuItemButton(
             leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-            onPressed: widget.onImportFolderFromDevice,
+            onPressed: () => ref
+                .read(sessionLockControllerProvider)
+                .withLockSuppression(widget.onImportFolderFromDevice),
             child: Text(context.l10n.importFolder),
           ),
           const PopupMenuDivider(),

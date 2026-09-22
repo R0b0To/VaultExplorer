@@ -81,6 +81,15 @@ class AppSettings {
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
   int autoLockMins;
+  // App-lock behavior below (lockAppOnScreenLock/appLockAfterMins) is
+  // intentionally separate from vault auto-lock above
+  // (lockContainersOnScreenLock/autoLockMins). Vault auto-lock unmounts
+  // open containers -- expensive to reverse (re-decrypt). App lock only
+  // re-shows LockGateScreen -- cheap to reverse -- so a container can stay
+  // mounted in the background while the app still asks for the master
+  // password again, or vice versa. See SessionLockController.
+  bool lockAppOnScreenLock;
+  int appLockAfterMins;
   bool hasSeenSwipeTutorial;
   ContainerSortMode containerSortMode;
   bool enableCardSwipeActions;
@@ -117,6 +126,8 @@ class AppSettings {
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
+    this.lockAppOnScreenLock = true,
+    this.appLockAfterMins = 0,
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.containerSortMode = ContainerSortMode.manual,
     this.enableCardSwipeActions = true,
@@ -184,6 +195,8 @@ class AppSettings {
     bool? defaultDerivedKeyCacheEnabled,
     bool? lockContainersOnScreenLock,
     int? autoLockMins,
+    bool? lockAppOnScreenLock,
+    int? appLockAfterMins,
     bool? hasSeenSwipeTutorial,
     ContainerSortMode? containerSortMode,
     bool? enableCardSwipeActions,
@@ -221,6 +234,8 @@ class AppSettings {
       defaultDerivedKeyCacheEnabled: defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
       lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
       autoLockMins: autoLockMins ?? this.autoLockMins,
+      lockAppOnScreenLock: lockAppOnScreenLock ?? this.lockAppOnScreenLock,
+      appLockAfterMins: appLockAfterMins ?? this.appLockAfterMins,
       hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
@@ -265,6 +280,8 @@ class AppSettings {
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
+    'lockAppOnScreenLock': lockAppOnScreenLock,
+    'appLockAfterMins': appLockAfterMins,
     'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
     'defaultLayoutMode': defaultLayoutMode.toJson(),
     'containerSortMode': containerSortMode.toJson(),
@@ -316,6 +333,22 @@ class AppSettings {
     useOledBlackTheme: j['useOledBlackTheme'] as bool? ?? false,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
+    // Migrates installs from before App Lock and Vault Auto-Lock had
+    // separate timeouts: they used to share lockContainersOnScreenLock/
+    // autoLockMins for both. A settings file with no 'lockAppOnScreenLock'/
+    // 'appLockAfterMins' key yet is always from before this split, so seed
+    // the new app-gate-only settings from the old shared ones once (only
+    // when a master password was actually in use -- otherwise there's
+    // nothing to preserve), the same way masterUnlockMethod below backfills
+    // from the legacy masterPasswordIsFingerprint boolean it replaced.
+    lockAppOnScreenLock: j['lockAppOnScreenLock'] as bool? ??
+        ((j['useMasterPassword'] as bool? ?? false)
+            ? (j['lockContainersOnScreenLock'] as bool? ?? true)
+            : true),
+    appLockAfterMins: j['appLockAfterMins'] as int? ??
+        ((j['useMasterPassword'] as bool? ?? false)
+            ? (j['autoLockMins'] as int? ?? 0)
+            : 0),
     defaultLayoutMode:
         BrowserLayoutMode.fromJson(
           j['defaultLayoutMode'] as String?,

@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 
@@ -57,13 +58,26 @@ class VaultExplorerApp extends StatelessWidget {
                             ...GlobalMaterialLocalizations.delegates,
                           ],
                           supportedLocales: AppLocalizations.supportedLocales,
-                          localeResolutionCallback: (deviceLocale, supportedLocales) {
+                         localeResolutionCallback: (deviceLocale, supportedLocales) {
                             for (final supported in supportedLocales) {
                               if (supported.languageCode == deviceLocale?.languageCode) {
                                 return supported;
                               }
                             }
                             return const Locale('en');
+                          },
+                          builder: (context, child) {
+                            return Consumer(
+                              builder: (context, ref, _) {
+                                return Listener(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPointerDown: (_) {
+                                    ref.read(sessionLockControllerProvider).scheduleAutoLock();
+                                  },
+                                  child: child ?? const SizedBox.shrink(),
+                                );
+                              },
+                            );
                           },
                           home: const _DisguiseModeGate(),
                         );

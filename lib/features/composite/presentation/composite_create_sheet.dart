@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
@@ -25,6 +26,9 @@ class CompositeCreateSheet extends ConsumerStatefulWidget {
 
 class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
   int _currentStep = 0;
+
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
 
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -226,8 +230,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
         SectionHeader(l10n.compositeCarrierFilesCountHeader(state.pickedCarriers.length)),
         SectionCard(
           children: [
-            InkWell(
-              onTap: state.isOperating ? null : ctrl.pickCarriers,
+           InkWell(
+              onTap: state.isOperating ? null : () => _suppressLock(ctrl.pickCarriers),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -254,7 +258,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                     ),
                     const SizedBox(width: 10),
                     FilledButton.tonalIcon(
-                      onPressed: state.isOperating ? null : ctrl.pickCarriers,
+                      onPressed: state.isOperating ? null : () => _suppressLock(ctrl.pickCarriers),
                       style: FilledButton.styleFrom(
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -354,7 +358,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
             onPressed: state.isOperating
                 ? null
                 : () async {
-                    await ctrl.pickCarriers();
+                    await _suppressLock(ctrl.pickCarriers);
                     if (!context.mounted) return;
                     final carriers = ref.read(compositeContainerProvider).pickedCarriers;
                     if (carriers.isNotEmpty && context.mounted) {
@@ -459,7 +463,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
             KeyfilesPicker(
               keyfiles: state.keyfiles,
               picking: state.pickingKeyfiles,
-              onPick: ctrl.pickKeyfiles,
+              onPick: () => _suppressLock(ctrl.pickKeyfiles),
               onRemove: ctrl.removeKeyfile,
               enabled: !state.isOperating,
             ),

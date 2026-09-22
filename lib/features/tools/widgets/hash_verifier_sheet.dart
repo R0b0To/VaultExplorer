@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/models/hash_operation.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -31,8 +32,13 @@ class HashVerifierSheet extends ConsumerStatefulWidget {
 }
 
 class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
+
   Future<List<CryptoSourceItem>> _pickExternalSources() async {
-    final picked = await ref.read(vaultLifecycleApiProvider).pickCryptoFiles();
+    final picked = await _suppressLock(
+      () => ref.read(vaultLifecycleApiProvider).pickCryptoFiles(),
+    );
     return picked
         .map((f) => CryptoSourceItem.external(displayName: f.displayName, externalUri: f.uri))
         .toList();
@@ -100,8 +106,10 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     );
     if (useDevice == null || !mounted) return;
 
-    if (useDevice) {
-      final folder = await ref.read(vaultLifecycleApiProvider).pickExtractFolder();
+     if (useDevice) {
+      final folder = await _suppressLock(
+        () => ref.read(vaultLifecycleApiProvider).pickExtractFolder(),
+      );
       if (folder == null || !mounted) return;
       try {
         await ref.read(vaultHashApiProvider).writeExternalFileBytes(

@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
 import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_controller.dart';
 
@@ -50,9 +51,11 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
 
   Future<void> _exportKeyfileToStorage(BuildContext context, WidgetRef ref) async {
     try {
-      final savedPath = await ref
-          .read(keyfilePassphraseGeneratorProvider.notifier)
-          .exportKeyfileToStorage();
+      final savedPath = await ref.read(sessionLockControllerProvider).withLockSuppression(
+            () => ref
+                .read(keyfilePassphraseGeneratorProvider.notifier)
+                .exportKeyfileToStorage(),
+          );
       if (savedPath != null && context.mounted) {
         showAppSnackBar(
           context,

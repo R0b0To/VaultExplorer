@@ -16,8 +16,8 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart'
-    show DeviceVolumeBridge;
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import '../caption_track.dart';
@@ -193,6 +193,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   EdgeSwipeClaimRecognizer? _volumeClaim;
   bool _isVolumeDragging = false;
   double _effectiveHoldSpeed = 2.0;
+  bool _isPlayingReported = false;
+  late final SessionLockController _lockController;
+
+  void _updateMediaPlayingState(bool isPlaying) {
+    if (_isPlayingReported == isPlaying) return;
+    _isPlayingReported = isPlaying;
+    _lockController.setMediaPlaying(isPlaying);
+  }
 
   /// Accurately extracts 2D scale, ignoring the 3D Z-axis which is always 1.0
   static double _getMatrixScale(Matrix4 matrix) {
@@ -216,6 +224,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   @override
   void initState() {
     super.initState();
+    _lockController = ref.read(sessionLockControllerProvider);
     _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final initialPoster = widget.posterBytes ??
         _thumbnailCache.peekMemory(
@@ -340,6 +349,7 @@ Future<void> _ensurePosterLoaded() async {
     if (becameActive) {
       _loadCaptionsForThisFile();
     } else if (becameInactive) {
+      _updateMediaPlayingState(false);
       _captionsToken++;
       _captionFile = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -358,7 +368,11 @@ Future<void> _ensurePosterLoaded() async {
   void _onControllerTick() {
     if (!mounted) return;
     final controller = _boundController;
-    if (controller == null) return;
+    if (controller == null) {
+      _updateMediaPlayingState(false);
+      return;
+    }
+    _updateMediaPlayingState(_isActive && controller.value.isPlaying);
     if (controller.value.hasError) {
       if (_playerError == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -461,6 +475,7 @@ Future<void> _ensurePosterLoaded() async {
 
   @override
   void dispose() {
+    _updateMediaPlayingState(false);
     _skipDebounceTimer?.cancel();
     _brightnessHudTimer?.cancel();
     _volumeHudTimer?.cancel();
@@ -1438,8 +1453,9 @@ bool _canStartEdgeSwipe() =>
     );
   }
 
-  void _onGlobalPointerDown(PointerDownEvent event) {
+ void _onGlobalPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch) return;
+    _lockController.scheduleAutoLock();
     _activeTouchPointers.add(event.pointer);
     if (_activeTouchPointers.length >= 2) {
       _abortEdgeGestures();

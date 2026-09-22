@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
@@ -23,6 +24,9 @@ class CreateContainerSheet extends ConsumerStatefulWidget {
 
 class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
   final _nameCtrl = TextEditingController(text: 'vault');
+
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
   final _sizeCtrl = TextEditingController(text: '100');
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
@@ -95,26 +99,28 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _ => '$blockSize B',
       };
 
-  Future<void> _create(CreateContainerState state) async {
+   Future<void> _create(CreateContainerState state) async {
     final l10n = context.l10n;
-    final ok = state.isFolderVault
-        ? await ref.read(createContainerProvider.notifier).createFolderVault(
-              password: _folderVaultPasswordCtrl.text,
-              confirmPassword: _folderVaultConfirmCtrl.text,
-              l10n: l10n,
-            )
-        : await ref.read(createContainerProvider.notifier).createContainerFile(
-              nameText: _nameCtrl.text,
-              sizeText: _sizeCtrl.text,
-              passwordText: _passwordCtrl.text,
-              confirmPasswordText: _confirmPasswordCtrl.text,
-              pimText: _pimCtrl.text,
-              hiddenPasswordText: _hiddenPasswordCtrl.text,
-              hiddenConfirmPasswordText: _hiddenConfirmPasswordCtrl.text,
-              hiddenPimText: _hiddenPimCtrl.text,
-              hiddenSizeText: _hiddenSizeCtrl.text,
-              l10n: l10n,
-            );
+    final ok = await _suppressLock(
+      () => state.isFolderVault
+          ? ref.read(createContainerProvider.notifier).createFolderVault(
+                password: _folderVaultPasswordCtrl.text,
+                confirmPassword: _folderVaultConfirmCtrl.text,
+                l10n: l10n,
+              )
+          : ref.read(createContainerProvider.notifier).createContainerFile(
+                nameText: _nameCtrl.text,
+                sizeText: _sizeCtrl.text,
+                passwordText: _passwordCtrl.text,
+                confirmPasswordText: _confirmPasswordCtrl.text,
+                pimText: _pimCtrl.text,
+                hiddenPasswordText: _hiddenPasswordCtrl.text,
+                hiddenConfirmPasswordText: _hiddenConfirmPasswordCtrl.text,
+                hiddenPimText: _hiddenPimCtrl.text,
+                hiddenSizeText: _hiddenSizeCtrl.text,
+                l10n: l10n,
+              ),
+    );
 
     if (ok && mounted) {
       Navigator.pop(context);
@@ -552,9 +558,11 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     return GestureDetector(
       onTap: busy
           ? null
-          : () => ref
-              .read(createContainerProvider.notifier)
-              .pickFolderVaultLocation(context.l10n),
+          : () => _suppressLock(
+                () => ref
+                    .read(createContainerProvider.notifier)
+                    .pickFolderVaultLocation(context.l10n),
+              ),
       child: Card(
         elevation: 0,
         color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
@@ -779,7 +787,9 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     return KeyfilesPicker(
       keyfiles: state.outerKeyfiles,
       picking: state.pickingOuterKeyfiles,
-      onPick: () => ref.read(createContainerProvider.notifier).pickOuterKeyfiles(),
+      onPick: () => _suppressLock(
+        () => ref.read(createContainerProvider.notifier).pickOuterKeyfiles(),
+      ),
       onRemove: (k) => ref.read(createContainerProvider.notifier).removeOuterKeyfile(k),
       enabled: !state.loading,
     );
@@ -1028,7 +1038,9 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
             KeyfilesPicker(
               keyfiles: state.hiddenKeyfiles,
               picking: state.pickingHiddenKeyfiles,
-              onPick: () => ref.read(createContainerProvider.notifier).pickHiddenKeyfiles(),
+              onPick: () => _suppressLock(
+                () => ref.read(createContainerProvider.notifier).pickHiddenKeyfiles(),
+              ),
               onRemove: (k) => ref.read(createContainerProvider.notifier).removeHiddenKeyfile(k),
               enabled: !state.loading,
             ),

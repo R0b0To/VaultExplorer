@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/header_backup_controller.dart';
 
@@ -44,6 +45,9 @@ class HeaderBackupSheet extends ConsumerStatefulWidget {
 class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
   final ScrollController _logScrollController = ScrollController();
 
+  Future<T> _suppressLock<T>(Future<T> Function() action) =>
+      ref.read(sessionLockControllerProvider).withLockSuppression(action);
+
   @override
   void dispose() {
     _logScrollController.dispose();
@@ -77,7 +81,9 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
   }
 
   Future<void> _saveExportedBackup(HeaderBackupFile backup) async {
-    final folder = await ref.read(vaultLifecycleApiProvider).pickExtractFolder();
+    final folder = await _suppressLock(
+      () => ref.read(vaultLifecycleApiProvider).pickExtractFolder(),
+    );
     if (folder == null || !mounted) return;
     final suggestedName = _suggestedFileName(backup);
     await ref
@@ -211,14 +217,14 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
                 icon: Icons.insert_drive_file_outlined,
                 title: l10n.vaultKindContainerFile,
                 subtitle: l10n.headerBackupTargetContainerSubtitle,
-                onTap: () => notifier.pickUnmountedFile(),
+                onTap: () => _suppressLock(() => notifier.pickUnmountedFile()),
               ),
               Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
               SheetOptionTile(
                 icon: Icons.folder_outlined,
                 title: l10n.vaultKindFolderVault,
                 subtitle: l10n.headerBackupTargetFolderSubtitle,
-                onTap: () => notifier.pickFolderVault(),
+                onTap: () => _suppressLock(() => notifier.pickFolderVault()),
               ),
             ],
           ),
@@ -412,7 +418,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
         const SizedBox(height: 10),
         if (backup == null)
           FilledButton.icon(
-            onPressed: state.busy ? null : () => notifier.pickBackupFile(),
+            onPressed: state.busy ? null : () => _suppressLock(() => notifier.pickBackupFile()),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), shape: const StadiumBorder()),
             icon: const Icon(Icons.file_open_outlined, size: 18),
             label: _actionButtonChild(l10n.headerBackupPickBackupFile, state.busy, cs),
@@ -582,7 +588,9 @@ class _HeaderBackupPasswordPromptDialogState
   Future<void> _pickKeyfiles() async {
     setState(() => _pickingKeyfiles = true);
     try {
-      final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
+      final picked = await ref.read(sessionLockControllerProvider).withLockSuppression(
+        () => ref.read(vaultLifecycleApiProvider).pickKeyfiles(),
+      );
       if (picked.isNotEmpty && mounted) {
         setState(() {
           _keyfiles.addAll(picked);

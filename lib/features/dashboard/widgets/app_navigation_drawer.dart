@@ -372,13 +372,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 onTap: () {
                                   Navigator.pop(context);
                                   if (currentVolId == loc.volId) return;
-                                  final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-                                      loc.path.startsWith('/data/user/0');
-                                  final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-                                      ? loc.treeUri!
-                                      : loc.path;
                                   onSelectContainer?.call(buildExternalStorageContainer(
-                                    rootPath: targetUri,
+                                    rootPath: loc.resolvedUri,
                                     displayName: loc.displayName,
                                     volId: loc.volId,
                                   ));
@@ -403,7 +398,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 if (loc != null) {
                                   Navigator.pop(context);
                                   onSelectContainer?.call(buildExternalStorageContainer(
-                                    rootPath: loc.path,
+                                    rootPath: loc.resolvedUri,
                                     displayName: loc.displayName,
                                     volId: loc.volId,
                                   ));

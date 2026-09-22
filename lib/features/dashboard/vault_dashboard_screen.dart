@@ -148,14 +148,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
    Future<void> _openExternalStorage(ExternalStorageLocation loc) async {
-    final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-        loc.path.startsWith('/data/user/0');
-    final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-        ? loc.treeUri!
-        : loc.path;
-
     final container = buildExternalStorageContainer(
-      rootPath: targetUri,
+      rootPath: loc.resolvedUri,
       displayName: loc.displayName,
       volId: loc.volId,
     );

@@ -31,8 +31,14 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
     final treeUri = result['treeUri'] as String?;
     var displayName = result['displayName'] as String? ?? '';
 
-    // Only internal phone storage (/storage/emulated/0) can use direct raw POSIX.
-    // Cloud document providers (Google Drive, Nextcloud) and removable SD cards MUST use treeUri.
+    // NOTE: this only decides what gets stored in `.path` for display/legacy
+    // purposes (e.g. showing a real folder path instead of a content:// URI
+    // where we have one). It must NOT be used to decide whether raw file
+    // access is safe -- `/storage/emulated/0` covers all of shared storage,
+    // not just app-private space, so raw POSIX access to an arbitrary
+    // folder under it still needs MANAGE_EXTERNAL_STORAGE. Actual access
+    // always goes through `ExternalStorageLocation.resolvedUri`, which
+    // prefers `treeUri` (a persisted SAF grant) regardless of this flag.
     final isInternalStorage = rawPath != null &&
         (rawPath.startsWith('/storage/emulated/0') || rawPath.startsWith('/data/user/0'));
     final effectivePath = (isInternalStorage ? rawPath : treeUri) ?? treeUri ?? rawPath;
@@ -103,14 +109,8 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
   MountedContainer? resolveContainer(int volId) {
     for (final loc in state) {
       if (loc.volId == volId) {
-        final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-            loc.path.startsWith('/data/user/0');
-        final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-            ? loc.treeUri!
-            : loc.path;
-
         return buildExternalStorageContainer(
-          rootPath: targetUri,
+          rootPath: loc.resolvedUri,
           displayName: loc.displayName,
           volId: loc.volId,
         );

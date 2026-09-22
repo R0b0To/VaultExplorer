@@ -170,7 +170,7 @@ class StorageLocationsSheet extends ConsumerWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onSelected(buildExternalStorageContainer(
-                    rootPath: loc.path,
+                    rootPath: loc.resolvedUri,
                     displayName: loc.displayName,
                     volId: loc.volId,
                   ));
@@ -201,7 +201,7 @@ class StorageLocationsSheet extends ConsumerWidget {
                 if (loc != null) {
                   Navigator.pop(context);
                   onSelected(buildExternalStorageContainer(
-                    rootPath: loc.path,
+                    rootPath: loc.resolvedUri,
                     displayName: loc.displayName,
                     volId: loc.volId,
                   ));

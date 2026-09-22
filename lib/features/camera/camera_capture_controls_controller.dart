@@ -2,34 +2,32 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'camera_capture_controls_controller.g.dart';
 
-/// The user-selected capture controls for one camera screen instance.
-///
-/// This deliberately does not own the native camera session, texture, or
-/// recording lifecycle: those resources are tied to the widget's platform
-/// view and must be torn down in lock-step with it. It owns the durable
-/// capture choices that several controls read and update together.
 class CameraCaptureControlsState {
   const CameraCaptureControlsState({
     this.isVideoMode = false,
     this.flashMode = 'auto',
     this.videoQuality = 'fhd',
+    this.photoResolution = 'max',
     this.timerDelaySeconds = 0,
   });
 
   final bool isVideoMode;
   final String flashMode;
   final String videoQuality;
+  final String photoResolution;
   final int timerDelaySeconds;
 
   CameraCaptureControlsState copyWith({
     bool? isVideoMode,
     String? flashMode,
     String? videoQuality,
+    String? photoResolution,
     int? timerDelaySeconds,
   }) => CameraCaptureControlsState(
     isVideoMode: isVideoMode ?? this.isVideoMode,
     flashMode: flashMode ?? this.flashMode,
     videoQuality: videoQuality ?? this.videoQuality,
+    photoResolution: photoResolution ?? this.photoResolution,
     timerDelaySeconds: timerDelaySeconds ?? this.timerDelaySeconds,
   );
 }
@@ -45,8 +43,11 @@ class CameraCaptureControls extends _$CameraCaptureControls {
     state = state.copyWith(videoQuality: value);
   }
 
-  /// Video capture always starts with flash off; photo capture returns to
-  /// automatic flash, matching the former screen-local behavior.
+  void selectPhotoResolution(String value) {
+    if (state.photoResolution == value) return;
+    state = state.copyWith(photoResolution: value);
+  }
+
   void setVideoMode(bool value) {
     if (state.isVideoMode == value) return;
     state = state.copyWith(

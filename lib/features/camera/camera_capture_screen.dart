@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -10,12 +10,12 @@ import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
 import 'camera_capture_lock_controller.dart';
 import 'camera_capture_session_controller.dart';
+import 'camera_ui_components.dart';
 import 'vault_camera_controller.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
@@ -40,14 +40,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   late final VaultLifecycleApi _lifecycleApi;
   late final VaultEngineEvents _engineEvents;
   late final VaultCameraController _cameraController;
+  late final ActiveRecordingRegistry _activeRecordingRegistry;
 
+  bool _isRecording = false;
   bool _pendingStopAfterStart = false;
-
-  /// True while VaultCameraRecordingService owns keeping the recording
-  /// alive (screen off / app backgrounded).
   bool _backgroundRecordingActive = false;
-
   bool _showShutterFlash = false;
+  double _selectedAspectRatio = 4 / 3; // 4:3 (1.333), 16:9 (1.777), 1:1 (1.0)
 
   double _baseZoom = 1.0;
   Timer? _exposureHideTimer;
@@ -78,13 +77,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   CameraCaptureSession get _captureSessionController =>
       ref.read(cameraCaptureSessionProvider(_captureControlsKey).notifier);
 
-  ActiveRecordingRegistry get _activeRecordingRegistry =>
-      ref.read(activeRecordingRegistryProvider);
-
   bool get _isInitialized => _captureSession.isInitialized;
   String get _selectedCameraId => _captureSession.selectedCameraId;
   List<NativeCameraLens> get _lenses => _captureSession.lenses;
-  bool get _isRecording => _captureSession.isRecording;
   bool get _isEncrypting => _captureSession.isEncrypting;
   bool get _isStartingVideo => _captureSession.isStartingVideo;
   String? get _permissionError => _captureSession.permissionError;
@@ -100,9 +95,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   double get _maxExposureEv => _captureSession.maxExposureEv;
   bool get _showExposureSlider => _captureSession.showExposureSlider;
 
-  /// Fired when the user taps "Stop & save" on the background recording
-  /// notification -- the only way to stop a recording that's continuing
-  /// with the screen off, since there's no shutter button to tap.
   void _onBackgroundRecordingStopRequestedEvent(int volId) {
     if (volId == widget.container.volId && _isRecording) {
       unawaited(_stopVideoRecording());
@@ -115,7 +107,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _fileIoApi = ref.read(vaultFileIoApiProvider);
     _lifecycleApi = ref.read(vaultLifecycleApiProvider);
     _engineEvents = ref.read(vaultEngineEventsProvider);
+    _activeRecordingRegistry = ref.read(activeRecordingRegistryProvider);
     _cameraController = VaultCameraController(_engineEvents);
+
     _engineEvents.addBackgroundRecordingStopRequestedListener(
       _onBackgroundRecordingStopRequestedEvent,
     );
@@ -139,9 +133,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   void _handleCameraEvent(Map<String, dynamic> event) {
     if (event['event'] != 'error' || !mounted) return;
-    // The camera device dropped out from under us (another app took it,
-    // a HAL error, thermal shutdown, etc.) -- the preview would otherwise
-    // just sit there frozen with no indication anything went wrong.
     _captureSessionController.setPermissionError(
       context.l10n.cameraDisconnectedError(
         event['message'] ?? context.l10n.unknownErrorFallback,
@@ -170,8 +161,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   }
 
   int _computeDeviceRotationDegrees() {
-    int degrees = ((_iconTurns * 360).round() % 360 + 360) % 360;
-    return degrees;
+    return ((_iconTurns * 360).round() % 360 + 360) % 360;
   }
 
   @override
@@ -185,7 +175,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _sensorSubscription?.cancel();
     _cameraEventSubscription?.cancel();
     unawaited(_cameraController.dispose());
-    if (_isRecording) unawaited(_fileIoApi.setKeepScreenOn(false));
+
+    // Safe disposal using local fields without calling ref.read
+    if (_isRecording) {
+      unawaited(_fileIoApi.setKeepScreenOn(false));
+    }
     _activeRecordingRegistry.unregister(widget.container.uri);
     if (_backgroundRecordingActive) {
       unawaited(_fileIoApi.stopBackgroundRecording());
@@ -221,26 +215,15 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
   }
 
- Future<void> _handleGoingInactive() async {
-    if (_isRecording) {
-      // VaultCameraRecordingService was already started while foregrounded to
-      // keep the recording alive when the screen turns off or the app is
-      // backgrounded. Deliberately do NOT close _cameraController so the native
-      // session and encoder keep running untouched.
-      return;
-    }
+  Future<void> _handleGoingInactive() async {
+    if (_isRecording) return;
     await _cameraController.close();
     if (mounted) {
       _captureSessionController.setUninitialized();
     }
   }
 
-  Future<void> _resumeFromBackgroundRecording() async {
-    // The native session and recorder were never closed while backgrounded,
-    // so there's nothing to reinitialize -- the existing preview texture
-    // just keeps rendering. The background recording service stays active
-    // until the recording is stopped.
-  }
+  Future<void> _resumeFromBackgroundRecording() async {}
 
   Future<void> _initCamera({String? cameraId}) async {
     try {
@@ -261,12 +244,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         cameraId: cameraId,
         facing: 'back',
         quality: _captureControls.videoQuality,
+        photoResolution: _captureControls.photoResolution,
       );
 
       if (!mounted) return;
 
       _captureSessionController.setCameraOpened(info);
-
       await _cameraController.setFlash(_captureControls.flashMode);
       await _cameraController.setZoom(_currentZoom);
     } catch (e) {
@@ -275,6 +258,37 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           context.l10n.cameraErrorMessage('$e'),
         );
       }
+    }
+  }
+
+  Future<void> _switchLens(String cameraId) async {
+    if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo) return;
+    _captureSessionController.setUninitialized(cancelCountdown: false);
+    try {
+      await _cameraController.switchLens(cameraId);
+      if (mounted) {
+        _captureSessionController.setZoom(_cameraController.zoomMin);
+        _captureSessionController.setCameraOpened(
+          VaultCameraSessionInfo(
+            sessionId: _cameraController.sessionId ?? 0,
+            textureId: _cameraController.textureId ?? 0,
+            cameraId: cameraId,
+            zoomMin: _cameraController.zoomMin,
+            zoomMax: _cameraController.zoomMax,
+            minExposureEv: _cameraController.minExposureEv,
+            maxExposureEv: _cameraController.maxExposureEv,
+            previewWidth: _cameraController.previewWidth,
+            previewHeight: _cameraController.previewHeight,
+            sensorOrientation: _cameraController.sensorOrientation,
+            lenses: _lenses,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
+      }
+      await _initCamera(cameraId: _selectedCameraId);
     }
   }
 
@@ -322,6 +336,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     await _initCamera(cameraId: _selectedCameraId);
   }
 
+  Future<void> _changePhotoResolution(String resolution) async {
+    if (_isRecording ||
+        _isEncrypting ||
+        _isCountingDown ||
+        _isStartingVideo ||
+        _captureControls.photoResolution == resolution) {
+      return;
+    }
+    _captureControlsController.selectPhotoResolution(resolution);
+    _captureSessionController.setUninitialized(cancelCountdown: false);
+    await _initCamera(cameraId: _selectedCameraId);
+  }
+
   void _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
     if (!_cameraController.isInitialized) return;
 
@@ -334,12 +361,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _captureSessionController.setShowExposureSlider(true);
 
     try {
+      // Hardware locks focus and exposure metering onto the tapped point
       await _cameraController.setFocusAndExposurePoint(nx, ny);
-    } catch (_) {
-      // The focus reticle and exposure slider already updated via controller
-      // above; a failed native call just means this particular tap doesn't
-      // take effect on the sensor, not a crash-worthy condition.
-    }
+    } catch (_) {}
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
@@ -348,6 +372,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         setState(() {
           _focusPoint = null;
         });
+        // Returns sensor back to continuous autofocus once reticle disappears
+        unawaited(_cameraController.resetFocusAndExposure());
       }
     });
   }
@@ -388,10 +414,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _captureControlsController.setVideoMode(videoMode);
     try {
       await _cameraController.setFlash(_captureControls.flashMode);
-    } catch (_) {
-      // The control state already reflects the toggle in the UI;
-      // a failed native call is picked up again next time flash is set.
-    }
+    } catch (_) {}
   }
 
   Future<void> _startPhotoCountdownAndCapture() async {
@@ -467,7 +490,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     _captureSessionController.setStartingVideo(true);
 
-     try {
+    try {
       final name = await _vaultService.nextAvailableName(isPhoto: false);
       final virtualPath = _vaultService.buildVirtualPath(name);
 
@@ -491,6 +514,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       }
 
       _recordingStart = DateTime.now();
+      setState(() => _isRecording = true);
 
       if (!mounted) return;
       _captureSessionController.startRecording();
@@ -500,12 +524,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _stopVideoRecording,
       );
 
-      // Start the foreground recording service immediately while the app is
-      // still in the foreground. On Android 14+ (API 34), a camera/microphone
-      // foreground service cannot be started once the app is already in the
-      // background or the screen is off due to while-in-use restrictions.
-      // Starting it now ensures the persistent notification appears right away
-      // and camera/mic access is preserved when pressing Home or locking the screen.
       _backgroundRecordingActive = true;
       unawaited(
         _fileIoApi.startBackgroundRecording(
@@ -540,6 +558,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _timer?.cancel();
     final startedAt = _recordingStart;
     _recordingStart = null;
+    setState(() => _isRecording = false);
 
     _captureSessionController.setEncrypting(
       true,
@@ -600,16 +619,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
   }
 
-  Widget _rotated({required Widget child}) {
-    return AnimatedRotation(
-      turns: _iconTurns,
-      alignment: Alignment.center,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutBack,
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
@@ -645,27 +654,29 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                       );
                       if (target != _currentZoom) {
                         _captureSessionController.setZoom(target);
-                        // Best-effort: _captureSessionController above already tracks the
-                        // gesture; a dropped native zoom call just means
-                        // this frame lags the sensor by one update.
                         try {
                           await _cameraController.setZoom(target);
                         } catch (_) {}
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
-                    child: ClipRect(
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: isRotated
-                              ? _cameraController.previewHeight.toDouble()
-                              : _cameraController.previewWidth.toDouble(),
-                          height: isRotated
-                              ? _cameraController.previewWidth.toDouble()
-                              : _cameraController.previewHeight.toDouble(),
-                          child: Texture(
-                            textureId: _cameraController.textureId!,
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: 1 / _selectedAspectRatio,
+                        child: ClipRect(
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: SizedBox(
+                              width: isRotated
+                                  ? _cameraController.previewHeight.toDouble()
+                                  : _cameraController.previewWidth.toDouble(),
+                              height: isRotated
+                                  ? _cameraController.previewWidth.toDouble()
+                                  : _cameraController.previewHeight.toDouble(),
+                              child: Texture(
+                                textureId: _cameraController.textureId!,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -685,46 +696,50 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 child: CircularProgressIndicator(color: Colors.white),
               ),
 
-            if (_showExposureSlider && _focusPoint != null) ...[
-              Positioned(
-                left: _focusPoint!.dx - 30,
-                top: _focusPoint!.dy - 30,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.amber, width: 1.5),
-                  ),
-                ),
-              ),
-              if (_minExposureEv < _maxExposureEv)
-                Positioned(
-                  right: 16,
-                  top: MediaQuery.of(context).size.height * 0.3,
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: SizedBox(
-                      width: MediaQuery.of(context).size.height * 0.4,
-                      child: Slider(
-                        value: _currentExposureEv,
-                        min: _minExposureEv,
-                        max: _maxExposureEv,
-                        activeColor: Colors.amber,
-                        onChanged: (val) async {
-                          _captureSessionController.setExposureEv(val);
-                          // Same reasoning as the pinch-zoom handler above:
-                          // the slider's own state already moved.
-                          try {
-                            await _cameraController.setExposureOffset(val);
-                          } catch (_) {}
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+            // Exposure focus reticle and vertical slider
+            CameraFocusExposureOverlay(
+              focusPoint: _focusPoint,
+              showExposureSlider: _showExposureSlider,
+              currentExposureEv: _currentExposureEv,
+              minExposureEv: _minExposureEv,
+              maxExposureEv: _maxExposureEv,
+              onExposureChanged: (val) async {
+                _captureSessionController.setExposureEv(val);
+                try {
+                  await _cameraController.setExposureOffset(val);
+                } catch (_) {}
+              },
+            ),
 
-            Positioned(top: 0, left: 0, right: 0, child: _buildTopControls()),
+            // Top Bar
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: CameraTopControlsBar(
+                isVideoMode: _captureControls.isVideoMode,
+                isRecording: _isRecording,
+                isCountingDown: _isCountingDown,
+                timerText: _timerText,
+                videoQuality: _captureControls.videoQuality,
+                photoResolution: _captureControls.photoResolution,
+                selectedAspectRatio: _selectedAspectRatio,
+                onAspectRatioChanged: (ratio) => setState(() => _selectedAspectRatio = ratio),
+                timerDelaySeconds: _captureControls.timerDelaySeconds,
+                flashMode: _captureControls.flashMode,
+                iconTurns: _iconTurns,
+                onClose: () => Navigator.pop(context),
+                onVideoQualityChanged: _changeQuality,
+                onPhotoResolutionChanged: _changePhotoResolution,
+                onCycleTimerDelay: _captureControlsController.cycleTimerDelay,
+                onCycleFlashMode: () {
+                  final nextMode = _captureControlsController.cyclePhotoFlashMode();
+                  unawaited(_cameraController.setFlash(nextMode));
+                },
+              ),
+            ),
+
+            // Bottom Bar
             Positioned(
               bottom: 0,
               left: 0,
@@ -742,7 +757,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
             if (_isCountingDown)
               Center(
-                child: _rotated(
+                child: buildRotatedWidget(
+                  iconTurns: _iconTurns,
                   child: Text(
                     '$_countdownValue',
                     style: const TextStyle(
@@ -758,7 +774,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               Container(
                 color: Colors.black54,
                 child: Center(
-                  child: _rotated(
+                  child: buildRotatedWidget(
+                    iconTurns: _iconTurns,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -783,289 +800,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
   }
 
-  Widget _buildTopControls() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.black54, Colors.transparent],
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SafeArea(
-        bottom: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _rotated(
-              child: IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            if (_isRecording || _isCountingDown)
-              _rotated(
-                child: Text(
-                  _timerText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            else
-              Row(
-                children: [
-                  PopupMenuButton<String>(
-                    initialValue: _captureControls.videoQuality,
-                    color: Colors.black87,
-                    onSelected: _changeQuality,
-                   itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'sd',
-                        child: Text(
-                          '480P (SD)',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'hd',
-                        child: Text(
-                          '720P (HD)',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'fhd',
-                        child: Text(
-                          '1080P (FHD)',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'uhd',
-                        child: Text(
-                          '4K (UHD)',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ],
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _rotated(
-                        child: Text(
-                          _captureControls.videoQuality.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!_captureControls.isVideoMode) ...[
-                    _rotated(
-                      child: IconButton(
-                        icon: Icon(
-                          _captureControls.timerDelaySeconds == 3
-                              ? Icons.timer_3_rounded
-                              : _captureControls.timerDelaySeconds == 10
-                              ? Icons.timer_10_rounded
-                              : Icons.timer_off_rounded,
-                          color: _captureControls.timerDelaySeconds > 0
-                              ? Colors.amber
-                              : Colors.white,
-                        ),
-                        onPressed: _captureControlsController.cycleTimerDelay,
-                      ),
-                    ),
-                    _rotated(
-                      child: IconButton(
-                        icon: Icon(
-                          _captureControls.flashMode == 'auto'
-                              ? Icons.flash_auto_rounded
-                              : (_captureControls.flashMode == 'on' ||
-                                    _captureControls.flashMode == 'torch')
-                              ? Icons.flash_on_rounded
-                              : Icons.flash_off_rounded,
-                          color: _captureControls.flashMode == 'off'
-                              ? Colors.white
-                              : Colors.amber,
-                        ),
-                        onPressed: () {
-                          final nextMode = _captureControlsController
-                              .cyclePhotoFlashMode();
-                          unawaited(_cameraController.setFlash(nextMode));
-                        },
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildZoomSelector() {
-    final currentLens = _lenses.firstWhere(
-      (l) => l.cameraId == _selectedCameraId,
-      orElse: () =>
-          _lenses.firstOrNull ??
-          const NativeCameraLens(
-            cameraId: '',
-            facing: 'back',
-            isLogical: false,
-            zoomMin: 1.0,
-            zoomMax: 1.0,
-          ),
-    );
-    final isBackCamera = currentLens.facing == 'back';
-
-    final List<({double zoom, String? switchCameraId})> options = [];
-
-    if (isBackCamera) {
-      final backLenses = _lenses.where((l) => l.facing == 'back').toList();
-      if (backLenses.length > 1) {
-        for (final lens in backLenses) {
-          options.add((zoom: lens.relativeZoom, switchCameraId: lens.cameraId));
-        }
-      } else {
-        if (_minZoom <= 0.6) {
-          options.add((zoom: _minZoom, switchCameraId: null));
-        }
-        if (_minZoom <= 1.0 && _maxZoom >= 1.0) {
-          options.add((zoom: 1.0, switchCameraId: null));
-        }
-        if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
-        if (_maxZoom >= 5.0) options.add((zoom: 5.0, switchCameraId: null));
-      }
-    } else {
-      if (_minZoom <= 1.0 && _maxZoom >= 1.0) {
-        options.add((zoom: 1.0, switchCameraId: null));
-      }
-      if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
-    }
-
-    if (options.length <= 1) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: options.map((option) {
-        final zoom = option.zoom;
-        bool isSelected = false;
-        if (option.switchCameraId != null) {
-          isSelected = option.switchCameraId == _selectedCameraId;
-        } else {
-          if (zoom <= 0.8 && _currentZoom < 0.8) {
-            isSelected = true;
-          } else if (zoom > 0.8 &&
-              zoom < 1.5 &&
-              _currentZoom >= 0.8 &&
-              _currentZoom < 1.5){
-            isSelected = true;}
-          else if (zoom >= 1.5 &&
-              zoom < 3.5 &&
-              _currentZoom >= 1.5 &&
-              _currentZoom < 3.5){
-            isSelected = true;}
-          else if (zoom >= 3.5 && _currentZoom >= 3.5){
-            isSelected = true;}
-        }
-
-        String label;
-        if ((zoom - 1.0).abs() < 0.05) {
-          label = '1x';
-        } else if (zoom < 1.0) {
-          label = '${zoom.toStringAsFixed(1)}x';
-        } else {
-          label = '${zoom.round()}x';
-        }
-
-        return GestureDetector(
-          onTap: () async {
-            if (_isRecording ||
-                _isEncrypting ||
-                _isCountingDown ||
-                _isStartingVideo) {
-              return;
-            }
-            HapticFeedback.selectionClick();
-
-            if (option.switchCameraId != null &&
-                option.switchCameraId != _selectedCameraId) {
-              _captureSessionController.setUninitialized(cancelCountdown: false);
-              try {
-                await _cameraController.switchLens(option.switchCameraId!);
-                if (mounted) {
-                  _captureSessionController.setZoom(_cameraController.zoomMin);
-                  _captureSessionController.setCameraOpened(
-                    VaultCameraSessionInfo(
-                      sessionId: _cameraController.sessionId ?? 0,
-                      textureId: _cameraController.textureId ?? 0,
-                      cameraId: option.switchCameraId!,
-                      zoomMin: _cameraController.zoomMin,
-                      zoomMax: _cameraController.zoomMax,
-                      minExposureEv: _cameraController.minExposureEv,
-                      maxExposureEv: _cameraController.maxExposureEv,
-                      previewWidth: _cameraController.previewWidth,
-                      previewHeight: _cameraController.previewHeight,
-                      sensorOrientation: _cameraController.sensorOrientation,
-                      lenses: _lenses,
-                    ),
-                  );
-                }
-              } catch (e) {
-                // Lens switch can fail if a lens can't be opened as a
-                // standalone stream; fall back to re-opening the previously
-                // selected lens instead of leaving the screen stuck on a
-                // blank/uninitialized preview.
-                if (mounted) {
-                  _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
-                }
-                await _initCamera(cameraId: _selectedCameraId);
-              }
-              return;
-            }
-            _captureSessionController.setZoom(zoom);
-            try {
-              await _cameraController.setZoom(zoom);
-            } catch (_) {
-              // Same reasoning as the other zoom/exposure handlers in this
-              // file: the UI state above already moved.
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: isSelected ? Colors.amber : Colors.black45,
-            ),
-            child: _rotated(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Widget _buildBottomControls() {
     return Container(
       decoration: const BoxDecoration(
@@ -1082,14 +816,29 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!_isRecording && !_isCountingDown) ...[
-              _buildZoomSelector(),
+              CameraLensSelectorBar(
+                lenses: _lenses,
+                selectedCameraId: _selectedCameraId,
+                currentZoom: _currentZoom,
+                minZoom: _minZoom,
+                maxZoom: _maxZoom,
+                iconTurns: _iconTurns,
+                onSwitchLens: _switchLens,
+                onSetZoom: (zoom) async {
+                  _captureSessionController.setZoom(zoom);
+                  try {
+                    await _cameraController.setZoom(zoom);
+                  } catch (_) {}
+                },
+              ),
               const SizedBox(height: 16),
             ],
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _rotated(
+                buildRotatedWidget(
+                  iconTurns: _iconTurns,
                   child: IconButton(
                     icon: const Icon(
                       Icons.flip_camera_ios_rounded,
@@ -1112,16 +861,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
-                      width: _captureControls.isVideoMode && _isRecording
-                          ? 30
-                          : 60,
-                      height: _captureControls.isVideoMode && _isRecording
-                          ? 30
-                          : 60,
+                      width: _captureControls.isVideoMode && _isRecording ? 30 : 60,
+                      height: _captureControls.isVideoMode && _isRecording ? 30 : 60,
                       decoration: BoxDecoration(
-                        color: _captureControls.isVideoMode
-                            ? Colors.red
-                            : Colors.white,
+                        color: _captureControls.isVideoMode ? Colors.red : Colors.white,
                         borderRadius: BorderRadius.circular(
                           _captureControls.isVideoMode && _isRecording ? 8 : 30,
                         ),
@@ -1149,7 +892,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }) {
       return GestureDetector(
         onTap: onTap,
-        child: _rotated(
+        child: buildRotatedWidget(
+          iconTurns: _iconTurns,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(8),

@@ -11,6 +11,8 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.MeteringRectangle
+import android.hardware.camera2.params.OutputConfiguration
+import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
 import android.media.MediaCodec
@@ -22,28 +24,13 @@ import android.util.Size
 import android.view.Surface
 import io.flutter.view.TextureRegistry
 import java.io.File
+import java.util.concurrent.Executor
 import javax.crypto.SecretKey
 import kotlin.math.abs
 import com.aeidolon.vaultexplorer.VeLog
 
 private const val TAG = "VaultCameraSession"
 
-/**
- * Owns one Camera2 device + one CameraCaptureSession for its whole
- * lifetime (until close()/lens switch). The session's output surfaces
- * are fixed at creation time -- preview, JPEG ImageReader, and the video
- * encoder's input Surface are ALL registered up front, so toggling
- * between photo/video mode or starting/stopping a recording only ever
- * changes which surfaces the *repeating request* targets (fast) rather
- * than reconfiguring the session (slow) -- that reconfigure was the
- * source of the multi-second "entering video mode" delay in the old
- * package:camera/CameraX implementation.
- *
- * Lens enumeration reads CameraCharacteristics directly and never opens
- * a camera to do it, which also removes the concurrent-camera race the
- * old zoom-range probing code could hit (opening one lens while another
- * was still asynchronously closing).
- */
 class VaultCameraSession(
     private val context: Context,
     private val textureRegistry: TextureRegistry,
@@ -70,20 +57,22 @@ class VaultCameraSession(
     private var zoomMaxCurrent = 1f
     private var currentZoom = 1f
     private var sensorArraySize: Rect? = null
-    // Locks the sensor to a fixed rate matching TARGET_RECORDING_FPS (see
-    // VaultVideoRecorder.prepareEncoder's setVideoFrameRate). Without an
-    // explicit CONTROL_AE_TARGET_FPS_RANGE, nothing constrains the actual
-    // capture rate, and in good lighting many HALs default
-    // TEMPLATE_RECORD/TEMPLATE_PREVIEW to a variable or higher range --
-    // observed on-device delivering close to double the configured frame
-    // rate. The encoder still allocates its target bitrate per frame
-    // assuming TARGET_RECORDING_FPS arrives, so when frames actually
-    // arrive faster than that, the output bitrate overshoots the
-    // configured target by roughly the same ratio (and playback duration
-    // metadata ends up inconsistent with the real frame count). Chosen
-    // once per open()/switchLens() via pickFixedFpsRange(), since it
-    // depends on this lens's CameraCharacteristics.
     private var recordingFpsRange: Range<Int>? = null
+
+    // Hardware capability safeguards
+    private var isFixedFocus = false
+    private var maxAfRegions = 0
+    private var maxAeRegions = 0
+    private var isFlashSupported = false
+
+    // Tap-to-focus & metering state
+    private var activeAfRegions: Array<MeteringRectangle>? = null
+    private var activeAeRegions: Array<MeteringRectangle>? = null
+    private var isTapToFocusActive = false
+
+    // Manual controls
+    private var awbMode: Int = CaptureRequest.CONTROL_AWB_MODE_AUTO
+    private var effectMode: Int = CaptureRequest.CONTROL_EFFECT_MODE_OFF
 
     private var flashMode = VaultFlashMode.OFF
     private var minExposureSteps = 0
@@ -91,16 +80,11 @@ class VaultCameraSession(
     private var exposureStepValue = 1.0 / 6.0
     private var currentExposureSteps = 0
     private var lastOrientationDegrees = 0
-    // The orientation hint that was actually baked into `videoRecorder` at
-    // prepare() time (MediaRecorder can't have its orientation hint changed
-    // once prepared). Used to detect when the device has rotated since the
-    // recorder was last (re)prepared, so the *next* recording picks up the
-    // rotation the phone is actually being held in instead of a stale one
-    // from whenever the session/lens was opened or the previous clip ended.
     private var lastPreparedOrientationDegrees: Int? = null
     private var photoSize: Size = Size(1920, 1080)
     private var videoSize: Size = Size(1920, 1080)
     private var pendingQuality: VaultVideoQuality = VaultVideoQuality.FHD
+    private var pendingPhotoResolution: VaultPhotoResolution = VaultPhotoResolution.MAX
     private var currentPreviewWidth: Int = 1920
     private var currentPreviewHeight: Int = 1080
 
@@ -110,62 +94,33 @@ class VaultCameraSession(
     private var pendingOpenResult: ((Boolean, String?) -> Unit)? = null
     private var pendingCloseCallback: (() -> Unit)? = null
     private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
-    // Set by takePhoto()/takePhotoToScratchpad() right before the capture
-    // request is submitted; consumed by onJpegAvailable() once the JPEG
-    // bytes actually arrive -- a ChunkSink rather than a (volId, path)
-    // pair so either capture destination flows through the same path.
     private var pendingPhotoWriter: ChunkSink? = null
+    private var isTriStreamSupported = false
 
     val currentCameraId: String get() = activeCameraId
     val currentZoomMin: Float get() = zoomMinCurrent
     val currentZoomMax: Float get() = zoomMaxCurrent
     val currentMinExposureEv: Double get() = minExposureSteps * exposureStepValue
     val currentMaxExposureEv: Double get() = maxExposureSteps * exposureStepValue
-    // Raw sensor-space preview dimensions (e.g. 1920x1080, always in the
-    // camera's landscape sensor orientation regardless of how the phone is
-    // held) plus the sensor's mounting angle, so Dart can work out the
-    // correct on-screen aspect ratio for the Texture instead of stretching
-    // it to whatever size the widget happens to be given.
     val previewWidth: Int get() = currentPreviewWidth
     val previewHeight: Int get() = currentPreviewHeight
     val sensorOrientationDegrees: Int get() = characteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
-    // ── Static enumeration -- no camera is opened for this ─────────────
-
     fun listLenses(): List<CameraLensInfo> = listCameraLenses(cameraManager)
 
-    // ── Thread confinement ──────────────────────────────────────────────
-    //
-    // Every field on this class (cameraDevice, captureSession, videoRecorder,
-    // isRecording, recordingChunkWriter, pending*Callback, etc.) is read and
-    // written ONLY from bgThread's looper. Camera2 already delivers all of
-    // its callbacks there (openCamera/createCaptureSession/ImageReader are
-    // all handed `bgHandler` explicitly below), but the public entry points
-    // on this class used to run on whatever thread called them -- in
-    // practice the Flutter platform (main) thread, via VaultCameraPlugin's
-    // MethodChannel handler. That meant two threads could read/write the
-    // same non-volatile, unsynchronized fields concurrently with no
-    // happens-before relationship between them: a classic data race, whose
-    // symptoms are intermittent and hard to reproduce (a zoom/flash call
-    // landing mid-reconfigure silently no-ops, a stale captureSession
-    // reference throws, etc.) rather than a clean crash every time.
-    //
-    // runOnCameraThread() posts every entry point's body onto bgHandler so
-    // ALL field access -- from external callers and from Camera2's own
-    // callbacks alike -- happens on a single thread. That also gets rid of
-    // the "*Locked" naming on the private helpers below, which used to imply
-    // a synchronization discipline that was never actually enforced by a
-    // lock; thread confinement now provides the real guarantee.
     private fun runOnCameraThread(block: () -> Unit) {
         if (Thread.currentThread() === bgThread) block() else bgHandler.post(block)
     }
 
-    // ── Open / close ────────────────────────────────────────────────────
-
-    fun open(cameraId: String, videoQuality: VaultVideoQuality, callback: (Boolean, String?) -> Unit) {
+    fun open(
+        cameraId: String,
+        videoQuality: VaultVideoQuality,
+        photoResolution: VaultPhotoResolution = VaultPhotoResolution.MAX,
+        callback: (Boolean, String?) -> Unit
+    ) {
         runOnCameraThread {
             closeCameraOnly {
-                openInternal(cameraId, videoQuality, callback)
+                openInternal(cameraId, videoQuality, photoResolution, callback)
             }
         }
     }
@@ -173,7 +128,7 @@ class VaultCameraSession(
     fun switchLens(cameraId: String, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
             closeCameraOnly {
-                openInternal(cameraId, pendingQuality, callback)
+                openInternal(cameraId, pendingQuality, pendingPhotoResolution, callback)
             }
         }
     }
@@ -183,6 +138,7 @@ class VaultCameraSession(
             closeCameraOnly {
                 jpegReader?.close()
                 jpegReader = null
+                previewSurface?.release()
                 previewSurface = null
                 try { textureEntry.release() } catch (_: Exception) {}
                 bgThread.quitSafely()
@@ -190,15 +146,21 @@ class VaultCameraSession(
         }
     }
 
-    private fun openInternal(cameraId: String, videoQuality: VaultVideoQuality, callback: (Boolean, String?) -> Unit) {
+    private fun openInternal(
+        cameraId: String,
+        videoQuality: VaultVideoQuality,
+        photoResolution: VaultPhotoResolution,
+        callback: (Boolean, String?) -> Unit
+    ) {
         try {
             @Suppress("MissingPermission")
             val chars = cameraManager.getCameraCharacteristics(cameraId)
             characteristics = chars
             activeCameraId = cameraId
             pendingQuality = videoQuality
+            pendingPhotoResolution = photoResolution
             pendingOpenResult = callback
-            configureSizesAndSurfacesLocked(chars, videoQuality)
+            configureSizesAndSurfacesLocked(chars, videoQuality, photoResolution)
             cameraManager.openCamera(cameraId, deviceStateCallback, bgHandler)
         } catch (e: Exception) {
             callback(false, e.message)
@@ -215,11 +177,6 @@ class VaultCameraSession(
         captureSession = null
         videoRecorder?.releaseEncoder()
         videoRecorder = null
-        // Wait for the real close callback before proceeding -- Android's
-        // CameraDevice.close() is asynchronous at the HAL level (can take
-        // 1-2s), and opening the next camera before it actually finishes
-        // is what caused "Unsupported set of inputs/outputs provided"
-        // configuration failures with a timer-based guess-delay approach.
         pendingCloseCallback = then
         device.close()
         cameraDevice = null
@@ -230,25 +187,46 @@ class VaultCameraSession(
             cameraDevice = device
             createSessionLocked()
         }
+
         override fun onDisconnected(device: CameraDevice) {
             device.close()
             cameraDevice = null
         }
+
+        // Safeguard: Clean teardown on fatal hardware error so next open won't hang
         override fun onError(device: CameraDevice, error: Int) {
-            device.close()
+            VeLog.e(TAG) { "Camera device error $error on device ${device.id}" }
+            try { captureSession?.close() } catch (_: Exception) {}
+            try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
+            captureSession = null
+            videoRecorder = null
+            try { device.close() } catch (_: Exception) {}
             cameraDevice = null
+
             pendingOpenResult?.invoke(false, "camera error $error")
             pendingOpenResult = null
             onEvent(mapOf("event" to "error", "message" to "camera error $error"))
         }
+
         override fun onClosed(device: CameraDevice) {
             pendingCloseCallback?.let { cb -> pendingCloseCallback = null; cb() }
         }
     }
 
-    private fun configureSizesAndSurfacesLocked(chars: CameraCharacteristics, videoQuality: VaultVideoQuality) {
+    private fun configureSizesAndSurfacesLocked(
+        chars: CameraCharacteristics,
+        videoQuality: VaultVideoQuality,
+        photoResolution: VaultPhotoResolution
+    ) {
         val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
             ?: throw IllegalStateException("no stream configuration map for $activeCameraId")
+
+        // Safeguard: Detect fixed-focus lenses (Wide/IR/Macro)
+        val minFocusDist = chars.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+        isFixedFocus = minFocusDist == null || minFocusDist == 0f
+        maxAfRegions = chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+        maxAeRegions = chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0
+        isFlashSupported = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false
 
         zoomRatioSupported = Build.VERSION.SDK_INT >= 30 && chars.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) != null
         if (zoomRatioSupported) {
@@ -275,17 +253,24 @@ class VaultCameraSession(
             chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES),
             TARGET_RECORDING_FPS,
         )
-        VeLog.d(TAG) { "configureSizesAndSurfacesLocked: recordingFpsRange=$recordingFpsRange" }
 
+        // Photo size strictly follows the chosen photo resolution
         val jpegSizes = map.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
-        photoSize = chooseSize(jpegSizes, 4000)
+        photoSize = chooseSize(jpegSizes, photoResolution.targetLongEdge, capAt1080p = false)
 
+        // Video size selects closest height (480p, 720p, 1080p, 2160p)
         val videoSizes = map.getOutputSizes(MediaCodec::class.java)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
-        videoSize = chooseSize(videoSizes, videoQuality.targetLongEdge)
+        videoSize = chooseVideoSizeByHeight(videoSizes, videoQuality.targetVideoHeight)
 
+        // Safeguard: Cap preview size at 1920 to stay within CDD limits
         val previewSizes = map.getOutputSizes(SurfaceTexture::class.java)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
-        val previewSize = chooseSize(previewSizes, 1920)
+        val photoAspect = photoSize.width.toFloat() / photoSize.height.toFloat()
+        val previewSize = previewSizes
+            .filter { abs((it.width.toFloat() / it.height.toFloat()) - photoAspect) < 0.05f }
+            .ifEmpty { previewSizes }
+            .let { chooseSize(it, 1920, capAt1080p = true) }
 
+        previewSurface?.release()
         surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
         previewSurface = Surface(surfaceTexture)
 
@@ -294,54 +279,118 @@ class VaultCameraSession(
         reader.setOnImageAvailableListener({ r -> onJpegAvailable(r) }, bgHandler)
         jpegReader = reader
 
-        val recorder = VaultVideoRecorder(videoSize.width, videoSize.height, videoQuality, recordAudio = true, cacheDir = context.cacheDir)
         val orientation = computeCaptureOrientation()
-        recorder.prepareEncoder(orientation)
+        val recorder = safePrepareRecorder(videoSize.width, videoSize.height, videoQuality, orientation)
         lastPreparedOrientationDegrees = orientation
         videoRecorder = recorder
         currentPreviewWidth = previewSize.width
         currentPreviewHeight = previewSize.height
+
+        // Auxiliary cameras (IR, Wide, Macro) must never attach 3 streams; only Camera 0 does
+        val hwLevel = chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+            ?: CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY
+        val isPrimaryCamera = activeCameraId == "0" || activeCameraId == "1"
+
+        isTriStreamSupported = isPrimaryCamera &&
+            hwLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY &&
+            hwLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
+    }
+
+    private fun safePrepareRecorder(
+        width: Int,
+        height: Int,
+        quality: VaultVideoQuality,
+        orientation: Int
+    ): VaultVideoRecorder {
+        return try {
+            val recorder = VaultVideoRecorder(width, height, quality, recordAudio = true, cacheDir = context.cacheDir)
+            recorder.prepareEncoder(orientation)
+            recorder
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "Failed to prepare encoder at ${width}x$height, falling back to 1080p" }
+            try {
+                val fallback = VaultVideoRecorder(1920, 1080, VaultVideoQuality.FHD, recordAudio = true, cacheDir = context.cacheDir)
+                fallback.prepareEncoder(orientation)
+                fallback
+            } catch (e2: Exception) {
+                VeLog.w(TAG, e2) { "1080p fallback failed, falling back to 720p" }
+                val fallback720 = VaultVideoRecorder(1280, 720, VaultVideoQuality.HD, recordAudio = true, cacheDir = context.cacheDir)
+                fallback720.prepareEncoder(orientation)
+                fallback720
+            }
+        }
     }
 
     private fun createSessionLocked() {
         val device = cameraDevice ?: return
-        val outputs = listOfNotNull(previewSurface, jpegReader?.surface, videoRecorder?.inputSurface)
+
+        // Auxiliary lenses use 2 streams: [preview, photo] when idle, [preview, video] when recording
+        val outputs = if (isTriStreamSupported) {
+            listOfNotNull(previewSurface, jpegReader?.surface, videoRecorder?.inputSurface)
+        } else {
+            if (isRecording) {
+                listOfNotNull(previewSurface, videoRecorder?.inputSurface)
+            } else {
+                listOfNotNull(previewSurface, jpegReader?.surface)
+            }
+        }
+
         try {
-            device.createCaptureSession(outputs, object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(session: CameraCaptureSession) {
-                    captureSession = session
-                    isRecording = false
-                    updateRepeatingRequest()
-                    pendingOpenResult?.invoke(true, null)
-                    pendingOpenResult = null
-                }
-                override fun onConfigureFailed(session: CameraCaptureSession) {
-                    pendingOpenResult?.invoke(false, "session configuration failed")
-                    pendingOpenResult = null
-                }
-            }, bgHandler)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val outputConfigs = outputs.map { OutputConfiguration(it) }
+                val sessionConfig = SessionConfiguration(
+                    SessionConfiguration.SESSION_REGULAR,
+                    outputConfigs,
+                    Executor { command -> bgHandler.post(command) },
+                    object : CameraCaptureSession.StateCallback() {
+                        override fun onConfigured(session: CameraCaptureSession) {
+                            captureSession = session
+                            updateRepeatingRequest()
+                            pendingOpenResult?.invoke(true, null)
+                            pendingOpenResult = null
+                        }
+                        override fun onConfigureFailed(session: CameraCaptureSession) {
+                            try { session.close() } catch (_: Exception) {}
+                            blacklistedCameraIds.add(activeCameraId)
+                            pendingOpenResult?.invoke(false, "session configuration failed")
+                            pendingOpenResult = null
+                        }
+                    }
+                )
+                device.createCaptureSession(sessionConfig)
+            } else {
+                @Suppress("DEPRECATION")
+                device.createCaptureSession(outputs, object : CameraCaptureSession.StateCallback() {
+                    override fun onConfigured(session: CameraCaptureSession) {
+                        captureSession = session
+                        updateRepeatingRequest()
+                        pendingOpenResult?.invoke(true, null)
+                        pendingOpenResult = null
+                    }
+                    override fun onConfigureFailed(session: CameraCaptureSession) {
+                        try { session.close() } catch (_: Exception) {}
+                        blacklistedCameraIds.add(activeCameraId)
+                        pendingOpenResult?.invoke(false, "session configuration failed")
+                        pendingOpenResult = null
+                    }
+                }, bgHandler)
+            }
         } catch (e: Exception) {
+            blacklistedCameraIds.add(activeCameraId)
             pendingOpenResult?.invoke(false, e.message)
             pendingOpenResult = null
         }
     }
-
-    // ── Repeating request / controls ───────────────────────────────────
 
     private fun updateRepeatingRequest() {
         val session = captureSession ?: return
         try {
             session.setRepeatingRequest(buildRequest(), null, bgHandler)
         } catch (e: Exception) {
-            VeLog.e("VaultCameraSession", e) { "updateRepeatingRequest failed" }
+            VeLog.e(TAG, e) { "updateRepeatingRequest failed" }
         }
     }
 
-    /** Shared by buildRequest() and setFocusAndExposurePoint() -- both need
-     *  the same device/template/target-surface/control setup and previously
-     *  duplicated it, which meant a future control had to be remembered in
-     *  two places. Each caller adds whatever's specific to it (AF/AE region
-     *  overrides, etc.) on top of the returned builder. */
     private fun newRequestBuilder(): CaptureRequest.Builder {
         val device = cameraDevice ?: throw IllegalStateException("no camera device")
         val template = if (isRecording) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW
@@ -356,44 +405,155 @@ class VaultCameraSession(
 
     private fun applyControls(builder: CaptureRequest.Builder) {
         builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
-        builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+
+        // Safeguard: Fixed-focus lenses MUST be set to AF_MODE_OFF
+        if (isFixedFocus) {
+            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+        } else if (isTapToFocusActive && activeAfRegions != null && maxAfRegions > 0) {
+            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+            builder.set(CaptureRequest.CONTROL_AF_REGIONS, activeAfRegions)
+        } else {
+            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+        }
+
+        // Apply AE metering region only if hardware supports it
+        if (isTapToFocusActive && activeAeRegions != null && maxAeRegions > 0) {
+            builder.set(CaptureRequest.CONTROL_AE_REGIONS, activeAeRegions)
+        }
+
         builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, currentExposureSteps)
-        recordingFpsRange?.let { builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+        if (isRecording) {
+            recordingFpsRange?.let { builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+        }
+
         applyZoom(builder)
         applyFlash(builder)
+        applyWhiteBalance(builder)
+        applyColorEffect(builder)
     }
 
+    // Safeguard: EV offset bounds check
     fun setExposureOffsetEv(ev: Double) {
         runOnCameraThread {
-            val steps = if (exposureStepValue == 0.0) 0 else (ev / exposureStepValue).toInt()
+            if (minExposureSteps >= maxExposureSteps || exposureStepValue <= 0.0) {
+                currentExposureSteps = 0
+                return@runOnCameraThread
+            }
+            val steps = (ev / exposureStepValue).toInt()
             currentExposureSteps = steps.coerceIn(minExposureSteps, maxExposureSteps)
             updateRepeatingRequest()
         }
     }
 
-    /** [nx]/[ny] normalized (0..1) tap position within the preview. */
+    // Safeguard: Coordinate mapping accounting for 90°/270° sensor mounting and zoom
     fun setFocusAndExposurePoint(nx: Float, ny: Float) {
         runOnCameraThread {
-            val rect = sensorArraySize ?: return@runOnCameraThread
             val session = captureSession ?: return@runOnCameraThread
-            val halfW = (rect.width() * 0.05f).toInt().coerceAtLeast(1)
-            val halfH = (rect.height() * 0.05f).toInt().coerceAtLeast(1)
-            val cx = (rect.left + (nx.coerceIn(0f, 1f) * rect.width()).toInt()).coerceIn(rect.left, rect.right)
-            val cy = (rect.top + (ny.coerceIn(0f, 1f) * rect.height()).toInt()).coerceIn(rect.top, rect.bottom)
-            val left = (cx - halfW).coerceIn(rect.left, rect.right - 1)
-            val top = (cy - halfH).coerceIn(rect.top, rect.bottom - 1)
-            val right = (cx + halfW).coerceIn(left + 1, rect.right)
-            val bottom = (cy + halfH).coerceIn(top + 1, rect.bottom)
-            val region = MeteringRectangle(left, top, right - left, bottom - top, MeteringRectangle.METERING_WEIGHT_MAX)
-            try {
-                val builder = newRequestBuilder()
-                builder.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(region))
-                builder.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(region))
-                builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
-                session.capture(builder.build(), null, bgHandler)
-            } catch (e: Exception) {
-                VeLog.e("VaultCameraSession", e) { "focus/expose failed" }
+            val chars = characteristics ?: return@runOnCameraThread
+            val activeArray = sensorArraySize ?: return@runOnCameraThread
+
+            val sensorOrientation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+            val isFront = chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+
+            // Rotate normalized portrait touch into sensor landscape space
+            val (sensorNormX, sensorNormY) = when (sensorOrientation) {
+                90 -> if (isFront) Pair(ny, nx) else Pair(ny, 1f - nx)
+                270 -> if (isFront) Pair(1f - ny, 1f - nx) else Pair(1f - ny, nx)
+                else -> Pair(nx, ny)
             }
+
+            // Scale to active crop area
+            val cropRect = if (zoomRatioSupported) {
+                activeArray
+            } else {
+                val cropW = (activeArray.width() / currentZoom).toInt().coerceAtLeast(1)
+                val cropH = (activeArray.height() / currentZoom).toInt().coerceAtLeast(1)
+                val left = activeArray.left + (activeArray.width() - cropW) / 2
+                val top = activeArray.top + (activeArray.height() - cropH) / 2
+                Rect(left, top, left + cropW, top + cropH)
+            }
+
+            val focusX = cropRect.left + (sensorNormX.coerceIn(0f, 1f) * cropRect.width()).toInt()
+            val focusY = cropRect.top + (sensorNormY.coerceIn(0f, 1f) * cropRect.height()).toInt()
+            val boxHalfW = (cropRect.width() * 0.06f).toInt().coerceAtLeast(20)
+            val boxHalfH = (cropRect.height() * 0.06f).toInt().coerceAtLeast(20)
+
+            val left = (focusX - boxHalfW).coerceIn(cropRect.left, cropRect.right - 1)
+            val top = (focusY - boxHalfH).coerceIn(cropRect.top, cropRect.bottom - 1)
+            val right = (focusX + boxHalfW).coerceIn(left + 1, cropRect.right)
+            val bottom = (focusY + boxHalfH).coerceIn(top + 1, cropRect.bottom)
+
+            val region = MeteringRectangle(left, top, right - left, bottom - top, MeteringRectangle.METERING_WEIGHT_MAX)
+            activeAfRegions = if (!isFixedFocus && maxAfRegions > 0) arrayOf(region) else null
+            activeAeRegions = if (maxAeRegions > 0) arrayOf(region) else null
+            isTapToFocusActive = true
+
+            updateRepeatingRequest()
+
+            if (!isFixedFocus) {
+                try {
+                    val builder = newRequestBuilder()
+                    builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+                    activeAfRegions?.let { builder.set(CaptureRequest.CONTROL_AF_REGIONS, it) }
+                    activeAeRegions?.let { builder.set(CaptureRequest.CONTROL_AE_REGIONS, it) }
+                    builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
+                    session.capture(builder.build(), null, bgHandler)
+                } catch (e: Exception) {
+                    VeLog.e(TAG, e) { "Failed to trigger focus scan" }
+                }
+            }
+        }
+    }
+
+    fun resetFocusAndExposure() {
+        runOnCameraThread {
+            if (!isTapToFocusActive) return@runOnCameraThread
+            isTapToFocusActive = false
+            activeAfRegions = null
+            activeAeRegions = null
+            updateRepeatingRequest()
+
+            if (!isFixedFocus) {
+                try {
+                    val builder = newRequestBuilder()
+                    builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL)
+                    captureSession?.capture(builder.build(), null, bgHandler)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun applyWhiteBalance(builder: CaptureRequest.Builder) {
+        builder.set(CaptureRequest.CONTROL_AWB_MODE, awbMode)
+    }
+
+    fun setWhiteBalance(modeStr: String) {
+        runOnCameraThread {
+            awbMode = when (modeStr.lowercase()) {
+                "daylight" -> CaptureRequest.CONTROL_AWB_MODE_DAYLIGHT
+                "cloudy" -> CaptureRequest.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT
+                "incandescent" -> CaptureRequest.CONTROL_AWB_MODE_INCANDESCENT
+                "fluorescent" -> CaptureRequest.CONTROL_AWB_MODE_FLUORESCENT
+                else -> CaptureRequest.CONTROL_AWB_MODE_AUTO
+            }
+            updateRepeatingRequest()
+        }
+    }
+
+    private fun applyColorEffect(builder: CaptureRequest.Builder) {
+        builder.set(CaptureRequest.CONTROL_EFFECT_MODE, effectMode)
+    }
+
+    fun setColorEffect(effectStr: String) {
+        runOnCameraThread {
+            effectMode = when (effectStr.lowercase()) {
+                "mono" -> CaptureRequest.CONTROL_EFFECT_MODE_MONO
+                "negative" -> CaptureRequest.CONTROL_EFFECT_MODE_NEGATIVE
+                "sepia" -> CaptureRequest.CONTROL_EFFECT_MODE_SEPIA
+                "solarize" -> CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE
+                else -> CaptureRequest.CONTROL_EFFECT_MODE_OFF
+            }
+            updateRepeatingRequest()
         }
     }
 
@@ -410,7 +570,13 @@ class VaultCameraSession(
         builder.set(CaptureRequest.SCALER_CROP_REGION, Rect(left, top, left + cropW, top + cropH))
     }
 
+    // Safeguard: Check if physical flash unit actually exists
     private fun applyFlash(builder: CaptureRequest.Builder) {
+        if (!isFlashSupported) {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+            builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            return
+        }
         when (flashMode) {
             VaultFlashMode.OFF -> {
                 builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
@@ -439,61 +605,30 @@ class VaultCameraSession(
         }
     }
 
-    /** [deviceRotationDegrees]: 0/90/180/270, how far the physical device is
-     *  rotated from its natural (portrait) orientation -- the same value
-     *  the old lockCaptureOrientation()-based Dart code already computed
-     *  from the accelerometer. Applied to the next photo/video capture. */
     fun setOrientationDegrees(deviceRotationDegrees: Int) {
         runOnCameraThread {
             val normalized = ((deviceRotationDegrees % 360) + 360) % 360
             if (normalized == lastOrientationDegrees) return@runOnCameraThread
             lastOrientationDegrees = normalized
-
-            // Bake the new orientation into the video encoder right away, while
-            // the phone is just sitting in preview -- not only after a recording
-            // stops. Previously the encoder's orientation hint was set once when
-            // the session/lens was opened (or right after the *previous* clip
-            // finished) and never touched again, so a video recorded after
-            // rotating the phone kept the old, wrong rotation baked into its
-            // MP4 metadata. Skipped mid-recording since MediaRecorder can't be
-            // reconfigured once started -- that recording keeps the orientation
-            // it began with, which is correct for it; the rotation will be
-            // picked up for the recording after it via the same post-stop path.
             if (!isRecording) {
                 reprepareVideoRecorder(force = false, reason = "orientation changed")
             }
         }
     }
 
-    /**
-     * (Re)prepares the video encoder and reconfigures the capture session to
-     * point at its fresh output Surface. A MediaRecorder can't be started
-     * twice, or have its orientation hint changed, once prepare() has run --
-     * so both "the previous clip just stopped and needs a fresh instance"
-     * (called from stopRecording(), [force]=true since videoRecorder has
-     * already been torn down and MUST be replaced regardless of orientation)
-     * and "the phone rotated while idle and the baked-in orientation is now
-     * stale" (called from setOrientationDegrees(), [force]=false so it's a
-     * no-op when the orientation hasn't actually changed) need the same
-     * fresh-instance-plus-session-reconfigure dance. Doing it here -- right
-     * after a clip stops, or as soon as the phone rotates while idle --
-     * hides that cost from the user instead of paying it the next time they
-     * press record.
-     */
     private fun reprepareVideoRecorder(force: Boolean, reason: String) {
         if (characteristics == null || cameraDevice == null) return
         val needed = computeCaptureOrientation()
         if (!force && needed == lastPreparedOrientationDegrees) return
         try {
-            val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
-            fresh.prepareEncoder(needed)
+            val fresh = safePrepareRecorder(videoSize.width, videoSize.height, pendingQuality, needed)
             videoRecorder?.releaseEncoder()
             videoRecorder = fresh
             lastPreparedOrientationDegrees = needed
             VeLog.d(TAG) { "reprepareVideoRecorder($reason): orientation=$needed, reconfiguring session" }
             createSessionLocked()
         } catch (e: Exception) {
-            VeLog.e(TAG, e) { "reprepareVideoRecorder($reason) failed - next recording may fail to start or have wrong rotation" }
+            VeLog.e(TAG, e) { "reprepareVideoRecorder($reason) failed" }
         }
     }
 
@@ -508,17 +643,10 @@ class VaultCameraSession(
         }
     }
 
-    // ── Photo capture ───────────────────────────────────────────────────
-
     fun takePhoto(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
         capturePhotoInternal(VaultChunkWriter(volId, virtualPath), callback)
     }
 
-    /** Same capture path as [takePhoto], but the JPEG bytes are encrypted
-     *  under an ephemeral key into [scratchpadFile] instead of being
-     *  written into a mounted vault -- see docs/architecture.md,
-     *  "Capture-First + Encrypted Scratchpad". Used by the Quick Capture
-     *  entry point, which runs before any vault has been chosen. */
     fun takePhotoToScratchpad(
         scratchpadFile: File,
         key: SecretKey,
@@ -534,6 +662,10 @@ class VaultCameraSession(
             val reader = jpegReader
             if (device == null || session == null || reader == null) {
                 callback(false, "camera not ready")
+                return@runOnCameraThread
+            }
+            if (isRecording) {
+                callback(false, "cannot take photo while recording")
                 return@runOnCameraThread
             }
             pendingPhotoCallback = callback
@@ -576,18 +708,10 @@ class VaultCameraSession(
         }
     }
 
-    // ── Video recording ─────────────────────────────────────────────────
-
     fun startRecording(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
         startRecordingInternal(VaultChunkWriter(volId, virtualPath), callback)
     }
 
-    /** Same recording path as [startRecording], but the finished clip is
-     *  encrypted under an ephemeral key into [scratchpadFile] instead of
-     *  being written into a mounted vault -- see [takePhotoToScratchpad]'s
-     *  doc comment. [stopRecording] needs no scratchpad-specific variant:
-     *  it already drains whatever [ChunkSink] was stored here and calls
-     *  its [ChunkSink.finish]. */
     fun startRecordingToScratchpad(
         scratchpadFile: File,
         key: SecretKey,
@@ -600,83 +724,68 @@ class VaultCameraSession(
         runOnCameraThread {
             val recorder = videoRecorder
             if (recorder == null || isRecording) {
-                VeLog.w(TAG) { "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)" }
                 callback(false, "not ready")
                 return@runOnCameraThread
             }
             try {
-                VeLog.d(TAG) { "startRecording" }
                 recorder.beginRecording()
                 recordingChunkWriter = writer
                 isRecording = true
-                updateRepeatingRequest()
+                if (!isTriStreamSupported) {
+                    createSessionLocked()
+                } else {
+                    updateRepeatingRequest()
+                }
                 callback(true, null)
             } catch (e: Exception) {
-                VeLog.e(TAG, e) { "startRecording failed" }
                 callback(false, e.message)
             }
         }
     }
 
     fun stopRecording(callback: (Boolean, Long, String?) -> Unit) {
-        // The whole method now runs on bgThread (see runOnCameraThread), so
-        // the "blocking, native" recorder.requestStop()/writeTo() calls
-        // below -- previously pushed onto bgHandler specifically to get
-        // them off whatever thread called stopRecording() -- no longer need
-        // a second, nested post: they already run off the caller's thread
-        // simply by virtue of this whole body being camera-thread-confined.
         runOnCameraThread {
             val recorder = videoRecorder
             val writer = recordingChunkWriter
             if (recorder == null || !isRecording || writer == null) {
-                VeLog.w(TAG) { "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)" }
                 callback(false, 0, "not recording")
                 return@runOnCameraThread
             }
             isRecording = false
-            // Nothing else should target this recorder's surface once it
-            // stops -- the repeating request falls back to preview-only
-            // immediately, before the stop()/write-out below even runs.
             videoRecorder = null
             updateRepeatingRequest()
             val result = recorder.requestStop()
             val ok = recorder.writeTo(writer)
             recordingChunkWriter = null
             recorder.releaseEncoder()
-            VeLog.d(TAG) { "stopRecording: ok=$ok durationMs=${result.durationMs}" }
             callback(ok, result.durationMs, if (ok) null else "vault write failed")
             rearmVideoRecorder()
         }
     }
 
-    /**
-     * A MediaRecorder can't be start()ed again once stopped -- it needs a
-     * fresh prepare(), which means a fresh output Surface (see
-     * reprepareVideoRecorder()'s doc for why that also means a session
-     * reconfigure). Doing this here, right after a recording finishes
-     * (while Dart is still showing its "encrypting..." overlay), hides
-     * that cost instead of paying it the next time the user presses
-     * record.
-     */
     private fun rearmVideoRecorder() {
         reprepareVideoRecorder(force = true, reason = "post-recording rearm")
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-
-    private fun chooseSize(candidates: List<Size>, targetLongEdge: Int): Size {
+    private fun chooseVideoSizeByHeight(candidates: List<Size>, targetHeight: Int): Size {
         return candidates.filter { it.width > 0 && it.height > 0 }
-            .minByOrNull { abs(maxOf(it.width, it.height) - targetLongEdge) }
+            .minByOrNull { abs(minOf(it.width, it.height) - targetHeight) }
             ?: candidates.firstOrNull()
             ?: Size(1920, 1080)
     }
 
-    /** Picks a fixed (lower == upper) FPS range matching [desiredFps] if this
-     *  lens advertises one, else the closest fixed range, else -- some
-     *  lenses genuinely don't offer any fixed range -- the narrowest
-     *  variable range that still contains [desiredFps]. Always returns
-     *  something rather than leaving the range unset, since an unset range
-     *  is exactly what let the HAL pick a mismatched capture rate. */
+    private fun chooseSize(candidates: List<Size>, targetLongEdge: Int, capAt1080p: Boolean = false): Size {
+        val list = if (capAt1080p) {
+            candidates.filter { it.width > 0 && it.height > 0 && maxOf(it.width, it.height) <= 1920 }
+                .ifEmpty { candidates.filter { it.width > 0 && it.height > 0 } }
+        } else {
+            candidates.filter { it.width > 0 && it.height > 0 }
+        }
+        return list.minByOrNull { abs(maxOf(it.width, it.height) - targetLongEdge) }
+            ?: list.firstOrNull()
+            ?: Size(1920, 1080)
+    }
+
     private fun pickFixedFpsRange(available: Array<Range<Int>>?, desiredFps: Int): Range<Int>? {
         val ranges = available?.toList().orEmpty()
         if (ranges.isEmpty()) return null

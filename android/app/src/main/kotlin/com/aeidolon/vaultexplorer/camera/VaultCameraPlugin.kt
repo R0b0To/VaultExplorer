@@ -98,6 +98,7 @@ class VaultCameraPlugin(
                         ?: pickDefaultCameraId(args["facing"] as? String ?: "back")
                         ?: return result.error("no_camera", "No camera matches request", null)
                     val quality = parseQuality(args["quality"] as? String)
+                    val photoRes = parsePhotoResolution(args["photoResolution"] as? String)
 
                     val id = nextId.getAndIncrement()
                     val session = VaultCameraSession(context, textureRegistry) { event ->
@@ -111,7 +112,7 @@ class VaultCameraPlugin(
                     })
                     eventChannels[id] = eventChannel
 
-                    session.open(cameraId, quality) { ok, error ->
+                    session.open(cameraId, quality, photoRes) { ok, error ->
                         mainHandler.post {
                             if (ok) {
                                 VeLog.d(TAG) { "open: ok camera=$cameraId preview=${session.previewWidth}x${session.previewHeight} sensorOrientation=${session.sensorOrientationDegrees}" }
@@ -185,6 +186,20 @@ class VaultCameraPlugin(
                     val nx = (args["x"] as? Number)?.toFloat() ?: 0.5f
                     val ny = (args["y"] as? Number)?.toFloat() ?: 0.5f
                     session.setFocusAndExposurePoint(nx, ny)
+                    result.success(null)
+                }
+                "resetFocusAndExposure" -> withSession(call, result) { session, _ ->
+                    session.resetFocusAndExposure()
+                    result.success(null)
+                }
+                "setWhiteBalance" -> withSession(call, result) { session, args ->
+                    val mode = args["mode"] as? String ?: "auto"
+                    session.setWhiteBalance(mode)
+                    result.success(null)
+                }
+                "setColorEffect" -> withSession(call, result) { session, args ->
+                    val effect = args["effect"] as? String ?: "off"
+                    session.setColorEffect(effect)
                     result.success(null)
                 }
                 "setOrientationDegrees" -> withSession(call, result) { session, args ->
@@ -275,9 +290,6 @@ class VaultCameraPlugin(
 
     private fun pickDefaultCameraId(facing: String): String? {
         val lenses = listCameraLenses(cameraManager)
-        // Prefer the primary (lowest-id, non-logical-duplicate) lens for the
-        // requested facing -- cameraIdList is generally ordered with the
-        // primary lens first for each facing.
         return lenses.firstOrNull { it.facing == facing }?.cameraId
             ?: lenses.firstOrNull()?.cameraId
     }
@@ -306,6 +318,13 @@ class VaultCameraPlugin(
     }
 }
 
+private fun parsePhotoResolution(wire: String?): VaultPhotoResolution = when (wire) {
+    "low" -> VaultPhotoResolution.LOW
+    "med", "medium" -> VaultPhotoResolution.MEDIUM
+    "high" -> VaultPhotoResolution.HIGH
+    else -> VaultPhotoResolution.MAX
+}
+
 private fun CameraLensInfo.toMap(): Map<String, Any?> = mapOf(
     "cameraId" to cameraId,
     "facing" to facing,
@@ -313,4 +332,6 @@ private fun CameraLensInfo.toMap(): Map<String, Any?> = mapOf(
     "zoomMin" to zoomMin.toDouble(),
     "zoomMax" to zoomMax.toDouble(),
     "relativeZoom" to relativeZoom.toDouble(),
+    "lensType" to lensType,
+    "displayName" to displayName,
 )

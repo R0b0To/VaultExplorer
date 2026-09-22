@@ -4,16 +4,13 @@ import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 
 class NativeCameraLens {
   final String cameraId;
-  final String facing; // 'back', 'front', 'external'
+  final String facing;
   final bool isLogical;
   final double zoomMin;
   final double zoomMax;
-  // Approximate optical zoom factor vs. this facing's primary/wide lens
-  // (e.g. ~0.5 for ultrawide, 1.0 for the main lens, ~2-5 for telephoto).
-  // Derived natively from focal length + sensor size, since each physical
-  // lens's own zoomMin/zoomMax is relative to itself (nearly always 1.0)
-  // and isn't meaningful for comparing lenses against each other.
   final double relativeZoom;
+  final String lensType;
+  final String displayName;
 
   const NativeCameraLens({
     required this.cameraId,
@@ -22,6 +19,8 @@ class NativeCameraLens {
     required this.zoomMin,
     required this.zoomMax,
     this.relativeZoom = 1.0,
+    this.lensType = 'main',
+    this.displayName = '1x',
   });
 
   factory NativeCameraLens.fromMap(Map<dynamic, dynamic> map) {
@@ -32,6 +31,8 @@ class NativeCameraLens {
       zoomMin: (map['zoomMin'] as num?)?.toDouble() ?? 1.0,
       zoomMax: (map['zoomMax'] as num?)?.toDouble() ?? 1.0,
       relativeZoom: (map['relativeZoom'] as num?)?.toDouble() ?? 1.0,
+      lensType: map['lensType'] as String? ?? 'main',
+      displayName: map['displayName'] as String? ?? '1x',
     );
   }
 }
@@ -130,11 +131,7 @@ class VaultCameraController {
   int get previewWidth => _previewWidth;
   int get previewHeight => _previewHeight;
   int get sensorOrientation => _sensorOrientation;
-  /// The preview's on-screen aspect ratio (width / height) once the sensor's
-  /// mounting rotation is accounted for. Camera2 always reports preview
-  /// sizes in the sensor's own landscape coordinate space, so a 90/270
-  /// mounting (true on virtually every phone) means the on-screen aspect
-  /// ratio is actually the *inverse* of previewWidth/previewHeight.
+
   double get previewAspectRatio {
     final rotated = _sensorOrientation % 180 != 0;
     final w = rotated ? _previewHeight : _previewWidth;
@@ -151,18 +148,12 @@ class VaultCameraController {
     return res ?? false;
   }
 
-  /// Requests camera + microphone permission and waits for the user to
-  /// actually answer the system dialog, returning whether it was granted.
-  /// Previously this only fired the request and returned immediately, so
-  /// callers proceeded to open the camera before the dialog was answered.
   Future<bool> requestPermissions() async {
     final resultFuture = _engineEvents.awaitCameraPermissionResult();
     await _channel.invokeMethod('requestPermissions');
     try {
       return await resultFuture.timeout(const Duration(seconds: 60));
     } on TimeoutException {
-      // The user backgrounded the app / dismissed the dialog without it
-      // resolving (shouldn't normally happen, but don't hang forever).
       return false;
     }
   }
@@ -171,13 +162,15 @@ class VaultCameraController {
     String? cameraId,
     String facing = 'back',
     String quality = 'fhd',
+    String photoResolution = 'max',
   }) async {
     await close();
 
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('open', {
-      'cameraId': ?cameraId,
+      'cameraId': cameraId,
       'facing': facing,
       'quality': quality,
+      'photoResolution': photoResolution,
     });
 
     if (res == null) throw Exception('Failed to open camera');
@@ -291,10 +284,6 @@ class VaultCameraController {
     return (success: ok, error: error);
   }
 
-  /// Same as [takePhoto], but the JPEG is encrypted under [sessionToken]'s
-  /// ephemeral key into [scratchpadPath] instead of a mounted vault --
-  /// used by the Quick Capture entry point, before any vault has been
-  /// chosen. See QuickCaptureApi.openSession for how the pair is created.
   Future<({bool success, String? error})> takePhotoToScratchpad({
     required String sessionToken,
     required String scratchpadPath,
@@ -331,11 +320,6 @@ class VaultCameraController {
     return (success: ok, error: error);
   }
 
-  /// Same as [startVideoRecording], but scratchpad-targeted -- see
-  /// [takePhotoToScratchpad]'s doc comment. [stopVideoRecording] needs
-  /// no scratchpad-specific variant: the native side already tracks
-  /// whichever destination [startRecording]/[startRecordingToScratchpad]
-  /// used and drains it the same way either way.
   Future<({bool success, String? error})> startVideoRecordingToScratchpad({
     required String sessionToken,
     required String scratchpadPath,
@@ -357,7 +341,6 @@ class VaultCameraController {
     return (success: ok, error: error);
   }
 
-
   Future<({bool success, int durationMs, String? error})> stopVideoRecording() async {
     final sId = _sessionId;
     if (sId == null) return (success: false, durationMs: 0, error: 'Camera not open');
@@ -371,6 +354,22 @@ class VaultCameraController {
     final error = res?['error'] as String?;
     return (success: ok, durationMs: durationMs, error: error);
   }
+  Future<void> setWhiteBalance(String mode) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setWhiteBalance', {
+      'sessionId': sId,
+      'mode': mode,
+    });
+  }
+
+  Future<void> resetFocusAndExposure() async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('resetFocusAndExposure', {
+      'sessionId': sId,
+    });
+  }
 
   Future<void> close() async {
     final sId = _sessionId;
@@ -381,11 +380,7 @@ class VaultCameraController {
     if (sId != null) {
       try {
         await _channel.invokeMethod('close', {'sessionId': sId});
-      } catch (_) {
-        // Best-effort teardown: _sessionId is already cleared above, so
-        // this controller is done with the native session regardless of
-        // whether the close call itself succeeds.
-      }
+      } catch (_) {}
     }
   }
 

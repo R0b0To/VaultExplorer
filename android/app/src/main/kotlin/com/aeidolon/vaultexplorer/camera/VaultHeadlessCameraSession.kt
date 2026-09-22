@@ -284,7 +284,7 @@ class VaultHeadlessCameraSession(private val context: Context) {
                 val chars = cameraManager.getCameraCharacteristics(cameraId)
                 characteristics = chars
                 val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                val size = chooseSize(map?.getOutputSizes(MediaRecorder::class.java), quality.targetLongEdge)
+                val size = chooseSize(map?.getOutputSizes(MediaRecorder::class.java), quality.targetVideoLongEdge)
 
                 val recorder = VaultVideoRecorder(size.width, size.height, quality, recordAudio, context.cacheDir)
                 recorder.prepareEncoder(orientationDegrees = computeCaptureOrientation())

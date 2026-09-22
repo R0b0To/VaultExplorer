@@ -2,50 +2,55 @@ package com.aeidolon.vaultexplorer.camera
 
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.media.MediaRecorder
 import android.os.Build
+import android.util.Size
 import kotlin.math.sqrt
 import com.aeidolon.vaultexplorer.VeLog
 
-/**
- * Static per-lens info read straight from [android.hardware.camera2.CameraCharacteristics]
- * -- no camera is ever opened to build this list, unlike the old
- * package:camera-based probe that had to briefly open each physical lens
- * to read its zoom range (the source of the concurrent-camera
- * configuration races seen in capture logs).
- */
 data class CameraLensInfo(
     val cameraId: String,
-    val facing: String,      // "back" | "front" | "external"
+    val facing: String,
     val isLogicalMultiCamera: Boolean,
     val zoomMin: Float,
     val zoomMax: Float,
     val sensorOrientationDegrees: Int,
-    // Approximate optical zoom factor of this lens relative to the primary/
-    // wide lens for its facing (e.g. ~0.5 for an ultrawide, 1.0 for the
-    // main/logical lens, ~2-5 for a telephoto). Physical (non-logical)
-    // camera ids each report their own CONTROL_ZOOM_RATIO_RANGE starting at
-    // 1.0, so using zoomMin directly (the old behavior) made every lens
-    // show up as "1x" in the UI -- this is derived from focal length vs
-    // sensor size instead, which is what actually differs between lenses.
     val relativeZoom: Float,
+    val lensType: String,    // "main" | "wide" | "infrared" | "telephoto" | "front"
+    val displayName: String, // "1x", "Wide", "IR", "Front"
 )
 
 enum class VaultFlashMode { OFF, AUTO, ON, TORCH }
 
-// The frame rate the video encoder is configured for (see
-// VaultVideoRecorder.prepareEncoder). VaultCameraSession locks the sensor's
-// CONTROL_AE_TARGET_FPS_RANGE to match this same constant -- if the two
-// were to drift apart (someone changing one without the other), the sensor
-// would deliver frames at a different real rate than the encoder budgets
-// bits for, silently bloating the output bitrate again (see
-// VaultCameraSession.pickFixedFpsRange's comment for the mechanism).
 const val TARGET_RECORDING_FPS = 30
 
-enum class VaultVideoQuality(val targetLongEdge: Int, val bitrateH264: Int, val bitrateHevc: Int) {
-    SD(720, 3_000_000, 1_800_000),
-    HD(1280, 8_000_000, 5_000_000),
-    FHD(1920, 16_000_000, 10_000_000),
-    UHD(3840, 45_000_000, 25_000_000),
+/** Explicit user-selected photo resolution */
+enum class VaultPhotoResolution(val targetLongEdge: Int, val label: String) {
+    LOW(1280, "1.2 MP (Low)"),
+    MEDIUM(1920, "2 MP (Med)"),
+    HIGH(2560, "5 MP (High)"),
+    MAX(4500, "Full (Max)");
+}
+
+/** Explicit user-selected video resolution */
+enum class VaultVideoQuality(
+    val targetVideoHeight: Int,
+    val bitrateH264: Int,
+    val bitrateHevc: Int,
+    val label: String
+) {
+    SD(480, 3_000_000, 1_800_000, "480p (SD)"),
+    HD(720, 8_000_000, 5_000_000, "720p (HD)"),
+    FHD(1080, 16_000_000, 10_000_000, "1080p (FHD)"),
+    UHD(2160, 45_000_000, 25_000_000, "4K (UHD)");
+
+    val targetVideoLongEdge: Int get() = when (this) {
+        SD -> 720
+        HD -> 1280
+        FHD -> 1920
+        UHD -> 3840
+    }
+    val targetLongEdge: Int get() = targetVideoLongEdge
 }
 
 private data class RawLens(
@@ -55,29 +60,43 @@ private data class RawLens(
     val zoomMin: Float,
     val zoomMax: Float,
     val sensorOrientation: Int,
-    // focalLengthMm / sensorDiagonalMm -- proportional to the 35mm-equivalent
-    // focal length, so the ratio between two lenses' focalDensity approximates
-    // their real-world optical zoom ratio regardless of each sensor's physical size.
     val focalDensity: Float?,
+    val isMonochromeOrInfrared: Boolean,
 )
 
-/** Callable before any camera is opened -- pure CameraCharacteristics reads. */
+// In-memory blacklist for cameras that fail to configure on this device
+val blacklistedCameraIds = mutableSetOf<String>()
+
 fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
     val raw = mutableListOf<RawLens>()
+
     for (id in cameraManager.cameraIdList) {
+        if (blacklistedCameraIds.contains(id)) {
+            VeLog.d("VaultCameraSession") { "skipping blacklisted faulty lens $id" }
+            continue
+        }
+
         try {
             val c = cameraManager.getCameraCharacteristics(id)
             val caps = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
 
-            // Some phones list auxiliary sensors (depth/mono/IR helpers used
-            // internally for portrait mode, face auth, etc.) directly in
-            // cameraIdList even though they can't be opened as a standalone
-            // preview/capture stream -- attempting to do so is what produced
-            // "Unsupported set of inputs/outputs provided" / "session
-            // configuration failed" when switching to them. Lenses without
-            // BACKWARD_COMPATIBLE aren't usable as a normal camera, so skip them.
+            // Must support standard Camera2 pipeline
             if (!caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE)) {
-                VeLog.d("VaultCameraSession") { "skipping non-standalone lens $id (no BACKWARD_COMPATIBLE)" }
+                continue
+            }
+
+            val map = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
+            val jpegSizes = map.getOutputSizes(android.graphics.ImageFormat.JPEG) ?: emptyArray<Size>()
+            val previewSizes = map.getOutputSizes(android.graphics.SurfaceTexture::class.java) ?: emptyArray<Size>()
+
+            // Must have both JPEG and preview output capabilities
+            if (jpegSizes.isEmpty() || previewSizes.isEmpty()) {
+                continue
+            }
+
+            // Real cameras must support at least 640x480 preview. Ghost calibration sensors often don't.
+            val maxPreviewW = previewSizes.maxOfOrNull { it.width } ?: 0
+            if (maxPreviewW < 640 && id != "0" && id != "1") {
                 continue
             }
 
@@ -104,22 +123,22 @@ fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
                 if (diagonal > 0f) focal / diagonal else null
             } else null
 
-            raw.add(RawLens(id, facing, isLogical, zoomMin, zoomMax, sensorOrientation, focalDensity))
+            // Detect Infrared / Night Vision sensors
+            val colorFilter = c.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT)
+            val isMonoOrIr = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME)
+                || colorFilter == 4 // SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO
+                || colorFilter == 5 // SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_NIR
+
+            raw.add(RawLens(id, facing, isLogical, zoomMin, zoomMax, sensorOrientation, focalDensity, isMonoOrIr))
         } catch (e: Exception) {
             VeLog.w("VaultCameraSession", e) { "skipping unreadable lens $id" }
         }
     }
 
     val out = mutableListOf<CameraLensInfo>()
-    for ((_, lensesForFacing) in raw.groupBy { it.facing }) {
-        // Reference lens for this facing's "1x": prefer the logical
-        // multi-camera (the id the OS treats as the default/main sensor,
-        // which is what non-multi-lens zoom already treats as 1x), else
-        // fall back to the lens with the largest focal density, which in
-        // practice is the primary wide sensor (ultrawide/tele sit either
-        // side of it).
-        val primary = lensesForFacing.firstOrNull { it.isLogical }
-            ?: lensesForFacing.maxByOrNull { it.focalDensity ?: 0f }
+    for ((facing, lensesForFacing) in raw.groupBy { it.facing }) {
+        val primary = lensesForFacing.firstOrNull { it.id == "0" || it.id == "1" }
+            ?: lensesForFacing.firstOrNull { it.isLogical }
             ?: lensesForFacing.first()
         val primaryDensity = primary.focalDensity
 
@@ -129,8 +148,30 @@ fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
             } else {
                 1f
             }
-            out.add(CameraLensInfo(l.id, l.facing, l.isLogical, l.zoomMin, l.zoomMax, l.sensorOrientation, relativeZoom))
+
+            val (lensType, displayName) = when {
+                facing == "front" -> "front" to "Front"
+                l.isMonochromeOrInfrared -> "infrared" to "IR"
+                l.id == "0" -> "main" to "1x"
+                relativeZoom < 0.85f -> "wide" to "Wide"
+                relativeZoom > 1.8f -> "telephoto" to "${relativeZoom.roundToOneDecimal()}x"
+                else -> "auxiliary" to "Lens ${l.id}"
+            }
+
+            out.add(CameraLensInfo(
+                l.id,
+                l.facing,
+                l.isLogical,
+                l.zoomMin,
+                l.zoomMax,
+                l.sensorOrientation,
+                relativeZoom,
+                lensType,
+                displayName
+            ))
         }
     }
     return out
 }
+
+private fun Float.roundToOneDecimal(): Float = (this * 10).toInt() / 10f

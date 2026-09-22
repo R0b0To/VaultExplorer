@@ -142,11 +142,24 @@ class SessionLockController {
     final settings = _settings!();
     VeLog.d(
       _kLogTag,
-      'handleScreenOff: received (lockContainersOnScreenLock=${settings.lockContainersOnScreenLock})',
+      'handleScreenOff: received (lockContainersOnScreenLock=${settings.lockContainersOnScreenLock}, '
+      'autoLockMins=${settings.autoLockMins})',
     );
-    if (settings.lockContainersOnScreenLock) {
-      VeLog.i(_kLogTag, 'handleScreenOff: lockContainersOnScreenLock=true -> performAutoLock');
+    if (!settings.lockContainersOnScreenLock) return;
+
+    if (settings.autoLockMins <= 0) {
+      // "Immediately" is selected -- lock as soon as the screen goes off.
+      VeLog.i(_kLogTag, 'handleScreenOff: autoLockMins<=0 -> performAutoLock immediately');
       performAutoLock();
+    } else {
+      // A real timeout is configured: don't lock on the spot, (re)arm the
+      // countdown from now so containers stay open until the screen has
+      // been off for the configured duration, same as the inactivity timer.
+      VeLog.i(
+        _kLogTag,
+        'handleScreenOff: autoLockMins=${settings.autoLockMins} -> arming countdown instead of locking immediately',
+      );
+      scheduleAutoLock();
     }
   }
 }

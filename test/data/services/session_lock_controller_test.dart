@@ -217,8 +217,9 @@ void buildController() {
   });
 
   group('handleScreenOff', () {
-    test('locks immediately when lockContainersOnScreenLock is true', () async {
-      settings = AppSettings(lockContainersOnScreenLock: true);
+    test('locks immediately when lockContainersOnScreenLock is true and '
+        'autoLockMins is 0 ("Immediately")', () async {
+      settings = AppSettings(lockContainersOnScreenLock: true, autoLockMins: 0);
       buildController();
 
       controller.handleScreenOff();
@@ -236,6 +237,47 @@ void buildController() {
       await Future<void>.delayed(Duration.zero);
 
       expect(enforceAppLockCalls, 0);
+    });
+
+    test('does NOT lock immediately when a real timeout is configured -- '
+        'waits for autoLockMins instead', () {
+      fakeAsync((async) {
+        settings = AppSettings(lockContainersOnScreenLock: true, autoLockMins: 60);
+        buildController();
+
+        controller.handleScreenOff();
+
+        // Screen just went off with a 1-hour timeout: containers must stay
+        // unlocked for the full hour, not lock on the spot.
+        async.elapse(const Duration(minutes: 59, seconds: 59));
+        expect(enforceAppLockCalls, 0);
+        expect(lockAllMountedContainersCalls, 0);
+
+        async.elapse(const Duration(seconds: 1));
+        expect(enforceAppLockCalls, 1);
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('a second handleScreenOff call restarts the countdown instead of '
+        'stacking another timer', () {
+      fakeAsync((async) {
+        settings = AppSettings(lockContainersOnScreenLock: true, autoLockMins: 10);
+        buildController();
+
+        controller.handleScreenOff();
+        async.elapse(const Duration(minutes: 6));
+        controller.handleScreenOff(); // e.g. screen off -> briefly on -> off again
+        async.elapse(const Duration(minutes: 6));
+        expect(enforceAppLockCalls, 0);
+
+        async.elapse(const Duration(minutes: 4));
+        expect(enforceAppLockCalls, 1);
+
+        controller.dispose();
+      });
     });
   });
 

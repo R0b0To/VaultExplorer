@@ -1,0 +1,19 @@
+### Features
+• App Lock Customization: Added granular controls to configure how and when the app lock triggers, including an option to lock immediately upon backgrounding
+• Vault Auto-Lock: Added an option within per-container settings to inherit the global default auto-lock duration
+
+### Improvements
+• Auto-Sync Interface: Redesigned the auto-sync UI/UX for improved clarity, relocating full-vault sync options directly to the vault configuration page
+• Status Badges: Redesigned file and folder badges with active state indicators for sync, pin, bookmark, and document provider statuses
+• Dynamic Action Button: Streamlined the file manager floating toolbar to trigger the action directly when only one option is enabled, bypassing the menu
+• In-App Camera: Added hardware safeguards when switching lenses, improved autofocus and color balance, and refined control labels
+• File Manager Zoom: Improved pinch-to-zoom gesture smoothness when adjusting font and item display sizes
+• Navigation Gestures: Refined gesture thresholds and responsiveness for sliding open the sidebar drawer and interacting with cards
+• App Settings: Polished settings organization and improved layout responsiveness across landscape orientations
+
+### Bug Fixes
+• External Storage: Fixed external storage requiring full file access permissions by adding full compatibility with the Storage Access Framework (SAF)
+• Background Recording: Fixed video recording stopping when switching applications or locking the screen
+• Auto-Lock Timer: Fixed an issue where configured auto-lock timers were not being properly respected
+• Dashboard Hints: Fixed the first-card nudge hint repeatedly displaying after being viewed or disabled in settings
+• Container Creation: Fixed composite containers failing to pin to the dashboard during creation when the toggle was enabled

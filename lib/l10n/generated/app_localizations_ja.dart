@@ -3130,6 +3130,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get neverAutoLockOption => 'しない';
 
   @override
+  String get neverAutoLockOptionSubtitle => 'アプリがロックされたり画面がオフになったりしても開いたままにします';
+
+  @override
+  String get defaultAutoLockOptionSubtitle => 'アプリの自動ロックおよび画面ロック設定に従います';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'ロック解除中はシステムのファイルピッカーにコンテンツを公開する';
 

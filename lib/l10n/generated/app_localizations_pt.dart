@@ -3290,6 +3290,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get neverAutoLockOption => 'Nunca';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Permanece aberto mesmo quando o app é bloqueado ou a tela se apaga';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Segue as configurações de bloqueio automático e de bloqueio de tela do app';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Expor o conteúdo ao Seletor de Arquivos do Sistema quando desbloqueado';
 

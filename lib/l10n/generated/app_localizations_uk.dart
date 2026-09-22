@@ -3310,6 +3310,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get neverAutoLockOption => 'Ніколи';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Залишається відкритим, навіть коли застосунок блокується або вимикається екран';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Дотримується налаштувань автоблокування застосунку та блокування екрана';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Надавати доступ системному провіднику під час розблокування';
 

@@ -4287,6 +4287,14 @@
   "@neverAutoLockOption": {
     "description": "Option meaning the container will never auto-lock"
   },
+  "neverAutoLockOptionSubtitle": "Stays open even when the app locks or the screen turns off",
+  "@neverAutoLockOptionSubtitle": {
+    "description": "Subtitle clarifying that Never exempts this container from the app-wide lock, shown under the Never option in the per-container auto-lock picker dialog"
+  },
+  "defaultAutoLockOptionSubtitle": "Follows the app's Auto-Lock and screen-lock settings",
+  "@defaultAutoLockOptionSubtitle": {
+    "description": "Subtitle explaining the \"use global default\" option, shown under it in the per-container auto-lock picker dialog"
+  },
   "exposeContentToFilePickerSubtitle": "Expose content to System File Picker when unlocked",
   "@exposeContentToFilePickerSubtitle": {
     "description": "Subtitle explaining the Android File Provider switch"

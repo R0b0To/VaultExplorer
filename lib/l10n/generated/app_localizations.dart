@@ -5550,6 +5550,18 @@ abstract class AppLocalizations {
   /// **'Never'**
   String get neverAutoLockOption;
 
+  /// Subtitle clarifying that Never exempts this container from the app-wide lock, shown under the Never option in the per-container auto-lock picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Stays open even when the app locks or the screen turns off'**
+  String get neverAutoLockOptionSubtitle;
+
+  /// Subtitle explaining the "use global default" option, shown under it in the per-container auto-lock picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Follows the app\'s Auto-Lock and screen-lock settings'**
+  String get defaultAutoLockOptionSubtitle;
+
   /// Subtitle explaining the Android File Provider switch
   ///
   /// In en, this message translates to:

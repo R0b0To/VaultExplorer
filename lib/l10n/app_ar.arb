@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1.2 ميجابكسل (منخفضة)",
   "cameraLensWide": "عريضة",
   "cameraLensInfrared": "الأشعة تحت الحمراء",
-  "cameraLensFront": "أمامية"
+  "cameraLensFront": "أمامية",
+  "neverAutoLockOptionSubtitle": "يبقى مفتوحًا حتى عند قفل التطبيق أو إيقاف تشغيل الشاشة",
+  "defaultAutoLockOptionSubtitle": "يتبع إعدادات القفل التلقائي للتطبيق وقفل الشاشة"
 }

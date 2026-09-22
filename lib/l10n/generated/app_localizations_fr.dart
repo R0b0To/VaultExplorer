@@ -3312,6 +3312,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get neverAutoLockOption => 'Jamais';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Reste ouvert même lorsque l\'application se verrouille ou que l\'écran s\'éteint';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Suit les paramètres de verrouillage automatique et de verrouillage de l\'écran de l\'application';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Exposer le contenu au sélecteur de fichiers système une fois déverrouillé';
 

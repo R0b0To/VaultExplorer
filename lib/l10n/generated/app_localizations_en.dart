@@ -3241,6 +3241,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get neverAutoLockOption => 'Never';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Stays open even when the app locks or the screen turns off';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Follows the app\'s Auto-Lock and screen-lock settings';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Expose content to System File Picker when unlocked';
 

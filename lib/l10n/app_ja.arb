@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1.2 MP (低画質)",
   "cameraLensWide": "広角",
   "cameraLensInfrared": "赤外線",
-  "cameraLensFront": "前面"
+  "cameraLensFront": "前面",
+  "neverAutoLockOptionSubtitle": "アプリがロックされたり画面がオフになったりしても開いたままにします",
+  "defaultAutoLockOptionSubtitle": "アプリの自動ロックおよび画面ロック設定に従います"
 }

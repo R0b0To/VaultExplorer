@@ -3296,6 +3296,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get neverAutoLockOption => 'Nie';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Bleibt geöffnet, selbst wenn die App gesperrt oder der Bildschirm ausgeschaltet wird';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Folgt den Einstellungen der App für automatische Sperre und Bildschirmsperre';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Inhalt bei Entsperrung für die Systemdateiauswahl freigeben';
 

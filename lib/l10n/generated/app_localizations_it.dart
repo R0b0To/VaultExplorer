@@ -3289,6 +3289,14 @@ class AppLocalizationsIt extends AppLocalizations {
   String get neverAutoLockOption => 'Mai';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'Rimane aperto anche quando l\'app si blocca o lo schermo si spegne';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'Segue le impostazioni di blocco automatico dell\'app e di blocco schermo';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'Esponi i contenuti al selettore file di sistema quando sbloccato';
 

@@ -3130,6 +3130,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get neverAutoLockOption => '안 함';
 
   @override
+  String get neverAutoLockOptionSubtitle => '앱이 잠기거나 화면이 꺼져도 열려 있는 상태를 유지합니다';
+
+  @override
+  String get defaultAutoLockOptionSubtitle => '앱의 자동 잠금 및 화면 잠금 설정을 따릅니다';
+
+  @override
   String get exposeContentToFilePickerSubtitle => '잠금 해제 시 시스템 파일 선택기에 콘텐츠 노출';
 
   @override

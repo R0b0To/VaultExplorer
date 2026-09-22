@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1,2 MP (Niedrig)",
   "cameraLensWide": "Weitwinkel",
   "cameraLensInfrared": "IR",
-  "cameraLensFront": "Front"
+  "cameraLensFront": "Front",
+  "neverAutoLockOptionSubtitle": "Bleibt geöffnet, selbst wenn die App gesperrt oder der Bildschirm ausgeschaltet wird",
+  "defaultAutoLockOptionSubtitle": "Folgt den Einstellungen der App für automatische Sperre und Bildschirmsperre"
 }

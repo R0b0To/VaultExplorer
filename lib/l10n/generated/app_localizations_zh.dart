@@ -3086,6 +3086,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get neverAutoLockOption => '从不';
 
   @override
+  String get neverAutoLockOptionSubtitle => '即使应用锁定或屏幕熄灭也保持打开状态';
+
+  @override
+  String get defaultAutoLockOptionSubtitle => '遵循应用的自动锁定和屏幕锁定设置';
+
+  @override
   String get exposeContentToFilePickerSubtitle => '解锁时向系统文件选择器公开内容';
 
   @override

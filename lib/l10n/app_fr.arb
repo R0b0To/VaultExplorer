@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1,2 MP (Basse)",
   "cameraLensWide": "Grand-angle",
   "cameraLensInfrared": "IR",
-  "cameraLensFront": "Avant"
+  "cameraLensFront": "Avant",
+  "neverAutoLockOptionSubtitle": "Reste ouvert même lorsque l'application se verrouille ou que l'écran s'éteint",
+  "defaultAutoLockOptionSubtitle": "Suit les paramètres de verrouillage automatique et de verrouillage de l'écran de l'application"
 }

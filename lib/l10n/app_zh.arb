@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "120 万像素 (低)",
   "cameraLensWide": "广角",
   "cameraLensInfrared": "红外",
-  "cameraLensFront": "前置"
+  "cameraLensFront": "前置",
+  "neverAutoLockOptionSubtitle": "即使应用锁定或屏幕熄灭也保持打开状态",
+  "defaultAutoLockOptionSubtitle": "遵循应用的自动锁定和屏幕锁定设置"
 }

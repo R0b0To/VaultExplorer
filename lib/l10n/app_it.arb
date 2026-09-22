@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1,2 MP (Bassa)",
   "cameraLensWide": "Grandangolo",
   "cameraLensInfrared": "IR",
-  "cameraLensFront": "Frontale"
+  "cameraLensFront": "Frontale",
+  "neverAutoLockOptionSubtitle": "Rimane aperto anche quando l'app si blocca o lo schermo si spegne",
+  "defaultAutoLockOptionSubtitle": "Segue le impostazioni di blocco automatico dell'app e di blocco schermo"
 }

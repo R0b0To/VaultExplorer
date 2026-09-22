@@ -3322,6 +3322,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get neverAutoLockOption => 'أبدًا';
 
   @override
+  String get neverAutoLockOptionSubtitle =>
+      'يبقى مفتوحًا حتى عند قفل التطبيق أو إيقاف تشغيل الشاشة';
+
+  @override
+  String get defaultAutoLockOptionSubtitle =>
+      'يتبع إعدادات القفل التلقائي للتطبيق وقفل الشاشة';
+
+  @override
   String get exposeContentToFilePickerSubtitle =>
       'عرض المحتوى في منتقي ملفات النظام عند فتح القفل';
 

@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1.2 MP (낮음)",
   "cameraLensWide": "광각",
   "cameraLensInfrared": "적외선",
-  "cameraLensFront": "전면"
+  "cameraLensFront": "전면",
+  "neverAutoLockOptionSubtitle": "앱이 잠기거나 화면이 꺼져도 열려 있는 상태를 유지합니다",
+  "defaultAutoLockOptionSubtitle": "앱의 자동 잠금 및 화면 잠금 설정을 따릅니다"
 }

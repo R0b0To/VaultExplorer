@@ -2246,5 +2246,7 @@
   "cameraPhotoResLow": "1,2 МП (Низька)",
   "cameraLensWide": "Ширококутна",
   "cameraLensInfrared": "ІЧ",
-  "cameraLensFront": "Фронтальна"
+  "cameraLensFront": "Фронтальна",
+  "neverAutoLockOptionSubtitle": "Залишається відкритим, навіть коли застосунок блокується або вимикається екран",
+  "defaultAutoLockOptionSubtitle": "Дотримується налаштувань автоблокування застосунку та блокування екрана"
 }

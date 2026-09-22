@@ -8246,4 +8246,37 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Повна (Макс. розд.)';
+
+  @override
+  String get cameraPhotoResHigh => '5 МП (Висока)';
+
+  @override
+  String get cameraPhotoResMedium => '2 МП (Середня)';
+
+  @override
+  String get cameraPhotoResLow => '1,2 МП (Низька)';
+
+  @override
+  String get cameraLensWide => 'Ширококутна';
+
+  @override
+  String get cameraLensInfrared => 'ІЧ';
+
+  @override
+  String get cameraLensFront => 'Фронтальна';
 }

@@ -8188,4 +8188,37 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Piena (Risoluzione max)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (Alta)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (Media)';
+
+  @override
+  String get cameraPhotoResLow => '1,2 MP (Bassa)';
+
+  @override
+  String get cameraLensWide => 'Grandangolo';
+
+  @override
+  String get cameraLensInfrared => 'IR';
+
+  @override
+  String get cameraLensFront => 'Frontale';
 }

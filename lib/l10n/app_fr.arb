@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Votre launcher ne prend pas en charge l'épinglage de raccourcis",
   "quickCaptureSavedToast": "{name} enregistré dans {destination}",
   "cardSwipeActionsTitle": "Gestes de balayage des cartes",
-  "cardSwipeActionsSubtitle": "Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer"
+  "cardSwipeActionsSubtitle": "Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Maximale (Rés. max)",
+  "cameraPhotoResHigh": "5 MP (Haute)",
+  "cameraPhotoResMedium": "2 MP (Moyenne)",
+  "cameraPhotoResLow": "1,2 MP (Basse)",
+  "cameraLensWide": "Grand-angle",
+  "cameraLensInfrared": "IR",
+  "cameraLensFront": "Avant"
 }

@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "您的启动器不支持固定快捷方式",
   "quickCaptureSavedToast": "已将 {name} 保存至 {destination}",
   "cardSwipeActionsTitle": "卡片滑动操作",
-  "cardSwipeActionsSubtitle": "滑动保险库卡片以快速显示编辑和移除操作"
+  "cardSwipeActionsSubtitle": "滑动保险库卡片以快速显示编辑和移除操作",
+  "cameraQualitySd": "480p (标清)",
+  "cameraQualityHd": "720p (高清)",
+  "cameraQualityFhd": "1080p (全高清)",
+  "cameraQualityUhd": "4K (超高清)",
+  "cameraPhotoResMax": "完整 (最高分辨率)",
+  "cameraPhotoResHigh": "500 万像素 (高)",
+  "cameraPhotoResMedium": "200 万像素 (中)",
+  "cameraPhotoResLow": "120 万像素 (低)",
+  "cameraLensWide": "广角",
+  "cameraLensInfrared": "红外",
+  "cameraLensFront": "前置"
 }

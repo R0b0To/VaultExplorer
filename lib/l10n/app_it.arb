@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Il tuo launcher non supporta il blocco dei collegamenti",
   "quickCaptureSavedToast": "{name} salvato in {destination}",
   "cardSwipeActionsTitle": "Gesti di scorrimento delle schede",
-  "cardSwipeActionsSubtitle": "Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione"
+  "cardSwipeActionsSubtitle": "Scorri le schede dei vault per mostrare rapidamente le azioni di modifica e rimozione",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Piena (Risoluzione max)",
+  "cameraPhotoResHigh": "5 MP (Alta)",
+  "cameraPhotoResMedium": "2 MP (Media)",
+  "cameraPhotoResLow": "1,2 MP (Bassa)",
+  "cameraLensWide": "Grandangolo",
+  "cameraLensInfrared": "IR",
+  "cameraLensFront": "Frontale"
 }

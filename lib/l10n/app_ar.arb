@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "مشغّل التطبيقات لديك لا يدعم تثبيت الاختصارات",
   "quickCaptureSavedToast": "تم حفظ {name} في {destination}",
   "cardSwipeActionsTitle": "إيماءات سحب البطاقات",
-  "cardSwipeActionsSubtitle": "اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة"
+  "cardSwipeActionsSubtitle": "اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة",
+  "cameraQualitySd": "480p (دقة قياسية)",
+  "cameraQualityHd": "720p (عالية الدقة)",
+  "cameraQualityFhd": "1080p (عالية الدقة بالكامل)",
+  "cameraQualityUhd": "4K (فائقة الدقة)",
+  "cameraPhotoResMax": "كاملة (أعلى دقة)",
+  "cameraPhotoResHigh": "5 ميجابكسل (عالية)",
+  "cameraPhotoResMedium": "2 ميجابكسل (متوسطة)",
+  "cameraPhotoResLow": "1.2 ميجابكسل (منخفضة)",
+  "cameraLensWide": "عريضة",
+  "cameraLensInfrared": "الأشعة تحت الحمراء",
+  "cameraLensFront": "أمامية"
 }

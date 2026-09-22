@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Seu launcher não é compatível com a fixação de atalhos",
   "quickCaptureSavedToast": "{name} salvo em {destination}",
   "cardSwipeActionsTitle": "Gestos de deslize nos cartões",
-  "cardSwipeActionsSubtitle": "Deslize os cartões de cofre para exibir rapidamente as ações de editar e remover"
+  "cardSwipeActionsSubtitle": "Deslize os cartões de cofre para exibir rapidamente as ações de editar e remover",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Completa (Res. máx.)",
+  "cameraPhotoResHigh": "5 MP (Alta)",
+  "cameraPhotoResMedium": "2 MP (Média)",
+  "cameraPhotoResLow": "1,2 MP (Baixa)",
+  "cameraLensWide": "Grande-angular",
+  "cameraLensInfrared": "IR",
+  "cameraLensFront": "Frontal"
 }

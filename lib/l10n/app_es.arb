@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Tu launcher no permite fijar accesos directos",
   "quickCaptureSavedToast": "{name} guardado en {destination}",
   "cardSwipeActionsTitle": "Gestos de deslizamiento en tarjetas",
-  "cardSwipeActionsSubtitle": "Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar"
+  "cardSwipeActionsSubtitle": "Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Completa (Máx. res.)",
+  "cameraPhotoResHigh": "5 MP (Alta)",
+  "cameraPhotoResMedium": "2 MP (Media)",
+  "cameraPhotoResLow": "1,2 MP (Baja)",
+  "cameraLensWide": "Gran angular",
+  "cameraLensInfrared": "IR",
+  "cameraLensFront": "Frontal"
 }

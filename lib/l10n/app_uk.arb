@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Ваш лончер не підтримує закріплення ярликів",
   "quickCaptureSavedToast": "{name} збережено в {destination}",
   "cardSwipeActionsTitle": "Жести змахування карток",
-  "cardSwipeActionsSubtitle": "Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення"
+  "cardSwipeActionsSubtitle": "Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Повна (Макс. розд.)",
+  "cameraPhotoResHigh": "5 МП (Висока)",
+  "cameraPhotoResMedium": "2 МП (Середня)",
+  "cameraPhotoResLow": "1,2 МП (Низька)",
+  "cameraLensWide": "Ширококутна",
+  "cameraLensInfrared": "ІЧ",
+  "cameraLensFront": "Фронтальна"
 }

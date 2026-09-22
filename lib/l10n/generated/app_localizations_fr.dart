@@ -8258,4 +8258,37 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Faites glisser les cartes de coffre pour afficher rapidement les actions Modifier et Supprimer';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Maximale (Rés. max)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (Haute)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (Moyenne)';
+
+  @override
+  String get cameraPhotoResLow => '1,2 MP (Basse)';
+
+  @override
+  String get cameraLensWide => 'Grand-angle';
+
+  @override
+  String get cameraLensInfrared => 'IR';
+
+  @override
+  String get cameraLensFront => 'Avant';
 }

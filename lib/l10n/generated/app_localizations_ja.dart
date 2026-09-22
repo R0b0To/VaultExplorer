@@ -7744,4 +7744,37 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cardSwipeActionsSubtitle => '保管庫カードをスワイプして編集および削除アクションをすばやく表示します';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'フル (最高解像度)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (高画質)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (標準)';
+
+  @override
+  String get cameraPhotoResLow => '1.2 MP (低画質)';
+
+  @override
+  String get cameraLensWide => '広角';
+
+  @override
+  String get cameraLensInfrared => '赤外線';
+
+  @override
+  String get cameraLensFront => '前面';
 }

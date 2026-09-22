@@ -10327,5 +10327,49 @@
   "cardSwipeActionsSubtitle": "Swipe vault cards to quickly reveal edit and remove actions",
   "@cardSwipeActionsSubtitle": {
     "description": "Settings toggle subtitle explaining card swipe actions on the dashboard"
+  },
+  "cameraQualitySd": "480p (SD)",
+  "@cameraQualitySd": {
+    "description": "Resolution option label for Standard Definition (480p) video"
+  },
+  "cameraQualityHd": "720p (HD)",
+  "@cameraQualityHd": {
+    "description": "Resolution option label for High Definition (720p) video"
+  },
+  "cameraQualityFhd": "1080p (FHD)",
+  "@cameraQualityFhd": {
+    "description": "Resolution option label for Full HD (1080p) video"
+  },
+  "cameraQualityUhd": "4K (UHD)",
+  "@cameraQualityUhd": {
+    "description": "Resolution option label for Ultra HD / 4K video"
+  },
+  "cameraPhotoResMax": "Full (Max Res)",
+  "@cameraPhotoResMax": {
+    "description": "Photo resolution option for maximum sensor resolution"
+  },
+  "cameraPhotoResHigh": "5 MP (High)",
+  "@cameraPhotoResHigh": {
+    "description": "Photo resolution option for 5 megapixel capture"
+  },
+  "cameraPhotoResMedium": "2 MP (Medium)",
+  "@cameraPhotoResMedium": {
+    "description": "Photo resolution option for 2 megapixel capture"
+  },
+  "cameraPhotoResLow": "1.2 MP (Low)",
+  "@cameraPhotoResLow": {
+    "description": "Photo resolution option for 1.2 megapixel capture"
+  },
+  "cameraLensWide": "Wide",
+  "@cameraLensWide": {
+    "description": "Label for the ultra-wide camera lens"
+  },
+  "cameraLensInfrared": "IR",
+  "@cameraLensInfrared": {
+    "description": "Label for the infrared / night-vision camera lens"
+  },
+  "cameraLensFront": "Front",
+  "@cameraLensFront": {
+    "description": "Label for the front-facing camera lens"
   }
 }

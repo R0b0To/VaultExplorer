@@ -7636,4 +7636,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cardSwipeActionsSubtitle => '滑动保险库卡片以快速显示编辑和移除操作';
+
+  @override
+  String get cameraQualitySd => '480p (标清)';
+
+  @override
+  String get cameraQualityHd => '720p (高清)';
+
+  @override
+  String get cameraQualityFhd => '1080p (全高清)';
+
+  @override
+  String get cameraQualityUhd => '4K (超高清)';
+
+  @override
+  String get cameraPhotoResMax => '完整 (最高分辨率)';
+
+  @override
+  String get cameraPhotoResHigh => '500 万像素 (高)';
+
+  @override
+  String get cameraPhotoResMedium => '200 万像素 (中)';
+
+  @override
+  String get cameraPhotoResLow => '120 万像素 (低)';
+
+  @override
+  String get cameraLensWide => '广角';
+
+  @override
+  String get cameraLensInfrared => '红外';
+
+  @override
+  String get cameraLensFront => '前置';
 }

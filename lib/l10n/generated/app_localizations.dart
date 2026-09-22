@@ -13566,6 +13566,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Swipe vault cards to quickly reveal edit and remove actions'**
   String get cardSwipeActionsSubtitle;
+
+  /// Resolution option label for Standard Definition (480p) video
+  ///
+  /// In en, this message translates to:
+  /// **'480p (SD)'**
+  String get cameraQualitySd;
+
+  /// Resolution option label for High Definition (720p) video
+  ///
+  /// In en, this message translates to:
+  /// **'720p (HD)'**
+  String get cameraQualityHd;
+
+  /// Resolution option label for Full HD (1080p) video
+  ///
+  /// In en, this message translates to:
+  /// **'1080p (FHD)'**
+  String get cameraQualityFhd;
+
+  /// Resolution option label for Ultra HD / 4K video
+  ///
+  /// In en, this message translates to:
+  /// **'4K (UHD)'**
+  String get cameraQualityUhd;
+
+  /// Photo resolution option for maximum sensor resolution
+  ///
+  /// In en, this message translates to:
+  /// **'Full (Max Res)'**
+  String get cameraPhotoResMax;
+
+  /// Photo resolution option for 5 megapixel capture
+  ///
+  /// In en, this message translates to:
+  /// **'5 MP (High)'**
+  String get cameraPhotoResHigh;
+
+  /// Photo resolution option for 2 megapixel capture
+  ///
+  /// In en, this message translates to:
+  /// **'2 MP (Medium)'**
+  String get cameraPhotoResMedium;
+
+  /// Photo resolution option for 1.2 megapixel capture
+  ///
+  /// In en, this message translates to:
+  /// **'1.2 MP (Low)'**
+  String get cameraPhotoResLow;
+
+  /// Label for the ultra-wide camera lens
+  ///
+  /// In en, this message translates to:
+  /// **'Wide'**
+  String get cameraLensWide;
+
+  /// Label for the infrared / night-vision camera lens
+  ///
+  /// In en, this message translates to:
+  /// **'IR'**
+  String get cameraLensInfrared;
+
+  /// Label for the front-facing camera lens
+  ///
+  /// In en, this message translates to:
+  /// **'Front'**
+  String get cameraLensFront;
 }
 
 class _AppLocalizationsDelegate

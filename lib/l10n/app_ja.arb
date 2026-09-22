@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "お使いのランチャーはショートカットの固定に対応していません",
   "quickCaptureSavedToast": "{name}を{destination}に保存しました",
   "cardSwipeActionsTitle": "カードのスワイプ操作",
-  "cardSwipeActionsSubtitle": "保管庫カードをスワイプして編集および削除アクションをすばやく表示します"
+  "cardSwipeActionsSubtitle": "保管庫カードをスワイプして編集および削除アクションをすばやく表示します",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "フル (最高解像度)",
+  "cameraPhotoResHigh": "5 MP (高画質)",
+  "cameraPhotoResMedium": "2 MP (標準)",
+  "cameraPhotoResLow": "1.2 MP (低画質)",
+  "cameraLensWide": "広角",
+  "cameraLensInfrared": "赤外線",
+  "cameraLensFront": "前面"
 }

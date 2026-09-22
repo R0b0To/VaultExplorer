@@ -2235,5 +2235,16 @@
   "quickCaptureShortcutUnsupportedMessage": "Dein Launcher unterstützt das Anheften von Verknüpfungen nicht",
   "quickCaptureSavedToast": "{name} in {destination} gespeichert",
   "cardSwipeActionsTitle": "Karten-Wischgesten",
-  "cardSwipeActionsSubtitle": "Tresorkarten wischen, um Bearbeiten- und Entfernen-Aktionen schnell anzuzeigen"
+  "cardSwipeActionsSubtitle": "Tresorkarten wischen, um Bearbeiten- und Entfernen-Aktionen schnell anzuzeigen",
+  "cameraQualitySd": "480p (SD)",
+  "cameraQualityHd": "720p (HD)",
+  "cameraQualityFhd": "1080p (FHD)",
+  "cameraQualityUhd": "4K (UHD)",
+  "cameraPhotoResMax": "Voll (Max. Auflösung)",
+  "cameraPhotoResHigh": "5 MP (Hoch)",
+  "cameraPhotoResMedium": "2 MP (Mittel)",
+  "cameraPhotoResLow": "1,2 MP (Niedrig)",
+  "cameraLensWide": "Weitwinkel",
+  "cameraLensInfrared": "IR",
+  "cameraLensFront": "Front"
 }

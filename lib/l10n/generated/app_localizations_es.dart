@@ -8205,4 +8205,37 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Desliza las tarjetas de las bóvedas para mostrar rápidamente las acciones de editar y eliminar';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Completa (Máx. res.)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (Alta)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (Media)';
+
+  @override
+  String get cameraPhotoResLow => '1,2 MP (Baja)';
+
+  @override
+  String get cameraLensWide => 'Gran angular';
+
+  @override
+  String get cameraLensInfrared => 'IR';
+
+  @override
+  String get cameraLensFront => 'Frontal';
 }

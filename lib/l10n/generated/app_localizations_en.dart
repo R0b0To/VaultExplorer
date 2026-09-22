@@ -8062,4 +8062,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Swipe vault cards to quickly reveal edit and remove actions';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Full (Max Res)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (High)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (Medium)';
+
+  @override
+  String get cameraPhotoResLow => '1.2 MP (Low)';
+
+  @override
+  String get cameraLensWide => 'Wide';
+
+  @override
+  String get cameraLensInfrared => 'IR';
+
+  @override
+  String get cameraLensFront => 'Front';
 }

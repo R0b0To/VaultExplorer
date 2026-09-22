@@ -7743,4 +7743,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get cardSwipeActionsSubtitle => '볼트 카드를 스와이프하여 편집 및 삭제 동작을 빠르게 표시합니다';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => '전체 (최대 해상도)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (높음)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (중간)';
+
+  @override
+  String get cameraPhotoResLow => '1.2 MP (낮음)';
+
+  @override
+  String get cameraLensWide => '광각';
+
+  @override
+  String get cameraLensInfrared => '적외선';
+
+  @override
+  String get cameraLensFront => '전면';
 }

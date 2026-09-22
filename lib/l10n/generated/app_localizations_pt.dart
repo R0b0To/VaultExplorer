@@ -8195,4 +8195,37 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'Deslize os cartões de cofre para exibir rapidamente as ações de editar e remover';
+
+  @override
+  String get cameraQualitySd => '480p (SD)';
+
+  @override
+  String get cameraQualityHd => '720p (HD)';
+
+  @override
+  String get cameraQualityFhd => '1080p (FHD)';
+
+  @override
+  String get cameraQualityUhd => '4K (UHD)';
+
+  @override
+  String get cameraPhotoResMax => 'Completa (Res. máx.)';
+
+  @override
+  String get cameraPhotoResHigh => '5 MP (Alta)';
+
+  @override
+  String get cameraPhotoResMedium => '2 MP (Média)';
+
+  @override
+  String get cameraPhotoResLow => '1,2 MP (Baixa)';
+
+  @override
+  String get cameraLensWide => 'Grande-angular';
+
+  @override
+  String get cameraLensInfrared => 'IR';
+
+  @override
+  String get cameraLensFront => 'Frontal';
 }

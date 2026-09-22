@@ -8249,4 +8249,37 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get cardSwipeActionsSubtitle =>
       'اسحب بطاقات الخزائن لإظهار إجراءات التعديل والحذف بسرعة';
+
+  @override
+  String get cameraQualitySd => '480p (دقة قياسية)';
+
+  @override
+  String get cameraQualityHd => '720p (عالية الدقة)';
+
+  @override
+  String get cameraQualityFhd => '1080p (عالية الدقة بالكامل)';
+
+  @override
+  String get cameraQualityUhd => '4K (فائقة الدقة)';
+
+  @override
+  String get cameraPhotoResMax => 'كاملة (أعلى دقة)';
+
+  @override
+  String get cameraPhotoResHigh => '5 ميجابكسل (عالية)';
+
+  @override
+  String get cameraPhotoResMedium => '2 ميجابكسل (متوسطة)';
+
+  @override
+  String get cameraPhotoResLow => '1.2 ميجابكسل (منخفضة)';
+
+  @override
+  String get cameraLensWide => 'عريضة';
+
+  @override
+  String get cameraLensInfrared => 'الأشعة تحت الحمراء';
+
+  @override
+  String get cameraLensFront => 'أمامية';
 }

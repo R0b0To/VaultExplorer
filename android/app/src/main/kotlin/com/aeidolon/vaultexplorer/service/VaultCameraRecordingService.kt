@@ -6,8 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.bridge.VaultCameraStopRequestedBridge
@@ -72,6 +75,15 @@ class VaultCameraRecordingService : Service() {
         }
     }
 
+     private fun startForegroundCompat() {
+        val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        } else {
+            0
+        }
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), serviceType)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_RECORDING) {
             // Don't stop the service here -- the recording isn't actually
@@ -79,14 +91,14 @@ class VaultCameraRecordingService : Service() {
             // once _stopVideoRecording() completes, which is what tears
             // this service down (see the finally block there).
             VaultCameraStopRequestedBridge.reportStopRequested(currentVolId)
-            startForeground(NOTIFICATION_ID, buildNotification())
+            startForegroundCompat()
             return START_NOT_STICKY
         }
 
         intent?.getIntExtra(EXTRA_VOL_ID, -1)?.let { if (it != -1) currentVolId = it }
         intent?.getStringExtra(EXTRA_CONTAINER_NAME)?.let { currentContainerName = it }
 
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForegroundCompat()
         wakeLock?.let { if (!it.isHeld) it.acquire(6 * 60 * 60 * 1000L /* 6h safety cap */) }
         return START_NOT_STICKY
     }

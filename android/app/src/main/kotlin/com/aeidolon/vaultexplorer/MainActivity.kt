@@ -36,6 +36,7 @@ import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
 import com.aeidolon.vaultexplorer.bridge.VaultCameraStopRequestedBridge
 import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
+import com.aeidolon.vaultexplorer.service.VaultCameraRecordingService
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.CameraRecordingServiceHandlers
@@ -821,9 +822,13 @@ open class MainActivity : FlutterFragmentActivity() {
         val detachFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
         registerReceiverCompat(usbDetachReceiver, detachFilter, exported = false)
 
-        screenOffReceiver = object : BroadcastReceiver() {
+         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF) return
+                if (VaultCameraRecordingService.isRunning) {
+                    VeLog.i("MainActivity") { "screenOffReceiver: camera recording active, suppressing onScreenOff auto-lock" }
+                    return
+                }
                 VeLog.i("MainActivity") { "screenOffReceiver: ACTION_SCREEN_OFF received, dispatching onScreenOff to Dart" }
                 runOnUiThread {
                     methodChannel?.invokeMethod("onScreenOff", null)

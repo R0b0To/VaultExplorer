@@ -43,16 +43,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   bool _pendingStopAfterStart = false;
 
-  /// Whether "lock vaults on screen lock" was OFF for this container when
-  /// the current recording started -- if so, the screen turning off
-  /// hands the recording to VaultCameraRecordingService instead of
-  /// stopping it. Cached at record-start rather than re-read live so a
-  /// mid-recording settings change can't change behavior unpredictably
-  /// partway through.
-  bool _allowBackgroundRecording = false;
-
   /// True while VaultCameraRecordingService owns keeping the recording
-  /// alive (screen off / app backgrounded, background recording allowed).
+  /// alive (screen off / app backgrounded).
   bool _backgroundRecordingActive = false;
 
   bool _showShutterFlash = false;
@@ -229,35 +221,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
   }
 
-  Future<void> _handleGoingInactive() async {
+ Future<void> _handleGoingInactive() async {
     if (_isRecording) {
-      if (_allowBackgroundRecording) {
-        // "Lock vaults on screen lock" is off for this container, so
-        // nothing is about to lock it out from under the recording.
-        // Hand off to VaultCameraRecordingService -- a foreground service
-        // is the only way the OS lets camera/mic access survive once
-        // nothing is in the foreground -- and deliberately do NOT close
-        // _cameraController here, so the native session and encoder keep
-        // running untouched.
-        _backgroundRecordingActive = true;
-        await _fileIoApi.startBackgroundRecording(
-          volId: widget.container.volId,
-          containerName: widget.container.displayName,
-        );
-        return;
-      }
-      // Otherwise the screen turning off is about to lock this container
-      // (see handleScreenOff/performAutoLock), so finish and save the
-      // recording now rather than let that lock yank it out from under an
-      // in-flight write.
-      //
-      // IMPORTANT: this must be fully awaited BEFORE close() runs below.
-      // close() nulls out the session id synchronously and tears the
-      // encoder down via releaseEncoder() (no finalize) on the native
-      // side; racing it against a not-yet-awaited _stopVideoRecording()
-      // was silently dropping the recording (stopVideoRecording() would
-      // return "Camera not open" because close() had already run first).
-      await _stopVideoRecording();
+      // VaultCameraRecordingService was already started while foregrounded to
+      // keep the recording alive when the screen turns off or the app is
+      // backgrounded. Deliberately do NOT close _cameraController so the native
+      // session and encoder keep running untouched.
+      return;
     }
     await _cameraController.close();
     if (mounted) {
@@ -266,11 +236,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   }
 
   Future<void> _resumeFromBackgroundRecording() async {
-    _backgroundRecordingActive = false;
-    await _fileIoApi.stopBackgroundRecording();
     // The native session and recorder were never closed while backgrounded,
     // so there's nothing to reinitialize -- the existing preview texture
-    // just keeps rendering.
+    // just keeps rendering. The background recording service stays active
+    // until the recording is stopped.
   }
 
   Future<void> _initCamera({String? cameraId}) async {
@@ -498,15 +467,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     _captureSessionController.setStartingVideo(true);
 
-    try {
-      // Read this up front (not lazily when the screen actually turns
-      // off) so the decision is ready instantly and can't add latency to
-      // the screen-off handoff.
-      final settings = await ref
-          .read(appSettingsServiceProvider)
-          .loadSettings();
-      _allowBackgroundRecording = !settings.lockContainersOnScreenLock;
-
+     try {
       final name = await _vaultService.nextAvailableName(isPhoto: false);
       final virtualPath = _vaultService.buildVirtualPath(name);
 
@@ -537,6 +498,20 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       _activeRecordingRegistry.register(
         widget.container.uri,
         _stopVideoRecording,
+      );
+
+      // Start the foreground recording service immediately while the app is
+      // still in the foreground. On Android 14+ (API 34), a camera/microphone
+      // foreground service cannot be started once the app is already in the
+      // background or the screen is off due to while-in-use restrictions.
+      // Starting it now ensures the persistent notification appears right away
+      // and camera/mic access is preserved when pressing Home or locking the screen.
+      _backgroundRecordingActive = true;
+      unawaited(
+        _fileIoApi.startBackgroundRecording(
+          volId: widget.container.volId,
+          containerName: widget.container.displayName,
+        ),
       );
 
       _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {

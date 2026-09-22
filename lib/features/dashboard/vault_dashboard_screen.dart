@@ -613,8 +613,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget _buildBody(
     List<VaultListItem> displayItems,
     VaultDashboardViewState state,
-    AppSettings appSettings,
-  ) {
+    AppSettings appSettings, {
+    required bool settingsLoaded,
+  }) {
     if (displayItems.isEmpty && !state.isLoading) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
@@ -645,6 +646,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       itemBuilder: (context, i) {
         final item = displayItems[i];
         final triggerNudge = i == 0 &&
+            settingsLoaded &&
             !appSettings.hasSeenSwipeTutorial &&
             appSettings.enableCardSwipeActions;
         return VaultCardRow(
@@ -663,11 +665,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           swapActions: appSettings.swapCardActions,
           swipeEnabled: appSettings.enableCardSwipeActions,
           dragEnabled: appSettings.containerSortMode == ContainerSortMode.manual,
-          onNudgeComplete: () async {
-            final updated = appSettings.copyWith(hasSeenSwipeTutorial: true);
-            await ref.read(appSettingsServiceProvider).saveSettings(updated);
-            ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-          },
+          onNudgeComplete: () => ref
+              .read(appSettingsControllerProvider.notifier)
+              .updateSettings((s) => s.copyWith(hasSeenSwipeTutorial: true)),
         );
       },
     );
@@ -683,7 +683,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
-    final appSettings = ref.watch(appSettingsControllerProvider).settings;
+    final appSettingsState = ref.watch(appSettingsControllerProvider);
+    final appSettings = appSettingsState.settings;
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
 
     if (widget.mountedNotifier != null) {
@@ -773,7 +774,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               children: [
                 // Auto-sync progress / attention; takes no space when idle.
                 const SyncStatusBanner(),
-                Expanded(child: _buildBody(displayItems, state, appSettings)),
+                Expanded(
+                  child: _buildBody(
+                    displayItems,
+                    state,
+                    appSettings,
+                    settingsLoaded: !appSettingsState.loading,
+                  ),
+                ),
               ],
             ),
           ),

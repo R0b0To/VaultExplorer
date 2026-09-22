@@ -33,6 +33,15 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
   StrictHorizontalDragGestureRecognizer({super.debugOwner});
   final Map<int, Offset> _startPositions = {};
 
+  /// Called with the drag's cumulative delta so far. Return true to let a
+  /// rightward drag fall through to an ancestor gesture detector instead of
+  /// being claimed here -- used when the card is already fully open toward
+  /// [_OpenSide.start] and there's nothing left to reveal, so a second swipe
+  /// hands off to the dashboard's drawer-open gesture. Mirrors how the
+  /// drawer's own swipeable rows (_CardHorizontalDragGestureRecognizer)
+  /// reject a leftward drag on a closed row so the drawer can close.
+  bool Function(Offset delta)? shouldYieldHorizontal;
+
   @override
   void addAllowedPointer(PointerDownEvent event) {
     super.addAllowedPointer(event);
@@ -60,8 +69,16 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
           _startPositions.remove(event.pointer);
           return;
         }
-        // 2. If movement is horizontal on the card, claim victory!
+        // 2. If movement is horizontal on the card, claim victory! -- unless
+        // there's nothing left for this card to reveal in that direction,
+        // in which case yield to whatever ancestor gesture wants it (the
+        // drawer-open swipe).
         else if (dx > 8.0 && dx > dy) {
+          if (shouldYieldHorizontal?.call(delta) ?? false) {
+            resolve(GestureDisposition.rejected);
+            _startPositions.remove(event.pointer);
+            return;
+          }
           resolve(GestureDisposition.accepted);
           _startPositions.remove(event.pointer);
         }
@@ -453,7 +470,9 @@ class _VaultCardRowState extends State<VaultCardRow>
                                         ..onStart = _onDragStart
                                         ..onUpdate = _onDragUpdate
                                         ..onEnd = _onDragEnd
-                                        ..onCancel = _onDragCancel;
+                                        ..onCancel = _onDragCancel
+                                        ..shouldYieldHorizontal = (delta) =>
+                                            _openSide == _OpenSide.start && delta.dx > 0;
                                     },
                                   ),
                               },

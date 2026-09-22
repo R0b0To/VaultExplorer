@@ -458,6 +458,18 @@ class ContainerRecord {
   final bool rememberPassword;
   final ContainerUnlockMethod unlockMethod;
   final int autoCloseMins;
+  // Distinct from "autoCloseMins == 0", which just means "no per-container
+  // inactivity timer configured" and is also the default for every
+  // never-touched container -- see the "never autolock" bug writeup this
+  // field fixes. This flag is only ever true when the user has explicitly
+  // picked "Never" in the per-container Auto-Lock Duration picker, and it's
+  // what exempts this container from the app-wide lock-all sweep
+  // (VaultDashboardScreen._lockAllMountedContainers) triggered by
+  // SessionLockController / "Lock containers on screen lock". Records
+  // written before this field existed have no key for it in the JSON file
+  // and deserialize to false, so upgrading never silently exempts an
+  // existing container from that security feature.
+  final bool autoCloseNever;
   final bool documentProvider;
   final List<DocumentProviderFolder> documentProviderFolders;
   final ThumbnailCacheMode? thumbnailCacheMode;
@@ -487,6 +499,7 @@ class ContainerRecord {
     this.rememberPassword = false,
     this.unlockMethod = ContainerUnlockMethod.password,
     this.autoCloseMins = 0,
+    this.autoCloseNever = false,
     this.documentProvider = false,
     this.documentProviderFolders = const [],
     this.thumbnailCacheMode,
@@ -508,11 +521,21 @@ class ContainerRecord {
   bool get isUsbSource => uri.startsWith('usb:');
   bool get isCompositeSource => uri.startsWith('composite:');
 
+  /// Whether this container should be skipped by the app-wide lock-all
+  /// sweep (VaultDashboardScreen._lockAllMountedContainers, triggered by
+  /// SessionLockController on the global auto-lock timeout or screen lock).
+  /// True only when the user explicitly picked "Never" for this specific
+  /// container -- never true just because autoCloseMins happens to be 0,
+  /// which is also the default for every container that's never had this
+  /// setting touched.
+  bool get isExemptFromGlobalLock => autoCloseNever;
+
   ContainerRecord copyWith({
     String? label,
     bool? rememberPassword,
     ContainerUnlockMethod? unlockMethod,
     int? autoCloseMins,
+    bool? autoCloseNever,
     bool? documentProvider,
     List<DocumentProviderFolder>? documentProviderFolders,
     Object? thumbnailCacheMode = _keep,
@@ -536,6 +559,7 @@ class ContainerRecord {
       rememberPassword: rememberPassword ?? this.rememberPassword,
       unlockMethod: unlockMethod ?? this.unlockMethod,
       autoCloseMins: autoCloseMins ?? this.autoCloseMins,
+      autoCloseNever: autoCloseNever ?? this.autoCloseNever,
       documentProvider: documentProvider ?? this.documentProvider,
       documentProviderFolders:
           documentProviderFolders ?? this.documentProviderFolders,
@@ -566,6 +590,7 @@ class ContainerRecord {
     'rememberPassword': rememberPassword,
     'unlockMethod': unlockMethod.toJson(),
     'autoCloseMins': autoCloseMins,
+    'autoCloseNever': autoCloseNever,
     'documentProvider': documentProvider,
     if (thumbnailCacheMode != null)
       'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
@@ -593,6 +618,9 @@ class ContainerRecord {
       rememberPassword: method != ContainerUnlockMethod.password,
       unlockMethod: method,
       autoCloseMins: j['autoCloseMins'] as int? ?? 0,
+      // Absent (pre-upgrade records) -> false, i.e. not exempt. See the
+      // field doc comment above for why this default matters.
+      autoCloseNever: j['autoCloseNever'] as bool? ?? false,
       documentProvider: j['documentProvider'] as bool? ?? false,
       // Populated from secure storage in _hydrate(), not from this file.
       documentProviderFolders: const [],

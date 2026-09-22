@@ -8,6 +8,15 @@ import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 /// intercept it in their `onChanged` handler (see [pickCustomAutoLockDuration]).
 const int kCustomAutoLockDuration = -1;
 
+/// Sentinel [SelectOption] value meaning "no override — follow the app-wide
+/// auto-lock / lock-on-screen-lock behavior". Only offered where a
+/// [defaultOption] is passed to [autoLockDurationOptions] (the per-container
+/// picker); the global settings picker has no such concept, since it *is*
+/// the app-wide setting. Distinct from the zero option (e.g. "Never"):
+/// picking "Never" here is what exempts a single container from the app-wide
+/// lock-all sweep, whereas this sentinel leaves that container subject to it.
+const int kInheritAutoLockDuration = -2;
+
 const List<int> _presetAutoLockMinutes = [1, 2, 5, 10, 15, 30, 60];
 
 /// Renders [minutes] as "N minutes", "N hours", or "N hours M minutes" for a
@@ -20,18 +29,22 @@ String formatAutoLockDuration(BuildContext context, int minutes) {
   return '${context.l10n.nHours(hours)} ${context.l10n.nMinutes(mins)}';
 }
 
-/// Builds the shared list of auto-lock duration options: [zeroOption] (whose
-/// label differs by call site — "Immediately" vs "Never"), the standard
-/// minute/hour presets, the currently configured duration if it isn't one of
-/// those presets (so it still shows up correctly selected), and a trailing
-/// "Custom…" entry (value [kCustomAutoLockDuration]) that opens a picker
-/// dialog rather than being a real duration.
+/// Builds the shared list of auto-lock duration options: an optional leading
+/// [defaultOption] (value [kInheritAutoLockDuration]) for pickers that need
+/// an explicit "no override" choice, [zeroOption] (whose label differs by
+/// call site — "Immediately" vs "Never"), the standard minute/hour presets,
+/// the currently configured duration if it isn't one of those presets (so it
+/// still shows up correctly selected), and a trailing "Custom…" entry (value
+/// [kCustomAutoLockDuration]) that opens a picker dialog rather than being a
+/// real duration.
 List<SelectOption<int>> autoLockDurationOptions(
   BuildContext context, {
   required SelectOption<int> zeroOption,
   required int currentMinutes,
+  SelectOption<int>? defaultOption,
 }) {
   final options = <SelectOption<int>>[
+    if (defaultOption != null) defaultOption,
     zeroOption,
     for (final mins in _presetAutoLockMinutes)
       SelectOption(value: mins, label: formatAutoLockDuration(context, mins)),

@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dart'
+    show kInheritAutoLockDuration;
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -35,7 +37,9 @@ void main() {
 
       expect(state.label, 'My Vault');
       expect(state.unlockMethod, ContainerUnlockMethod.password);
-      expect(state.autoCloseMins, 0);
+      // A never-configured container defaults to "App Default", not "Never"
+      // -- it must stay subject to the app-wide lock-all sweep.
+      expect(state.autoCloseMins, kInheritAutoLockDuration);
       expect(state.documentProvider, isFalse);
       expect(state.cacheDerivedKey, isFalse);
       expect(state.cipherId, 255);

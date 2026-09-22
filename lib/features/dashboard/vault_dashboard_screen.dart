@@ -236,7 +236,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Future<void> _lockAllMountedContainers() async {
-    final mountedList = ref.read(vaultDashboardControllerProvider).mounted;
+    final state = ref.read(vaultDashboardControllerProvider);
+    final mountedList = state.mounted;
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final controller = ref.read(vaultDashboardControllerProvider.notifier);
 
@@ -247,6 +248,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     );
 
     for (final c in List<MountedContainer>.from(mountedList)) {
+      if (state.records[c.uri]?.isExemptFromGlobalLock == true) {
+        VeLog.d(
+          _kLogTag,
+          '_lockAllMountedContainers: volId=${c.volId} exempt (per-container '
+          'Auto-Lock Duration set to Never), skipping',
+        );
+        continue;
+      }
       if (!controller.acquireLockGuard(c.volId)) {
         VeLog.d(_kLogTag, '_lockAllMountedContainers: volId=${c.volId} guard busy, skipping');
         continue;

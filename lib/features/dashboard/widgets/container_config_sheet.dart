@@ -872,7 +872,16 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               value: state.autoCloseMins,
               options: autoLockDurationOptions(
                 context,
-                zeroOption: SelectOption(value: 0, label: context.l10n.neverAutoLockOption),
+                defaultOption: SelectOption(
+                  value: kInheritAutoLockDuration,
+                  label: context.l10n.useGlobalDefaultSubtitle,
+                  subtitle: context.l10n.defaultAutoLockOptionSubtitle,
+                ),
+                zeroOption: SelectOption(
+                  value: 0,
+                  label: context.l10n.neverAutoLockOption,
+                  subtitle: context.l10n.neverAutoLockOptionSubtitle,
+                ),
                 currentMinutes: state.autoCloseMins,
               ),
               onChanged: (v) {

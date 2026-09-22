@@ -759,6 +759,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               }
               _drawerDragDistance += details.primaryDelta ?? 0.0;
               if (_drawerDragDistance > 60.0) {
+                _swipeGroup.closeAll();
                 _scaffoldKey.currentState?.openDrawer();
                 _drawerDragDistance = 0.0;
                 _isTouchFromEdge = true;

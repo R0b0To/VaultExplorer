@@ -27,6 +27,17 @@ class SwipeRowGroupController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Closes whichever card is currently open, if any. Used when the user's
+  /// swipe continues past an already-open card into opening the navigation
+  /// drawer -- at that point the card reveal was never the intent, so it
+  /// shouldn't stay open underneath the drawer.
+  void closeAll() {
+    if (_openId != null) {
+      _openId = null;
+      notifyListeners();
+    }
+  }
 }
 
 class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {

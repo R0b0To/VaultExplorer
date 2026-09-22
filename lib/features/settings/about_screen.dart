@@ -14,7 +14,11 @@ const _kContributorsUrl = '$_kGithubUrl/graphs/contributors';
 const _kKofiUrl = 'https://ko-fi.com/r0b0to';
 
 class AboutScreen extends ConsumerWidget {
-  const AboutScreen({super.key});
+  /// True when embedded in the wide-layout detail pane instead of pushed
+  /// as a full-screen route.
+  final bool embedded;
+
+  const AboutScreen({super.key, this.embedded = false});
 
   Future<void> _openUrl(WidgetRef ref, BuildContext context, String url) async {
     try {
@@ -147,17 +151,11 @@ class AboutScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title:
-            Text(context.l10n.aboutScreenTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
             child: ListView(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -379,7 +377,19 @@ class AboutScreen extends ConsumerWidget {
             ),
           ),
         ),
+      );
+
+    if (embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title:
+            Text(context.l10n.aboutScreenTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
+      body: body,
     );
   }
 }

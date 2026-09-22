@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
@@ -40,8 +41,18 @@ class AppSettingsScreen extends ConsumerStatefulWidget {
 const _kAndroidSdkR = 30;
 const _kAndroidSdkS = 31;
 
+/// The settings hubs shown in the persistent sidebar on wide/landscape
+/// layouts. Order and membership mirror the hub tiles used in the narrow,
+/// single-column layout.
+enum _SettingsSection { security, storage, fileHandling, appearance, advanced, about }
+
 class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     with WidgetsBindingObserver {
+  // Which hub is shown in the detail pane when the sidebar layout is
+  // active. Only used on wide/landscape layouts; the narrow layout
+  // navigates with the app's normal Navigator instead.
+  _SettingsSection _selectedSection = _SettingsSection.security;
+
   @override
   void initState() {
     super.initState();
@@ -138,11 +149,18 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool selected = false,
+    bool showChevron = true,
   }) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      selected: selected,
+      selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.4),
+      shape: selected
+          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+          : null,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -166,11 +184,114 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               ),
             )
           : null,
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-      ),
+      trailing: showChevron
+          ? Icon(
+              Icons.chevron_right_rounded,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            )
+          : null,
       onTap: onTap,
+    );
+  }
+
+  /// The persistent sidebar shown alongside the detail pane on
+  /// wide/landscape layouts -- same hubs as the narrow layout's list, but
+  /// selecting one swaps the detail pane in place instead of pushing a
+  /// full-screen route.
+  Widget _buildSidebar(
+    AppSettingsViewState state,
+    FileManagerToolbarSettingsState fmSettingsState,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      children: [
+        SectionCard(
+          children: [
+            _buildHubTile(
+              icon: Icons.shield_rounded,
+              iconColor: cs.primary,
+              title: context.l10n.sectionSecurityPrivacy,
+              subtitle: _securitySummary(state),
+              selected: _selectedSection == _SettingsSection.security,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.security),
+            ),
+            _buildHubTile(
+              icon: Icons.settings_input_composite_rounded,
+              iconColor: cs.secondary,
+              title: context.l10n.sectionKeyStorageIntegration,
+              subtitle: _systemSummary(state),
+              selected: _selectedSection == _SettingsSection.storage,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.storage),
+            ),
+            _buildHubTile(
+              icon: Icons.folder_copy_rounded,
+              iconColor: cs.tertiary,
+              title: context.l10n.sectionVaultFileHandling,
+              subtitle: _fileHandlingSummary(state, fmSettingsState),
+              selected: _selectedSection == _SettingsSection.fileHandling,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.fileHandling),
+            ),
+            _buildHubTile(
+              icon: Icons.palette_rounded,
+              iconColor: Colors.deepPurpleAccent,
+              title: context.l10n.sectionAppearanceInterface,
+              subtitle: _appearanceSummary(state),
+              selected: _selectedSection == _SettingsSection.appearance,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.appearance),
+            ),
+            _buildHubTile(
+              icon: Icons.terminal_rounded,
+              iconColor: Colors.teal,
+              title: '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+              subtitle: _backupDiagnosticsSummary(state),
+              selected: _selectedSection == _SettingsSection.advanced,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.advanced),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SectionCard(
+          children: [
+            _buildHubTile(
+              icon: Icons.info_outline_rounded,
+              iconColor: cs.primary,
+              title: context.l10n.aboutAppTitle,
+              subtitle: context.l10n.aboutVersionSubtitle(appVersion),
+              selected: _selectedSection == _SettingsSection.about,
+              showChevron: false,
+              onTap: () => setState(() => _selectedSection = _SettingsSection.about),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// The right-hand detail pane on wide/landscape layouts. Wrapped in its
+  /// own [Navigator] so a hub that pushes a deeper page (e.g. Security ->
+  /// Emergency Panic & Duress) slides in within this pane only, leaving the
+  /// sidebar visible -- rather than covering the whole screen. Keying the
+  /// Navigator by the selected section resets that inner stack whenever the
+  /// sidebar selection changes.
+  Widget _buildDetailPane() {
+    return Navigator(
+      key: ValueKey(_selectedSection),
+      onGenerateRoute: (_) => MaterialPageRoute(
+        builder: (_) => switch (_selectedSection) {
+          _SettingsSection.security => const SecuritySettingsScreen(embedded: true),
+          _SettingsSection.storage => const StorageServicesSettingsScreen(embedded: true),
+          _SettingsSection.fileHandling => const FileHandlingSettingsScreen(embedded: true),
+          _SettingsSection.appearance => const AppearanceSettingsScreen(embedded: true),
+          _SettingsSection.advanced => const AdvancedSettingsScreen(embedded: true),
+          _SettingsSection.about => const AboutScreen(embedded: true),
+        },
+      ),
     );
   }
 
@@ -197,131 +318,144 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
       body: state.loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
+              child: context.screen.useWideLayout
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: context.screen.secondaryPaneWidth(),
+                          child: _buildSidebar(state, fmSettingsState),
+                        ),
+                        const VerticalDivider(width: 0.2),
+                        Expanded(child: _buildDetailPane()),
+                      ],
+                    )
+                  : _buildNarrowHubList(state, fmSettingsState, cs, textTheme),
+            ),
+    );
+  }
+
+  /// The narrow-layout hub list: unchanged from before the sidebar was
+  /// added -- tapping a hub pushes its screen as a full-screen route.
+  Widget _buildNarrowHubList(
+    AppSettingsViewState state,
+    FileManagerToolbarSettingsState fmSettingsState,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          children: [
+            // Grouped Settings Hubs in a single SectionCard
+            SectionCard(
+              children: [
+                _buildHubTile(
+                  icon: Icons.shield_rounded,
+                  iconColor: cs.primary,
+                  title: context.l10n.sectionSecurityPrivacy,
+                  subtitle: _securitySummary(state),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SecuritySettingsScreen(),
                     ),
-                    children: [
-                      // Grouped Settings Hubs in a single SectionCard
-                      SectionCard(
-                        children: [
-                          _buildHubTile(
-                            icon: Icons.shield_rounded,
-                            iconColor: cs.primary,
-                            title: context.l10n.sectionSecurityPrivacy,
-                            subtitle: _securitySummary(state),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SecuritySettingsScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildHubTile(
-                            icon: Icons.settings_input_composite_rounded,
-                            iconColor: cs.secondary,
-                            title: context.l10n.sectionKeyStorageIntegration,
-                            subtitle: _systemSummary(state),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const StorageServicesSettingsScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildHubTile(
-                            icon: Icons.folder_copy_rounded,
-                            iconColor: cs.tertiary,
-                            title: context.l10n.sectionVaultFileHandling,
-                            subtitle: _fileHandlingSummary(state, fmSettingsState),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const FileHandlingSettingsScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildHubTile(
-                            icon: Icons.palette_rounded,
-                            iconColor: Colors.deepPurpleAccent,
-                            title: context.l10n.sectionAppearanceInterface,
-                            subtitle: _appearanceSummary(state),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AppearanceSettingsScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildHubTile(
-                            icon: Icons.terminal_rounded,
-                            iconColor: Colors.teal,
-                            title: '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-                            subtitle: _backupDiagnosticsSummary(state),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AdvancedSettingsScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // About Card in its own matching SectionCard
-                      SectionCard(
-                        children: [
-                          ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 4,
-                            ),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.info_outline_rounded, color: cs.primary, size: 22),
-                            ),
-                            title: Text(
-                              context.l10n.aboutAppTitle,
-                              style: textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              context.l10n.aboutVersionSubtitle(appVersion),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-      ),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AboutScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                    ],
                   ),
                 ),
-              ),
+                _buildHubTile(
+                  icon: Icons.settings_input_composite_rounded,
+                  iconColor: cs.secondary,
+                  title: context.l10n.sectionKeyStorageIntegration,
+                  subtitle: _systemSummary(state),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const StorageServicesSettingsScreen(),
+                    ),
+                  ),
+                ),
+                _buildHubTile(
+                  icon: Icons.folder_copy_rounded,
+                  iconColor: cs.tertiary,
+                  title: context.l10n.sectionVaultFileHandling,
+                  subtitle: _fileHandlingSummary(state, fmSettingsState),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const FileHandlingSettingsScreen(),
+                    ),
+                  ),
+                ),
+                _buildHubTile(
+                  icon: Icons.palette_rounded,
+                  iconColor: Colors.deepPurpleAccent,
+                  title: context.l10n.sectionAppearanceInterface,
+                  subtitle: _appearanceSummary(state),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AppearanceSettingsScreen(),
+                    ),
+                  ),
+                ),
+                _buildHubTile(
+                  icon: Icons.terminal_rounded,
+                  iconColor: Colors.teal,
+                  title: '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+                  subtitle: _backupDiagnosticsSummary(state),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdvancedSettingsScreen(),
+                    ),
+                  ),
+                ),
+              ],
             ),
+
+            const SizedBox(height: 16),
+
+            // About Card in its own matching SectionCard
+            SectionCard(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.info_outline_rounded, color: cs.primary, size: 22),
+                  ),
+                  title: Text(
+                    context.l10n.aboutAppTitle,
+                    style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    context.l10n.aboutVersionSubtitle(appVersion),
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AboutScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -331,7 +465,12 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SecuritySettingsScreen extends ConsumerStatefulWidget {
-  const SecuritySettingsScreen({super.key});
+  /// True when this screen is embedded in the wide-layout detail pane
+  /// (drawn without its own AppBar/back button) rather than pushed as a
+  /// full-screen route.
+  final bool embedded;
+
+  const SecuritySettingsScreen({super.key, this.embedded = false});
 
   @override
   ConsumerState<SecuritySettingsScreen> createState() =>
@@ -676,15 +815,7 @@ class _SecuritySettingsScreenState
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          context.l10n.sectionSecurityPrivacy,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
+    final body = SafeArea(
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
@@ -924,7 +1055,7 @@ class _SecuritySettingsScreenState
                 ),
                 const SizedBox(height: 16),
 
-                // 3. Stealth, Duress & Emergency
+                // 3a. Mask Mode (disguise the app's identity)
                 SectionHeader(context.l10n.sectionMaskMode),
                 SectionCard(
                   children: [
@@ -943,6 +1074,16 @@ class _SecuritySettingsScreenState
                       value: state.disguiseMode == DisguiseMode.decoy,
                       onChanged: _setDiscreteMode,
                     ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 3b. Emergency Panic & Duress (its own concept: wipe/duress
+                // triggers, separate from disguising the app's identity)
+                SectionHeader(context.l10n.emergencyPanicTitle),
+                SectionCard(
+                  children: [
                     ListTile(
                       leading: Icon(Icons.warning_amber_rounded, color: cs.error),
                       title: Text(
@@ -959,6 +1100,16 @@ class _SecuritySettingsScreenState
                         MaterialPageRoute(builder: (_) => const EmergencySettingsScreen()),
                       ),
                     ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 3c. Quick Capture (a productivity shortcut, not a stealth
+                // or emergency feature -- its own section)
+                SectionHeader(context.l10n.quickCaptureSettingsTitle),
+                SectionCard(
+                  children: [
                     ListTile(
                       leading: Icon(Icons.bolt_rounded, color: cs.primary),
                       title: Text(
@@ -981,7 +1132,21 @@ class _SecuritySettingsScreenState
             ),
           ),
         ),
+      );
+
+    if (widget.embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          context.l10n.sectionSecurityPrivacy,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: body,
     );
   }
 }
@@ -991,7 +1156,11 @@ class _SecuritySettingsScreenState
 // ─────────────────────────────────────────────────────────────────────────────
 
 class StorageServicesSettingsScreen extends ConsumerWidget {
-  const StorageServicesSettingsScreen({super.key});
+  /// True when embedded in the wide-layout detail pane instead of pushed
+  /// as a full-screen route.
+  final bool embedded;
+
+  const StorageServicesSettingsScreen({super.key, this.embedded = false});
 
   Future<void> _toggleStoragePermission(
     BuildContext context,
@@ -1035,21 +1204,13 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          context.l10n.sectionKeyStorageIntegration,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
                 SectionCard(
                   children: [
@@ -1154,7 +1315,21 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      );
+
+    if (embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          context.l10n.sectionKeyStorageIntegration,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: body,
     );
   }
 }
@@ -1164,7 +1339,11 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class FileHandlingSettingsScreen extends ConsumerWidget {
-  const FileHandlingSettingsScreen({super.key});
+  /// True when embedded in the wide-layout detail pane instead of pushed
+  /// as a full-screen route.
+  final bool embedded;
+
+  const FileHandlingSettingsScreen({super.key, this.embedded = false});
 
   String _labelForAssociation(BuildContext context, String value) {
     if (value == 'editor') return context.l10n.fileAssocInAppTextEditor;
@@ -1182,19 +1361,11 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          context.l10n.sectionVaultFileHandling,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
@@ -1352,7 +1523,21 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      );
+
+    if (embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          context.l10n.sectionVaultFileHandling,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: body,
     );
   }
 }
@@ -1362,7 +1547,11 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppearanceSettingsScreen extends ConsumerWidget {
-  const AppearanceSettingsScreen({super.key});
+  /// True when embedded in the wide-layout detail pane instead of pushed
+  /// as a full-screen route.
+  final bool embedded;
+
+  const AppearanceSettingsScreen({super.key, this.embedded = false});
 
   String _getNativeLanguageName(Locale locale) {
     const nativeNames = {
@@ -1397,19 +1586,11 @@ class AppearanceSettingsScreen extends ConsumerWidget {
         ? 'system'
         : state.settings.languageCode!;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          context.l10n.sectionAppearanceInterface,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
@@ -1586,7 +1767,21 @@ class AppearanceSettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      );
+
+    if (embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          context.l10n.sectionAppearanceInterface,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: body,
     );
   }
 }
@@ -1596,7 +1791,11 @@ class AppearanceSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AdvancedSettingsScreen extends ConsumerWidget {
-  const AdvancedSettingsScreen({super.key});
+  /// True when embedded in the wide-layout detail pane instead of pushed
+  /// as a full-screen route.
+  final bool embedded;
+
+  const AdvancedSettingsScreen({super.key, this.embedded = false});
 
   Future<void> _exportSettings(BuildContext context, WidgetRef ref, AppSettingsViewState state) async {
     if (state.backupBusy) return;
@@ -1714,19 +1913,11 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
@@ -1825,7 +2016,21 @@ class AdvancedSettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+      );
+
+    if (embedded) {
+      return Scaffold(body: body);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
+      body: body,
     );
   }
 }

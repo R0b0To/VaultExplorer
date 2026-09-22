@@ -8229,4 +8229,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Front';
+
+  @override
+  String get appLockBehaviorTitle => 'App-Sperrverhalten';
+
+  @override
+  String get lockAppOnScreenOffTitle =>
+      'App bei ausgeschaltetem Bildschirm sperren';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Sperrbildschirm anzeigen, sobald der Bildschirm ausgeschaltet wird';
 }

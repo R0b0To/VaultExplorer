@@ -10379,5 +10379,17 @@
   "cameraLensFront": "Front",
   "@cameraLensFront": {
     "description": "Label for the front-facing camera lens"
+  },
+  "appLockBehaviorTitle": "App Lock Behavior",
+  "@appLockBehaviorTitle": {
+    "description": "Settings section or option title for configuring how the app locks"
+  },
+  "lockAppOnScreenOffTitle": "Lock App on Screen Off",
+  "@lockAppOnScreenOffTitle": {
+    "description": "Settings toggle title to immediately lock the app when the device screen turns off"
+  },
+  "lockAppOnScreenOffSubtitle": "Show the lock screen as soon as the screen turns off",
+  "@lockAppOnScreenOffSubtitle": {
+    "description": "Settings toggle subtitle explaining that the lock screen appears immediately when the screen is turned off"
   }
 }

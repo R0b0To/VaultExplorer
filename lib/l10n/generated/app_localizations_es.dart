@@ -8246,4 +8246,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Frontal';
+
+  @override
+  String get appLockBehaviorTitle => 'Comportamiento del bloqueo de la app';
+
+  @override
+  String get lockAppOnScreenOffTitle => 'Bloquear la app al apagar la pantalla';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Muestra la pantalla de bloqueo en cuanto se apaga la pantalla';
 }

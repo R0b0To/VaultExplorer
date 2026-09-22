@@ -8236,4 +8236,14 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Frontal';
+
+  @override
+  String get appLockBehaviorTitle => 'Comportamento do bloqueio do app';
+
+  @override
+  String get lockAppOnScreenOffTitle => 'Bloquear o app ao desligar a tela';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Mostra a tela de bloqueio assim que a tela se apaga';
 }

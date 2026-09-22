@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "IR",
   "cameraLensFront": "Frontal",
   "neverAutoLockOptionSubtitle": "Permanece abierto incluso cuando la app se bloquea o la pantalla se apaga",
-  "defaultAutoLockOptionSubtitle": "Sigue los ajustes de bloqueo automático y bloqueo de pantalla de la app"
+  "defaultAutoLockOptionSubtitle": "Sigue los ajustes de bloqueo automático y bloqueo de pantalla de la app",
+  "appLockBehaviorTitle": "Comportamiento del bloqueo de la app",
+  "lockAppOnScreenOffTitle": "Bloquear la app al apagar la pantalla",
+  "lockAppOnScreenOffSubtitle": "Muestra la pantalla de bloqueo en cuanto se apaga la pantalla"
 }

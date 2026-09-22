@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "赤外線",
   "cameraLensFront": "前面",
   "neverAutoLockOptionSubtitle": "アプリがロックされたり画面がオフになったりしても開いたままにします",
-  "defaultAutoLockOptionSubtitle": "アプリの自動ロックおよび画面ロック設定に従います"
+  "defaultAutoLockOptionSubtitle": "アプリの自動ロックおよび画面ロック設定に従います",
+  "appLockBehaviorTitle": "アプリのロック動作",
+  "lockAppOnScreenOffTitle": "画面消灯時にアプリをロック",
+  "lockAppOnScreenOffSubtitle": "画面が消灯するとすぐにロック画面を表示します"
 }

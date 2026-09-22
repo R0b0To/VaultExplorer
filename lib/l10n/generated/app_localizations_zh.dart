@@ -7675,4 +7675,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cameraLensFront => '前置';
+
+  @override
+  String get appLockBehaviorTitle => '应用锁定行为';
+
+  @override
+  String get lockAppOnScreenOffTitle => '屏幕熄灭时锁定应用';
+
+  @override
+  String get lockAppOnScreenOffSubtitle => '屏幕熄灭时立即显示锁定屏幕';
 }

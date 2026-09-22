@@ -8290,4 +8290,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'أمامية';
+
+  @override
+  String get appLockBehaviorTitle => 'سلوك قفل التطبيق';
+
+  @override
+  String get lockAppOnScreenOffTitle => 'قفل التطبيق عند إيقاف تشغيل الشاشة';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'إظهار شاشة القفل بمجرد إيقاف تشغيل الشاشة';
 }

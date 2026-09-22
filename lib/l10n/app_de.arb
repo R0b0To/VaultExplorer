@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "IR",
   "cameraLensFront": "Front",
   "neverAutoLockOptionSubtitle": "Bleibt geöffnet, selbst wenn die App gesperrt oder der Bildschirm ausgeschaltet wird",
-  "defaultAutoLockOptionSubtitle": "Folgt den Einstellungen der App für automatische Sperre und Bildschirmsperre"
+  "defaultAutoLockOptionSubtitle": "Folgt den Einstellungen der App für automatische Sperre und Bildschirmsperre",
+  "appLockBehaviorTitle": "App-Sperrverhalten",
+  "lockAppOnScreenOffTitle": "App bei ausgeschaltetem Bildschirm sperren",
+  "lockAppOnScreenOffSubtitle": "Sperrbildschirm anzeigen, sobald der Bildschirm ausgeschaltet wird"
 }

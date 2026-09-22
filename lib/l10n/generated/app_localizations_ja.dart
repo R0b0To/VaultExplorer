@@ -7783,4 +7783,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cameraLensFront => '前面';
+
+  @override
+  String get appLockBehaviorTitle => 'アプリのロック動作';
+
+  @override
+  String get lockAppOnScreenOffTitle => '画面消灯時にアプリをロック';
+
+  @override
+  String get lockAppOnScreenOffSubtitle => '画面が消灯するとすぐにロック画面を表示します';
 }

@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "IR",
   "cameraLensFront": "Frontale",
   "neverAutoLockOptionSubtitle": "Rimane aperto anche quando l'app si blocca o lo schermo si spegne",
-  "defaultAutoLockOptionSubtitle": "Segue le impostazioni di blocco automatico dell'app e di blocco schermo"
+  "defaultAutoLockOptionSubtitle": "Segue le impostazioni di blocco automatico dell'app e di blocco schermo",
+  "appLockBehaviorTitle": "Comportamento blocco app",
+  "lockAppOnScreenOffTitle": "Blocca l'app allo spegnimento dello schermo",
+  "lockAppOnScreenOffSubtitle": "Mostra la schermata di blocco non appena lo schermo si spegne"
 }

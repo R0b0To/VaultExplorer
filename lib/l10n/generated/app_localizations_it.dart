@@ -8229,4 +8229,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Frontale';
+
+  @override
+  String get appLockBehaviorTitle => 'Comportamento blocco app';
+
+  @override
+  String get lockAppOnScreenOffTitle =>
+      'Blocca l\'app allo spegnimento dello schermo';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Mostra la schermata di blocco non appena lo schermo si spegne';
 }

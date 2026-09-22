@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "الأشعة تحت الحمراء",
   "cameraLensFront": "أمامية",
   "neverAutoLockOptionSubtitle": "يبقى مفتوحًا حتى عند قفل التطبيق أو إيقاف تشغيل الشاشة",
-  "defaultAutoLockOptionSubtitle": "يتبع إعدادات القفل التلقائي للتطبيق وقفل الشاشة"
+  "defaultAutoLockOptionSubtitle": "يتبع إعدادات القفل التلقائي للتطبيق وقفل الشاشة",
+  "appLockBehaviorTitle": "سلوك قفل التطبيق",
+  "lockAppOnScreenOffTitle": "قفل التطبيق عند إيقاف تشغيل الشاشة",
+  "lockAppOnScreenOffSubtitle": "إظهار شاشة القفل بمجرد إيقاف تشغيل الشاشة"
 }

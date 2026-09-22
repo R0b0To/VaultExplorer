@@ -7782,4 +7782,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get cameraLensFront => '전면';
+
+  @override
+  String get appLockBehaviorTitle => '앱 잠금 동작';
+
+  @override
+  String get lockAppOnScreenOffTitle => '화면이 꺼질 때 앱 잠금';
+
+  @override
+  String get lockAppOnScreenOffSubtitle => '화면이 꺼지는 즉시 잠금 화면을 표시합니다';
 }

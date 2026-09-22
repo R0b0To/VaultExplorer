@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "적외선",
   "cameraLensFront": "전면",
   "neverAutoLockOptionSubtitle": "앱이 잠기거나 화면이 꺼져도 열려 있는 상태를 유지합니다",
-  "defaultAutoLockOptionSubtitle": "앱의 자동 잠금 및 화면 잠금 설정을 따릅니다"
+  "defaultAutoLockOptionSubtitle": "앱의 자동 잠금 및 화면 잠금 설정을 따릅니다",
+  "appLockBehaviorTitle": "앱 잠금 동작",
+  "lockAppOnScreenOffTitle": "화면이 꺼질 때 앱 잠금",
+  "lockAppOnScreenOffSubtitle": "화면이 꺼지는 즉시 잠금 화면을 표시합니다"
 }

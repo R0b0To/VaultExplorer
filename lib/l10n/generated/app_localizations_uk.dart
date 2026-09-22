@@ -8287,4 +8287,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Фронтальна';
+
+  @override
+  String get appLockBehaviorTitle => 'Поведінка блокування застосунку';
+
+  @override
+  String get lockAppOnScreenOffTitle =>
+      'Блокувати застосунок при вимкненні екрана';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Показувати екран блокування, щойно вимикається екран';
 }

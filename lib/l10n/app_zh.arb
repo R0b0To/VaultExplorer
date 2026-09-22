@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "红外",
   "cameraLensFront": "前置",
   "neverAutoLockOptionSubtitle": "即使应用锁定或屏幕熄灭也保持打开状态",
-  "defaultAutoLockOptionSubtitle": "遵循应用的自动锁定和屏幕锁定设置"
+  "defaultAutoLockOptionSubtitle": "遵循应用的自动锁定和屏幕锁定设置",
+  "appLockBehaviorTitle": "应用锁定行为",
+  "lockAppOnScreenOffTitle": "屏幕熄灭时锁定应用",
+  "lockAppOnScreenOffSubtitle": "屏幕熄灭时立即显示锁定屏幕"
 }

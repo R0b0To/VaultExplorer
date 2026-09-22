@@ -13644,6 +13644,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Front'**
   String get cameraLensFront;
+
+  /// Settings section or option title for configuring how the app locks
+  ///
+  /// In en, this message translates to:
+  /// **'App Lock Behavior'**
+  String get appLockBehaviorTitle;
+
+  /// Settings toggle title to immediately lock the app when the device screen turns off
+  ///
+  /// In en, this message translates to:
+  /// **'Lock App on Screen Off'**
+  String get lockAppOnScreenOffTitle;
+
+  /// Settings toggle subtitle explaining that the lock screen appears immediately when the screen is turned off
+  ///
+  /// In en, this message translates to:
+  /// **'Show the lock screen as soon as the screen turns off'**
+  String get lockAppOnScreenOffSubtitle;
 }
 
 class _AppLocalizationsDelegate

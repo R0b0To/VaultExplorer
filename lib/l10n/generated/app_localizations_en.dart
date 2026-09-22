@@ -8103,4 +8103,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Front';
+
+  @override
+  String get appLockBehaviorTitle => 'App Lock Behavior';
+
+  @override
+  String get lockAppOnScreenOffTitle => 'Lock App on Screen Off';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Show the lock screen as soon as the screen turns off';
 }

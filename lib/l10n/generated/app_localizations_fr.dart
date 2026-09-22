@@ -8299,4 +8299,16 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get cameraLensFront => 'Avant';
+
+  @override
+  String get appLockBehaviorTitle =>
+      'Comportement du verrouillage de l\'application';
+
+  @override
+  String get lockAppOnScreenOffTitle =>
+      'Verrouiller l\'application à l\'extinction de l\'écran';
+
+  @override
+  String get lockAppOnScreenOffSubtitle =>
+      'Affiche l\'écran de verrouillage dès que l\'écran s\'éteint';
 }

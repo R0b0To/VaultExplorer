@@ -2248,5 +2248,8 @@
   "cameraLensInfrared": "IR",
   "cameraLensFront": "Avant",
   "neverAutoLockOptionSubtitle": "Reste ouvert même lorsque l'application se verrouille ou que l'écran s'éteint",
-  "defaultAutoLockOptionSubtitle": "Suit les paramètres de verrouillage automatique et de verrouillage de l'écran de l'application"
+  "defaultAutoLockOptionSubtitle": "Suit les paramètres de verrouillage automatique et de verrouillage de l'écran de l'application",
+  "appLockBehaviorTitle": "Comportement du verrouillage de l'application",
+  "lockAppOnScreenOffTitle": "Verrouiller l'application à l'extinction de l'écran",
+  "lockAppOnScreenOffSubtitle": "Affiche l'écran de verrouillage dès que l'écran s'éteint"
 }

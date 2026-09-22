@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/composite_container_controller.dart';
@@ -123,6 +124,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
       confirmPassword: _confirmPasswordController.text,
     );
     if (ok && mounted) {
+      await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+      if (!mounted) return;
       Navigator.of(context).pop();
       showAppSnackBar(
         context,

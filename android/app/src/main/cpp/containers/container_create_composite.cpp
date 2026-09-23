@@ -429,20 +429,41 @@ CompositeUnlockResult prepareCompositeSession(
     // Completeness guard: the header just validated using only whatever
     // bytes fell within the carrier(s) actually supplied for *this* unlock
     // attempt -- that's necessarily true of offset 0, but says nothing
-    // about the rest of the volume. fields.volumeSize is the authoritative
-    // total size that was recorded in the header at creation time, when it
-    // was built from every carrier in the original set. If the carriers
-    // supplied now don't add up to at least that many bytes, one or more
-    // original carriers are missing: reject the mount rather than let it
-    // "succeed" and fail unpredictably (or silently return incomplete data)
-    // the moment a read reaches into the missing region. See composite_map
-    // deriveExtents/CompositeBlockDevice for how totalBytes is assembled
-    // purely from the carriers passed in here.
-    if (totalBytes < fields.volumeSize) {
+    // about the rest of the volume. The header records the geometry of the
+    // volume as it was built from every carrier in the original set, so if
+    // the carriers supplied now don't add up to at least that much, one or
+    // more original carriers are missing: reject the mount rather than let
+    // it "succeed" and fail unpredictably (or silently return incomplete
+    // data) the moment a read reaches into the missing region.
+    //
+    // NOTE: fields.volumeSize is NOT the full logical size. Composite
+    // creation writes DATA_SIZE (= VOLUME_SIZE - 2 * VC_DATA_AREA_OFFSET)
+    // into both the volume-size and key-scope-size header fields, and
+    // VC_DATA_AREA_OFFSET into key-scope-start. The full logical size is
+    // therefore: leading header region + encrypted data area + trailing
+    // (backup) header region. Comparing against fields.volumeSize alone
+    // would be 2 * VC_DATA_AREA_OFFSET (256 KiB) too lenient, letting a
+    // missing carrier smaller than that slip through.
+    //
+    // A healthy full set always satisfies totalBytes >= requiredBytes:
+    // creation floors VOLUME_SIZE down to a 4096 multiple of the extent
+    // total, and recovery re-derives each extent's length from its blind
+    // trailer as (fileSize - 16 - offset) aligned down to 512.
+    const uint64_t dataEnd = fields.encryptedAreaStart + fields.encryptedAreaLength;
+    const bool geometryOverflow = dataEnd < fields.encryptedAreaStart ||
+                                  dataEnd + VC_DATA_AREA_OFFSET < dataEnd;
+    const uint64_t requiredBytes = geometryOverflow
+        ? UINT64_MAX
+        : dataEnd + VC_DATA_AREA_OFFSET;
+    if (totalBytes < requiredBytes) {
         LOGI("[Unlock] COMPOSITE_CARRIERS_INCOMPLETE: supplied carriers total=%llu bytes, "
-             "header declares volumeSize=%llu bytes (missing %llu bytes)",
-             (unsigned long long)totalBytes, (unsigned long long)fields.volumeSize,
-             (unsigned long long)(fields.volumeSize - totalBytes));
+             "header geometry requires %llu bytes (dataStart=%llu dataLen=%llu, missing %llu bytes)",
+             (unsigned long long)totalBytes, (unsigned long long)requiredBytes,
+             (unsigned long long)fields.encryptedAreaStart,
+             (unsigned long long)fields.encryptedAreaLength,
+             (unsigned long long)(geometryOverflow ? 0 : requiredBytes - totalBytes));
+        mbedtls_platform_zeroize(dKey, sizeof(dKey));
+        mbedtls_platform_zeroize(decH, sizeof(decH));
         return {false, "COMPOSITE_CARRIERS_INCOMPLETE"};
     }
 
@@ -450,6 +471,8 @@ CompositeUnlockResult prepareCompositeSession(
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
     const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER];
     if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
+        mbedtls_platform_zeroize(dKey, sizeof(dKey));
+        mbedtls_platform_zeroize(decH, sizeof(decH));
         return {false, "CASCADE_KEY_SETUP_FAILED"};
     }
 
@@ -464,7 +487,7 @@ CompositeUnlockResult prepareCompositeSession(
         v.dataOffset = fields.encryptedAreaStart;
         v.dataAreaLengthBytes = fields.encryptedAreaLength;
         v.isHiddenVolume = fields.isHiddenVolume();
-        v.fileSize = fields.volumeSize;
+        v.fileSize = requiredBytes;
         v.matchedCipherId = static_cast<int>(matchedCipher);
         v.matchedHashId = static_cast<int>(matchedHash);
         v.partitionStartSector = 0;

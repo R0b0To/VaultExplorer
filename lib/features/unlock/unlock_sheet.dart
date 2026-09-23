@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
@@ -573,17 +574,20 @@ Widget _buildVaultKindSegmentedButton(
             ),
           ],
         ),
-        if (state.isComposite && state.compositeCarrierCount == 1 && widget.initialUri == null) ...[
-          const SizedBox(height: 8),
-          InlineBanner(
-            context.l10n.compositeSingleCarrierWarningBanner,
-            tone: AppBannerTone.info,
-            icon: Icons.layers_rounded,
-            trailing: TextButton(
-              onPressed: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickCompositeCarriers()),
-              child: Text(context.l10n.compositeSelectAllCarriersButton),
+        if (state.isComposite &&
+            state.compositeCarrierCount > 0 &&
+            widget.initialUri == null &&
+            widget.initialCompositeCarriers == null) ...[
+          if (state.compositeCarrierCount == 1) ...[
+            const SizedBox(height: 8),
+            InlineBanner(
+              context.l10n.compositeSingleCarrierWarningBanner,
+              tone: AppBannerTone.info,
+              icon: Icons.layers_rounded,
             ),
-          ),
+          ],
+          const SizedBox(height: 8),
+          _buildCompositeCarriersEditor(context, state, cs, textTheme),
         ],
         if (state.isFolderVault && !state.hasAllStorageAccess) ...[
           const SizedBox(height: 8),
@@ -599,6 +603,140 @@ Widget _buildVaultKindSegmentedButton(
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  /// Carrier list shown once a composite carrier has been detected. Mirrors
+  /// the carriers step of the composite-create wizard: "Add" can be tapped
+  /// repeatedly (each pick may come from a different folder or storage
+  /// volume, and is merged into the selection), and each row can be removed.
+  Widget _buildCompositeCarriersEditor(
+    BuildContext context,
+    UnlockState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final notifier = ref.read(unlockControllerProvider(_params).notifier);
+    final carriers = state.compositeCarriers;
+    final l10n = context.l10n;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(l10n.compositeCarrierFilesCountHeader(carriers.length)),
+        SectionCard(
+          children: [
+            InkWell(
+              onTap: state.loading
+                  ? null
+                  : () => _suppressLock(() async => notifier.addCompositeCarriers()),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(Icons.add_photo_alternate_rounded, color: cs.primary, size: 24),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l10n.compositeAddCarrierFilesTitle,
+                            style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.compositeAddCarrierFilesSubtitle,
+                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.tonalIcon(
+                      onPressed: state.loading
+                          ? null
+                          : () => _suppressLock(() async => notifier.addCompositeCarriers()),
+                      style: FilledButton.styleFrom(
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                      ),
+                      icon: const Icon(Icons.folder_open_rounded, size: 18),
+                      label: Text(l10n.compositeBrowseButtonLabel),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const ClampingScrollPhysics(),
+                itemCount: carriers.length,
+                itemExtent: 56,
+                padding: EdgeInsets.zero,
+                itemBuilder: (context, index) {
+                  final carrier = carriers[index];
+                  final budget = state.compositeCarrierProfiles[carrier.uri];
+                  // A file that isn't recognized as a carrier will be ignored
+                  // by the unlock and the volume will then be reported as
+                  // incomplete, so flag it here instead of after the attempt.
+                  final unrecognized =
+                      budget != null && budget.detectedFormat != 'composite_carrier';
+
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      budget == null
+                          ? Icons.hourglass_empty_rounded
+                          : (unrecognized
+                              ? Icons.warning_amber_rounded
+                              : Icons.verified_user_rounded),
+                      size: 20,
+                      color: budget == null
+                          ? cs.outline
+                          : (unrecognized ? cs.error : cs.primary),
+                    ),
+                    title: Text(
+                      carrier.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      budget == null
+                          ? l10n.compositeCarrierAnalyzingStatus
+                          : (unrecognized
+                              ? '${budget.detectedFormat.toUpperCase()} • ${formatBytes(budget.fileSize)}'
+                              : formatBytes(budget.fileSize)),
+                      style: unrecognized ? TextStyle(color: cs.error) : null,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: state.loading
+                          ? null
+                          : () {
+                              // Removing the last carrier empties the selection,
+                              // so drop any typed credentials with it (same as
+                              // the picker's clear button).
+                              if (carriers.length == 1) _resetInputFields();
+                              notifier.removeCompositeCarrier(carrier.uri);
+                            },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

@@ -119,6 +119,14 @@ class UnlockState {
   final int biometricAutoTriggerTick;
   final List<String> compositeCarrierUris;
 
+  /// Display names for [compositeCarrierUris], keyed by URI. Purely cosmetic:
+  /// URIs without an entry fall back to a name derived from the URI itself.
+  final Map<String, String> compositeCarrierNames;
+
+  /// Per-carrier analysis (keyed by URI), filled in asynchronously after a
+  /// carrier is added. A URI with no entry yet is still being analyzed.
+  final Map<String, CarrierBudget> compositeCarrierProfiles;
+
   final ({MountedContainer container, ContainerRecord? record})? mountedSuccess;
 
   bool get isLuks => ContainerFormat.isLuksWire(containerFormat);
@@ -134,6 +142,12 @@ class UnlockState {
   bool get isVeraCrypt => !isLuks && !isFolderVault && !isBitlocker && !isComposite;
   bool get hasAdvancedSettings => isVeraCrypt || isLuks || isComposite;
   int get compositeCarrierCount => compositeCarrierUris.length;
+
+  /// [compositeCarrierUris] paired with their display names, in selection order.
+  List<KeyfileRef> get compositeCarriers => [
+    for (final u in compositeCarrierUris)
+      (uri: u, displayName: compositeCarrierNames[u] ?? _fallbackCarrierName(u)),
+  ];
 
   const UnlockState({
     this.selectedUri,
@@ -169,6 +183,8 @@ class UnlockState {
     this.isAuthenticating = false,
     this.biometricAutoTriggerTick = 0,
     this.compositeCarrierUris = const [],
+    this.compositeCarrierNames = const {},
+    this.compositeCarrierProfiles = const {},
     this.mountedSuccess,
   });
 
@@ -211,6 +227,8 @@ class UnlockState {
     bool? isAuthenticating,
     int? biometricAutoTriggerTick,
     List<String>? compositeCarrierUris,
+    Map<String, String>? compositeCarrierNames,
+    Map<String, CarrierBudget>? compositeCarrierProfiles,
     bool clearCompositeCarrierUris = false,
     ({MountedContainer container, ContainerRecord? record})? mountedSuccess,
   }) => UnlockState(
@@ -252,15 +270,57 @@ class UnlockState {
     compositeCarrierUris: clearCompositeCarrierUris
         ? const []
         : (compositeCarrierUris ?? this.compositeCarrierUris),
+    compositeCarrierNames: clearCompositeCarrierUris
+        ? const {}
+        : (compositeCarrierNames ?? this.compositeCarrierNames),
+    compositeCarrierProfiles: clearCompositeCarrierUris
+        ? const {}
+        : (compositeCarrierProfiles ?? this.compositeCarrierProfiles),
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
   );
 }
+
+/// Default display name for an ad-hoc composite selection (no saved record).
+String _autoCompositeName(List<KeyfileRef> carriers) => carriers.length == 1
+    ? 'Composite Carrier (${carriers.first.displayName})'
+    : 'Composite Container (${carriers.length} files)';
+
+/// Best-effort readable file name from a SAF/content URI, for carriers whose
+/// picker-provided name isn't available.
+String _fallbackCarrierName(String uri) {
+  var tail = uri.contains('/') ? uri.substring(uri.lastIndexOf('/') + 1) : uri;
+  try {
+    tail = Uri.decodeComponent(tail);
+  } catch (_) {
+    // Malformed escape sequence: keep the raw tail.
+  }
+  final slash = tail.lastIndexOf('/');
+  if (slash >= 0) {
+    tail = tail.substring(slash + 1);
+  } else {
+    final colon = tail.lastIndexOf(':');
+    if (colon >= 0) tail = tail.substring(colon + 1);
+  }
+  return tail.isEmpty ? uri : tail;
+}
+
+/// Placeholder profile for a carrier that couldn't be analyzed at all.
+CarrierBudget _unknownCarrierBudget(String uri) => (
+  fileIndex: 0,
+  path: uri,
+  detectedFormat: 'unknown',
+  fileSize: 0,
+  payloadOffset: 0,
+  allocatableBytes: 0,
+  tier: CarrierTier.low,
+);
 
 @riverpod
 class UnlockController extends _$UnlockController {
   late final void Function(int) _onUnlockStarted;
   late final void Function(UnlockProgress) _onUnlockProgress;
   int? _trackedActiveVolId;
+  final Set<String> _profilingCarrierUris = <String>{};
 
   @override
   UnlockState build(UnlockParams params) {
@@ -518,27 +578,126 @@ class UnlockController extends _$UnlockController {
     );
   }
 
-  Future<void> pickCompositeCarriers() async {
+  /// Adds more carrier files to the current composite selection.
+  ///
+  /// Each call opens the system picker once, so carriers that live in
+  /// different folders or on different storage volumes (internal storage,
+  /// SD card, USB OTG...) can be added one pick at a time. Files already in
+  /// the selection are skipped (merged by URI).
+  Future<void> addCompositeCarriers() async {
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final picked = await lifecycle.pickCryptoFiles();
     if (picked.isEmpty || !ref.mounted) return;
-    setCompositeCarriers(picked);
+
+    final existing = state.compositeCarriers;
+    final seen = existing.map((c) => c.uri).toSet();
+    final added = [
+      for (final p in picked)
+        if (seen.add(p.uri)) p,
+    ];
+    if (added.isEmpty) return;
+    _applyCompositeCarriers([...existing, ...added]);
   }
 
-  void setCompositeCarriers(List<KeyfileRef> carriers, {String? name}) {
+  /// Removes one carrier from the composite selection. Removing the last one
+  /// clears the selection entirely.
+  void removeCompositeCarrier(String uri) {
+    final remaining =
+        state.compositeCarriers.where((c) => c.uri != uri).toList();
+    if (remaining.length == state.compositeCarrierUris.length) return;
+    if (remaining.isEmpty) {
+      clearSelection();
+      return;
+    }
+    _applyCompositeCarriers(remaining);
+  }
+
+  /// Replaces the whole composite selection.
+  void setCompositeCarriers(
+    List<KeyfileRef> carriers, {
+    String? name,
+    Map<String, CarrierBudget> knownProfiles = const {},
+  }) {
     if (carriers.isEmpty) return;
     final carrierUris = carriers.map((c) => c.uri).toList();
     state = state._copy(
       selectedUri: 'composite:${carrierUris.first}',
-      selectedName: name ??
-          (carriers.length == 1
-              ? 'Composite Carrier (${carriers.first.displayName})'
-              : 'Composite Container (${carriers.length} files)'),
+      selectedName: name ?? _autoCompositeName(carriers),
       compositeCarrierUris: carrierUris,
+      compositeCarrierNames: {for (final c in carriers) c.uri: c.displayName},
+      compositeCarrierProfiles: {
+        for (final e in knownProfiles.entries)
+          if (carrierUris.contains(e.key)) e.key: e.value,
+      },
       containerFormat: 'composite',
       clearError: true,
       isPlainDiskImage: false,
     );
+    unawaited(_profilePendingCarriers());
+  }
+
+  /// Applies an edited carrier list (add/remove) while keeping the session's
+  /// identity stable: the selection URI and display name are only regenerated
+  /// if they were the auto-generated ones for the previous carrier set, so a
+  /// saved container's label/URI (matched by picking one of its carriers) is
+  /// never overwritten by an edit.
+  void _applyCompositeCarriers(List<KeyfileRef> carriers) {
+    if (carriers.isEmpty) return;
+    final previous = state.compositeCarriers;
+    final previousAutoUri =
+        previous.isEmpty ? null : 'composite:${previous.first.uri}';
+    final previousAutoName =
+        previous.isEmpty ? null : _autoCompositeName(previous);
+    final keep = carriers.map((c) => c.uri).toSet();
+
+    state = state._copy(
+      selectedUri:
+          (state.selectedUri == null || state.selectedUri == previousAutoUri)
+              ? 'composite:${carriers.first.uri}'
+              : state.selectedUri,
+      selectedName:
+          (state.selectedName == null || state.selectedName == previousAutoName)
+              ? _autoCompositeName(carriers)
+              : state.selectedName,
+      compositeCarrierUris: carriers.map((c) => c.uri).toList(),
+      compositeCarrierNames: {for (final c in carriers) c.uri: c.displayName},
+      compositeCarrierProfiles: {
+        for (final e in state.compositeCarrierProfiles.entries)
+          if (keep.contains(e.key)) e.key: e.value,
+      },
+      containerFormat: 'composite',
+      clearError: true,
+      isPlainDiskImage: false,
+    );
+    unawaited(_profilePendingCarriers());
+  }
+
+  /// Analyzes every selected carrier that has no profile yet, one at a time
+  /// so a single unreadable file can't mark the others as unrecognized.
+  Future<void> _profilePendingCarriers() async {
+    final pending = state.compositeCarrierUris
+        .where((u) =>
+            !state.compositeCarrierProfiles.containsKey(u) &&
+            _profilingCarrierUris.add(u))
+        .toList();
+    if (pending.isEmpty) return;
+
+    final api = ref.read(vaultCompositeApiProvider);
+    for (final uri in pending) {
+      final profile = await api.profileCarriers(carrierUris: [uri]);
+      _profilingCarrierUris.remove(uri);
+      if (!ref.mounted) return;
+      // The user may have removed this carrier while it was being analyzed.
+      if (!state.compositeCarrierUris.contains(uri)) continue;
+      state = state._copy(
+        compositeCarrierProfiles: {
+          ...state.compositeCarrierProfiles,
+          uri: (profile != null && profile.carriers.isNotEmpty)
+              ? profile.carriers.first
+              : _unknownCarrierBudget(uri),
+        },
+      );
+    }
   }
 
   Future<void> pickFile(AppLocalizations l10n) async {
@@ -632,12 +791,17 @@ class UnlockController extends _$UnlockController {
       final profile =
           await compositeApi.profileCarriers(carrierUris: [single.uri]);
       if (!ref.mounted) return;
-      final isCarrier = profile != null &&
-          profile.carriers.isNotEmpty &&
-          profile.carriers.first.detectedFormat == 'composite_carrier';
+      final carrierBudget =
+          (profile != null && profile.carriers.isNotEmpty)
+              ? profile.carriers.first
+              : null;
 
-      if (isCarrier) {
-        setCompositeCarriers([single]);
+      if (carrierBudget != null &&
+          carrierBudget.detectedFormat == 'composite_carrier') {
+        setCompositeCarriers(
+          [single],
+          knownProfiles: {single.uri: carrierBudget},
+        );
         return;
       }
 
@@ -1260,10 +1424,13 @@ class UnlockController extends _$UnlockController {
             keyfiles: state.keyfiles
                 .map((k) => {'uri': k.uri, 'name': k.displayName})
                 .toList(),
-            compositeCarriers: carrierUris.map((u) {
-              final n = u.contains('/') ? u.substring(u.lastIndexOf('/') + 1) : u;
-              return {'uri': u, 'name': n};
-            }).toList(),
+            compositeCarriers: carrierUris
+                .map((u) => {
+                      'uri': u,
+                      'name':
+                          state.compositeCarrierNames[u] ?? _fallbackCarrierName(u),
+                    })
+                .toList(),
           );
           await repo.save(savedRecord);
         }

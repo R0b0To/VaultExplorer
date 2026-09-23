@@ -364,7 +364,7 @@ CompositeCreateResult createCompositeContainer(
     return {true, "", "", VOLUME_SIZE};
 }
 
-bool prepareCompositeSession(
+CompositeUnlockResult prepareCompositeSession(
     int volId,
     const std::vector<CarrierTarget>& carriers,
     const std::vector<CarrierExtent>& extents,
@@ -377,7 +377,7 @@ bool prepareCompositeSession(
     int keyfileCount,
     bool readOnly
 ) {
-    if (volId < 0 || volId >= FF_VOLUMES) return false;
+    if (volId < 0 || volId >= FF_VOLUMES) return {false, "INVALID_VOLUME_ID"};
     clearUnlockCancellation(volId);
 
     auto fdCache = std::make_shared<CarrierFdCache>(32);
@@ -387,11 +387,11 @@ bool prepareCompositeSession(
 
     auto device = std::make_unique<CompositeBlockDevice>(extents, fdCache);
     uint64_t totalBytes = device->totalSize();
-    if (totalBytes < 512) return false;
+    if (totalBytes < 512) return {false, "SIZE_TOO_SMALL"};
 
     unsigned char headerSector[VC_FULL_HEADER_SIZE];
     if (!device->pread(0, headerSector, VC_FULL_HEADER_SIZE)) {
-        return false;
+        return {false, "HEADER_READ_FAILED"};
     }
 
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
@@ -399,7 +399,7 @@ bool prepareCompositeSession(
     size_t mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
     std::memcpy(mixedPassword, password, mixedPasswordLen);
     if (keyfileCount > 0 && !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
-        return false;
+        return {false, "KEYFILE_FAILED"};
     }
 
     unsigned char dKey[192];
@@ -424,13 +424,33 @@ bool prepareCompositeSession(
             }
         }
     }
-    if (!matched) return false;
+    if (!matched) return {false, "INCORRECT_PASSWORD_OR_INVALID_CONTAINER"};
+
+    // Completeness guard: the header just validated using only whatever
+    // bytes fell within the carrier(s) actually supplied for *this* unlock
+    // attempt -- that's necessarily true of offset 0, but says nothing
+    // about the rest of the volume. fields.volumeSize is the authoritative
+    // total size that was recorded in the header at creation time, when it
+    // was built from every carrier in the original set. If the carriers
+    // supplied now don't add up to at least that many bytes, one or more
+    // original carriers are missing: reject the mount rather than let it
+    // "succeed" and fail unpredictably (or silently return incomplete data)
+    // the moment a read reaches into the missing region. See composite_map
+    // deriveExtents/CompositeBlockDevice for how totalBytes is assembled
+    // purely from the carriers passed in here.
+    if (totalBytes < fields.volumeSize) {
+        LOGI("[Unlock] COMPOSITE_CARRIERS_INCOMPLETE: supplied carriers total=%llu bytes, "
+             "header declares volumeSize=%llu bytes (missing %llu bytes)",
+             (unsigned long long)totalBytes, (unsigned long long)fields.volumeSize,
+             (unsigned long long)(fields.volumeSize - totalBytes));
+        return {false, "COMPOSITE_CARRIERS_INCOMPLETE"};
+    }
 
     CascadeContext candidateCascade;
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
     const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER];
     if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
-        return false;
+        return {false, "CASCADE_KEY_SETUP_FAILED"};
     }
 
     VolumeState& v = volumes[volId];
@@ -458,5 +478,5 @@ bool prepareCompositeSession(
         std::memcpy(v.preservedDerivedKey, dKey, 192);
         v.preservedDerivedKeyLen = 192;
     }
-    return true;
+    return {true, ""};
 }

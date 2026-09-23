@@ -28,7 +28,15 @@ CompositeCreateResult createCompositeContainer(
     const char* operationId = ""
 );
 
-bool prepareCompositeSession(
+struct CompositeUnlockResult {
+    bool success = false;
+    // One of: INVALID_VOLUME_ID, SIZE_TOO_SMALL, HEADER_READ_FAILED,
+    // KEYFILE_FAILED, INCORRECT_PASSWORD_OR_INVALID_CONTAINER,
+    // COMPOSITE_CARRIERS_INCOMPLETE, CASCADE_KEY_SETUP_FAILED. Empty on success.
+    std::string errorCode;
+};
+
+CompositeUnlockResult prepareCompositeSession(
     int volId,
     const std::vector<CarrierTarget>& carriers,
     const std::vector<CarrierExtent>& extents,

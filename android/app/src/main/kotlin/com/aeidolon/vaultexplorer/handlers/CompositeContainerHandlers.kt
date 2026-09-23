@@ -149,17 +149,20 @@ class CompositeContainerHandlers(
             try {
                 val opened = resolveCarrierDescriptors(carrierUris, readOnly)
                 val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
-                val files = NativeEngine.unlockCompositeContainerNative(
+                val unlockResult = NativeEngine.unlockCompositeContainerNative(
                     targetVolId, opened.paths, opened.fds, payloadOffsets, extentLengths,
                     password, pim, cipherId, hashId, keyfileFds, readOnly
                 )
 
                 activity.runOnUiThread {
-                    if (files != null) {
+                    val success = unlockResult?.get("success") as? Boolean ?: false
+                    if (success) {
+                        val files = (unlockResult?.get("files") as? List<*>)
+                            ?.mapNotNull { it as? String } ?: emptyList()
                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                             uri = compositeUriKey,
                             volId = targetVolId,
-                            cachedFilesList = files.toList(),
+                            cachedFilesList = files,
                             displayName = displayName,
                             documentProvider = docProvider,
                             readOnly = readOnly,
@@ -174,14 +177,18 @@ class CompositeContainerHandlers(
                         result.success(
                             mapOf(
                                 "volId" to targetVolId,
-                                "files" to files.toList(),
+                                "files" to files,
                                 "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
                                 "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                 "containerFormat" to ContainerEngine.format(targetVolId).wireName
                             )
                         )
                     } else {
-                        result.error("AUTH_FAIL", "Incorrect password or carrier set mismatch", null)
+                        // errorCode is null only if the native call itself threw before
+                        // building a result map; fall back to the old generic reason.
+                        val errorCode = (unlockResult?.get("errorCode") as? String)
+                            ?: "INCORRECT_PASSWORD_OR_INVALID_CONTAINER"
+                        result.error("AUTH_FAIL", errorCode, errorCode)
                     }
                 }
             } catch (e: Exception) {

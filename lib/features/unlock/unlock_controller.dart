@@ -1141,6 +1141,11 @@ class UnlockController extends _$UnlockController {
         return l10n.incorrectPasswordOrInvalidContainer;
       case 'INCORRECT_PASSWORD':
         return l10n.incorrectPassword;
+      case 'COMPOSITE_CARRIERS_INCOMPLETE':
+        // Password was correct, but the carrier files supplied for this
+        // unlock don't add up to the full volume recorded in the header --
+        // i.e. one or more of the original carrier files weren't selected.
+        return l10n.compositeIncorrectCredentialsOrCarrierMismatchError;
       default:
         return null;
     }

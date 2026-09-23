@@ -192,7 +192,50 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createCompositeContainerNative(
     JNI_CATCH_RETURN(JNI_FALSE)
 }
 
-extern "C" JNIEXPORT jobjectArray JNICALL
+// Builds the Map<String, Any?> handed back to Kotlin for a composite unlock
+// attempt. Keys: "success" (Boolean); on success also "files" (ArrayList<String>,
+// currently always empty -- the composite path doesn't pre-populate a root
+// listing); on failure also "errorCode" (String) -- one of the codes documented
+// on CompositeUnlockResult in container_create_composite.h, plus the
+// bridge-local NO_CARRIERS / NO_EXTENTS_DETECTED / FILESYSTEM_MOUNT_FAILED for
+// failures that happen before/after prepareCompositeSession runs.
+static jobject buildCompositeUnlockResultMap(
+    JNIEnv* env, bool success, const std::string& errorCode
+) {
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
+    jmethodID mapPut = env->GetMethodID(mapClass, "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    jclass boolClass = env->FindClass("java/lang/Boolean");
+    jmethodID boolInit = env->GetMethodID(boolClass, "<init>", "(Z)V");
+
+    jobject result = env->NewObject(mapClass, mapInit);
+
+    jstring kSuccess = env->NewStringUTF("success");
+    jobject vSuccess = env->NewObject(boolClass, boolInit, static_cast<jboolean>(success));
+    env->CallObjectMethod(result, mapPut, kSuccess, vSuccess);
+    env->DeleteLocalRef(kSuccess);
+    env->DeleteLocalRef(vSuccess);
+
+    if (success) {
+        jclass listClass = env->FindClass("java/util/ArrayList");
+        jmethodID listInit = env->GetMethodID(listClass, "<init>", "()V");
+        jstring kFiles = env->NewStringUTF("files");
+        jobject vFiles = env->NewObject(listClass, listInit);
+        env->CallObjectMethod(result, mapPut, kFiles, vFiles);
+        env->DeleteLocalRef(kFiles);
+        env->DeleteLocalRef(vFiles);
+    } else {
+        jstring kErr = env->NewStringUTF("errorCode");
+        jstring vErr = env->NewStringUTF(errorCode.c_str());
+        env->CallObjectMethod(result, mapPut, kErr, vErr);
+        env->DeleteLocalRef(kErr);
+        env->DeleteLocalRef(vErr);
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     JNIEnv* env, jobject,
     jint volId,
@@ -212,7 +255,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     clearUnlockCancellation(volId);
     
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
-    if (carriers.empty()) return nullptr;
+    if (carriers.empty()) return buildCompositeUnlockResultMap(env, false, "NO_CARRIERS");
 
     // 1. Sort carriers into the identical canonical order
     CompositeMap::sortCanonical(carriers);
@@ -222,14 +265,14 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     auto extents = CompositeMap::deriveExtents(profile.perFile);
     if (extents.empty()) {
         LOGI("unlockCompositeContainerNative: derived 0 extents for %zu carriers", carriers.size());
-        return nullptr;
+        return buildCompositeUnlockResultMap(env, false, "NO_EXTENTS_DETECTED");
     }
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     size_t passLen = nativePass ? std::strlen(nativePass) : 0;
     std::vector<int> kf = extractKeyfileFds(env, keyfileFds);
 
-    bool ok = prepareCompositeSession(
+    CompositeUnlockResult unlockResult = prepareCompositeSession(
         volId, carriers, extents,
         reinterpret_cast<const unsigned char*>(nativePass), passLen,
         pim, cipherId, hashId,
@@ -238,9 +281,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     );
 
     env->ReleaseStringUTFChars(password, nativePass);
-    if (!ok) {
-        LOGI("unlockCompositeContainerNative: prepareCompositeSession failed for volId=%d", volId);
-        return nullptr;
+    if (!unlockResult.success) {
+        LOGI("unlockCompositeContainerNative: prepareCompositeSession failed for volId=%d code=%s",
+             volId, unlockResult.errorCode.c_str());
+        return buildCompositeUnlockResultMap(env, false, unlockResult.errorCode);
     }
 
     bool mountOk = false;
@@ -250,10 +294,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     }
     if (!mountOk) {
         LOGI("unlockCompositeContainerNative: filesystem mount failed for volId=%d", volId);
-        return nullptr;
+        return buildCompositeUnlockResultMap(env, false, "FILESYSTEM_MOUNT_FAILED");
     }
 
-    jclass strClass = env->FindClass("java/lang/String");
-    return env->NewObjectArray(0, strClass, nullptr);
+    return buildCompositeUnlockResultMap(env, true, "");
     JNI_CATCH_RETURN(nullptr)
 }

@@ -327,6 +327,13 @@ internal object NativeEngine {
         operationId: String? = null
     ): Boolean
 
+    /**
+     * Returns null only on a JNI-level exception. On a normal call, always
+     * returns a Map with a "success" Boolean; on success it also carries
+     * "files" (List<String>, currently always empty); on failure it also
+     * carries "errorCode" (String) -- see CompositeUnlockResult in
+     * container_create_composite.h and composite_bridge.cpp for the codes.
+     */
     @JvmStatic
     external fun unlockCompositeContainerNative(
         volId: Int,
@@ -340,5 +347,5 @@ internal object NativeEngine {
         hashId: Int = 255,
         keyfileFds: IntArray? = null,
         readOnly: Boolean = false
-    ): Array<String>?    
+    ): Map<String, Any?>?
 }

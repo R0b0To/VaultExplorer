@@ -258,7 +258,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         VeLog.d(
           _kLogTag,
           '_lockAllMountedContainers: volId=${c.volId} exempt (per-container '
-          'Auto-Lock Duration set to Never), skipping',
+          'Auto-Lock Duration configured), skipping',
         );
         continue;
       }
@@ -713,6 +713,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
         _lockController.scheduleAutoLock();
+        _container.read(vaultDashboardControllerProvider.notifier).resetAllAutoCloseTimers();
         final edgeInset = math.max(
           72.0,
           MediaQuery.systemGestureInsetsOf(context).left,

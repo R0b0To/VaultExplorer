@@ -92,6 +92,7 @@ class VaultDashboardViewState {
 @Riverpod(keepAlive: true)
 class VaultDashboardController extends _$VaultDashboardController {
   final Map<int, Timer> _autoCloseTimers = {};
+  final Map<int, DateTime> _autoCloseScheduledAt = {};
   Timer? _undoTimer;
   Future<void>? _loadAllFuture;
 
@@ -155,6 +156,7 @@ class VaultDashboardController extends _$VaultDashboardController {
         t.cancel();
       }
       _autoCloseTimers.clear();
+      _autoCloseScheduledAt.clear();
       _undoTimer?.cancel();
 
       events.removeUsbContainerDetachedListener(_onUsbDetachedListener);
@@ -262,6 +264,7 @@ class VaultDashboardController extends _$VaultDashboardController {
         state.mounted,
       ).map((c) => refreshContainerSpace(c.volId)),
     );
+    await checkAutoCloseTimeouts();
   }
 
   void _syncSecureScreen() {
@@ -286,38 +289,93 @@ class VaultDashboardController extends _$VaultDashboardController {
       cancelAutoClose(container.volId);
       return;
     }
+    _autoCloseScheduledAt[container.volId] = DateTime.now();
+    _armAutoCloseTimer(container, Duration(minutes: mins));
+  }
+
+  void _armAutoCloseTimer(MountedContainer container, Duration duration) {
     _autoCloseTimers[container.volId]?.cancel();
     _autoCloseTimers[container.volId] = Timer(
-      Duration(minutes: mins),
-      () async {
-        if (!ref.mounted) return;
-        if (!acquireLockGuard(container.volId)) {
-          if (ref.mounted) {
-            _autoCloseTimers[container.volId] = Timer(
-              const Duration(seconds: 30),
-              () => scheduleAutoClose(container),
-            );
-          }
-          return;
-        }
-        try {
-          await ref
-              .read(vaultLifecycleApiProvider)
-              .lockContainer(container.uri);
-          if (!ref.mounted) return;
-          onContainerLocked(container.volId);
-        } catch (e) {
-          VeLog.e(_kLogTag, 'Auto-close lock failed for volId=${container.volId}', e);
-        } finally {
-          releaseLockGuard(container.volId);
-        }
-      },
+      duration,
+      () => _performAutoCloseLock(container),
     );
+  }
+
+  Future<void> _performAutoCloseLock(MountedContainer container) async {
+    if (!ref.mounted) return;
+    if (ref.read(sessionLockControllerProvider).isMediaPlaying) {
+      VeLog.d(_kLogTag, '_performAutoCloseLock: media is playing, postponing auto-close');
+      return;
+    }
+    if (!acquireLockGuard(container.volId)) {
+      if (ref.mounted) {
+        _autoCloseTimers[container.volId] = Timer(
+          const Duration(seconds: 30),
+          () => _performAutoCloseLock(container),
+        );
+      }
+      return;
+    }
+    try {
+      await ref
+          .read(vaultLifecycleApiProvider)
+          .lockContainer(container.uri);
+      if (!ref.mounted) return;
+      onContainerLocked(container.volId);
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Auto-close lock failed for volId=${container.volId}', e);
+    } finally {
+      releaseLockGuard(container.volId);
+    }
   }
 
   void cancelAutoClose(int volId) {
     _autoCloseTimers[volId]?.cancel();
     _autoCloseTimers.remove(volId);
+    _autoCloseScheduledAt.remove(volId);
+  }
+
+  void resetAllAutoCloseTimers() {
+    for (final container in state.mounted) {
+      final record = state.records[container.uri];
+      if ((record?.autoCloseMins ?? 0) > 0) {
+        scheduleAutoClose(container);
+      }
+    }
+  }
+
+  Future<void> checkAutoCloseTimeouts() async {
+    final now = DateTime.now();
+    for (final container in List<MountedContainer>.from(state.mounted)) {
+      final record = state.records[container.uri];
+      final mins = record?.autoCloseMins ?? 0;
+      if (mins <= 0) continue;
+
+      final scheduledAt = _autoCloseScheduledAt[container.volId];
+      if (scheduledAt == null) {
+        scheduleAutoClose(container);
+        continue;
+      }
+
+      final elapsed = now.difference(scheduledAt);
+      final timeout = Duration(minutes: mins);
+      if (elapsed >= timeout) {
+        VeLog.i(
+          _kLogTag,
+          'checkAutoCloseTimeouts: volId=${container.volId} timeout reached '
+          '(elapsed=${elapsed.inSeconds}s >= timeout=${timeout.inSeconds}s), locking',
+        );
+        cancelAutoClose(container.volId);
+        await _performAutoCloseLock(container);
+      } else {
+        final remaining = timeout - elapsed;
+        VeLog.d(
+          _kLogTag,
+          'checkAutoCloseTimeouts: volId=${container.volId} has ${remaining.inSeconds}s remaining, rescheduling',
+        );
+        _armAutoCloseTimer(container, remaining);
+      }
+    }
   }
 
   void onUserActivityForContainer(int volId) {

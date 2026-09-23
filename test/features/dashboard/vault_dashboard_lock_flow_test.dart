@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 
 // --- In-memory test fakes ---
@@ -204,6 +205,92 @@ void main() {
       // Confirm locking one container did not trigger app-wide lock
       expect(enforceAppLockCalls, 0);
       expect(lockAllMountedContainersCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'global auto-lock sweep does not lock container configured with explicit auto-lock duration, but locks App Default container',
+    (WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          appSettingsServiceProvider.overrideWithValue(const FakeAppSettingsService()),
+          containerRepositoryProvider.overrideWith(
+            (ref) => FakeContainerRepository(ref.watch(vaultCryptoApiProvider)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(vaultDashboardControllerProvider.notifier);
+      await controller.loadAll();
+
+      final vaultCustom = _testContainer(volId: 1, uri: 'file:///vaultCustom.hc', name: 'Vault Custom');
+      final vaultDefault = _testContainer(volId: 2, uri: 'file:///vaultDefault.hc', name: 'Vault Default');
+      final vaultNever = _testContainer(volId: 3, uri: 'file:///vaultNever.hc', name: 'Vault Never');
+
+      const recordCustom = ContainerRecord(
+        uri: 'file:///vaultCustom.hc',
+        label: 'Vault Custom',
+        autoCloseMins: 1,
+        autoCloseNever: false,
+      );
+      const recordDefault = ContainerRecord(
+        uri: 'file:///vaultDefault.hc',
+        label: 'Vault Default',
+        autoCloseMins: 0,
+        autoCloseNever: false,
+      );
+      const recordNever = ContainerRecord(
+        uri: 'file:///vaultNever.hc',
+        label: 'Vault Never',
+        autoCloseMins: 0,
+        autoCloseNever: true,
+      );
+
+      controller.onContainerMounted(vaultCustom, record: recordCustom);
+      controller.onContainerMounted(vaultDefault, record: recordDefault);
+      controller.onContainerMounted(vaultNever, record: recordNever);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: VaultDashboard(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final stateBefore = container.read(vaultDashboardControllerProvider);
+      expect(stateBefore.mounted, hasLength(3));
+
+      // Trigger global vault lock (as happens when autoLockMins == 0 on screen off / away resume)
+      await container.read(sessionLockControllerProvider).performVaultLock();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Vault Default should be locked, but Vault Custom and Vault Never remain mounted
+      final stateAfter = container.read(vaultDashboardControllerProvider);
+      expect(stateAfter.mounted, hasLength(2));
+      expect(stateAfter.mounted.any((c) => c.volId == vaultDefault.volId), isFalse);
+      expect(stateAfter.mounted.any((c) => c.volId == vaultCustom.volId), isTrue);
+      expect(stateAfter.mounted.any((c) => c.volId == vaultNever.volId), isTrue);
+
+      // Advance 1 minute: Vault Custom's own auto-close timer fires
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Vault Custom is now locked, while Vault Never still remains mounted
+      final stateAfterTimeout = container.read(vaultDashboardControllerProvider);
+      expect(stateAfterTimeout.mounted, hasLength(1));
+      expect(stateAfterTimeout.mounted.single.volId, vaultNever.volId);
     },
   );
 }

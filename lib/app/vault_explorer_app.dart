@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 
@@ -73,6 +74,7 @@ class VaultExplorerApp extends StatelessWidget {
                                   behavior: HitTestBehavior.translucent,
                                   onPointerDown: (_) {
                                     ref.read(sessionLockControllerProvider).scheduleAutoLock();
+                                    ref.read(vaultDashboardControllerProvider.notifier).resetAllAutoCloseTimers();
                                   },
                                   child: child ?? const SizedBox.shrink(),
                                 );

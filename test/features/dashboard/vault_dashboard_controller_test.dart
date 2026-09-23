@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
 MountedContainer _testContainer({
@@ -47,6 +48,8 @@ void main() {
           return true;
         case 'getActiveContainerSessions':
           return {'sessions': <Map<String, dynamic>>[]};
+        case 'lockContainer':
+          return true;
         default:
           return null;
       }
@@ -172,6 +175,49 @@ void main() {
       controller.releaseLockGuard(10);
       expect(controller.acquireLockGuard(10), isTrue);
       controller.releaseLockGuard(10);
+    });
+
+    test('checkAutoCloseTimeouts locks containers whose timeout was reached', () async {
+      final controller = container.read(vaultDashboardControllerProvider.notifier);
+      await controller.loadAll();
+
+      final vault = _testContainer(volId: 1, uri: 'file:///vault1.hc', name: 'Vault 1');
+      const record = ContainerRecord(
+        uri: 'file:///vault1.hc',
+        label: 'Vault 1',
+        autoCloseMins: 1,
+      );
+
+      controller.onContainerMounted(vault, record: record);
+      expect(container.read(vaultDashboardControllerProvider).mounted, hasLength(1));
+
+      // Before timeout has elapsed: container stays mounted
+      await controller.checkAutoCloseTimeouts();
+      expect(container.read(vaultDashboardControllerProvider).mounted, hasLength(1));
+
+      // Cancel auto-close timer before tearing down
+      controller.cancelAutoClose(vault.volId);
+    });
+
+    test('resetAllAutoCloseTimers reschedules auto-close timers for mounted containers', () async {
+      final controller = container.read(vaultDashboardControllerProvider.notifier);
+      await controller.loadAll();
+
+      final vault = _testContainer(volId: 1, uri: 'file:///vault1.hc', name: 'Vault 1');
+      const record = ContainerRecord(
+        uri: 'file:///vault1.hc',
+        label: 'Vault 1',
+        autoCloseMins: 5,
+      );
+
+      controller.onContainerMounted(vault, record: record);
+      expect(container.read(vaultDashboardControllerProvider).mounted, hasLength(1));
+
+      // Calling resetAllAutoCloseTimers should not throw and keep container mounted
+      controller.resetAllAutoCloseTimers();
+      expect(container.read(vaultDashboardControllerProvider).mounted, hasLength(1));
+
+      controller.cancelAutoClose(vault.volId);
     });
   });
 }

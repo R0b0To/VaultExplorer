@@ -5,7 +5,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/password_exchange/exchange_record.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/file_operation_service.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 

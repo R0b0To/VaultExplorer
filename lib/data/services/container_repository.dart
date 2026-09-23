@@ -524,11 +524,12 @@ class ContainerRecord {
   /// Whether this container should be skipped by the app-wide lock-all
   /// sweep (VaultDashboardScreen._lockAllMountedContainers, triggered by
   /// SessionLockController on the global auto-lock timeout or screen lock).
-  /// True only when the user explicitly picked "Never" for this specific
-  /// container -- never true just because autoCloseMins happens to be 0,
+  /// True when the user explicitly configured this specific container to
+  /// "Never" (autoCloseNever) or an explicit duration (autoCloseMins > 0).
+  /// Only false when the container follows "App Default" (autoCloseMins == 0 && !autoCloseNever),
   /// which is also the default for every container that's never had this
   /// setting touched.
-  bool get isExemptFromGlobalLock => autoCloseNever;
+  bool get isExemptFromGlobalLock => autoCloseNever || autoCloseMins > 0;
 
   ContainerRecord copyWith({
     String? label,

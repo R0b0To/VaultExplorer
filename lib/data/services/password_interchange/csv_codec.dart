@@ -90,9 +90,9 @@ class CsvCodec implements PasswordFormatCodec {
       throw PasswordFileFormatException('Could not read this file as text: $e');
     }
 
-    List<List<dynamic>> rows;
+ final List<List<dynamic>> rows;
     try {
-      rows = const CsvToListConverter(shouldParseNumbers: false, eol: '\n').convert(text);
+      rows = csv.decode(text);
     } catch (e) {
       throw PasswordFileFormatException('Could not parse this file as CSV: $e');
     }
@@ -297,7 +297,7 @@ class CsvCodec implements PasswordFormatCodec {
       ]);
     }
 
-    final csvText = const ListToCsvConverter(eol: '\n').convert(rows);
+    final csvText = Csv(lineDelimiter: '\n').encode(rows);
     return Uint8List.fromList(utf8.encode(csvText));
   }
 }

@@ -320,8 +320,8 @@ class KdbxCodec implements PasswordFormatCodec {
       entry.times.touch();
     }
 
-    try {
-      return await db.save();
+   try {
+      return Uint8List.fromList(await db.save());
     } catch (e) {
       throw PasswordFileFormatException('Could not create the KDBX file: $e');
     }

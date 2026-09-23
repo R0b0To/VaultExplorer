@@ -6252,6 +6252,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get automationAllowCameraCapture => 'カメラ撮影を許可';
 
   @override
+  String get automationOverlayPermissionTitle => '他のアプリの上に重ねて表示';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Android 14+ では、バックグラウンドでのカメラ撮影に「他のアプリの上に重ねて表示」の権限が必要です。画面ロック時やアプリがバックグラウンドにあるときの自動撮影を許可するには、この権限を付与してください。';
+
+  @override
   String get automationPimSavedMessage => 'PIMを保存しました';
 
   @override

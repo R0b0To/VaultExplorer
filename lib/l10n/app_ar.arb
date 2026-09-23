@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "أتمتة الكاميرا",
   "automationCameraDescription": "تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.",
   "automationAllowCameraCapture": "السماح بالتقاط الصور بالكاميرا",
+  "automationOverlayPermissionTitle": "الظهور فوق التطبيقات الأخرى",
+  "automationOverlayPermissionMessage": "يتطلب التقاط الكاميرا في الخلفية إذن 'الظهور فوق التطبيقات الأخرى' على نظام Android 14+. يُرجى منح هذا الإذن للسماح بالالتقاط التلقائي أثناء قفل الشاشة أو تشغيل التطبيق في الخلفية.",
   "automationPimSavedMessage": "تم حفظ PIM",
   "automationActionImportFolderLabel": "استيراد مجلد",
   "automationActionExportFolderLabel": "تصدير مجلد",

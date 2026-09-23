@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "카메라 자동화",
   "automationCameraDescription": "자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.",
   "automationAllowCameraCapture": "카메라 캡처 허용",
+  "automationOverlayPermissionTitle": "다른 앱 위에 표시",
+  "automationOverlayPermissionMessage": "Android 14+에서 백그라운드 카메라 캡처를 실행하려면 '다른 앱 위에 표시' 권한이 필요합니다. 화면이 잠겨 있거나 앱이 백그라운드에 있을 때 자동 캡처를 허용하려면 이 권한을 부여하세요.",
   "automationPimSavedMessage": "PIM이 저장되었습니다",
   "automationActionImportFolderLabel": "폴더 가져오기",
   "automationActionExportFolderLabel": "폴더 내보내기",

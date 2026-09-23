@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Automatización de la cámara",
   "automationCameraDescription": "Permite que la automatización active TAKE_PHOTO / START_RECORDING / STOP_RECORDING para esta bóveda. Desactivado de forma predeterminada incluso con acceso completo — a diferencia de la importación/exportación de archivos, una foto no necesita ninguna indicación en pantalla, por lo que es una activación explícita independiente.",
   "automationAllowCameraCapture": "Permitir captura de cámara",
+  "automationOverlayPermissionTitle": "Mostrar sobre otras aplicaciones",
+  "automationOverlayPermissionMessage": "La captura de cámara en segundo plano requiere el permiso 'Mostrar sobre otras aplicaciones' en Android 14+. Conceda este permiso para permitir capturas automáticas mientras la pantalla está bloqueada o la aplicación está en segundo plano.",
   "automationPimSavedMessage": "PIM guardado",
   "automationActionImportFolderLabel": "Importar carpeta",
   "automationActionExportFolderLabel": "Exportar carpeta",

@@ -6623,6 +6623,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationAllowCameraCapture => 'Дозволити зйомку камерою';
 
   @override
+  String get automationOverlayPermissionTitle =>
+      'Відображати поверх інших додатків';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Для зйомки камерою у фоновому режимі на Android 14+ потрібен дозвіл \'Відображати поверх інших додатків\'. Надайте цей дозвіл, щоб дозволити автоматичну зйомку, коли екран заблоковано або додаток у фоні.';
+
+  @override
   String get automationPimSavedMessage => 'PIM збережено';
 
   @override

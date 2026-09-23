@@ -6251,6 +6251,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get automationAllowCameraCapture => '카메라 캡처 허용';
 
   @override
+  String get automationOverlayPermissionTitle => '다른 앱 위에 표시';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Android 14+에서 백그라운드 카메라 캡처를 실행하려면 \'다른 앱 위에 표시\' 권한이 필요합니다. 화면이 잠겨 있거나 앱이 백그라운드에 있을 때 자동 캡처를 허용하려면 이 권한을 부여하세요.';
+
+  @override
   String get automationPimSavedMessage => 'PIM이 저장되었습니다';
 
   @override

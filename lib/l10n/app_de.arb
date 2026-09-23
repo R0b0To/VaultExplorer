@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Kamera-Automatisierung",
   "automationCameraDescription": "Ermöglicht der Automatisierung, TAKE_PHOTO / START_RECORDING / STOP_RECORDING für diesen Tresor auszulösen. Standardmäßig auch bei vollem Zugriff deaktiviert – anders als Datei-Import/-Export benötigt ein Foto überhaupt keine Anzeige auf dem Bildschirm, daher ist dies eine separate, ausdrückliche Freigabe.",
   "automationAllowCameraCapture": "Kameraaufnahme zulassen",
+  "automationOverlayPermissionTitle": "Über anderen Apps anzeigen",
+  "automationOverlayPermissionMessage": "Für die Kamera-Automatisierung im Hintergrund ist unter Android 14+ die Berechtigung 'Über anderen Apps anzeigen' erforderlich. Erteilen Sie diese Berechtigung, um automatische Aufnahmen bei gesperrtem Bildschirm oder im Hintergrund zu ermöglichen.",
   "automationPimSavedMessage": "PIM gespeichert",
   "automationActionImportFolderLabel": "Ordner importieren",
   "automationActionExportFolderLabel": "Ordner exportieren",

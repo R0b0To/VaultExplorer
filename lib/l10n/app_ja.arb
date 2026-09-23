@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "カメラの自動化",
   "automationCameraDescription": "このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。",
   "automationAllowCameraCapture": "カメラ撮影を許可",
+  "automationOverlayPermissionTitle": "他のアプリの上に重ねて表示",
+  "automationOverlayPermissionMessage": "Android 14+ では、バックグラウンドでのカメラ撮影に「他のアプリの上に重ねて表示」の権限が必要です。画面ロック時やアプリがバックグラウンドにあるときの自動撮影を許可するには、この権限を付与してください。",
   "automationPimSavedMessage": "PIMを保存しました",
   "automationActionImportFolderLabel": "フォルダをインポート",
   "automationActionExportFolderLabel": "フォルダをエクスポート",

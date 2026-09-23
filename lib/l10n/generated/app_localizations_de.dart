@@ -6575,6 +6575,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get automationAllowCameraCapture => 'Kameraaufnahme zulassen';
 
   @override
+  String get automationOverlayPermissionTitle => 'Über anderen Apps anzeigen';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Für die Kamera-Automatisierung im Hintergrund ist unter Android 14+ die Berechtigung \'Über anderen Apps anzeigen\' erforderlich. Erteilen Sie diese Berechtigung, um automatische Aufnahmen bei gesperrtem Bildschirm oder im Hintergrund zu ermöglichen.';
+
+  @override
   String get automationPimSavedMessage => 'PIM gespeichert';
 
   @override

@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "相机自动化",
   "automationCameraDescription": "允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。",
   "automationAllowCameraCapture": "允许相机拍摄",
+  "automationOverlayPermissionTitle": "在其他应用上层显示",
+  "automationOverlayPermissionMessage": "Android 14+ 上的后台相机拍摄需要“在其他应用上层显示”权限。请授予此权限，以便在屏幕锁定或应用处于后台时允许自动拍摄。",
   "automationPimSavedMessage": "PIM 已保存",
   "automationActionImportFolderLabel": "导入文件夹",
   "automationActionExportFolderLabel": "导出文件夹",

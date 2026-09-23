@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Automazione fotocamera",
   "automationCameraDescription": "Consente all'automazione di attivare TAKE_PHOTO / START_RECORDING / STOP_RECORDING per questo vault. Disattivato per impostazione predefinita anche con accesso completo: a differenza dell'importazione/esportazione di file, una foto non richiede alcuna indicazione a schermo, quindi è un'attivazione esplicita separata.",
   "automationAllowCameraCapture": "Consenti acquisizione dalla fotocamera",
+  "automationOverlayPermissionTitle": "Mostra sopra altre app",
+  "automationOverlayPermissionMessage": "L'acquisizione della fotocamera in background richiede l'autorizzazione 'Mostra sopra altre app' su Android 14+. Concedi questa autorizzazione per consentire acquisizioni automatiche mentre lo schermo è bloccato o l'app è in background.",
   "automationPimSavedMessage": "PIM salvato",
   "automationActionImportFolderLabel": "Importa cartella",
   "automationActionExportFolderLabel": "Esporta cartella",

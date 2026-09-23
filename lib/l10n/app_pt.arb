@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Automação da Câmera",
   "automationCameraDescription": "Permite que a automação acione TAKE_PHOTO / START_RECORDING / STOP_RECORDING para este cofre. Desativado por padrão mesmo com acesso total — diferente da importação/exportação de arquivos, uma foto não precisa de nenhuma indicação na tela, por isso é uma opção explícita separada.",
   "automationAllowCameraCapture": "Permitir captura pela câmera",
+  "automationOverlayPermissionTitle": "Sobrepor a outros apps",
+  "automationOverlayPermissionMessage": "A captura da câmera em segundo plano requer permissão para sobrepor a outros apps no Android 14+. Conceda esta permissão para permitir capturas automatizadas enquanto a tela estiver bloqueada ou o app estiver em segundo plano.",
   "automationPimSavedMessage": "PIM salvo",
   "automationActionImportFolderLabel": "Importar pasta",
   "automationActionExportFolderLabel": "Exportar pasta",

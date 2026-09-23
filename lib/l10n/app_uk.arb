@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Автоматизація камери",
   "automationCameraDescription": "Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, зйомка не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.",
   "automationAllowCameraCapture": "Дозволити зйомку камерою",
+  "automationOverlayPermissionTitle": "Відображати поверх інших додатків",
+  "automationOverlayPermissionMessage": "Для зйомки камерою у фоновому режимі на Android 14+ потрібен дозвіл 'Відображати поверх інших додатків'. Надайте цей дозвіл, щоб дозволити автоматичну зйомку, коли екран заблоковано або додаток у фоні.",
   "automationPimSavedMessage": "PIM збережено",
   "automationActionImportFolderLabel": "Імпортувати папку",
   "automationActionExportFolderLabel": "Експортувати папку",

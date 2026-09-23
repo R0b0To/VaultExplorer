@@ -6593,6 +6593,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get automationAllowCameraCapture => 'Permitir captura de cámara';
 
   @override
+  String get automationOverlayPermissionTitle =>
+      'Mostrar sobre otras aplicaciones';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'La captura de cámara en segundo plano requiere el permiso \'Mostrar sobre otras aplicaciones\' en Android 14+. Conceda este permiso para permitir capturas automáticas mientras la pantalla está bloqueada o la aplicación está en segundo plano.';
+
+  @override
   String get automationPimSavedMessage => 'PIM guardado';
 
   @override

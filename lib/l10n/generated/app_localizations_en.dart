@@ -6479,6 +6479,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automationAllowCameraCapture => 'Allow camera capture';
 
   @override
+  String get automationOverlayPermissionTitle => 'Display over other apps';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Background camera capture requires permission to display over other apps on Android 14+. Grant this permission to allow automated captures while the screen is locked or the app is in the background.';
+
+  @override
   String get automationPimSavedMessage => 'PIM saved';
 
   @override

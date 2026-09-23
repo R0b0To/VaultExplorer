@@ -6575,6 +6575,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Consenti acquisizione dalla fotocamera';
 
   @override
+  String get automationOverlayPermissionTitle => 'Mostra sopra altre app';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'L\'acquisizione della fotocamera in background richiede l\'autorizzazione \'Mostra sopra altre app\' su Android 14+. Concedi questa autorizzazione per consentire acquisizioni automatiche mentre lo schermo è bloccato o l\'app è in background.';
+
+  @override
   String get automationPimSavedMessage => 'PIM salvato';
 
   @override

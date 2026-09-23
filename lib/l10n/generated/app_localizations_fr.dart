@@ -6636,6 +6636,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Autoriser la capture par l\'appareil photo';
 
   @override
+  String get automationOverlayPermissionTitle =>
+      'Afficher sur d\'autres applications';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'La capture de l\'appareil photo en arrière-plan nécessite l\'autorisation \'Afficher sur d\'autres applications\' sur Android 14+. Accordez cette autorisation pour autoriser les captures automatisées lorsque l\'écran est verrouillé ou que l\'application est en arrière-plan.';
+
+  @override
   String get automationPimSavedMessage => 'PIM enregistré';
 
   @override

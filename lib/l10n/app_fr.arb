@@ -1778,6 +1778,8 @@
   "automationCameraSectionHeader": "Automatisation de l'appareil photo",
   "automationCameraDescription": "Permet à l'automatisation de déclencher TAKE_PHOTO / START_RECORDING / STOP_RECORDING pour ce coffre. Désactivé par défaut même avec l'accès complet — contrairement à l'import/export de fichiers, une photo ne nécessite aucune indication à l'écran, il s'agit donc d'une activation explicite distincte.",
   "automationAllowCameraCapture": "Autoriser la capture par l'appareil photo",
+  "automationOverlayPermissionTitle": "Afficher sur d'autres applications",
+  "automationOverlayPermissionMessage": "La capture de l'appareil photo en arrière-plan nécessite l'autorisation 'Afficher sur d'autres applications' sur Android 14+. Accordez cette autorisation pour autoriser les captures automatisées lorsque l'écran est verrouillé ou que l'application est en arrière-plan.",
   "automationPimSavedMessage": "PIM enregistré",
   "automationActionImportFolderLabel": "Importer un dossier",
   "automationActionExportFolderLabel": "Exporter un dossier",

@@ -6179,6 +6179,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationAllowCameraCapture => '允许相机拍摄';
 
   @override
+  String get automationOverlayPermissionTitle => '在其他应用上层显示';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'Android 14+ 上的后台相机拍摄需要“在其他应用上层显示”权限。请授予此权限，以便在屏幕锁定或应用处于后台时允许自动拍摄。';
+
+  @override
   String get automationPimSavedMessage => 'PIM 已保存';
 
   @override

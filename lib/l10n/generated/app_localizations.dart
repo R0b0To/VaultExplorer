@@ -10827,6 +10827,18 @@ abstract class AppLocalizations {
   /// **'Allow camera capture'**
   String get automationAllowCameraCapture;
 
+  /// Dialog title requesting display over other apps permission for camera automation
+  ///
+  /// In en, this message translates to:
+  /// **'Display over other apps'**
+  String get automationOverlayPermissionTitle;
+
+  /// Dialog message explaining why display over other apps permission is required for camera automation
+  ///
+  /// In en, this message translates to:
+  /// **'Background camera capture requires permission to display over other apps on Android 14+. Grant this permission to allow automated captures while the screen is locked or the app is in the background.'**
+  String get automationOverlayPermissionMessage;
+
   /// Success message shown after saving PIM
   ///
   /// In en, this message translates to:

@@ -6646,6 +6646,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get automationAllowCameraCapture => 'السماح بالتقاط الصور بالكاميرا';
 
   @override
+  String get automationOverlayPermissionTitle => 'الظهور فوق التطبيقات الأخرى';
+
+  @override
+  String get automationOverlayPermissionMessage =>
+      'يتطلب التقاط الكاميرا في الخلفية إذن \'الظهور فوق التطبيقات الأخرى\' على نظام Android 14+. يُرجى منح هذا الإذن للسماح بالالتقاط التلقائي أثناء قفل الشاشة أو تشغيل التطبيق في الخلفية.';
+
+  @override
   String get automationPimSavedMessage => 'تم حفظ PIM';
 
   @override

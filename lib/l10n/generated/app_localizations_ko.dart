@@ -7798,4 +7798,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get lockAppOnScreenOffSubtitle => '화면이 꺼지는 즉시 잠금 화면을 표시합니다';
+
+  @override
+  String get settingsHubSecuritySubtitle => '마스터 잠금, 생체 인식 및 자동 잠금';
+
+  @override
+  String get settingsHubStorageSubtitle => '저장소 접근, 백그라운드 서비스 및 공유 메뉴';
+
+  @override
+  String get settingsHubFileHandlingSubtitle => '자동 열기, 섬네일 및 파일 연결';
+
+  @override
+  String get settingsHubAppearanceSubtitle => '테마, OLED 트루 블랙 및 언어';
+
+  @override
+  String get settingsHubAdvancedSubtitle => '설정 백업, 디버그 로그 및 로그캣';
 }

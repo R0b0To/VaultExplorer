@@ -10399,5 +10399,25 @@
   "lockAppOnScreenOffSubtitle": "Show the lock screen as soon as the screen turns off",
   "@lockAppOnScreenOffSubtitle": {
     "description": "Settings toggle subtitle explaining that the lock screen appears immediately when the screen is turned off"
+  },
+  "settingsHubSecuritySubtitle": "Master lock, biometrics & auto-lock",
+  "@settingsHubSecuritySubtitle": {
+    "description": "Concise sub-description for the Security & Privacy settings hub card"
+  },
+  "settingsHubStorageSubtitle": "Storage access, background service & share sheet",
+  "@settingsHubStorageSubtitle": {
+    "description": "Concise sub-description for the Key Storage & System Access settings hub card"
+  },
+  "settingsHubFileHandlingSubtitle": "Auto-open, thumbnails & file associations",
+  "@settingsHubFileHandlingSubtitle": {
+    "description": "Concise sub-description for the Vault & File Handling settings hub card"
+  },
+  "settingsHubAppearanceSubtitle": "Themes, pure black OLED & language",
+  "@settingsHubAppearanceSubtitle": {
+    "description": "Concise sub-description for the Appearance & Interface settings hub card"
+  },
+  "settingsHubAdvancedSubtitle": "Settings backup, debug logs & logcat",
+  "@settingsHubAdvancedSubtitle": {
+    "description": "Concise sub-description for the Backup & Debug settings hub card"
   }
 }

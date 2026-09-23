@@ -73,78 +73,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     }
   }
 
-  String _securitySummary(AppSettingsViewState state) {
-    final parts = <String>[];
-    if (state.settings.useMasterPassword && state.settings.masterPasswordHash != null) {
-      parts.add(state.settings.masterUnlockMethod.getLocalizedLabel(context.l10n));
-    } else {
-      parts.add(context.l10n.masterPasswordInactiveSubtitle);
-    }
-    if (state.disguiseMode == DisguiseMode.decoy) {
-      parts.add(context.l10n.discreteModeTitle);
-    }
-    if (state.settings.blockScreenshots) {
-      parts.add(context.l10n.blockScreenshotsTitle);
-    }
-    return parts.join(' · ');
-  }
-
-  String _systemSummary(AppSettingsViewState state) {
-    final parts = <String>[];
-    parts.add(state.hasAllStorageAccess
-        ? context.l10n.fastStorageAccessGrantedSubtitle
-        : context.l10n.fastStorageAccessNotGrantedSubtitle);
-    if (state.settings.keepVaultsRunningInBackground) {
-      parts.add(context.l10n.keepVaultsRunningInBackgroundTitle);
-    }
-    return parts.join(' · ');
-  }
-
-  String _fileHandlingSummary(
-    AppSettingsViewState state,
-    FileManagerToolbarSettingsState fmState,
-  ) {
-    final parts = <String>[];
-    parts.add(state.settings.deleteAfterImportMode.getLocalizedLabel(context.l10n));
-    parts.add(fmState.config.defaultThumbnailCacheMode.getLocalizedLabel(context.l10n));
-    final count = state.settings.extensionPreferences.length;
-    if (count > 0) {
-      parts.add('$count ${context.l10n.fileAssociationsHeader}');
-    }
-    return parts.join(' · ');
-  }
-
-  String _appearanceSummary(AppSettingsViewState state) {
-    final parts = <String>[];
-    switch (state.settings.themeMode) {
-      case ThemeMode.system:
-        parts.add(context.l10n.systemDefault);
-      case ThemeMode.light:
-        parts.add(context.l10n.lightTheme);
-      case ThemeMode.dark:
-        parts.add(state.settings.useOledBlackTheme
-            ? '${context.l10n.darkTheme} (OLED)'
-            : context.l10n.darkTheme);
-    }
-    final lang = state.settings.languageCode;
-    if (lang != null && lang.isNotEmpty) {
-      parts.add(lang.toUpperCase());
-    } else {
-      parts.add(context.l10n.systemDefault);
-    }
-    return parts.join(' · ');
-  }
-
-  String _backupDiagnosticsSummary(AppSettingsViewState state) {
-    final parts = <String>[];
-    parts.add(context.l10n.sectionBackupRestore);
-    if (state.settings.debugLoggingEnabled) {
-      parts.add(context.l10n.debugLoggingTitle);
-    }
-    return parts.join(' · ');
-  }
-
-  Widget _buildHubTile({
+   Widget _buildHubTile({
     required IconData icon,
     required Color iconColor,
     required String title,
@@ -179,7 +108,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 subtitle,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
@@ -199,10 +128,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   /// wide/landscape layouts -- same hubs as the narrow layout's list, but
   /// selecting one swaps the detail pane in place instead of pushing a
   /// full-screen route.
-  Widget _buildSidebar(
-    AppSettingsViewState state,
-    FileManagerToolbarSettingsState fmSettingsState,
-  ) {
+  Widget _buildSidebar() {
     final cs = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -213,7 +139,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.shield_rounded,
               iconColor: cs.primary,
               title: context.l10n.sectionSecurityPrivacy,
-              subtitle: _securitySummary(state),
+              subtitle: context.l10n.settingsHubSecuritySubtitle,
               selected: _selectedSection == _SettingsSection.security,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.security),
@@ -222,7 +148,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.settings_input_composite_rounded,
               iconColor: cs.secondary,
               title: context.l10n.sectionKeyStorageIntegration,
-              subtitle: _systemSummary(state),
+              subtitle: context.l10n.settingsHubStorageSubtitle,
               selected: _selectedSection == _SettingsSection.storage,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.storage),
@@ -231,7 +157,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.folder_copy_rounded,
               iconColor: cs.tertiary,
               title: context.l10n.sectionVaultFileHandling,
-              subtitle: _fileHandlingSummary(state, fmSettingsState),
+              subtitle: context.l10n.settingsHubFileHandlingSubtitle,
               selected: _selectedSection == _SettingsSection.fileHandling,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.fileHandling),
@@ -240,7 +166,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.palette_rounded,
               iconColor: Colors.deepPurpleAccent,
               title: context.l10n.sectionAppearanceInterface,
-              subtitle: _appearanceSummary(state),
+              subtitle: context.l10n.settingsHubAppearanceSubtitle,
               selected: _selectedSection == _SettingsSection.appearance,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.appearance),
@@ -249,7 +175,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.terminal_rounded,
               iconColor: Colors.teal,
               title: '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-              subtitle: _backupDiagnosticsSummary(state),
+              subtitle: context.l10n.settingsHubAdvancedSubtitle,
               selected: _selectedSection == _SettingsSection.advanced,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.advanced),
@@ -263,7 +189,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               icon: Icons.info_outline_rounded,
               iconColor: cs.primary,
               title: context.l10n.aboutAppTitle,
-              subtitle: context.l10n.aboutVersionSubtitle(appVersion),
+              subtitle: context.l10n.versionInfoSubtitle(appVersion),
               selected: _selectedSection == _SettingsSection.about,
               showChevron: false,
               onTap: () => setState(() => _selectedSection = _SettingsSection.about),
@@ -299,7 +225,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(appSettingsControllerProvider);
-    final fmSettingsState = ref.watch(fileManagerToolbarSettingsProvider(null));
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -325,13 +250,13 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                       children: [
                         SizedBox(
                           width: context.screen.secondaryPaneWidth(),
-                          child: _buildSidebar(state, fmSettingsState),
+                          child: _buildSidebar(),
                         ),
                         const VerticalDivider(width: 0.2),
                         Expanded(child: _buildDetailPane()),
                       ],
                     )
-                  : _buildNarrowHubList(state, fmSettingsState, cs, textTheme),
+                  : _buildNarrowHubList(cs, textTheme),
             ),
     );
   }
@@ -339,8 +264,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   /// The narrow-layout hub list: unchanged from before the sidebar was
   /// added -- tapping a hub pushes its screen as a full-screen route.
   Widget _buildNarrowHubList(
-    AppSettingsViewState state,
-    FileManagerToolbarSettingsState fmSettingsState,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
@@ -358,7 +281,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   icon: Icons.shield_rounded,
                   iconColor: cs.primary,
                   title: context.l10n.sectionSecurityPrivacy,
-                  subtitle: _securitySummary(state),
+                  subtitle: context.l10n.settingsHubSecuritySubtitle,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -370,7 +293,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   icon: Icons.settings_input_composite_rounded,
                   iconColor: cs.secondary,
                   title: context.l10n.sectionKeyStorageIntegration,
-                  subtitle: _systemSummary(state),
+                  subtitle: context.l10n.settingsHubStorageSubtitle,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -382,7 +305,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   icon: Icons.folder_copy_rounded,
                   iconColor: cs.tertiary,
                   title: context.l10n.sectionVaultFileHandling,
-                  subtitle: _fileHandlingSummary(state, fmSettingsState),
+                  subtitle: context.l10n.settingsHubFileHandlingSubtitle,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -394,7 +317,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   icon: Icons.palette_rounded,
                   iconColor: Colors.deepPurpleAccent,
                   title: context.l10n.sectionAppearanceInterface,
-                  subtitle: _appearanceSummary(state),
+                  subtitle: context.l10n.settingsHubAppearanceSubtitle,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -406,7 +329,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   icon: Icons.terminal_rounded,
                   iconColor: Colors.teal,
                   title: '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-                  subtitle: _backupDiagnosticsSummary(state),
+                  subtitle: context.l10n.settingsHubAdvancedSubtitle,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -437,7 +360,9 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                     style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    context.l10n.aboutVersionSubtitle(appVersion),
+                    context.l10n.versionInfoSubtitle(appVersion),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   trailing: Icon(

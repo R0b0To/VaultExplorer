@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "アプリの自動ロックおよび画面ロック設定に従います",
   "appLockBehaviorTitle": "アプリのロック動作",
   "lockAppOnScreenOffTitle": "画面消灯時にアプリをロック",
-  "lockAppOnScreenOffSubtitle": "画面が消灯するとすぐにロック画面を表示します"
+  "lockAppOnScreenOffSubtitle": "画面が消灯するとすぐにロック画面を表示します",
+  "settingsHubSecuritySubtitle": "マスターロック、生体認証、自動ロック",
+  "settingsHubStorageSubtitle": "ストレージアクセス、バックグラウンド、共有メニュー",
+  "settingsHubFileHandlingSubtitle": "自動オープン、サムネイル、ファイルの関連付け",
+  "settingsHubAppearanceSubtitle": "テーマ、OLED純黒、言語",
+  "settingsHubAdvancedSubtitle": "設定のバックアップ、デバッグログ、Logcat"
 }

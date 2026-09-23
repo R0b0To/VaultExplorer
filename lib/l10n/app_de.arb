@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "Folgt den Einstellungen der App für automatische Sperre und Bildschirmsperre",
   "appLockBehaviorTitle": "App-Sperrverhalten",
   "lockAppOnScreenOffTitle": "App bei ausgeschaltetem Bildschirm sperren",
-  "lockAppOnScreenOffSubtitle": "Sperrbildschirm anzeigen, sobald der Bildschirm ausgeschaltet wird"
+  "lockAppOnScreenOffSubtitle": "Sperrbildschirm anzeigen, sobald der Bildschirm ausgeschaltet wird",
+  "settingsHubSecuritySubtitle": "Master-Sperre, Biometrie & Auto-Sperre",
+  "settingsHubStorageSubtitle": "Speicherzugriff, Hintergrunddienst & Teilen-Menü",
+  "settingsHubFileHandlingSubtitle": "Auto-Öffnen, Thumbnails & Dateiverknüpfungen",
+  "settingsHubAppearanceSubtitle": "Designs, reines OLED-Schwarz & Sprache",
+  "settingsHubAdvancedSubtitle": "Einstellungen-Backup, Debug-Logs & Logcat"
 }

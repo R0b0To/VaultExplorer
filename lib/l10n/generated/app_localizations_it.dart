@@ -8247,4 +8247,23 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Mostra la schermata di blocco non appena lo schermo si spegne';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Blocco principale, biometria e blocco automatico';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Accesso all\'archiviazione, servizio in background e menu condividi';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Apertura automatica, miniature e associazioni file';
+
+  @override
+  String get settingsHubAppearanceSubtitle => 'Temi, nero puro OLED e lingua';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Backup impostazioni, log di debug e logcat';
 }

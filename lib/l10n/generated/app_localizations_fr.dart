@@ -8319,4 +8319,23 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Affiche l\'écran de verrouillage dès que l\'écran s\'éteint';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Verrouillage principal, biométrie et verrouillage auto';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Accès au stockage, service en arrière-plan et partage';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Ouverture auto, miniatures et associations de fichiers';
+
+  @override
+  String get settingsHubAppearanceSubtitle => 'Thèmes, noir pur OLED et langue';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Sauvegarde des paramètres, journaux de débogage et logcat';
 }

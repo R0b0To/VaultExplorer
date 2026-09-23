@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "앱의 자동 잠금 및 화면 잠금 설정을 따릅니다",
   "appLockBehaviorTitle": "앱 잠금 동작",
   "lockAppOnScreenOffTitle": "화면이 꺼질 때 앱 잠금",
-  "lockAppOnScreenOffSubtitle": "화면이 꺼지는 즉시 잠금 화면을 표시합니다"
+  "lockAppOnScreenOffSubtitle": "화면이 꺼지는 즉시 잠금 화면을 표시합니다",
+  "settingsHubSecuritySubtitle": "마스터 잠금, 생체 인식 및 자동 잠금",
+  "settingsHubStorageSubtitle": "저장소 접근, 백그라운드 서비스 및 공유 메뉴",
+  "settingsHubFileHandlingSubtitle": "자동 열기, 섬네일 및 파일 연결",
+  "settingsHubAppearanceSubtitle": "테마, OLED 트루 블랙 및 언어",
+  "settingsHubAdvancedSubtitle": "설정 백업, 디버그 로그 및 로그캣"
 }

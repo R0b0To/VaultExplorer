@@ -7691,4 +7691,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lockAppOnScreenOffSubtitle => '屏幕熄灭时立即显示锁定屏幕';
+
+  @override
+  String get settingsHubSecuritySubtitle => '主密码锁定、生物识别及自动锁定';
+
+  @override
+  String get settingsHubStorageSubtitle => '存储访问、后台服务及分享菜单';
+
+  @override
+  String get settingsHubFileHandlingSubtitle => '自动打开、缩略图及文件关联';
+
+  @override
+  String get settingsHubAppearanceSubtitle => '主题、OLED纯黑及语言';
+
+  @override
+  String get settingsHubAdvancedSubtitle => '设置备份、调试日志及Logcat';
 }

@@ -8120,4 +8120,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Show the lock screen as soon as the screen turns off';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Master lock, biometrics & auto-lock';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Storage access, background service & share sheet';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Auto-open, thumbnails & file associations';
+
+  @override
+  String get settingsHubAppearanceSubtitle =>
+      'Themes, pure black OLED & language';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Settings backup, debug logs & logcat';
 }

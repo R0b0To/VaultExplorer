@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "يتبع إعدادات القفل التلقائي للتطبيق وقفل الشاشة",
   "appLockBehaviorTitle": "سلوك قفل التطبيق",
   "lockAppOnScreenOffTitle": "قفل التطبيق عند إيقاف تشغيل الشاشة",
-  "lockAppOnScreenOffSubtitle": "إظهار شاشة القفل بمجرد إيقاف تشغيل الشاشة"
+  "lockAppOnScreenOffSubtitle": "إظهار شاشة القفل بمجرد إيقاف تشغيل الشاشة",
+  "settingsHubSecuritySubtitle": "القفل الرئيسي، القياسات الحيوية والقفل التلقائي",
+  "settingsHubStorageSubtitle": "الوصول إلى التخزين، الخدمة في الخلفية والمشاركة",
+  "settingsHubFileHandlingSubtitle": "الفتح التلقائي، المصغرات وارتباطات الملفات",
+  "settingsHubAppearanceSubtitle": "السمات، أسود OLED النقي واللغة",
+  "settingsHubAdvancedSubtitle": "نسخ الإعدادات احتياطيًا، سجلات التصحيح وlogcat"
 }

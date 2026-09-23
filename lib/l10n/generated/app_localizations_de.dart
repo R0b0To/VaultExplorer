@@ -8247,4 +8247,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Sperrbildschirm anzeigen, sobald der Bildschirm ausgeschaltet wird';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Master-Sperre, Biometrie & Auto-Sperre';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Speicherzugriff, Hintergrunddienst & Teilen-Menü';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Auto-Öffnen, Thumbnails & Dateiverknüpfungen';
+
+  @override
+  String get settingsHubAppearanceSubtitle =>
+      'Designs, reines OLED-Schwarz & Sprache';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Einstellungen-Backup, Debug-Logs & Logcat';
 }

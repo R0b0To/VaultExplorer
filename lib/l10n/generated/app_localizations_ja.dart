@@ -7799,4 +7799,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get lockAppOnScreenOffSubtitle => '画面が消灯するとすぐにロック画面を表示します';
+
+  @override
+  String get settingsHubSecuritySubtitle => 'マスターロック、生体認証、自動ロック';
+
+  @override
+  String get settingsHubStorageSubtitle => 'ストレージアクセス、バックグラウンド、共有メニュー';
+
+  @override
+  String get settingsHubFileHandlingSubtitle => '自動オープン、サムネイル、ファイルの関連付け';
+
+  @override
+  String get settingsHubAppearanceSubtitle => 'テーマ、OLED純黒、言語';
+
+  @override
+  String get settingsHubAdvancedSubtitle => '設定のバックアップ、デバッグログ、Logcat';
 }

@@ -13674,6 +13674,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show the lock screen as soon as the screen turns off'**
   String get lockAppOnScreenOffSubtitle;
+
+  /// Concise sub-description for the Security & Privacy settings hub card
+  ///
+  /// In en, this message translates to:
+  /// **'Master lock, biometrics & auto-lock'**
+  String get settingsHubSecuritySubtitle;
+
+  /// Concise sub-description for the Key Storage & System Access settings hub card
+  ///
+  /// In en, this message translates to:
+  /// **'Storage access, background service & share sheet'**
+  String get settingsHubStorageSubtitle;
+
+  /// Concise sub-description for the Vault & File Handling settings hub card
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-open, thumbnails & file associations'**
+  String get settingsHubFileHandlingSubtitle;
+
+  /// Concise sub-description for the Appearance & Interface settings hub card
+  ///
+  /// In en, this message translates to:
+  /// **'Themes, pure black OLED & language'**
+  String get settingsHubAppearanceSubtitle;
+
+  /// Concise sub-description for the Backup & Debug settings hub card
+  ///
+  /// In en, this message translates to:
+  /// **'Settings backup, debug logs & logcat'**
+  String get settingsHubAdvancedSubtitle;
 }
 
 class _AppLocalizationsDelegate

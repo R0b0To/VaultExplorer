@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "Segue le impostazioni di blocco automatico dell'app e di blocco schermo",
   "appLockBehaviorTitle": "Comportamento blocco app",
   "lockAppOnScreenOffTitle": "Blocca l'app allo spegnimento dello schermo",
-  "lockAppOnScreenOffSubtitle": "Mostra la schermata di blocco non appena lo schermo si spegne"
+  "lockAppOnScreenOffSubtitle": "Mostra la schermata di blocco non appena lo schermo si spegne",
+  "settingsHubSecuritySubtitle": "Blocco principale, biometria e blocco automatico",
+  "settingsHubStorageSubtitle": "Accesso all'archiviazione, servizio in background e menu condividi",
+  "settingsHubFileHandlingSubtitle": "Apertura automatica, miniature e associazioni file",
+  "settingsHubAppearanceSubtitle": "Temi, nero puro OLED e lingua",
+  "settingsHubAdvancedSubtitle": "Backup impostazioni, log di debug e logcat"
 }

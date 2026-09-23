@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "Дотримується налаштувань автоблокування застосунку та блокування екрана",
   "appLockBehaviorTitle": "Поведінка блокування застосунку",
   "lockAppOnScreenOffTitle": "Блокувати застосунок при вимкненні екрана",
-  "lockAppOnScreenOffSubtitle": "Показувати екран блокування, щойно вимикається екран"
+  "lockAppOnScreenOffSubtitle": "Показувати екран блокування, щойно вимикається екран",
+  "settingsHubSecuritySubtitle": "Головне блокування, біометрія та автоблокування",
+  "settingsHubStorageSubtitle": "Доступ до сховища, фонова служба та меню поширення",
+  "settingsHubFileHandlingSubtitle": "Автоматичне відкриття, мініатюри та асоціації файлів",
+  "settingsHubAppearanceSubtitle": "Теми, глибокий чорний OLED та мова",
+  "settingsHubAdvancedSubtitle": "Резервна копія налаштувань, логи налагодження та logcat"
 }

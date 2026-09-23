@@ -8306,4 +8306,24 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Показувати екран блокування, щойно вимикається екран';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Головне блокування, біометрія та автоблокування';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Доступ до сховища, фонова служба та меню поширення';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Автоматичне відкриття, мініатюри та асоціації файлів';
+
+  @override
+  String get settingsHubAppearanceSubtitle =>
+      'Теми, глибокий чорний OLED та мова';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Резервна копія налаштувань, логи налагодження та logcat';
 }

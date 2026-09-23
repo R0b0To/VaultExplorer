@@ -8264,4 +8264,23 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'Muestra la pantalla de bloqueo en cuanto se apaga la pantalla';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'Bloqueo maestro, biometría y bloqueo automático';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'Acceso a almacenamiento, servicio en segundo plano y menú compartir';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'Apertura automática, miniaturas y asociaciones de archivos';
+
+  @override
+  String get settingsHubAppearanceSubtitle => 'Temas, negro puro OLED e idioma';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'Copia de ajustes, registros de depuración y logcat';
 }

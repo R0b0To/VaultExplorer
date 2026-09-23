@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "遵循应用的自动锁定和屏幕锁定设置",
   "appLockBehaviorTitle": "应用锁定行为",
   "lockAppOnScreenOffTitle": "屏幕熄灭时锁定应用",
-  "lockAppOnScreenOffSubtitle": "屏幕熄灭时立即显示锁定屏幕"
+  "lockAppOnScreenOffSubtitle": "屏幕熄灭时立即显示锁定屏幕",
+  "settingsHubSecuritySubtitle": "主密码锁定、生物识别及自动锁定",
+  "settingsHubStorageSubtitle": "存储访问、后台服务及分享菜单",
+  "settingsHubFileHandlingSubtitle": "自动打开、缩略图及文件关联",
+  "settingsHubAppearanceSubtitle": "主题、OLED纯黑及语言",
+  "settingsHubAdvancedSubtitle": "设置备份、调试日志及Logcat"
 }

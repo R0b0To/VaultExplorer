@@ -2253,5 +2253,10 @@
   "defaultAutoLockOptionSubtitle": "Suit les paramètres de verrouillage automatique et de verrouillage de l'écran de l'application",
   "appLockBehaviorTitle": "Comportement du verrouillage de l'application",
   "lockAppOnScreenOffTitle": "Verrouiller l'application à l'extinction de l'écran",
-  "lockAppOnScreenOffSubtitle": "Affiche l'écran de verrouillage dès que l'écran s'éteint"
+  "lockAppOnScreenOffSubtitle": "Affiche l'écran de verrouillage dès que l'écran s'éteint",
+  "settingsHubSecuritySubtitle": "Verrouillage principal, biométrie et verrouillage auto",
+  "settingsHubStorageSubtitle": "Accès au stockage, service en arrière-plan et partage",
+  "settingsHubFileHandlingSubtitle": "Ouverture auto, miniatures et associations de fichiers",
+  "settingsHubAppearanceSubtitle": "Thèmes, noir pur OLED et langue",
+  "settingsHubAdvancedSubtitle": "Sauvegarde des paramètres, journaux de débogage et logcat"
 }

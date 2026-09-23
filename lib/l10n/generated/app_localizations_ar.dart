@@ -8307,4 +8307,23 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get lockAppOnScreenOffSubtitle =>
       'إظهار شاشة القفل بمجرد إيقاف تشغيل الشاشة';
+
+  @override
+  String get settingsHubSecuritySubtitle =>
+      'القفل الرئيسي، القياسات الحيوية والقفل التلقائي';
+
+  @override
+  String get settingsHubStorageSubtitle =>
+      'الوصول إلى التخزين، الخدمة في الخلفية والمشاركة';
+
+  @override
+  String get settingsHubFileHandlingSubtitle =>
+      'الفتح التلقائي، المصغرات وارتباطات الملفات';
+
+  @override
+  String get settingsHubAppearanceSubtitle => 'السمات، أسود OLED النقي واللغة';
+
+  @override
+  String get settingsHubAdvancedSubtitle =>
+      'نسخ الإعدادات احتياطيًا، سجلات التصحيح وlogcat';
 }

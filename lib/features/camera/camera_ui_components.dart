@@ -1,8 +1,260 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'vault_camera_controller.dart';
+
+class CameraPopupMenuItem<T> {
+  final T value;
+  final Widget child;
+  final bool isSelected;
+
+  const CameraPopupMenuItem({
+    required this.value,
+    required this.child,
+    this.isSelected = false,
+  });
+}
+
+class CameraPopupMenuButton<T> extends StatefulWidget {
+  final ValueChanged<T> onSelected;
+  final List<CameraPopupMenuItem<T>> items;
+  final Widget child;
+  final double iconTurns;
+
+  const CameraPopupMenuButton({
+    super.key,
+    required this.onSelected,
+    required this.items,
+    required this.child,
+    required this.iconTurns,
+  });
+
+  @override
+  State<CameraPopupMenuButton<T>> createState() => _CameraPopupMenuButtonState<T>();
+}
+
+class _CameraPopupMenuButtonState<T> extends State<CameraPopupMenuButton<T>> {
+  _CameraPopupMenuRoute<T>? _activeRoute;
+
+  @override
+  void didUpdateWidget(covariant CameraPopupMenuButton<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((oldWidget.iconTurns - widget.iconTurns).abs() > 0.01) {
+      if (_activeRoute != null && _activeRoute!.isActive) {
+        if (_activeRoute!.isCurrent) {
+          _activeRoute!.navigator?.pop();
+        } else {
+          _activeRoute!.navigator?.removeRoute(_activeRoute!);
+        }
+        _activeRoute = null;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_activeRoute != null && _activeRoute!.isActive) {
+      _activeRoute!.navigator?.removeRoute(_activeRoute!);
+      _activeRoute = null;
+    }
+    super.dispose();
+  }
+
+  void _showMenu() {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return;
+
+    final buttonRect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final screenSize = overlay?.size ?? MediaQuery.of(context).size;
+
+    final route = _CameraPopupMenuRoute<T>(
+      buttonRect: buttonRect,
+      screenSize: screenSize,
+      items: widget.items,
+      iconTurns: widget.iconTurns,
+      onSelected: widget.onSelected,
+    );
+
+    _activeRoute = route;
+    Navigator.of(context).push(route).then((_) {
+      if (_activeRoute == route) {
+        _activeRoute = null;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _showMenu,
+      child: widget.child,
+    );
+  }
+}
+
+class _CameraPopupMenuRoute<T> extends PopupRoute<void> {
+  final Rect buttonRect;
+  final Size screenSize;
+  final List<CameraPopupMenuItem<T>> items;
+  final double iconTurns;
+  final ValueChanged<T> onSelected;
+
+  _CameraPopupMenuRoute({
+    required this.buttonRect,
+    required this.screenSize,
+    required this.items,
+    required this.iconTurns,
+    required this.onSelected,
+  });
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 150);
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  Color? get barrierColor => Colors.black26;
+
+  @override
+  String? get barrierLabel => 'Dismiss';
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: child,
+    );
+  }
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final menuContent = Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 100),
+        decoration: BoxDecoration(
+          color: const Color(0xEB1E1E1E),
+          borderRadius: BorderRadius.circular(12),
+          
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  if (i > 0)
+                    const Divider(color: Colors.white12, height: 1, thickness: 0.5),
+                  InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context).pop();
+                      onSelected(items[i].value);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      color: items[i].isSelected
+                          ? const Color(0x26FFC107)
+                          : Colors.transparent,
+                      child: Center(
+                        child: items[i].child,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return CustomSingleChildLayout(
+      delegate: _CameraPopupMenuLayoutDelegate(
+        buttonRect: buttonRect,
+        screenSize: screenSize,
+        iconTurns: iconTurns,
+      ),
+      child: buildRotatedWidget(
+        iconTurns: iconTurns,
+        child: menuContent,
+      ),
+    );
+  }
+}
+
+class _CameraPopupMenuLayoutDelegate extends SingleChildLayoutDelegate {
+  final Rect buttonRect;
+  final Size screenSize;
+  final double iconTurns;
+
+  _CameraPopupMenuLayoutDelegate({
+    required this.buttonRect,
+    required this.screenSize,
+    required this.iconTurns,
+  });
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return constraints.loosen();
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final angle = iconTurns * 2 * math.pi;
+    final cosA = math.cos(angle).abs();
+    final sinA = math.sin(angle).abs();
+
+    final visualWidth = childSize.width * cosA + childSize.height * sinA;
+    final visualHeight = childSize.width * sinA + childSize.height * cosA;
+
+    final targetCx = buttonRect.center.dx;
+    final targetCy = buttonRect.bottom + 8.0 + visualHeight / 2.0;
+
+    final minCx = visualWidth / 2.0 + 8.0;
+    final maxCx = size.width - visualWidth / 2.0 - 8.0;
+    final clampedCx = minCx <= maxCx ? targetCx.clamp(minCx, maxCx) : size.width / 2.0;
+
+    final minCy = buttonRect.bottom + 4.0 + visualHeight / 2.0;
+    final maxCy = size.height - visualHeight / 2.0 - 8.0;
+    final clampedCy = minCy <= maxCy ? targetCy.clamp(minCy, maxCy) : size.height / 2.0;
+
+    return Offset(
+      clampedCx - childSize.width / 2.0,
+      clampedCy - childSize.height / 2.0,
+    );
+  }
+
+  @override
+  bool shouldRelayout(_CameraPopupMenuLayoutDelegate oldDelegate) {
+    return buttonRect != oldDelegate.buttonRect ||
+        screenSize != oldDelegate.screenSize ||
+        iconTurns != oldDelegate.iconTurns;
+  }
+}
 
 Widget buildRotatedWidget({required double iconTurns, required Widget child}) {
   return AnimatedRotation(
@@ -93,14 +345,43 @@ class CameraTopControlsBar extends StatelessWidget {
               Row(
                 children: [
                   // Aspect Ratio Selector
-                  PopupMenuButton<double>(
-                    initialValue: selectedAspectRatio,
-                    color: Colors.black87,
+                  CameraPopupMenuButton<double>(
+                    iconTurns: iconTurns,
                     onSelected: onAspectRatioChanged,
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 4 / 3, child: Text('4:3', style: TextStyle(color: Colors.white))),
-                      PopupMenuItem(value: 16 / 9, child: Text('16:9', style: TextStyle(color: Colors.white))),
-                      PopupMenuItem(value: 1.0, child: Text('1:1', style: TextStyle(color: Colors.white))),
+                    items: [
+                      CameraPopupMenuItem(
+                        value: 4 / 3,
+                        isSelected: (selectedAspectRatio - 4 / 3).abs() < 0.05,
+                        child: Text(
+                          '4:3',
+                          style: TextStyle(
+                            color: (selectedAspectRatio - 4 / 3).abs() < 0.05 ? Colors.amber : Colors.white,
+                            fontWeight: (selectedAspectRatio - 4 / 3).abs() < 0.05 ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      CameraPopupMenuItem(
+                        value: 16 / 9,
+                        isSelected: (selectedAspectRatio - 16 / 9).abs() < 0.05,
+                        child: Text(
+                          '16:9',
+                          style: TextStyle(
+                            color: (selectedAspectRatio - 16 / 9).abs() < 0.05 ? Colors.amber : Colors.white,
+                            fontWeight: (selectedAspectRatio - 16 / 9).abs() < 0.05 ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      CameraPopupMenuItem(
+                        value: 1.0,
+                        isSelected: (selectedAspectRatio - 1.0).abs() < 0.05,
+                        child: Text(
+                          '1:1',
+                          style: TextStyle(
+                            color: (selectedAspectRatio - 1.0).abs() < 0.05 ? Colors.amber : Colors.white,
+                            fontWeight: (selectedAspectRatio - 1.0).abs() < 0.05 ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
                     ],
                     child: Padding(
                       padding: const EdgeInsets.all(6.0),
@@ -128,15 +409,54 @@ class CameraTopControlsBar extends StatelessWidget {
 
                   // Video Mode Resolution Menu
                   if (isVideoMode)
-                    PopupMenuButton<String>(
-                      initialValue: videoQuality,
-                      color: Colors.black87,
+                    CameraPopupMenuButton<String>(
+                      iconTurns: iconTurns,
                       onSelected: onVideoQualityChanged,
-                      itemBuilder: (context) => [
-                        PopupMenuItem(value: 'sd', child: Text(l10n.cameraQualitySd, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'hd', child: Text(l10n.cameraQualityHd, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'fhd', child: Text(l10n.cameraQualityFhd, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'uhd', child: Text(l10n.cameraQualityUhd, style: const TextStyle(color: Colors.white))),
+                      items: [
+                        CameraPopupMenuItem(
+                          value: 'sd',
+                          isSelected: videoQuality == 'sd',
+                          child: Text(
+                            l10n.cameraQualitySd,
+                            style: TextStyle(
+                              color: videoQuality == 'sd' ? Colors.amber : Colors.white,
+                              fontWeight: videoQuality == 'sd' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'hd',
+                          isSelected: videoQuality == 'hd',
+                          child: Text(
+                            l10n.cameraQualityHd,
+                            style: TextStyle(
+                              color: videoQuality == 'hd' ? Colors.amber : Colors.white,
+                              fontWeight: videoQuality == 'hd' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'fhd',
+                          isSelected: videoQuality == 'fhd',
+                          child: Text(
+                            l10n.cameraQualityFhd,
+                            style: TextStyle(
+                              color: videoQuality == 'fhd' ? Colors.amber : Colors.white,
+                              fontWeight: videoQuality == 'fhd' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'uhd',
+                          isSelected: videoQuality == 'uhd',
+                          child: Text(
+                            l10n.cameraQualityUhd,
+                            style: TextStyle(
+                              color: videoQuality == 'uhd' ? Colors.amber : Colors.white,
+                              fontWeight: videoQuality == 'uhd' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
                       ],
                       child: Padding(
                         padding: const EdgeInsets.all(6.0),
@@ -159,15 +479,54 @@ class CameraTopControlsBar extends StatelessWidget {
                     )
                   // Photo Mode Resolution Menu
                   else
-                    PopupMenuButton<String>(
-                      initialValue: photoResolution,
-                      color: Colors.black87,
+                    CameraPopupMenuButton<String>(
+                      iconTurns: iconTurns,
                       onSelected: onPhotoResolutionChanged,
-                      itemBuilder: (context) => [
-                        PopupMenuItem(value: 'max', child: Text(l10n.cameraPhotoResMax, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'high', child: Text(l10n.cameraPhotoResHigh, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'med', child: Text(l10n.cameraPhotoResMedium, style: const TextStyle(color: Colors.white))),
-                        PopupMenuItem(value: 'low', child: Text(l10n.cameraPhotoResLow, style: const TextStyle(color: Colors.white))),
+                      items: [
+                        CameraPopupMenuItem(
+                          value: 'max',
+                          isSelected: photoResolution == 'max',
+                          child: Text(
+                            l10n.cameraPhotoResMax,
+                            style: TextStyle(
+                              color: photoResolution == 'max' ? Colors.amber : Colors.white,
+                              fontWeight: photoResolution == 'max' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'high',
+                          isSelected: photoResolution == 'high',
+                          child: Text(
+                            l10n.cameraPhotoResHigh,
+                            style: TextStyle(
+                              color: photoResolution == 'high' ? Colors.amber : Colors.white,
+                              fontWeight: photoResolution == 'high' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'med',
+                          isSelected: photoResolution == 'med',
+                          child: Text(
+                            l10n.cameraPhotoResMedium,
+                            style: TextStyle(
+                              color: photoResolution == 'med' ? Colors.amber : Colors.white,
+                              fontWeight: photoResolution == 'med' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        CameraPopupMenuItem(
+                          value: 'low',
+                          isSelected: photoResolution == 'low',
+                          child: Text(
+                            l10n.cameraPhotoResLow,
+                            style: TextStyle(
+                              color: photoResolution == 'low' ? Colors.amber : Colors.white,
+                              fontWeight: photoResolution == 'low' ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
                       ],
                       child: Padding(
                         padding: const EdgeInsets.all(6.0),

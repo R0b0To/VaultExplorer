@@ -212,13 +212,44 @@ class AppNavigationDrawer extends ConsumerWidget {
                           // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
                           if (displayItems.isNotEmpty || onAddVault != null) ...[
                             Padding(
-                              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                              child: Text(
-                                context.l10n.vaultsSectionTitle,
-                                style: textTheme.labelMedium?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    context.l10n.vaultsSectionTitle.toUpperCase(),
+                                    style: textTheme.labelSmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (dashboardState.mounted.isNotEmpty)
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: cs.error,
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      icon: const Icon(Icons.lock_rounded, size: 14),
+                                      label: Text(
+                                        context.l10n.lockAllVaultsTitle,
+                                        style: textTheme.labelSmall?.copyWith(
+                                          color: cs.error,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        for (final c in dashboardState.mounted) {
+                                          ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
+                                          ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(c.volId);
+                                        }
+                                      },
+                                    ),
+                                ],
                               ),
                             ),
                             for (final item in displayItems) ...[
@@ -290,19 +321,12 @@ class AppNavigationDrawer extends ConsumerWidget {
                               ),
                           ],
 
-                          if (showStorageLocations) ...[
-                            // 3. Storage Locations Section
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                              child: Text(
-                                context.l10n.storageLocationsTitle,
-                                style: textTheme.labelMedium?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                           const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 1),
+                            child: Divider(),
+                          ),
 
+                          if (showStorageLocations) ...[
                             if (primary != null)
                               ListTile(
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
@@ -482,27 +506,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                           ),
 
 
-                          // 6. Quick Action: Lock All Vaults
-                          if (dashboardState.mounted.isNotEmpty)
-                            ListTile(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                              leading: Icon(Icons.lock_rounded, color: cs.error),
-                              title: Text(
-                                context.l10n.lockAllVaultsTitle,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: cs.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context);
-                                for (final c in dashboardState.mounted) {
-                                  ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
-                                  ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(c.volId);
-                                }
-                              },
-                            ),
-                        ],
+                            ],
                       ),
                     );
                   },

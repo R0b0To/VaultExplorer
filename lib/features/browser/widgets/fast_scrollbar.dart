@@ -38,11 +38,6 @@ class _PopupBadge {
   const _PopupBadge({this.icon, this.text});
 }
 
-const _monthNames = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 class _FastScrollbarState extends State<FastScrollbar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _fadeController;
@@ -190,12 +185,12 @@ class _FastScrollbarState extends State<FastScrollbar>
   }
 
   String _formatPopupDate(DateTime dt) {
+    final localizations = MaterialLocalizations.of(context);
     final now = DateTime.now();
-    final monthText = _monthNames[dt.month - 1];
     if (dt.year == now.year) {
-      return '${dt.day} $monthText';
+      return localizations.formatShortMonthDay(dt);
     }
-    return '${dt.day} $monthText ${dt.year}';
+    return localizations.formatShortDate(dt);
   }
 
   _PopupBadge? _computePopupBadge(double fraction) {

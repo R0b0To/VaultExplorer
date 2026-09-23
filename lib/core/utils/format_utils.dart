@@ -1,3 +1,4 @@
+import 'package:material_ui/material_ui.dart';
 import '../filesystem/file_size.dart';
 
 /// Formats a byte count into a human-readable string (e.g. "4.2 MB", "1 GB").
@@ -51,13 +52,26 @@ const _months = [
 /// [RawEntry.modifiedSecs]'s own doc comment) into a short display string for
 /// list rows: "14:32" for today, "Jan 5" for this year, "Jan 5, 2024"
 /// otherwise. Returns "—" when unknown.
-String formatEntryDate(int secs) {
+///
+/// When [context] is provided, uses [MaterialLocalizations] to format dates
+/// and times according to the user's active locale and 12/24-hour preference.
+String formatEntryDate(int secs, [BuildContext? context]) {
   if (secs <= 0) return '—';
   final dt = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
   final now = DateTime.now();
 
   final isToday =
       dt.year == now.year && dt.month == now.month && dt.day == now.day;
+
+  if (context != null) {
+    final localizations = MaterialLocalizations.of(context);
+    if (isToday) {
+      return localizations.formatTimeOfDay(TimeOfDay.fromDateTime(dt));
+    }
+    return dt.year == now.year
+        ? localizations.formatShortMonthDay(dt)
+        : localizations.formatShortDate(dt);
+  }
 
   if (isToday) {
     final hr = dt.hour.toString().padLeft(2, '0');

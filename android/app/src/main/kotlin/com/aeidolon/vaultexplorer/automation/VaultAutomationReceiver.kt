@@ -1,10 +1,13 @@
 package com.aeidolon.vaultexplorer.automation
 
+import android.app.ActivityOptions
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraManager
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
@@ -144,8 +147,8 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         private val fuseThread = HandlerThread("automation-split-fuse").apply { start() }
         private val fuseHandler = Handler(fuseThread.looper)
 
-        private const val PHOTO_TIMEOUT_MS = 8_000L
-        private const val START_RECORDING_TIMEOUT_MS = 10_000L
+        private const val PHOTO_TIMEOUT_MS = 12_000L
+        private const val START_RECORDING_TIMEOUT_MS = 15_000L
         // Generous on purpose: this is how long the receiver waits before
         // giving up and reporting ERROR, not a cap on the save itself -- a
         // very long recording's finalize can still outlive it, in which case
@@ -153,6 +156,101 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         // file lands in the vault either way; only the result broadcast
         // would be a false-negative ERROR/timeout in that case, not the data.
         private const val STOP_RECORDING_TIMEOUT_MS = 60_000L
+
+        internal fun pickCameraId(context: Context, facing: String): String? {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val lenses = listCameraLenses(cameraManager)
+            return lenses.firstOrNull { it.facing == facing }?.cameraId ?: lenses.firstOrNull()?.cameraId
+        }
+
+        internal fun generateCaptureName(volId: Int, isPhoto: Boolean): String {
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val prefix = if (isPhoto) "IMG_" else "VID_"
+            val ext = if (isPhoto) ".jpg" else ".mp4"
+            val existingNames = (ContainerFileSystem.listDirectory(volId, "") ?: emptyArray())
+                .mapNotNull { VaultAutomationFolderOps.parseDirEntry(it)?.name }
+                .toSet()
+            var candidate = "$prefix$stamp$ext"
+            var counter = 1
+            while (candidate in existingNames) {
+                candidate = "$prefix${stamp}_$counter$ext"
+                counter++
+            }
+            return candidate
+        }
+
+        internal fun outcomeForCameraError(error: String?): Outcome = when {
+            error == null -> Outcome("ERROR", "Unknown camera error")
+            error == "permission_denied" -> Outcome(
+                "PERMISSION_DENIED",
+                "Camera/microphone permission not granted -- grant it once from the app's own camera screen first",
+            )
+            error.startsWith("camera_unavailable") || error == "camera disconnected" || error == "session configuration failed" ->
+                Outcome("CAMERA_UNAVAILABLE", error)
+            else -> Outcome("ERROR", error)
+        }
+
+        internal fun sendResult(context: Context, action: String, outcome: Outcome) {
+            VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
+            val resultIntent = Intent(ACTION_AUTOMATION_RESULT).apply {
+                putExtra(EXTRA_ORIGINAL_ACTION, action)
+                putExtra(RESULT_CODE, outcome.code)
+                putExtra(RESULT_MESSAGE, outcome.message)
+                outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
+                outcome.streamUri?.let { uriStr ->
+                    putExtra(EXTRA_STREAM_URI, uriStr)
+                }
+                outcome.matchedCount?.let { putExtra(EXTRA_MATCHED_COUNT, it) }
+                outcome.succeededCount?.let { putExtra(EXTRA_SUCCEEDED_COUNT, it) }
+                outcome.failedCount?.let { putExtra(EXTRA_FAILED_COUNT, it) }
+                outcome.skippedCount?.let { putExtra(EXTRA_SKIPPED_COUNT, it) }
+                addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            }
+            context.sendBroadcast(resultIntent)
+        }
+
+        internal fun launchCaptureActivity(context: Context, action: String, intent: Intent): Boolean {
+            val captureIntent = Intent(context, VaultAutomationCaptureActivity::class.java).apply {
+                this.action = action
+                putExtras(intent)
+                putExtra(VaultAutomationCaptureActivity.EXTRA_TRAMPOLINE, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            }
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val bOptions = ActivityOptions.makeBasic().apply {
+                        setPendingIntentCreatorBackgroundActivityStartMode(
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                        )
+                    }.toBundle()
+                    val pi = PendingIntent.getActivity(
+                        context,
+                        action.hashCode(),
+                        captureIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                        bOptions,
+                    )
+                    val sendOptions = ActivityOptions.makeBasic().apply {
+                        setPendingIntentBackgroundActivityStartMode(
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                        )
+                    }.toBundle()
+                    pi.send(context, 0, null, null, null, null, sendOptions)
+                } else {
+                    context.startActivity(captureIntent)
+                }
+                true
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "Failed to launch VaultAutomationCaptureActivity via PendingIntent" }
+                try {
+                    context.startActivity(captureIntent)
+                    true
+                } catch (e2: Exception) {
+                    VeLog.e(TAG, e2) { "Direct startActivity also failed" }
+                    false
+                }
+            }
+        }
     }
 
     // internal rather than private: outcomeForCameraError below needs to
@@ -234,25 +332,6 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
         sendResult(context, action, outcome)
     }
-
-            private fun sendResult(context: Context, action: String, outcome: Outcome) {
-            VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
-            val resultIntent = Intent(ACTION_AUTOMATION_RESULT).apply {
-                putExtra(EXTRA_ORIGINAL_ACTION, action)
-                putExtra(RESULT_CODE, outcome.code)
-                putExtra(RESULT_MESSAGE, outcome.message)
-                outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
-                outcome.streamUri?.let { uriStr ->
-                    putExtra(EXTRA_STREAM_URI, uriStr)
-                }
-                outcome.matchedCount?.let { putExtra(EXTRA_MATCHED_COUNT, it) }
-                outcome.succeededCount?.let { putExtra(EXTRA_SUCCEEDED_COUNT, it) }
-                outcome.failedCount?.let { putExtra(EXTRA_FAILED_COUNT, it) }
-                outcome.skippedCount?.let { putExtra(EXTRA_SKIPPED_COUNT, it) }
-                addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-            }
-            context.sendBroadcast(resultIntent)
-        }
 
     private fun startKeepAlive(context: Context) {
         ContextCompat.startForegroundService(context, Intent(context, VaultKeepAliveService::class.java))
@@ -596,45 +675,22 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
         val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
             ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
-        val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
-        val cameraId = try {
-            pickCameraId(context, facing)
-        } catch (e: SecurityException) {
-            return Outcome("CAMERA_UNAVAILABLE", "Camera disabled by system/device policy: ${e.message}")
-        } ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
 
-        val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
-            ?: generateCaptureName(volId, isPhoto = true)
+        val latch = VaultAutomationActivityBridge.arm()
+        if (!launchCaptureActivity(context, ACTION_TAKE_PHOTO, intent)) {
+            return Outcome("ERROR", "Failed to launch capture activity (Background Activity Launch blocked by OS)")
+        }
 
-        val session = VaultHeadlessCameraSession(context)
-        if (!session.hasPermissions()) {
-            return Outcome(
-                "PERMISSION_DENIED",
-                "Camera/microphone permission not granted -- grant it once from the app's own camera screen first; automation can't prompt for it",
+        val result = VaultAutomationActivityBridge.await(latch, PHOTO_TIMEOUT_MS)
+            ?: return Outcome(
+                "ERROR",
+                "Photo capture timed out (on Android 14+, grant 'Display over other apps' to VaultExplorer or target Activity directly in Tasker)",
             )
+        return if (result.ok) {
+            Outcome("OK", "Photo saved to ${result.vaultPath ?: "vault"}")
+        } else {
+            outcomeForCameraError(result.message)
         }
-        val latch = CountDownLatch(1)
-        var ok = false
-        var error: String? = null
-        try {
-            session.capturePhotoAndClose(cameraId, volId, vaultPath) { resultOk, resultError ->
-                ok = resultOk
-                error = resultError
-                latch.countDown()
-            }
-        } catch (e: SecurityException) {
-            session.closeAll()
-            return Outcome("CAMERA_UNAVAILABLE", "Camera access blocked by system policy: ${e.message}")
-        } catch (e: Exception) {
-            session.closeAll()
-            return Outcome("ERROR", "Photo capture setup error: ${e.message}")
-        }
-        val completed = try { latch.await(PHOTO_TIMEOUT_MS, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { false }
-        if (!completed) {
-            session.closeAll()
-            return Outcome("ERROR", "Photo capture timed out")
-        }
-        return if (ok) Outcome("OK", "Photo saved to $vaultPath") else outcomeForCameraError(error)
     }
 
     private fun handleStartRecording(context: Context, vaultUri: String, intent: Intent): Outcome {
@@ -646,44 +702,22 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (VaultAutomationRecordingService.isRecording) {
             return Outcome("BUSY", "An automation recording is already in progress")
         }
-        val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
-        val cameraId = try {
-            pickCameraId(context, facing)
-        } catch (e: SecurityException) {
-            return Outcome("CAMERA_UNAVAILABLE", "Camera disabled by system/device policy: ${e.message}")
-        } ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
 
-        val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
-            ?: generateCaptureName(volId, isPhoto = false)
-        val quality = when (intent.getStringExtra(EXTRA_VIDEO_QUALITY)?.lowercase(Locale.US)) {
-            "hd" -> VaultVideoQuality.HD
-            "uhd" -> VaultVideoQuality.UHD
-            else -> VaultVideoQuality.FHD
+        val latch = VaultAutomationActivityBridge.arm()
+        if (!launchCaptureActivity(context, ACTION_START_RECORDING, intent)) {
+            return Outcome("ERROR", "Failed to launch capture activity (Background Activity Launch blocked by OS)")
         }
-        val recordAudio = intent.getBooleanExtra(EXTRA_RECORD_AUDIO, true)
-        val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
 
-        val latch = VaultAutomationCaptureBridge.arm()
-        val serviceIntent = Intent(context, VaultAutomationRecordingService::class.java).apply {
-            action = VaultAutomationRecordingService.ACTION_START
-            putExtra(VaultAutomationRecordingService.EXTRA_VOL_ID, volId)
-            putExtra(VaultAutomationRecordingService.EXTRA_VAULT_PATH, vaultPath)
-            putExtra(VaultAutomationRecordingService.EXTRA_CAMERA_ID, cameraId)
-            putExtra(VaultAutomationRecordingService.EXTRA_VIDEO_QUALITY, quality.name)
-            putExtra(VaultAutomationRecordingService.EXTRA_RECORD_AUDIO, recordAudio)
-            putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
-            putExtra("vaultUri", vaultUri)
+        val result = VaultAutomationActivityBridge.await(latch, START_RECORDING_TIMEOUT_MS)
+            ?: return Outcome(
+                "ERROR",
+                "Timed out waiting for recording to start (on Android 14+, grant 'Display over other apps' to VaultExplorer or target Activity directly in Tasker)",
+            )
+        return if (result.ok) {
+            Outcome("OK", "Recording started: ${result.vaultPath ?: "vault"}")
+        } else {
+            outcomeForCameraError(result.message)
         }
-        try {
-            ContextCompat.startForegroundService(context, serviceIntent)
-        } catch (e: SecurityException) {
-            return Outcome("CAMERA_UNAVAILABLE", "Recording service blocked by policy: ${e.message}")
-        } catch (e: Exception) {
-            return Outcome("ERROR", "Failed to start recording service: ${e.message}")
-        }
-        val result = VaultAutomationCaptureBridge.await(latch, START_RECORDING_TIMEOUT_MS)
-            ?: return Outcome("ERROR", "Timed out waiting for the camera to start")
-        return if (result.ok) Outcome("OK", "Recording started: $vaultPath") else outcomeForCameraError(result.message)
     }
 
     private fun handleStopRecording(context: Context, vaultUri: String): Outcome {
@@ -710,46 +744,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun pickCameraId(context: Context, facing: String): String? {
-        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val lenses = listCameraLenses(cameraManager)
-        return lenses.firstOrNull { it.facing == facing }?.cameraId ?: lenses.firstOrNull()?.cameraId
-    }
-
-    /** Mirrors CameraVaultService.nextAvailableName's naming convention on the
-     *  Dart side (IMG_/VID_ + timestamp, deduplicated against the vault root
-     *  listing) so an automation capture with no explicit vault_path looks
-     *  the same as one taken through the in-app camera. Always lands at the
-     *  vault root; pass vault_path explicitly for anywhere else. */
-    private fun generateCaptureName(volId: Int, isPhoto: Boolean): String {
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val prefix = if (isPhoto) "IMG_" else "VID_"
-        val ext = if (isPhoto) ".jpg" else ".mp4"
-        val existingNames = (ContainerFileSystem.listDirectory(volId, "") ?: emptyArray())
-            .mapNotNull { VaultAutomationFolderOps.parseDirEntry(it)?.name }
-            .toSet()
-        var candidate = "$prefix$stamp$ext"
-        var counter = 1
-        while (candidate in existingNames) {
-            candidate = "$prefix${stamp}_$counter$ext"
-            counter++
-        }
-        return candidate
-    }
-
-    // internal rather than private: lets VaultAutomationReceiverTest
-    // exercise this directly -- same pattern used elsewhere in this pass
-    // (FolderVaultChecker, looksLikeRwModeUnsupported, isReservedCachePath).
-    internal fun outcomeForCameraError(error: String?): Outcome = when {
-        error == null -> Outcome("ERROR", "Unknown camera error")
-        error == "permission_denied" -> Outcome(
-            "PERMISSION_DENIED",
-            "Camera/microphone permission not granted -- grant it once from the app's own camera screen first",
-        )
-        error.startsWith("camera_unavailable") || error == "camera disconnected" || error == "session configuration failed" ->
-            Outcome("CAMERA_UNAVAILABLE", error)
-        else -> Outcome("ERROR", error)
-    }
+    internal fun outcomeForCameraError(error: String?): Outcome = Companion.outcomeForCameraError(error)
 
     /**
      * Not vault-gated: this only ever touches a plaintext staging file

@@ -25,6 +25,8 @@ abstract final class ChannelMethods {
   static const getMountedContainerFolders = 'getMountedContainerFolders';
   static const hasAllFilesAccess = 'hasAllFilesAccess';
   static const requestAllFilesAccess = 'requestAllFilesAccess';
+  static const hasOverlayPermission = 'hasOverlayPermission';
+  static const requestOverlayPermission = 'requestOverlayPermission';
   static const requestNotificationPermission = 'requestNotificationPermission';
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';

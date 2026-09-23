@@ -6,10 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureBridge
@@ -115,7 +118,19 @@ class VaultAutomationRecordingService : Service() {
         }
 
         currentVaultUri = vaultUri
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                0
+            }
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), serviceType)
+        } catch (e: SecurityException) {
+            VeLog.e(TAG, e) { "startForeground failed: ${e.message}" }
+            VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, "Recording blocked by OS security policy: ${e.message}"))
+            stopSelf()
+            return
+        }
         acquireWakeLock()
 
         val newSession = VaultHeadlessCameraSession(applicationContext)

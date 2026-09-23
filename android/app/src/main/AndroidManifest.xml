@@ -16,6 +16,7 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -238,6 +239,19 @@
                 <action android:name="com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE" />
             </intent-filter>
         </receiver>
+        <activity
+            android:name=".automation.VaultAutomationCaptureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TransparentCapture"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.aeidolon.vaultexplorer.automation.capture">
+            <intent-filter>
+                <action android:name="com.aeidolon.vaultexplorer.action.TAKE_PHOTO" />
+                <action android:name="com.aeidolon.vaultexplorer.action.START_RECORDING" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".panic.PanicKitConnectActivity"
             android:exported="true"

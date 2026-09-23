@@ -62,6 +62,37 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         }
     }
 
+    fun handleHasOverlayPermission(call: MethodCall, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            result.success(Settings.canDrawOverlays(activity))
+        } else {
+            result.success(true)
+        }
+    }
+
+    fun handleRequestOverlayPermission(call: MethodCall, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${activity.packageName}"),
+                )
+                activity.startActivity(intent)
+                result.success(true)
+            } catch (e: Exception) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                    activity.startActivity(intent)
+                    result.success(true)
+                } catch (e2: Exception) {
+                    result.error("OVERLAY_PERMISSION_ERROR", e2.message, null)
+                }
+            }
+        } else {
+            result.success(true)
+        }
+    }
+
     fun handleHasAllFilesAccess(call: MethodCall, result: MethodChannel.Result) {
         val hasAccess = com.aeidolon.vaultexplorer.RawFileResolver.hasExternalStoragePermission(activity)
         result.success(hasAccess)

@@ -163,10 +163,6 @@ class AppNavigationDrawer extends ConsumerWidget {
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
     final externalStorages = ref.watch(externalStorageLocationsProvider);
-    // Whole "Storage Locations" section (Local Storage + added locations +
-    // the add button) is toggled from Settings. Hiding it only affects this
-    // drawer; [primaryLocalContainer] stays resolvable for cross-container
-    // paste regardless.
     final showStorageLocations = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.showStorageLocationsInDrawer),
     );
@@ -411,13 +407,13 @@ class AppNavigationDrawer extends ConsumerWidget {
                           ],
 
                           const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
+                            padding: EdgeInsets.symmetric(vertical: 1),
                             child: Divider(),
                           ),
 
                           // 4. Tools Destination
                           ListTile(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                             selected: isTools,
                             selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
                             leading: Icon(
@@ -445,7 +441,7 @@ class AppNavigationDrawer extends ConsumerWidget {
 
                           // 5A. File Manager Settings (Toolbar, layout, thumbnails)
                           ListTile(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                             leading: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
                             title: Text(context.l10n.fileManagerSettingsTitle),
                             onTap: () {
@@ -461,7 +457,7 @@ class AppNavigationDrawer extends ConsumerWidget {
 
                           // 5B. App & Security Settings (Master password, auto-lock, backup)
                           ListTile(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                             selected: isSettings,
                             selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
                             leading: Icon(
@@ -485,7 +481,6 @@ class AppNavigationDrawer extends ConsumerWidget {
                             },
                           ),
 
-                          const SizedBox(height: 8),
 
                           // 6. Quick Action: Lock All Vaults
                           if (dashboardState.mounted.isNotEmpty)

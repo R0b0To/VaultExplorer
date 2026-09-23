@@ -99,8 +99,28 @@ class _AutomationSettingsScreenState
     final error = await ref
         .read(automationSettingsProvider(widget.uri, widget.containerFormat).notifier)
         .setCaptureEnabled(enabled, context.l10n);
-    if (!mounted || error == null) return;
-    showAppSnackBar(context, message: error, tone: AppBannerTone.error);
+    if (!mounted) return;
+    if (error != null) {
+      showAppSnackBar(context, message: error, tone: AppBannerTone.error);
+      return;
+    }
+    if (enabled) {
+      final hasOverlay = await ref
+          .read(vaultLifecycleApiProvider)
+          .hasOverlayPermission();
+      if (!hasOverlay && mounted) {
+        final openSettings = await showAppConfirmDialog(
+          context,
+          title: context.l10n.automationOverlayPermissionTitle,
+          message: context.l10n.automationOverlayPermissionMessage,
+          confirmLabel: context.l10n.openSettings,
+          cancelLabel: context.l10n.cancel,
+        );
+        if (openSettings && mounted) {
+          await ref.read(vaultLifecycleApiProvider).requestOverlayPermission();
+        }
+      }
+    }
   }
 
   Future<void> _savePassword() async {

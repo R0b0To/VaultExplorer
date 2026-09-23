@@ -127,6 +127,28 @@ class VaultLifecycleApi {
     }
   }
 
+  Future<bool> hasOverlayPermission() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.hasOverlayPermission,
+      );
+      return result ?? true;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  Future<bool> requestOverlayPermission() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.requestOverlayPermission,
+      );
+      return result ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Requests broad storage access, appropriate to the running Android
   /// version:
   /// - API 30+ (R): opens system Settings for the user to grant All Files

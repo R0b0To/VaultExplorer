@@ -22,15 +22,24 @@ Every intent is sent as a **Broadcast** to VaultExplorer's receiver, which retur
 
 ## 2. Intent Target Configuration
 
-Every intent sent to VaultExplorer must target the explicit Broadcast Receiver component:
+Every intent sent to VaultExplorer targets either the Broadcast Receiver or (for camera capture on Android 14+) the invisible Capture Activity:
 
+#### General Actions (Unlock, Lock, Import, Export, Wipe, Panic)
 | Setting | Value |
 | :--- | :--- |
 | **Package** | `com.aeidolon.vaultexplorer` |
 | **Class / Component** | `com.aeidolon.vaultexplorer.automation.VaultAutomationReceiver` |
 | **Target Type** | **Broadcast** *(Not Activity or Service!)* |
 
-> ⚠️ **Important**: In **MacroDroid**, set **Intent Target** to **Broadcast**. Setting it to *Activity* will result in `unable to find explicit activity class`. In **Tasker**, set **Target** to **Broadcast Receiver**.
+#### Camera Actions (`TAKE_PHOTO`, `START_RECORDING`)
+On Android 14+ (API 34+), the OS enforces strict "while-in-use" restrictions on camera and microphone hardware. You can configure camera actions in two ways:
+
+- **Option A (Recommended — Direct Activity)**: Set Target Type to **Activity** (or `am start`) targeting:
+  - **Component**: `com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureActivity`
+  - Runs invisibly without UI or animations, bypassing background restrictions completely.
+- **Option B (Broadcast Trampoline)**: Set Target Type to **Broadcast** targeting `VaultAutomationReceiver`. The receiver trampolines to the invisible activity. On Android 14+, grant VaultExplorer the **"Display over other apps"** permission in device settings so the OS permits background activity launching.
+
+> ⚠️ **Important**: In **MacroDroid**, set **Intent Target** to **Broadcast** for general actions (or **Activity** if using Option A for camera). In **Tasker**, set **Target** to **Broadcast Receiver** (or **Activity** for Option A).
 
 ---
 

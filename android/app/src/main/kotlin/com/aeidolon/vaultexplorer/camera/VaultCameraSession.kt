@@ -80,7 +80,6 @@ class VaultCameraSession(
     private var exposureStepValue = 1.0 / 6.0
     private var currentExposureSteps = 0
     private var lastOrientationDegrees = 0
-    private var lastPreparedOrientationDegrees: Int? = null
     private var photoSize: Size = Size(1920, 1080)
     private var videoSize: Size = Size(1920, 1080)
     private var pendingQuality: VaultVideoQuality = VaultVideoQuality.FHD
@@ -95,7 +94,7 @@ class VaultCameraSession(
     private var pendingCloseCallback: (() -> Unit)? = null
     private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
     private var pendingPhotoWriter: ChunkSink? = null
-    private var isTriStreamSupported = false
+    private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
 
     val currentCameraId: String get() = activeCameraId
     val currentZoomMin: Float get() = zoomMinCurrent
@@ -121,14 +120,6 @@ class VaultCameraSession(
         runOnCameraThread {
             closeCameraOnly {
                 openInternal(cameraId, videoQuality, photoResolution, callback)
-            }
-        }
-    }
-
-    fun switchLens(cameraId: String, callback: (Boolean, String?) -> Unit) {
-        runOnCameraThread {
-            closeCameraOnly {
-                openInternal(cameraId, pendingQuality, pendingPhotoResolution, callback)
             }
         }
     }
@@ -177,6 +168,10 @@ class VaultCameraSession(
         captureSession = null
         videoRecorder?.releaseEncoder()
         videoRecorder = null
+        isRecording = false
+        recordingChunkWriter = null
+        pendingRecordStart?.invoke(false, "camera closed")
+        pendingRecordStart = null
         pendingCloseCallback = then
         device.close()
         cameraDevice = null
@@ -200,11 +195,15 @@ class VaultCameraSession(
             try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
             captureSession = null
             videoRecorder = null
+            isRecording = false
+            recordingChunkWriter = null
             try { device.close() } catch (_: Exception) {}
             cameraDevice = null
 
             pendingOpenResult?.invoke(false, "camera error $error")
             pendingOpenResult = null
+            pendingRecordStart?.invoke(false, "camera error $error")
+            pendingRecordStart = null
             onEvent(mapOf("event" to "error", "message" to "camera error $error"))
         }
 
@@ -279,21 +278,8 @@ class VaultCameraSession(
         reader.setOnImageAvailableListener({ r -> onJpegAvailable(r) }, bgHandler)
         jpegReader = reader
 
-        val orientation = computeCaptureOrientation()
-        val recorder = safePrepareRecorder(videoSize.width, videoSize.height, videoQuality, orientation)
-        lastPreparedOrientationDegrees = orientation
-        videoRecorder = recorder
         currentPreviewWidth = previewSize.width
         currentPreviewHeight = previewSize.height
-
-        // Auxiliary cameras (IR, Wide, Macro) must never attach 3 streams; only Camera 0 does
-        val hwLevel = chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-            ?: CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY
-        val isPrimaryCamera = activeCameraId == "0" || activeCameraId == "1"
-
-        isTriStreamSupported = isPrimaryCamera &&
-            hwLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY &&
-            hwLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
     }
 
     private fun safePrepareRecorder(
@@ -321,65 +307,120 @@ class VaultCameraSession(
         }
     }
 
+    /**
+     * Builds the capture session for the current mode. Only two stream sets
+     * are ever used, both inside what every Camera2 hardware level (LEGACY
+     * included) guarantees:
+     *   idle      -> [preview, JPEG]
+     *   recording -> [preview, recorder surface]
+     * The recorder is created (and its orientation hint fixed) right before
+     * recording starts, so device rotation never forces a reconfiguration
+     * while previewing -- that reconfiguration is what used to leave the
+     * preview black after rotating on some devices.
+     */
     private fun createSessionLocked() {
         val device = cameraDevice ?: return
 
-        // Auxiliary lenses use 2 streams: [preview, photo] when idle, [preview, video] when recording
-        val outputs = if (isTriStreamSupported) {
-            listOfNotNull(previewSurface, jpegReader?.surface, videoRecorder?.inputSurface)
+        // Retire the previous session explicitly before configuring the next one.
+        captureSession?.let { try { it.close() } catch (_: Exception) {} }
+        captureSession = null
+
+        val outputs = if (isRecording) {
+            listOfNotNull(previewSurface, videoRecorder?.inputSurface)
         } else {
-            if (isRecording) {
-                listOfNotNull(previewSurface, videoRecorder?.inputSurface)
-            } else {
-                listOfNotNull(previewSurface, jpegReader?.surface)
+            listOfNotNull(previewSurface, jpegReader?.surface)
+        }
+
+        val stateCallback = object : CameraCaptureSession.StateCallback() {
+            override fun onConfigured(session: CameraCaptureSession) {
+                if (cameraDevice !== device) {
+                    // Device was closed/replaced while this session was configuring.
+                    try { session.close() } catch (_: Exception) {}
+                    return
+                }
+                captureSession = session
+                updateRepeatingRequest()
+                onSessionReady()
+            }
+
+            override fun onConfigureFailed(session: CameraCaptureSession) {
+                try { session.close() } catch (_: Exception) {}
+                onSessionFailed("session configuration failed")
             }
         }
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val outputConfigs = outputs.map { OutputConfiguration(it) }
-                val sessionConfig = SessionConfiguration(
-                    SessionConfiguration.SESSION_REGULAR,
-                    outputConfigs,
-                    Executor { command -> bgHandler.post(command) },
-                    object : CameraCaptureSession.StateCallback() {
-                        override fun onConfigured(session: CameraCaptureSession) {
-                            captureSession = session
-                            updateRepeatingRequest()
-                            pendingOpenResult?.invoke(true, null)
-                            pendingOpenResult = null
-                        }
-                        override fun onConfigureFailed(session: CameraCaptureSession) {
-                            try { session.close() } catch (_: Exception) {}
-                            blacklistedCameraIds.add(activeCameraId)
-                            pendingOpenResult?.invoke(false, "session configuration failed")
-                            pendingOpenResult = null
-                        }
-                    }
+                device.createCaptureSession(
+                    SessionConfiguration(
+                        SessionConfiguration.SESSION_REGULAR,
+                        outputConfigs,
+                        Executor { command -> bgHandler.post(command) },
+                        stateCallback,
+                    )
                 )
-                device.createCaptureSession(sessionConfig)
             } else {
                 @Suppress("DEPRECATION")
-                device.createCaptureSession(outputs, object : CameraCaptureSession.StateCallback() {
-                    override fun onConfigured(session: CameraCaptureSession) {
-                        captureSession = session
-                        updateRepeatingRequest()
-                        pendingOpenResult?.invoke(true, null)
-                        pendingOpenResult = null
-                    }
-                    override fun onConfigureFailed(session: CameraCaptureSession) {
-                        try { session.close() } catch (_: Exception) {}
-                        blacklistedCameraIds.add(activeCameraId)
-                        pendingOpenResult?.invoke(false, "session configuration failed")
-                        pendingOpenResult = null
-                    }
-                }, bgHandler)
+                device.createCaptureSession(outputs, stateCallback, bgHandler)
             }
         } catch (e: Exception) {
-            blacklistedCameraIds.add(activeCameraId)
-            pendingOpenResult?.invoke(false, e.message)
-            pendingOpenResult = null
+            VeLog.e(TAG, e) { "createCaptureSession threw" }
+            onSessionFailed(e.message ?: "session configuration failed")
         }
+    }
+
+    /** A session (idle or recording) is configured and repeating. */
+    private fun onSessionReady() {
+        pendingOpenResult?.let { cb ->
+            pendingOpenResult = null
+            cb(true, null)
+        }
+
+        val startCb = pendingRecordStart ?: return
+        pendingRecordStart = null
+        val recorder = videoRecorder
+        if (!isRecording || recorder == null) {
+            startCb(false, "not ready")
+            return
+        }
+        try {
+            recorder.beginRecording()
+            startCb(true, null)
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "beginRecording failed" }
+            abortRecordingAndRestorePreview()
+            startCb(false, e.message ?: "recording failed to start")
+        }
+    }
+
+    private fun onSessionFailed(reason: String) {
+        val openCb = pendingOpenResult
+        if (openCb != null) {
+            pendingOpenResult = null
+            openCb(false, reason)
+            return
+        }
+
+        val startCb = pendingRecordStart
+        if (startCb != null) {
+            // Recording session could not be configured -- give the preview back.
+            pendingRecordStart = null
+            abortRecordingAndRestorePreview()
+            startCb(false, reason)
+            return
+        }
+
+        // A late failure with nobody waiting on it (e.g. after stopping a recording).
+        onEvent(mapOf("event" to "error", "message" to reason))
+    }
+
+    private fun abortRecordingAndRestorePreview() {
+        isRecording = false
+        recordingChunkWriter = null
+        videoRecorder?.releaseEncoder()
+        videoRecorder = null
+        createSessionLocked()
     }
 
     private fun updateRepeatingRequest() {
@@ -605,30 +646,14 @@ class VaultCameraSession(
         }
     }
 
+    /**
+     * Only remembers the device rotation. It is consumed when a photo is
+     * captured (JPEG_ORIENTATION) and when a recording is prepared (the
+     * MediaRecorder orientation hint), never by reconfiguring the session.
+     */
     fun setOrientationDegrees(deviceRotationDegrees: Int) {
         runOnCameraThread {
-            val normalized = ((deviceRotationDegrees % 360) + 360) % 360
-            if (normalized == lastOrientationDegrees) return@runOnCameraThread
-            lastOrientationDegrees = normalized
-            if (!isRecording) {
-                reprepareVideoRecorder(force = false, reason = "orientation changed")
-            }
-        }
-    }
-
-    private fun reprepareVideoRecorder(force: Boolean, reason: String) {
-        if (characteristics == null || cameraDevice == null) return
-        val needed = computeCaptureOrientation()
-        if (!force && needed == lastPreparedOrientationDegrees) return
-        try {
-            val fresh = safePrepareRecorder(videoSize.width, videoSize.height, pendingQuality, needed)
-            videoRecorder?.releaseEncoder()
-            videoRecorder = fresh
-            lastPreparedOrientationDegrees = needed
-            VeLog.d(TAG) { "reprepareVideoRecorder($reason): orientation=$needed, reconfiguring session" }
-            createSessionLocked()
-        } catch (e: Exception) {
-            VeLog.e(TAG, e) { "reprepareVideoRecorder($reason) failed" }
+            lastOrientationDegrees = ((deviceRotationDegrees % 360) + 360) % 360
         }
     }
 
@@ -722,24 +747,28 @@ class VaultCameraSession(
 
     private fun startRecordingInternal(writer: ChunkSink, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
-            val recorder = videoRecorder
-            if (recorder == null || isRecording) {
+            if (cameraDevice == null || captureSession == null) {
+                callback(false, "camera not ready")
+                return@runOnCameraThread
+            }
+            if (isRecording || pendingRecordStart != null) {
                 callback(false, "not ready")
                 return@runOnCameraThread
             }
-            try {
-                recorder.beginRecording()
-                recordingChunkWriter = writer
-                isRecording = true
-                if (!isTriStreamSupported) {
-                    createSessionLocked()
-                } else {
-                    updateRepeatingRequest()
-                }
-                callback(true, null)
+            val recorder = try {
+                safePrepareRecorder(videoSize.width, videoSize.height, pendingQuality, computeCaptureOrientation())
             } catch (e: Exception) {
-                callback(false, e.message)
+                VeLog.e(TAG, e) { "prepare recorder failed" }
+                callback(false, e.message ?: "recorder prepare failed")
+                return@runOnCameraThread
             }
+            videoRecorder = recorder
+            recordingChunkWriter = writer
+            isRecording = true
+            // MediaRecorder.start() happens in onSessionReady() once the
+            // [preview, recorder] session is configured and repeating.
+            pendingRecordStart = callback
+            createSessionLocked()
         }
     }
 
@@ -753,18 +782,18 @@ class VaultCameraSession(
             }
             isRecording = false
             videoRecorder = null
-            updateRepeatingRequest()
+            recordingChunkWriter = null
+            try {
+                captureSession?.stopRepeating()
+                captureSession?.abortCaptures()
+            } catch (_: Exception) {}
             val result = recorder.requestStop()
             val ok = recorder.writeTo(writer)
-            recordingChunkWriter = null
             recorder.releaseEncoder()
             callback(ok, result.durationMs, if (ok) null else "vault write failed")
-            rearmVideoRecorder()
+            // Back to the [preview, JPEG] session.
+            createSessionLocked()
         }
-    }
-
-    private fun rearmVideoRecorder() {
-        reprepareVideoRecorder(force = true, reason = "post-recording rearm")
     }
 
     private fun chooseVideoSizeByHeight(candidates: List<Size>, targetHeight: Int): Size {

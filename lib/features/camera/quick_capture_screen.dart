@@ -56,7 +56,16 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
   StreamSubscription<({double x, double y, double z})>? _sensorSubscription;
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
-  double _iconTurns = 0.0;
+  // Physical device rotation from the accelerometer (0, 0.25, 0.5, -0.25).
+  double _deviceTurns = 0.0;
+  // Surface.ROTATION_* (0..3) of the display, i.e. how far the OS has rotated the UI.
+  int _displayRotation = 0;
+
+  /// Icon rotation that is still needed on top of what the OS already applied.
+  double get _iconTurns => cameraIconTurns(
+    deviceTurns: _deviceTurns,
+    displayRotation: _displayRotation,
+  );
 
   CameraCaptureControlsState get _captureControls =>
       ref.read(cameraCaptureControlsProvider(_quickCaptureControlsKey));
@@ -96,7 +105,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     _engineEvents = ref.read(vaultEngineEventsProvider);
     _quickCaptureApi = ref.read(quickCaptureApiProvider);
     _cameraController = VaultCameraController(_engineEvents);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    // Follow the device: the preview is counter-rotated by the display
+    // rotation (see CameraPreviewView), so no portrait lock is needed.
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     WidgetsBinding.instance.addObserver(this);
@@ -105,6 +116,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     );
     _initCamera();
     _startSensorListener();
+    unawaited(_refreshDisplayRotation());
   }
 
   void _handleCameraEvent(Map<String, dynamic> event) {
@@ -127,8 +139,8 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           double snappedTurns = (turns * 4).round() / 4.0;
           if (snappedTurns == -0.5) snappedTurns = 0.5;
 
-          if (_iconTurns != snappedTurns && mounted) {
-            setState(() => _iconTurns = snappedTurns);
+          if (_deviceTurns != snappedTurns && mounted) {
+            setState(() => _deviceTurns = snappedTurns);
             _cameraController.setOrientationDegrees(
               _computeDeviceRotationDegrees(),
             );
@@ -137,7 +149,18 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   }
 
   int _computeDeviceRotationDegrees() {
-    return ((_iconTurns * 360).round() % 360 + 360) % 360;
+    return ((_deviceTurns * 360).round() % 360 + 360) % 360;
+  }
+
+  @override
+  void didChangeMetrics() {
+    unawaited(_refreshDisplayRotation());
+  }
+
+  Future<void> _refreshDisplayRotation() async {
+    final rotation = await VaultCameraController.getDisplayRotation();
+    if (!mounted || rotation == _displayRotation) return;
+    setState(() => _displayRotation = rotation);
   }
 
   @override
@@ -231,37 +254,6 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     }
   }
 
-  Future<void> _switchLens(String cameraId) async {
-    if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo) return;
-    _captureSessionController.setUninitialized(cancelCountdown: false);
-    try {
-      await _cameraController.switchLens(cameraId);
-      if (mounted) {
-        _captureSessionController.setZoom(_cameraController.zoomMin);
-        _captureSessionController.setCameraOpened(
-          VaultCameraSessionInfo(
-            sessionId: _cameraController.sessionId ?? 0,
-            textureId: _cameraController.textureId ?? 0,
-            cameraId: cameraId,
-            zoomMin: _cameraController.zoomMin,
-            zoomMax: _cameraController.zoomMax,
-            minExposureEv: _cameraController.minExposureEv,
-            maxExposureEv: _cameraController.maxExposureEv,
-            previewWidth: _cameraController.previewWidth,
-            previewHeight: _cameraController.previewHeight,
-            sensorOrientation: _cameraController.sensorOrientation,
-            lenses: _lenses,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
-      }
-      await _initCamera(cameraId: _selectedCameraId);
-    }
-  }
-
   Future<void> _flipCamera() async {
     if (_isRecording ||
         _isEncrypting ||
@@ -320,8 +312,15 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   void _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
     if (!_cameraController.isInitialized) return;
 
-    final nx = details.localPosition.dx / constraints.maxWidth;
-    final ny = details.localPosition.dy / constraints.maxHeight;
+    // Normalized in the displayed frame -> natural-orientation frame, which
+    // is what the native focus/metering mapping expects.
+    final natural = cameraDisplayPointToNatural(
+      details.localPosition.dx / constraints.maxWidth,
+      details.localPosition.dy / constraints.maxHeight,
+      _displayRotation,
+    );
+    final nx = natural.x;
+    final ny = natural.y;
 
     setState(() => _focusPoint = details.localPosition);
     _captureSessionController.setShowExposureSlider(true);
@@ -673,8 +672,8 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
             if (_isInitialized && _cameraController.textureId != null)
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final bool isRotated =
-                      _cameraController.sensorOrientation % 180 != 0;
+                  final bool isLandscapeFrame =
+                      constraints.maxWidth > constraints.maxHeight;
 
                   return GestureDetector(
                     onScaleStart: (_) => _baseZoom = _currentZoom,
@@ -692,24 +691,15 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
                     child: Center(
-                      child: AspectRatio(
-                        aspectRatio: 1 / _selectedAspectRatio,
-                        child: ClipRect(
-                          child: FittedBox(
-                            fit: BoxFit.cover,
-                            child: SizedBox(
-                              width: isRotated
-                                  ? _cameraController.previewHeight.toDouble()
-                                  : _cameraController.previewWidth.toDouble(),
-                              height: isRotated
-                                  ? _cameraController.previewWidth.toDouble()
-                                  : _cameraController.previewHeight.toDouble(),
-                              child: Texture(
-                                textureId: _cameraController.textureId!,
-                              ),
-                            ),
-                          ),
-                        ),
+                      child: CameraPreviewView(
+                        textureId: _cameraController.textureId!,
+                        previewWidth: _cameraController.previewWidth,
+                        previewHeight: _cameraController.previewHeight,
+                        sensorOrientation: _cameraController.sensorOrientation,
+                        displayRotation: _displayRotation,
+                        frameAspectRatio: isLandscapeFrame
+                            ? _selectedAspectRatio
+                            : 1 / _selectedAspectRatio,
                       ),
                     ),
                   );
@@ -860,14 +850,11 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!_isRecording && !_isCountingDown) ...[
-              CameraLensSelectorBar(
-                lenses: _lenses,
-                selectedCameraId: _selectedCameraId,
+              CameraZoomIndicator(
                 currentZoom: _currentZoom,
                 minZoom: _minZoom,
                 maxZoom: _maxZoom,
                 iconTurns: _iconTurns,
-                onSwitchLens: _switchLens,
                 onSetZoom: (zoom) async {
                   _captureSessionController.setZoom(zoom);
                   try {

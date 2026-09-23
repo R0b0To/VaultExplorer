@@ -256,6 +256,108 @@ class _CameraPopupMenuLayoutDelegate extends SingleChildLayoutDelegate {
   }
 }
 
+/// Clockwise quarter-turns that bring the camera preview upright.
+///
+/// The preview texture is delivered upright for the device's *natural*
+/// orientation (Android rotates the sensor buffer by SENSOR_ORIENTATION), so
+/// when the display is rotated ([displayRotation] = `Surface.ROTATION_*` as
+/// 0..3, "graphics rotated clockwise by N * 90 degrees") the texture has to be
+/// rotated back by the same amount, counter-clockwise.
+int cameraPreviewQuarterTurns(int displayRotation) =>
+    (4 - (displayRotation % 4)) % 4;
+
+/// Converts a point normalized (0..1) in the *displayed* frame into the
+/// natural-orientation frame that native focus/metering expects.
+({double x, double y}) cameraDisplayPointToNatural(
+  double x,
+  double y,
+  int displayRotation,
+) {
+  switch (displayRotation % 4) {
+    case 1:
+      return (x: 1 - y, y: x);
+    case 2:
+      return (x: 1 - x, y: 1 - y);
+    case 3:
+      return (x: y, y: 1 - x);
+    default:
+      return (x: x, y: y);
+  }
+}
+
+/// Turns (for [buildRotatedWidget]) that keep overlay icons upright.
+///
+/// [deviceTurns] is the physical device rotation from the accelerometer
+/// (0, 0.25, 0.5, -0.25). Whatever part of that rotation the OS already
+/// applied to the UI ([displayRotation]) must not be applied a second time.
+double cameraIconTurns({
+  required double deviceTurns,
+  required int displayRotation,
+}) {
+  final deviceQuarters = (deviceTurns * 4).round();
+  final q = (((deviceQuarters - displayRotation) % 4) + 4) % 4;
+  switch (q) {
+    case 1:
+      return 0.25;
+    case 2:
+      return 0.5;
+    case 3:
+      return -0.25;
+    default:
+      return 0.0;
+  }
+}
+
+/// Camera preview cropped to [frameAspectRatio] (width / height of the
+/// visible frame), rotated to match the current display rotation.
+class CameraPreviewView extends StatelessWidget {
+  final int textureId;
+  final int previewWidth;
+  final int previewHeight;
+  final int sensorOrientation;
+  final int displayRotation;
+  final double frameAspectRatio;
+
+  const CameraPreviewView({
+    super.key,
+    required this.textureId,
+    required this.previewWidth,
+    required this.previewHeight,
+    required this.sensorOrientation,
+    required this.displayRotation,
+    required this.frameAspectRatio,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Size of the texture as it arrives: already turned upright for the
+    // natural orientation, hence width/height swap for 90/270 sensors.
+    final swap = sensorOrientation % 180 != 0;
+    final naturalW = (swap ? previewHeight : previewWidth).toDouble();
+    final naturalH = (swap ? previewWidth : previewHeight).toDouble();
+
+    final turns = cameraPreviewQuarterTurns(displayRotation);
+    final odd = turns.isOdd;
+
+    return AspectRatio(
+      aspectRatio: frameAspectRatio,
+      child: ClipRect(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: odd ? naturalH : naturalW,
+            height: odd ? naturalW : naturalH,
+            child: RotatedBox(
+              quarterTurns: turns,
+              child: Texture(textureId: textureId),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 Widget buildRotatedWidget({required double iconTurns, required Widget child}) {
   return AnimatedRotation(
     turns: iconTurns,
@@ -587,122 +689,65 @@ class CameraTopControlsBar extends StatelessWidget {
   }
 }
 
-class CameraLensSelectorBar extends StatelessWidget {
-  final List<NativeCameraLens> lenses;
-  final String selectedCameraId;
+/// "1x", "2.3x", "0.5x" -- whole values without a decimal.
+String formatCameraZoom(double zoom) {
+  final rounded = (zoom * 10).round() / 10;
+  return rounded == rounded.roundToDouble()
+      ? '${rounded.round()}x'
+      : '${rounded.toStringAsFixed(1)}x';
+}
+
+/// Single pill showing the live zoom level. Follows pinch zoom; tapping it
+/// jumps back to 1x.
+class CameraZoomIndicator extends StatelessWidget {
   final double currentZoom;
   final double minZoom;
   final double maxZoom;
   final double iconTurns;
-  final Future<void> Function(String cameraId) onSwitchLens;
   final Future<void> Function(double zoom) onSetZoom;
 
-  const CameraLensSelectorBar({
+  const CameraZoomIndicator({
     super.key,
-    required this.lenses,
-    required this.selectedCameraId,
     required this.currentZoom,
     required this.minZoom,
     required this.maxZoom,
     required this.iconTurns,
-    required this.onSwitchLens,
     required this.onSetZoom,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final currentLens = lenses.firstWhere(
-      (l) => l.cameraId == selectedCameraId,
-      orElse: () => lenses.firstOrNull ?? const NativeCameraLens(
-        cameraId: '',
-        facing: 'back',
-        isLogical: false,
-        zoomMin: 1.0,
-        zoomMax: 1.0,
-      ),
-    );
-    final isBackCamera = currentLens.facing == 'back';
+    // No zoom range (fixed-focal-length camera): nothing worth showing.
+    if (maxZoom - minZoom < 0.05) return const SizedBox.shrink();
 
-    final List<({String label, double zoom, String? switchCameraId})> options = [];
+    final atOneX = (currentZoom - 1.0).abs() < 0.05;
 
-    if (isBackCamera) {
-      final backLenses = lenses.where((l) => l.facing == 'back').toList();
-      if (backLenses.length > 1) {
-        for (final lens in backLenses) {
-          final localizedLabel = switch (lens.lensType) {
-            'wide' => l10n.cameraLensWide,
-            'infrared' => l10n.cameraLensInfrared,
-            'front' => l10n.cameraLensFront,
-            _ => lens.displayName,
-          };
-          options.add((
-            label: localizedLabel,
-            zoom: 1.0,
-            switchCameraId: lens.cameraId,
-          ));
-        }
-      } else {
-        if (minZoom < 0.95) {
-          options.add((label: '${minZoom.toStringAsFixed(1)}x', zoom: minZoom, switchCameraId: null));
-        }
-        options.add((label: '1x', zoom: 1.0, switchCameraId: null));
-        if (maxZoom >= 2.0 && maxZoom < 3.0) {
-          options.add((label: '2x', zoom: 2.0, switchCameraId: null));
-        } else if (maxZoom >= 3.0) {
-          options.add((label: '3x', zoom: 3.0, switchCameraId: null));
-        }
-        if (maxZoom >= 5.0) {
-          options.add((label: '5x', zoom: 5.0, switchCameraId: null));
-        }
-      }
-    } else {
-      options.add((label: '1x', zoom: 1.0, switchCameraId: null));
-      if (maxZoom >= 2.0) {
-        options.add((label: '2x', zoom: 2.0, switchCameraId: null));
-      }
-    }
-
-    if (options.length <= 1) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: options.map((option) {
-        final isSelected = option.switchCameraId != null
-            ? option.switchCameraId == selectedCameraId
-            : (currentZoom - option.zoom).abs() < 0.2;
-
-        return GestureDetector(
-          onTap: () async {
-            HapticFeedback.selectionClick();
-            if (option.switchCameraId != null && option.switchCameraId != selectedCameraId) {
-              await onSwitchLens(option.switchCameraId!);
-            } else {
-              await onSetZoom(option.zoom);
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: isSelected ? Colors.amber : Colors.black45,
-            ),
-            child: buildRotatedWidget(
-              iconTurns: iconTurns,
-              child: Text(
-                option.label,
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
+    return Center(
+      child: GestureDetector(
+        onTap: () async {
+          HapticFeedback.selectionClick();
+          await onSetZoom(1.0.clamp(minZoom, maxZoom));
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: atOneX ? Colors.black45 : Colors.amber,
+          ),
+          child: buildRotatedWidget(
+            iconTurns: iconTurns,
+            child: Text(
+              formatCameraZoom(currentZoom),
+              style: TextStyle(
+                color: atOneX ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 }

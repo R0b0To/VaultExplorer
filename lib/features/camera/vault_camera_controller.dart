@@ -143,6 +143,19 @@ class VaultCameraController {
   List<NativeCameraLens> get lenses => _lenses;
   bool get isInitialized => _sessionId != null && _textureId != null;
 
+  /// Quarter-turn index (0..3) of the activity's display, i.e. Android's
+  /// `Surface.ROTATION_0/90/180/270`. The preview texture is always delivered
+  /// upright for the device's *natural* orientation, so anything showing it
+  /// has to counter-rotate it by this amount (see [CameraPreviewView]).
+  static Future<int> getDisplayRotation() async {
+    try {
+      final res = await _channel.invokeMethod<int>('getDisplayRotation');
+      return ((res ?? 0) % 4 + 4) % 4;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   static Future<bool> hasPermissions() async {
     final res = await _channel.invokeMethod<bool>('hasPermissions');
     return res ?? false;
@@ -196,28 +209,6 @@ class VaultCameraController {
     });
 
     return info;
-  }
-
-  Future<void> switchLens(String cameraId) async {
-    final sId = _sessionId;
-    if (sId == null) return;
-
-    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('switchLens', {
-      'sessionId': sId,
-      'cameraId': cameraId,
-    });
-
-    if (res != null) {
-      _textureId = (res['textureId'] as num?)?.toInt() ?? _textureId;
-      _cameraId = res['cameraId'] as String? ?? _cameraId;
-      _zoomMin = (res['zoomMin'] as num?)?.toDouble() ?? _zoomMin;
-      _zoomMax = (res['zoomMax'] as num?)?.toDouble() ?? _zoomMax;
-      _minExposureEv = (res['minExposureEv'] as num?)?.toDouble() ?? _minExposureEv;
-      _maxExposureEv = (res['maxExposureEv'] as num?)?.toDouble() ?? _maxExposureEv;
-      _previewWidth = (res['previewWidth'] as num?)?.toInt() ?? _previewWidth;
-      _previewHeight = (res['previewHeight'] as num?)?.toInt() ?? _previewHeight;
-      _sensorOrientation = (res['sensorOrientation'] as num?)?.toInt() ?? _sensorOrientation;
-    }
   }
 
   Future<void> setZoom(double zoom) async {

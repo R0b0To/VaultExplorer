@@ -46,13 +46,8 @@ void main() {
           return {'success': true, 'error': null};
         case 'stopVideoRecording':
           return {'success': true, 'durationMs': 3500, 'error': null};
-        case 'switchLens':
-          return {
-            'textureId': 102,
-            'cameraId': '1',
-            'zoomMin': 0.5,
-            'zoomMax': 4.0,
-          };
+        case 'getDisplayRotation':
+          return 3;
         case 'setZoom':
         case 'setFlash':
         case 'setExposureOffset':
@@ -120,14 +115,8 @@ void main() {
       expect(stopRes.durationMs, 3500);
     });
 
-    test('switchLens updates parameters', () async {
-      await controller.open();
-      await controller.switchLens('1');
-
-      expect(controller.cameraId, '1');
-      expect(controller.textureId, 102);
-      expect(controller.zoomMin, 0.5);
-      expect(controller.zoomMax, 4.0);
+    test('getDisplayRotation returns the native quarter-turn index', () async {
+      expect(await VaultCameraController.getDisplayRotation(), 3);
     });
 
     test('close resets initialized state', () async {

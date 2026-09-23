@@ -2,10 +2,8 @@ package com.aeidolon.vaultexplorer.camera
 
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.media.MediaRecorder
 import android.os.Build
 import android.util.Size
-import kotlin.math.sqrt
 import com.aeidolon.vaultexplorer.VeLog
 
 data class CameraLensInfo(
@@ -53,59 +51,58 @@ enum class VaultVideoQuality(
     val targetLongEdge: Int get() = targetVideoLongEdge
 }
 
-private data class RawLens(
-    val id: String,
-    val facing: String,
-    val isLogical: Boolean,
-    val zoomMin: Float,
-    val zoomMax: Float,
-    val sensorOrientation: Int,
-    val focalDensity: Float?,
-    val isMonochromeOrInfrared: Boolean,
-)
-
-// In-memory blacklist for cameras that fail to configure on this device
-val blacklistedCameraIds = mutableSetOf<String>()
-
+/**
+ * Returns at most two cameras: the device's main back camera and its main
+ * front camera. Auxiliary sensors (ultra-wide/tele/macro/depth/IR/mono ids
+ * that some OEMs expose as standalone camera ids) are deliberately ignored
+ * -- they are what made session configuration fail on a long tail of
+ * devices. Ultra-wide / tele reach on logical multi-cameras still works
+ * through the zoom ratio of the main camera (see zoomMin/zoomMax).
+ *
+ * "Main" = the first usable camera of that facing in
+ * CameraManager.cameraIdList order, which is the ordering CameraX also
+ * relies on for its default back/front selectors.
+ */
 fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
-    val raw = mutableListOf<RawLens>()
+    val out = mutableListOf<CameraLensInfo>()
+    for (facing in listOf("back", "front")) {
+        pickMainCamera(cameraManager, facing)?.let { out.add(it) }
+    }
+    return out
+}
+
+private fun pickMainCamera(cameraManager: CameraManager, facing: String): CameraLensInfo? {
+    val wantedFacing = if (facing == "front") {
+        CameraCharacteristics.LENS_FACING_FRONT
+    } else {
+        CameraCharacteristics.LENS_FACING_BACK
+    }
 
     for (id in cameraManager.cameraIdList) {
-        if (blacklistedCameraIds.contains(id)) {
-            VeLog.d("VaultCameraSession") { "skipping blacklisted faulty lens $id" }
-            continue
-        }
-
         try {
             val c = cameraManager.getCameraCharacteristics(id)
+            if (c.get(CameraCharacteristics.LENS_FACING) != wantedFacing) continue
+
             val caps = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)
 
-            // Must support standard Camera2 pipeline
-            if (!caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE)) {
-                continue
-            }
+            // Must support the standard Camera2 colour pipeline (skips depth-only,
+            // monochrome and other special-purpose ids).
+            if (!caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE)) continue
+            if (caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME)) continue
+            val colorFilter = c.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT)
+            if (colorFilter == COLOR_FILTER_ARRANGEMENT_MONO || colorFilter == COLOR_FILTER_ARRANGEMENT_NIR) continue
 
             val map = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
             val jpegSizes = map.getOutputSizes(android.graphics.ImageFormat.JPEG) ?: emptyArray<Size>()
             val previewSizes = map.getOutputSizes(android.graphics.SurfaceTexture::class.java) ?: emptyArray<Size>()
 
             // Must have both JPEG and preview output capabilities
-            if (jpegSizes.isEmpty() || previewSizes.isEmpty()) {
-                continue
-            }
+            if (jpegSizes.isEmpty() || previewSizes.isEmpty()) continue
 
-            // Real cameras must support at least 640x480 preview. Ghost calibration sensors often don't.
+            // Real cameras support at least a 640x480 preview; ghost calibration sensors often don't.
             val maxPreviewW = previewSizes.maxOfOrNull { it.width } ?: 0
-            if (maxPreviewW < 640 && id != "0" && id != "1") {
-                continue
-            }
+            if (maxPreviewW < 640 && id != "0" && id != "1") continue
 
-            val facing = when (c.get(CameraCharacteristics.LENS_FACING)) {
-                CameraCharacteristics.LENS_FACING_FRONT -> "front"
-                CameraCharacteristics.LENS_FACING_BACK -> "back"
-                else -> "external"
-            }
-            val isLogical = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA)
             var zoomMin = 1f
             var zoomMax = c.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f
             if (Build.VERSION.SDK_INT >= 30) {
@@ -114,64 +111,26 @@ fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
                     zoomMax = range.upper
                 }
             }
-            val sensorOrientation = c.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
-            val focal = c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
-            val physSize = c.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
-            val focalDensity = if (focal != null && physSize != null) {
-                val diagonal = sqrt(physSize.width * physSize.width + physSize.height * physSize.height)
-                if (diagonal > 0f) focal / diagonal else null
-            } else null
-
-            // Detect Infrared / Night Vision sensors
-            val colorFilter = c.get(CameraCharacteristics.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT)
-            val isMonoOrIr = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME)
-                || colorFilter == 4 // SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO
-                || colorFilter == 5 // SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_NIR
-
-            raw.add(RawLens(id, facing, isLogical, zoomMin, zoomMax, sensorOrientation, focalDensity, isMonoOrIr))
+            return CameraLensInfo(
+                cameraId = id,
+                facing = facing,
+                isLogicalMultiCamera = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA),
+                zoomMin = zoomMin,
+                zoomMax = zoomMax,
+                sensorOrientationDegrees = c.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90,
+                relativeZoom = 1f,
+                lensType = if (facing == "front") "front" else "main",
+                displayName = if (facing == "front") "Front" else "1x",
+            )
         } catch (e: Exception) {
-            VeLog.w("VaultCameraSession", e) { "skipping unreadable lens $id" }
+            VeLog.w("VaultCameraSession", e) { "skipping unreadable camera $id" }
         }
     }
-
-    val out = mutableListOf<CameraLensInfo>()
-    for ((facing, lensesForFacing) in raw.groupBy { it.facing }) {
-        val primary = lensesForFacing.firstOrNull { it.id == "0" || it.id == "1" }
-            ?: lensesForFacing.firstOrNull { it.isLogical }
-            ?: lensesForFacing.first()
-        val primaryDensity = primary.focalDensity
-
-        for (l in lensesForFacing) {
-            val relativeZoom = if (l.focalDensity != null && primaryDensity != null && primaryDensity > 0f) {
-                l.focalDensity / primaryDensity
-            } else {
-                1f
-            }
-
-            val (lensType, displayName) = when {
-                facing == "front" -> "front" to "Front"
-                l.isMonochromeOrInfrared -> "infrared" to "IR"
-                l.id == "0" -> "main" to "1x"
-                relativeZoom < 0.85f -> "wide" to "Wide"
-                relativeZoom > 1.8f -> "telephoto" to "${relativeZoom.roundToOneDecimal()}x"
-                else -> "auxiliary" to "Lens ${l.id}"
-            }
-
-            out.add(CameraLensInfo(
-                l.id,
-                l.facing,
-                l.isLogical,
-                l.zoomMin,
-                l.zoomMax,
-                l.sensorOrientation,
-                relativeZoom,
-                lensType,
-                displayName
-            ))
-        }
-    }
-    return out
+    return null
 }
 
-private fun Float.roundToOneDecimal(): Float = (this * 10).toInt() / 10f
+// CameraMetadata.SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO / _NIR (API 29+),
+// spelled as literals so this file compiles against any compileSdk.
+private const val COLOR_FILTER_ARRANGEMENT_MONO = 5
+private const val COLOR_FILTER_ARRANGEMENT_NIR = 6

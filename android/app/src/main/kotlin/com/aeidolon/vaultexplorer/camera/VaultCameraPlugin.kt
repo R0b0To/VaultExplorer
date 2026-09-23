@@ -5,10 +5,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.view.Surface
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -81,6 +83,7 @@ class VaultCameraPlugin(
         try {
             when (call.method) {
                 "hasPermissions" -> result.success(hasCameraPermissions())
+                "getDisplayRotation" -> result.success(currentDisplayRotation())
                 "requestPermissions" -> {
                     ActivityCompat.requestPermissions(
                         activity,
@@ -135,29 +138,6 @@ class VaultCameraPlugin(
                                 eventChannels.remove(id)?.setStreamHandler(null)
                                 eventSinks.remove(id)
                                 result.error("open_failed", error, null)
-                            }
-                        }
-                    }
-                }
-                "switchLens" -> withSession(call, result) { session, args ->
-                    val cameraId = args["cameraId"] as? String ?: return@withSession result.error("bad_args", "cameraId required", null)
-                    session.switchLens(cameraId) { ok, error ->
-                        mainHandler.post {
-                            if (ok) {
-                                result.success(mapOf(
-                                    "textureId" to session.textureId,
-                                    "cameraId" to session.currentCameraId,
-                                    "zoomMin" to session.currentZoomMin.toDouble(),
-                                    "zoomMax" to session.currentZoomMax.toDouble(),
-                                    "minExposureEv" to session.currentMinExposureEv,
-                                    "maxExposureEv" to session.currentMaxExposureEv,
-                                    "previewWidth" to session.previewWidth,
-                                    "previewHeight" to session.previewHeight,
-                                    "sensorOrientation" to session.sensorOrientationDegrees,
-                                ))
-                            } else {
-                                VeLog.e(TAG) { "switchLens: failed camera=$cameraId error=$error" }
-                                result.error("switch_failed", error, null)
                             }
                         }
                     }
@@ -282,6 +262,26 @@ class VaultCameraPlugin(
             return
         }
         block(session, args)
+    }
+
+    /**
+     * Surface.ROTATION_0..3 of the activity's display, as 0..3. The preview
+     * texture is delivered upright for the device's natural orientation, so
+     * Dart needs this to counter-rotate it whenever the display is rotated.
+     */
+    private fun currentDisplayRotation(): Int {
+        val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity.display?.rotation
+        } else {
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay.rotation
+        }
+        return when (rotation) {
+            Surface.ROTATION_90 -> 1
+            Surface.ROTATION_180 -> 2
+            Surface.ROTATION_270 -> 3
+            else -> 0
+        }
     }
 
     private fun hasCameraPermissions(): Boolean =

@@ -19,6 +19,8 @@ dependencies:
   riverpod_annotation: ^4.0.6
   material_ui: ^1.1.0
   meta: ^1.19.0
+  kpasslib: ^1.1.2
+  csv: ^8.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

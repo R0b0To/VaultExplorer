@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dar
 import 'package:vaultexplorer/features/tools/widgets/hash_verifier_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/header_backup_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/password_interchange/password_interchange_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
@@ -79,6 +80,14 @@ class ToolsScreen extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
 
+        SectionHeader(context.l10n.toolsSectionPasswordManager),
+        SectionCard(
+          children: [
+            _buildPasswordInterchangeRow(context, cs),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+
         SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
         SectionCard(
           children: [
@@ -131,6 +140,13 @@ class ToolsScreen extends StatelessWidget {
                 SectionCard(
                   children: [
                     _buildVaultSyncRow(context, cs),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SectionHeader(context.l10n.toolsSectionPasswordManager),
+                SectionCard(
+                  children: [
+                    _buildPasswordInterchangeRow(context, cs),
                   ],
                 ),
               ],
@@ -227,6 +243,22 @@ class ToolsScreen extends StatelessWidget {
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VaultSyncScreen(
+            mountedContainers: mountedContainers,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordInterchangeRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.import_export_rounded,
+      title: context.l10n.toolPasswordInterchangeTitle,
+      subtitle: context.l10n.toolPasswordInterchangeSubtitle,
+      iconColor: cs.tertiary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PasswordInterchangeScreen(
             mountedContainers: mountedContainers,
           ),
         ),

@@ -7813,4 +7813,140 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsHubAdvancedSubtitle => '설정 백업, 디버그 로그 및 로그캣';
+
+  @override
+  String get toolPasswordInterchangeTitle => '비밀번호 가져오기 / 내보내기';
+
+  @override
+  String get toolPasswordInterchangeSubtitle =>
+      'KeePass, Bitwarden 및 기타 비밀번호 관리자와 로그인, 카드, 메모를 주고받기';
+
+  @override
+  String get toolsSectionPasswordManager => '비밀번호 관리자';
+
+  @override
+  String get passwordInterchangeExportTab => '내보내기';
+
+  @override
+  String get passwordInterchangeImportTab => '가져오기';
+
+  @override
+  String get passwordInterchangeSourceHeader => '보낼 위치';
+
+  @override
+  String get passwordInterchangeChooseFolder => '보관함 폴더 선택';
+
+  @override
+  String get passwordInterchangeIncludeSubfolders => '하위 폴더 포함';
+
+  @override
+  String get passwordInterchangeFormatHeader => '형식';
+
+  @override
+  String get passwordInterchangeFormatLabel => '파일 형식';
+
+  @override
+  String get passwordInterchangeMasterPassword => '마스터 비밀번호';
+
+  @override
+  String get passwordInterchangeConfirmPassword => '비밀번호 확인';
+
+  @override
+  String get passwordInterchangePasswordsDontMatch => '비밀번호가 일치하지 않습니다';
+
+  @override
+  String get passwordInterchangeRunExport => '내보내기';
+
+  @override
+  String passwordInterchangeExportReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목 내보내기 준비 완료',
+      one: '1개 항목 내보내기 준비 완료',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSaveToDevice => '기기에 저장…';
+
+  @override
+  String get passwordInterchangeSaved => '저장되었습니다.';
+
+  @override
+  String get passwordInterchangeFileHeader => '파일';
+
+  @override
+  String get passwordInterchangeChooseFile => '파일 선택…';
+
+  @override
+  String get passwordInterchangeReadFile => '파일 읽기';
+
+  @override
+  String passwordInterchangeFoundItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목 발견',
+      one: '1개 항목 발견',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSelectAll => '모두 선택';
+
+  @override
+  String get passwordInterchangeSelectNone => '선택 해제';
+
+  @override
+  String passwordInterchangeWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 행을 읽을 수 없습니다',
+      one: '1개 행을 읽을 수 없습니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeDestinationHeader => '저장 위치';
+
+  @override
+  String get passwordInterchangeMirrorFolders => '폴더 재구성';
+
+  @override
+  String passwordInterchangeRunImport(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목 가져오기',
+      one: '1개 항목 가져오기',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeImportedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목을 가져왔습니다',
+      one: '1개 항목을 가져왔습니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeSkippedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목을 건너뛰었습니다',
+      one: '1개 항목을 건너뛰었습니다',
+    );
+    return '$_temp0';
+  }
 }

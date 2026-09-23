@@ -8326,4 +8326,146 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get settingsHubAdvancedSubtitle =>
       'Резервна копія налаштувань, логи налагодження та logcat';
+
+  @override
+  String get toolPasswordInterchangeTitle => 'Імпорт / експорт паролів';
+
+  @override
+  String get toolPasswordInterchangeSubtitle =>
+      'Переносьте логіни, картки та нотатки з або до KeePass, Bitwarden та інших менеджерів паролів';
+
+  @override
+  String get toolsSectionPasswordManager => 'Менеджер паролів';
+
+  @override
+  String get passwordInterchangeExportTab => 'Експорт';
+
+  @override
+  String get passwordInterchangeImportTab => 'Імпорт';
+
+  @override
+  String get passwordInterchangeSourceHeader => 'Звідки';
+
+  @override
+  String get passwordInterchangeChooseFolder => 'Виберіть папку сховища';
+
+  @override
+  String get passwordInterchangeIncludeSubfolders => 'Включно з підпапками';
+
+  @override
+  String get passwordInterchangeFormatHeader => 'Формат';
+
+  @override
+  String get passwordInterchangeFormatLabel => 'Формат файлу';
+
+  @override
+  String get passwordInterchangeMasterPassword => 'Головний пароль';
+
+  @override
+  String get passwordInterchangeConfirmPassword => 'Підтвердьте пароль';
+
+  @override
+  String get passwordInterchangePasswordsDontMatch => 'Паролі не збігаються';
+
+  @override
+  String get passwordInterchangeRunExport => 'Експортувати';
+
+  @override
+  String passwordInterchangeExportReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів готові до експорту',
+      few: '$count елементи готові до експорту',
+      one: '1 елемент готовий до експорту',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSaveToDevice => 'Зберегти на пристрій…';
+
+  @override
+  String get passwordInterchangeSaved => 'Збережено.';
+
+  @override
+  String get passwordInterchangeFileHeader => 'Файл';
+
+  @override
+  String get passwordInterchangeChooseFile => 'Виберіть файл…';
+
+  @override
+  String get passwordInterchangeReadFile => 'Прочитати файл';
+
+  @override
+  String passwordInterchangeFoundItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Знайдено $count елементів',
+      few: 'Знайдено $count елементи',
+      one: 'Знайдено 1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSelectAll => 'Вибрати все';
+
+  @override
+  String get passwordInterchangeSelectNone => 'Зняти виділення';
+
+  @override
+  String passwordInterchangeWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Не вдалося прочитати $count рядків',
+      few: 'Не вдалося прочитати $count рядки',
+      one: 'Не вдалося прочитати 1 рядок',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeDestinationHeader => 'Зберегти в';
+
+  @override
+  String get passwordInterchangeMirrorFolders => 'Відтворити папки';
+
+  @override
+  String passwordInterchangeRunImport(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Імпортувати $count елементів',
+      few: 'Імпортувати $count елементи',
+      one: 'Імпортувати 1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeImportedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Імпортовано $count елементів',
+      few: 'Імпортовано $count елементи',
+      one: 'Імпортовано 1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeSkippedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів пропущено',
+      few: '$count елементи пропущено',
+      one: '1 елемент пропущено',
+    );
+    return '$_temp0';
+  }
 }

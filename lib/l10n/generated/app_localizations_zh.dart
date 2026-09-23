@@ -7706,4 +7706,140 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsHubAdvancedSubtitle => '设置备份、调试日志及Logcat';
+
+  @override
+  String get toolPasswordInterchangeTitle => '导入 / 导出密码';
+
+  @override
+  String get toolPasswordInterchangeSubtitle =>
+      '在 KeePass、Bitwarden 和其他密码管理器之间迁移登录信息、卡片和备忘录';
+
+  @override
+  String get toolsSectionPasswordManager => '密码管理器';
+
+  @override
+  String get passwordInterchangeExportTab => '导出';
+
+  @override
+  String get passwordInterchangeImportTab => '导入';
+
+  @override
+  String get passwordInterchangeSourceHeader => '来源';
+
+  @override
+  String get passwordInterchangeChooseFolder => '选择保险库文件夹';
+
+  @override
+  String get passwordInterchangeIncludeSubfolders => '包含子文件夹';
+
+  @override
+  String get passwordInterchangeFormatHeader => '格式';
+
+  @override
+  String get passwordInterchangeFormatLabel => '文件格式';
+
+  @override
+  String get passwordInterchangeMasterPassword => '主密码';
+
+  @override
+  String get passwordInterchangeConfirmPassword => '确认密码';
+
+  @override
+  String get passwordInterchangePasswordsDontMatch => '密码不匹配';
+
+  @override
+  String get passwordInterchangeRunExport => '导出';
+
+  @override
+  String passwordInterchangeExportReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个项目已准备好导出',
+      one: '1 个项目已准备好导出',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSaveToDevice => '保存到设备…';
+
+  @override
+  String get passwordInterchangeSaved => '已保存。';
+
+  @override
+  String get passwordInterchangeFileHeader => '文件';
+
+  @override
+  String get passwordInterchangeChooseFile => '选择文件…';
+
+  @override
+  String get passwordInterchangeReadFile => '读取文件';
+
+  @override
+  String passwordInterchangeFoundItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '找到 $count 个项目',
+      one: '找到 1 个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSelectAll => '全选';
+
+  @override
+  String get passwordInterchangeSelectNone => '取消全选';
+
+  @override
+  String passwordInterchangeWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 行无法读取',
+      one: '1 行无法读取',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeDestinationHeader => '保存到';
+
+  @override
+  String get passwordInterchangeMirrorFolders => '重新创建文件夹';
+
+  @override
+  String passwordInterchangeRunImport(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '导入 $count 个项目',
+      one: '导入 1 个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeImportedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已导入 $count 个项目',
+      one: '已导入 1 个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeSkippedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已跳过 $count 个项目',
+      one: '已跳过 1 个项目',
+    );
+    return '$_temp0';
+  }
 }

@@ -8267,4 +8267,142 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsHubAdvancedSubtitle =>
       'Einstellungen-Backup, Debug-Logs & Logcat';
+
+  @override
+  String get toolPasswordInterchangeTitle =>
+      'Passwörter importieren / exportieren';
+
+  @override
+  String get toolPasswordInterchangeSubtitle =>
+      'Anmeldedaten, Karten und Notizen von oder zu KeePass, Bitwarden und anderen Passwort-Managern übertragen';
+
+  @override
+  String get toolsSectionPasswordManager => 'Passwort-Manager';
+
+  @override
+  String get passwordInterchangeExportTab => 'Exportieren';
+
+  @override
+  String get passwordInterchangeImportTab => 'Importieren';
+
+  @override
+  String get passwordInterchangeSourceHeader => 'Von';
+
+  @override
+  String get passwordInterchangeChooseFolder => 'Tresorordner auswählen';
+
+  @override
+  String get passwordInterchangeIncludeSubfolders => 'Unterordner einschließen';
+
+  @override
+  String get passwordInterchangeFormatHeader => 'Format';
+
+  @override
+  String get passwordInterchangeFormatLabel => 'Dateiformat';
+
+  @override
+  String get passwordInterchangeMasterPassword => 'Master-Passwort';
+
+  @override
+  String get passwordInterchangeConfirmPassword => 'Passwort bestätigen';
+
+  @override
+  String get passwordInterchangePasswordsDontMatch =>
+      'Passwörter stimmen nicht überein';
+
+  @override
+  String get passwordInterchangeRunExport => 'Exportieren';
+
+  @override
+  String passwordInterchangeExportReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente bereit zum Exportieren',
+      one: '1 Element bereit zum Exportieren',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSaveToDevice => 'Auf Gerät speichern…';
+
+  @override
+  String get passwordInterchangeSaved => 'Gespeichert.';
+
+  @override
+  String get passwordInterchangeFileHeader => 'Datei';
+
+  @override
+  String get passwordInterchangeChooseFile => 'Datei auswählen…';
+
+  @override
+  String get passwordInterchangeReadFile => 'Datei einlesen';
+
+  @override
+  String passwordInterchangeFoundItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente gefunden',
+      one: '1 Element gefunden',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeSelectAll => 'Alle auswählen';
+
+  @override
+  String get passwordInterchangeSelectNone => 'Keine auswählen';
+
+  @override
+  String passwordInterchangeWarningsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Zeilen konnten nicht gelesen werden',
+      one: '1 Zeile konnte nicht gelesen werden',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passwordInterchangeDestinationHeader => 'Speichern in';
+
+  @override
+  String get passwordInterchangeMirrorFolders => 'Ordner nachbilden';
+
+  @override
+  String passwordInterchangeRunImport(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente importieren',
+      one: '1 Element importieren',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeImportedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente importiert',
+      one: '1 Element importiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passwordInterchangeSkippedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente wurden übersprungen',
+      one: '1 Element wurde übersprungen',
+    );
+    return '$_temp0';
+  }
 }

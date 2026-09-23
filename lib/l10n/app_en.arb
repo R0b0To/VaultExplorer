@@ -10419,5 +10419,151 @@
   "settingsHubAdvancedSubtitle": "Settings backup, debug logs & logcat",
   "@settingsHubAdvancedSubtitle": {
     "description": "Concise sub-description for the Backup & Debug settings hub card"
+  },
+  "toolPasswordInterchangeTitle": "Import / Export Passwords",
+  "@toolPasswordInterchangeTitle": {
+    "description": "Tools screen row title and screen app bar title for the password-manager interchange tool"
+  },
+  "toolPasswordInterchangeSubtitle": "Move logins, cards and notes to or from KeePass, Bitwarden and other password managers",
+  "@toolPasswordInterchangeSubtitle": {
+    "description": "Tools screen row subtitle for the password-manager interchange tool"
+  },
+  "toolsSectionPasswordManager": "Password Manager",
+  "@toolsSectionPasswordManager": {
+    "description": "Tools screen section header grouping the password-manager interchange tool"
+  },
+  "passwordInterchangeExportTab": "Export",
+  "@passwordInterchangeExportTab": {
+    "description": "Segmented-button label choosing the export direction on the password interchange screen"
+  },
+  "passwordInterchangeImportTab": "Import",
+  "@passwordInterchangeImportTab": {
+    "description": "Segmented-button label choosing the import direction on the password interchange screen"
+  },
+  "passwordInterchangeSourceHeader": "From",
+  "@passwordInterchangeSourceHeader": {
+    "description": "Section header above the vault folder picker on the export screen"
+  },
+  "passwordInterchangeChooseFolder": "Choose a vault folder",
+  "@passwordInterchangeChooseFolder": {
+    "description": "Placeholder list tile title before a vault folder has been picked"
+  },
+  "passwordInterchangeIncludeSubfolders": "Include subfolders",
+  "@passwordInterchangeIncludeSubfolders": {
+    "description": "Switch label: whether export should recurse into subfolders of the chosen vault folder"
+  },
+  "passwordInterchangeFormatHeader": "Format",
+  "@passwordInterchangeFormatHeader": {
+    "description": "Section header above the file-format picker"
+  },
+  "passwordInterchangeFormatLabel": "File format",
+  "@passwordInterchangeFormatLabel": {
+    "description": "Dropdown field label for choosing the interchange file format"
+  },
+  "passwordInterchangeMasterPassword": "Master password",
+  "@passwordInterchangeMasterPassword": {
+    "description": "Text field label for an encrypted format's (e.g. KDBX) master password"
+  },
+  "passwordInterchangeConfirmPassword": "Confirm password",
+  "@passwordInterchangeConfirmPassword": {
+    "description": "Text field label confirming the master password when creating a new encrypted export"
+  },
+  "passwordInterchangePasswordsDontMatch": "Passwords don't match",
+  "@passwordInterchangePasswordsDontMatch": {
+    "description": "Inline validation error when the password and confirm-password fields differ"
+  },
+  "passwordInterchangeRunExport": "Export",
+  "@passwordInterchangeRunExport": {
+    "description": "Button label that starts the export"
+  },
+  "passwordInterchangeExportReady": "{count, plural, =1{1 item ready to export} other{{count} items ready to export}}",
+  "@passwordInterchangeExportReady": {
+    "description": "Confirmation shown once an export file has been generated and is ready to save",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordInterchangeSaveToDevice": "Save to device…",
+  "@passwordInterchangeSaveToDevice": {
+    "description": "Button/list tile label to pick a destination folder and save the generated export file"
+  },
+  "passwordInterchangeSaved": "Saved.",
+  "@passwordInterchangeSaved": {
+    "description": "Confirmation shown once the export file has been written to the chosen destination"
+  },
+  "passwordInterchangeFileHeader": "File",
+  "@passwordInterchangeFileHeader": {
+    "description": "Section header above the source-file picker on the import screen"
+  },
+  "passwordInterchangeChooseFile": "Choose a file…",
+  "@passwordInterchangeChooseFile": {
+    "description": "Placeholder list tile title before a file has been picked for import"
+  },
+  "passwordInterchangeReadFile": "Read file",
+  "@passwordInterchangeReadFile": {
+    "description": "Button label that decodes the picked import file using the chosen format"
+  },
+  "passwordInterchangeFoundItems": "{count, plural, =1{Found 1 item} other{Found {count} items}}",
+  "@passwordInterchangeFoundItems": {
+    "description": "Heading showing how many items were decoded from the picked import file",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordInterchangeSelectAll": "Select all",
+  "@passwordInterchangeSelectAll": {
+    "description": "Button that selects every decoded item in the import preview list"
+  },
+  "passwordInterchangeSelectNone": "Select none",
+  "@passwordInterchangeSelectNone": {
+    "description": "Button that clears the selection in the import preview list"
+  },
+  "passwordInterchangeWarningsCount": "{count, plural, =1{1 row could not be read} other{{count} rows could not be read}}",
+  "@passwordInterchangeWarningsCount": {
+    "description": "Warning shown when some rows/entries in the import file were skipped during decoding",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordInterchangeDestinationHeader": "Save into",
+  "@passwordInterchangeDestinationHeader": {
+    "description": "Section header above the destination vault folder picker on the import screen"
+  },
+  "passwordInterchangeMirrorFolders": "Recreate folders",
+  "@passwordInterchangeMirrorFolders": {
+    "description": "Switch label: whether each item's original folder/group is recreated under the chosen destination folder"
+  },
+  "passwordInterchangeRunImport": "{count, plural, =1{Import 1 item} other{Import {count} items}}",
+  "@passwordInterchangeRunImport": {
+    "description": "Button label that writes the selected decoded items into the Item Vault",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordInterchangeImportedCount": "{count, plural, =1{Imported 1 item} other{Imported {count} items}}",
+  "@passwordInterchangeImportedCount": {
+    "description": "Result screen heading showing how many items were successfully imported",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 item was skipped} other{{count} items were skipped}}",
+  "@passwordInterchangeSkippedCount": {
+    "description": "Result screen line showing how many items could not be imported",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

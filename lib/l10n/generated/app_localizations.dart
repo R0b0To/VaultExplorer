@@ -13704,6 +13704,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings backup, debug logs & logcat'**
   String get settingsHubAdvancedSubtitle;
+
+  /// Tools screen row title and screen app bar title for the password-manager interchange tool
+  ///
+  /// In en, this message translates to:
+  /// **'Import / Export Passwords'**
+  String get toolPasswordInterchangeTitle;
+
+  /// Tools screen row subtitle for the password-manager interchange tool
+  ///
+  /// In en, this message translates to:
+  /// **'Move logins, cards and notes to or from KeePass, Bitwarden and other password managers'**
+  String get toolPasswordInterchangeSubtitle;
+
+  /// Tools screen section header grouping the password-manager interchange tool
+  ///
+  /// In en, this message translates to:
+  /// **'Password Manager'**
+  String get toolsSectionPasswordManager;
+
+  /// Segmented-button label choosing the export direction on the password interchange screen
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get passwordInterchangeExportTab;
+
+  /// Segmented-button label choosing the import direction on the password interchange screen
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get passwordInterchangeImportTab;
+
+  /// Section header above the vault folder picker on the export screen
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get passwordInterchangeSourceHeader;
+
+  /// Placeholder list tile title before a vault folder has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a vault folder'**
+  String get passwordInterchangeChooseFolder;
+
+  /// Switch label: whether export should recurse into subfolders of the chosen vault folder
+  ///
+  /// In en, this message translates to:
+  /// **'Include subfolders'**
+  String get passwordInterchangeIncludeSubfolders;
+
+  /// Section header above the file-format picker
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get passwordInterchangeFormatHeader;
+
+  /// Dropdown field label for choosing the interchange file format
+  ///
+  /// In en, this message translates to:
+  /// **'File format'**
+  String get passwordInterchangeFormatLabel;
+
+  /// Text field label for an encrypted format's (e.g. KDBX) master password
+  ///
+  /// In en, this message translates to:
+  /// **'Master password'**
+  String get passwordInterchangeMasterPassword;
+
+  /// Text field label confirming the master password when creating a new encrypted export
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get passwordInterchangeConfirmPassword;
+
+  /// Inline validation error when the password and confirm-password fields differ
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords don\'t match'**
+  String get passwordInterchangePasswordsDontMatch;
+
+  /// Button label that starts the export
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get passwordInterchangeRunExport;
+
+  /// Confirmation shown once an export file has been generated and is ready to save
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item ready to export} other{{count} items ready to export}}'**
+  String passwordInterchangeExportReady(int count);
+
+  /// Button/list tile label to pick a destination folder and save the generated export file
+  ///
+  /// In en, this message translates to:
+  /// **'Save to device…'**
+  String get passwordInterchangeSaveToDevice;
+
+  /// Confirmation shown once the export file has been written to the chosen destination
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get passwordInterchangeSaved;
+
+  /// Section header above the source-file picker on the import screen
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get passwordInterchangeFileHeader;
+
+  /// Placeholder list tile title before a file has been picked for import
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a file…'**
+  String get passwordInterchangeChooseFile;
+
+  /// Button label that decodes the picked import file using the chosen format
+  ///
+  /// In en, this message translates to:
+  /// **'Read file'**
+  String get passwordInterchangeReadFile;
+
+  /// Heading showing how many items were decoded from the picked import file
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Found 1 item} other{Found {count} items}}'**
+  String passwordInterchangeFoundItems(int count);
+
+  /// Button that selects every decoded item in the import preview list
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get passwordInterchangeSelectAll;
+
+  /// Button that clears the selection in the import preview list
+  ///
+  /// In en, this message translates to:
+  /// **'Select none'**
+  String get passwordInterchangeSelectNone;
+
+  /// Warning shown when some rows/entries in the import file were skipped during decoding
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 row could not be read} other{{count} rows could not be read}}'**
+  String passwordInterchangeWarningsCount(int count);
+
+  /// Section header above the destination vault folder picker on the import screen
+  ///
+  /// In en, this message translates to:
+  /// **'Save into'**
+  String get passwordInterchangeDestinationHeader;
+
+  /// Switch label: whether each item's original folder/group is recreated under the chosen destination folder
+  ///
+  /// In en, this message translates to:
+  /// **'Recreate folders'**
+  String get passwordInterchangeMirrorFolders;
+
+  /// Button label that writes the selected decoded items into the Item Vault
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Import 1 item} other{Import {count} items}}'**
+  String passwordInterchangeRunImport(int count);
+
+  /// Result screen heading showing how many items were successfully imported
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Imported 1 item} other{Imported {count} items}}'**
+  String passwordInterchangeImportedCount(int count);
+
+  /// Result screen line showing how many items could not be imported
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item was skipped} other{{count} items were skipped}}'**
+  String passwordInterchangeSkippedCount(int count);
 }
 
 class _AppLocalizationsDelegate

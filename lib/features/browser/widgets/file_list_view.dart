@@ -16,7 +16,8 @@ import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
-/// Rejects list scroll drag deltas while a 2-finger pinch gesture is active.
+/// Rejects list scroll drag deltas while a 2-finger pinch gesture is active
+/// without detaching the Scrollable's DragGestureRecognizer.
 class _ZoomScrollPhysics extends AlwaysScrollableScrollPhysics {
   final ValueGetter<bool> isZooming;
 
@@ -30,13 +31,16 @@ class _ZoomScrollPhysics extends AlwaysScrollableScrollPhysics {
     );
   }
 
+  // DO NOT override shouldAcceptUserOffset! Returning false causes
+  // ScrollableState.setCanDrag(false), which deletes the DragGestureRecognizer
+  // from the list and permanently breaks touch scrolling.
+  // Instead, absorb user offset deltas directly while zooming:
   @override
-  bool shouldAcceptUserOffset(ScrollMetrics position) {
-    if (isZooming()) return false;
-    return super.shouldAcceptUserOffset(position);
+  double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
+    if (isZooming()) return 0.0;
+    return super.applyPhysicsToUserOffset(position, offset);
   }
 }
-
 class FileListView extends StatefulWidget {
   final List<RawEntry> items;
   final bool isSelectionMode;
@@ -123,7 +127,6 @@ class _FileListViewState extends State<FileListView> {
   double _baselineScale = 1.0;
   late double _zoomLevel;
   final Map<Key, int> _keyIndexMap = {};
-  int _pointerCount = 0;
   int _lastPointerCount = 0;
   bool _isZooming = false;
   bool _isAtBottomAnchor = false;
@@ -199,6 +202,9 @@ class _FileListViewState extends State<FileListView> {
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount < 2) {
+      if (_isZooming) {
+        _handleScaleEnd(ScaleEndDetails(pointerCount: details.pointerCount));
+      }
       _lastPointerCount = details.pointerCount;
       return;
     }
@@ -242,12 +248,14 @@ class _FileListViewState extends State<FileListView> {
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
+    if (!_isZooming) return;
     _isZooming = false;
     _lastPointerCount = 0;
     _isAtBottomAnchor = false;
     _isAtTopAnchor = false;
     widget.onZoomLevelChanged?.call(_zoomLevel);
   }
+
 
   bool _onScrollNotification(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification) {
@@ -266,29 +274,16 @@ class _FileListViewState extends State<FileListView> {
     final itemExtent = _computeItemExtent(_zoomLevel);
     final scrollPhysics = _ZoomScrollPhysics(isZooming: () => _isZooming);
 
-    return Listener(
-      onPointerDown: (_) => _pointerCount++,
-      onPointerUp: (_) {
-        _pointerCount = math.max(0, _pointerCount - 1);
-        if (_pointerCount < 2 && _isZooming) {
-          _isZooming = false;
-          _lastPointerCount = 0;
-          _isAtBottomAnchor = false;
-          _isAtTopAnchor = false;
-          widget.onZoomLevelChanged?.call(_zoomLevel);
-        }
-      },
-      onPointerCancel: (_) {
-        _pointerCount = 0;
-        if (_isZooming) {
-          _isZooming = false;
-          _lastPointerCount = 0;
-          _isAtBottomAnchor = false;
-          _isAtTopAnchor = false;
-          widget.onZoomLevelChanged?.call(_zoomLevel);
-        }
-      },
-      child: HoldRangeSelectContainer(
+    // Zoom start/update/end are driven entirely by HoldRangeSelectContainer's
+    // onScale* callbacks below (backed by _PinchScaleGestureRecognizer), which
+    // are the single source of truth for "is a real 2-finger pinch active".
+    // This used to *also* track raw pointer down/up/cancel counts here and
+    // force _isZooming back to false as soon as the count dropped below 2 --
+    // but that count was independent of (and could desync from) the gesture
+    // recognizer's own pointer tracking, which could flip _isZooming off
+    // mid-gesture and left the two objects disagreeing about whether a pinch
+    // was still in progress. Trusting the scale callbacks alone avoids that.
+    return HoldRangeSelectContainer(
         items: widget.items,
         selectedItems: widget.selectedItems,
         isSelectionMode: widget.isSelectionMode,
@@ -496,7 +491,6 @@ class _FileListViewState extends State<FileListView> {
             ),
           ],
         ),
-      ),
     );
   }
 }

@@ -114,7 +114,7 @@ class FileRowShell extends StatelessWidget {
     BuildContext context,
   ) {
     final double baseWidth = switch (col) {
-      FileDetailColumn.date => 68,
+      FileDetailColumn.date => 75,
       FileDetailColumn.size => 60,
       FileDetailColumn.type => 50,
     };
@@ -132,7 +132,6 @@ class FileRowShell extends StatelessWidget {
         textAlign: TextAlign.right,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         softWrap: false,
       ),
     );

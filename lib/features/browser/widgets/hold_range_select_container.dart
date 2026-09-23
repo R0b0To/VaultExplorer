@@ -13,6 +13,7 @@ class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
   _PinchScaleGestureRecognizer({super.debugOwner});
 
   final Set<int> _activePointers = <int>{};
+  VoidCallback? onPinchEnd;
 
   @override
   void addAllowedPointer(PointerDownEvent event) {
@@ -33,21 +34,21 @@ class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
 
   @override
   void stopTrackingPointer(int pointer) {
-    // CRITICAL: Clean up pointer immediately if tracking was stopped/rejected
-    // so dead pointer IDs never leak into future touches.
     _activePointers.remove(pointer);
     super.stopTrackingPointer(pointer);
   }
 
   @override
+  void didStopTrackingLastPointer(int pointer) {
+    _activePointers.clear();
+    super.didStopTrackingLastPointer(pointer);
+    onPinchEnd?.call();
+  }
+
+  @override
   void rejectGesture(int pointer) {
-    // ONLY refuse rejection if 2 or more fingers are on screen (a real pinch).
-    // If there is only 1 finger, allow rejection so normal scrolling works 100%!
-    if (_activePointers.length >= 2) {
-      acceptGesture(pointer);
-    } else {
-      super.rejectGesture(pointer);
-    }
+    _activePointers.remove(pointer);
+    super.rejectGesture(pointer);
   }
 
   @override
@@ -141,8 +142,9 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   RawEntry? _lastInteractedEntry;
   int? _lastInteractedIndex;
   bool _hasMoved = false;
-  int _activePointers = 0;
+  final Set<int> _downPointers = <int>{};
   Timer? _holdTimer;
+  bool _scaleStarted = false;
 
   int? get _effectiveAnchorIndex {
     if (_lastInteractedEntry != null &&
@@ -205,8 +207,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   // ── Gestures ───────────────────────────────────────────────────────────────
 
   void _handlePointerDown(PointerDownEvent event) {
-    _activePointers++;
-    if (_activePointers > 1) {
+    _downPointers.add(event.pointer);
+    if (_downPointers.length > 1) {
       _cancelHoldTimer();
       return;
     }
@@ -218,7 +220,7 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     if (_pointerDownItem != null && !_pointerDownItem!.entry.isPlaceholder) {
       _cancelHoldTimer();
       _holdTimer = Timer(widget.holdDelay, () {
-        if (!mounted || _activePointers != 1 || _pointerDownItem == null) return;
+        if (!mounted || _downPointers.length != 1 || _pointerDownItem == null) return;
         final touchedItem = _pointerDownItem!;
         if (touchedItem.entry.isPlaceholder) return;
 
@@ -228,7 +230,6 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
           HapticFeedback.selectionClick();
           widget.onLongPressSelect?.call(touchedItem.entry);
         } else {
-          // Already in selection mode: select all items between last anchor and touched item!
           final anchorIndex = _effectiveAnchorIndex;
           if (anchorIndex != null && anchorIndex != touchedItem.index) {
             final minIndex = math.min(anchorIndex, touchedItem.index);
@@ -259,13 +260,12 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (_activePointers != 1) {
+    if (_downPointers.length != 1) {
       _cancelHoldTimer();
       return;
     }
 
     final startPos = _pointerDownPosition;
-    // If the user moves their finger beyond threshold, cancel hold timer and mark as scrolling
     if (startPos != null && (event.position - startPos).distance > 12.0) {
       _hasMoved = true;
       _cancelHoldTimer();
@@ -273,9 +273,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
-    _activePointers = math.max(0, _activePointers - 1);
+    _downPointers.remove(event.pointer);
     _cancelHoldTimer();
-    // Only register interaction if finger did not move (i.e. a discrete tap, not a scroll)
     if (!_hasMoved && _pointerDownItem != null) {
       _lastInteractedIndex = _pointerDownItem!.index;
       _lastInteractedEntry = _pointerDownItem!.entry;
@@ -283,17 +282,24 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     _pointerDownPosition = null;
     _pointerDownItem = null;
     _hasMoved = false;
+    _checkScaleFinished();
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
-    _activePointers = math.max(0, _activePointers - 1);
+    _downPointers.remove(event.pointer);
     _cancelHoldTimer();
     _pointerDownPosition = null;
     _pointerDownItem = null;
     _hasMoved = false;
+    _checkScaleFinished();
   }
 
-  bool _scaleStarted = false;
+  void _checkScaleFinished() {
+    if (_scaleStarted && _downPointers.length < 2) {
+      _scaleStarted = false;
+      widget.onScaleEnd?.call(ScaleEndDetails());
+    }
+  }
 
   void _handleScaleStart(ScaleStartDetails details) {
     if (details.pointerCount >= 2) {
@@ -306,8 +312,6 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount >= 2) {
       _cancelHoldTimer();
-      // If finger 1 started pan before finger 2 landed, onScaleStart was dropped.
-      // Synthesize onScaleStart now that both fingers are confirmed on screen.
       if (!_scaleStarted) {
         _scaleStarted = true;
         widget.onScaleStart?.call(
@@ -319,6 +323,11 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
         );
       }
       widget.onScaleUpdate?.call(details);
+    } else if (_scaleStarted && details.pointerCount < 2) {
+      // One finger was lifted: immediately finish scaling so the remaining finger
+      // can scroll natively without getting locked out.
+      _scaleStarted = false;
+      widget.onScaleEnd?.call(ScaleEndDetails(pointerCount: details.pointerCount));
     }
   }
 
@@ -348,7 +357,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
               instance
                 ..onStart = _handleScaleStart
                 ..onUpdate = _handleScaleUpdate
-                ..onEnd = _handleScaleEnd;
+                ..onEnd = _handleScaleEnd
+                ..onPinchEnd = _checkScaleFinished;
             },
           ),
         },
@@ -357,4 +367,3 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     );
   }
 }
-

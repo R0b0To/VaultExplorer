@@ -3,11 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
-import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
@@ -320,6 +317,13 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         // target, which for a new rule is this same pick.
       }
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
+      final syncedPaths = rules
+          .where((r) => r.autoSyncOnUnlock || r.liveWatch)
+          .map((r) => r.vaultRelativePath)
+          .toSet();
+      ref
+          .read(vaultSyncedFolderPathsProvider(widget.vault).notifier)
+          .update(syncedPaths);
     }
     if (!mounted) return;
 
@@ -370,15 +374,26 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _saving = true);
+    final remainingRules = [
+      for (final r in config.rules)
+        if (r.id != existing.id) r
+    ];
     final ok = await ref.read(syncConfigStoreProvider).save(
       widget.vault,
-      config.copyWith(rules: [for (final r in config.rules) if (r.id != existing.id) r]),
+      config.copyWith(rules: remainingRules),
     );
     if (ok) {
       try {
         await ref.read(syncTargetBindingStoreProvider).delete(config.vaultSyncId, existing.id);
       } catch (_) {}
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
+      final syncedPaths = remainingRules
+          .where((r) => r.autoSyncOnUnlock || r.liveWatch)
+          .map((r) => r.vaultRelativePath)
+          .toSet();
+      ref
+          .read(vaultSyncedFolderPathsProvider(widget.vault).notifier)
+          .update(syncedPaths);
     }
     if (!mounted) return;
 
@@ -715,7 +730,16 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        onPressed: _canSave ? () => _save(syncAfter: false) : null,
+                        onPressed: _canSave
+                            ? () {
+                                final isInitialSync = _existing == null ||
+                                    _existing?.lastSyncedAt == null ||
+                                    _existing?.targetEndpointUri.isEmpty == true ||
+                                    _targetUri != _initialTargetUri ||
+                                    _targetSub != _initialTargetSub;
+                                _save(syncAfter: isInitialSync);
+                              }
+                            : null,
                         icon: _saving
                             ? const SizedBox(
                                 width: 18,

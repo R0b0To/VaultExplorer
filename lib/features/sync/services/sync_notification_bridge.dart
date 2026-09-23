@@ -30,6 +30,7 @@ class SyncNotificationBridge {
   AppLocalizations? _l10n;
   DateTime? _lastPush;
   bool _showing = false;
+  int _activeToken = 0;
 
   SyncNotificationBridge({
     required VaultLifecycleApi lifecycle,
@@ -40,8 +41,22 @@ class SyncNotificationBridge {
        _settings = settings;
 
   Future<void> update(SyncStatus status) async {
-    final fraction = status.fraction;
-    if (!status.running || fraction == null) {
+    final token = ++_activeToken;
+
+    AppSettings settings;
+    try {
+      settings = await _settings.loadSettings();
+    } catch (_) {
+      return;
+    }
+    if (token != _activeToken) return;
+
+    if (!settings.keepVaultsRunningInBackground) {
+      if (_showing) await clear();
+      return;
+    }
+
+    if (!status.running) {
       await clear();
       return;
     }
@@ -52,35 +67,57 @@ class SyncNotificationBridge {
     if (last != null && now.difference(last) < _minPushGap) return;
     _lastPush = now;
 
-    final l10n = _l10n ??= await _resolveL10n();
+    final l10n = _l10n ??= await _resolveL10n(languageCode: settings.languageCode);
+    if (token != _activeToken) return;
+
     _showing = true;
-    await _lifecycle.updateBackgroundServiceProgress(
-      hasActive: true,
-      title: l10n.autoSyncNotificationTitle,
-      text: l10n.autoSyncNotificationProgress(
-        status.doneActions,
-        status.totalActions,
-      ),
-      progress: (fraction * 1000).round().clamp(0, 1000),
-      max: 1000,
-    );
+    final fraction = status.fraction;
+    if (fraction != null) {
+      await _lifecycle.updateBackgroundServiceProgress(
+        hasActive: true,
+        title: l10n.autoSyncNotificationTitle,
+        text: l10n.autoSyncNotificationProgress(
+          status.doneActions,
+          status.totalActions,
+        ),
+        progress: (fraction * 1000).round().clamp(0, 1000),
+        max: 1000,
+        indeterminate: false,
+      );
+    } else {
+      await _lifecycle.updateBackgroundServiceProgress(
+        hasActive: true,
+        title: l10n.autoSyncNotificationTitle,
+        text: status.targetLabel.isNotEmpty ? status.targetLabel : null,
+        indeterminate: true,
+      );
+    }
+
+    if (token != _activeToken) {
+      // clear() was called while updateBackgroundServiceProgress was in flight.
+      if (_fileOps.activeOperations.isEmpty) {
+        await _lifecycle.updateBackgroundServiceProgress(hasActive: false);
+      }
+    }
   }
 
   Future<void> clear() async {
+    ++_activeToken;
     _lastPush = null;
     _l10n = null;
-    if (!_showing) return;
     _showing = false;
     if (_fileOps.activeOperations.isNotEmpty) return; // they own it now
     await _lifecycle.updateBackgroundServiceProgress(hasActive: false);
   }
 
-  Future<AppLocalizations> _resolveL10n() async {
-    String? code;
-    try {
-      code = (await _settings.loadSettings()).languageCode;
-    } catch (_) {
-      code = null;
+  Future<AppLocalizations> _resolveL10n({String? languageCode}) async {
+    String? code = languageCode;
+    if (code == null) {
+      try {
+        code = (await _settings.loadSettings()).languageCode;
+      } catch (_) {
+        code = null;
+      }
     }
     final Locale wanted = (code != null && code.isNotEmpty)
         ? Locale(code)

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -45,13 +47,43 @@ final syncCoordinatorServiceProvider = Provider<SyncCoordinatorService>((ref) {
 });
 
 /// Returns the set of vault-relative folder paths that have auto-sync configured.
-final vaultSyncedFolderPathsProvider =
-    FutureProvider.family<Set<String>, MountedContainer>((ref, vault) async {
-  final configStore = ref.watch(syncConfigStoreProvider);
-  final config = await configStore.load(vault);
-  if (config == null) return const {};
-  return config.rules.map((r) => r.vaultRelativePath).toSet();
-});
+final vaultSyncedFolderPathsProvider = NotifierProvider.family<
+    VaultSyncedFolderPathsNotifier, Set<String>, MountedContainer>(
+  VaultSyncedFolderPathsNotifier.new,
+);
+
+class VaultSyncedFolderPathsNotifier extends Notifier<Set<String>> {
+  final MountedContainer vault;
+  VaultSyncedFolderPathsNotifier(this.vault);
+
+  @override
+  Set<String> build() {
+    unawaited(_load());
+    return const {};
+  }
+
+  Future<void> _load() async {
+    final configStore = ref.read(syncConfigStoreProvider);
+    final config = await configStore.load(vault);
+    if (!ref.mounted) return;
+    if (config == null) {
+      state = const {};
+      return;
+    }
+    state = config.rules
+        .where((r) => r.autoSyncOnUnlock || r.liveWatch)
+        .map((r) => r.vaultRelativePath)
+        .toSet();
+  }
+
+  void update(Set<String> paths) {
+    state = paths;
+  }
+
+  void refresh() {
+    unawaited(_load());
+  }
+}
 
 /// Live sync status for the dashboard banner. Rebuilds only when the status
 /// actually changes.

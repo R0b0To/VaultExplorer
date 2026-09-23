@@ -73,6 +73,9 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.da
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
+import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
+import 'package:vaultexplorer/features/sync/services/sync_status.dart';
+import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/open_with_dialog.dart';
@@ -416,7 +419,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool _isFolderSynced(RawEntry entry) {
     if (!entry.isDir || widget.container.isLocalStorage) return false;
     final path = _fullPathOf(entry);
-    final synced = ref.watch(vaultSyncedFolderPathsProvider(widget.container)).value ?? const {};
+    final synced = ref.watch(vaultSyncedFolderPathsProvider(widget.container));
     return synced.contains(path);
   }
 
@@ -3125,6 +3128,7 @@ Future<void> _extractSelectedArchive() async {
     ref.watch(fileBrowserSelectionProvider(widget.container.volId));
     ref.watch(fileBrowserSortProvider(widget.container.volId));
     ref.watch(fileBrowserNavigationProvider(widget.container.volId));
+    ref.watch(vaultSyncedFolderPathsProvider(widget.container));
 
     final effectiveToolbarUri =
         widget.container.isLocalStorage ? null : widget.container.uri;
@@ -3135,6 +3139,16 @@ Future<void> _extractSelectedArchive() async {
           setState(() {
             _toolbarConfig = next.config;
           });
+        }
+      },
+    );
+    ref.listen<SyncStatus>(
+      syncStatusProvider,
+      (previous, next) {
+        if (previous?.running == true &&
+            !next.running &&
+            next.lastCompletedReport?.didWork == true) {
+          _loadDirectoryContents(_currentDirPath, refresh: true);
         }
       },
     );
@@ -3428,6 +3442,8 @@ Future<void> _extractSelectedArchive() async {
                       if (_toolbarConfig.showBreadcrumbBar) ...[
                         BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                       ],
+                      if (!widget.container.isLocalStorage && _archiveContext == null)
+                        const SyncStatusBanner(),
                       if (_archiveContext?.isSolid == true)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),

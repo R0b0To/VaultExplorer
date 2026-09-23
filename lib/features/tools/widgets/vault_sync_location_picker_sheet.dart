@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet.dart';
@@ -20,9 +21,7 @@ import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dar
 ///
 /// The selectable storages are the mounted vaults, the device's Local Storage
 /// (when all-files access is granted) and any saved external / document-
-/// provider locations. An app-bar action adds a new location through the
-/// system folder picker, so an SD card or cloud provider can be granted
-/// without leaving the sheet.
+/// provider locations.
 ///
 /// Pops with a [VaultSyncSide] on confirm, or nothing if the user backs out.
 /// Reuses [VaultBrowserScaffold] -- same browsing / switch-storage behavior
@@ -193,34 +192,12 @@ class _VaultSyncLocationPickerSheetState
     return _targets.first;
   }
 
-  Future<void> _addLocation() async {
-    final location = await ref
-        .read(externalStorageLocationsProvider.notifier)
-        .promptAndAddLocation();
-    if (location == null || !mounted) return;
-    _rebuildTargets(selectVolId: location.volId);
-  }
-
   Future<void> _requestLocalAccess() async {
     // The result arrives via the resumed lifecycle callback.
     await ref
         .read(vaultLifecycleApiProvider)
         .requestAllFilesAccess(openSettings: true);
   }
-
-  List<Widget> _actions(BuildContext context) => [
-    if (_accessChecked && _localRoot == null)
-      IconButton(
-        icon: const Icon(Icons.smartphone_rounded),
-        tooltip: context.l10n.vaultSyncEnableLocalStorageTooltip,
-        onPressed: _requestLocalAccess,
-      ),
-    IconButton(
-      icon: const Icon(Icons.add_rounded),
-      tooltip: context.l10n.vaultSyncAddStorageTooltip,
-      onPressed: _addLocation,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +218,14 @@ class _VaultSyncLocationPickerSheetState
           context.l10n.vaultSyncPickLocationTitle(widget.sideLabel),
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        actions: _actions(context),
+        actions: [
+          if (_accessChecked && _localRoot == null)
+            IconButton(
+              icon: const Icon(Icons.smartphone_rounded),
+              tooltip: context.l10n.vaultSyncEnableLocalStorageTooltip,
+              onPressed: _requestLocalAccess,
+            ),
+        ],
       ),
       body: !_accessChecked
           ? const Center(child: CircularProgressIndicator())
@@ -266,7 +250,29 @@ class _VaultSyncLocationPickerSheetState
       selectorLabel: (ctx) => ctx.l10n.vaultSyncStorageSelectorLabel,
       containerSubtitle: (ctx, container) =>
           syncTargetKindOf(container).label(ctx.l10n),
-      actions: _actions,
+      actions: (ctx) => [
+        if (_accessChecked && _localRoot == null)
+          IconButton(
+            icon: const Icon(Icons.smartphone_rounded),
+            tooltip: ctx.l10n.vaultSyncEnableLocalStorageTooltip,
+            onPressed: _requestLocalAccess,
+          ),
+        IconButton(
+          icon: const Icon(Icons.create_new_folder_outlined),
+          tooltip: ctx.l10n.newFolderTitle,
+          onPressed: () {
+            BrowserDialogs.showCreateFolder(
+              ctx,
+              container: state.selectedContainer,
+              currentDirPath: state.currentPath,
+              existingEntries: state.rawEntries,
+              onSuccess: () =>
+                  notifier.loadDirectory(state.currentPath, refresh: true),
+              readOnly: state.selectedContainer.readOnly,
+            );
+          },
+        ),
+      ],
       processEntries: (raw) {
         final folders = raw.where((e) => e.isDir).toList()
           ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));

@@ -116,6 +116,8 @@ class SyncCoordinatorService {
 
   final Map<String, _VaultSession> _sessions = {};
   final Map<String, MountedContainer> _unlocked = {};
+  final Set<String> _explicitSyncRules = <String>{};
+  Timer? _completedLingerTimer;
   int _runningCount = 0;
 
   /// Progress of the run currently transferring files (idle otherwise).
@@ -144,6 +146,7 @@ class SyncCoordinatorService {
   }
 
   void dispose() {
+    _completedLingerTimer?.cancel();
     _events.removeContainerLockedListener(_onContainerLocked);
     _events.removePanicSessionPurgedListener(_onPanic);
     _onPanic();
@@ -211,6 +214,7 @@ class SyncCoordinatorService {
   bool syncNow(MountedContainer vault, String ruleId) {
     final session = _sessions[vault.uri];
     if (session == null || session.locked) return false;
+    _explicitSyncRules.add(ruleId);
     session.scheduler.request(ruleId);
     return true;
   }
@@ -467,9 +471,26 @@ class SyncCoordinatorService {
     final ledgerKey =
         '${rule.id}#${_fingerprint('${rule.vaultRelativePath}|${target.identity}|${target.subPath}')}';
 
+    final isExplicit = _explicitSyncRules.remove(rule.id);
+
     var announced = false;
+    if (isExplicit) {
+      announced = true;
+      _runningCount++;
+      _publish(
+        SyncStatus(
+          running: true,
+          targetLabel: target.displayName,
+          doneActions: 0,
+          totalActions: 0,
+          failedActions: 0,
+          attention: _attentionCount,
+        ),
+      );
+    }
+
     void onProgress(SyncProgress p) {
-      if (p.totalActions == 0) return; // scanning, or nothing to do: stay quiet
+      if (p.totalActions == 0 && !isExplicit) return; // scanning, or nothing to do: stay quiet
       if (!announced) {
         announced = true;
         _runningCount++;
@@ -486,8 +507,9 @@ class SyncCoordinatorService {
       );
     }
 
+    SyncRunReport? report;
     try {
-      return await _runner.run(
+      report = await _runner.run(
         rule: rule,
         vault: vaultEndpoint,
         target: targetEndpoint,
@@ -496,12 +518,18 @@ class SyncCoordinatorService {
         ledgerKey: ledgerKey,
         onProgress: onProgress,
       );
+      return report;
     } finally {
       if (announced) {
         _runningCount--;
         if (_runningCount <= 0) {
           _runningCount = 0;
-          _publishIdle();
+          final rep = report;
+          if (rep != null && (isExplicit || rep.didWork)) {
+            _publishCompleted(rep, target.displayName);
+          } else {
+            _publishIdle();
+          }
         }
       }
     }
@@ -515,11 +543,30 @@ class SyncCoordinatorService {
       .length;
 
   void _publish(SyncStatus next) {
+    _completedLingerTimer?.cancel();
     status.value = next;
     unawaited(_notifier.update(next));
   }
 
+  void _publishCompleted(SyncRunReport report, String targetLabel) {
+    status.value = SyncStatus(
+      running: false,
+      attention: _attentionCount,
+      lastCompletedReport: report,
+      lastCompletedTargetLabel: targetLabel,
+    );
+    unawaited(_notifier.clear());
+    _completedLingerTimer?.cancel();
+    _completedLingerTimer = Timer(const Duration(seconds: 4), () {
+      if (!status.value.running) {
+        status.value = SyncStatus(attention: _attentionCount);
+        unawaited(_notifier.clear());
+      }
+    });
+  }
+
   void _publishIdle() {
+    _completedLingerTimer?.cancel();
     status.value = SyncStatus(attention: _attentionCount);
     unawaited(_notifier.clear());
   }

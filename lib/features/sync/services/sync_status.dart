@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/features/sync/domain/models/sync_plan.dart';
 
 /// What the UI (dashboard banner, notification) shows about syncing.
 @immutable
@@ -18,6 +19,10 @@ class SyncStatus {
   /// that couldn't be read, or deletions that were held back as suspicious.
   final int attention;
 
+  /// Most recent completed run, if any (used for in-app completion feedback).
+  final SyncRunReport? lastCompletedReport;
+  final String? lastCompletedTargetLabel;
+
   const SyncStatus({
     this.running = false,
     this.targetLabel = '',
@@ -25,6 +30,8 @@ class SyncStatus {
     this.totalActions = 0,
     this.failedActions = 0,
     this.attention = 0,
+    this.lastCompletedReport,
+    this.lastCompletedTargetLabel,
   });
 
   /// 0..1 while [totalActions] is known, else null.
@@ -38,6 +45,9 @@ class SyncStatus {
     int? totalActions,
     int? failedActions,
     int? attention,
+    SyncRunReport? lastCompletedReport,
+    String? lastCompletedTargetLabel,
+    bool clearLastCompleted = false,
   }) {
     return SyncStatus(
       running: running ?? this.running,
@@ -46,6 +56,12 @@ class SyncStatus {
       totalActions: totalActions ?? this.totalActions,
       failedActions: failedActions ?? this.failedActions,
       attention: attention ?? this.attention,
+      lastCompletedReport: clearLastCompleted
+          ? null
+          : (lastCompletedReport ?? this.lastCompletedReport),
+      lastCompletedTargetLabel: clearLastCompleted
+          ? null
+          : (lastCompletedTargetLabel ?? this.lastCompletedTargetLabel),
     );
   }
 
@@ -58,7 +74,9 @@ class SyncStatus {
       other.doneActions == doneActions &&
       other.totalActions == totalActions &&
       other.failedActions == failedActions &&
-      other.attention == attention;
+      other.attention == attention &&
+      other.lastCompletedReport == lastCompletedReport &&
+      other.lastCompletedTargetLabel == lastCompletedTargetLabel;
 
   @override
   int get hashCode => Object.hash(
@@ -68,5 +86,7 @@ class SyncStatus {
     totalActions,
     failedActions,
     attention,
+    lastCompletedReport,
+    lastCompletedTargetLabel,
   );
 }

@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "폴더 재구성",
   "passwordInterchangeRunImport": "{count, plural, =1{1개 항목 가져오기} other{{count}개 항목 가져오기}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{1개 항목을 가져왔습니다} other{{count}개 항목을 가져왔습니다}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1개 항목을 건너뛰었습니다} other{{count}개 항목을 건너뛰었습니다}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1개 항목을 건너뛰었습니다} other{{count}개 항목을 건너뛰었습니다}}",
+  "autoLockIndicatorLocksAfter": "비활동 잠금: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "화면 꺼짐 시 잠금",
+  "autoLockIndicatorNeverLocks": "자동 잠금 안 함",
+  "autoLockIndicatorLocksAfterTooltip": "{duration} 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)"
 }

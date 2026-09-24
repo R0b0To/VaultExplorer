@@ -8430,4 +8430,20 @@ class AppLocalizationsPt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'Bloqueio por inatividade: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => 'Bloqueio ao desligar tela';
+
+  @override
+  String get autoLockIndicatorNeverLocks => 'Não bloqueia automaticamente';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'Bloqueia após $duration de inatividade (reinicia ao usar o app)';
+  }
 }

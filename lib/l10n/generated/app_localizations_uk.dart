@@ -8493,4 +8493,20 @@ class AppLocalizationsUk extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'Блокування за бездіяльністю: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => 'Блокування при вимк. екрана';
+
+  @override
+  String get autoLockIndicatorNeverLocks => 'Не блокується автоматично';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'Блокується після $duration бездіяльності (скидається під час користування)';
+  }
 }

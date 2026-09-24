@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Recréer les dossiers",
   "passwordInterchangeRunImport": "{count, plural, =1{Importer 1 élément} other{Importer {count} éléments}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{1 élément importé} other{{count} éléments importés}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 élément a été ignoré} other{{count} éléments ont été ignorés}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 élément a été ignoré} other{{count} éléments ont été ignorés}}",
+  "autoLockIndicatorLocksAfter": "Verrouillage d'inactivité : {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Verrouillage à l'extinction",
+  "autoLockIndicatorNeverLocks": "Ne se verrouille pas automatiquement",
+  "autoLockIndicatorLocksAfterTooltip": "Se verrouille après {duration} d'inactivité (réinitialisé lors de l'utilisation)"
 }

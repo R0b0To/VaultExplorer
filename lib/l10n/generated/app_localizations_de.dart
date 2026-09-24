@@ -8428,4 +8428,20 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'Inaktivitäts-Sperre: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => 'Bildschirm-Aus-Sperre';
+
+  @override
+  String get autoLockIndicatorNeverLocks => 'Wird nicht automatisch gesperrt';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'Sperrt nach $duration Inaktivität (wird bei App-Nutzung zurückgesetzt)';
+  }
 }

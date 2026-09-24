@@ -7863,4 +7863,20 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return '闲置锁定: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => '屏幕熄灭锁定';
+
+  @override
+  String get autoLockIndicatorNeverLocks => '不会自动锁定';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return '闲置 $duration 后锁定（使用应用时重置）';
+  }
 }

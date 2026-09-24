@@ -7970,4 +7970,20 @@ class AppLocalizationsKo extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return '비활동 잠금: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => '화면 꺼짐 시 잠금';
+
+  @override
+  String get autoLockIndicatorNeverLocks => '자동 잠금 안 함';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return '$duration 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)';
+  }
 }

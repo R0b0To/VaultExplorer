@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Recrear carpetas",
   "passwordInterchangeRunImport": "{count, plural, =1{Importar 1 elemento} other{Importar {count} elementos}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{Se importó 1 elemento} other{Se importaron {count} elementos}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{Se omitió 1 elemento} other{Se omitieron {count} elementos}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{Se omitió 1 elemento} other{Se omitieron {count} elementos}}",
+  "autoLockIndicatorLocksAfter": "Bloqueo por inactividad: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Bloqueo al apagar pantalla",
+  "autoLockIndicatorNeverLocks": "No se bloqueará automáticamente",
+  "autoLockIndicatorLocksAfterTooltip": "Se bloquea tras {duration} de inactividad (se reinicia al usar la app)"
 }

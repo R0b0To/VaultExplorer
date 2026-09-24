@@ -13902,6 +13902,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 item was skipped} other{{count} items were skipped}}'**
   String passwordInterchangeSkippedCount(int count);
+
+  /// Concise auto-lock label indicating lock on inactivity; {duration} is a duration like '5 minutes'
+  ///
+  /// In en, this message translates to:
+  /// **'Inactivity lock: {duration}'**
+  String autoLockIndicatorLocksAfter(String duration);
+
+  /// Concise auto-lock label when the vault locks as soon as the screen turns off
+  ///
+  /// In en, this message translates to:
+  /// **'Screen-off lock'**
+  String get autoLockIndicatorLocksOnScreenOff;
+
+  /// Auto-lock feedback shown when a vault is configured to never auto-lock
+  ///
+  /// In en, this message translates to:
+  /// **'Won\'t auto-lock'**
+  String get autoLockIndicatorNeverLocks;
+
+  /// Tooltip explaining that the auto-lock timer resets on interaction; {duration} is a duration like '5 minutes'
+  ///
+  /// In en, this message translates to:
+  /// **'Locks after {duration} of inactivity (resets while using the app)'**
+  String autoLockIndicatorLocksAfterTooltip(String duration);
 }
 
 class _AppLocalizationsDelegate

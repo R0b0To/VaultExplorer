@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "إعادة إنشاء المجلدات",
   "passwordInterchangeRunImport": "{count, plural, =1{استيراد عنصر واحد} other{استيراد {count} عنصر}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{تم استيراد عنصر واحد} other{تم استيراد {count} عنصر}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{تم تخطي عنصر واحد} other{تم تخطي {count} عنصر}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{تم تخطي عنصر واحد} other{تم تخطي {count} عنصر}}",
+  "autoLockIndicatorLocksAfter": "قفل عند عدم النشاط: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "قفل عند إيقاف الشاشة",
+  "autoLockIndicatorNeverLocks": "لن يُقفل تلقائيًا",
+  "autoLockIndicatorLocksAfterTooltip": "يُقفل بعد {duration} من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)"
 }

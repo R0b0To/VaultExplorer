@@ -8490,4 +8490,20 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'قفل عند عدم النشاط: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => 'قفل عند إيقاف الشاشة';
+
+  @override
+  String get autoLockIndicatorNeverLocks => 'لن يُقفل تلقائيًا';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'يُقفل بعد $duration من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)';
+  }
 }

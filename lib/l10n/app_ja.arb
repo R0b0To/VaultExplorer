@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "フォルダを再現",
   "passwordInterchangeRunImport": "{count, plural, =1{1 件の項目をインポート} other{{count} 件の項目をインポート}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{1 件の項目をインポートしました} other{{count} 件の項目をインポートしました}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 件の項目をスキップしました} other{{count} 件の項目をスキップしました}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 件の項目をスキップしました} other{{count} 件の項目をスキップしました}}",
+  "autoLockIndicatorLocksAfter": "無操作ロック: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "画面オフ時ロック",
+  "autoLockIndicatorNeverLocks": "自動ロックしません",
+  "autoLockIndicatorLocksAfterTooltip": "無操作が{duration}続くとロック（操作中はリセット）"
 }

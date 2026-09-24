@@ -10591,5 +10591,31 @@
         "type": "int"
       }
     }
+  },
+  "autoLockIndicatorLocksAfter": "Inactivity lock: {duration}",
+  "@autoLockIndicatorLocksAfter": {
+    "description": "Concise auto-lock label indicating lock on inactivity; {duration} is a duration like '5 minutes'",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "autoLockIndicatorLocksOnScreenOff": "Screen-off lock",
+  "@autoLockIndicatorLocksOnScreenOff": {
+    "description": "Concise auto-lock label when the vault locks as soon as the screen turns off"
+  },
+  "autoLockIndicatorNeverLocks": "Won't auto-lock",
+  "@autoLockIndicatorNeverLocks": {
+    "description": "Auto-lock feedback shown when a vault is configured to never auto-lock"
+  },
+  "autoLockIndicatorLocksAfterTooltip": "Locks after {duration} of inactivity (resets while using the app)",
+  "@autoLockIndicatorLocksAfterTooltip": {
+    "description": "Tooltip explaining that the auto-lock timer resets on interaction; {duration} is a duration like '5 minutes'",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
   }
 }

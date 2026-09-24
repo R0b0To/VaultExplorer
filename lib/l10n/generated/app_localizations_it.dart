@@ -8426,4 +8426,20 @@ class AppLocalizationsIt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'Blocco per inattività: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => 'Blocco a schermo spento';
+
+  @override
+  String get autoLockIndicatorNeverLocks => 'Non si blocca automaticamente';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'Si blocca dopo $duration di inattività (si azzera usando l\'app)';
+  }
 }

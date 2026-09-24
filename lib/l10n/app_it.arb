@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Ricrea cartelle",
   "passwordInterchangeRunImport": "{count, plural, =1{Importa 1 elemento} other{Importa {count} elementi}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{Importato 1 elemento} other{Importati {count} elementi}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 elemento è stato ignorato} other{{count} elementi sono stati ignorati}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 elemento è stato ignorato} other{{count} elementi sono stati ignorati}}",
+  "autoLockIndicatorLocksAfter": "Blocco per inattività: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Blocco a schermo spento",
+  "autoLockIndicatorNeverLocks": "Non si blocca automaticamente",
+  "autoLockIndicatorLocksAfterTooltip": "Si blocca dopo {duration} di inattività (si azzera usando l'app)"
 }

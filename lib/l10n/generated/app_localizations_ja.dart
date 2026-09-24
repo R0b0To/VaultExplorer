@@ -7971,4 +7971,20 @@ class AppLocalizationsJa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return '無操作ロック: $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff => '画面オフ時ロック';
+
+  @override
+  String get autoLockIndicatorNeverLocks => '自動ロックしません';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return '無操作が$duration続くとロック（操作中はリセット）';
+  }
 }

@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Recriar pastas",
   "passwordInterchangeRunImport": "{count, plural, =1{Importar 1 item} other{Importar {count} itens}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{1 item importado} other{{count} itens importados}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 item foi ignorado} other{{count} itens foram ignorados}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 item foi ignorado} other{{count} itens foram ignorados}}",
+  "autoLockIndicatorLocksAfter": "Bloqueio por inatividade: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Bloqueio ao desligar tela",
+  "autoLockIndicatorNeverLocks": "Não bloqueia automaticamente",
+  "autoLockIndicatorLocksAfterTooltip": "Bloqueia após {duration} de inatividade (reinicia ao usar o app)"
 }

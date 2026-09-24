@@ -8500,4 +8500,22 @@ class AppLocalizationsFr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String autoLockIndicatorLocksAfter(String duration) {
+    return 'Verrouillage d\'inactivité : $duration';
+  }
+
+  @override
+  String get autoLockIndicatorLocksOnScreenOff =>
+      'Verrouillage à l\'extinction';
+
+  @override
+  String get autoLockIndicatorNeverLocks =>
+      'Ne se verrouille pas automatiquement';
+
+  @override
+  String autoLockIndicatorLocksAfterTooltip(String duration) {
+    return 'Se verrouille après $duration d\'inactivité (réinitialisé lors de l\'utilisation)';
+  }
 }

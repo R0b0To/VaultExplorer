@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Відтворити папки",
   "passwordInterchangeRunImport": "{count, plural, =1{Імпортувати 1 елемент} few{Імпортувати {count} елементи} other{Імпортувати {count} елементів}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{Імпортовано 1 елемент} few{Імпортовано {count} елементи} other{Імпортовано {count} елементів}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 елемент пропущено} few{{count} елементи пропущено} other{{count} елементів пропущено}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 елемент пропущено} few{{count} елементи пропущено} other{{count} елементів пропущено}}",
+  "autoLockIndicatorLocksAfter": "Блокування за бездіяльністю: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Блокування при вимк. екрана",
+  "autoLockIndicatorNeverLocks": "Не блокується автоматично",
+  "autoLockIndicatorLocksAfterTooltip": "Блокується після {duration} бездіяльності (скидається під час користування)"
 }

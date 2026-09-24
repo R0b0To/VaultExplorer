@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "重新创建文件夹",
   "passwordInterchangeRunImport": "{count, plural, =1{导入 1 个项目} other{导入 {count} 个项目}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{已导入 1 个项目} other{已导入 {count} 个项目}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{已跳过 1 个项目} other{已跳过 {count} 个项目}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{已跳过 1 个项目} other{已跳过 {count} 个项目}}",
+  "autoLockIndicatorLocksAfter": "闲置锁定: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "屏幕熄灭锁定",
+  "autoLockIndicatorNeverLocks": "不会自动锁定",
+  "autoLockIndicatorLocksAfterTooltip": "闲置 {duration} 后锁定（使用应用时重置）"
 }

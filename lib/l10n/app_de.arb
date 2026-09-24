@@ -2291,5 +2291,9 @@
   "passwordInterchangeMirrorFolders": "Ordner nachbilden",
   "passwordInterchangeRunImport": "{count, plural, =1{1 Element importieren} other{{count} Elemente importieren}}",
   "passwordInterchangeImportedCount": "{count, plural, =1{1 Element importiert} other{{count} Elemente importiert}}",
-  "passwordInterchangeSkippedCount": "{count, plural, =1{1 Element wurde übersprungen} other{{count} Elemente wurden übersprungen}}"
+  "passwordInterchangeSkippedCount": "{count, plural, =1{1 Element wurde übersprungen} other{{count} Elemente wurden übersprungen}}",
+  "autoLockIndicatorLocksAfter": "Inaktivitäts-Sperre: {duration}",
+  "autoLockIndicatorLocksOnScreenOff": "Bildschirm-Aus-Sperre",
+  "autoLockIndicatorNeverLocks": "Wird nicht automatisch gesperrt",
+  "autoLockIndicatorLocksAfterTooltip": "Sperrt nach {duration} Inaktivität (wird bei App-Nutzung zurückgesetzt)"
 }

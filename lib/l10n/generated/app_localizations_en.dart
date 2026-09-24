@@ -3221,6 +3221,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reuse key material in Android Keystore';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle => 'Cached key lifetime';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'Until I turn it off';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return 'Removed automatically on $date';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'Pin algorithm to skip auto-detection on unlock.';
 

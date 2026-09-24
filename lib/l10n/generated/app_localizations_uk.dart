@@ -3290,6 +3290,31 @@ class AppLocalizationsUk extends AppLocalizations {
       'Повторно використовувати ключ із Android Keystore';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count дня',
+      many: '$count днів',
+      few: '$count дні',
+      one: '$count день',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle =>
+      'Тривалість зберігання ключа в кеші';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'Доки я не вимкну';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return 'Буде автоматично видалено $date';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'Закріпити алгоритм для пропуску автовизначення під час відкриття.';
 

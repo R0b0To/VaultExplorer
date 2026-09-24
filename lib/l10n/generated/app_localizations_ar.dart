@@ -3302,6 +3302,33 @@ class AppLocalizationsAr extends AppLocalizations {
       'إعادة استخدام مادة المفتاح في Android Keystore';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count يوم',
+      many: '$count يومًا',
+      few: '$count أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+      zero: '0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle =>
+      'مدة الاحتفاظ بالمفتاح المخزَّن مؤقتًا';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'حتى أوقفه بنفسي';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return 'تتم الإزالة تلقائيًا في $date';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'تثبيت الخوارزمية لتخطي الكشف التلقائي عند فتح القفل.';
 

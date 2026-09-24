@@ -3067,6 +3067,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reuseKeyMaterialKeystoreSubtitle => '重用Android Keystore中的密钥材料';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle => '缓存密钥的保留时长';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => '直到我关闭为止';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return '将于 $date 自动删除';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle => '固定算法以在解锁时跳过自动检测。';
 
   @override

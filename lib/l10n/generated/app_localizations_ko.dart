@@ -3110,6 +3110,27 @@ class AppLocalizationsKo extends AppLocalizations {
   String get reuseKeyMaterialKeystoreSubtitle => 'Android 키스토어의 키 자료를 재사용';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count일',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle => '캐시된 키 보관 기간';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => '끌 때까지';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return '$date에 자동으로 삭제됨';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       '잠금 해제 시 자동 감지를 건너뛰도록 알고리즘을 고정합니다.';
 

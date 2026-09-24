@@ -3110,6 +3110,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String get reuseKeyMaterialKeystoreSubtitle => 'Android Keystore内の鍵情報を再利用します';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count日',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle => 'キャッシュした鍵の保持期間';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'オフにするまで';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return '$dateに自動的に削除されます';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'ロック解除時の自動検出をスキップするようアルゴリズムを固定します。';
 

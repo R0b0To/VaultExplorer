@@ -3276,6 +3276,29 @@ class AppLocalizationsDe extends AppLocalizations {
       'Schlüsselmaterial im Android Keystore wiederverwenden';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Tage',
+      one: '1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle =>
+      'Lebensdauer des zwischengespeicherten Schlüssels';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'Bis ich es ausschalte';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return 'Wird automatisch am $date entfernt';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'Algorithmus fixieren, um die automatische Erkennung beim Entsperren zu überspringen.';
 

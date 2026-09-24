@@ -4263,6 +4263,32 @@
   "@reuseKeyMaterialKeystoreSubtitle": {
     "description": "Subtitle for the cache-derived-key switch for non-CryFS containers"
   },
+  "nDays": "{count, plural, =1{1 day} other{{count} days}}",
+  "@nDays": {
+    "description": "Duration in days, used for the cached derived key lifetime options",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "cacheDerivedKeyLifetimeTitle": "Cached key lifetime",
+  "@cacheDerivedKeyLifetimeTitle": {
+    "description": "Label of the picker that sets how long a container's cached derived key is kept before it is removed automatically"
+  },
+  "cacheDerivedKeyLifetimeNever": "Until I turn it off",
+  "@cacheDerivedKeyLifetimeNever": {
+    "description": "Cached key lifetime option: no expiry, the key stays until derived key caching is turned off"
+  },
+  "cacheDerivedKeyLifetimeExpiresOn": "Removed automatically on {date}",
+  "@cacheDerivedKeyLifetimeExpiresOn": {
+    "description": "Shows the date on which the cached derived key will be removed automatically; {date} is a formatted calendar date",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "pinAlgorithmSkipAutoDetectSubtitle": "Pin algorithm to skip auto-detection on unlock.",
   "@pinAlgorithmSkipAutoDetectSubtitle": {
     "description": "Subtitle explaining the advanced cipher/hash pinning option"

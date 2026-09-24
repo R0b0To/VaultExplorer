@@ -3291,6 +3291,28 @@ class AppLocalizationsFr extends AppLocalizations {
       'Réutiliser la clé stockée dans l\'Android Keystore';
 
   @override
+  String nDays(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count jours',
+      one: '1 jour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cacheDerivedKeyLifetimeTitle => 'Durée de vie de la clé en cache';
+
+  @override
+  String get cacheDerivedKeyLifetimeNever => 'Jusqu\'à ce que je le désactive';
+
+  @override
+  String cacheDerivedKeyLifetimeExpiresOn(String date) {
+    return 'Supprimée automatiquement le $date';
+  }
+
+  @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
       'Épingler l\'algorithme pour ignorer la détection automatique au déverrouillage.';
 

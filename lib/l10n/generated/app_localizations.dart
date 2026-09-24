@@ -5514,6 +5514,30 @@ abstract class AppLocalizations {
   /// **'Reuse key material in Android Keystore'**
   String get reuseKeyMaterialKeystoreSubtitle;
 
+  /// Duration in days, used for the cached derived key lifetime options
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String nDays(num count);
+
+  /// Label of the picker that sets how long a container's cached derived key is kept before it is removed automatically
+  ///
+  /// In en, this message translates to:
+  /// **'Cached key lifetime'**
+  String get cacheDerivedKeyLifetimeTitle;
+
+  /// Cached key lifetime option: no expiry, the key stays until derived key caching is turned off
+  ///
+  /// In en, this message translates to:
+  /// **'Until I turn it off'**
+  String get cacheDerivedKeyLifetimeNever;
+
+  /// Shows the date on which the cached derived key will be removed automatically; {date} is a formatted calendar date
+  ///
+  /// In en, this message translates to:
+  /// **'Removed automatically on {date}'**
+  String cacheDerivedKeyLifetimeExpiresOn(String date);
+
   /// Subtitle explaining the advanced cipher/hash pinning option
   ///
   /// In en, this message translates to:

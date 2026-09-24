@@ -56,6 +56,7 @@ class SyncStateRecord {
   final SyncSideState vault;
   final SyncSideState target;
   final int lastSyncedAtMs;
+  final bool isDir;
 
   const SyncStateRecord({
     required this.ruleId,
@@ -63,6 +64,7 @@ class SyncStateRecord {
     required this.vault,
     required this.target,
     required this.lastSyncedAtMs,
+    this.isDir = false,
   });
 
   @override
@@ -73,11 +75,12 @@ class SyncStateRecord {
           other.relPath == relPath &&
           other.vault == vault &&
           other.target == target &&
-          other.lastSyncedAtMs == lastSyncedAtMs;
+          other.lastSyncedAtMs == lastSyncedAtMs &&
+          other.isDir == isDir;
 
   @override
   int get hashCode =>
-      Object.hash(ruleId, relPath, vault, target, lastSyncedAtMs);
+      Object.hash(ruleId, relPath, vault, target, lastSyncedAtMs, isDir);
 }
 
 /// A scan of one side of a sync pair.

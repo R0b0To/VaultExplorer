@@ -43,6 +43,16 @@ class FakeSyncEndpoint implements SyncEndpoint {
   final bool supportsSetModified;
 
   final Map<String, FakeFile> files = {};
+  final Set<String> explicitDirs = {};
+
+  void mkdir(String relDir) {
+    final parts = relDir.split('/');
+    for (var i = 1; i <= parts.length; i++) {
+      explicitDirs.add(parts.sublist(0, i).join('/'));
+    }
+  }
+
+  bool hasDir(String rel) => explicitDirs.contains(rel);
 
   /// Final paths (not temp names) whose copy should fail.
   final Set<String> failCopyTo = {};
@@ -82,7 +92,7 @@ class FakeSyncEndpoint implements SyncEndpoint {
   }) async {
     if (token.isCancelled) throw const SyncCancelledException();
     final out = <String, SyncSideState>{};
-    final dirs = <String>{};
+    final dirs = Set<String>.of(explicitDirs);
     final leftovers = <String>[];
     for (final entry in files.entries) {
       final rel = entry.key;
@@ -120,7 +130,10 @@ class FakeSyncEndpoint implements SyncEndpoint {
   }
 
   @override
-  Future<bool> ensureDirectory(String relDir) async => true;
+  Future<bool> ensureDirectory(String relDir) async {
+    mkdir(relDir);
+    return true;
+  }
 
   @override
   Future<bool> copyFrom(
@@ -146,6 +159,26 @@ class FakeSyncEndpoint implements SyncEndpoint {
 
   @override
   Future<bool> rename(String fromRel, String toRel) async {
+    final isDir = explicitDirs.contains(fromRel) || files.keys.any((k) => k.startsWith('$fromRel/'));
+    if (isDir) {
+      if (explicitDirs.contains(toRel) || files.containsKey(toRel) || files.keys.any((k) => k.startsWith('$toRel/'))) {
+        return false;
+      }
+      explicitDirs.remove(fromRel);
+      explicitDirs.add(toRel);
+      final toMoveFiles = files.keys.where((k) => k.startsWith('$fromRel/')).toList();
+      for (final f in toMoveFiles) {
+        final newPath = '$toRel/${f.substring(fromRel.length + 1)}';
+        files[newPath] = files.remove(f)!;
+      }
+      final toMoveDirs = explicitDirs.where((d) => d != fromRel && d.startsWith('$fromRel/')).toList();
+      for (final d in toMoveDirs) {
+        final newPath = '$toRel/${d.substring(fromRel.length + 1)}';
+        explicitDirs.remove(d);
+        explicitDirs.add(newPath);
+      }
+      return true;
+    }
     if (!files.containsKey(fromRel)) return false;
     if (files.containsKey(toRel)) return false; // never replaces
     if (failRenameTo.remove(toRel)) return false;
@@ -154,7 +187,12 @@ class FakeSyncEndpoint implements SyncEndpoint {
   }
 
   @override
-  Future<bool> delete(String relPath) async => files.remove(relPath) != null;
+  Future<bool> delete(String relPath) async {
+    final fileRemoved = files.remove(relPath) != null;
+    final dirRemoved = explicitDirs.remove(relPath);
+    explicitDirs.removeWhere((d) => d.startsWith('$relPath/'));
+    return fileRemoved || dirRemoved;
+  }
 
   @override
   Future<bool> setModified(String relPath, int mtimeSecs) async {

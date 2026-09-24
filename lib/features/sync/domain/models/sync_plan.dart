@@ -17,8 +17,20 @@ enum SyncActionKind {
   deleteOnTarget,
   deleteOnVault,
 
+  /// Creates a directory on target.
+  createDirOnTarget,
+
+  /// Creates a directory on vault.
+  createDirOnVault,
+
+  /// Deletes a directory on target.
+  deleteDirOnTarget,
+
+  /// Deletes a directory on vault.
+  deleteDirOnVault,
+
   /// Both sides changed the same file and neither may silently win: the
-  /// loser's version is preserved as a "(... Conflict <timestamp>)" copy
+  /// loser's version is preserved as a "(... Conflict `timestamp`)" copy
   /// and the winner keeps the original name. See [SyncAction.winner].
   keepBoth,
 
@@ -54,6 +66,7 @@ enum SyncSkipReason {
 class SyncAction {
   final SyncActionKind kind;
   final String relPath;
+  final bool isDir;
 
   /// State each side had when the plan was made. The *source* side's state
   /// is what gets recorded as its baseline after a transfer, so a file
@@ -82,6 +95,7 @@ class SyncAction {
   const SyncAction({
     required this.kind,
     required this.relPath,
+    this.isDir = false,
     this.vaultState,
     this.targetState,
     this.replacesExisting = false,
@@ -102,7 +116,9 @@ class SyncAction {
 
   bool get isDelete =>
       kind == SyncActionKind.deleteOnTarget ||
-      kind == SyncActionKind.deleteOnVault;
+      kind == SyncActionKind.deleteOnVault ||
+      kind == SyncActionKind.deleteDirOnTarget ||
+      kind == SyncActionKind.deleteDirOnVault;
 
   bool get movesData =>
       kind == SyncActionKind.copyToTarget ||

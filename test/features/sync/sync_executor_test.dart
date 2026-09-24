@@ -410,4 +410,148 @@ void main() {
       expect(report.completedCleanly, isFalse);
     });
   });
+
+  group('Directory synchronization & folder renaming', () {
+    test('empty folders created in Vault are synchronized to Target', () async {
+      final h = Harness();
+      h.vault.mkdir('EmptyFolder');
+      h.vault.mkdir('Nested/SubEmpty');
+
+      final r = rule(direction: SyncDirection.vaultToTarget, deleteOrphans: true);
+      final report = await h.run(r);
+
+      expect(report.failed, 0);
+      expect(h.target.hasDir('EmptyFolder'), isTrue);
+      expect(h.target.hasDir('Nested/SubEmpty'), isTrue);
+      expect(h.target.hasDir('Nested'), isTrue);
+    });
+
+    test('empty folders deleted from Vault are removed from Target with deleteOrphans enabled', () async {
+      final h = Harness();
+      h.vault.mkdir('EmptyFolder');
+      final r = rule(direction: SyncDirection.vaultToTarget, deleteOrphans: true);
+      await h.run(r);
+      expect(h.target.hasDir('EmptyFolder'), isTrue);
+
+      // Now delete from vault
+      h.vault.explicitDirs.remove('EmptyFolder');
+      final report = await h.run(r);
+
+      expect(report.failed, 0);
+      expect(report.deleted, 1);
+      expect(h.target.hasDir('EmptyFolder'), isFalse);
+    });
+
+    test('empty folders deleted from Vault survive on Target with deleteOrphans disabled', () async {
+      final h = Harness();
+      h.vault.mkdir('EmptyFolder');
+      final r = rule(direction: SyncDirection.vaultToTarget, deleteOrphans: false);
+      await h.run(r);
+      expect(h.target.hasDir('EmptyFolder'), isTrue);
+
+      h.vault.explicitDirs.remove('EmptyFolder');
+      final report = await h.run(r);
+
+      expect(report.deleted, 0);
+      expect(h.target.hasDir('EmptyFolder'), isTrue);
+    });
+
+    test('renaming a folder 3 times updates target without leaving duplicate folders', () async {
+      final h = Harness();
+      h.vault.put('MyFolder/file.txt', 'hello');
+
+      final r = rule(
+        direction: SyncDirection.vaultToTarget,
+        strategy: ConflictStrategy.vaultWins,
+        deleteOrphans: true,
+      );
+
+      // Initial sync
+      await h.run(r);
+      expect(h.target.read('MyFolder/file.txt'), 'hello');
+      expect(h.target.hasDir('MyFolder'), isTrue);
+
+      // Rename 1: MyFolder -> MyFolder 1
+      await h.vault.rename('MyFolder', 'MyFolder 1');
+      await h.run(r);
+      expect(h.target.read('MyFolder 1/file.txt'), 'hello');
+      expect(h.target.hasDir('MyFolder 1'), isTrue);
+      expect(h.target.hasDir('MyFolder'), isFalse, reason: 'old folder must be removed');
+      expect(h.target.has('MyFolder/file.txt'), isFalse);
+
+      // Rename 2: MyFolder 1 -> MyFolder 2
+      await h.vault.rename('MyFolder 1', 'MyFolder 2');
+      await h.run(r);
+      expect(h.target.read('MyFolder 2/file.txt'), 'hello');
+      expect(h.target.hasDir('MyFolder 2'), isTrue);
+      expect(h.target.hasDir('MyFolder 1'), isFalse, reason: 'old folder 1 must be removed');
+      expect(h.target.hasDir('MyFolder'), isFalse);
+
+      // Rename 3: MyFolder 2 -> MyFolder 3
+      await h.vault.rename('MyFolder 2', 'MyFolder 3');
+      await h.run(r);
+      expect(h.target.read('MyFolder 3/file.txt'), 'hello');
+      expect(h.target.hasDir('MyFolder 3'), isTrue);
+      expect(h.target.hasDir('MyFolder 2'), isFalse, reason: 'old folder 2 must be removed');
+      expect(h.target.hasDir('MyFolder 1'), isFalse);
+      expect(h.target.hasDir('MyFolder'), isFalse);
+
+      // After 3 renames, target contains ONLY MyFolder 3 and its file -- no duplicate copies!
+      expect(h.target.explicitDirs.where((d) => d.startsWith('MyFolder')).toList(), ['MyFolder 3']);
+    });
+
+    test('renaming a folder with >= 10 files proceeds without mass-delete guard blocking it', () async {
+      final h = Harness();
+      for (var i = 1; i <= 15; i++) {
+        h.vault.put('BigFolder/file$i.txt', 'content $i');
+      }
+
+      final r = rule(
+        direction: SyncDirection.vaultToTarget,
+        strategy: ConflictStrategy.vaultWins,
+        deleteOrphans: true,
+      );
+
+      // Initial sync of 15 files + 1 directory
+      final initial = await h.run(r);
+      expect(initial.copied, 16);
+      expect(h.target.hasDir('BigFolder'), isTrue);
+
+      // Rename folder
+      await h.vault.rename('BigFolder', 'RenamedBigFolder');
+      final renameReport = await h.run(r);
+
+      expect(renameReport.deletionsBlocked, isFalse, reason: 'renames must not be blocked by mass delete guard');
+      expect(renameReport.deleted, 16, reason: '15 files + 1 old directory deleted');
+      expect(h.target.hasDir('BigFolder'), isFalse);
+      expect(h.target.hasDir('RenamedBigFolder'), isTrue);
+      for (var i = 1; i <= 15; i++) {
+        expect(h.target.read('RenamedBigFolder/file$i.txt'), 'content $i');
+        expect(h.target.has('BigFolder/file$i.txt'), isFalse);
+      }
+    });
+
+    test('two-way sync creates and propagates empty folders symmetrically', () async {
+      final h = Harness();
+      h.vault.mkdir('FromVault');
+      h.target.mkdir('FromTarget');
+
+      final r = rule(direction: SyncDirection.twoWay, deleteOrphans: true);
+      final first = await h.run(r);
+
+      expect(first.failed, 0);
+      expect(h.target.hasDir('FromVault'), isTrue);
+      expect(h.vault.hasDir('FromTarget'), isTrue);
+
+      // Delete FromVault from vault side
+      h.vault.explicitDirs.remove('FromVault');
+      final second = await h.run(r);
+
+      expect(second.deleted, 1);
+      expect(h.target.hasDir('FromVault'), isFalse);
+      expect(h.vault.hasDir('FromVault'), isFalse);
+      expect(h.target.hasDir('FromTarget'), isTrue);
+      expect(h.vault.hasDir('FromTarget'), isTrue);
+    });
+  });
 }

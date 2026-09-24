@@ -122,6 +122,7 @@ class SyncLedgerCodec {
             r.target.size,
             r.target.hash,
             r.lastSyncedAtMs,
+            if (r.isDir) 1,
           ],
       ];
     }
@@ -169,12 +170,14 @@ class SyncLedgerCodec {
         (tHash != null && tHash is! String)) {
       return null;
     }
+    final isDir = row.length > 8 && row[8] == 1;
     return SyncStateRecord(
       ruleId: ruleId,
       relPath: path,
       vault: SyncSideState(size: vSize, mtimeSecs: vMtime, hash: vHash as String?),
       target: SyncSideState(size: tSize, mtimeSecs: tMtime, hash: tHash as String?),
       lastSyncedAtMs: at,
+      isDir: isDir,
     );
   }
 }

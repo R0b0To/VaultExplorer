@@ -126,12 +126,18 @@ class SyncExecutor {
   }) async {
     final key = ledgerKey ?? rule.id;
 
-    // Bookkeeping first, then transfers, then deletions.
+    // Directory creates first (shallowest first), then bookkeeping,
+    // then transfers, then file deletions, then directory deletions (deepest first).
+    final dirCreates = <SyncAction>[];
     final cheap = <SyncAction>[];
     final transfers = <SyncAction>[];
-    final deletions = <SyncAction>[];
+    final fileDeletions = <SyncAction>[];
+    final dirDeletions = <SyncAction>[];
     for (final a in plan.actions) {
       switch (a.kind) {
+        case SyncActionKind.createDirOnTarget:
+        case SyncActionKind.createDirOnVault:
+          dirCreates.add(a);
         case SyncActionKind.adopt:
         case SyncActionKind.forget:
           cheap.add(a);
@@ -141,12 +147,24 @@ class SyncExecutor {
           transfers.add(a);
         case SyncActionKind.deleteOnTarget:
         case SyncActionKind.deleteOnVault:
-          deletions.add(a);
+          fileDeletions.add(a);
+        case SyncActionKind.deleteDirOnTarget:
+        case SyncActionKind.deleteDirOnVault:
+          dirDeletions.add(a);
         case SyncActionKind.skip:
           break;
       }
     }
-    final work = [...cheap, ...transfers, ...deletions];
+    dirCreates.sort((a, b) => a.relPath.length.compareTo(b.relPath.length));
+    dirDeletions.sort((a, b) => b.relPath.length.compareTo(a.relPath.length));
+
+    final work = [
+      ...dirCreates,
+      ...cheap,
+      ...transfers,
+      ...fileDeletions,
+      ...dirDeletions,
+    ];
 
     var done = 0;
     var failed = 0;
@@ -176,11 +194,35 @@ class SyncExecutor {
         report(action.relPath);
         try {
           switch (action.kind) {
+            case SyncActionKind.createDirOnTarget:
+              final ok = await target.ensureDirectory(action.relPath);
+              if (!ok) throw const _StepFailed('mkdir');
+              _put(
+                ledger,
+                key,
+                action.relPath,
+                const SyncSideState(size: 0, mtimeSecs: 0),
+                const SyncSideState(size: 0, mtimeSecs: 0),
+                isDir: true,
+              );
+              copied++;
+            case SyncActionKind.createDirOnVault:
+              final ok = await vault.ensureDirectory(action.relPath);
+              if (!ok) throw const _StepFailed('mkdir');
+              _put(
+                ledger,
+                key,
+                action.relPath,
+                const SyncSideState(size: 0, mtimeSecs: 0),
+                const SyncSideState(size: 0, mtimeSecs: 0),
+                isDir: true,
+              );
+              copied++;
             case SyncActionKind.adopt:
               final v = action.vaultState;
               final t = action.targetState;
               if (v != null && t != null) {
-                _put(ledger, key, action.relPath, v, t);
+                _put(ledger, key, action.relPath, v, t, isDir: action.isDir);
               }
               adopted++;
             case SyncActionKind.forget:
@@ -226,6 +268,14 @@ class SyncExecutor {
               await _delete(vault, action.relPath);
               ledger.remove(key, action.relPath);
               deleted++;
+            case SyncActionKind.deleteDirOnTarget:
+              await _delete(target, action.relPath);
+              ledger.remove(key, action.relPath);
+              deleted++;
+            case SyncActionKind.deleteDirOnVault:
+              await _delete(vault, action.relPath);
+              ledger.remove(key, action.relPath);
+              deleted++;
             case SyncActionKind.skip:
               break;
           }
@@ -264,8 +314,9 @@ class SyncExecutor {
     String ruleId,
     String rel,
     SyncSideState vault,
-    SyncSideState target,
-  ) {
+    SyncSideState target, {
+    bool isDir = false,
+  }) {
     ledger.put(
       SyncStateRecord(
         ruleId: ruleId,
@@ -273,6 +324,7 @@ class SyncExecutor {
         vault: vault,
         target: target,
         lastSyncedAtMs: _now().millisecondsSinceEpoch,
+        isDir: isDir,
       ),
     );
   }

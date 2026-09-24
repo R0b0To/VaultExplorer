@@ -346,7 +346,13 @@ class ContainerSyncEndpoint implements SyncEndpoint {
   @override
   Future<bool> delete(String relPath) async {
     try {
-      return await _io.deleteFile(container, _abs(relPath));
+      final abs = _abs(relPath);
+      final ok = await _io.deleteFile(container, abs);
+      if (ok) {
+        _knownDirs.remove(abs);
+        _knownDirs.removeWhere((d) => d.startsWith('$abs/'));
+      }
+      return ok;
     } catch (_) {
       return false;
     }

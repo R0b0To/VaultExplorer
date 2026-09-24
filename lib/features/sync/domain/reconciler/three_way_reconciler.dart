@@ -87,12 +87,13 @@ class ThreeWayReconciler {
     final paths = <String>{
       ...vault.files.keys,
       ...target.files.keys,
-      ...baseline.keys,
+      ...baseline.keys.where((k) => !(baseline[k]?.isDir ?? false)),
     }.toList()..sort();
 
     for (final path in paths) {
       await run.decide(path);
     }
+    run.reconcileDirectories();
     return run.finish();
   }
 
@@ -419,21 +420,183 @@ class _Run {
     return '$dir$stem ($label Conflict $stamp)$ext';
   }
 
-  void _skip(String path, SyncSkipReason reason, SyncSideState? v, SyncSideState? t) =>
-      actions.add(_skipAction(path, reason, v, t));
+  void _skip(String path, SyncSkipReason reason, SyncSideState? v, SyncSideState? t, {bool isDir = false}) =>
+      actions.add(_skipAction(path, reason, v, t, isDir: isDir));
 
   SyncAction _skipAction(
     String path,
     SyncSkipReason reason,
     SyncSideState? v,
-    SyncSideState? t,
-  ) => SyncAction(
+    SyncSideState? t, {
+    bool isDir = false,
+  }) => SyncAction(
     kind: SyncActionKind.skip,
     relPath: path,
     vaultState: v,
     targetState: t,
     skipReason: reason,
+    isDir: isDir,
   );
+
+  // ── directory reconciliation ──────────────────────────────────────
+
+  void reconcileDirectories() {
+    final vaultSurvivingFiles = {...vault.files.keys}
+      ..removeAll(actions.where((a) => a.kind == SyncActionKind.deleteOnVault).map((a) => a.relPath));
+    vaultSurvivingFiles.addAll(actions.where((a) => a.kind == SyncActionKind.copyToVault).map((a) => a.relPath));
+
+    final targetSurvivingFiles = {...target.files.keys}
+      ..removeAll(actions.where((a) => a.kind == SyncActionKind.deleteOnTarget).map((a) => a.relPath));
+    targetSurvivingFiles.addAll(actions.where((a) => a.kind == SyncActionKind.copyToTarget).map((a) => a.relPath));
+
+    bool clashingWithFile(String d, SyncSnapshot snap) {
+      return snap.files.containsKey(d) || _ancestorIsFile(d, snap);
+    }
+
+    final existingActionPaths = {for (final a in actions) a.relPath};
+
+    final baselineDirs = <String>{};
+    for (final r in baseline.values) {
+      if (r.isDir) {
+        baselineDirs.add(r.relPath);
+      } else {
+        var p = r.relPath;
+        while (p.contains('/')) {
+          p = p.substring(0, p.lastIndexOf('/'));
+          baselineDirs.add(p);
+        }
+      }
+    }
+
+    if (rule.direction == SyncDirection.vaultToTarget) {
+      final toCreate = vault.dirs.where((d) => !target.dirs.contains(d)).toList()
+        ..sort((a, b) => a.length.compareTo(b.length));
+      for (final d in toCreate) {
+        if (existingActionPaths.contains(d) || clashingWithFile(d, target)) continue;
+        actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+        existingActionPaths.add(d);
+      }
+
+      if (rule.deleteOrphans) {
+        final toDelete = target.dirs.where((d) => !vault.dirs.contains(d)).toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+        final deletedDirs = <String>{};
+        for (final d in toDelete) {
+          if (existingActionPaths.contains(d)) continue;
+          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d)) continue;
+          final prefix = '$d/';
+          final hasFiles = targetSurvivingFiles.any((f) => f.startsWith(prefix));
+          final hasSubdirs = target.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedDirs.contains(other));
+          if (!hasFiles && !hasSubdirs) {
+            actions.add(SyncAction(kind: SyncActionKind.deleteDirOnTarget, relPath: d, isDir: true));
+            deletedDirs.add(d);
+            existingActionPaths.add(d);
+          }
+        }
+      }
+    } else if (rule.direction == SyncDirection.targetToVault) {
+      final toCreate = target.dirs.where((d) => !vault.dirs.contains(d)).toList()
+        ..sort((a, b) => a.length.compareTo(b.length));
+      for (final d in toCreate) {
+        if (existingActionPaths.contains(d) || clashingWithFile(d, vault)) continue;
+        actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+        existingActionPaths.add(d);
+      }
+
+      if (rule.deleteOrphans) {
+        final toDelete = vault.dirs.where((d) => !target.dirs.contains(d)).toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
+        final deletedDirs = <String>{};
+        for (final d in toDelete) {
+          if (existingActionPaths.contains(d)) continue;
+          if (vault.isUnderUnreadable(d) || vault.isUnderTruncated(d)) continue;
+          final prefix = '$d/';
+          final hasFiles = vaultSurvivingFiles.any((f) => f.startsWith(prefix));
+          final hasSubdirs = vault.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedDirs.contains(other));
+          if (!hasFiles && !hasSubdirs) {
+            actions.add(SyncAction(kind: SyncActionKind.deleteDirOnVault, relPath: d, isDir: true));
+            deletedDirs.add(d);
+            existingActionPaths.add(d);
+          }
+        }
+      }
+    } else {
+      // Two-way sync
+      final allDirs = {...vault.dirs, ...target.dirs, ...baselineDirs}.toList()
+        ..sort((a, b) => a.length.compareTo(b.length));
+
+      for (final d in allDirs) {
+        if (existingActionPaths.contains(d)) continue;
+        final inV = vault.dirs.contains(d);
+        final inT = target.dirs.contains(d);
+        final inB = baselineDirs.contains(d);
+
+        if (inV && !inT && !inB) {
+          if (!clashingWithFile(d, target)) {
+            actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+            existingActionPaths.add(d);
+          }
+        } else if (!inV && inT && !inB) {
+          if (!clashingWithFile(d, vault)) {
+            actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+            existingActionPaths.add(d);
+          }
+        }
+      }
+
+      final allDirsReversed = allDirs.toList()..sort((a, b) => b.length.compareTo(a.length));
+      final deletedVaultDirs = <String>{};
+      final deletedTargetDirs = <String>{};
+
+      for (final d in allDirsReversed) {
+        if (existingActionPaths.contains(d)) continue;
+        final inV = vault.dirs.contains(d);
+        final inT = target.dirs.contains(d);
+        final inB = baselineDirs.contains(d);
+
+        if (inV && !inT && inB) {
+          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d)) continue;
+          if (rule.deleteOrphans) {
+            final prefix = '$d/';
+            final hasFiles = vaultSurvivingFiles.any((f) => f.startsWith(prefix));
+            final hasSubdirs = vault.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedVaultDirs.contains(other));
+            if (!hasFiles && !hasSubdirs) {
+              actions.add(SyncAction(kind: SyncActionKind.deleteDirOnVault, relPath: d, isDir: true));
+              deletedVaultDirs.add(d);
+              existingActionPaths.add(d);
+            }
+          } else {
+            if (!clashingWithFile(d, target)) {
+              actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+              existingActionPaths.add(d);
+            }
+          }
+        } else if (!inV && inT && inB) {
+          if (vault.isUnderUnreadable(d) || vault.isUnderTruncated(d)) continue;
+          if (rule.deleteOrphans) {
+            final prefix = '$d/';
+            final hasFiles = targetSurvivingFiles.any((f) => f.startsWith(prefix));
+            final hasSubdirs = target.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedTargetDirs.contains(other));
+            if (!hasFiles && !hasSubdirs) {
+              actions.add(SyncAction(kind: SyncActionKind.deleteDirOnTarget, relPath: d, isDir: true));
+              deletedTargetDirs.add(d);
+              existingActionPaths.add(d);
+            }
+          } else {
+            if (!clashingWithFile(d, vault)) {
+              actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+              existingActionPaths.add(d);
+            }
+          }
+        } else if (!inV && !inT && inB) {
+          if (baseline[d]?.isDir ?? false) {
+            actions.add(SyncAction(kind: SyncActionKind.forget, relPath: d, isDir: true));
+            existingActionPaths.add(d);
+          }
+        }
+      }
+    }
+  }
 
   // ── mass-deletion guard ─────────────────────────────────────────────
 
@@ -444,18 +607,53 @@ class _Run {
       (baselineCount * reconciler.massDeleteFraction).floor(),
     );
 
-    final delOnVault = actions.where((a) => a.kind == SyncActionKind.deleteOnVault).length;
-    final delOnTarget = actions.where((a) => a.kind == SyncActionKind.deleteOnTarget).length;
+    final delFileOnVault = actions.where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnVault).toList();
+    final delFileOnTarget = actions.where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnTarget).toList();
+
+    // Check for renames/moves so moving/renaming files is not falsely counted as mass deletion:
+    final copyToTargetFiles = actions.where((a) => !a.isDir && a.kind == SyncActionKind.copyToTarget).toList();
+    final copyToVaultFiles = actions.where((a) => !a.isDir && a.kind == SyncActionKind.copyToVault).toList();
+
+    int renamedOnTarget = 0;
+    final availableTargetCopies = List<SyncAction>.of(copyToTargetFiles);
+    for (final del in delFileOnTarget) {
+      final delName = del.relPath.split('/').last;
+      final delSize = del.targetState?.size ?? 0;
+      final matchIdx = availableTargetCopies.indexWhere(
+        (c) => c.relPath.split('/').last == delName && (c.vaultState?.size ?? 0) == delSize,
+      );
+      if (matchIdx >= 0) {
+        renamedOnTarget++;
+        availableTargetCopies.removeAt(matchIdx);
+      }
+    }
+
+    int renamedOnVault = 0;
+    final availableVaultCopies = List<SyncAction>.of(copyToVaultFiles);
+    for (final del in delFileOnVault) {
+      final delName = del.relPath.split('/').last;
+      final delSize = del.vaultState?.size ?? 0;
+      final matchIdx = availableVaultCopies.indexWhere(
+        (c) => c.relPath.split('/').last == delName && (c.targetState?.size ?? 0) == delSize,
+      );
+      if (matchIdx >= 0) {
+        renamedOnVault++;
+        availableVaultCopies.removeAt(matchIdx);
+      }
+    }
+
+    final netDelOnVault = delFileOnVault.length - renamedOnVault;
+    final netDelOnTarget = delFileOnTarget.length - renamedOnTarget;
 
     // Deleting on the vault is driven by what the target *lost*, so an
     // empty target listing is the suspicious case there (and vice versa).
     final emptyIsSuspicious = baselineCount >= reconciler.emptySideMinBaseline;
     final blockVault =
-        delOnVault > 0 &&
-        ((target.files.isEmpty && emptyIsSuspicious) || delOnVault > limit);
+        delFileOnVault.isNotEmpty &&
+        ((target.files.isEmpty && emptyIsSuspicious) || netDelOnVault > limit);
     final blockTarget =
-        delOnTarget > 0 &&
-        ((vault.files.isEmpty && emptyIsSuspicious) || delOnTarget > limit);
+        delFileOnTarget.isNotEmpty &&
+        ((vault.files.isEmpty && emptyIsSuspicious) || netDelOnTarget > limit);
 
     if (!blockVault && !blockTarget) {
       return SyncPlan(ruleId: rule.id, actions: List.unmodifiable(actions));
@@ -463,9 +661,9 @@ class _Run {
 
     final guarded = <SyncAction>[
       for (final a in actions)
-        if ((blockVault && a.kind == SyncActionKind.deleteOnVault) ||
-            (blockTarget && a.kind == SyncActionKind.deleteOnTarget))
-          _skipAction(a.relPath, SyncSkipReason.massDeleteGuard, a.vaultState, a.targetState)
+        if ((blockVault && (a.kind == SyncActionKind.deleteOnVault || a.kind == SyncActionKind.deleteDirOnVault)) ||
+            (blockTarget && (a.kind == SyncActionKind.deleteOnTarget || a.kind == SyncActionKind.deleteDirOnTarget)))
+          _skipAction(a.relPath, SyncSkipReason.massDeleteGuard, a.vaultState, a.targetState, isDir: a.isDir)
         else
           a,
     ];

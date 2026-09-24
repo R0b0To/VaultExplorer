@@ -1,0 +1,8 @@
+### Improvements
+• Auto-Sync: Expanded the auto-sync engine to track, detect, and synchronize folder structure changes and empty directories alongside individual files
+• Image Format Re-encoding**: Added support for re-encoding edited images into lossy formats (such as JPEG and WebP)
+
+### Bug Fixes
+• Image Editor Prompt: Fixed an issue where the image editor redundantly prompted users to save changes twice before closing
+• Camera Backgrounding: Fixed a lifecycle freeze where transitioning the app to the background during an active camera session caused recording or capture state errors
+• General Stability: Resolved miscellaneous minor bugs

@@ -31,7 +31,9 @@ class BaseContainerCard extends StatelessWidget {
   final Widget? trailingAction;
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
+
   const BaseContainerCard({
+    super.key,
     required this.onTap,
     required this.icon,
     required this.iconBackgroundColor,
@@ -42,11 +44,13 @@ class BaseContainerCard extends StatelessWidget {
     this.backgroundColor,
     this.borderRadius,
   });
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final effectiveRadius = borderRadius ?? BorderRadius.circular(18);
+
     return Card(
       elevation: 0,
       color: backgroundColor ?? cs.surfaceContainer,
@@ -77,7 +81,8 @@ class BaseContainerCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        // Changed from Flexible to Expanded:
+                        Expanded(
                           child: Text(
                             title,
                             style: textTheme.titleMedium?.copyWith(
@@ -89,13 +94,16 @@ class BaseContainerCard extends StatelessWidget {
                             maxLines: 1,
                           ),
                         ),
-                        if (titleTrailing != null) titleTrailing!,
+                        if (titleTrailing != null) ...[
+                          const SizedBox(width: 8), // Gap before trailing item
+                          titleTrailing!,
+                        ],
                       ],
                     ),
-                     if (subtitle != null) ...[
+                    if (subtitle != null) ...[
                       const SizedBox(height: 3),
                       subtitle!,
-                      ]
+                    ],
                   ],
                 ),
               ),

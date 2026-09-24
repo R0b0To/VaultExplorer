@@ -675,7 +675,7 @@ Widget _buildVaultKindSegmentedButton(
                 ),
               ),
             ),
-            const Divider(height: 1),
+          
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 280),
               child: ListView.builder(

@@ -42,6 +42,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   late final VaultCameraController _cameraController;
   late final ActiveRecordingRegistry _activeRecordingRegistry;
 
+  AppLifecycleState _lastLifecycleState = AppLifecycleState.resumed;
+  Future<void>? _backgroundingFuture;
+  bool _isOpeningCamera = false;
+
   bool _isRecording = false;
   bool _pendingStopAfterStart = false;
   bool _backgroundRecordingActive = false;
@@ -223,22 +227,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_cameraController.isInitialized) return;
+    _lastLifecycleState = state;
 
-    if (state == AppLifecycleState.inactive) {
-      unawaited(_handleGoingInactive());
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _backgroundingFuture = _handleGoingBackground();
     } else if (state == AppLifecycleState.resumed) {
-      if (_backgroundRecordingActive) {
-        unawaited(_resumeFromBackgroundRecording());
-      } else {
-        _initCamera(
-          cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
-        );
-      }
+      unawaited(_handleResumed());
     }
   }
 
-  Future<void> _handleGoingInactive() async {
+  Future<void> _handleGoingBackground() async {
     if (_isRecording) return;
     await _cameraController.close();
     if (mounted) {
@@ -246,9 +244,26 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
   }
 
+  Future<void> _handleResumed() async {
+    unawaited(_refreshDisplayRotation());
+    if (_backgroundingFuture != null) {
+      await _backgroundingFuture;
+    }
+    if (!mounted) return;
+    if (_backgroundRecordingActive) {
+      unawaited(_resumeFromBackgroundRecording());
+    } else if (!_cameraController.isInitialized) {
+      await _initCamera(
+        cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
+      );
+    }
+  }
+
   Future<void> _resumeFromBackgroundRecording() async {}
 
   Future<void> _initCamera({String? cameraId}) async {
+    if (_isOpeningCamera) return;
+    _isOpeningCamera = true;
     try {
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
@@ -272,6 +287,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
       if (!mounted) return;
 
+      if (_lastLifecycleState == AppLifecycleState.paused ||
+          _lastLifecycleState == AppLifecycleState.hidden) {
+        await _cameraController.close();
+        return;
+      }
+
       _captureSessionController.setCameraOpened(info);
       await _cameraController.setFlash(_captureControls.flashMode);
       await _cameraController.setZoom(_currentZoom);
@@ -281,6 +302,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           context.l10n.cameraErrorMessage('$e'),
         );
       }
+    } finally {
+      _isOpeningCamera = false;
     }
   }
 

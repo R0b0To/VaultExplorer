@@ -38,6 +38,10 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   late final QuickCaptureApi _quickCaptureApi;
   late final VaultCameraController _cameraController;
 
+  AppLifecycleState _lastLifecycleState = AppLifecycleState.resumed;
+  Future<void>? _backgroundingFuture;
+  bool _isOpeningCamera = false;
+
   _Phase _phase = _Phase.camera;
   ScratchpadSession? _pendingScratchpad;
   bool? _pendingIsVideo;
@@ -196,19 +200,17 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_cameraController.isInitialized) return;
+    _lastLifecycleState = state;
     if (_phase != _Phase.camera) return;
 
-    if (state == AppLifecycleState.inactive) {
-      unawaited(_handleGoingInactive());
-    } else if (state == AppLifecycleState.resumed && _phase == _Phase.camera) {
-      _initCamera(
-        cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
-      );
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _backgroundingFuture = _handleGoingBackground();
+    } else if (state == AppLifecycleState.resumed) {
+      unawaited(_handleResumed());
     }
   }
 
-  Future<void> _handleGoingInactive() async {
+  Future<void> _handleGoingBackground() async {
     if (_isRecording) {
       await _stopVideoRecording();
     }
@@ -218,7 +220,22 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     }
   }
 
+  Future<void> _handleResumed() async {
+    unawaited(_refreshDisplayRotation());
+    if (_backgroundingFuture != null) {
+      await _backgroundingFuture;
+    }
+    if (!mounted || _phase != _Phase.camera) return;
+    if (!_cameraController.isInitialized) {
+      await _initCamera(
+        cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
+      );
+    }
+  }
+
   Future<void> _initCamera({String? cameraId}) async {
+    if (_isOpeningCamera) return;
+    _isOpeningCamera = true;
     try {
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
@@ -242,6 +259,13 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
       if (!mounted) return;
 
+      if (_phase != _Phase.camera ||
+          _lastLifecycleState == AppLifecycleState.paused ||
+          _lastLifecycleState == AppLifecycleState.hidden) {
+        await _cameraController.close();
+        return;
+      }
+
       _captureSessionController.setCameraOpened(info);
       await _cameraController.setFlash(_captureControls.flashMode);
       await _cameraController.setZoom(_currentZoom);
@@ -251,6 +275,8 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           context.l10n.cameraErrorMessage('$e'),
         );
       }
+    } finally {
+      _isOpeningCamera = false;
     }
   }
 

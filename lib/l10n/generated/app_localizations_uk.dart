@@ -936,7 +936,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get customDurationOption => 'Власний…';
+  String get customDurationOption => 'Власна тривалість…';
 
   @override
   String get customDurationDialogTitle => 'Власна тривалість';
@@ -3294,10 +3294,10 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count дня',
+      other: '$count днів',
       many: '$count днів',
       few: '$count дні',
-      one: '$count день',
+      one: '1 день',
     );
     return '$_temp0';
   }
@@ -3307,7 +3307,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Тривалість зберігання ключа в кеші';
 
   @override
-  String get cacheDerivedKeyLifetimeNever => 'Доки я не вимкну';
+  String get cacheDerivedKeyLifetimeNever => 'До вимкнення вручну';
 
   @override
   String cacheDerivedKeyLifetimeExpiresOn(String date) {
@@ -3336,11 +3336,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get neverAutoLockOptionSubtitle =>
-      'Залишається відкритим, навіть коли застосунок блокується або вимикається екран';
+      'Залишається відкритим, навіть коли програма блокується або вимикається екран';
 
   @override
   String get defaultAutoLockOptionSubtitle =>
-      'Дотримується налаштувань автоблокування застосунку та блокування екрана';
+      'Використовує налаштування автоблокування програми та блокування екрана';
 
   @override
   String get exposeContentToFilePickerSubtitle =>
@@ -4139,7 +4139,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Дешифрування та повторне шифрування відбуваються в оперативній пам\'яті. Кілька операцій, яким потрібен тимчасовий файл, наприклад запис відео чи експорт, зберігають його у приватному сховищі застосунку та перезаписують нулями після завершення.';
+      'Дешифрування та повторне шифрування відбуваються в оперативній пам\'яті. Кілька операцій, яким потрібен тимчасовий файл, наприклад запис відео чи експорт, зберігають його у приватному сховищі програми та перезаписують нулями після завершення.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Без аналітики та телеметрії';
@@ -4153,7 +4153,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get privacyPointKeystoreBody =>
-      'Збережені паролі, графічні ключі та похідні ключі шифруються за допомогою AES-GCM із ключем, що зберігається в Android Keystore (апаратно захищеному, якщо підтримується).';
+      'Збережені паролі, графічні ключі та кешовані похідні ключі шифруються за допомогою AES-GCM із ключем, що зберігається в Android Keystore (апаратно захищеному, де це підтримується).';
 
   @override
   String get privacyPointPosixTitle => 'Прискорення POSIX та прямий доступ';
@@ -4168,14 +4168,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Блокування мініатюр у списку додатків, необов\'язкове блокування знімків екрана (FLAG_SECURE), а також автоматичне очищення пошкодженого буфера обміну під час фокусування вікна. Паролі, скопійовані з елементів сховища, позначаються як конфіденційні в Android 13+ і автоматично стираються через 30 секунд, якщо ними не скористалися.';
+      'Блокування мініатюр у списку нещодавніх програм, необов\'язкове блокування знімків екрана (FLAG_SECURE), а також автоматичне очищення пошкодженого буфера обміну під час фокусування вікна. Паролі, скопійовані з елементів сховища, позначаються як конфіденційні в Android 13+ і автоматично очищаються через 30 секунд, якщо ними не скористалися.';
 
   @override
   String get privacyPointMaskModeTitle => 'Режим маскування';
 
   @override
   String get privacyPointMaskModeBody =>
-      'За бажанням маскує програму під повноцінний локальний файловий менеджер із іншою назвою та іконкою. Затисніть заголовок на 2 секунди, щоб відкрити справжнє сховище.';
+      'За бажанням маскує програму під повноцінний локальний файловий менеджер із іншою назвою та значком. Затисніть заголовок на 2 секунди, щоб відкрити справжнє сховище.';
 
   @override
   String get privacyPointExternalLinksTitle =>
@@ -5897,38 +5897,39 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+      'Ліва та права папки не можуть бути однаковими або вкладеними одна в одну.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return 'Файли, скопійовані зі сховища до $targets, зберігатимуться незашифрованими.';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => 'Сховище';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => 'Зашифроване сховище';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice => 'Пам\'ять пристрою · незашифровано';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider =>
+      'Провайдер документів · незашифровано';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => 'Додати місце зберігання';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+      'Увімкнути доступ до локального сховища';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle => 'Немає сховищ для синхронізації';
 
   @override
   String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+      'Додайте папку чи провайдера документів за допомогою кнопки «+» або змонтуйте сховище.';
 
   @override
   String get vaultSyncReadOnlyBadge => 'Лише для читання';
@@ -6648,12 +6649,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationAllowCameraCapture => 'Дозволити зйомку камерою';
 
   @override
-  String get automationOverlayPermissionTitle =>
-      'Відображати поверх інших додатків';
+  String get automationOverlayPermissionTitle => 'Показ поверх інших програм';
 
   @override
   String get automationOverlayPermissionMessage =>
-      'Для зйомки камерою у фоновому режимі на Android 14+ потрібен дозвіл \'Відображати поверх інших додатків\'. Надайте цей дозвіл, щоб дозволити автоматичну зйомку, коли екран заблоковано або додаток у фоні.';
+      'Для зйомки камерою у фоновому режимі на Android 14+ потрібен дозвіл «Показ поверх інших програм». Надайте цей дозвіл, щоб дозволити автоматичну зйомку, коли екран заблоковано або програма працює у фоні.';
 
   @override
   String get automationPimSavedMessage => 'PIM збережено';
@@ -7346,39 +7346,44 @@ class AppLocalizationsUk extends AppLocalizations {
   String get triggerPanicButton => 'Очистити зараз';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => 'Очищення під час перезавантаження';
 
   @override
-  String get panicBootTriggerLevelLabel => 'Level to Run on Reboot';
+  String get panicBootTriggerLevelLabel =>
+      'Рівень для виконання під час перезавантаження';
 
   @override
-  String get panicBootTriggerArmTitle => 'Arm for Next Boot';
+  String get panicBootTriggerArmTitle =>
+      'Активувати для наступного перезавантаження';
 
   @override
   String panicBootTriggerArmedSubtitle(String tier) {
-    return 'Armed — $tier will run automatically the next time this device boots, then disarm itself';
+    return 'Активовано — $tier виконається автоматично під час наступного завантаження пристрою, після чого тригер вимкнеться';
   }
 
   @override
   String get panicBootTriggerDisarmedSubtitle =>
-      'Off — rebooting this device behaves normally';
+      'Вимкнено — під час перезавантаження пристрій працюватиме у звичайному режимі';
 
   @override
-  String get panicBootTriggerConfirmTitle => 'Arm Wipe on Reboot?';
+  String get panicBootTriggerConfirmTitle =>
+      'Активувати очищення під час перезавантаження?';
 
   @override
   String panicBootTriggerConfirmMessage(String tier) {
-    return 'The next time this device boots — including an ordinary restart or automatic update, not only one you trigger yourself — $tier will run automatically, before you open the app. This fires once, then disarms itself.';
+    return 'Під час наступного запуску або перезавантаження пристрою (зокрема звичайного перезапуску чи автоматичного оновлення, а не лише ініційованого вами) $tier виконається автоматично ще до відкриття програми. Спрацьовує один раз, після чого тригер вимикається.';
   }
 
   @override
-  String get panicBootTriggerArmButton => 'Arm';
+  String get panicBootTriggerArmButton => 'Активувати';
 
   @override
-  String get panicBootTriggerArmedSuccessMessage => 'Boot trigger armed';
+  String get panicBootTriggerArmedSuccessMessage =>
+      'Тригер під час перезавантаження активовано';
 
   @override
-  String get panicBootTriggerDisarmedSuccessMessage => 'Boot trigger disarmed';
+  String get panicBootTriggerDisarmedSuccessMessage =>
+      'Тригер під час перезавантаження вимкнено';
 
   @override
   String get sectionPanicKit => 'Служба реагування PanicKit';
@@ -7703,18 +7708,18 @@ class AppLocalizationsUk extends AppLocalizations {
       'Приховувати верхню панель під час прокручування вниз, щоб збільшити простір перегляду';
 
   @override
-  String get useFabForToolbarLabel => 'Плаваюча кнопка для панелі інструментів';
+  String get useFabForToolbarLabel => 'Плавуча кнопка для панелі інструментів';
 
   @override
   String get useFabForToolbarDesc =>
-      'Замінити нижню панель плаваючою кнопкою для максимального простору';
+      'Замінити нижню панель плавучою кнопкою для максимального простору перегляду';
 
   @override
   String get bottomSelectionBarLabel => 'Панель вибору внизу';
 
   @override
   String get bottomSelectionBarDesc =>
-      'Відображати панель вибору внизу замість верхньої частини';
+      'Відображати панель вибору внизу замість верхньої частини екрана';
 
   @override
   String get clipboardFabTapToPaste =>
@@ -7747,11 +7752,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get renameStorageLocationTitle => 'Перейменувати місце';
 
   @override
-  String get removeStorageLocationTitle => 'Видалити місце';
+  String get removeStorageLocationTitle => 'Вилучити місце';
 
   @override
   String removeStorageLocationConfirm(String name) {
-    return 'Вилучити \"$name\" з місць зберігання? Файли не буде видалено.';
+    return 'Вилучити «$name» з місць зберігання? Файли не буде видалено.';
   }
 
   @override
@@ -7759,7 +7764,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageLocationUnresolvedError =>
-      'Не вдалося отримати прямий доступ до цього місця. Перевірте дозволи на зберігання.';
+      'Не вдалося отримати прямий доступ до цього місця зберігання. Переконайтеся, що надано відповідні дозволи.';
 
   @override
   String get internalStorageSubtitle => 'Внутрішня пам\'ять';
@@ -7777,20 +7782,20 @@ class AppLocalizationsUk extends AppLocalizations {
   String get mediaViewerActionDiagnostics => 'Діагностика';
 
   @override
-  String get mediaViewerCustomizeControls =>
-      'Налаштувати елементи керування...';
+  String get mediaViewerCustomizeControls => 'Налаштувати керування';
 
   @override
   String get mediaViewerControlsTitle => 'Елементи керування медіаплеєром';
 
   @override
-  String get mediaViewerControlsReset => 'Елементи керування скинуто';
+  String get mediaViewerControlsReset =>
+      'Елементи керування скинуто до початкових';
 
   @override
-  String get mediaViewerTransportDisplay => 'Транспорт і відображення';
+  String get mediaViewerTransportDisplay => 'Керування відтворенням та екран';
 
   @override
-  String get mediaViewerShowScrubberTitle => 'Показувати індикатор прогресу';
+  String get mediaViewerShowScrubberTitle => 'Показувати шкалу прогресу';
 
   @override
   String get mediaViewerShowScrubberDesc =>
@@ -7798,7 +7803,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mediaViewerShowCenterTransportTitle =>
-      'Показувати центральні елементи керування';
+      'Показувати центральні кнопки відтворення';
 
   @override
   String get mediaViewerShowCenterTransportDesc =>
@@ -7806,7 +7811,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mediaViewerShowPrevNextTitle =>
-      'Показувати кнопки \"Далі\" та \"Назад\"';
+      'Показувати кнопки «Назад» і «Далі»';
 
   @override
   String get mediaViewerShowPrevNextDesc =>
@@ -7833,7 +7838,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Усі елементи керування вже закріплені.';
 
   @override
-  String get mediaPlayerControlsTitle => 'Керування медіаплеєром';
+  String get mediaPlayerControlsTitle => 'Керування плеєром';
 
   @override
   String get mediaControlsResetSuccess =>
@@ -7843,36 +7848,36 @@ class AppLocalizationsUk extends AppLocalizations {
   String get playbackAndDisplayHeader => 'Відтворення та відображення';
 
   @override
-  String get showProgressBarTitle => 'Показувати панель прогресу (повзунок)';
+  String get showProgressBarTitle => 'Показувати шкалу прогресу (скрубер)';
 
   @override
   String get showProgressBarSubtitle => 'Шкала часу для відео та аудіо';
 
   @override
   String get scrubPreviewStyleTitle =>
-      'Стиль попереднього перегляду під час перетягування';
+      'Стиль попереднього перегляду під час перемотування';
 
   @override
   String get scrubPreviewMiniBoxLabel => 'Міні-вікно';
 
   @override
   String get scrubPreviewMiniBoxDesc =>
-      'Невелика мініатюра над панеллю прогресу';
+      'Невелика мініатюра над шкалою прогресу';
 
   @override
-  String get scrubPreviewFullscreenLabel => 'На весь екран';
+  String get scrubPreviewFullscreenLabel => 'Повноекранний';
 
   @override
   String get scrubPreviewFullscreenDesc =>
-      'Великий кадр займає весь екран під час перетягування панелі прогресу';
+      'Великий кадр займає весь екран під час перемотування';
 
   @override
   String get showTransportControlsOnPhotosTitle =>
-      'Показувати елементи керування на фотографіях';
+      'Показувати кнопки відтворення для фотографій';
 
   @override
   String get showTransportControlsOnPhotosSubtitle =>
-      'Увімкнути керування слайд-шоу для зображень (вимкніть для мінімалізму)';
+      'Керування слайд-шоу під час перегляду зображень (вимкніть для мінімалістичного вигляду)';
 
   @override
   String get statusBadgeTitle => 'Значок стану';
@@ -7889,7 +7894,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Перетягніть дії сюди, щоб закріпити на верхній панелі';
 
   @override
-  String get bottomDockActionsHeader => 'Дії нижньої панелі (док)';
+  String get bottomDockActionsHeader => 'Дії нижньої панелі';
 
   @override
   String get bottomDockActionsEmptyHint =>
@@ -7900,7 +7905,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get moreMenuActionsEmptyHint =>
-      'Перетягніть дії сюди для випадаючого меню верхньої панелі';
+      'Перетягніть дії сюди для випадного меню верхньої панелі';
 
   @override
   String get advancedSettingsActionsHeader =>
@@ -7908,7 +7913,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get advancedSettingsActionsEmptyHint =>
-      'Перетягніть дії сюди для вкладки розширених налаштувань';
+      'Перетягніть дії сюди для вікна розширених налаштувань';
 
   @override
   String get dropHereAtEnd => 'Відпустити тут наприкінці';
@@ -7979,27 +7984,28 @@ class AppLocalizationsUk extends AppLocalizations {
   String get calculatingFolderStats => 'Обчислення…';
 
   @override
-  String get videoGesturesHeader => 'Жести відео та масштаб';
+  String get videoGesturesHeader => 'Жести відео та масштабування';
 
   @override
-  String get edgeSwipeBrightnessTitle => 'Жест провезення для яскравості';
+  String get edgeSwipeBrightnessTitle => 'Свайп для регулювання яскравості';
 
   @override
   String get edgeSwipeBrightnessSubtitle =>
-      'Проведіть біля лівого краю для налаштування яскравості екрана';
+      'Проведіть уздовж лівого краю для налаштування яскравості екрана';
 
   @override
-  String get edgeSwipeVolumeTitle => 'Жест провезення для гучності';
+  String get edgeSwipeVolumeTitle => 'Свайп для регулювання гучності';
 
   @override
   String get edgeSwipeVolumeSubtitle =>
-      'Проведіть біля правого краю для налаштування гучності';
+      'Проведіть уздовж правого краю для налаштування гучності';
 
   @override
   String get edgeSwipeHudTitle => 'Показувати індикатор жесту';
 
   @override
-  String get edgeSwipeHudSubtitle => 'Відображати відсоток під час провезення';
+  String get edgeSwipeHudSubtitle =>
+      'Відображати відсоток під час проведення жесту';
 
   @override
   String get edgeSwipeWidthTitle => 'Ширина крайової зони';
@@ -8015,15 +8021,15 @@ class AppLocalizationsUk extends AppLocalizations {
   String get minZoomTitle => 'Мінімальний рівень масштабу';
 
   @override
-  String get holdSpeedMultiplierTitle =>
-      'Швидкість притискання для перемотування';
+  String get holdSpeedMultiplierTitle => 'Швидкість прискорення утриманням';
 
   @override
   String get holdSpeedMultiplierSubtitle =>
-      'Швидкість під час утримання пальця на відео';
+      'Швидкість під час натискання та утримання відео';
 
   @override
-  String get defaultAspectRatioTitle => 'Стандартне співвідношення сторін';
+  String get defaultAspectRatioTitle =>
+      'Співвідношення сторін за замовчуванням';
 
   @override
   String get defaultAspectRatioSubtitle =>
@@ -8048,7 +8054,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get aspectRatioCentre => 'По центру';
 
   @override
-  String get autoSyncMenuAction => 'Автосинхронізація…';
+  String get autoSyncMenuAction => 'Автосинхронізація';
 
   @override
   String get autoSyncSheetTitle => 'Автосинхронізація';
@@ -8065,7 +8071,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncTargetNotSetHere =>
-      'Це правило налаштовано на іншому пристрої. Виберіть папку для цього пристрою.';
+      'Це правило було налаштовано на іншому пристрої. Виберіть папку для використання на цьому пристрої.';
 
   @override
   String get autoSyncPickerSideLabel => 'Ціль синхронізації';
@@ -8085,14 +8091,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncDirectionVaultToTargetHint =>
-      'Резервна копія: папка слідує за сховищем. Зміни в папці не копіюються назад.';
+      'Резервна копія: папка повторює вміст сховища. Зміни в папці не копіюються назад.';
 
   @override
   String get autoSyncDirectionTargetToVault => 'З папки у сховище';
 
   @override
   String get autoSyncDirectionTargetToVaultHint =>
-      'Імпорт: сховище слідує за папкою. Зміни у сховищі не копіюються назад.';
+      'Імпорт: сховище повторює вміст папки. Зміни у сховищі не копіюються назад.';
 
   @override
   String get autoSyncConflictSection => 'Якщо файл змінено з обох боків';
@@ -8105,20 +8111,20 @@ class AppLocalizationsUk extends AppLocalizations {
       'Інша версія зберігається як перейменована копія з обох боків.';
 
   @override
-  String get autoSyncConflictKeepNewer => 'Зберегти новішу';
+  String get autoSyncConflictKeepNewer => 'Залишати новішу версію';
 
   @override
   String get autoSyncConflictKeepNewerHint =>
       'Якщо неможливо визначити, яка новіша, зберігає обидві.';
 
   @override
-  String get autoSyncConflictVaultWins => 'Перемагає версія зі сховища';
+  String get autoSyncConflictVaultWins => 'Залишати версію зі сховища';
 
   @override
   String get autoSyncConflictVaultWinsHint => 'Версію в папці буде замінено.';
 
   @override
-  String get autoSyncConflictTargetWins => 'Перемагає версія з папки';
+  String get autoSyncConflictTargetWins => 'Залишати версію з папки';
 
   @override
   String get autoSyncConflictTargetWinsHint =>
@@ -8140,14 +8146,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Час від часу перевіряє зміни, поки сховище відкрите. Не кожна зміна помічається одразу.';
 
   @override
-  String get autoSyncDeleteTitle => 'Копіювати також видалення';
+  String get autoSyncDeleteTitle => 'Синхронізувати також видалення';
 
   @override
   String get autoSyncDeleteSubtitle =>
-      'Файл, видалений з одного боку, видаляється і з іншого. Видалення призупиняються, якщо папка несподівано виглядає порожньою.';
+      'Файл, видалений в одному місці, видаляється і в іншому. Для захисту від втрати даних видалення призупиняється, якщо папка раптово виявилася порожньою.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Пропускати файли, що відповідають';
+  String get autoSyncIgnoreLabel => 'Пропускати файли за шаблоном';
 
   @override
   String get autoSyncIgnoreHelper => 'Один шаблон на рядок, наприклад *.tmp';
@@ -8172,7 +8178,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncReportDeletionsPaused =>
-      'Видалення призупинено, бо папка несподівано виглядала порожньою або було б видалено забагато файлів.';
+      'Видалення призупинено для захисту даних: папка раптово спорожніла або видаляється забагато файлів одночасно.';
 
   @override
   String get autoSyncReportIncomplete =>
@@ -8217,7 +8223,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncProblemOverlapsOtherRule =>
-      'Для цієї папки або вищої чи вкладеної в неї вже налаштовано автосинхронізацію.';
+      'Для цієї папки або батьківської чи вкладеної в неї вже налаштовано автосинхронізацію.';
 
   @override
   String get autoSyncReadOnlyNotice =>
@@ -8259,14 +8265,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get quickCaptureTileToggleSubtitle =>
-      'Відкриває камеру прямо зі швидких налаштувань, без запиту PIN-коду чи візерунка. Перед збереженням вам усе одно потрібно вибрати та розблокувати сховище.';
+      'Відкриває камеру прямо зі швидких налаштувань, без запиту PIN-коду чи графічного ключа. Перед збереженням вам усе одно потрібно вибрати та розблокувати сховище.';
 
   @override
   String get quickCaptureAddShortcutTitle => 'Додати на головний екран';
 
   @override
   String get quickCaptureAddShortcutSubtitle =>
-      'Закріплює значок швидкого захоплення на головному екрані, якщо це підтримує ваш лончер';
+      'Закріпити значок швидкого захоплення на головному екрані, якщо це підтримує ваш лаунчер';
 
   @override
   String get quickCaptureShortcutRequestedMessage =>
@@ -8274,11 +8280,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get quickCaptureShortcutUnsupportedMessage =>
-      'Ваш лончер не підтримує закріплення ярликів';
+      'Ваш лаунчер не підтримує закріплення ярликів';
 
   @override
   String quickCaptureSavedToast(String name, String destination) {
-    return '$name збережено в $destination';
+    return '$name збережено у $destination';
   }
 
   @override
@@ -8286,7 +8292,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get cardSwipeActionsSubtitle =>
-      'Проведіть по картці сховища, щоб швидко відкрити дії редагування та видалення';
+      'Проведіть по картці сховища, щоб швидко відкрити дії редагування та вилучення';
 
   @override
   String get cameraQualitySd => '480p (SD)';
@@ -8301,16 +8307,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cameraQualityUhd => '4K (UHD)';
 
   @override
-  String get cameraPhotoResMax => 'Повна (Макс. розд.)';
+  String get cameraPhotoResMax => 'Повна (макс. роздільність)';
 
   @override
-  String get cameraPhotoResHigh => '5 МП (Висока)';
+  String get cameraPhotoResHigh => '5 Мп (висока)';
 
   @override
-  String get cameraPhotoResMedium => '2 МП (Середня)';
+  String get cameraPhotoResMedium => '2 Мп (середня)';
 
   @override
-  String get cameraPhotoResLow => '1,2 МП (Низька)';
+  String get cameraPhotoResLow => '1,2 Мп (низька)';
 
   @override
   String get cameraLensWide => 'Ширококутна';
@@ -8322,11 +8328,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cameraLensFront => 'Фронтальна';
 
   @override
-  String get appLockBehaviorTitle => 'Поведінка блокування застосунку';
+  String get appLockBehaviorTitle => 'Поведінка блокування програми';
 
   @override
   String get lockAppOnScreenOffTitle =>
-      'Блокувати застосунок при вимкненні екрана';
+      'Блокувати програму під час вимкнення екрана';
 
   @override
   String get lockAppOnScreenOffSubtitle =>
@@ -8350,14 +8356,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get settingsHubAdvancedSubtitle =>
-      'Резервна копія налаштувань, логи налагодження та logcat';
+      'Резервна копія налаштувань та системний журнал';
 
   @override
-  String get toolPasswordInterchangeTitle => 'Імпорт / експорт паролів';
+  String get toolPasswordInterchangeTitle => 'Імпорт та експорт паролів';
 
   @override
   String get toolPasswordInterchangeSubtitle =>
-      'Переносьте логіни, картки та нотатки з або до KeePass, Bitwarden та інших менеджерів паролів';
+      'Переносьте логіни, картки та нотатки між іншими менеджерами паролів';
 
   @override
   String get toolsSectionPasswordManager => 'Менеджер паролів';
@@ -8400,7 +8406,8 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count елементів готові до експорту',
+      other: '$count елементів готово до експорту',
+      many: '$count елементів готово до експорту',
       few: '$count елементи готові до експорту',
       one: '1 елемент готовий до експорту',
     );
@@ -8428,6 +8435,7 @@ class AppLocalizationsUk extends AppLocalizations {
       count,
       locale: localeName,
       other: 'Знайдено $count елементів',
+      many: 'Знайдено $count елементів',
       few: 'Знайдено $count елементи',
       one: 'Знайдено 1 елемент',
     );
@@ -8446,6 +8454,7 @@ class AppLocalizationsUk extends AppLocalizations {
       count,
       locale: localeName,
       other: 'Не вдалося прочитати $count рядків',
+      many: 'Не вдалося прочитати $count рядків',
       few: 'Не вдалося прочитати $count рядки',
       one: 'Не вдалося прочитати 1 рядок',
     );
@@ -8453,7 +8462,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get passwordInterchangeDestinationHeader => 'Зберегти в';
+  String get passwordInterchangeDestinationHeader => 'Зберегти до';
 
   @override
   String get passwordInterchangeMirrorFolders => 'Відтворити папки';
@@ -8464,6 +8473,7 @@ class AppLocalizationsUk extends AppLocalizations {
       count,
       locale: localeName,
       other: 'Імпортувати $count елементів',
+      many: 'Імпортувати $count елементів',
       few: 'Імпортувати $count елементи',
       one: 'Імпортувати 1 елемент',
     );
@@ -8476,6 +8486,7 @@ class AppLocalizationsUk extends AppLocalizations {
       count,
       locale: localeName,
       other: 'Імпортовано $count елементів',
+      many: 'Імпортовано $count елементів',
       few: 'Імпортовано $count елементи',
       one: 'Імпортовано 1 елемент',
     );
@@ -8488,6 +8499,7 @@ class AppLocalizationsUk extends AppLocalizations {
       count,
       locale: localeName,
       other: '$count елементів пропущено',
+      many: '$count елементів пропущено',
       few: '$count елементи пропущено',
       one: '1 елемент пропущено',
     );
@@ -8500,13 +8512,14 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get autoLockIndicatorLocksOnScreenOff => 'Блокування при вимк. екрана';
+  String get autoLockIndicatorLocksOnScreenOff =>
+      'Блокування після вимкнення екрана';
 
   @override
   String get autoLockIndicatorNeverLocks => 'Не блокується автоматично';
 
   @override
   String autoLockIndicatorLocksAfterTooltip(String duration) {
-    return 'Блокується після $duration бездіяльності (скидається під час користування)';
+    return 'Блокується після $duration бездіяльності (скидається під час використання програми)';
   }
 }

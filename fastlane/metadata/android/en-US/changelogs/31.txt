@@ -1,0 +1,19 @@
+### Features
+• Password Import & Export: Added a migration tool to import and export credentials compatible with Bitwarden, KeePass, CSV, and other formats
+• Multi-Location Carriers: Implemented a dedicated UI to select composite container carrier files located across different folders and drives
+• Derived Key Cache: Added security options to configure automatic purging of cached derived encryption keys after a set inactivity duration
+
+### Improvements
+• Composite Mount Safeguards: Added strict validation checks preventing composite containers from mounting when carrier files are missing or incomplete
+• Sidebar Drawer: Cleaned up the side drawer navigation by removing redundant labels, adding clear section dividers, and relocating the "Lock All Vaults" action to the header to prevent accidental taps
+• In-App Camera: Simplified camera integration to focus on standard front and rear lenses, improving capture stability and performance across diverse hardware
+• Auto-Sync Feedback: Added visual progress indicators inside the file browser and persistent progress notifications when running background sync
+• Initial Auto-Sync: Configuring or enabling auto-sync for the first time now automatically triggers an immediate sync upon saving
+• Credential Search: Expanded search indexing within secure items to match usernames and email addresses alongside titles
+• Dashboard Indicators: Added visual status indicators on dashboard vault cards when an auto-lock inactivity timer is running
+
+### Bug Fixes
+• Per-Container Auto-Lock: Fixed per-container auto-lock timers being overridden when global auto-lock was also enabled
+• External Storage Items: Fixed an issue where items created or edited within external storage-mounted vaults failed to save properly
+• List Scrolling: Fixed list layouts in the file manager occasionally becoming unresponsive to scroll gestures after a pinch gesture
+• Automation Capture: Fixed photo and video capture via automation tools on Android 13+ (API 33+) by properly requesting the "Display over other apps" permission

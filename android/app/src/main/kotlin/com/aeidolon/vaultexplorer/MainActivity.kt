@@ -130,6 +130,7 @@ private object ChannelMethods {
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
     const val GET_APK_ICON              = "getApkIcon"
+    const val ENCODE_IMAGE              = "encodeImage"
     const val SET_PLAYBACK_ACTIVE       = "setPlaybackActive"
     const val GET_FOLDER_SIZE           = "getFolderSize"
     const val HASH_PASSWORD             = "hashPassword"
@@ -932,6 +933,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
                 ChannelMethods.GET_APK_ICON -> thumbnailHandlers.handleGetApkIcon(call, result)
+                ChannelMethods.ENCODE_IMAGE -> thumbnailHandlers.handleEncodeImage(call, result)
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)

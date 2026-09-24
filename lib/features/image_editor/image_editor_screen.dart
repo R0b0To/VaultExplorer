@@ -22,6 +22,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/image_editor/image_output_format.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/crop_overlay.dart';
@@ -70,6 +71,18 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
 
   Uint8List? _originalBytes;
+
+  /// Pixel count of the picture as first decoded from [_originalBytes]. Lets
+  /// a save tell how much a crop shrank the image so the file can shrink with
+  /// it (see [imageSizeBudgetBytes]).
+  int _originalPixelCount = 0;
+
+  /// True once "Overwrite original" has replaced the file on disk with an
+  /// edited version. From then on [_originalBytes] no longer matches what is
+  /// on disk, which matters when the user resets the image (see
+  /// [_resetToOriginal]).
+  bool _overwroteOriginal = false;
+
   ui.Image? _workingImage;
 
   final List<_EditorSnapshot> _undoStack = [];
@@ -97,7 +110,22 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   ImageEditorDocument get _documentController =>
       ref.read(imageEditorDocumentProvider(_controlsKey).notifier);
 
-  bool get _isDirty => _document.isEdited || _annotations.isNotEmpty || _undoStack.isNotEmpty;
+  /// Whether the editor holds changes that are not on disk yet.
+  ///
+  /// This intentionally does not look at [_undoStack]. The undo history is
+  /// kept after a save so the user can still step back, which used to make a
+  /// freshly saved edit look "unsaved" forever: the save button stayed
+  /// enabled and leaving the screen asked to save again. Every operation that
+  /// changes the working image marks the document edited (flattening
+  /// annotations, cropping, undoing), and a save clears that mark, so
+  /// [ImageEditorDocumentState.isEdited] plus pending annotations is the whole
+  /// truth.
+  bool get _isDirty => _document.isEdited || _annotations.isNotEmpty;
+
+  /// Whether "reset to original" has anything to do: unsaved edits, or edit
+  /// history that was already saved.
+  bool get _canReset => _isDirty || _undoStack.isNotEmpty;
+
   bool get _canUndo => _undoStack.isNotEmpty || _annotations.isNotEmpty;
 
   String get _fileName {
@@ -196,6 +224,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       if (!mounted) return;
       setState(() {
         _originalBytes = bytes;
+        _originalPixelCount = image.width * image.height;
         _workingImage = image;
       });
       _documentController.loaded();
@@ -487,7 +516,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _resetToOriginal() async {
-    if (!_isDirty || _originalBytes == null) return;
+    if (!_canReset || _originalBytes == null) return;
     final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -531,7 +560,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       _annotationsController.clear();
       _controlsController.resetDocumentControls();
       _documentController.loaded();
-      _documentController.resetEdited();
+      // Nothing is left to save after a reset - unless an earlier overwrite
+      // already replaced the file on disk with an edited version. Then the
+      // original picture now on screen is itself a change to save.
+      if (_overwroteOriginal) {
+        _documentController.markEdited();
+      } else {
+        _documentController.resetEdited();
+      }
       oldImage?.dispose();
     } catch (_) {
       if (!mounted) return;
@@ -557,13 +593,61 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           ? e.name == name
           : e.name.toLowerCase() == name.toLowerCase(),
     );
-    final plain = '${base}_edited.png';
+    final ext = _outputExtension;
+    final plain = '${base}_edited.$ext';
     if (!collides(plain)) return plain;
     var n = 1;
-    while (collides('${base}_edited ($n).png')) {
+    while (collides('${base}_edited ($n).$ext')) {
       n++;
     }
-    return '${base}_edited ($n).png';
+    return '${base}_edited ($n).$ext';
+  }
+
+  ImageOutputFormat get _outputFormat =>
+      imageOutputFormatForExtension(_fileExtension);
+
+  String get _outputExtension =>
+      imageOutputExtension(_outputFormat, _fileExtension);
+
+  /// Encodes the working image for saving, in the same family as the file
+  /// that was opened (see [ImageOutputFormat]).
+  ///
+  /// PNG goes through `dart:ui`. JPEG and WebP have no encoder there, so the
+  /// raw pixels are handed to the platform encoder; when the edit made the
+  /// picture smaller, the encoder is also told how big the result may be so a
+  /// crop cannot make the file larger than the share of the original it kept.
+  ///
+  /// Returns null if encoding failed, so the caller can report it instead of
+  /// silently writing a different format than the file's extension promises.
+  Future<Uint8List?> _encodeWorkingImage() async {
+    final image = _workingImage;
+    if (image == null) return null;
+
+    final format = _outputFormat;
+    if (format == ImageOutputFormat.png) {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return null;
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    }
+
+    final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (raw == null) return null;
+    final original = _originalBytes;
+    final budget = original == null
+        ? null
+        : imageSizeBudgetBytes(
+            originalBytes: original.length,
+            originalPixels: _originalPixelCount,
+            newPixels: image.width * image.height,
+          );
+    return _fileIoApi.encodeImage(
+      rgba: raw.buffer.asUint8List(raw.offsetInBytes, raw.lengthInBytes),
+      width: image.width,
+      height: image.height,
+      format: format.name,
+      quality: kLossyEncodeQuality,
+      maxBytes: budget ?? 0,
+    );
   }
 
   Future<void> _onSavePressed() async {
@@ -576,11 +660,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     try {
       await _flattenPendingAnnotations();
       if (!mounted) return;
-      final byteData = await _workingImage!.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final encodedBytes = await _encodeWorkingImage();
       if (!mounted) return;
-      if (byteData == null) {
+      if (encodedBytes == null) {
         _documentController.setSaving(false);
         showAppSnackBar(
           context,
@@ -591,7 +673,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         );
         return;
       }
-      final pngBytes = byteData.buffer.asUint8List();
 
       final lastSlash = widget.filePath.lastIndexOf('/');
       final dirPath = lastSlash == -1
@@ -630,9 +711,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
       switch (choice) {
         case SaveAsNewFile(:final fileName):
-          await _saveAsNewFile(dirPath, fileName, fsType, pngBytes);
+          await _saveAsNewFile(dirPath, fileName, fsType, encodedBytes);
         case OverwriteOriginal():
-          await _saveOverwrite(pngBytes);
+          await _saveOverwrite(encodedBytes);
       }
     } catch (e) {
       if (!mounted) return;
@@ -649,7 +730,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     String dirPath,
     String fileName,
     FilesystemType fsType,
-    Uint8List pngBytes,
+    Uint8List bytes,
   ) async {
     final built = PathComponents(
       parentSegments: dirPath.isEmpty ? const [] : dirPath.split('/'),
@@ -670,7 +751,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         final ok = await _fileIoApi.writeWholeFile(
           widget.container,
           path,
-          pngBytes,
+          bytes,
         );
         if (!mounted) return;
         _documentController.setSaving(false);
@@ -693,11 +774,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     }
   }
 
-  Future<void> _saveOverwrite(Uint8List pngBytes) async {
+  Future<void> _saveOverwrite(Uint8List bytes) async {
     final ok = await _fileIoApi.writeWholeFile(
       widget.container,
       widget.filePath,
-      pngBytes,
+      bytes,
     );
     if (!mounted) return;
     if (!ok) {
@@ -711,6 +792,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
       return;
     }
+    _overwroteOriginal = true;
     FullResImageCache.invalidate(widget.container, widget.filePath);
     await ref
         .read(thumbnailCacheServiceProvider)
@@ -884,7 +966,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       IconButton(
         icon: const Icon(Icons.restart_alt_rounded),
         tooltip: l10n.resetImageTooltip,
-        onPressed: _isDirty ? _resetToOriginal : null,
+        onPressed: _canReset ? _resetToOriginal : null,
       ),
     ];
     if (!widget.container.readOnly) {

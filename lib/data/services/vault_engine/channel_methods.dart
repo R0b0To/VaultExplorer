@@ -110,6 +110,7 @@ abstract final class ChannelMethods {
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const getApkIcon = 'getApkIcon';
+  static const encodeImage = 'encodeImage';
   static const setPlaybackActive = 'setPlaybackActive';
   static const hashPassword = 'hashPassword';
   static const hashPasswordSha256 = 'hashPasswordSha256';

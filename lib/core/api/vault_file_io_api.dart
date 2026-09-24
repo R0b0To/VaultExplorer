@@ -384,6 +384,43 @@ class VaultFileIoApi {
     }
   }
 
+  /// Encodes raw pixels as a lossy image file (`'jpeg'` or `'webp'`) with the
+  /// platform's own encoder. `dart:ui` can only produce PNG, which is several
+  /// times larger than the JPEG/WebP photo an edit started from.
+  ///
+  /// [rgba] must be `width * height * 4` bytes of premultiplied RGBA - what
+  /// `ui.Image.toByteData(format: ui.ImageByteFormat.rawRgba)` returns.
+  /// [quality] is the starting quality (1-100). If [maxBytes] is positive the
+  /// native side lowers the quality step by step until the result fits (down
+  /// to a floor), so an image that lost pixels cannot come out larger than
+  /// the share of the original it kept; it is best effort, not a hard limit.
+  ///
+  /// Returns `null` on any failure so the caller can surface a save error
+  /// rather than write something in a different format than the file name
+  /// promises.
+  Future<Uint8List?> encodeImage({
+    required Uint8List rgba,
+    required int width,
+    required int height,
+    required String format,
+    int quality = 92,
+    int maxBytes = 0,
+  }) async {
+    try {
+      return await _channel.invokeMethod<Uint8List>(ChannelMethods.encodeImage, {
+        'rgba': rgba,
+        'width': width,
+        'height': height,
+        'format': format,
+        'quality': quality,
+        'maxBytes': maxBytes,
+      });
+    } catch (e) {
+      logSwallowed('encodeImage', e);
+      return null;
+    }
+  }
+
  Future<List<String>?> listDirectory(
     MountedContainer container,
     String dirPath, {

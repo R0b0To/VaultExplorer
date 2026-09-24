@@ -122,6 +122,20 @@ class ThumbnailHandlers(
          * new position first.
          */
         private const val EXOPLAYER_BLANK_RETRY_DELAY_MS = 200L
+
+        /** Starting quality for [handleEncodeImage] when the caller sends none. */
+        private const val ENCODE_DEFAULT_QUALITY = 92
+
+        /**
+         * Lowest quality [handleEncodeImage] will fall back to while trying to
+         * meet a `maxBytes` budget. Below this, JPEG/WebP artefacts on a
+         * photo become obvious, so a budget that can't be met by here is
+         * simply missed rather than trading away more quality.
+         */
+        private const val ENCODE_MIN_QUALITY = 60
+
+        /** Quality decrement between [handleEncodeImage] retries. */
+        private const val ENCODE_QUALITY_STEP = 8
     }
 
     /**
@@ -1250,6 +1264,107 @@ class ThumbnailHandlers(
                 }
             }
         }
+    }
+
+    /**
+     * Encodes raw RGBA pixels as a lossy image file (JPEG or WebP) using the
+     * platform encoder ([Bitmap.compress]).
+     *
+     * `dart:ui` can only encode PNG, which is lossless and several times
+     * larger than the JPEG/WebP an edited photo started out as, so the image
+     * editor hands its pixels here for any source that was lossy instead.
+     *
+     * Arguments:
+     *  - `rgba`: `width * height * 4` bytes of *premultiplied* RGBA
+     *    (`ui.ImageByteFormat.rawRgba`). That is exactly the in-memory
+     *    layout of an `ARGB_8888` [Bitmap], so it is copied in unchanged.
+     *  - `width`, `height`: pixel dimensions of `rgba`.
+     *  - `format`: `"jpeg"` or `"webp"` (lossy).
+     *  - `quality`: starting quality, 1..100 (default [ENCODE_DEFAULT_QUALITY]).
+     *  - `maxBytes`: if > 0, the result is re-encoded at progressively lower
+     *    quality (down to [ENCODE_MIN_QUALITY]) until it fits, so an image
+     *    that lost pixels to a crop can't end up larger than the share of the
+     *    original file it kept. Best effort: if even the floor doesn't fit,
+     *    the smallest attempt is returned.
+     *
+     * Replies with the encoded bytes, or an error (`INVALID_ARGS`,
+     * `ENCODE_FAILED`, `ENCODE_OOM`).
+     */
+    fun handleEncodeImage(call: MethodCall, result: MethodChannel.Result) {
+        val rgba = call.argument<ByteArray>("rgba")
+        val width = call.argument<Int>("width")
+        val height = call.argument<Int>("height")
+        val format = call.argument<String>("format")
+        val startQuality = (call.argument<Int>("quality") ?: ENCODE_DEFAULT_QUALITY).coerceIn(1, 100)
+        // Number, not Int: Dart sends an int that doesn't fit 32 bits as a Long.
+        val maxBytes = call.argument<Number>("maxBytes")?.toLong() ?: 0L
+
+        if (rgba == null || width == null || height == null || format == null) {
+            result.error("INVALID_ARGS", "rgba, width, height and format required", null)
+            return
+        }
+        if (width <= 0 || height <= 0 ||
+            rgba.size.toLong() != width.toLong() * height.toLong() * 4L
+        ) {
+            result.error("INVALID_ARGS", "rgba length does not match width * height * 4", null)
+            return
+        }
+        val compressFormat = when (format) {
+            "jpeg" -> Bitmap.CompressFormat.JPEG
+            "webp" -> lossyWebpFormat()
+            else -> {
+                result.error("INVALID_ARGS", "Unsupported format: $format", null)
+                return
+            }
+        }
+
+        imageExecutor.execute {
+            var bitmap: Bitmap? = null
+            try {
+                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap = bmp
+                bmp.copyPixelsFromBuffer(java.nio.ByteBuffer.wrap(rgba))
+
+                var quality = startQuality
+                var encoded = compressBitmap(bmp, compressFormat, quality)
+                while (maxBytes > 0 && encoded.size > maxBytes && quality > ENCODE_MIN_QUALITY) {
+                    quality = (quality - ENCODE_QUALITY_STEP).coerceAtLeast(ENCODE_MIN_QUALITY)
+                    encoded = compressBitmap(bmp, compressFormat, quality)
+                }
+
+                val out = encoded
+                activity.runOnUiThread { result.success(out) }
+            } catch (e: OutOfMemoryError) {
+                VeLog.w(TAG) { "handleEncodeImage out of memory for ${width}x$height" }
+                activity.runOnUiThread { result.error("ENCODE_OOM", "Not enough memory to encode image", null) }
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "handleEncodeImage failed for ${width}x$height: ${e.message}" }
+                activity.runOnUiThread { result.error("ENCODE_FAILED", e.message, null) }
+            } finally {
+                bitmap?.recycle()
+            }
+        }
+    }
+
+    /** Lossy WebP: `WEBP_LOSSY` on API 30+, the (lossy) legacy `WEBP` before. */
+    @Suppress("DEPRECATION")
+    private fun lossyWebpFormat(): Bitmap.CompressFormat =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Bitmap.CompressFormat.WEBP_LOSSY
+        } else {
+            Bitmap.CompressFormat.WEBP
+        }
+
+    private fun compressBitmap(
+        bitmap: Bitmap,
+        format: Bitmap.CompressFormat,
+        quality: Int,
+    ): ByteArray {
+        val stream = ByteArrayOutputStream()
+        if (!bitmap.compress(format, quality, stream)) {
+            throw java.io.IOException("Bitmap.compress returned false")
+        }
+        return stream.toByteArray()
     }
 
     /**

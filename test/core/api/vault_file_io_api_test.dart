@@ -258,6 +258,62 @@ void main() {
     );
   });
 
+  group('encodeImage', () {
+    test('sends pixels, size, format, quality and size budget', () async {
+      final encoded = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]);
+      nextResult = encoded;
+      final rgba = Uint8List(2 * 3 * 4);
+
+      final result = await api.encodeImage(
+        rgba: rgba,
+        width: 2,
+        height: 3,
+        format: 'jpeg',
+        quality: 90,
+        maxBytes: 4096,
+      );
+
+      expect(calls, hasLength(1));
+      expect(calls.single.method, 'encodeImage');
+      expect(calls.single.arguments, {
+        'rgba': rgba,
+        'width': 2,
+        'height': 3,
+        'format': 'jpeg',
+        'quality': 90,
+        'maxBytes': 4096,
+      });
+      expect(result, encoded);
+    });
+
+    test('defaults to high quality and no size budget', () async {
+      nextResult = Uint8List(0);
+
+      await api.encodeImage(
+        rgba: Uint8List(4),
+        width: 1,
+        height: 1,
+        format: 'webp',
+      );
+
+      expect(calls.single.arguments['quality'], 92);
+      expect(calls.single.arguments['maxBytes'], 0);
+    });
+
+    test('returns null instead of throwing when the native encoder fails', () async {
+      nextError = PlatformException(code: 'ENCODE_FAILED');
+
+      final result = await api.encodeImage(
+        rgba: Uint8List(4),
+        width: 1,
+        height: 1,
+        format: 'jpeg',
+      );
+
+      expect(result, isNull);
+    });
+  });
+
   group('shareFiles', () {
     test('sends filePath and fileNames through the injected channel', () async {
       nextResult = true;

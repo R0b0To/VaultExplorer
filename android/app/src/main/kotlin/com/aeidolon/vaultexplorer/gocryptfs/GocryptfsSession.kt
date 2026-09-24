@@ -81,18 +81,26 @@ class GocryptfsSession(
                 createNewFileNode(parentPhysical, ciphertextName)
             }
             
-            if (!normalized.endsWith(".tmp")) {
-                if (batchWriteActive) pendingBatchWritePaths.add(normalized)
-                safOps.markWritePending(result)
-            }
+            // NOTE: this used to skip markWritePending/batch-tracking for
+            // any virtualPath ending in ".tmp" as a disposable scratchpad.
+            // Every ".tmp" this session actually sees comes from the
+            // Dart-side atomic write-then-rename pattern (VaultItemsService
+            // .saveItem, VaultFileIoApi.writeWholeFile), where the ".tmp"
+            // file's content becomes the PERMANENT file moments later via
+            // renameFile -- and a rename only renames the real SAF
+            // document, it never uploads content. Skipping the push here
+            // meant that content never reached the real document at all,
+            // leaving it as the empty placeholder created at file-creation
+            // time; see the matching fix/comment in CryptomatorSession for
+            // the full story.
+            if (batchWriteActive) pendingBatchWritePaths.add(normalized)
+            safOps.markWritePending(result)
             return result
         }
 
         override fun invalidateCacheAfterWrite(virtualPath: String) {
             val normalized = normalize(virtualPath)
-            if (!normalized.endsWith(".tmp")) {
-                pushContentForPath(normalized)
-            }
+            pushContentForPath(normalized)
             tree.invalidate(parentOf(normalized))
         }
     }
@@ -125,9 +133,7 @@ class GocryptfsSession(
         val paths = pendingBatchWritePaths.toList()
         pendingBatchWritePaths.clear()
         for (path in paths) {
-            if (!path.endsWith(".tmp")) {
-                pushContentForPath(path)
-            }
+            pushContentForPath(path)
         }
         tree.invalidateAll()
     }

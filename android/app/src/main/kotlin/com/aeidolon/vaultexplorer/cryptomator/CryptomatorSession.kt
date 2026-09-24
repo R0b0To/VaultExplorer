@@ -151,24 +151,37 @@ class CryptomatorSession(
             }
             VeLog.d("MirrorTrace") { "getOrCreatePhysicalFileForWrite: path=$normalized existing=${existing != null} mirrorUri=${result.uri} lengthNow=${result.length()}" }
             
-            // Do not track temporary scratchpad files for SAF synchronization
-            if (!normalized.endsWith(".tmp")) {
-                vaultDocOps.markWritePending(result)
-                pendingBatchWrites[normalized] = result
-            }
+            // NOTE: this used to skip markWritePending/pendingBatchWrites
+            // registration for any virtualPath ending in ".tmp", on the
+            // assumption that such paths are disposable scratchpad files
+            // that never need to reach the real SAF tree. That assumption
+            // is wrong for every ".tmp" this session actually sees: they
+            // all come from the Dart-side atomic write-then-rename pattern
+            // (VaultItemsService.saveItem, VaultFileIoApi.writeWholeFile --
+            // used for secure items, text/image editor saves, sync config,
+            // archive extraction, etc.), where the ".tmp" file's content
+            // becomes the PERMANENT file a moment later via renameFile.
+            // Skipping the content push here meant that content never
+            // reached the real remote document at all -- pushRename only
+            // renames the real doc, it does not upload content -- so the
+            // real document was left as the empty placeholder
+            // pushFileWrite created at file-creation time. The write
+            // looked successful (reads within the same session hit the
+            // still-populated local mirror), but the item read back empty
+            // as soon as the mirror was rebuilt (next unlock/app restart),
+            // since that's when its content is lazily re-pulled from the
+            // (empty) real document. See MirroredSafDocumentOps.
+            vaultDocOps.markWritePending(result)
+            pendingBatchWrites[normalized] = result
             return result
         }
         override fun invalidateCacheAfterWrite(virtualPath: String) {
             val normalized = normalize(virtualPath)
             val physicalFile = pendingBatchWrites.remove(normalized)
             if (physicalFile == null) {
-                if (!normalized.endsWith(".tmp")) {
-                    VeLog.w("MirrorTrace") { "invalidateCacheAfterWrite: path=$normalized -- no captured write instance, nothing pushed!" }
-                }
+                VeLog.w("MirrorTrace") { "invalidateCacheAfterWrite: path=$normalized -- no captured write instance, nothing pushed!" }
             } else {
-                if (!normalized.endsWith(".tmp")) {
-                    pushContentFor(normalized, physicalFile)
-                }
+                pushContentFor(normalized, physicalFile)
             }
             tree.invalidate(parentOf(normalized))
         }
@@ -219,9 +232,8 @@ class CryptomatorSession(
         // to. See the comment on getOrCreatePhysicalFileForWrite.
         val writes = pendingBatchWrites.toMap()
         pendingBatchWrites.clear()
-        val validWrites = writes.filterKeys { !it.endsWith(".tmp") }
-        VeLog.d("MirrorTrace") { "endBatchWrite: flushing ${validWrites.size} pending write(s): ${validWrites.keys}" }
-        for ((path, physicalFile) in validWrites) {
+        VeLog.d("MirrorTrace") { "endBatchWrite: flushing ${writes.size} pending write(s): ${writes.keys}" }
+        for ((path, physicalFile) in writes) {
             pushContentFor(path, physicalFile)
         }
         tree.invalidateAll()

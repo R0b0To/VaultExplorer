@@ -37,6 +37,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   bool _oldObscure = true;
   bool _newObscure = true;
   bool _confirmObscure = true;
+  bool _oldPimObscure = true;
+  bool _newPimObscure = true;
 
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
@@ -100,11 +102,15 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: TextField(
                   controller: _oldPimCtrl,
                   keyboardType: TextInputType.number,
-                  obscureText: true,
+                  obscureText: _oldPimObscure,
                   obscuringCharacter: '*',
                   decoration: InputDecoration(
                     labelText: context.l10n.oldPimOptionalLabel,
                     prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _oldPimObscure,
+                      onToggle: () => setState(() => _oldPimObscure = !_oldPimObscure),
+                    ),
                   ),
                 ),
               ),
@@ -169,11 +175,15 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: TextField(
                   controller: _newPimCtrl,
                   keyboardType: TextInputType.number,
-                  obscureText: true,
+                  obscureText: _newPimObscure,
                   obscuringCharacter: '*',
                   decoration: InputDecoration(
                     labelText: context.l10n.newPimOptionalLabel,
                     prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _newPimObscure,
+                      onToggle: () => setState(() => _newPimObscure = !_newPimObscure),
+                    ),
                   ),
                 ),
               ),

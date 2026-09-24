@@ -42,8 +42,10 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
 
   bool _obscure = true;
   bool _confirmObscure = true;
+  bool _pimObscure = true;
   bool _hiddenObscure = true;
   bool _hiddenConfirmObscure = true;
+  bool _hiddenPimObscure = true;
   bool _folderVaultObscure = true;
   bool _folderVaultConfirmObscure = true;
 
@@ -713,7 +715,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         ),
       ),
       Padding(
-        padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
+        padding: EdgeInsets.fromLTRB(16, vPad, 16, vPad),
         child: TextField(
           controller: _confirmPasswordCtrl,
           obscureText: _confirmObscure,
@@ -725,6 +727,24 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
             suffixIcon: PasswordVisibilityToggle(
               obscured: _confirmObscure,
               onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
+        child: TextField(
+          controller: _pimCtrl,
+          keyboardType: TextInputType.number,
+          obscureText: _pimObscure,
+          obscuringCharacter: '*',
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: l10n.pimOptionalLabel,
+            prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _pimObscure,
+              onToggle: () => setState(() => _pimObscure = !_pimObscure),
             ),
           ),
         ),
@@ -900,19 +920,6 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               onChanged: (val) =>
                   ref.read(createContainerProvider.notifier).setFileSystem(val),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
-                controller: _pimCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                obscuringCharacter: '*',
-                decoration: InputDecoration(
-                  labelText: l10n.pimOptionalLabel,
-                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
-                ),
-              ),
-            ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(
@@ -1019,7 +1026,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
+              padding: EdgeInsets.fromLTRB(16, vPad, 16, vPad),
               child: TextField(
                 controller: _hiddenConfirmPasswordCtrl,
                 obscureText: _hiddenConfirmObscure,
@@ -1031,6 +1038,24 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                   suffixIcon: PasswordVisibilityToggle(
                     obscured: _hiddenConfirmObscure,
                     onToggle: () => setState(() => _hiddenConfirmObscure = !_hiddenConfirmObscure),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
+              child: TextField(
+                controller: _hiddenPimCtrl,
+                keyboardType: TextInputType.number,
+                obscureText: _hiddenPimObscure,
+                obscuringCharacter: '*',
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: l10n.pimOptionalLabel,
+                  prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _hiddenPimObscure,
+                    onToggle: () => setState(() => _hiddenPimObscure = !_hiddenPimObscure),
                   ),
                 ),
               ),
@@ -1108,19 +1133,6 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               options: fileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
               onChanged: (val) =>
                   ref.read(createContainerProvider.notifier).setHiddenFileSystem(val),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
-                controller: _hiddenPimCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                obscuringCharacter: '*',
-                decoration: InputDecoration(
-                  labelText: l10n.pimOptionalLabel,
-                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
-                ),
-              ),
             ),
           ],
         ),

@@ -20,6 +20,25 @@ const Set<String> kBrowserFilterDocumentExtensions = {
   'xml',
 };
 
+/// Field keys, shared across every Item Vault entry type that has one
+/// (`password`'s `username`, `identity`'s and `softwareLicense`'s `email`),
+/// that search also matches against -- same idea real password managers
+/// use: finding an entry by the login it's *for*, not just by its title.
+/// Kept as a flat key list rather than switching on [VaultItemType] so a
+/// future field named `username`/`email` on another item type is picked up
+/// automatically.
+const List<String> kVaultItemSearchableFieldKeys = ['username', 'email'];
+
+/// Whether [name]'s extension identifies it as an Item Vault entry
+/// (password/card/identity/note/bank account/license) rather than an
+/// ordinary file -- the same extension set [vaultIconForExt] and the
+/// `'secure'` browser filter already key off of.
+bool isVaultItemFileName(String name) {
+  final dot = name.lastIndexOf('.');
+  if (dot == -1) return false;
+  return vaultIconForExt(name.substring(dot + 1)) != null;
+}
+
 String joinPath(String name, String currentDirPath) =>
     currentDirPath.isEmpty ? name : '$currentDirPath/$name';
 

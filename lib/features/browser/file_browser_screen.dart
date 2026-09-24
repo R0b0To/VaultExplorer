@@ -451,17 +451,63 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   /// currently visible" (needed to compute the same index the visible
   /// list uses) -- pulled out once here since both copies needed to stay
   /// identical for jump-to-item to land on the right row.
-  bool _isVisibleInCurrentListing(RawEntry item, String query) {
+  ///
+  /// [skipQueryCheck] is for entries sourced from the search controller's
+  /// own scan (`_deepSearchResults`) rather than straight from the
+  /// directory listing: the scan already matched [item] against [query] --
+  /// by name *or*, for an Item Vault entry, by username/email (see
+  /// file_browser_search_controller.dart) -- so re-checking [item].name
+  /// here would wrongly drop a content-only match, whose name doesn't
+  /// contain [query] at all. Hidden-files and the type filter still apply
+  /// either way.
+  bool _isVisibleInCurrentListing(RawEntry item, String query, {bool skipQueryCheck = false}) {
     if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
       return false;
     }
-    final name = item.name;
-    if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
+    if (!skipQueryCheck) {
+      final name = item.name;
+      if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
+    }
     if (item.isDir) {
       if (query.isEmpty && _currentFilter != null) return false;
       return true;
     }
-    return _matchesFilter(name);
+    return _matchesFilter(item.name);
+  }
+
+  /// Search-aware view of [localItems] (the current directory's listing,
+  /// already merged with placeholders/pending-deletes where the caller
+  /// does that): folds in the search controller's own results so an Item
+  /// Vault entry found by username/email -- not just by name -- shows up
+  /// too, without waiting on it for the common case of a plain name
+  /// search.
+  ///
+  /// Deep-search mode aside, [localItems] is filtered synchronously and
+  /// instantly (same as before this existed) for the name-match case;
+  /// `_deepSearchResults` (populated by a debounced scan even in
+  /// non-deep-search mode now -- see file_browser_search_controller.dart's
+  /// onQueryChanged) only has to contribute entries that check adds that
+  /// the instant pass couldn't already find, so a plain name search never
+  /// waits on it. In deep-search mode, `_deepSearchResults` already spans
+  /// every matched folder, so it's used as-is instead -- `localItems`
+  /// alone could never represent that.
+  List<RawEntry> _searchAwareVisibleItems(List<RawEntry> localItems, String query) {
+    if (!_searchActive || query.isEmpty) {
+      return localItems.where((item) => _isVisibleInCurrentListing(item, query)).toList();
+    }
+    if (_isDeepSearch) {
+      return _deepSearchResults
+          .where((item) => _isVisibleInCurrentListing(item, query, skipQueryCheck: true))
+          .toList();
+    }
+    final instant = localItems.where((item) => _isVisibleInCurrentListing(item, query)).toList();
+    final instantLowerNames = instant.map((e) => e.lowercaseName).toSet();
+    final contentOnlyMatches = _deepSearchResults.where(
+      (item) =>
+          !instantLowerNames.contains(item.lowercaseName) &&
+          _isVisibleInCurrentListing(item, query, skipQueryCheck: true),
+    );
+    return [...instant, ...contentOnlyMatches];
   }
 
   void _onContainerLockedEvent(int volId) {
@@ -573,13 +619,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (!_browserScrollController.hasClients) return;
 
     final query = _searchQuery.trim().toLowerCase();
-    final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
-        ? _deepSearchResults
-        : _currentItems;
-
-    final sortedItems = baseItems
-        .where((item) => _isVisibleInCurrentListing(item, query))
-        .toList()
+    final sortedItems = _searchAwareVisibleItems(_currentItems, query).toList()
       ..sort(_compareOverall);
 
     final targetIndex = sortedItems.indexWhere((e) {
@@ -3006,11 +3046,7 @@ Future<void> _extractSelectedArchive() async {
       ...visibleCurrentItems,
       ...uniquePlaceholders,
     ];
-    final baseItems =
-        (searchActive && isDeep && query.isNotEmpty) ? deepResults : combinedItems;
-    final filteredItems = baseItems
-        .where((item) => _isVisibleInCurrentListing(item, query))
-        .toList()
+    final filteredItems = _searchAwareVisibleItems(combinedItems, query).toList()
       ..sort(_compareOverall);
 
     int dirCount = 0;

@@ -146,7 +146,7 @@ void main() {
     late _RecordingCryptoApi crypto;
     late ProviderContainer localContainer;
 
-    setUp(() {
+     setUp(() {
       crypto = _RecordingCryptoApi();
       localContainer = ProviderContainer(
         overrides: [
@@ -158,6 +158,7 @@ void main() {
           vaultLifecycleApiProvider.overrideWith((ref) => _FakeVaultLifecycleApi()),
         ],
       );
+      localContainer.listen(provider, (_, __) {});
       addTearDown(localContainer.dispose);
     });
 

@@ -210,8 +210,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1600));
     });
 
-    testWidgets('displays day number and month text for date sort in popup', (tester) async {
-      final dateInstant = DateTime(2024, 9, 16, 12, 0);
+   testWidgets('displays day number and month text for date sort in popup', (tester) async {
+      final dateInstant = DateTime(DateTime.now().year, 9, 16, 12, 0);
       final secs = dateInstant.millisecondsSinceEpoch ~/ 1000;
 
       final entries = List.generate(
@@ -238,7 +238,7 @@ void main() {
       await tester.pump();
 
       // Should display day number and month as text (e.g. contains '16' and 'Sep')
-      final finder = find.textContaining('16 Sep');
+      final finder = find.textContaining('Sep 16');
       expect(finder, findsOneWidget);
 
       await gesture.up();

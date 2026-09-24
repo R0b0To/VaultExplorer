@@ -379,6 +379,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Temp credentials read failed', e);
     }
+    if (!ref.mounted) return;
 
     bool biometricAvailable = false;
     try {
@@ -387,6 +388,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Biometric availability check failed', e);
     }
+    if (!ref.mounted) return;
 
     ThumbnailCacheMode? thumbMode = state.thumbnailCacheMode;
     ThumbnailQuality? thumbQuality = state.thumbnailQuality;
@@ -400,6 +402,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Derived key expiry read failed', e);
     }
+    if (!ref.mounted) return;
 
     try {
       final toolbarConfig =
@@ -409,6 +412,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     } catch (_) {
       thumbMode ??= ThumbnailCacheMode.disabled;
     }
+    if (!ref.mounted) return;
 
     try {
       final settings = appSettings ??
@@ -419,12 +423,14 @@ class ContainerConfigController extends _$ContainerConfigController {
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Settings load failed', e);
     }
+    if (!ref.mounted) return;
 
     String? patternHash;
     String? pinHash;
     if (state.unlockMethod == ContainerUnlockMethod.pattern) {
       patternHash = await ref.read(containerRepositoryProvider).getPatternHash(params.uri);
     }
+    if (!ref.mounted) return;
     if (state.unlockMethod == ContainerUnlockMethod.pin) {
       pinHash = await ref.read(containerRepositoryProvider).getPinHash(params.uri);
     }
@@ -649,6 +655,7 @@ class ContainerConfigController extends _$ContainerConfigController {
 
     await ref.read(containerRepositoryProvider).save(record);
     await _applyDerivedKeyLifetime();
+    if (!ref.mounted) return record;
     if (!state.isMounted && !state.cacheDerivedKey) {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(params.uri);

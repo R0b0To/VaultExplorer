@@ -21,13 +21,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-    <!-- Handing a vault APK to the system package installer (see
-         SystemPermissionHandlers.handleInstallApk). The bytes are streamed
-         out through ContainerDocumentsProvider exactly like any other
-         "open with" hand-off; this app never writes a decrypted copy to
-         disk of its own. Still gated behind the user's own per-app
-         "install unknown apps" switch, which this permission only makes
-         it possible to ask for. -->
+
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 

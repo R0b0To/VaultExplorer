@@ -104,7 +104,7 @@ class FileRowShell extends StatelessWidget {
 
   String _columnText(FileDetailColumn col, BuildContext context) =>
       switch (col) {
-        FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
+        FileDetailColumn.date => formatEntryDate(entry.modifiedSecs, context),
         FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
         FileDetailColumn.type => _getTypeLabel(entry, context),
       };

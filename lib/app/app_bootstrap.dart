@@ -16,6 +16,10 @@ import 'package:vaultexplorer/core/services/resume_paint_signal.dart';
 import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/derived_key_expiry_service.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
 void configurePlatformIntegrations(ProviderContainer container) {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -43,6 +47,7 @@ void configurePlatformIntegrations(ProviderContainer container) {
 }
 
 Future<void> runDeferredStartupWork(ProviderContainer container) async {
+  unawaited(_purgeExpiredDerivedKeys(container));
   unawaited(
     DeviceCapabilityService.init(container.read(vaultLifecycleApiProvider)),
   );
@@ -77,6 +82,27 @@ Future<void> runDeferredStartupWork(ProviderContainer container) async {
     appVersion = 'unknown';
   }
   await _cleanupOrphanedTempFiles();
+}
+
+/// Removes cached derived keys whose per-vault lifetime has run out. The
+/// dashboard may already have loaded its records by the time this finishes,
+/// so it reloads when a vault's caching flag was switched off.
+Future<void> _purgeExpiredDerivedKeys(ProviderContainer container) async {
+  try {
+    final changed = await DerivedKeyExpiryService(
+      cryptoApi: container.read(vaultCryptoApiProvider),
+      repository: container.read(containerRepositoryProvider),
+    ).purgeExpired();
+    if (changed > 0) {
+      await container.read(vaultDashboardControllerProvider.notifier).loadAll();
+    }
+  } catch (e) {
+    VeLog.w(
+      'AppBootstrap',
+      'Expired derived-key purge failed; will retry next launch',
+      e,
+    );
+  }
 }
 
 Future<void> _cleanupOrphanedTempFiles() async {

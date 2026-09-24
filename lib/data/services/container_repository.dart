@@ -106,12 +106,21 @@ enum ContainerUnlockMethod {
 ContainerRepository containerRepository(Ref ref) =>
     ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
 
+/// The string the platform layer uses to key a container's cached derived key.
+///
+/// It is the record's URI, except for USB drives: their record URI is the
+/// synthetic `usb:<deviceName>` while the unlock flow stores, loads and clears
+/// the cached key under the bare device name.
+String derivedKeyPathForUri(String uri) =>
+    uri.startsWith('usb:') ? uri.substring('usb:'.length) : uri;
+
 class ContainerRepository {
   ContainerRepository._(this._clearDerivedKey);
   ContainerRepository.withCryptoApi(VaultCryptoApi cryptoApi)
     : this._(cryptoApi.clearDerivedKey);
 
-  final Future<bool> Function(String filePath) _clearDerivedKey;
+  final Future<bool> Function(String filePath, {bool removeExpiry})
+  _clearDerivedKey;
   static const _secure = AppSecureStorage.instance;
   Map<String, ContainerRecord>? _cache;
 
@@ -246,11 +255,31 @@ class ContainerRepository {
     await _secure.delete(key: _keyfilesKey(uri));
     await _secure.delete(key: _compositeCarriersKey(uri));
     try {
-      await _clearDerivedKey(uri);
+      await _clearDerivedKey(derivedKeyPathForUri(uri), removeExpiry: true);
     } catch (e) {
       _logSwallowed('remove/clearDerivedKey', e);
     }
     await _persist();
+  }
+
+  /// Switches derived-key caching off for every record whose cached key was
+  /// keyed by one of [keyPaths] (see [derivedKeyPathForUri]). Used after the
+  /// platform layer purged keys whose lifetime ran out, so the vault stops
+  /// caching instead of quietly caching a fresh key on the next unlock.
+  ///
+  /// Returns how many records changed.
+  Future<int> disableDerivedKeyCachingFor(Iterable<String> keyPaths) async {
+    await _ensureLoaded();
+    final wanted = keyPaths.toSet();
+    var changed = 0;
+    for (final record in _cache!.values.toList()) {
+      if (!record.cacheDerivedKey) continue;
+      if (!wanted.contains(derivedKeyPathForUri(record.uri))) continue;
+      _cache![record.uri] = record.copyWith(cacheDerivedKey: false);
+      changed++;
+    }
+    if (changed > 0) await _persist();
+    return changed;
   }
 
   Future<void> setFolderExposed(

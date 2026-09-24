@@ -34,6 +34,12 @@ import com.aeidolon.vaultexplorer.VeLog
  * container file itself (falling back to a hash of the path string), not
  * the path, so a renamed/moved container still finds its cached key.
  *
+ * A cached key can optionally be given a lifetime: an absolute expiry the
+ * user sets per container (see [DerivedKeyExpiryStore]). Once it has passed
+ * the key is removed -- from the prefs file and from the AndroidKeyStore --
+ * either the next time it would be loaded ([loadDerivedKeyBytes]) or during
+ * the sweep the app runs on launch ([purgeExpiredKeys]), whichever is first.
+ *
  * Holds [activity] rather than a pre-resolved Context/ContentResolver
  * snapshot; see [NativeOpSupport]'s doc comment for why.
  */
@@ -137,6 +143,14 @@ class DerivedKeyHandlers(
     private val androidKeyStore: KeyStore by lazy {
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     }
+
+    /** Same file `StorageShredder` / `PanicPurgeRegistry` clear on a panic
+     *  wipe, so blobs and their expiry bookkeeping go together. */
+    private val derivedPrefs by lazy {
+        activity.getSharedPreferences(DERIVED_KEYS_PREFS, Context.MODE_PRIVATE)
+    }
+
+    private val expiry by lazy { DerivedKeyExpiryStore(derivedPrefs) }
 
     private fun getOrCreateDerivedKey(alias: String): SecretKey {
         val existing = androidKeyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
@@ -250,17 +264,18 @@ class DerivedKeyHandlers(
         VeLog.i("VaultExplorer_C++") { "Storing derived key" }
         val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
         val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
-        activity.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
-            .edit()
-            .putString(alias, encoded)
-            .apply()
+        val editor = derivedPrefs.edit().putString(alias, encoded)
+        expiry.recordStored(editor, filePath, alias)
+        editor.apply()
         return true
     }
 
     private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
+        // An expired key is removed instead of returned, so a stale cache can
+        // never unlock a vault even if the launch-time sweep has not run yet.
+        if (purgeIfExpired(filePath)) return null
         val alias = derivedKeyAlias(filePath)
-        val encoded = activity.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
-            .getString(alias, null) ?: return null
+        val encoded = derivedPrefs.getString(alias, null) ?: return null
         val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
         val decrypted = decryptDerivedKey(encrypted, alias)
         if (decrypted != null) {
@@ -269,11 +284,60 @@ class DerivedKeyHandlers(
         return decrypted
     }
 
-    private fun clearDerivedKeyBytes(filePath: String): Boolean {
-        return activity.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
-            .edit()
-            .remove(derivedKeyAlias(filePath))
-            .commit()
+    /**
+     * Drops the cached blob for [filePath]. The configured expiry survives by
+     * default: this is also what runs when a cached key turns out to be stale
+     * (wrong after a password change), and that must not silently turn a
+     * "remove after 7 days" vault into "keep forever". Pass [removeExpiry]
+     * when the vault itself goes away or caching is being switched off, which
+     * also deletes the now-useless AndroidKeyStore entry.
+     */
+    private fun clearDerivedKeyBytes(filePath: String, removeExpiry: Boolean = false): Boolean {
+        val alias = derivedKeyAlias(filePath)
+        val ok = derivedPrefs.edit().remove(alias).commit()
+        if (removeExpiry) {
+            deleteKeystoreAlias(alias)
+            expiry.forget(filePath)
+        }
+        return ok
+    }
+
+    private fun deleteKeystoreAlias(alias: String) {
+        try {
+            if (androidKeyStore.containsAlias(alias)) androidKeyStore.deleteEntry(alias)
+        } catch (e: Exception) {
+            VeLog.w("VaultExplorer_C++", e) { "Failed to delete derived-key Keystore alias" }
+        }
+    }
+
+    /** Removes one expired cache: blob, Keystore entry and (unless
+     *  [keepExpiry], see [DerivedKeyExpiryStore.markPurged]) expiry state. */
+    private fun purge(due: DerivedKeyExpiryStore.Due, keepExpiry: Boolean = false) {
+        val alias = due.alias ?: due.path?.let { derivedKeyAlias(it) }
+        if (alias != null) deleteKeystoreAlias(alias)
+        expiry.markPurged(due, alias, keepExpiry)
+        VeLog.i("VaultExplorer_C++") { "Cached derived key reached its lifetime and was removed" }
+    }
+
+    /** Unlock-path purge. Keeps the elapsed expiry so that a key cached
+     *  again later in this session is removed again rather than living on;
+     *  the next launch sweep clears it for good. */
+    private fun purgeIfExpired(filePath: String): Boolean {
+        val due = expiry.dueFor(filePath) ?: return false
+        purge(due, keepExpiry = true)
+        return true
+    }
+
+    /**
+     * Launch-time sweep: removes every cached key whose lifetime has run
+     * out, without needing access to any container file. Returns the paths
+     * (as originally passed to store/load) of every vault purged since the
+     * last call -- including ones [loadDerivedKeyBytes] purged mid-session --
+     * so the Dart side can switch key caching off for them.
+     */
+    fun purgeExpiredKeys(): List<String> {
+        for (due in expiry.due()) purge(due)
+        return expiry.takePurgedPaths()
     }
 
     fun handleDeriveDerivedKey(call: MethodCall, result: MethodChannel.Result) {
@@ -333,7 +397,53 @@ class DerivedKeyHandlers(
             result.success(false)
             return
         }
-        result.success(clearDerivedKeyBytes(filePath))
+        val removeExpiry = call.argument<Boolean>("removeExpiry") ?: false
+        result.success(clearDerivedKeyBytes(filePath, removeExpiry))
+    }
+
+    /** Sets (or, with no `expiresAtMs`, removes) the lifetime of [filePath]'s
+     *  cached key. Off the main thread because finding the blob's alias for
+     *  the mapping can read the container header. */
+    fun handleSetDerivedKeyExpiry(call: MethodCall, result: MethodChannel.Result) {
+        val filePath = call.argument<String>("filePath")
+        if (filePath == null) {
+            result.error("INVALID_ARGS", "filePath required", null)
+            return
+        }
+        val expiresAtMs = call.argument<Number>("expiresAtMs")?.toLong()
+        ioExecutor.execute {
+            try {
+                val blobAlias = if (expiresAtMs != null) {
+                    derivedKeyAlias(filePath).takeIf { derivedPrefs.contains(it) }
+                } else {
+                    null
+                }
+                expiry.setExpiry(filePath, expiresAtMs, blobAlias)
+                activity.runOnUiThread { result.success(true) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    fun handleGetDerivedKeyExpiry(call: MethodCall, result: MethodChannel.Result) {
+        val filePath = call.argument<String>("filePath")
+        if (filePath == null) {
+            result.success(null)
+            return
+        }
+        result.success(expiry.expiryOf(filePath))
+    }
+
+    fun handlePurgeExpiredDerivedKeys(@Suppress("UNUSED_PARAMETER") call: MethodCall, result: MethodChannel.Result) {
+        ioExecutor.execute {
+            try {
+                val purged = purgeExpiredKeys()
+                activity.runOnUiThread { result.success(purged) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
     }
 
     fun handleHashPassword(call: MethodCall, result: MethodChannel.Result) {
@@ -429,5 +539,9 @@ class DerivedKeyHandlers(
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }
         }
+    }
+
+    private companion object {
+        const val DERIVED_KEYS_PREFS = "vc2_derived_keys"
     }
 }

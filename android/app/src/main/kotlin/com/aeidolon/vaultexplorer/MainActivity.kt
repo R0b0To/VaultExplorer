@@ -156,6 +156,9 @@ private object ChannelMethods {
     const val STORE_DERIVED_KEY         = "storeDerivedKey"
     const val LOAD_DERIVED_KEY          = "loadDerivedKey"
     const val CLEAR_DERIVED_KEY         = "clearDerivedKey"
+    const val SET_DERIVED_KEY_EXPIRY    = "setDerivedKeyExpiry"
+    const val GET_DERIVED_KEY_EXPIRY    = "getDerivedKeyExpiry"
+    const val PURGE_EXPIRED_DERIVED_KEYS = "purgeExpiredDerivedKeys"
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
     const val BEGIN_BATCH_WRITE         = "beginBatchWrite"
     const val END_BATCH_WRITE           = "endBatchWrite"
@@ -901,6 +904,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.STORE_DERIVED_KEY -> derivedKeyHandlers.handleStoreDerivedKey(call, result)
                 ChannelMethods.LOAD_DERIVED_KEY -> derivedKeyHandlers.handleLoadDerivedKey(call, result)
                 ChannelMethods.CLEAR_DERIVED_KEY -> derivedKeyHandlers.handleClearDerivedKey(call, result)
+                ChannelMethods.SET_DERIVED_KEY_EXPIRY -> derivedKeyHandlers.handleSetDerivedKeyExpiry(call, result)
+                ChannelMethods.GET_DERIVED_KEY_EXPIRY -> derivedKeyHandlers.handleGetDerivedKeyExpiry(call, result)
+                ChannelMethods.PURGE_EXPIRED_DERIVED_KEYS -> derivedKeyHandlers.handlePurgeExpiredDerivedKeys(call, result)
                 ChannelMethods.HASH_PASSWORD -> derivedKeyHandlers.handleHashPassword(call, result)
                 ChannelMethods.HASH_PASSWORD_SHA256 -> derivedKeyHandlers.handleHashPasswordSha256(call, result)
                 ChannelMethods.AES_GCM_ENCRYPT -> derivedKeyHandlers.handleAesGcmEncrypt(call, result)

@@ -440,7 +440,7 @@ by name.
 | Split & Join | `splitContainer`, `joinContainer`, `cancelSplitJoin`, `unlockSplitContainer` |
 | Single-file crypto ("Encrypt/Decrypt Files" tool) | `encryptSingleFile`, `decryptSingleFile`, `pickCryptoFiles` |
 | Hash Verifier | `computeExternalFileHash`/`cancelHashCompute`, `hashBytesSha256`/`hashBytesMd5`, `begin/update/finish/discardHashSession`, `readExternalFileBytes`/`writeExternalFileBytes` |
-| Crypto | `hashPassword`/`hashPasswordSha256`, `aesGcmEncrypt`/`aesGcmDecrypt`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey` |
+| Crypto | `hashPassword`/`hashPasswordSha256`, `aesGcmEncrypt`/`aesGcmDecrypt`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey`, `setDerivedKeyExpiry`/`getDerivedKeyExpiry`, `purgeExpiredDerivedKeys` |
 | Secure storage | `read/write/deleteSecure`, `deleteAllSecure`, `readAllSecure`, `containsKeySecure` |
 | Automation settings (per-vault, gates §5.4) | `get/regenerateAutomationToken`, `getAutomationVaultConfig`, `setAutomationTier`, `set/getAutomationPassword`/`Keyfiles`/`Pim`, `setAutomationCaptureEnabled` |
 | Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |

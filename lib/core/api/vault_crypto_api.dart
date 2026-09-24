@@ -181,11 +181,56 @@ class VaultCryptoApi {
     return base64Decode(result);
   }
 
-  Future<bool> clearDerivedKey(String filePath) async {
+  /// Drops the cached derived key for [filePath].
+  ///
+  /// A configured expiry (see [setDerivedKeyExpiry]) is kept by default, since
+  /// this is also the "cached key turned out to be stale" path and that must
+  /// not quietly lift a vault's lifetime. Pass [removeExpiry] when the vault is
+  /// being removed or key caching switched off: it then also deletes the
+  /// Keystore entry and forgets the expiry.
+  Future<bool> clearDerivedKey(
+    String filePath, {
+    bool removeExpiry = false,
+  }) async {
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.clearDerivedKey,
-      {'filePath': filePath},
+      {'filePath': filePath, if (removeExpiry) 'removeExpiry': true},
     );
     return result ?? false;
+  }
+
+  /// Sets the moment at which [filePath]'s cached derived key is removed, or
+  /// clears it when [expiresAt] is null. The platform enforces it: the key is
+  /// refused (and deleted) once [expiresAt] has passed, and swept on launch
+  /// by [purgeExpiredDerivedKeys].
+  Future<bool> setDerivedKeyExpiry(String filePath, DateTime? expiresAt) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.setDerivedKeyExpiry,
+      {
+        'filePath': filePath,
+        if (expiresAt != null) 'expiresAtMs': expiresAt.millisecondsSinceEpoch,
+      },
+    );
+    return result ?? false;
+  }
+
+  /// The expiry currently configured for [filePath], or null for none.
+  Future<DateTime?> getDerivedKeyExpiry(String filePath) async {
+    final ms = await _channel.invokeMethod<int>(
+      ChannelMethods.getDerivedKeyExpiry,
+      {'filePath': filePath},
+    );
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  /// Removes every cached derived key whose expiry has passed. Returns the
+  /// file paths (the same strings used with [loadDerivedKey]) of every vault
+  /// purged since this was last called, so key caching can be switched off
+  /// for them.
+  Future<List<String>> purgeExpiredDerivedKeys() async {
+    final result = await _channel.invokeListMethod<String>(
+      ChannelMethods.purgeExpiredDerivedKeys,
+    );
+    return result ?? const [];
   }
 }

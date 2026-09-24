@@ -18,6 +18,17 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 part 'container_config_controller.g.dart';
 
+/// [ContainerConfigState.derivedKeyLifetimeDays] value meaning "no expiry":
+/// the cached key stays until caching is switched off.
+const int kNoDerivedKeyExpiry = 0;
+
+/// Picker-only sentinel meaning "leave the expiry that is already stored
+/// alone". Never stored in state; see [ContainerConfigController.setDerivedKeyLifetimeDays].
+const int kKeepDerivedKeyExpiry = -1;
+
+/// Lifetimes offered for a cached derived key, in days.
+const List<int> kDerivedKeyLifetimePresetDays = [1, 7, 30, 90];
+
 @immutable
 class ContainerConfigParams {
   final String uri;
@@ -50,6 +61,16 @@ class ContainerConfigState {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
+
+  /// The expiry currently stored for this container's cached key, loaded from
+  /// the platform layer. Null means none.
+  final DateTime? derivedKeyExpiresAt;
+
+  /// A lifetime picked in this session, applied when saving: [kNoDerivedKeyExpiry]
+  /// for none, or a number of days counted from the moment of saving. Null means
+  /// the picker was not touched and [derivedKeyExpiresAt] stays as it is -- the
+  /// expiry is an absolute date and is only overwritten by an explicit choice.
+  final int? derivedKeyLifetimeDays;
   final int cipherId;
   final int hashId;
   final List<KeyfileRef> keyfiles;
@@ -88,6 +109,8 @@ class ContainerConfigState {
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     required this.cacheDerivedKey,
+    this.derivedKeyExpiresAt,
+    this.derivedKeyLifetimeDays,
     this.cipherId = 255,
     this.hashId = 255,
     this.keyfiles = const [],
@@ -119,6 +142,16 @@ class ContainerConfigState {
 
   bool get wasPasswordless => initialUnlockMethod == ContainerUnlockMethod.password;
 
+  /// The expiry the cached key will have once this is saved: the stored one if
+  /// the lifetime was not touched, none for [kNoDerivedKeyExpiry], otherwise
+  /// [derivedKeyLifetimeDays] days from [now] (the moment of saving).
+  DateTime? effectiveDerivedKeyExpiry([DateTime? now]) {
+    final days = derivedKeyLifetimeDays;
+    if (days == null) return derivedKeyExpiresAt;
+    if (days == kNoDerivedKeyExpiry) return null;
+    return (now ?? DateTime.now()).add(Duration(days: days));
+  }
+
   bool get unlockMethodNeedsPassword => unlockMethod != ContainerUnlockMethod.password;
 
   bool get needsPatternSetup =>
@@ -136,6 +169,7 @@ class ContainerConfigState {
     if (thumbnailCacheMode != initialThumbnailCacheMode) return true;
     if (thumbnailQuality != initialThumbnailQuality) return true;
     if (cacheDerivedKey != initialCacheDerivedKey) return true;
+    if (cacheDerivedKey && derivedKeyLifetimeDays != null) return true;
     if (cipherId != initialCipherId) return true;
     if (hashId != initialHashId) return true;
     if (changePassword) return true;
@@ -179,6 +213,9 @@ class ContainerConfigState {
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
     bool? cacheDerivedKey,
+    DateTime? derivedKeyExpiresAt,
+    int? derivedKeyLifetimeDays,
+    bool clearDerivedKeyLifetimeDays = false,
     int? cipherId,
     int? hashId,
     List<KeyfileRef>? keyfiles,
@@ -209,6 +246,10 @@ class ContainerConfigState {
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
     cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
+    derivedKeyExpiresAt: derivedKeyExpiresAt ?? this.derivedKeyExpiresAt,
+    derivedKeyLifetimeDays: clearDerivedKeyLifetimeDays
+        ? null
+        : (derivedKeyLifetimeDays ?? this.derivedKeyLifetimeDays),
     cipherId: cipherId ?? this.cipherId,
     hashId: hashId ?? this.hashId,
     keyfiles: keyfiles ?? this.keyfiles,
@@ -351,6 +392,15 @@ class ContainerConfigController extends _$ContainerConfigController {
     ThumbnailQuality? thumbQuality = state.thumbnailQuality;
     bool derivedKey = state.cacheDerivedKey;
 
+    DateTime? derivedKeyExpiresAt;
+    try {
+      derivedKeyExpiresAt = await ref
+          .read(vaultCryptoApiProvider)
+          .getDerivedKeyExpiry(derivedKeyPathForUri(params.uri));
+    } catch (e) {
+      VeLog.w('ContainerConfigController', 'Derived key expiry read failed', e);
+    }
+
     try {
       final toolbarConfig =
           await ref.read(fileManagerToolbarServiceProvider).load();
@@ -387,6 +437,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       thumbnailCacheMode: thumbMode,
       thumbnailQuality: thumbQuality,
       cacheDerivedKey: derivedKey,
+      derivedKeyExpiresAt: derivedKeyExpiresAt,
       initialThumbnailCacheMode: thumbMode,
       initialThumbnailQuality: thumbQuality,
       initialCacheDerivedKey: state.initialCacheDerivedKey ?? derivedKey,
@@ -418,6 +469,19 @@ class ContainerConfigController extends _$ContainerConfigController {
       state = state._copy(thumbnailQuality: quality);
 
   void setCacheDerivedKey(bool val) => state = state._copy(cacheDerivedKey: val);
+
+  /// Picks how long the cached derived key may live: [kNoDerivedKeyExpiry],
+  /// a number of days from saving, or [kKeepDerivedKeyExpiry] to go back to
+  /// the expiry already stored. Choosing "none" when none is stored is a no-op
+  /// choice and is not tracked as a pending change.
+  void setDerivedKeyLifetimeDays(int days) {
+    final isNoOp =
+        days == kKeepDerivedKeyExpiry ||
+        (days == kNoDerivedKeyExpiry && state.derivedKeyExpiresAt == null);
+    state = isNoOp
+        ? state._copy(clearDerivedKeyLifetimeDays: true)
+        : state._copy(derivedKeyLifetimeDays: days);
+  }
 
   void setCipherId(int cipherId) => state = state._copy(cipherId: cipherId);
 
@@ -497,6 +561,36 @@ class ContainerConfigController extends _$ContainerConfigController {
     );
   }
 
+  /// Hands the derived-key lifetime choice to the platform layer, which owns
+  /// the cached key and enforces the expiry -- the expiry is not part of the
+  /// container record.
+  ///
+  /// Switching caching off in this save also removes whatever key is still
+  /// cached, along with any expiry, so nothing lingers in the Keystore for a
+  /// vault that no longer uses it.
+  Future<void> _applyDerivedKeyLifetime() async {
+    final keyPath = derivedKeyPathForUri(params.uri);
+    try {
+      final crypto = ref.read(vaultCryptoApiProvider);
+      if (!state.cacheDerivedKey) {
+        if (state.initialCacheDerivedKey == true) {
+          await crypto.clearDerivedKey(keyPath, removeExpiry: true);
+        }
+      } else if (state.derivedKeyLifetimeDays != null) {
+        await crypto.setDerivedKeyExpiry(
+          keyPath,
+          state.effectiveDerivedKeyExpiry(),
+        );
+      }
+    } catch (e) {
+      VeLog.e(
+        'ContainerConfigController',
+        'Applying derived key lifetime failed for uri=${VeLog.censorUri(params.uri)}',
+        e,
+      );
+    }
+  }
+
   Future<ContainerRecord?> saveContainer({
     required String passwordText,
     String? pimText,
@@ -554,6 +648,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     );
 
     await ref.read(containerRepositoryProvider).save(record);
+    await _applyDerivedKeyLifetime();
     if (!state.isMounted && !state.cacheDerivedKey) {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(params.uri);

@@ -787,6 +787,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                       .read(containerConfigControllerProvider(_params).notifier)
                       .setCacheDerivedKey(v),
                 ),
+                if (state.cacheDerivedKey) _buildDerivedKeyLifetimeTile(context, state),
                 if (!_isCryfs)
                   AdvancedParamsPanel(
                     collapsible: false,
@@ -852,6 +853,44 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Lifetime picker for the cached derived key. The expiry is an absolute
+  /// date: an untouched picker shows the date already stored, and only an
+  /// explicit choice replaces it (counting from the moment of saving).
+  Widget _buildDerivedKeyLifetimeTile(
+    BuildContext context,
+    ContainerConfigState state,
+  ) {
+    final l10n = context.l10n;
+    final dates = MaterialLocalizations.of(context);
+    String expiresOn(DateTime date) =>
+        l10n.cacheDerivedKeyLifetimeExpiresOn(dates.formatShortDate(date));
+
+    final stored = state.derivedKeyExpiresAt;
+    final pendingDays = state.derivedKeyLifetimeDays;
+    final effective = state.effectiveDerivedKeyExpiry();
+
+    return OptionPickerTile<int>(
+      label: l10n.cacheDerivedKeyLifetimeTitle,
+      prefixIcon: Icons.timer_outlined,
+      value: pendingDays ??
+          (stored != null ? kKeepDerivedKeyExpiry : kNoDerivedKeyExpiry),
+      options: [
+        if (stored != null)
+          SelectOption(value: kKeepDerivedKeyExpiry, label: expiresOn(stored)),
+        SelectOption(
+          value: kNoDerivedKeyExpiry,
+          label: l10n.cacheDerivedKeyLifetimeNever,
+        ),
+        for (final days in kDerivedKeyLifetimePresetDays)
+          SelectOption(value: days, label: l10n.nDays(days)),
+      ],
+      subtitle: effective != null ? expiresOn(effective) : null,
+      onChanged: (days) => ref
+          .read(containerConfigControllerProvider(_params).notifier)
+          .setDerivedKeyLifetimeDays(days),
     );
   }
 

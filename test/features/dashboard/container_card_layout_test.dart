@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 
 void main() {
@@ -32,6 +33,8 @@ void main() {
             home: Scaffold(
               body: ContainerCard(
                 container: folderVaultContainer,
+                record: null,
+                appSettings: AppSettings(),
                 onLocked: (_) {},
                 onBrowse: () {},
               ),
@@ -77,6 +80,8 @@ void main() {
             home: Scaffold(
               body: ContainerCard(
                 container: folderVaultContainer,
+                record: null,
+                appSettings: AppSettings(),
                 onLocked: (_) {},
                 onBrowse: () {},
               ),
@@ -125,9 +130,11 @@ void main() {
                     containerFormat: 'veracrypt',
                     onUnlock: () {},
                   ),
-                  ContainerCard(
+                 ContainerCard(
                     key: const ValueKey('mounted'),
                     container: mountedContainer,
+                    record: null,
+                    appSettings: AppSettings(),
                     onLocked: (_) {},
                     onBrowse: () {},
                   ),

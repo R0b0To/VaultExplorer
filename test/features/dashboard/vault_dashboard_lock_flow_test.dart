@@ -155,15 +155,17 @@ void main() {
             ],
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: Consumer(
+               body: Consumer(
                 builder: (context, ref, _) {
-                  final mounted = ref.watch(vaultDashboardControllerProvider).mounted;
+                  final state = ref.watch(vaultDashboardControllerProvider);
                   return Column(
-                    children: mounted.map((c) {
+                    children: state.mounted.map((c) {
                       final key = c.volId == vaultA.volId ? vaultAKey : vaultBKey;
                       return ContainerCard(
                         key: key,
                         container: c,
+                        record: state.records[c.uri],
+                        appSettings: state.appSettings,
                         onLocked: controller.onContainerLocked,
                         onBrowse: () {},
                       );

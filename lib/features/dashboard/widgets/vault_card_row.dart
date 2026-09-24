@@ -6,6 +6,7 @@ import 'package:flutter/semantics.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 
 enum _OpenSide { none, start, end }
@@ -110,6 +111,8 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
 class VaultCardRow extends StatefulWidget {
   final int index;
   final VaultListItem item;
+  final ContainerRecord? record;
+  final AppSettings appSettings;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -127,6 +130,8 @@ class VaultCardRow extends StatefulWidget {
     super.key,
     required this.index,
     required this.item,
+    required this.record,
+    required this.appSettings,
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
@@ -364,6 +369,8 @@ class _VaultCardRowState extends State<VaultCardRow>
         MountedVaultItem(:final container) => ContainerCard(
             key: ValueKey('mounted_${widget.item.uri}'),
             container: container,
+            record: widget.record,
+            appSettings: widget.appSettings,
             onLocked: widget.onLocked,
             onBrowse: _handleTap,
             borderRadius: dynamicRadius,

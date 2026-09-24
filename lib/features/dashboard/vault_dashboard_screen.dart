@@ -664,10 +664,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             settingsLoaded &&
             !appSettings.hasSeenSwipeTutorial &&
             appSettings.enableCardSwipeActions;
-        return VaultCardRow(
+       return VaultCardRow(
           key: ValueKey(item.uri),
           index: i,
           item: item,
+          record: state.records[item.uri],
+          appSettings: appSettings,
           group: _swipeGroup,
           onOpen: () => openItem(item),
           onEdit: () => _requestEdit(item),

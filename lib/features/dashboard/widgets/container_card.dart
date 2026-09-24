@@ -10,6 +10,8 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/auto_lock_indicator.dart';
 
 const _kLogTag = 'ContainerCard';
 
@@ -24,6 +26,7 @@ class BaseContainerCard extends StatelessWidget {
   final Widget icon;
   final Color iconBackgroundColor;
   final String title;
+  final Widget? titleTrailing;
   final Widget? subtitle;
   final Widget? trailingAction;
   final Color? backgroundColor;
@@ -33,6 +36,7 @@ class BaseContainerCard extends StatelessWidget {
     required this.icon,
     required this.iconBackgroundColor,
     required this.title,
+    this.titleTrailing,
     this.subtitle,
     this.trailingAction,
     this.backgroundColor,
@@ -71,15 +75,22 @@ class BaseContainerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.1,
-                        height: 1.2,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.1,
+                              height: 1.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        if (titleTrailing != null) titleTrailing!,
+                      ],
                     ),
                      if (subtitle != null) ...[
                       const SizedBox(height: 3),
@@ -102,12 +113,16 @@ class BaseContainerCard extends StatelessWidget {
 
 class ContainerCard extends StatelessWidget {
   final MountedContainer container;
+  final ContainerRecord? record;
+  final AppSettings appSettings;
   final ValueChanged<int> onLocked;
   final VoidCallback onBrowse;
   final BorderRadiusGeometry? borderRadius;
   const ContainerCard({
     super.key,
     required this.container,
+    required this.record,
+    required this.appSettings,
     required this.onLocked,
     required this.onBrowse,
     this.borderRadius,
@@ -206,6 +221,7 @@ class ContainerCard extends StatelessWidget {
       icon: iconWidget,
       iconBackgroundColor: cs.primaryContainer,
       title: container.displayName,
+      titleTrailing: AutoLockIconBadge(record: record, settings: appSettings),
       subtitle: subtitleWidget,
       trailingAction: _LockButton(container: container, onLocked: onLocked),
       backgroundColor: cardBg,
@@ -253,7 +269,9 @@ class SavedContainerCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
         ),
-        // Reserve the exact height of the progress bar + spacing (4 + 4 = 8)
+       // Reserves the exact height of ContainerCard's progress bar +
+        // spacing (4 + 4 = 8) so mounted and locked cards maintain identical
+        // height and prevent Cumulative Layout Shift (CLS).
         const SizedBox(height: 8),
       ],
     );

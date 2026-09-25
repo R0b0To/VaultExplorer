@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -385,7 +386,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     if (ok) {
       try {
         await ref.read(syncTargetBindingStoreProvider).delete(config.vaultSyncId, existing.id);
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('SyncRuleEditorSheet', 'Target binding cleanup failed for rule ${existing.id}', e);
+      }
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
       final syncedPaths = remainingRules
           .where((r) => r.autoSyncOnUnlock || r.liveWatch)

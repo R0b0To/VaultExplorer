@@ -285,7 +285,9 @@ class SyncCoordinatorService {
   Future<void> _quiesce(_VaultSession session) async {
     try {
       await session.starting;
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_tag, 'Session start failed before quiesce; locking anyway', e);
+    }
     await session.scheduler.idle;
   }
 
@@ -406,7 +408,9 @@ class SyncCoordinatorService {
       // Commit what the run learned, also after a cancellation.
       try {
         await session.ledger.flush();
-      } catch (_) {}
+      } catch (e) {
+        VeLog.e(_tag, 'Ledger flush failed after sync run', e);
+      }
     }
     watch.stop();
     _liveWatch.noteRunFinished(session.vault.uri, ruleId, watch.elapsed);

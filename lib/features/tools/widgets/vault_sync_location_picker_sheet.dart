@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
@@ -275,7 +276,7 @@ class _VaultSyncLocationPickerSheetState
       ],
       processEntries: (raw) {
         final folders = raw.where((e) => e.isDir).toList()
-          ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+          ..sort((a, b) => naturalCompare(a.name.toLowerCase(), b.name.toLowerCase()));
         return folders;
       },
       buildEntryTile: (ctx, entry) => ListTile(

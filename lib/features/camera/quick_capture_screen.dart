@@ -145,9 +145,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
           if (_deviceTurns != snappedTurns && mounted) {
             setState(() => _deviceTurns = snappedTurns);
-            _cameraController.setOrientationDegrees(
-              _computeDeviceRotationDegrees(),
-            );
+            unawaited(applyOrientationSilent(_cameraController, _computeDeviceRotationDegrees()));
           }
         });
   }
@@ -351,9 +349,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     setState(() => _focusPoint = details.localPosition);
     _captureSessionController.setShowExposureSlider(true);
 
-    try {
-      await _cameraController.setFocusAndExposurePoint(nx, ny);
-    } catch (_) {}
+    await applyFocusAndExposurePoint(_cameraController, nx, ny, logTag: 'QuickCaptureScreen');
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
@@ -413,9 +409,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       return;
     }
     _captureControlsController.setVideoMode(videoMode);
-    try {
-      await _cameraController.setFlash(_captureControls.flashMode);
-    } catch (_) {}
+    await applyFlash(_cameraController, _captureControls.flashMode, logTag: 'QuickCaptureScreen');
   }
 
   void _triggerShutterFlash() {
@@ -710,9 +704,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                       );
                       if (target != _currentZoom) {
                         _captureSessionController.setZoom(target);
-                        try {
-                          await _cameraController.setZoom(target);
-                        } catch (_) {}
+                        await applyZoomSilent(_cameraController, target);
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
@@ -753,9 +745,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                 maxExposureEv: _maxExposureEv,
                 onExposureChanged: (val) async {
                   _captureSessionController.setExposureEv(val);
-                  try {
-                    await _cameraController.setExposureOffset(val);
-                  } catch (_) {}
+                  await applyExposureOffsetSilent(_cameraController, val);
                 },
               ),
 
@@ -785,7 +775,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                   onCycleTimerDelay: _captureControlsController.cycleTimerDelay,
                   onCycleFlashMode: () {
                     final nextMode = _captureControlsController.cyclePhotoFlashMode();
-                    unawaited(_cameraController.setFlash(nextMode));
+                    unawaited(applyFlash(_cameraController, nextMode, logTag: 'QuickCaptureScreen'));
                   },
                 ),
               ),
@@ -883,9 +873,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                 iconTurns: _iconTurns,
                 onSetZoom: (zoom) async {
                   _captureSessionController.setZoom(zoom);
-                  try {
-                    await _cameraController.setZoom(zoom);
-                  } catch (_) {}
+                  await applyZoomLogged(_cameraController, zoom, logTag: 'QuickCaptureScreen');
                 },
               ),
               const SizedBox(height: 16),

@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -305,7 +306,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         if (cached != null && cached.$2 != null && cached.$3 != null) {
           _onSizeKnown(fullPath, cached.$2!, cached.$3!);
         }
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('FileMasonryView', 'Size prefetch failed for ${VeLog.censorName(fullPath)}', e);
+      }
     }
   }
 
@@ -682,7 +685,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('FileMasonryView', 'Decode-for-size failed for ${VeLog.censorName(path)}', e);
+    }
   }
 
   static Future<Uint8List> _fetch(
@@ -873,7 +878,9 @@ class _VideoMasonryThumb extends ConsumerWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('FileMasonryView', 'Decode-for-size failed for ${VeLog.censorName(path)}', e);
+    }
   }
 
   static Future<Uint8List> _fetch(

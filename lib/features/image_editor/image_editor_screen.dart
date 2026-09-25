@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/filesystem/path_components.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -686,7 +687,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       try {
         final raw = await _fileIoApi.listDirectory(widget.container, dirPath);
         if (raw != null) existingEntries = RawEntry.parseAll(raw);
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('ImageEditorScreen', 'Directory listing failed at ${VeLog.censorUri(dirPath)} during rename conflict check', e);
+      }
       if (!mounted) return;
 
       final fsType = resolveFilesystemType(widget.container);

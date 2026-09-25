@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 class NativeCameraLens {
   final String cameraId;
@@ -371,7 +372,9 @@ class VaultCameraController {
     if (sId != null) {
       try {
         await _channel.invokeMethod('close', {'sessionId': sId});
-      } catch (_) {}
+      } catch (e) {
+        VeLog.e('VaultCameraController', 'Native session close failed (sessionId=$sId)', e);
+      }
     }
   }
 
@@ -379,4 +382,91 @@ class VaultCameraController {
     await close();
     await _eventsController.close();
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gesture-handler helpers shared by camera_capture_screen.dart and
+// quick_capture_screen.dart. Both screens wire up an identical set of
+// focus/zoom/exposure/flash gestures against a [VaultCameraController];
+// these wrap that boilerplate (the native call is advisory — local session
+// state, not the hardware round trip, is the source of truth for what the
+// UI shows, so a failure here is swallowed rather than surfaced) so it
+// exists in one place instead of two.
+
+/// Tap-to-focus. Not high-frequency (one call per tap), so failures are
+/// logged.
+Future<void> applyFocusAndExposurePoint(
+  VaultCameraController controller,
+  double x,
+  double y, {
+  required String logTag,
+}) async {
+  try {
+    await controller.setFocusAndExposurePoint(x, y);
+  } catch (e) {
+    VeLog.w(logTag, 'setFocusAndExposurePoint failed', e);
+  }
+}
+
+/// Re-applies flash mode after a photo/video mode switch. One call per
+/// switch, so failures are logged.
+Future<void> applyFlash(
+  VaultCameraController controller,
+  String mode, {
+  required String logTag,
+}) async {
+  try {
+    await controller.setFlash(mode);
+  } catch (e) {
+    VeLog.w(logTag, 'setFlash failed after mode switch', e);
+  }
+}
+
+/// Discrete zoom-level chip tap. One call per tap, so failures are logged.
+Future<void> applyZoomLogged(
+  VaultCameraController controller,
+  double zoom, {
+  required String logTag,
+}) async {
+  try {
+    await controller.setZoom(zoom);
+  } catch (e) {
+    VeLog.w(logTag, 'setZoom failed', e);
+  }
+}
+
+/// Pinch-to-zoom. Fires on every pointer-move of the gesture, so this is
+/// deliberately unlogged to avoid spamming the log stream during a drag.
+Future<void> applyZoomSilent(
+  VaultCameraController controller,
+  double zoom,
+) async {
+  try {
+    await controller.setZoom(zoom);
+  } catch (_) {}
+}
+
+/// Exposure slider drag. Fires on every pointer-move, same reasoning as
+/// [applyZoomSilent].
+Future<void> applyExposureOffsetSilent(
+  VaultCameraController controller,
+  double ev,
+) async {
+  try {
+    await controller.setExposureOffset(ev);
+  } catch (_) {}
+}
+
+/// Device-rotation counter-rotation, called from the accelerometer stream
+/// listener on every snapped-angle change — high-frequency and, unlike the
+/// other setters here, wasn't even wrapped in a try/catch before, so a
+/// failure became an unhandled Future error. Deliberately unlogged for the
+/// same reason as [applyZoomSilent]; the try/catch itself is the fix.
+Future<void> applyOrientationSilent(
+  VaultCameraController controller,
+  int degrees,
+) async {
+  try {
+    await controller.setOrientationDegrees(degrees);
+  } catch (_) {}
 }

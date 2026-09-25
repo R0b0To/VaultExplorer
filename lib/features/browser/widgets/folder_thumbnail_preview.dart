@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -207,7 +208,8 @@ class _FolderThumbnailPreviewState
               ));
             }
           }
-        } catch (_) {
+        } catch (e) {
+          VeLog.w('FolderThumbnailPreview', 'Thumbnail fetch failed for ${VeLog.censorName(firstPath)}', e);
         } finally {
           if (acquired) {
             ThumbnailConcurrency.imageLimiter.release(completer);

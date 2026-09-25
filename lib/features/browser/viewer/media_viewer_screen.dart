@@ -1253,7 +1253,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       if (raw != null) {
         existingEntries = RawEntry.parseAll(raw);
       }
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('MediaViewerScreen', 'Directory listing failed at ${VeLog.censorUri(dirPath)} during file info lookup', e);
+    }
     final currentEntry = existingEntries.firstWhere(
       (e) => e.name == baseName,
       orElse: () => RawEntry(

@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 part 'file_browser_navigation_controller.g.dart';
 
@@ -235,7 +236,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
               .toList();
           parentSegment.items = parsed;
         }
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('FileBrowserNavigation', 'Parent prefetch failed at ${VeLog.censorUri(parentSegment.fatPath)}', e);
+      }
     }());
   }
 

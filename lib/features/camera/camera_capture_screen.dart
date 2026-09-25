@@ -169,9 +169,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
           if (_deviceTurns != snappedTurns && mounted) {
             setState(() => _deviceTurns = snappedTurns);
-            _cameraController.setOrientationDegrees(
-              _computeDeviceRotationDegrees(),
-            );
+            unawaited(applyOrientationSilent(_cameraController, _computeDeviceRotationDegrees()));
           }
         });
   }
@@ -382,10 +380,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     });
     _captureSessionController.setShowExposureSlider(true);
 
-    try {
-      // Hardware locks focus and exposure metering onto the tapped point
-      await _cameraController.setFocusAndExposurePoint(nx, ny);
-    } catch (_) {}
+    // Hardware locks focus and exposure metering onto the tapped point
+    await applyFocusAndExposurePoint(_cameraController, nx, ny, logTag: 'CameraCaptureScreen');
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
@@ -434,9 +430,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
 
     _captureControlsController.setVideoMode(videoMode);
-    try {
-      await _cameraController.setFlash(_captureControls.flashMode);
-    } catch (_) {}
+    await applyFlash(_cameraController, _captureControls.flashMode, logTag: 'CameraCaptureScreen');
   }
 
   Future<void> _startPhotoCountdownAndCapture() async {
@@ -676,9 +670,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                       );
                       if (target != _currentZoom) {
                         _captureSessionController.setZoom(target);
-                        try {
-                          await _cameraController.setZoom(target);
-                        } catch (_) {}
+                        await applyZoomSilent(_cameraController, target);
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
@@ -718,9 +710,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               maxExposureEv: _maxExposureEv,
               onExposureChanged: (val) async {
                 _captureSessionController.setExposureEv(val);
-                try {
-                  await _cameraController.setExposureOffset(val);
-                } catch (_) {}
+                await applyExposureOffsetSilent(_cameraController, val);
               },
             ),
 
@@ -747,7 +737,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 onCycleTimerDelay: _captureControlsController.cycleTimerDelay,
                 onCycleFlashMode: () {
                   final nextMode = _captureControlsController.cyclePhotoFlashMode();
-                  unawaited(_cameraController.setFlash(nextMode));
+                  unawaited(applyFlash(_cameraController, nextMode, logTag: 'CameraCaptureScreen'));
                 },
               ),
             ),
@@ -836,9 +826,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 iconTurns: _iconTurns,
                 onSetZoom: (zoom) async {
                   _captureSessionController.setZoom(zoom);
-                  try {
-                    await _cameraController.setZoom(zoom);
-                  } catch (_) {}
+                  await applyZoomLogged(_cameraController, zoom, logTag: 'CameraCaptureScreen');
                 },
               ),
               const SizedBox(height: 16),

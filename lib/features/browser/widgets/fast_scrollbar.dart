@@ -286,6 +286,9 @@ class _FastScrollbarState extends State<FastScrollbar>
     ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
 
     try {
+      // Fires on every index change while dragging the scrubber, so this is
+      // deliberately unlogged — haptics are also unsupported on some
+      // devices, which is an expected, non-actionable failure.
       HapticFeedback.selectionClick();
     } catch (_) {}
 

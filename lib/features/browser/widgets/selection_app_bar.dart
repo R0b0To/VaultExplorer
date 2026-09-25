@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -124,10 +125,18 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         final bool showCut = !isInsideArchive && availableSlots >= 2;
         final bool showRename = !isInsideArchive && availableSlots >= 3;
 
-        return AppBar(
+          return AppBar(
           backgroundColor: cs.surfaceContainer,
           foregroundColor: cs.onSurface,
           elevation: 0,
+          scrolledUnderElevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Theme.of(context).brightness == Brightness.dark
+                ? Brightness.light
+                : Brightness.dark,
+            statusBarBrightness: Theme.of(context).brightness,
+          ),
       
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),

@@ -295,7 +295,6 @@ class _FileListViewState extends State<FileListView> {
         onScaleEnd: _handleScaleEnd,
         child: Column(
           children: [
-            const SizedBox(height: 8),
             Expanded(
               child: MediaQuery(
                 data: MediaQuery.of(context).copyWith(

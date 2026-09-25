@@ -83,7 +83,8 @@ class AppNavigationDrawer extends ConsumerWidget {
     );
   }
 
-  void _confirmRemove(BuildContext context, WidgetRef ref, ExternalStorageLocation loc) {
+ void _confirmRemove(BuildContext context, WidgetRef ref, ExternalStorageLocation loc) {
+    final isCurrent = currentVolId != null && currentVolId == loc.volId;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -93,8 +94,12 @@ class AppNavigationDrawer extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
-              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
               Navigator.pop(ctx);
+              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
+              if (isCurrent && context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                onSelectTab?.call(0);
+              }
             },
             child: Text(context.l10n.remove),
           ),
@@ -450,9 +455,25 @@ class AppNavigationDrawer extends ConsumerWidget {
                                             : Offset.zero;
                                         _showLocationContextMenu(context, ref, loc, pos);
                                       },
-                                      onTap: () {
+                                  onTap: () async {
+                                        if (currentVolId == loc.volId) {
+                                          Navigator.pop(context);
+                                          return;
+                                        }
+                                        final isAccessible = await ref
+                                            .read(externalStorageLocationsProvider.notifier)
+                                            .isAccessible(loc);
+                                        if (!context.mounted) return;
+                                        if (!isAccessible) {
+                                          Navigator.pop(context);
+                                          showAppSnackBar(
+                                            context,
+                                            message: context.l10n.storageLocationUnavailable(loc.displayName),
+                                            tone: AppBannerTone.warning,
+                                          );
+                                          return;
+                                        }
                                         Navigator.pop(context);
-                                        if (currentVolId == loc.volId) return;
                                         onSelectContainer?.call(buildExternalStorageContainer(
                                           rootPath: loc.resolvedUri,
                                           displayName: loc.displayName,

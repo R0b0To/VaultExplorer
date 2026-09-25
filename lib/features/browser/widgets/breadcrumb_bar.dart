@@ -53,8 +53,14 @@ class _BreadcrumbDragGestureRecognizer
 class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
   final List<PathSegment> stack;
   final ValueChanged<int> onTap;
+  final Color? backgroundColor;
 
-  const BreadcrumbBar({super.key, required this.stack, required this.onTap});
+  const BreadcrumbBar({
+    super.key,
+    required this.stack,
+    required this.onTap,
+    this.backgroundColor,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(40);
@@ -169,7 +175,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
       height: 40,
       alignment: Alignment.centerLeft, // Always pin breadcrumbs to the left
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: widget.backgroundColor ?? cs.surface,
       ),
       child: Listener(
         onPointerSignal: (event) {

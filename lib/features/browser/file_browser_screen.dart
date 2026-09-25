@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
@@ -275,10 +277,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
       return false;
     }
-    if (isSelectionMode) {
-      return false;
-    }
-    if (_searchActive) {
+  if (_searchActive) {
       if (_appBarAnimController.value < 1.0) {
         _appBarAnimController.value = 1.0;
       }
@@ -290,6 +289,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (notification is ScrollUpdateNotification) {
       final delta = notification.scrollDelta ?? 0.0;
       final pixels = notification.metrics.pixels;
+
+      if (isSelectionMode) {
+        // In selection mode: never collapse (delta > 0).
+        // If app bar was hidden, allow scrolling up (delta < 0) or pulling at top to reveal it.
+        if ((delta < 0.0 || pixels <= 0.0) && _appBarAnimController.value < 1.0) {
+          final newFactor = (_appBarAnimController.value - (delta / kToolbarHeight)).clamp(0.0, 1.0);
+          if (newFactor != _appBarAnimController.value) {
+            _appBarAnimController.value = newFactor;
+          }
+        }
+        return false;
+      }
 
       // On a scrollable list, lock to fully open only when actively scrolling down
       // into the top boundary (delta <= 0). If dragging up (delta > 0), allow collapsing.
@@ -311,8 +322,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         if (newFactor != _appBarAnimController.value) {
           _appBarAnimController.value = newFactor;
         }
-      } else if (overscroll > 0.0) {
-        // Pulling up past the bottom (or on a short non-scrollable list) hides the app bar
+      } else if (overscroll > 0.0 && !isSelectionMode) {
+        // Pulling up past the bottom hides the app bar (only in normal mode)
         final newFactor = (_appBarAnimController.value - (overscroll / kToolbarHeight)).clamp(0.0, 1.0);
         if (newFactor != _appBarAnimController.value) {
           _appBarAnimController.value = newFactor;
@@ -320,12 +331,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
     } else if (notification is ScrollEndNotification) {
       final pixels = notification.metrics.pixels;
-      // Only force snap-open on release if it's a scrollable list at the very top
+      // Force snap-open on release if at the very top or if in selection mode and partially open
       if (canScroll && pixels <= 0.0) {
         if (_appBarAnimController.value != 1.0) {
           _appBarAnimController.animateTo(1.0, duration: AppMotion.short2, curve: Curves.easeOutCubic);
         }
-      } else if (_appBarAnimController.value > 0.0 && _appBarAnimController.value < 1.0) {
+      } else if (isSelectionMode && _appBarAnimController.value > 0.0 && _appBarAnimController.value < 1.0) {
+        _appBarAnimController.animateTo(1.0, duration: AppMotion.short2, curve: Curves.easeOutCubic);
+      } else if (!isSelectionMode && _appBarAnimController.value > 0.0 && _appBarAnimController.value < 1.0) {
         final target = _appBarAnimController.value >= 0.5 ? 1.0 : 0.0;
         _appBarAnimController.animateTo(
           target,
@@ -1417,7 +1430,7 @@ void _navigateUp() {
   /// long-press would), regardless of whether the row body would otherwise
   /// open the item. This mirrors [_handleItemLongPress]'s haptic feedback
   /// so both entry points into selection feel the same.
-  void _handleIconTap(RawEntry entry) {
+    void _handleIconTap(RawEntry entry) {
     _signalActivity();
     HapticFeedback.selectionClick();
     toggleSelectItem(entry);
@@ -1886,7 +1899,7 @@ void _navigateUp() {
     }
   }
 
-  void _handleItemLongPress(RawEntry entry) {
+ void _handleItemLongPress(RawEntry entry) {
     _signalActivity();
     if (!isSelectionMode) {
       HapticFeedback.selectionClick();
@@ -3178,7 +3191,7 @@ Future<void> _extractSelectedArchive() async {
         }
       },
     );
-    ref.listen<SyncStatus>(
+     ref.listen<SyncStatus>(
       syncStatusProvider,
       (previous, next) {
         if (previous?.running == true &&
@@ -3188,7 +3201,20 @@ Future<void> _extractSelectedArchive() async {
         }
       },
     );
-    if (_isContainerLocked) {
+    if (widget.container.isExternalStorage) {
+      ref.listen<List<ExternalStorageLocation>>(
+        externalStorageLocationsProvider,
+        (previous, next) {
+          if (previous != null &&
+              !next.any((loc) => loc.volId == widget.container.volId)) {
+            if (mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          }
+        },
+      );
+    }
+   if (_isContainerLocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
@@ -3374,427 +3400,476 @@ Future<void> _extractSelectedArchive() async {
                 ],
               )
             : null,
-        body: SafeArea(
-          bottom: false,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              dragStartBehavior: DragStartBehavior.start,
-              onHorizontalDragStart: widget.drawer == null
-                  ? null
-                  : (details) {
-                      final edgeInset = math.max(
-                        72.0,
-                        MediaQuery.systemGestureInsetsOf(context).left,
-                      );
-                      if (_isMultiTouch ||
-                          _isTouchFromEdge ||
-                          details.globalPosition.dx <= edgeInset ||
-                          _backGestureProgress != null) {
-                        _isTouchFromEdge = true;
-                        _drawerDragDistance = 0.0;
-                        return;
-                      }
-                      _drawerDragDistance = 0.0;
-                    },
-              onHorizontalDragUpdate: widget.drawer == null
-                  ? null
-                  : (details) {
-                      if (_isMultiTouch ||
-                          _isTouchFromEdge ||
-                          _backGestureProgress != null ||
-                          widget.drawer == null) {
-                        _drawerDragDistance = 0.0;
-                        return;
-                      }
-                      _drawerDragDistance += details.primaryDelta ?? 0.0;
-                      if (_drawerDragDistance > 60.0) {
-                        _scaffoldKey.currentState?.openDrawer();
-                        _drawerDragDistance = 0.0;
-                        _isTouchFromEdge = true;
-                      }
-                    },
-              onHorizontalDragEnd: widget.drawer == null
-                  ? null
-                  : (_) {
-                      _drawerDragDistance = 0.0;
-                    },
-              onHorizontalDragCancel: widget.drawer == null
-                  ? null
-                  : () {
-                      _drawerDragDistance = 0.0;
-                    },
-              child: Stack(
-                children: [
-                  Column(
-                    children: [
-                   ClipRect(
-                      key: const Key('browser_app_bar_clip_rect'),
-                      child: AnimatedBuilder(
-                        animation: _appBarAnimController,
-                        builder: (context, _) {
-                          // Follow current status: if it was hidden, stay hidden
-                          final factor = (!_toolbarConfig.autoHideAppBar || _searchActive)
-                              ? 1.0
-                              : _appBarAnimController.value;
-                          if (factor == 0.0) {
-                            return const SizedBox.shrink();
-                          }
-                          return Align(
-                            key: const Key('browser_app_bar_align'),
-                            alignment: Alignment.bottomCenter,
-                            heightFactor: factor,
-                            child: SizedBox(
-                              height: kToolbarHeight,
-                              child: MediaQuery.removePadding(
-                                context: context,
-                                removeTop: true,
-                                child: buildAppBar(selectionMode: false),
-                              ),
-                            ),
+         body: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _handleScrollNotification,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  dragStartBehavior: DragStartBehavior.start,
+                  onHorizontalDragStart: widget.drawer == null
+                      ? null
+                      : (details) {
+                          final edgeInset = math.max(
+                            72.0,
+                            MediaQuery.systemGestureInsetsOf(context).left,
                           );
+                          if (_isMultiTouch ||
+                              _isTouchFromEdge ||
+                              details.globalPosition.dx <= edgeInset ||
+                              _backGestureProgress != null) {
+                            _isTouchFromEdge = true;
+                            _drawerDragDistance = 0.0;
+                            return;
+                          }
+                          _drawerDragDistance = 0.0;
                         },
-                      ),
-                    ),
-                    Expanded(
-                      child: Stack(
-                        children: [
-            Row(
-              children: [
-                if (isLandscape && showBookmarkBar)
-                  BookmarkBar(
-                    bookmarkPaths: _bookmarkPaths,
-                    axis: Axis.vertical,
-                    onTapItem: (path) {
-                      final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
-                      _navigateToPath(path, isDir: isDir);
-                    },
-                    onRemoveBookmark: (path) => _pinsBookmarksNotifier.removeBookmark(widget.container, path),
-                  ),
-                Expanded(
-                  child: Column(
+                  onHorizontalDragUpdate: widget.drawer == null
+                      ? null
+                      : (details) {
+                          if (_isMultiTouch ||
+                              _isTouchFromEdge ||
+                              _backGestureProgress != null ||
+                              widget.drawer == null) {
+                            _drawerDragDistance = 0.0;
+                            return;
+                          }
+                          _drawerDragDistance += details.primaryDelta ?? 0.0;
+                          if (_drawerDragDistance > 60.0) {
+                            _scaffoldKey.currentState?.openDrawer();
+                            _drawerDragDistance = 0.0;
+                            _isTouchFromEdge = true;
+                          }
+                        },
+                  onHorizontalDragEnd: widget.drawer == null
+                      ? null
+                      : (_) {
+                          _drawerDragDistance = 0.0;
+                        },
+                  onHorizontalDragCancel: widget.drawer == null
+                      ? null
+                      : () {
+                          _drawerDragDistance = 0.0;
+                        },
+                  child: Stack(
                     children: [
-                      if (_toolbarConfig.showBreadcrumbBar) ...[
-                        BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                      ],
-                      if (!widget.container.isLocalStorage && _archiveContext == null)
-                        const SyncStatusBanner(),
-                      if (_archiveContext?.isSolid == true)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                          child: InlineBanner(
-                            context.l10n.archiveSolidWarning,
-                            tone: AppBannerTone.warning,
-                          ),
-                        ),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            KeyedSubtree(
-                              key: ValueKey(_currentDirPath),
-                              child: buildBrowserBody(
-                                context,
-                                filteredItems,
-                                isLoading: _isLoading,
-                                currentItems: _currentItems,
-                                atRoot: _atRoot,
-                                onNavigateUp: _atRoot ? null : _navigateUp,
-                                searchQuery: _searchQuery,
-                                layoutMode: _layoutMode,
-                                container: widget.container,
-                                currentDirPath: _currentDirPath,
-                                thumbnailCacheMode: _resolvedThumbnailCacheMode,
-                                thumbnailQuality: _resolvedThumbnailQuality,
-                                toolbarConfig: _toolbarConfig,
-                                isSelectionMode: isSelectionMode,
-                                selectedItems: selectedItems,
-                                searchActive: _searchActive,
-                                mountedDocProviderFolders: _mountedDocProviderFolders,
-                                isFolderMounted: _isFolderMounted,
-                                isPinned: _isPinned,
-                                isBookmark: _isBookmark,
-                                isFolderSynced: _isFolderSynced,
-                                onDirTap: _handleDirTap,
-                                onFileTap: _handleFileTap,
-                                onItemLongPress: _handleItemLongPress,
-                                onIconTap: _handleIconTap,
-                                onItemMoreTap: _showItemActionsSheet,
-                                onSelectionChanged: setSelectedItems,
-                                onGridColumnCountChanged: (count) {
-                                  _toolbarConfig = isLandscape
-                                      ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
-                                      : _toolbarConfig.copyWith(gridColumnsPortrait: count);
-                                  _toolbarSvc.save(_toolbarConfig);
-                                  final effectiveToolbarUri =
-                                      widget.container.isLocalStorage ? null : widget.container.uri;
-                                  ref
-                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
-                                      .applyImportedConfig(_toolbarConfig);
-                                },
-                                onMasonryColumnCountChanged: (count) {
-                                  _toolbarConfig = isLandscape
-                                      ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
-                                      : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
-                                  _toolbarSvc.save(_toolbarConfig);
-                                  final effectiveToolbarUri =
-                                      widget.container.isLocalStorage ? null : widget.container.uri;
-                                  ref
-                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
-                                      .applyImportedConfig(_toolbarConfig);
-                                },
-                                onListZoomLevelChanged: (newZoom) {
-                                  setState(() {
-                                    _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
-                                  });
-                                  _toolbarSvc.save(_toolbarConfig);
-                                  final effectiveToolbarUri =
-                                      widget.container.isLocalStorage ? null : widget.container.uri;
-                                  ref
-                                      .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
-                                      .applyImportedConfig(_toolbarConfig);
-                                },
-                                onRefresh: () {
-                                  FolderThumbnailPreview.clearSessionCache();
-                                  return _loadDirectoryContents(_currentDirPath, refresh: true);
-                                },
-                                isListingTruncated: _isListingTruncated,
-                                scrollController: _browserScrollController,
-                                archiveContext: _archiveContext,
-                                archiveRootPath: _archiveRootPathForSearch,
-                                sortBy: sortBy,
-                              ),
-                            ),
-                            if (_backGestureProgress != null)
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      if (_backGestureProgress! >= 0.18 &&
-                                          sortedPreviewItems != null) ...[
-                                        ColoredBox(
-                                          color: Theme.of(context).scaffoldBackgroundColor,
-                                        ),
-                                        buildBrowserBody(
-                                          context,
-                                          sortedPreviewItems,
-                                          isLoading: false,
-                                          currentItems: sortedPreviewItems,
-                                          atRoot: _backGesturePreviewAtRoot,
-                                          onNavigateUp: null,
-                                          searchQuery: '',
-                                          layoutMode: _backGesturePreviewLayoutMode ?? _layoutMode,
-                                          container: widget.container,
-                                          currentDirPath: previewDirPath,
-                                          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-                                          thumbnailQuality: _resolvedThumbnailQuality,
-                                          toolbarConfig: _toolbarConfig,
-                                          isSelectionMode: false,
-                                          selectedItems: const {},
-                                          searchActive: false,
-                                          mountedDocProviderFolders: _mountedDocProviderFolders,
-                                          isFolderMounted: (e) => isFolderMounted(
-                                            e,
-                                            previewDirPath,
-                                            _mountedDocProviderFolders,
-                                          ),
-                                          isPinned: (e) => isPinned(
-                                            e,
-                                            previewDirPath,
-                                            _pinnedPaths,
-                                          ),
-                                          isBookmark: (e) => isBookmark(
-                                            e,
-                                            previewDirPath,
-                                            _bookmarkPaths,
-                                          ),
-                                          isFolderSynced: _isFolderSynced,
-                                          onDirTap: (_) {},
-                                          onFileTap: (_) {},
-                                          onItemLongPress: (_) {},
-                                          onIconTap: (_) {},
-                                          onItemMoreTap: (_) {},
-                                          onGridColumnCountChanged: (_) {},
-                                          onMasonryColumnCountChanged: (_) {},
-                                          onListZoomLevelChanged: (_) {},
-                                          onRefresh: () async {},
-                                          isListingTruncated: false,
-                                          scrollController: _backGesturePreviewScrollController,
-                                          archiveContext: previewArchiveContext,
-                                          archiveRootPath: previewArchiveRootPath,
-                                          sortBy: sortBy,
-                                        ),
-                                      ],
-                                      Opacity(
-                                        opacity: _fadeScrimOpacity(_backGestureProgress!),
-                                        child: ColoredBox(
-                                          color: Theme.of(context).scaffoldBackgroundColor,
-                                        ),
-                                      ),
-                                    ],
+                      Column(
+                        children: [
+                       ClipRect(
+                          key: const Key('browser_app_bar_clip_rect'),
+                          child: AnimatedBuilder(
+                            animation: _appBarAnimController,
+                            builder: (context, _) {
+                              // Follow current status: if it was hidden, stay hidden
+                              final factor = (!_toolbarConfig.autoHideAppBar || _searchActive)
+                                  ? 1.0
+                                  : _appBarAnimController.value;
+                              if (factor == 0.0) {
+                                return const SizedBox.shrink();
+                              }
+                              return Align(
+                                key: const Key('browser_app_bar_align'),
+                                alignment: Alignment.bottomCenter,
+                                heightFactor: factor,
+                                child: SizedBox(
+                                  height: kToolbarHeight,
+                                  child: MediaQuery.removePadding(
+                                    context: context,
+                                    removeTop: true,
+                                    child: buildAppBar(selectionMode: false),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            AnimatedPositioned(
-              duration: AppMotion.short2,
-              curve: Curves.easeOutCubic,
-              left: 0,
-              right: 0,
-              bottom: bannerBottomOffset,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_statusMessage != null)
-                        Padding(
-                          padding: EdgeInsets.only(
-                            bottom: _searchActive ? 16 : 8,
-                            left: 16,
-                            right: 16,
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: AppMotion.short2,
-                            child: InlineBanner(
-                              _statusMessage!,
-                              key: ValueKey(_statusBannerKey),
-                              tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
-                              trailing: _mediaScanInProgress
-                                  ? TextButton(
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      onPressed: _cancelMediaScan,
-                                      child: Text(context.l10n.cancel),
-                                    )
-                                  : null,
-                            ),
+                              );
+                            },
                           ),
                         ),
-                      if (_searchActive)
-                        BottomSearchBar(
-                          initialQuery: _searchQuery,
-                          onChanged: _onSearchQueryChanged,
-                          isDeepSearch: _isDeepSearch,
-                          onDeepSearchToggle: _onDeepSearchToggled,
-                          isSearchingSubfolders: _isSearchingSubfolders,
-                          onClose: () => setState(() => _clearSearch()),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    ),
-  ],
-),
-  // ── Top Selection Bar Overlay (when bottomSelectionBar is DISABLED) ──
-  if (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
-    Positioned(
-      key: const Key('browser_selection_app_bar_overlay'),
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        elevation: 2.0,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: kToolbarHeight,
-              child: MediaQuery.removePadding(
-                context: context,
-                removeTop: true,
-                child: buildAppBar(selectionMode: true),
-              ),
-            ),
-            if (_toolbarConfig.showBreadcrumbBar && _appBarAnimController.value < 0.5)
-              Container(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                child: Row(
+                        Expanded(
+                          child: Stack(
+                            children: [
+                Row(
                   children: [
                     if (isLandscape && showBookmarkBar)
-                      const SizedBox(width: 56),
+                      BookmarkBar(
+                        bookmarkPaths: _bookmarkPaths,
+                        axis: Axis.vertical,
+                        onTapItem: (path) {
+                          final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
+                          _navigateToPath(path, isDir: isDir);
+                        },
+                        onRemoveBookmark: (path) => _pinsBookmarksNotifier.removeBookmark(widget.container, path),
+                      ),
                     Expanded(
-                      child: BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                      child: Column(
+                        children: [
+                         if (_toolbarConfig.showBreadcrumbBar) ...[
+                        BreadcrumbBar(
+                          stack: _pathStack,
+                          onTap: _jumpTo,
+                          backgroundColor: isSelectionMode
+                              ? Theme.of(context).colorScheme.surfaceContainer
+                              : null,
+                        ),
+                      ],
+                          if (!widget.container.isLocalStorage && _archiveContext == null)
+                            const SyncStatusBanner(),
+                          if (_archiveContext?.isSolid == true)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                              child: InlineBanner(
+                                context.l10n.archiveSolidWarning,
+                                tone: AppBannerTone.warning,
+                              ),
+                            ),
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                KeyedSubtree(
+                                  key: ValueKey(_currentDirPath),
+                                  child: buildBrowserBody(
+                                    context,
+                                    filteredItems,
+                                    isLoading: _isLoading,
+                                    currentItems: _currentItems,
+                                    atRoot: _atRoot,
+                                    onNavigateUp: _atRoot ? null : _navigateUp,
+                                    searchQuery: _searchQuery,
+                                    layoutMode: _layoutMode,
+                                    container: widget.container,
+                                    currentDirPath: _currentDirPath,
+                                    thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                                    thumbnailQuality: _resolvedThumbnailQuality,
+                                    toolbarConfig: _toolbarConfig,
+                                    isSelectionMode: isSelectionMode,
+                                    selectedItems: selectedItems,
+                                    searchActive: _searchActive,
+                                    mountedDocProviderFolders: _mountedDocProviderFolders,
+                                    isFolderMounted: _isFolderMounted,
+                                    isPinned: _isPinned,
+                                    isBookmark: _isBookmark,
+                                    isFolderSynced: _isFolderSynced,
+                                    onDirTap: _handleDirTap,
+                                    onFileTap: _handleFileTap,
+                                    onItemLongPress: _handleItemLongPress,
+                                    onIconTap: _handleIconTap,
+                                    onItemMoreTap: _showItemActionsSheet,
+                                    onSelectionChanged: setSelectedItems,
+                                    onGridColumnCountChanged: (count) {
+                                      _toolbarConfig = isLandscape
+                                          ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
+                                          : _toolbarConfig.copyWith(gridColumnsPortrait: count);
+                                      _toolbarSvc.save(_toolbarConfig);
+                                      final effectiveToolbarUri =
+                                          widget.container.isLocalStorage ? null : widget.container.uri;
+                                      ref
+                                          .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                          .applyImportedConfig(_toolbarConfig);
+                                    },
+                                    onMasonryColumnCountChanged: (count) {
+                                      _toolbarConfig = isLandscape
+                                          ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
+                                          : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
+                                      _toolbarSvc.save(_toolbarConfig);
+                                      final effectiveToolbarUri =
+                                          widget.container.isLocalStorage ? null : widget.container.uri;
+                                      ref
+                                          .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                          .applyImportedConfig(_toolbarConfig);
+                                    },
+                                    onListZoomLevelChanged: (newZoom) {
+                                      setState(() {
+                                        _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                                      });
+                                      _toolbarSvc.save(_toolbarConfig);
+                                      final effectiveToolbarUri =
+                                          widget.container.isLocalStorage ? null : widget.container.uri;
+                                      ref
+                                          .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+                                          .applyImportedConfig(_toolbarConfig);
+                                    },
+                                    onRefresh: () {
+                                      FolderThumbnailPreview.clearSessionCache();
+                                      return _loadDirectoryContents(_currentDirPath, refresh: true);
+                                    },
+                                    isListingTruncated: _isListingTruncated,
+                                    scrollController: _browserScrollController,
+                                    archiveContext: _archiveContext,
+                                    archiveRootPath: _archiveRootPathForSearch,
+                                    sortBy: sortBy,
+                                  ),
+                                ),
+                                if (_backGestureProgress != null)
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          if (_backGestureProgress! >= 0.18 &&
+                                              sortedPreviewItems != null) ...[
+                                            ColoredBox(
+                                              color: Theme.of(context).scaffoldBackgroundColor,
+                                            ),
+                                            buildBrowserBody(
+                                              context,
+                                              sortedPreviewItems,
+                                              isLoading: false,
+                                              currentItems: sortedPreviewItems,
+                                              atRoot: _backGesturePreviewAtRoot,
+                                              onNavigateUp: null,
+                                              searchQuery: '',
+                                              layoutMode: _backGesturePreviewLayoutMode ?? _layoutMode,
+                                              container: widget.container,
+                                              currentDirPath: previewDirPath,
+                                              thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                                              thumbnailQuality: _resolvedThumbnailQuality,
+                                              toolbarConfig: _toolbarConfig,
+                                              isSelectionMode: false,
+                                              selectedItems: const {},
+                                              searchActive: false,
+                                              mountedDocProviderFolders: _mountedDocProviderFolders,
+                                              isFolderMounted: (e) => isFolderMounted(
+                                                e,
+                                                previewDirPath,
+                                                _mountedDocProviderFolders,
+                                              ),
+                                              isPinned: (e) => isPinned(
+                                                e,
+                                                previewDirPath,
+                                                _pinnedPaths,
+                                              ),
+                                              isBookmark: (e) => isBookmark(
+                                                e,
+                                                previewDirPath,
+                                                _bookmarkPaths,
+                                              ),
+                                              isFolderSynced: _isFolderSynced,
+                                              onDirTap: (_) {},
+                                              onFileTap: (_) {},
+                                              onItemLongPress: (_) {},
+                                              onIconTap: (_) {},
+                                              onItemMoreTap: (_) {},
+                                              onGridColumnCountChanged: (_) {},
+                                              onMasonryColumnCountChanged: (_) {},
+                                              onListZoomLevelChanged: (_) {},
+                                              onRefresh: () async {},
+                                              isListingTruncated: false,
+                                              scrollController: _backGesturePreviewScrollController,
+                                              archiveContext: previewArchiveContext,
+                                              archiveRootPath: previewArchiveRootPath,
+                                              sortBy: sortBy,
+                                            ),
+                                          ],
+                                          Opacity(
+                                            opacity: _fadeScrimOpacity(_backGestureProgress!),
+                                            child: ColoredBox(
+                                              color: Theme.of(context).scaffoldBackgroundColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-          ],
-        ),
-      ),
-    ),
-
-  // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
-  if (isSelectionMode && _toolbarConfig.bottomSelectionBar)
-    Positioned(
-      key: const Key('browser_selection_bottom_bar_overlay'),
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        elevation: 4.0,
-        child: SafeArea(
-          top: false,
-          bottom: !(!isLandscape && (showActionBar || showBookmarkBar)),
-          child: SizedBox(
-            height: kToolbarHeight,
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              removeBottom: true,
-              child: buildAppBar(selectionMode: true),
-            ),
+                AnimatedPositioned(
+                  duration: AppMotion.short2,
+                  curve: Curves.easeOutCubic,
+                  left: 0,
+                  right: 0,
+                  bottom: bannerBottomOffset,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_statusMessage != null)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: _searchActive ? 16 : 8,
+                                left: 16,
+                                right: 16,
+                              ),
+                              child: AnimatedSwitcher(
+                                duration: AppMotion.short2,
+                                child: InlineBanner(
+                                  _statusMessage!,
+                                  key: ValueKey(_statusBannerKey),
+                                  tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
+                                  trailing: _mediaScanInProgress
+                                      ? TextButton(
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                          onPressed: _cancelMediaScan,
+                                          child: Text(context.l10n.cancel),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          if (_searchActive)
+                            BottomSearchBar(
+                              initialQuery: _searchQuery,
+                              onChanged: _onSearchQueryChanged,
+                              isDeepSearch: _isDeepSearch,
+                              onDeepSearchToggle: _onDeepSearchToggled,
+                              isSearchingSubfolders: _isSearchingSubfolders,
+                              onClose: () => setState(() => _clearSearch()),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-      ),
+      ],
     ),
+      // ── FAB Toolbar: Add FAB + "More" cascade (search/sort/filter/view/play) ──
+      if (hasFabToolbar)
+        ..._buildFabToolbar(
+          bottomOffset: baseBottomOffset +
+              ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
+                  ? kToolbarHeight
+                  : 0.0),
+        ),
+        
 
-  // ── FAB Toolbar: Add FAB + "More" cascade (search/sort/filter/view/play) ──
-  if (hasFabToolbar)
-    ..._buildFabToolbar(
-      bottomOffset: baseBottomOffset +
-          ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
-              ? kToolbarHeight
-              : 0.0),
+      // ── Clipboard Paste FAB ────────────────────────────────────────────────
+      if (!isSelectionMode && !_searchActive)
+        Positioned(
+          right: 16.0 + MediaQuery.paddingOf(context).right,
+          bottom: useFab
+              ? (baseBottomOffset + 68.0)
+              : baseBottomOffset,
+          child: ClipboardFab(
+            onPaste: _isReadOnly ? null : _paste,
+            heroTag: 'browser_clipboard_fab_${widget.container.volId}',
+          ),
+        ),
+    ],
     ),
-    
-
-  // ── Clipboard Paste FAB ────────────────────────────────────────────────
-  if (!isSelectionMode && !_searchActive)
-    Positioned(
-      right: 16.0 + MediaQuery.paddingOf(context).right,
-      bottom: useFab
-          ? (baseBottomOffset + 68.0)
-          : baseBottomOffset,
-      child: ClipboardFab(
-        onPaste: _isReadOnly ? null : _paste,
-        heroTag: 'browser_clipboard_fab_${widget.container.volId}',
+    ),
+    ),
+    ),
+      // ── Top Selection Bar Overlay (when bottomSelectionBar is DISABLED) ──
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: AnimatedSwitcher(
+          duration: AppMotion.short2,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          ),
+          transitionBuilder: (child, animation) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, -1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              )),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+          child: (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
+              ? Material(
+                  key: const ValueKey('browser_selection_app_bar_overlay'),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  elevation: 0.0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: SizedBox(
+                      height: kToolbarHeight,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: buildAppBar(selectionMode: true),
+                      ),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('no_selection_top_bar')),
+        ),
       ),
-    ),
-],
-),
-),
-),
-),
+
+      // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
+      Positioned(
+        key: const Key('browser_selection_bottom_bar_overlay_container'),
+        bottom: 0,
+        left: 0,
+        right: 0,
+        child: AnimatedSwitcher(
+          duration: AppMotion.short2,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          ),
+          transitionBuilder: (child, animation) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              )),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+          child: (isSelectionMode && _toolbarConfig.bottomSelectionBar)
+              ? Material(
+                  key: const ValueKey('browser_selection_bottom_bar_overlay'),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  elevation: 4.0,
+                  child: SafeArea(
+                    top: false,
+                    bottom: !(!isLandscape && (showActionBar || showBookmarkBar)),
+                    child: SizedBox(
+                      height: kToolbarHeight,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        removeBottom: true,
+                        child: buildAppBar(selectionMode: true),
+                      ),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('no_selection_bottom_bar')),
+        ),
+      ),
+    ],
+  ),
 ),
 ),
 );

@@ -32,6 +32,8 @@ import 'image_editor_annotations_controller.dart';
 import 'image_editor_controls_controller.dart';
 import 'image_editor_document_controller.dart';
 
+part 'image_editor_screen_shelf.dart';
+
 class _UnsupportedImageFormatException implements Exception {}
 
 enum _ExitChoice { cancel, discard, save }
@@ -892,61 +894,62 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           top: false,
           bottom: false,
           child: isLandscape
-              ? _buildLandscapeLayout(l10n, hasError)
-              : _buildPortraitLayout(l10n, hasError),
+              ? _LandscapeLayout(
+                  body: _buildBody(),
+                  hasError: hasError,
+                  shelf: _ContextualShelf(
+                    l10n: l10n,
+                    isLandscape: true,
+                    activeTool: _controls.activeTool,
+                    cropRotationAngle: _controls.cropRotationAngle,
+                    cropAspectRatio: _controls.cropAspectRatio,
+                    cropBoxSize: _cropBoxSize,
+                    onRotateAngleChanged: _onRotateAngleChanged,
+                    onResetRotation: () => _controlsController.setCropRotationAngle(0.0),
+                    onRotate90: _stepRotate90,
+                    onSetCropAspect: _setCropAspect,
+                    currentColor: _controls.currentColor,
+                    onSetColor: _controlsController.setColor,
+                    onShowStrokeWidthPicker: _showStrokeWidthPicker,
+                    hasAnnotations: _annotations.isNotEmpty,
+                    onClearAllAnnotations: _clearAllAnnotations,
+                    onShowFontSizePicker: _showFontSizePicker,
+                  ),
+                  squaredToolGrid: _SquaredToolGrid(
+                    l10n: l10n,
+                    activeTool: _controls.activeTool,
+                    onSelectTool: _selectTool,
+                  ),
+                )
+              : _PortraitLayout(
+                  body: _buildBody(),
+                  hasError: hasError,
+                  shelf: _ContextualShelf(
+                    l10n: l10n,
+                    isLandscape: false,
+                    activeTool: _controls.activeTool,
+                    cropRotationAngle: _controls.cropRotationAngle,
+                    cropAspectRatio: _controls.cropAspectRatio,
+                    cropBoxSize: _cropBoxSize,
+                    onRotateAngleChanged: _onRotateAngleChanged,
+                    onResetRotation: () => _controlsController.setCropRotationAngle(0.0),
+                    onRotate90: _stepRotate90,
+                    onSetCropAspect: _setCropAspect,
+                    currentColor: _controls.currentColor,
+                    onSetColor: _controlsController.setColor,
+                    onShowStrokeWidthPicker: _showStrokeWidthPicker,
+                    hasAnnotations: _annotations.isNotEmpty,
+                    onClearAllAnnotations: _clearAllAnnotations,
+                    onShowFontSizePicker: _showFontSizePicker,
+                  ),
+                  toolSelectorRow: _ToolSelectorRow(
+                    l10n: l10n,
+                    activeTool: _controls.activeTool,
+                    onSelectTool: _selectTool,
+                  ),
+                ),
         ),
       ),
-    );
-  }
-
-  // ── PORTRAIT LAYOUT ────────────────────────────────────────────────────────
-
-  Widget _buildPortraitLayout(AppLocalizations l10n, bool hasError) {
-    return Column(
-      children: [
-        Expanded(child: _buildBody()),
-        if (!hasError) ...[
-          _buildContextualShelf(l10n, isLandscape: false),
-          _buildToolSelectorRow(l10n),
-        ],
-      ],
-    );
-  }
-
-  // ── LANDSCAPE LAYOUT (Right-Side Control Cockpit) ──────────────────────────
-
-  Widget _buildLandscapeLayout(AppLocalizations l10n, bool hasError) {
-    return Row(
-      children: [
-        Expanded(child: _buildBody()),
-        if (!hasError)
-          Container(
-            width: 290,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              border: Border(
-                left: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-            ),
-            child: SafeArea(
-              left: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: _buildContextualShelf(l10n, isLandscape: true),
-                      ),
-                    ),
-                    const Divider(color: Colors.white12, height: 16),
-                    _buildSquaredToolGrid(l10n),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -1133,301 +1136,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           },
         );
       },
-    );
-  }
-
-  // ── CONTEXTUAL SHELF (ADAPTIVE TO PORTRAIT & LANDSCAPE) ────────────────────
-
-  Widget _buildContextualShelf(AppLocalizations l10n, {required bool isLandscape}) {
-    switch (_controls.activeTool) {
-      case EditorTool.crop:
-        final currentAspect = _cropBoxSize == null
-            ? 1.0
-            : _cropBoxSize!.width / _cropBoxSize!.height;
-
-        final aspectOptions = [
-          (label: l10n.cropAspectFreeLabel, ratio: null),
-          (label: l10n.cropAspectSquareLabel, ratio: 1.0),
-          (label: l10n.cropAspectOriginalLabel, ratio: currentAspect),
-          (label: '4:3', ratio: 4 / 3),
-          (label: '16:9', ratio: 16 / 9),
-        ];
-
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: _AngleRulerDial(
-                angle: _controls.cropRotationAngle,
-                onAngleChanged: _onRotateAngleChanged,
-                onReset: () => _controlsController.setCropRotationAngle(0.0),
-                onRotate90: _stepRotate90,
-              ),
-            ),
-            const SizedBox(height: 6),
-            if (isLandscape)
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                children: [
-                  for (final opt in aspectOptions)
-                    _AspectChip(
-                      label: opt.label,
-                      selected: opt.ratio == null
-                          ? _controls.cropAspectRatio == null
-                          : (_controls.cropAspectRatio != null &&
-                              (_controls.cropAspectRatio! - opt.ratio!).abs() < 0.01),
-                      onTap: () => _setCropAspect(opt.ratio),
-                    ),
-                ],
-              )
-            else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    for (final opt in aspectOptions)
-                      _AspectChip(
-                        label: opt.label,
-                        selected: opt.ratio == null
-                            ? _controls.cropAspectRatio == null
-                            : (_controls.cropAspectRatio != null &&
-                                (_controls.cropAspectRatio! - opt.ratio!).abs() < 0.01),
-                        onTap: () => _setCropAspect(opt.ratio),
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        );
-
-      case EditorTool.draw:
-      case EditorTool.redact:
-        final colors = isLandscape
-            ? Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final color in editorColorPalette)
-                      _ColorSwatch(
-                        color: color,
-                        selected: color == _controls.currentColor,
-                        onTap: () => _controlsController.setColor(color),
-                      ),
-                  ],
-                ),
-              )
-            : SizedBox(
-                height: 52,
-                child: Row(
-                  children: [
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          for (final color in editorColorPalette)
-                            _ColorSwatch(
-                              color: color,
-                              selected: color == _controls.currentColor,
-                              onTap: () => _controlsController.setColor(color),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            colors,
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _EditorActionButton(
-                  icon: Icons.tune_rounded,
-                  label: 'Stroke',
-                  onPressed: _showStrokeWidthPicker,
-                ),
-                const SizedBox(width: 12),
-                _EditorActionButton(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Clear',
-                  onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
-                  isDestructive: true,
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case EditorTool.text:
-        final colors = isLandscape
-            ? Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final color in editorColorPalette)
-                      _ColorSwatch(
-                        color: color,
-                        selected: color == _controls.currentColor,
-                        onTap: () => _controlsController.setColor(color),
-                      ),
-                  ],
-                ),
-              )
-            : SizedBox(
-                height: 52,
-                child: Row(
-                  children: [
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          for (final color in editorColorPalette)
-                            _ColorSwatch(
-                              color: color,
-                              selected: color == _controls.currentColor,
-                              onTap: () => _controlsController.setColor(color),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            colors,
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _EditorActionButton(
-                  icon: Icons.format_size_rounded,
-                  label: 'Font Size',
-                  onPressed: _showFontSizePicker,
-                ),
-                const SizedBox(width: 12),
-                _EditorActionButton(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Clear',
-                  onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
-                  isDestructive: true,
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case EditorTool.none:
-        return const SizedBox(height: 8);
-    }
-  }
-
-  // ── PORTRAIT TOOL BAR ──────────────────────────────────────────────────────
-
-  Widget _buildToolSelectorRow(AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _ToolButton(
-            icon: Icons.crop_rounded,
-            label: l10n.cropToolLabel,
-            selected: _controls.activeTool == EditorTool.crop,
-            onTap: () => _selectTool(EditorTool.crop),
-          ),
-          _ToolButton(
-            icon: Icons.brush_rounded,
-            label: l10n.drawToolLabel,
-            selected: _controls.activeTool == EditorTool.draw,
-            onTap: () => _selectTool(EditorTool.draw),
-          ),
-          _ToolButton(
-            icon: Icons.text_fields_rounded,
-            label: l10n.textToolLabel,
-            selected: _controls.activeTool == EditorTool.text,
-            onTap: () => _selectTool(EditorTool.text),
-          ),
-          _ToolButton(
-            icon: Icons.visibility_off_outlined,
-            label: l10n.redactToolLabel,
-            selected: _controls.activeTool == EditorTool.redact,
-            onTap: () => _selectTool(EditorTool.redact),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── LANDSCAPE SQUARED 2x2 TOOL GRID ────────────────────────────────────────
-
-  Widget _buildSquaredToolGrid(AppLocalizations l10n) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _SquareToolCard(
-                icon: Icons.crop_rounded,
-                label: l10n.cropToolLabel,
-                selected: _controls.activeTool == EditorTool.crop,
-                onTap: () => _selectTool(EditorTool.crop),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _SquareToolCard(
-                icon: Icons.brush_rounded,
-                label: l10n.drawToolLabel,
-                selected: _controls.activeTool == EditorTool.draw,
-                onTap: () => _selectTool(EditorTool.draw),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _SquareToolCard(
-                icon: Icons.text_fields_rounded,
-                label: l10n.textToolLabel,
-                selected: _controls.activeTool == EditorTool.text,
-                onTap: () => _selectTool(EditorTool.text),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _SquareToolCard(
-                icon: Icons.visibility_off_outlined,
-                label: l10n.redactToolLabel,
-                selected: _controls.activeTool == EditorTool.redact,
-                onTap: () => _selectTool(EditorTool.redact),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 

@@ -253,7 +253,19 @@ class AppNavigationDrawer extends ConsumerWidget {
                                         ),
                                       ),
                                       onPressed: () {
-                                        Navigator.pop(context);
+                                        // Only close the drawer if the vault currently being
+                                        // browsed is one of the ones about to be locked -- that
+                                        // screen will pop itself in response, and closing the
+                                        // drawer first keeps that pop from being swallowed by
+                                        // the drawer's own local history entry. Otherwise (e.g.
+                                        // locking from the Dashboard, or locking vaults other
+                                        // than the one on screen) the drawer should stay open so
+                                        // the list can simply refresh to show them as locked.
+                                        final willLeaveCurrentScreen = currentVolId != null &&
+                                            dashboardState.mounted.any((c) => c.volId == currentVolId);
+                                        if (willLeaveCurrentScreen) {
+                                          Navigator.pop(context);
+                                        }
                                         for (final c in dashboardState.mounted) {
                                           ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
                                           ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(c.volId);
@@ -294,7 +306,16 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     onLock: isMounted
                                         ? () async {
                                             final container = (item as MountedVaultItem).container;
-                                            Navigator.pop(context); // Close drawer only
+                                            // Only close the drawer when locking the vault that's
+                                            // currently being browsed -- that screen is about to
+                                            // pop itself, and closing the drawer first keeps that
+                                            // pop from being swallowed by the drawer's own local
+                                            // history entry. Locking any other vault (including
+                                            // the only one, from the Dashboard) should leave the
+                                            // drawer open and just update its status in place.
+                                            if (isCurrent) {
+                                              Navigator.pop(context);
+                                            }
                                             await _lockSingleVault(context, ref, container);
                                           }
                                         : null,

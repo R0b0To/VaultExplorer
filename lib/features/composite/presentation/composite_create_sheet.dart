@@ -30,9 +30,10 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
   Future<T> _suppressLock<T>(Future<T> Function() action) =>
       ref.read(sessionLockControllerProvider).withLockSuppression(action);
 
-  final _passwordController = TextEditingController();
+   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _pimController = TextEditingController();
+  final _carrierScrollCtrl = ScrollController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -55,11 +56,12 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
     });
   }
 
-  @override
+   @override
   void dispose() {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _pimController.dispose();
+    _carrierScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -278,47 +280,94 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
             if (state.pickedCarriers.isNotEmpty) ...[
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 280),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const ClampingScrollPhysics(),
-                  itemCount: state.pickedCarriers.length,
-                  itemExtent: 56, // Fixed height eliminates child layout measurement overhead
-                  padding: EdgeInsets.zero,
-                  itemBuilder: (context, index) {
-                    final carrier = state.pickedCarriers[index];
-                    final budget = state.profile != null &&
-                            index < state.profile!.carriers.length
-                        ? state.profile!.carriers[index]
-                        : null;
+                child: Scrollbar(
+                  controller: _carrierScrollCtrl,
+                  thumbVisibility: state.pickedCarriers.length > 4,
+                  interactive: true,
+                  thickness: 4.5,
+                  radius: const Radius.circular(8),
+                  child: ListView.builder(
+                    controller: _carrierScrollCtrl,
+                    shrinkWrap: true,
+                    physics: const ClampingScrollPhysics(),
+                    itemCount: state.pickedCarriers.length,
+                    itemExtent: 54,
+                    padding: const EdgeInsets.only(right: 6),
+                    itemBuilder: (context, index) {
+                      final carrier = state.pickedCarriers[index];
+                      final budget = state.profile != null &&
+                              index < state.profile!.carriers.length
+                          ? state.profile!.carriers[index]
+                          : null;
 
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(
-                        budget?.tier.id == 0
-                            ? Icons.verified_user_rounded
-                            : Icons.insert_drive_file_rounded,
-                        size: 20,
-                        color: budget?.tier.id == 0 ? cs.primary : cs.outline,
-                      ),
-                      title: Text(
-                        carrier.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        budget != null
-                            ? l10n.compositeCarrierAllocatableSubtitle(
-                                budget.detectedFormat.toUpperCase(),
-                                formatBytes(budget.allocatableBytes),
-                              )
-                            : l10n.compositeCarrierAnalyzingStatus,
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: state.isOperating ? null : () => ctrl.removeCarrier(index),
-                      ),
-                    );
-                  },
+                      Widget leadingWidget;
+                      if (budget == null || state.isAnalyzing) {
+                        leadingWidget = SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: Center(
+                            child: SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        leadingWidget = Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${index + 1}',
+                            style: textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                        leading: leadingWidget,
+                        title: Text(
+                          carrier.displayName,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: cs.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          budget != null
+                              ? l10n.compositeCarrierAllocatableSubtitle(
+                                  budget.detectedFormat.toUpperCase(),
+                                  formatBytes(budget.allocatableBytes),
+                                )
+                              : l10n.compositeCarrierAnalyzingStatus,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          tooltip: l10n.clear,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: state.isOperating ? null : () => ctrl.removeCarrier(index),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

@@ -1,0 +1,13 @@
+### Improvements
+• Container Format Autodetection: Implemented automatic format detection when unlocking file containers to dynamically identify BitLocker, LUKS, and plain disk images with fallback to VeraCrypt, presenting only the credential fields required for each specific format
+• Secure Deletion: Enabled cryptographic zeroing prior to file deletion when automatically removing original source files after a successful import
+• PIM Credential Flow: Added a visibility toggle to PIM input fields across creation and password modification screens, grouping PIM together with passwords and keyfiles during container setup
+• Composite Volume Shortcut: Added a direct shortcut to composite container creation within the VeraCrypt setup flow, complete with an experimental badge to highlight cautious use
+• Auto-Lock Indicators: Updated vault avatars with distinct badges to visually differentiate between globally inherited and container-specific auto-lock configurations
+• Vault Card Actions: Replaced swipe-to-reveal gestures on vault cards with an accessible, discoverable three-dots overflow menu
+• External Storage Operations: Enhanced file operations for sidebar-linked external storage providers, introducing proactive accessibility checks to verify that locations are mounted and reachable before opening
+• Material 3 Navigation Drawer: Polished side drawer component styling, list item shapes, and paddings to align with Material 3 design standards
+
+### Bug Fixes
+• File Sharing Streams: Migrated outgoing shares to a dedicated standard ContentProvider, ensuring external transfer tools (such as LocalSend) stream data reliably rather than failing on physical file path checks
+• Drawer Vault Locking: Fixed an issue where locking any background container dismissed the navigation drawer; closing the drawer and returning to the dashboard now only triggers when locking the container currently in view

@@ -168,6 +168,8 @@ void main() {
                         appSettings: state.appSettings,
                         onLocked: controller.onContainerLocked,
                         onBrowse: () {},
+                        onEdit: () {},
+                        onDelete: () {},
                       );
                     }).toList(),
                   );

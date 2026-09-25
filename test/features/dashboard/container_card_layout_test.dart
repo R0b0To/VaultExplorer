@@ -30,13 +30,15 @@ void main() {
               ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(
+           home: Scaffold(
               body: ContainerCard(
                 container: folderVaultContainer,
                 record: null,
                 appSettings: AppSettings(),
                 onLocked: (_) {},
                 onBrowse: () {},
+                onEdit: () {},
+                onDelete: () {},
               ),
             ),
           ),
@@ -77,13 +79,15 @@ void main() {
               ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(
+           home: Scaffold(
               body: ContainerCard(
                 container: folderVaultContainer,
                 record: null,
                 appSettings: AppSettings(),
                 onLocked: (_) {},
                 onBrowse: () {},
+                onEdit: () {},
+                onDelete: () {},
               ),
             ),
           ),
@@ -122,21 +126,25 @@ void main() {
           home: Scaffold(
             body: SingleChildScrollView(
               child: Column(
-                children: [
+                 children: [
                   SavedContainerCard(
                     key: const ValueKey('locked'),
                     name: 'Test Vault',
                     uri: 'file:///test_vault',
                     containerFormat: 'veracrypt',
                     onUnlock: () {},
+                    onEdit: () {},
+                    onDelete: () {},
                   ),
-                 ContainerCard(
+                  ContainerCard(
                     key: const ValueKey('mounted'),
                     container: mountedContainer,
                     record: null,
                     appSettings: AppSettings(),
                     onLocked: (_) {},
                     onBrowse: () {},
+                    onEdit: () {},
+                    onDelete: () {},
                   ),
                 ],
               ),

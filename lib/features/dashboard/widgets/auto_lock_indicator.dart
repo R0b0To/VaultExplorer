@@ -40,14 +40,33 @@ class AutoLockNever extends AutoLockStatus {
 /// [VaultDashboardScreen._lockAllMountedContainers] for the real sweep this
 /// mirrors, and [SessionLockController.handleScreenOff] for the app-wide
 /// screen-off/inactivity behavior a non-overridden container follows.
-AutoLockStatus computeAutoLockStatus(ContainerRecord? record, AppSettings settings) {
-  if (record?.autoCloseNever == true) return const AutoLockNever();
-  final perContainerMins = record?.autoCloseMins ?? 0;
-  if (perContainerMins > 0) return AutoLockAfter(perContainerMins);
-  if (!settings.lockContainersOnScreenLock) return const AutoLockNever();
-  if (settings.autoLockMins > 0) return AutoLockAfter(settings.autoLockMins);
-  return const AutoLockOnScreenOff();
+/// Distinguishes whether the lock policy comes from a custom vault override
+/// or is inherited from the global app settings.
+class AutoLockPolicy {
+  final AutoLockStatus status;
+  final bool isCustomOverride;
+  const AutoLockPolicy({required this.status, required this.isCustomOverride});
 }
+
+AutoLockPolicy computeAutoLockPolicy(ContainerRecord? record, AppSettings settings) {
+  if (record?.autoCloseNever == true) {
+    return const AutoLockPolicy(status: AutoLockNever(), isCustomOverride: true);
+  }
+  final perContainerMins = record?.autoCloseMins ?? 0;
+  if (perContainerMins > 0) {
+    return AutoLockPolicy(status: AutoLockAfter(perContainerMins), isCustomOverride: true);
+  }
+  if (!settings.lockContainersOnScreenLock) {
+    return const AutoLockPolicy(status: AutoLockNever(), isCustomOverride: false);
+  }
+  if (settings.autoLockMins > 0) {
+    return AutoLockPolicy(status: AutoLockAfter(settings.autoLockMins), isCustomOverride: false);
+  }
+  return const AutoLockPolicy(status: AutoLockOnScreenOff(), isCustomOverride: false);
+}
+
+AutoLockStatus computeAutoLockStatus(ContainerRecord? record, AppSettings settings) =>
+    computeAutoLockPolicy(record, settings).status;
 
 class _AutoLockVisual {
   const _AutoLockVisual({required this.icon, required this.label, required this.tooltip});
@@ -83,18 +102,30 @@ class AutoLockIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = _visualFor(context, computeAutoLockStatus(record, settings));
+    final policy = computeAutoLockPolicy(record, settings);
+    final visual = _visualFor(context, policy.status);
     if (visual == null) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
+    final Color iconColor = switch (policy.status) {
+      AutoLockNever() => cs.error,
+      _ => policy.isCustomOverride ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.75),
+    };
+
+    final IconData iconData = switch (policy.status) {
+      AutoLockAfter() => policy.isCustomOverride ? Icons.timer_rounded : Icons.timer_outlined,
+      AutoLockOnScreenOff() => Icons.screen_lock_portrait_outlined,
+      AutoLockNever() => Icons.timer_off_outlined,
+    };
+
     return Padding(
       padding: const EdgeInsets.only(left: 6),
       child: Tooltip(
         message: visual.tooltip,
         child: Icon(
-          visual.icon,
-          size: 15,
-          color: cs.onSurfaceVariant,
+          iconData,
+          size: 16,
+          color: iconColor,
         ),
       ),
     );
@@ -119,7 +150,8 @@ class DrawerAutoLockStatusText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = _visualFor(context, computeAutoLockStatus(record, settings));
+    final policy = computeAutoLockPolicy(record, settings);
+    final visual = _visualFor(context, policy.status);
     final cs = Theme.of(context).colorScheme;
     final baseStyle = (style ?? const TextStyle()).copyWith(color: statusColor);
 
@@ -131,6 +163,17 @@ class DrawerAutoLockStatusText extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       );
     }
+
+    final Color iconColor = policy.isCustomOverride
+        ? cs.primary
+        : cs.onSurfaceVariant.withValues(alpha: 0.75);
+
+    final IconData iconData = switch (policy.status) {
+      AutoLockAfter() => policy.isCustomOverride ? Icons.timer_rounded : Icons.timer_outlined,
+      AutoLockOnScreenOff() => Icons.screen_lock_portrait_outlined,
+      AutoLockNever() => Icons.timer_off_outlined,
+    };
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -139,9 +182,9 @@ class DrawerAutoLockStatusText extends StatelessWidget {
         Tooltip(
           message: visual.tooltip,
           child: Icon(
-            visual.icon,
+            iconData,
             size: 13,
-            color: cs.onSurfaceVariant,
+            color: iconColor,
           ),
         ),
       ],

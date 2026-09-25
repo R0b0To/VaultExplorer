@@ -55,13 +55,11 @@ void main() {
         videoAutoPlay: false,
         blockScreenshots: true,
         keepVaultsRunningInBackground: true,
-        hasSeenSwipeTutorial: true,
         lockContainersOnScreenLock: false,
         defaultDerivedKeyCacheEnabled: true,
         autoLockMins: 5,
         defaultLayoutMode: BrowserLayoutMode.masonry,
         containerSortMode: ContainerSortMode.newest,
-        swapCardActions: true,
         themeMode: ThemeMode.dark,
         useDynamicColor: true,
         autoOpenOnUnlock: true,
@@ -83,13 +81,11 @@ void main() {
       expect(roundTripped.videoAutoPlay, original.videoAutoPlay);
       expect(roundTripped.blockScreenshots, original.blockScreenshots);
       expect(roundTripped.keepVaultsRunningInBackground, original.keepVaultsRunningInBackground);
-      expect(roundTripped.hasSeenSwipeTutorial, original.hasSeenSwipeTutorial);
       expect(roundTripped.lockContainersOnScreenLock, original.lockContainersOnScreenLock);
       expect(roundTripped.defaultDerivedKeyCacheEnabled, original.defaultDerivedKeyCacheEnabled);
       expect(roundTripped.autoLockMins, original.autoLockMins);
       expect(roundTripped.defaultLayoutMode, original.defaultLayoutMode);
       expect(roundTripped.containerSortMode, original.containerSortMode);
-      expect(roundTripped.swapCardActions, original.swapCardActions);
       expect(roundTripped.themeMode, original.themeMode);
       expect(roundTripped.useDynamicColor, original.useDynamicColor);
       expect(roundTripped.autoOpenOnUnlock, original.autoOpenOnUnlock);

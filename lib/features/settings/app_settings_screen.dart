@@ -1693,53 +1693,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                           .read(appSettingsControllerProvider.notifier)
                           .updateSettings((s) => s.copyWith(containerSortMode: v)),
                     ),
-                    SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      title: Text(
-                        context.l10n.cardSwipeActionsTitle,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        context.l10n.cardSwipeActionsSubtitle,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      value: state.settings.enableCardSwipeActions,
-                      onChanged: (v) => ref
-                          .read(appSettingsControllerProvider.notifier)
-                          .updateSettings((s) => s.copyWith(enableCardSwipeActions: v)),
-                    ),
-                    if (state.settings.enableCardSwipeActions) ...[
-                      SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text(
-                          context.l10n.swapCardSwipeActionsTitle,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          context.l10n.swapCardSwipeActionsSubtitle,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        value: state.settings.swapCardActions,
-                        onChanged: (v) => ref
-                            .read(appSettingsControllerProvider.notifier)
-                            .updateSettings((s) => s.copyWith(swapCardActions: v)),
-                      ),
-                      SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text(
-                          context.l10n.swipeGestureHintTitle,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          context.l10n.swipeGestureHintSubtitle,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        value: !state.settings.hasSeenSwipeTutorial,
-                        onChanged: (v) => ref
-                            .read(appSettingsControllerProvider.notifier)
-                            .updateSettings((s) => s.copyWith(hasSeenSwipeTutorial: !v)),
-                      ),
-                    ],
                   ],
                 ),
               ],

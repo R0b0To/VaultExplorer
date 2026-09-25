@@ -90,10 +90,7 @@ class AppSettings {
   // password again, or vice versa. See SessionLockController.
   bool lockAppOnScreenLock;
   int appLockAfterMins;
-  bool hasSeenSwipeTutorial;
   ContainerSortMode containerSortMode;
-  bool enableCardSwipeActions;
-  bool swapCardActions;
   ThemeMode themeMode;
   bool useDynamicColor;
   bool useOledBlackTheme;
@@ -121,8 +118,7 @@ class AppSettings {
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
-    this.keepVaultsRunningInBackground = false,
-    this.hasSeenSwipeTutorial = false,
+     this.keepVaultsRunningInBackground = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
@@ -130,8 +126,6 @@ class AppSettings {
     this.appLockAfterMins = 0,
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.containerSortMode = ContainerSortMode.manual,
-    this.enableCardSwipeActions = true,
-    this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
     this.useOledBlackTheme = false,
@@ -197,10 +191,7 @@ class AppSettings {
     int? autoLockMins,
     bool? lockAppOnScreenLock,
     int? appLockAfterMins,
-    bool? hasSeenSwipeTutorial,
     ContainerSortMode? containerSortMode,
-    bool? enableCardSwipeActions,
-    bool? swapCardActions,
     ThemeMode? themeMode,
     bool? useDynamicColor,
     bool? useOledBlackTheme,
@@ -234,13 +225,10 @@ class AppSettings {
       defaultDerivedKeyCacheEnabled: defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
       lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
       autoLockMins: autoLockMins ?? this.autoLockMins,
-      lockAppOnScreenLock: lockAppOnScreenLock ?? this.lockAppOnScreenLock,
+    lockAppOnScreenLock: lockAppOnScreenLock ?? this.lockAppOnScreenLock,
       appLockAfterMins: appLockAfterMins ?? this.appLockAfterMins,
-      hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
-      enableCardSwipeActions: enableCardSwipeActions ?? this.enableCardSwipeActions,
-      swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
       useOledBlackTheme: useOledBlackTheme ?? this.useOledBlackTheme,
@@ -280,13 +268,10 @@ class AppSettings {
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
-    'lockAppOnScreenLock': lockAppOnScreenLock,
+   'lockAppOnScreenLock': lockAppOnScreenLock,
     'appLockAfterMins': appLockAfterMins,
-    'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
     'defaultLayoutMode': defaultLayoutMode.toJson(),
     'containerSortMode': containerSortMode.toJson(),
-    'enableCardSwipeActions': enableCardSwipeActions,
-    'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
     'useDynamicColor': useDynamicColor,
     'useOledBlackTheme': useOledBlackTheme,
@@ -323,11 +308,8 @@ class AppSettings {
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
     keepVaultsRunningInBackground: j['keepVaultsRunningInBackground'] as bool? ?? false,
-    hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),
-    enableCardSwipeActions: j['enableCardSwipeActions'] as bool? ?? true,
-    swapCardActions: j['swapCardActions'] as bool? ?? false,
     themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
     useDynamicColor: j['useDynamicColor'] as bool? ?? false,
     useOledBlackTheme: j['useOledBlackTheme'] as bool? ?? false,

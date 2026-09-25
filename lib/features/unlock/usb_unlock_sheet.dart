@@ -180,8 +180,13 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
+       appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: state.loading ? null : () => Navigator.of(context).pop(),
+          ),
           title: Text(
             widget.existingRecord != null
                 ? context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label)
@@ -336,9 +341,11 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ),
         );
 
-     case _UsbUnlockCredentialState.password:
+    case _UsbUnlockCredentialState.password:
       default:
-        if (!state.hasAdvancedSettings) return const SizedBox.shrink();
+        final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
+        final isKnownLuksOrBitlocker = widget.existingRecord != null && (format.isLuks || format == ContainerFormat.bitlocker);
+        if (!state.hasAdvancedSettings || isKnownLuksOrBitlocker) return const SizedBox.shrink();
         final hasSelection = state.selected != null;
         final canConfigure = hasSelection && !state.loading;
         return SingleChildScrollView(
@@ -549,12 +556,14 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ),
         ];
 
-      case _UsbUnlockCredentialState.password:
+     case _UsbUnlockCredentialState.password:
         final isUnlock = widget.existingRecord != null;
         final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
         final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
         final isKnownLuks = isUnlock && format.isLuks;
+        final isKnownBitlocker = isUnlock && format == ContainerFormat.bitlocker;
         final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+        final hasAdvanced = (!isKnownLuks && !isKnownBitlocker) && state.hasAdvancedSettings;
         final isWide = context.screen.useWideLayout;
         final hasSelection = state.selected != null;
         final canConfigure = hasSelection && !state.loading;
@@ -582,7 +591,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                     filled: true,
                     fillColor: cs.surfaceContainerHighest,
                     labelText: context.l10n.passwordFieldLabel,
-                    hintText: context.l10n.passwordHintContainer,
+                    hintText: isKnownBitlocker
+                        ? context.l10n.passwordHintBitlocker
+                        : context.l10n.passwordHintContainer,
                     prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -613,7 +624,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   onSubmitted: (_) => _onUnlock(),
                 ),
               ],
-              if (hasDirectOptions) ...[
+            if (hasDirectOptions) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 1),
                   child: KeyfilesPicker(
@@ -624,8 +635,17 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                     onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
                   ),
                 ),
+                if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: Text(
+                      context.l10n.luksKeyfileReplacesPasswordNote,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
               ],
-              if (!state.hasAdvancedSettings) ...[
+              if (!hasAdvanced) ...[
                 SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: state.readOnly,
@@ -638,7 +658,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
-              if (state.hasAdvancedSettings && !isWide) ...[
+              if (hasAdvanced && !isWide) ...[
                 Theme(
                   data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
@@ -682,17 +702,18 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     UsbUnlockState state,
     ColorScheme cs,
     TextTheme textTheme,
-  ) {
+ ) {
     final isUnlock = widget.existingRecord != null;
     final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
     final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
     final isKnownLuks = isUnlock && format.isLuks;
+    final isKnownBitlocker = isUnlock && format == ContainerFormat.bitlocker;
     final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
     final hasSelection = state.selected != null;
     final canConfigure = hasSelection && !state.loading;
 
     return [
-     if (!hasDirectOptions) ...[
+     if (!hasDirectOptions && !isKnownBitlocker) ...[
         PimInputField(
           controller: _pimCtrl,
           enabled: canConfigure,
@@ -709,14 +730,16 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ),
         ),
       ],
-      AdvancedParamsPanel(
-        collapsible: false,
-        cipherId: state.cipherId,
-        hashId: state.hashId,
-        enabled: canConfigure,
-        onCipherChanged: (val) => ref.read(usbUnlockControllerProvider(_params).notifier).setCipherId(val),
-        onHashChanged: (val) => ref.read(usbUnlockControllerProvider(_params).notifier).setHashId(val),
-      ),
+      if (!isKnownLuks && !isKnownBitlocker) ...[
+        AdvancedParamsPanel(
+          collapsible: false,
+          cipherId: state.cipherId,
+          hashId: state.hashId,
+          enabled: canConfigure,
+          onCipherChanged: (val) => ref.read(usbUnlockControllerProvider(_params).notifier).setCipherId(val),
+          onHashChanged: (val) => ref.read(usbUnlockControllerProvider(_params).notifier).setHashId(val),
+        ),
+      ],
       SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         value: state.readOnly,
@@ -732,23 +755,25 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         ),
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
-      SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        value: state.protectHiddenVolume && !state.readOnly,
-        onChanged: (canConfigure && !state.readOnly)
-            ? (val) {
-                ref.read(usbUnlockControllerProvider(_params).notifier).setProtectHiddenVolume(val);
-              }
-            : null,
-        title: Text(context.l10n.protectHiddenVolumeToggleTitle),
-        subtitle: Text(
-          state.readOnly
-              ? context.l10n.readOnlyModeContainerSubtitle
-              : context.l10n.protectHiddenVolumeToggleSubtitle,
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      if (!isKnownLuks && !isKnownBitlocker) ...[
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          value: state.protectHiddenVolume && !state.readOnly,
+          onChanged: (canConfigure && !state.readOnly)
+              ? (val) {
+                  ref.read(usbUnlockControllerProvider(_params).notifier).setProtectHiddenVolume(val);
+                }
+              : null,
+          title: Text(context.l10n.protectHiddenVolumeToggleTitle),
+          subtitle: Text(
+            state.readOnly
+                ? context.l10n.readOnlyModeContainerSubtitle
+                : context.l10n.protectHiddenVolumeToggleSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
         ),
-        secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
-      ),
+      ],
       if (state.protectHiddenVolume && !state.readOnly) ...[
         Padding(
           padding: const EdgeInsets.all(12),
@@ -832,20 +857,37 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         InlineErrorBanner(state.error!),
       ],
       const SizedBox(height: 10),
+      if (state.loading) ...[
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_clock_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  _unlockProgressLabel(context, state),
+                  style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
       FilledButton(
-        onPressed: state.loading ? () {} : (isButtonEnabled ? _onUnlock : null),
+        onPressed: state.loading ? null : (isButtonEnabled ? _onUnlock : null),
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(50),
           shape: const StadiumBorder(),
         ),
         child: state.loading
-            ? Text(
-                _unlockProgressLabel(context, state),
-                maxLines: 2,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                softWrap: true,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
               )
             : Text(
                 context.l10n.unlockDriveButton,

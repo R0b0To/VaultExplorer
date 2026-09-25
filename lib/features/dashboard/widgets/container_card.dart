@@ -25,6 +25,7 @@ class BaseContainerCard extends StatelessWidget {
   final VoidCallback onTap;
   final Widget icon;
   final Color iconBackgroundColor;
+  final Widget? avatarBadge;
   final String title;
   final Widget? titleTrailing;
   final Widget? subtitle;
@@ -37,6 +38,7 @@ class BaseContainerCard extends StatelessWidget {
     required this.onTap,
     required this.icon,
     required this.iconBackgroundColor,
+    this.avatarBadge,
     required this.title,
     this.titleTrailing,
     this.subtitle,
@@ -60,18 +62,29 @@ class BaseContainerCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
+         child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: iconBackgroundColor,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Center(child: icon),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: iconBackgroundColor,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Center(child: icon),
+                  ),
+                  if (avatarBadge != null)
+                    Positioned(
+                      right: -3,
+                      bottom: -3,
+                      child: avatarBadge!,
+                    ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -108,7 +121,7 @@ class BaseContainerCard extends StatelessWidget {
                 ),
               ),
               if (trailingAction != null) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 trailingAction!,
               ],
             ],
@@ -125,6 +138,8 @@ class ContainerCard extends StatelessWidget {
   final AppSettings appSettings;
   final ValueChanged<int> onLocked;
   final VoidCallback onBrowse;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final BorderRadiusGeometry? borderRadius;
   const ContainerCard({
     super.key,
@@ -133,6 +148,8 @@ class ContainerCard extends StatelessWidget {
     required this.appSettings,
     required this.onLocked,
     required this.onBrowse,
+    required this.onEdit,
+    required this.onDelete,
     this.borderRadius,
   });
 
@@ -200,8 +217,10 @@ class ContainerCard extends StatelessWidget {
                   formatBytes(container.totalSpace),
                 )
               : context.l10n.volMountedSummary(container.volId),
-          style: textTheme.bodySmall?.copyWith(
+         style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
+            fontSize: 11.5,
+            letterSpacing: -0.2,
             height: 1.2,
           ),
           overflow: TextOverflow.ellipsis,
@@ -224,14 +243,25 @@ class ContainerCard extends StatelessWidget {
           : cs.primaryContainer.withValues(alpha: 0.35),
       cs.surfaceContainerHigh,
     );
-    return BaseContainerCard(
+     return BaseContainerCard(
       onTap: onBrowse,
       icon: iconWidget,
       iconBackgroundColor: cs.primaryContainer,
+      avatarBadge: AutoLockIconBadge(record: record, settings: appSettings),
       title: container.displayName,
-      titleTrailing: AutoLockIconBadge(record: record, settings: appSettings),
       subtitle: subtitleWidget,
-      trailingAction: _LockButton(container: container, onLocked: onLocked),
+      trailingAction: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+           _LockButton(container: container, onLocked: onLocked),
+          const SizedBox(width: 6),
+          _VaultMoreMenuButton(
+            onEdit: onEdit,
+            onDelete: onDelete,
+            isMounted: true,
+          ),
+        ],
+      ),
       backgroundColor: cardBg,
       borderRadius: borderRadius,
     );
@@ -243,6 +273,8 @@ class SavedContainerCard extends StatelessWidget {
   final String uri;
   final String containerFormat;
   final VoidCallback onUnlock;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final BorderRadiusGeometry? borderRadius;
   const SavedContainerCard({
     super.key,
@@ -250,6 +282,8 @@ class SavedContainerCard extends StatelessWidget {
     required this.uri,
     required this.containerFormat,
     required this.onUnlock,
+    required this.onEdit,
+    required this.onDelete,
     this.borderRadius,
   });
   @override
@@ -270,8 +304,10 @@ class SavedContainerCard extends StatelessWidget {
       children: [
         Text(
           isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
-          style: textTheme.bodySmall?.copyWith(
+         style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
+            fontSize: 11.5,
+            letterSpacing: -0.2,
             height: 1.2,
           ),
           overflow: TextOverflow.ellipsis,
@@ -289,9 +325,10 @@ class SavedContainerCard extends StatelessWidget {
       iconBackgroundColor: cs.surfaceContainerHighest,
       title: name,
       subtitle: subtitleWidget,
-      trailingAction: _UnlockButton(
-        onUnlock: onUnlock,
-        isUsb: isUsb,
+      trailingAction: _VaultMoreMenuButton(
+        onEdit: onEdit,
+        onDelete: onDelete,
+        isMounted: false,
       ),
       backgroundColor: cs.surfaceContainerHigh,
       borderRadius: borderRadius,
@@ -319,9 +356,9 @@ class _CompactIconButton extends StatelessWidget {
     final message = isLoading && tooltip != null ? '$tooltip, in progress' : (tooltip ?? '');
     return Tooltip(
       message: message,
-      child: SizedBox(
-        width: 44,
-        height: 44,
+       child: SizedBox(
+        width: 38,
+        height: 38,
         child: FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
@@ -337,14 +374,14 @@ class _CompactIconButton extends StatelessWidget {
           ),
           child: isLoading
               ? SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
+                    strokeWidth: 2.2,
                     color: foregroundColor.withValues(alpha: 0.8),
                   ),
                 )
-              : Icon(icon, size: 22),
+              : Icon(icon, size: 20),
         ),
       ),
     );
@@ -413,25 +450,61 @@ class _LockButtonState extends ConsumerState<_LockButton> {
   }
 }
 
-class _UnlockButton extends StatelessWidget {
-  final VoidCallback onUnlock;
-  final bool isUsb;
-  const _UnlockButton({
-    required this.onUnlock,
-    required this.isUsb,
+class _VaultMoreMenuButton extends StatelessWidget {
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final bool isMounted;
+
+  const _VaultMoreMenuButton({
+    required this.onEdit,
+    required this.onDelete,
+    required this.isMounted,
   });
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return _CompactIconButton(
-      icon: isUsb ? Icons.usb_rounded : Icons.lock_outline_rounded,
-      onPressed: () {
-        HapticFeedback.lightImpact();
-        onUnlock();
+     return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: cs.onSurfaceVariant,
+        size: 22,
+      ),
+      tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (action) {
+        if (action == 'edit') {
+          onEdit();
+        } else if (action == 'delete') {
+          onDelete();
+        }
       },
-      backgroundColor: cs.secondaryContainer,
-      foregroundColor: cs.onSecondaryContainer,
-      tooltip: isUsb ? context.l10n.reconnectUsbTooltip : context.l10n.unlockContainerTooltip,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.tune_rounded, size: 20, color: cs.onSurface),
+              const SizedBox(width: 12),
+              Text(context.l10n.edit),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+              const SizedBox(width: 12),
+              Text(
+                context.l10n.remove,
+                style: TextStyle(color: cs.error),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -54,7 +54,6 @@ class VaultDashboard extends ConsumerStatefulWidget {
 class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBindingObserver {
   SessionLockController get _lockController => ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
- final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
   double _drawerDragDistance = 0.0;
   bool _isTouchFromEdge = false;
@@ -130,10 +129,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     _checkStorageAccess();
   }
 
-  @override
+   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _swipeGroup.dispose();
     super.dispose();
   }
 
@@ -660,17 +658,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       },
       itemBuilder: (context, i) {
         final item = displayItems[i];
-        final triggerNudge = i == 0 &&
-            settingsLoaded &&
-            !appSettings.hasSeenSwipeTutorial &&
-            appSettings.enableCardSwipeActions;
-       return VaultCardRow(
+        return VaultCardRow(
           key: ValueKey(item.uri),
           index: i,
           item: item,
           record: state.records[item.uri],
           appSettings: appSettings,
-          group: _swipeGroup,
           onOpen: () => openItem(item),
           onEdit: () => _requestEdit(item),
           onDelete: () => _requestDelete(item),
@@ -678,13 +671,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
           isRemoving: state.animatingOutUris.contains(item.uri),
           isInserting: state.animatingInUris.contains(item.uri),
-          triggerNudge: triggerNudge,
-          swapActions: appSettings.swapCardActions,
-          swipeEnabled: appSettings.enableCardSwipeActions,
           dragEnabled: appSettings.containerSortMode == ContainerSortMode.manual,
-          onNudgeComplete: () => ref
-              .read(appSettingsControllerProvider.notifier)
-              .updateSettings((s) => s.copyWith(hasSeenSwipeTutorial: true)),
         );
       },
     );
@@ -777,7 +764,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               }
               _drawerDragDistance += details.primaryDelta ?? 0.0;
               if (_drawerDragDistance > 60.0) {
-                _swipeGroup.closeAll();
                 _scaffoldKey.currentState?.openDrawer();
                 _drawerDragDistance = 0.0;
                 _isTouchFromEdge = true;

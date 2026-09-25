@@ -59,6 +59,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   final _pimCtrl = TextEditingController();
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenPimCtrl = TextEditingController();
+  final _carrierScrollCtrl = ScrollController();
 
   bool _obscure = true;
   bool _hiddenObscure = true;
@@ -115,13 +116,14 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
   }
 
-  @override
+ @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     _hiddenPasswordCtrl.dispose();
     _hiddenPimCtrl.dispose();
+    _carrierScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -254,8 +256,13 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         }
       },
       child: Scaffold(
-        appBar: AppBar(
+       appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: state.loading ? null : () => Navigator.of(context).pop(),
+          ),
           title: Text(
             (widget.initialUri != null || widget.initialCompositeCarriers != null)
                 ? context.l10n.unlockContainerTitle
@@ -529,10 +536,18 @@ Widget _buildVaultKindSegmentedButton(
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+         if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildVaultKindSegmentedButton(
+              context,
+              state,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+            ),
+          ),
+        ],
         SectionCard(
           children: [
-            if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide)
-              _buildVaultKindSplitRow(context, state),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
              leading: Container(
@@ -696,63 +711,106 @@ Widget _buildVaultKindSegmentedButton(
               ),
             ),
           
-            ConstrainedBox(
+          ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 280),
-              child: ListView.builder(
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                itemCount: carriers.length,
-                itemExtent: 56,
-                padding: EdgeInsets.zero,
-                itemBuilder: (context, index) {
-                  final carrier = carriers[index];
-                  final budget = state.compositeCarrierProfiles[carrier.uri];
-                  // A file that isn't recognized as a carrier will be ignored
-                  // by the unlock and the volume will then be reported as
-                  // incomplete, so flag it here instead of after the attempt.
-                  final unrecognized =
-                      budget != null && budget.detectedFormat != 'composite_carrier';
+              child: Scrollbar(
+                controller: _carrierScrollCtrl,
+                thumbVisibility: carriers.length > 4,
+                interactive: true,
+                thickness: 4.5,
+                radius: const Radius.circular(8),
+                child: ListView.builder(
+                  controller: _carrierScrollCtrl,
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: carriers.length,
+                  itemExtent: 54,
+                  padding: const EdgeInsets.only(right: 6),
+                  itemBuilder: (context, index) {
+                    final carrier = carriers[index];
+                    final budget = state.compositeCarrierProfiles[carrier.uri];
+                    final unrecognized =
+                        budget != null && budget.detectedFormat != 'composite_carrier';
 
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(
-                      budget == null
-                          ? Icons.hourglass_empty_rounded
-                          : (unrecognized
-                              ? Icons.warning_amber_rounded
-                              : Icons.verified_user_rounded),
-                      size: 20,
-                      color: budget == null
-                          ? cs.outline
-                          : (unrecognized ? cs.error : cs.primary),
-                    ),
-                    title: Text(
-                      carrier.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      budget == null
-                          ? l10n.compositeCarrierAnalyzingStatus
-                          : (unrecognized
-                              ? '${budget.detectedFormat.toUpperCase()} • ${formatBytes(budget.fileSize)}'
-                              : formatBytes(budget.fileSize)),
-                      style: unrecognized ? TextStyle(color: cs.error) : null,
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: state.loading
-                          ? null
-                          : () {
-                              // Removing the last carrier empties the selection,
-                              // so drop any typed credentials with it (same as
-                              // the picker's clear button).
-                              if (carriers.length == 1) _resetInputFields();
-                              notifier.removeCompositeCarrier(carrier.uri);
-                            },
-                    ),
-                  );
-                },
+                    Widget leadingWidget;
+                    if (budget == null) {
+                      leadingWidget = SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: Center(
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                          ),
+                        ),
+                      );
+                    } else if (unrecognized) {
+                      leadingWidget = Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: cs.errorContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.warning_amber_rounded, size: 16, color: cs.onErrorContainer),
+                      );
+                    } else {
+                      leadingWidget = Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${index + 1}',
+                          style: textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                      leading: leadingWidget,
+                      title: Text(
+                        carrier.displayName,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: unrecognized ? cs.error : cs.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        budget == null
+                            ? l10n.compositeCarrierAnalyzingStatus
+                            : (unrecognized
+                                ? '${budget.detectedFormat.toUpperCase()} • ${formatBytes(budget.fileSize)}'
+                                : formatBytes(budget.fileSize)),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: unrecognized ? cs.error : cs.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        tooltip: l10n.clear,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: state.loading
+                            ? null
+                            : () {
+                                if (carriers.length == 1) _resetInputFields();
+                                notifier.removeCompositeCarrier(carrier.uri);
+                              },
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -1315,20 +1373,37 @@ List<Widget> _buildAdvancedOptionsSection(
         InlineErrorBanner(state.error!),
       ],
       const SizedBox(height: 10),
+      if (state.loading) ...[
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_clock_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  _unlockProgressLabel(context, state),
+                  style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
       FilledButton(
-        onPressed: state.loading ? () {} : (isButtonEnabled ? _onUnlock : null),
+        onPressed: state.loading ? null : (isButtonEnabled ? _onUnlock : null),
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(50),
           shape: const StadiumBorder(),
         ),
         child: state.loading
-            ? Text(
-                _unlockProgressLabel(context, state),
-                maxLines: 2,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                softWrap: true,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
               )
             : Text(
                 state.isPlainDiskImage || state.containerFormat == 'plain'

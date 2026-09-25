@@ -144,8 +144,6 @@ class MediaPrefetchController {
   /// newly-discovered ratio; callers should debounce it (e.g. coalesce
   /// into a single post-frame `setState`) rather than rebuild on every
   /// call.
-  int _preloadGeneration = 0;
-
   Future<void> preloadAspectRatios(
     List<String> playlist, {
     required bool Function() isStillWanted,
@@ -153,46 +151,32 @@ class MediaPrefetchController {
     int startIndex = 0,
   }) async {
     if (_cacheMode == ThumbnailCacheMode.disabled) return;
-    final generation = ++_preloadGeneration;
-    final order = _expandingIndexOrder(startIndex, playlist.length);
-    var cursor = 0;
-    const concurrency = 6;
-
-    Future<void> worker() async {
-      while (cursor < order.length) {
-        if (!isStillWanted() || generation != _preloadGeneration) return;
-        final index = order[cursor++];
-        final fileName = playlist[index];
-        if (!MediaViewerConstants.isImage(fileName)) continue;
-        if (MediaAspectRatioCache.get(container, fileName) != null) continue;
-        try {
-          final header = await _fileIoApi.readFileChunk(
-            container,
-            fileName,
-            0,
-            _headerSniffBytes,
-          );
-          if (header == null || header.isEmpty) continue;
-          final dims = extractImageDimensionsFromBytes(header);
-          if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
-            MediaAspectRatioCache.put(container, fileName, dims.$1, dims.$2);
-            onRatioLearned();
-          }
-        } catch (e) {
-          VeLog.w(
-            'MediaPrefetchController',
-            'Aspect-ratio preload failed for ${VeLog.censorName(fileName)}',
-            e,
-          );
+    for (final index in _expandingIndexOrder(startIndex, playlist.length)) {
+      if (!isStillWanted()) return;
+      final fileName = playlist[index];
+      if (!MediaViewerConstants.isImage(fileName)) continue;
+      if (MediaAspectRatioCache.get(container, fileName) != null) continue;
+      try {
+        final header = await _fileIoApi.readFileChunk(
+          container,
+          fileName,
+          0,
+          _headerSniffBytes,
+        );
+        if (header == null || header.isEmpty) continue;
+        final dims = extractImageDimensionsFromBytes(header);
+        if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
+          MediaAspectRatioCache.put(container, fileName, dims.$1, dims.$2);
+          onRatioLearned();
         }
+      } catch (e) {
+        VeLog.w(
+          'MediaPrefetchController',
+          'Aspect-ratio preload failed for ${VeLog.censorName(fileName)}',
+          e,
+        );
       }
     }
-
-    final workers = List.generate(
-      math.min(concurrency, order.length),
-      (_) => worker(),
-    );
-    await Future.wait(workers);
   }
 
   /// Every index in `[0, length)` exactly once, nearest-to-[startIndex]

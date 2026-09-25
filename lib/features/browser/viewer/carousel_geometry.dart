@@ -65,7 +65,12 @@ class CarouselGeometry {
     return EdgeInsets.only(top: topPadding, bottom: bottomPadding);
   }
 
-  double offsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
+ double offsetForIndex(
+    int targetIndex,
+    double viewportWidth,
+    double viewportHeight, [
+    double Function(int index)? customItemHeight,
+  ]) {
     if (playlist.isEmpty || viewportHeight <= 0) return 0.0;
     if (targetIndex <= 0) return 0.0;
     if (targetIndex >= playlist.length) targetIndex = playlist.length - 1;
@@ -73,9 +78,13 @@ class CarouselGeometry {
     final padding = continuousListPadding(viewportWidth, viewportHeight);
     double sumPrevHeights = 0.0;
     for (int i = 0; i < targetIndex; i++) {
-      sumPrevHeights += itemHeight(i, viewportWidth, viewportHeight);
+      sumPrevHeights += customItemHeight != null
+          ? customItemHeight(i)
+          : itemHeight(i, viewportWidth, viewportHeight);
     }
-    final currentItemHeight = itemHeight(targetIndex, viewportWidth, viewportHeight);
+    final currentItemHeight = customItemHeight != null
+        ? customItemHeight(targetIndex)
+        : itemHeight(targetIndex, viewportWidth, viewportHeight);
     if (currentItemHeight >= viewportHeight) {
       return padding.top + sumPrevHeights;
     }
@@ -107,7 +116,12 @@ class CarouselGeometry {
     return (visibleTop + visibleBottom) / 2.0 - viewportHeight / 2.0;
   }
 
-  int indexForOffset(double offset, double viewportWidth, double viewportHeight) {
+  int indexForOffset(
+    double offset,
+    double viewportWidth,
+    double viewportHeight, [
+    double Function(int index)? customItemHeight,
+  ]) {
     if (playlist.isEmpty) return 0;
     if (playlist.length == 1) return 0;
 
@@ -117,8 +131,12 @@ class CarouselGeometry {
     double minDiff = double.infinity;
 
     for (int i = 0; i < playlist.length; i++) {
-      final h = itemHeight(i, viewportWidth, viewportHeight);
-      final ideal = (h >= viewportHeight) ? currentOffset : currentOffset - (viewportHeight - h) / 2.0;
+      final h = customItemHeight != null
+          ? customItemHeight(i)
+          : itemHeight(i, viewportWidth, viewportHeight);
+      final ideal = (h >= viewportHeight)
+          ? currentOffset
+          : currentOffset - (viewportHeight - h) / 2.0;
       final diff = (offset - ideal).abs();
       if (diff < minDiff) {
         minDiff = diff;

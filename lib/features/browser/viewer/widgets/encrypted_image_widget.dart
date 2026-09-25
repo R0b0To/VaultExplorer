@@ -8,6 +8,8 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/core/utils/image_dimensions.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'native_avif_widget.dart';
@@ -20,6 +22,7 @@ class EncryptedImageWidget extends ConsumerStatefulWidget {
   final VoidCallback? onError;
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
+  final void Function(int width, int height)? onSizeKnown;
 
   const EncryptedImageWidget({
     super.key,
@@ -30,6 +33,7 @@ class EncryptedImageWidget extends ConsumerStatefulWidget {
     this.onError,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.onSizeKnown,
   });
 
   @override
@@ -46,6 +50,14 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   Completer<void>? _limiterCompleter;
   late final ThumbnailCacheService _thumbnailCache;
 
+  void _sniffAndNotifySize(Uint8List bytes) {
+    final dims = extractImageDimensionsFromBytes(bytes);
+    if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
+      MediaAspectRatioCache.put(widget.container, widget.fileName, dims.$1, dims.$2);
+      widget.onSizeKnown?.call(dims.$1, dims.$2);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +69,9 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
           widget.fileName,
           widget.thumbnailQuality,
         );
+    if (_thumbnailBytes != null) {
+      _sniffAndNotifySize(_thumbnailBytes!);
+    }
     final cachedFullRes = FullResImageCache.get(
       widget.container,
       widget.fileName,
@@ -64,6 +79,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     if (cachedFullRes != null) {
       _bytes = cachedFullRes;
       _isFullResLoaded = true;
+      _sniffAndNotifySize(cachedFullRes);
     } else {
       _loadImage();
     }
@@ -96,12 +112,13 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       }
     } else if (!_isFullResLoaded && _currentlyLoadingFile == null) {
       _loadImage();
-    } else if (!_isFullResLoaded &&
+     } else if (!_isFullResLoaded &&
         widget.prefetchedBytes != null &&
         _thumbnailBytes == null) {
       setState(() {
         _thumbnailBytes = widget.prefetchedBytes;
       });
+      _sniffAndNotifySize(widget.prefetchedBytes!);
     }
   }
 
@@ -165,11 +182,12 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
         }
         return;
       }
-      setState(() {
+       setState(() {
         _error = null;
         _bytes = data;
         _isFullResLoaded = true;
       });
+      _sniffAndNotifySize(data);
     } catch (e) {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (mounted &&
@@ -197,13 +215,14 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
         mode: widget.thumbnailCacheMode,
         quality: widget.thumbnailQuality,
       );
-      if (thumb != null &&
+        if (thumb != null &&
           mounted &&
           _currentlyLoadingFile == targetFile &&
           !_isFullResLoaded) {
         setState(() {
           _thumbnailBytes = thumb;
         });
+        _sniffAndNotifySize(thumb);
       }
     } catch (_) {
       // The thumbnail is only a placeholder shown while the full-res image

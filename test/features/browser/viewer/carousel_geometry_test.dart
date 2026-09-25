@@ -108,4 +108,77 @@ void main() {
       expect(geometry.indexForOffset(650 + shift, w, h), 2);
     });
   });
+
+  group('unknown aspect ratios (cold-open) drift the continuous-scroll math',
+      () {
+    const w = 1000.0;
+    const h = 3000.0;
+
+    // Ten wide (2.5:1) images -- only the first four have a learned aspect
+    // ratio, the way prefetchSurrounding's narrow neighbour window would
+    // leave things right after opening the viewer. The rest fall back to
+    // the fixed 16:9 guess itemHeight() uses whenever aspectRatioFor
+    // returns null (see MediaPrefetchController.preloadAspectRatios).
+    final playlist = List<String>.generate(
+      10,
+      (i) => i < 4 ? 'known$i.jpg' : 'unknown$i.jpg',
+    );
+
+    final coldGeometry = CarouselGeometry(
+      playlist: playlist,
+      rotations: const {},
+      isAudio: (_) => false,
+      aspectRatioFor: (name) => name.startsWith('known') ? 2.5 : null,
+    );
+
+    // Same playlist once every item's true ratio is known -- what
+    // MediaPrefetchController.preloadAspectRatios brings about in the
+    // background, rather than waiting for each item to be scrolled into
+    // view once before its height is right.
+    final warmGeometry = CarouselGeometry(
+      playlist: playlist,
+      rotations: const {},
+      isAudio: (_) => false,
+      aspectRatioFor: (_) => 2.5,
+    );
+
+    test('sanity check: fully-known 2.5:1 items are all 400px tall', () {
+      expect(warmGeometry.itemHeight(0, w, h), 400.0);
+      expect(warmGeometry.continuousListPadding(w, h).top, 1300.0);
+      expect(warmGeometry.continuousListPadding(w, h).bottom, 1300.0);
+    });
+
+    test('bottom padding stays wrong until the last item is learned', () {
+      // The fallback height is w/(16/9); floating-point division doesn't
+      // land on an exact value here, and nothing in the fix depends on
+      // it being exact, so closeTo instead of an exact literal.
+      expect(
+        coldGeometry.continuousListPadding(w, h).bottom,
+        closeTo(1218.75, 0.01),
+      );
+      expect(warmGeometry.continuousListPadding(w, h).bottom, 1300.0);
+    });
+
+    test('offsetForIndex drifts by hundreds of px for an unvisited item',
+        () {
+      final coldOffset = coldGeometry.offsetForIndex(9, w, h);
+      final warmOffset = warmGeometry.offsetForIndex(9, w, h);
+
+      expect(warmOffset, 3600.0); // 9 * the true 400px item height
+      expect(coldOffset, closeTo(4493.75, 0.01));
+      expect(coldOffset - warmOffset, closeTo(893.75, 0.01));
+    });
+
+    test(
+      'indexForOffset picks the wrong "current" item at the exact offset '
+      'the last item sits at once its ratio is known, because the walk '
+      'it does internally used the wrong guessed heights for everything '
+      'past the prefetch window',
+      () {
+        // 3600.0 is exactly where item 9 sits once every ratio is known.
+        expect(warmGeometry.indexForOffset(3600.0, w, h), 9);
+        expect(coldGeometry.indexForOffset(3600.0, w, h), 7);
+      },
+    );
+  });
 }

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show PointerDeviceKind;
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/image_dimensions.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -120,73 +121,9 @@ class _ImagePageItemState extends State<ImagePageItem>
     _initImageDimensions();
   }
 
-  static (int, int)? extractDimensionsFromBytes(Uint8List bytes) {
-    if (bytes.length < 4) return null;
-    // JPEG SOF parser (scans markers synchronously in <0.01ms)
-    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
-      int i = 2;
-      while (i < bytes.length - 8) {
-        if (bytes[i] != 0xFF) {
-          i++;
-          continue;
-        }
-        final marker = bytes[i + 1];
-        if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2) {
-          final h = (bytes[i + 5] << 8) | bytes[i + 6];
-          final w = (bytes[i + 7] << 8) | bytes[i + 8];
-          if (w > 0 && h > 0) return (w, h);
-          break;
-        }
-        final len = (bytes[i + 2] << 8) | bytes[i + 3];
-        if (len < 2) break;
-        i += 2 + len;
-      }
-    }
-    // PNG header parser
-    if (bytes.length >= 24 &&
-        bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
-      final w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-      final h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
-      if (w > 0 && h > 0) return (w, h);
-    }
-    // GIF header parser
-    if (bytes.length >= 10 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
-      final w = bytes[6] | (bytes[7] << 8);
-      final h = bytes[8] | (bytes[9] << 8);
-      if (w > 0 && h > 0) return (w, h);
-    }
-    // WebP (RIFF....WEBP)
-    if (bytes.length >= 30 &&
-        bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
-        bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
-      // VP8 (lossy)
-      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x20) {
-        final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
-        final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
-        if (w > 0 && h > 0) return (w, h);
-      }
-      // VP8L (lossless)
-      if (bytes.length >= 25 &&
-          bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x4C) {
-        if (bytes[16] == 0x2F) {
-          final w = 1 + (((bytes[18] & 0x3F) << 8) | bytes[17]);
-          final h = 1 + (((bytes[20] & 0x0F) << 10) | (bytes[19] << 2) | ((bytes[18] & 0xC0) >> 6));
-          if (w > 0 && h > 0) return (w, h);
-        }
-      }
-      // VP8X (extended)
-      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x58) {
-        final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
-        final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
-        if (w > 0 && h > 0) return (w, h);
-      }
-    }
-    return null;
-  }
-
   void _initImageDimensions() {
     if (widget.prefetchedBytes != null && widget.prefetchedBytes!.isNotEmpty) {
-      final dims = extractDimensionsFromBytes(widget.prefetchedBytes!);
+      final dims = extractImageDimensionsFromBytes(widget.prefetchedBytes!);
       if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
         _imageSize = Size(dims.$1.toDouble(), dims.$2.toDouble());
         MediaAspectRatioCache.put(
@@ -644,7 +581,7 @@ bool _isClampingMatrix = false;
                   type: MaterialType.transparency,
                   child: RotatedBox(
                     quarterTurns: widget.rotationQuarterTurns,
-                    child: EncryptedImageWidget(
+                  child: EncryptedImageWidget(
                       container: widget.container,
                       fileName: widget.fileName,
                       prefetchedBytes: widget.prefetchedBytes,
@@ -652,6 +589,14 @@ bool _isClampingMatrix = false;
                       onError: widget.onError,
                       thumbnailQuality: widget.thumbnailQuality,
                       thumbnailCacheMode: widget.thumbnailCacheMode,
+                      onSizeKnown: (w, h) {
+                        if (_imageSize == null ||
+                            _imageSize!.width != w ||
+                            _imageSize!.height != h) {
+                          _imageSize = Size(w.toDouble(), h.toDouble());
+                          widget.onSizeKnown?.call(w, h);
+                        }
+                      },
                     ),
                   ),
                 ),

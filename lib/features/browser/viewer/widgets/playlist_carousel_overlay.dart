@@ -10,6 +10,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/core/utils/image_dimensions.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -470,29 +472,35 @@ class _CarouselThumb extends ConsumerWidget {
       syncLookup: () =>
           thumbnailCache.peekMemory(container, fileName, thumbnailQuality),
       cacheHeight: scaledSize,
-      imageBuilder: (context, bytes, cacheHeight) => Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
-          if (isVideo)
-            Positioned(
-              right: 6,
-              bottom: 6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 14,
+       imageBuilder: (context, bytes, cacheHeight) {
+        final dims = extractImageDimensionsFromBytes(bytes);
+        if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
+          MediaAspectRatioCache.put(container, fileName, dims.$1, dims.$2);
+        }
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
+            if (isVideo)
+              Positioned(
+                right: 6,
+                bottom: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        );
+      },
       loadingBuilder: (context) => Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(

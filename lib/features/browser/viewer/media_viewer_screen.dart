@@ -5,9 +5,6 @@ import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart'
     show
-        Drag,
-        DoubleTapGestureRecognizer,
-        VerticalDragGestureRecognizer,
         Velocity;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -134,12 +131,18 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   // or mid-interaction (reported via onZoomChanged). Kept separate from
   // _multiTouchLock so either source can hold the lock independently.
   bool _zoomInteractionLock = false;
-  // Scroll drag forwarded to the continuous list from outside its bounds
-  // (see _onMarginDragStart).
-  Drag? _marginDrag;
 
   int _activeMenuCount = 0;
   late bool _wasEmpty;
+
+  // Coalesces bursts of `preloadAspectRatios` callbacks (one per file whose
+  // true aspect ratio was just learned) into a single setState per frame,
+  // same pattern as file_masonry_view.dart's `_scheduleRebuild`.
+  bool _hasPendingGeometryRebuild = false;
+  // Folder scope the background aspect-ratio preload was last kicked off
+  // for, so switching folders (which swaps `_playlistController.playlist`)
+  // re-runs it instead of leaving the new items on the 16:9 fallback.
+  String? _aspectRatioPreloadFolder;
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
@@ -237,6 +240,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _playbackManager.currentFileNotifier.addListener(
       _onCurrentMediaFileChanged,
     );
+    _kickOffAspectRatioPreload();
 
     _loadConfig();
 
@@ -346,6 +350,73 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _wasEmpty = nowEmpty;
       setState(() {});
     }
+    _kickOffAspectRatioPreload();
+  }
+
+     void _scheduleGeometryRebuild() {
+    if (_hasPendingGeometryRebuild) return;
+    _hasPendingGeometryRebuild = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _hasPendingGeometryRebuild = false;
+      if (!mounted) return;
+      // Do not shift layout while the user is actively swiping or coasting
+      if (_isSwiping) return;
+      setState(() {});
+    });
+  }
+
+  // See MediaPrefetchController.preloadAspectRatios: on a cold open (no
+  // thumbnails decoded/cached yet), only the handful of items
+  // prefetchSurrounding has actually visited have a learned aspect ratio,
+  // so CarouselGeometry falls back to a fixed 16:9 guess for everything
+  // else -- a guess that can be badly wrong (e.g. wide panoramas) and
+  // whose error compounds across a long playlist's cumulative
+  // item-height sum, worst for a jump (filmstrip tap, or just scrolling)
+  // to an index the preload hasn't reached yet. Starting from
+  // currentIndex rather than 0 means wherever the viewer actually opened
+  // -- not necessarily the start of the playlist -- gets covered first,
+  // since that's the region the person is most likely to navigate into
+  // next. Kicked off once per distinct folder scope so re-entering the
+  // same folder doesn't repeat the walk.
+  void _kickOffAspectRatioPreload([int? startIndex]) {
+    final folder = _playlistController.selectedFolder;
+    final start = startIndex ?? _playlistController.currentIndex;
+    if (_aspectRatioPreloadFolder == folder && startIndex == null) return;
+    _aspectRatioPreloadFolder = folder;
+    final playlist = List<String>.from(_playlistController.playlist);
+    unawaited(
+      _prefetchController.preloadAspectRatios(
+        playlist,
+        startIndex: start,
+        isStillWanted: () => mounted && _playlistController.selectedFolder == folder,
+        onRatioLearned: _scheduleGeometryRebuild,
+      ),
+    );
+  }
+
+int get _knownAspectRatioCount {
+    int count = 0;
+    for (final file in _playlistController.playlist) {
+      if (MediaAspectRatioCache.get(widget.container, file) != null) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+ // Freezes measured item heights while the user is actively swiping or coasting
+  // so items do not resize mid-gesture and cause screen jitter.
+  final Map<int, double> _lockedExtents = {};
+
+  double _getItemExtent(int index, double vw, double vh) {
+    if (_isSwiping) {
+      final locked = _lockedExtents[index];
+      if (locked != null) return locked;
+      final h = _geometry.itemHeight(index, vw, vh);
+      _lockedExtents[index] = h;
+      return h;
+    }
+    return _geometry.itemHeight(index, vw, vh);
   }
 
   // Pure carousel layout math now lives in CarouselGeometry
@@ -374,6 +445,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           _viewportHeight,
         );
         if (animate) {
+
           _isProgrammaticScrolling = true;
           _listScrollController
               .animateTo(
@@ -586,9 +658,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       // _activateCurrentMedia() above -- shouldn't break playlist
       // navigation.
     }
-    unawaited(_activateCurrentMedia());
+   unawaited(_activateCurrentMedia());
 
     _scheduleSurroundingPrefetch();
+    if (_scrollMode.isContinuous) {
+      _kickOffAspectRatioPreload(index);
+    }
 
     if (_scrollMode.isContinuous) {
       if (_listScrollController.hasClients &&
@@ -596,7 +671,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           _viewportHeight > 0) {
         // Target offsets assume an un-zoomed list.
         _resetContinuousZoom();
-        final target = _geometry.offsetForIndex(
+     final target = _geometry.offsetForIndex(
           index,
           _viewportWidth,
           _viewportHeight,
@@ -626,7 +701,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       }
     }
 
-    if (mounted && _transitionToken == token) {
+  if (mounted && _transitionToken == token) {
       _isProgrammaticScrolling = false;
       _isSwiping = false;
       _sessionController.setIsAutoAdvancing(false);
@@ -874,77 +949,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (mounted) setState(() => _continuousScale = 1.0);
   }
 
-  // When the list is zoomed out it only covers part of the screen, and a
-  // drag that starts on the empty area around it never reaches the list. These
-  // handlers forward such vertical drags to the list's scroll position so it
-  // keeps scrolling from anywhere on screen. Drags that start on the list
-  // itself are still handled by the list (it is deeper in the gesture arena).
-  //
-  // Drag deltas and velocities are screen pixels; the list lives in
-  // pre-transform pixels, so both are divided by the current zoom to keep the
-  // content under the finger (this is the same conversion Flutter does for
-  // drags that land on the list directly).
-  void _onMarginDragStart(DragStartDetails details) {
-    // If zoom interaction lock is active (an edge swipe or pinch is claiming the gesture),
-    // do not forward margin drags to the list.
-    if (_zoomInteractionLock ||
-        !_listScrollController.hasClients ||
-        _listScrollController.positions.length != 1) {
-      return;
-    }
-    _marginDrag = _listScrollController.position.drag(
-      details,
-      () => _marginDrag = null,
-    );
-  }
-
   static double _getMatrixScale(Matrix4 matrix) {
     final double x = matrix.storage[0];
     final double y = matrix.storage[1];
     return math.sqrt(x * x + y * y);
-  }
-
-  double get _continuousZoomFactor {
-    final s = _getMatrixScale(_continuousTransformationController.value);
-    return s > 0 ? s : 1.0;
-  }
-
-  void _onMarginDragUpdate(DragUpdateDetails details) {
-    final drag = _marginDrag;
-    if (drag == null) return;
-    final dy = (details.primaryDelta ?? details.delta.dy) / _continuousZoomFactor;
-    drag.update(
-      DragUpdateDetails(
-        sourceTimeStamp: details.sourceTimeStamp,
-        delta: Offset(0, dy),
-        primaryDelta: dy,
-        globalPosition: details.globalPosition,
-        localPosition: details.localPosition,
-      ),
-    );
-  }
-
-  void _onMarginDragEnd(DragEndDetails details) {
-    final drag = _marginDrag;
-    _marginDrag = null;
-    if (drag == null) return;
-    final vy =
-        (details.primaryVelocity ?? details.velocity.pixelsPerSecond.dy) /
-        _continuousZoomFactor;
-    drag.end(
-      DragEndDetails(
-        velocity: Velocity(pixelsPerSecond: Offset(0, vy)),
-        primaryVelocity: vy,
-        globalPosition: details.globalPosition,
-        localPosition: details.localPosition,
-      ),
-    );
-  }
-
-  void _onMarginDragCancel() {
-    final drag = _marginDrag;
-    _marginDrag = null;
-    drag?.cancel();
   }
 
   // Called on every raw pointer down, regardless of which gesture
@@ -975,9 +983,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
   }
 
-  void _onScrollStart() {
+ void _onScrollStart() {
     if (!_isSwiping) {
       _isSwiping = true;
+      _lockedExtents.clear();
       _sessionController.setIsAutoAdvancing(false);
       _playbackManager.activeController?.pause();
       _cancelSlideshowTimer();
@@ -986,6 +995,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onScrollEnd() {
     _isSwiping = false;
+    _lockedExtents.clear();
     if (_playbackManager.currentFileNotifier.value !=
         _playlistController.currentFile) {
       unawaited(_activateCurrentMedia());
@@ -1879,11 +1889,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               edgeSwipeHudEnabled: gestureConfig.edgeSwipeHudEnabled,
               edgeSwipeWidthFraction: gestureConfig.edgeSwipeWidthFraction,
               isActive: _playlistController.currentFile == fileName,
-              onSizeKnown: (w, h) {
+            onSizeKnown: (w, h) {
                 if (_scrollMode.isContinuous) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() {});
-                  });
+                  _scheduleGeometryRebuild();
                 }
               },
               onError: () => _handleMediaError(fileName),
@@ -1939,11 +1947,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   setState(() {});
                 }
               },
-              onSizeKnown: (w, h) {
+            onSizeKnown: (w, h) {
                 if (_scrollMode.isContinuous) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() {});
-                  });
+                  _scheduleGeometryRebuild();
                 }
               },
               onZoomChanged: _onZoomInteractionChanged,
@@ -2016,7 +2022,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 (_viewportWidth > 0 && _viewportHeight > 0) &&
                 (newWidth != _viewportWidth || newHeight != _viewportHeight);
 
-            if (dimsChanged) {
+             if (dimsChanged) {
               _viewportWidth = newWidth;
               _viewportHeight = newHeight;
               if (_scrollMode.isContinuous) {
@@ -2025,38 +2031,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   newWidth,
                   newHeight,
                 );
-                final oldController = _listScrollController;
-                _listScrollController = ScrollController(
-                  initialScrollOffset: targetOffset,
-                );
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  oldController.dispose();
-                  if (mounted) {
-                    // The new list is positioned for an un-zoomed viewport.
-                    _resetContinuousZoom(keepCenter: false);
-                    unawaited(_activateCurrentMedia());
-                    _onScrollEnd();
-                  }
-                });
+                if (_listScrollController.hasClients &&
+                    _listScrollController.positions.length == 1) {
+                  _listScrollController.jumpTo(targetOffset);
+                }
               } else {
-                final oldPageController = _pageController;
-                _pageController = PageController(
-                  initialPage: _playlistController.currentIndex,
-                );
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  oldPageController.dispose();
-                  if (mounted) {
-                    unawaited(_activateCurrentMedia());
-                    _onScrollEnd();
-                  }
-                });
+                if (_pageController.hasClients &&
+                    _pageController.positions.length == 1) {
+                  _pageController.jumpToPage(_playlistController.currentIndex);
+                }
               }
             } else {
+              final isFirstLayout = _viewportWidth == 0.0 && _viewportHeight == 0.0;
               _viewportWidth = newWidth;
               _viewportHeight = newHeight;
+              if (isFirstLayout &&
+                  _scrollMode.isContinuous &&
+                  _playlistController.currentIndex > 0) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _scrollToCurrentIndex(animate: false);
+                });
+              }
             }
 
-            final builderKey = ValueKey(
+           final builderKey = ValueKey(
               '${_playlistController.isPlaylistMode}_'
               '${_playlistController.selectedFolder}_'
               '${_playlistController.isShuffled}_'
@@ -2073,18 +2071,23 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
             // not something PageView/ListView re-reads on its own.
             Widget buildMainScrollView(ScrollPhysics physics) {
               if (_scrollMode.isContinuous) {
-                final listWidget = ListView.builder(
+             final listWidget = ListView.builder(
                   key: builderKey,
                   controller: _listScrollController,
                   scrollDirection: Axis.vertical,
                   physics: physics,
+                  itemExtentBuilder: (index, _) => _getItemExtent(
+                    index,
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  ),
                   padding: _geometry.continuousListPadding(
                     constraints.maxWidth,
                     constraints.maxHeight,
                   ),
                   itemCount: _playlistController.playlist.length,
                   itemBuilder: (context, index) {
-                    final itemHeight = _geometry.itemHeight(
+                    final itemHeight = _getItemExtent(
                       index,
                       constraints.maxWidth,
                       constraints.maxHeight,
@@ -2214,16 +2217,21 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                               if (_scrollMode.isContinuous &&
                                   _viewportHeight > 0 &&
                                   _listScrollController.hasClients) {
-                                final offset = _listScrollController.offset;
-                                final newIndex = _geometry.indexForOffset(
-                                  // Zoomed: use the middle of what's actually
-                                  // on screen, not of the list's viewport.
-                                  offset + _continuousVisibleCenterShift(),
+                                 final offset = _listScrollController.offset;
+                                final shift = _continuousVisibleCenterShift();
+                                double customHeight(int i) => _getItemExtent(
+                                  i,
                                   _viewportWidth,
                                   _viewportHeight,
                                 );
-                                if (_playlistController.currentIndex !=
-                                    newIndex) {
+                                final newIndex = _geometry.indexForOffset(
+                                  offset + shift,
+                                  _viewportWidth,
+                                  _viewportHeight,
+                                  customHeight,
+                                );
+
+                                if (_playlistController.currentIndex != newIndex) {
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
                                     if (mounted &&
                                         !_isProgrammaticScrolling &&

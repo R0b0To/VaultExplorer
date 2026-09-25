@@ -13944,6 +13944,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Composite Wizard'**
   String get createCompositeHintAction;
+
+  /// Notice shown when an unencrypted plain disk image is selected in the unlock screen
+  ///
+  /// In en, this message translates to:
+  /// **'Unencrypted disk image detected. No password is required to mount this volume.'**
+  String get plainDiskImageNotice;
 }
 
 class _AppLocalizationsDelegate

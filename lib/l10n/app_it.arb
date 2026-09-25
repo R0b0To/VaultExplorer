@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "Si blocca dopo {duration} di inattività (si azzera usando l'app)",
   "badgeExperimental": "Sperimentale",
   "createCompositeHintPrompt": "Cerchi volumi distribuiti nascosti nei file contenitore?",
-  "createCompositeHintAction": "Apri procedura guidata composita"
+  "createCompositeHintAction": "Apri procedura guidata composita",
+  "plainDiskImageNotice": "Rilevata immagine disco non crittografata. Non è richiesta alcuna password per montare questo volume."
 }

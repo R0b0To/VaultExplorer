@@ -7996,4 +7996,8 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'コンポジットウィザードを開く';
+
+  @override
+  String get plainDiskImageNotice =>
+      '暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。';
 }

@@ -8454,4 +8454,8 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'Composite-Assistenten öffnen';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich.';
 }

@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "闲置 {duration} 后锁定（使用应用时重置）",
   "badgeExperimental": "实验性",
   "createCompositeHintPrompt": "寻找隐藏并分布在载体文件中的卷？",
-  "createCompositeHintAction": "打开复合卷向导"
+  "createCompositeHintAction": "打开复合卷向导",
+  "plainDiskImageNotice": "检测到未加密的磁盘映像。装载此卷无需密码。"
 }

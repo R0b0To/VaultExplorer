@@ -8516,4 +8516,8 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'فتح معالج وحدة التخزين المركبة';
+
+  @override
+  String get plainDiskImageNotice =>
+      'تم اكتشاف صورة قرص غير مشفرة. لا يلزم وجود كلمة مرور لفتح هذا المجلد.';
 }

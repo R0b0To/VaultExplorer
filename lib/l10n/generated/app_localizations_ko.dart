@@ -7995,4 +7995,8 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => '복합 볼륨 마법사 열기';
+
+  @override
+  String get plainDiskImageNotice =>
+      '암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다.';
 }

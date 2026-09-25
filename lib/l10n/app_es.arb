@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "Se bloquea tras {duration} de inactividad (se reinicia al usar la app)",
   "badgeExperimental": "Experimental",
   "createCompositeHintPrompt": "¿Buscas volúmenes distribuidos ocultos en archivos portadores?",
-  "createCompositeHintAction": "Abrir asistente de volumen compuesto"
+  "createCompositeHintAction": "Abrir asistente de volumen compuesto",
+  "plainDiskImageNotice": "Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen."
 }

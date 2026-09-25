@@ -8324,4 +8324,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'Open Composite Wizard';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Unencrypted disk image detected. No password is required to mount this volume.';
 }

@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "Sperrt nach {duration} Inaktivität (wird bei App-Nutzung zurückgesetzt)",
   "badgeExperimental": "Experimentell",
   "createCompositeHintPrompt": "Suchen Sie nach verteilten Volumes, die in Trägerdateien verborgen sind?",
-  "createCompositeHintAction": "Composite-Assistenten öffnen"
+  "createCompositeHintAction": "Composite-Assistenten öffnen",
+  "plainDiskImageNotice": "Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich."
 }

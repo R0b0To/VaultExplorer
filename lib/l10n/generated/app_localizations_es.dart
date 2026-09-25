@@ -8470,4 +8470,8 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get createCompositeHintAction =>
       'Abrir asistente de volumen compuesto';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen.';
 }

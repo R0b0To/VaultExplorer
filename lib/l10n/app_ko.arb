@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "{duration} 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)",
   "badgeExperimental": "실험적",
   "createCompositeHintPrompt": "캐리어 파일에 분산 숨김 처리된 볼륨을 찾으시나요?",
-  "createCompositeHintAction": "복합 볼륨 마법사 열기"
+  "createCompositeHintAction": "복합 볼륨 마법사 열기",
+  "plainDiskImageNotice": "암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다."
 }

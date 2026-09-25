@@ -8532,4 +8532,8 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'Відкрити майстер композитного тому';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Виявлено незашифрований образ диска. Для монтування цього тому пароль не потрібен.';
 }

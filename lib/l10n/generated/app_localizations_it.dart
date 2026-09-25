@@ -8452,4 +8452,8 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => 'Apri procedura guidata composita';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Rilevata immagine disco non crittografata. Non è richiesta alcuna password per montare questo volume.';
 }

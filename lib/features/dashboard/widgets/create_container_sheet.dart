@@ -11,6 +11,7 @@ import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
+import 'package:vaultexplorer/features/composite/presentation/composite_create_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 
 enum _WizStep { basics, security, advanced, hiddenVolume, review }
@@ -386,7 +387,85 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         state.isFolderVault
             ? _buildFolderVaultBasicInfo(state, cs, textTheme)
             : _buildContainerBasicInfo(state, cs, textTheme, isShortScreen),
+        if (!state.isFolderVault && state.format == CreateFormat.veracrypt) ...[
+          const SizedBox(height: 16),
+          _buildCompositeContainerHint(cs, textTheme),
+        ],
       ],
+    );
+  }
+
+  Widget _buildCompositeContainerHint(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CompositeCreateSheet(),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.layers_rounded, size: 22, color: cs.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.createCompositeHintPrompt,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                     Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              l10n.createCompositeHintAction,
+                              style: textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cs.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              l10n.badgeExperimental,
+                              style: textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.onTertiaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded, size: 18, color: cs.primary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

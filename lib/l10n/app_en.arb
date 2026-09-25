@@ -10629,5 +10629,9 @@
   "createCompositeHintAction": "Open Composite Wizard",
   "@createCompositeHintAction": {
     "description": "Action label to open the composite container wizard"
+  },
+  "plainDiskImageNotice": "Unencrypted disk image detected. No password is required to mount this volume.",
+  "@plainDiskImageNotice": {
+    "description": "Notice shown when an unencrypted plain disk image is selected in the unlock screen"
   }
 }

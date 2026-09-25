@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "يُقفل بعد {duration} من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)",
   "badgeExperimental": "تجريبي",
   "createCompositeHintPrompt": "هل تبحث عن وحدات تخزين موزعة ومخفية داخل ملفات وسيطة؟",
-  "createCompositeHintAction": "فتح معالج وحدة التخزين المركبة"
+  "createCompositeHintAction": "فتح معالج وحدة التخزين المركبة",
+  "plainDiskImageNotice": "تم اكتشاف صورة قرص غير مشفرة. لا يلزم وجود كلمة مرور لفتح هذا المجلد."
 }

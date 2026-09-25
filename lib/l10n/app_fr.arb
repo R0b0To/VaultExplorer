@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "Se verrouille après {duration} d'inactivité (réinitialisé lors de l'utilisation)",
   "badgeExperimental": "Expérimental",
   "createCompositeHintPrompt": "Vous recherchez des volumes distribués cachés dans des fichiers porteurs ?",
-  "createCompositeHintAction": "Ouvrir l'assistant de volume composite"
+  "createCompositeHintAction": "Ouvrir l'assistant de volume composite",
+  "plainDiskImageNotice": "Image disque non chiffrée détectée. Aucun mot de passe n'est requis pour monter ce volume."
 }

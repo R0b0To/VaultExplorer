@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "Bloqueia após {duration} de inatividade (reinicia ao usar o app)",
   "badgeExperimental": "Experimental",
   "createCompositeHintPrompt": "Procurando volumes distribuídos ocultos em arquivos de suporte?",
-  "createCompositeHintAction": "Abrir assistente composto"
+  "createCompositeHintAction": "Abrir assistente composto",
+  "plainDiskImageNotice": "Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume."
 }

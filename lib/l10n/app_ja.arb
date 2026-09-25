@@ -2298,5 +2298,6 @@
   "autoLockIndicatorLocksAfterTooltip": "無操作が{duration}続くとロック（操作中はリセット）",
   "badgeExperimental": "実験的",
   "createCompositeHintPrompt": "キャリアファイル内に隠蔽・分散されたボリュームをお探しですか？",
-  "createCompositeHintAction": "コンポジットウィザードを開く"
+  "createCompositeHintAction": "コンポジットウィザードを開く",
+  "plainDiskImageNotice": "暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。"
 }

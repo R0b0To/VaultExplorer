@@ -7888,4 +7888,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get createCompositeHintAction => '打开复合卷向导';
+
+  @override
+  String get plainDiskImageNotice => '检测到未加密的磁盘映像。装载此卷无需密码。';
 }

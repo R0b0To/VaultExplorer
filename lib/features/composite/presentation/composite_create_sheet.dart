@@ -36,6 +36,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _obscurePim = true;
 
   static const _steps = [
     _CompositeWizStep.carriers,
@@ -275,8 +276,6 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               ),
             ),
             if (state.pickedCarriers.isNotEmpty) ...[
-              const Divider(height: 1),
-              // Virtualized viewport: renders only the ~5 items currently visible
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 280),
                 child: ListView.builder(
@@ -447,11 +446,15 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               child: TextField(
                 controller: _pimController,
                 keyboardType: TextInputType.number,
-                obscureText: true,
+                obscureText: _obscurePim,
                 obscuringCharacter: '*',
                 decoration: InputDecoration(
                   labelText: l10n.compositePimFieldLabel,
                   prefixIcon: const Icon(Icons.speed_rounded, size: 20),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _obscurePim,
+                    onToggle: () => setState(() => _obscurePim = !_obscurePim),
+                  ),
                 ),
                 onChanged: (val) {
                   final parsed = int.tryParse(val.trim()) ?? 0;

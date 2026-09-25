@@ -312,11 +312,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs) {
+ Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.layers_rounded,
       title: context.l10n.toolCompositeContainerTitle,
       subtitle: context.l10n.toolCompositeContainerSubtitle,
+      badgeText: context.l10n.badgeExperimental,
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -365,6 +366,7 @@ class _ToolRow extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final Color? iconColor;
+  final String? badgeText;
 
   const _ToolRow({
     required this.icon,
@@ -372,6 +374,7 @@ class _ToolRow extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.iconColor,
+    this.badgeText,
   });
 
   @override
@@ -395,12 +398,38 @@ class _ToolRow extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(icon, size: 20, color: accent),
       ),
-      title: Text(
-        title,
-        style: textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.1,
+   title: Text.rich(
+        TextSpan(
+          text: title,
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
+          children: [
+            if (badgeText != null) ...[
+              const WidgetSpan(child: SizedBox(width: 8)),
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cs.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badgeText!,
+                    style: textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onTertiaryContainer,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 2),

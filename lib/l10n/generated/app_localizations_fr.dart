@@ -8529,4 +8529,8 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get createCompositeHintAction =>
       'Ouvrir l\'assistant de volume composite';
+
+  @override
+  String get plainDiskImageNotice =>
+      'Image disque non chiffrée détectée. Aucun mot de passe n\'est requis pour monter ce volume.';
 }

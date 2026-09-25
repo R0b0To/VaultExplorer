@@ -23,6 +23,7 @@ import java.io.File
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.container.ContainerShareProvider
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.R
@@ -523,10 +524,7 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     return
                 }
             val docUris = fileNames.map { fileName ->
-                DocumentsContract.buildDocumentUri(
-                    "com.aeidolon.vaultexplorer.documents",
-                    "$volId:file:$fileName"
-                )
+                ContainerShareProvider.buildUri(volId, fileName)
             }
             val intent = if (docUris.size == 1) {
                 Intent(Intent.ACTION_SEND).apply {
@@ -539,8 +537,20 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     type = "*/*"
                 }
             }
-           intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            val chooser = Intent.createChooser(intent, null)
+            val clipData = if (docUris.size == 1) {
+                ClipData.newUri(activity.contentResolver, fileNames[0].substringAfterLast("/"), docUris[0])
+            } else {
+                val clip = ClipData.newUri(activity.contentResolver, "Shared files", docUris[0])
+                for (i in 1 until docUris.size) {
+                    clip.addItem(ClipData.Item(docUris[i]))
+                }
+                clip
+            }
+            intent.clipData = clipData
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val chooser = Intent.createChooser(intent, null).apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val excluded = arrayOf(
                     ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.VaultShareActivity"),

@@ -167,7 +167,7 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity-alias>
-        <provider
+           <provider
             android:name="com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider"
             android:authorities="com.aeidolon.vaultexplorer.documents"
             android:exported="true"
@@ -177,6 +177,11 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <provider
+            android:name="com.aeidolon.vaultexplorer.container.ContainerShareProvider"
+            android:authorities="com.aeidolon.vaultexplorer.shareprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <provider
             android:name="com.aeidolon.vaultexplorer.pdf.VaultPdfContentProvider"
             android:authorities="${applicationId}.pdfprovider"

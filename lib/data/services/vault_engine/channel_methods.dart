@@ -239,6 +239,7 @@ abstract final class ChannelMethods {
 
 // Document Providers & SAF Storage
   static const String safListDirectory = 'safListDirectory';
+  static const String safCheckTreeAccess = 'safCheckTreeAccess';
   static const String safGetFileSize = 'safGetFileSize';
   static const String safReadFileChunk = 'safReadFileChunk';
   static const String safWriteFileChunk = 'safWriteFileChunk';

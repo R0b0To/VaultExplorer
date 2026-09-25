@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -94,6 +96,37 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
   Future<void> removeLocation(String id) async {
     state = state.where((loc) => loc.id != id).toList();
     await _repo.saveAll(state);
+  }
+
+   /// True if [loc] can actually be opened right now.
+  ///
+  /// For SAF-backed locations (content:// URIs), asks the native SAF engine
+  /// to probe whether the persisted grant exists and the storage volume is
+  /// currently connected and reachable (e.g. USB drive or SD card is inserted).
+  /// For raw filesystem paths, verifies that the directory exists on disk.
+  Future<bool> isAccessible(ExternalStorageLocation loc) async {
+    final uri = loc.resolvedUri;
+    if (uri.isEmpty) return false;
+    if (uri.startsWith('content://')) {
+      final channel = ref.read(vaultEngineChannelProvider);
+      try {
+        final accessible = await channel.invokeMethod<bool>(
+          ChannelMethods.safCheckTreeAccess,
+          {'treeUri': uri},
+        );
+        return accessible ?? false;
+      } catch (e) {
+        VeLog.w('ExternalStorage', 'isAccessible check failed for ${loc.displayName}', e);
+        return false;
+      }
+    } else {
+      try {
+        return Directory(uri).existsSync();
+      } catch (e) {
+        VeLog.w('ExternalStorage', 'Directory exists check failed for ${loc.displayName}', e);
+        return false;
+      }
+    }
   }
 
   Future<void> renameLocation(String id, String newName) async {

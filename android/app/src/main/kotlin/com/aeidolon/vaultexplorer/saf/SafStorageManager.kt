@@ -233,6 +233,45 @@ class SafStorageManager(private val context: Context) {
     }
 
     /**
+     * True if [treeUri] can actually be opened right now: it still has a
+     * persisted read grant AND the tree responds to a live query.
+     *
+     * A persisted grant alone isn't enough -- Android doesn't revoke it
+     * just because removable media (a USB drive, an SD card) was
+     * unplugged, so a stale grant for a device that's no longer connected
+     * looks identical to a healthy one until you actually try to query
+     * it. Callers should check this before opening a saved storage
+     * location rather than after (see [resolveDocumentId] / [listDirectory],
+     * which silently return null/empty for an inaccessible tree).
+     */
+    fun isTreeAccessible(treeUri: Uri): Boolean {
+        return try {
+            val decodedTarget = runCatching { Uri.decode(treeUri.toString()) }.getOrNull() ?: treeUri.toString()
+            val hasGrant = context.contentResolver.persistedUriPermissions.any { perm ->
+                if (!perm.isReadPermission) return@any false
+                if (perm.uri == treeUri || perm.uri.toString() == treeUri.toString()) return@any true
+                val decodedPerm = runCatching { Uri.decode(perm.uri.toString()) }.getOrNull() ?: perm.uri.toString()
+                decodedPerm == decodedTarget || (
+                    perm.uri.authority == treeUri.authority &&
+                    decodedTarget.startsWith(decodedPerm)
+                )
+            }
+            if (!hasGrant) return false
+
+            if (DocumentsContract.isTreeUri(treeUri)) {
+                val rootDocId = resolveDocumentId(treeUri, "") ?: return false
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
+                documentExists(docUri)
+            } else {
+                documentExists(treeUri)
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "isTreeAccessible check failed for $treeUri: ${e.message}" }
+            false
+        }
+    }
+
+    /**
      * Lists directory contents in a single cursor pass with full metadata.
      */
     fun listDirectory(treeUri: Uri, relativePath: String, refresh: Boolean = false): List<SafEntry> {

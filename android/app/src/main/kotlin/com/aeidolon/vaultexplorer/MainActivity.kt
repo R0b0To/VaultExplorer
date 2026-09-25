@@ -82,7 +82,7 @@ private object ChannelMethods {
     const val CREATE_CONTAINER          = "createContainer"
     const val CREATE_USB_CONTAINER      = "createUsbContainer"
     const val GET_USB_DEVICE_CAPACITY   = "getUsbDeviceCapacity"
-   const val UNLOCK_CONTAINER          = "unlockContainer"
+    const val UNLOCK_CONTAINER          = "unlockContainer"
     const val DETECTS_AS_PLAIN_DISK_IMAGE = "detectsAsPlainDiskImage"
     const val PROBE_CONTAINER_FORMAT    = "probeContainerFormat"
     const val LOCK_CONTAINER            = "lockContainer"
@@ -285,6 +285,7 @@ private object ChannelMethods {
 
     // Document Providers & SAF Storage
     const val SAF_LIST_DIRECTORY        = "safListDirectory"
+    const val SAF_CHECK_TREE_ACCESS     = "safCheckTreeAccess"
     const val SAF_GET_FILE_SIZE         = "safGetFileSize"
     const val SAF_READ_FILE_CHUNK       = "safReadFileChunk"
     const val SAF_WRITE_FILE_CHUNK      = "safWriteFileChunk"
@@ -974,6 +975,13 @@ open class MainActivity : FlutterFragmentActivity() {
                             )
                         }
                         runOnUiThread { result.success(list) }
+                    }
+                }
+                ChannelMethods.SAF_CHECK_TREE_ACCESS -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    ioExecutor.execute {
+                        val accessible = safStorageManager.isTreeAccessible(treeUri)
+                        runOnUiThread { result.success(accessible) }
                     }
                 }
                 ChannelMethods.SAF_GET_FILE_SIZE -> {

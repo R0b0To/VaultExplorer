@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -6,6 +7,7 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 
 class StorageLocationsDrawer extends ConsumerWidget {
@@ -20,7 +22,19 @@ class StorageLocationsDrawer extends ConsumerWidget {
     required this.onSelected,
   });
 
-  get FileManagerToolbarSettingsSheet => null;
+  IconData _iconForStorage(String path) {
+    final lower = path.toLowerCase();
+    if (lower.contains('cloud') ||
+        lower.contains('drive') ||
+        lower.contains('nextcloud') ||
+        lower.contains('owncloud')) {
+      return Icons.cloud_outlined;
+    }
+    if (lower.contains('primary') || lower.contains('emulated')) {
+      return Icons.folder_special_rounded;
+    }
+    return Icons.sd_card_rounded;
+  }
 
   void _promptRename(BuildContext context, WidgetRef ref, ExternalStorageLocation loc) {
     final ctrl = TextEditingController(text: loc.displayName);
@@ -53,6 +67,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
   }
 
   void _confirmRemove(BuildContext context, WidgetRef ref, ExternalStorageLocation loc) {
+    final isCurrent = activeVolId == loc.volId;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -62,14 +77,66 @@ class StorageLocationsDrawer extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
           FilledButton(
             onPressed: () {
-              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
               Navigator.pop(ctx);
+              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
+              if (isCurrent && context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
             child: Text(context.l10n.remove),
           ),
         ],
       ),
     );
+  }
+
+  void _showLocationContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    ExternalStorageLocation loc,
+    Offset tapPosition,
+  ) {
+    HapticFeedback.mediumImpact();
+    final cs = Theme.of(context).colorScheme;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPosition & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
+              const SizedBox(width: 12),
+              Text(context.l10n.rename),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'remove',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+              const SizedBox(width: 12),
+              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+            ],
+          ),
+        ),
+      ],
+    ).then((action) {
+      if (action == 'rename') {
+        _promptRename(context, ref, loc);
+      } else if (action == 'remove') {
+        _confirmRemove(context, ref, loc);
+      }
+    });
   }
 
   @override
@@ -98,103 +165,83 @@ class StorageLocationsDrawer extends ConsumerWidget {
                         color: activeVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
                       ),
                       title: Text(
-                        primary.displayName,
-                        style: textTheme.bodyLarge?.copyWith(
+                        context.l10n.localStorageCardTitle,
+                        style: textTheme.bodyMedium?.copyWith(
                           fontWeight: activeVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
                         ),
                       ),
-                      subtitle: Text(
-                        context.l10n.internalStorageSubtitle,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      trailing: activeVolId == kDecoyLocalVolId
-                          ? Icon(Icons.check_circle_rounded, color: cs.primary)
-                          : null,
                       onTap: () {
                         Navigator.pop(context);
+                        if (activeVolId == kDecoyLocalVolId) return;
                         onSelected(primary);
                       },
                     ),
 
-                  if (externals.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 6),
-                      child: Text(
-                        context.l10n.storageLocationsTitle,
-                        style: textTheme.labelMedium?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    for (final loc in externals) ...[
-                      ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                        selected: activeVolId == loc.volId,
-                        selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
-                        leading: Icon(
-                          loc.path.startsWith('content://')
-                              ? Icons.cloud_outlined
-                              : Icons.sd_card_rounded,
-                          color: activeVolId == loc.volId ? cs.primary : cs.secondary,
-                        ),
-                        title: Text(
-                          loc.displayName,
-                          style: textTheme.bodyLarge?.copyWith(
-                            fontWeight: activeVolId == loc.volId ? FontWeight.bold : FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          loc.path,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-                              onSelected: (action) {
-                                if (action == 'rename') {
-                                  _promptRename(context, ref, loc);
-                                } else if (action == 'remove') {
-                                  _confirmRemove(context, ref, loc);
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
-                                PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
-                              ],
+                  for (final loc in externals) ...[
+                    Builder(
+                      builder: (tileContext) {
+                        final isCurrent = activeVolId == loc.volId;
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onSecondaryTapDown: (details) =>
+                              _showLocationContextMenu(context, ref, loc, details.globalPosition),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                            selected: isCurrent,
+                            selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
+                            leading: Icon(
+                              _iconForStorage(loc.path),
+                              color: isCurrent ? cs.primary : cs.secondary,
                             ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          final isInternal = loc.path.startsWith('/storage/emulated/0') ||
-                              loc.path.startsWith('/data/user/0');
-                          final targetUri =
-                              (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
-                                  ? loc.treeUri!
-                                  : loc.path;
-                          onSelected(buildExternalStorageContainer(
-                            rootPath: targetUri,
-                            displayName: loc.displayName,
-                            volId: loc.volId,
-                          ));
-                        },
-                      ),
-                    ],
+                            title: Text(
+                              loc.displayName,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onLongPress: () {
+                              final box = tileContext.findRenderObject() as RenderBox?;
+                              final pos = box != null
+                                  ? box.localToGlobal(box.size.center(Offset.zero))
+                                  : Offset.zero;
+                              _showLocationContextMenu(context, ref, loc, pos);
+                            },
+                            onTap: () async {
+                              if (isCurrent) {
+                                Navigator.pop(context);
+                                return;
+                              }
+                              final isAccessible = await ref
+                                  .read(externalStorageLocationsProvider.notifier)
+                                  .isAccessible(loc);
+                              if (!context.mounted) return;
+                              if (!isAccessible) {
+                                Navigator.pop(context);
+                                showAppSnackBar(
+                                  context,
+                                  message: context.l10n.storageLocationUnavailable(loc.displayName),
+                                  tone: AppBannerTone.warning,
+                                );
+                                return;
+                              }
+                              Navigator.pop(context);
+                              onSelected(buildExternalStorageContainer(
+                                rootPath: loc.resolvedUri,
+                                displayName: loc.displayName,
+                                volId: loc.volId,
+                              ));
+                            },
+                          ),
+                        );
+                      },
+                    ),
                   ],
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Divider(),
-                  ),
 
                   ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    leading: Icon(Icons.add_to_drive_rounded, color: cs.primary),
+                    leading: Icon(Icons.add, color: cs.primary),
                     title: Text(
                       context.l10n.addStorageLocationTitle,
                       style: textTheme.bodyMedium?.copyWith(
@@ -204,35 +251,36 @@ class StorageLocationsDrawer extends ConsumerWidget {
                     ),
                     onTap: () async {
                       final notifier = ref.read(externalStorageLocationsProvider.notifier);
-                      final loc = await notifier.promptAndAddLocation();
+                      final loc = await ref.read(sessionLockControllerProvider).withLockSuppression(
+                        () => notifier.promptAndAddLocation(),
+                      );
                       if (!context.mounted) return;
                       if (loc != null) {
                         Navigator.pop(context);
                         onSelected(buildExternalStorageContainer(
-                          rootPath: loc.path,
+                          rootPath: loc.resolvedUri,
                           displayName: loc.displayName,
                           volId: loc.volId,
                         ));
-                      } else {
-                        showAppSnackBar(
-                          context,
-                          message: context.l10n.storageLocationUnresolvedError,
-                          tone: AppBannerTone.warning,
-                        );
                       }
                     },
                   ),
 
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.symmetric(vertical: 1),
                     child: Divider(),
                   ),
 
                   // Decoy Settings (Only shows File Manager / Interface settings, no vault security)
                   ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    leading: Icon(Icons.settings_outlined, color: cs.onSurfaceVariant),
-                    title: Text(context.l10n.settingsTooltip),
+                    leading: Icon(Icons.settings, color: cs.onSurfaceVariant),
+                    title: Text(
+                      context.l10n.settingsMenuItem,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(

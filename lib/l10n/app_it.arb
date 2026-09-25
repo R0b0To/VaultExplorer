@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Blocco per inattività: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Blocco a schermo spento",
   "autoLockIndicatorNeverLocks": "Non si blocca automaticamente",
-  "autoLockIndicatorLocksAfterTooltip": "Si blocca dopo {duration} di inattività (si azzera usando l'app)"
+  "autoLockIndicatorLocksAfterTooltip": "Si blocca dopo {duration} di inattività (si azzera usando l'app)",
+  "badgeExperimental": "Sperimentale",
+  "createCompositeHintPrompt": "Cerchi volumi distribuiti nascosti nei file contenitore?",
+  "createCompositeHintAction": "Apri procedura guidata composita"
 }

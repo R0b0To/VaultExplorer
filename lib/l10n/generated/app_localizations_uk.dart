@@ -8522,4 +8522,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Блокується після $duration бездіяльності (скидається під час використання програми)';
   }
+
+  @override
+  String get badgeExperimental => 'Експериментальний';
+
+  @override
+  String get createCompositeHintPrompt =>
+      'Шукаєте розподілені томи, приховані у файлах-носіях?';
+
+  @override
+  String get createCompositeHintAction => 'Відкрити майстер композитного тому';
 }

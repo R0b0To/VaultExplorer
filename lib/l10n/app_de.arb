@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Inaktivitäts-Sperre: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Bildschirm-Aus-Sperre",
   "autoLockIndicatorNeverLocks": "Wird nicht automatisch gesperrt",
-  "autoLockIndicatorLocksAfterTooltip": "Sperrt nach {duration} Inaktivität (wird bei App-Nutzung zurückgesetzt)"
+  "autoLockIndicatorLocksAfterTooltip": "Sperrt nach {duration} Inaktivität (wird bei App-Nutzung zurückgesetzt)",
+  "badgeExperimental": "Experimentell",
+  "createCompositeHintPrompt": "Suchen Sie nach verteilten Volumes, die in Trägerdateien verborgen sind?",
+  "createCompositeHintAction": "Composite-Assistenten öffnen"
 }

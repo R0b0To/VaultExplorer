@@ -8518,4 +8518,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Se verrouille après $duration d\'inactivité (réinitialisé lors de l\'utilisation)';
   }
+
+  @override
+  String get badgeExperimental => 'Expérimental';
+
+  @override
+  String get createCompositeHintPrompt =>
+      'Vous recherchez des volumes distribués cachés dans des fichiers porteurs ?';
+
+  @override
+  String get createCompositeHintAction =>
+      'Ouvrir l\'assistant de volume composite';
 }

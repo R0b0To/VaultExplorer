@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "قفل عند عدم النشاط: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "قفل عند إيقاف الشاشة",
   "autoLockIndicatorNeverLocks": "لن يُقفل تلقائيًا",
-  "autoLockIndicatorLocksAfterTooltip": "يُقفل بعد {duration} من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)"
+  "autoLockIndicatorLocksAfterTooltip": "يُقفل بعد {duration} من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)",
+  "badgeExperimental": "تجريبي",
+  "createCompositeHintPrompt": "هل تبحث عن وحدات تخزين موزعة ومخفية داخل ملفات وسيطة؟",
+  "createCompositeHintAction": "فتح معالج وحدة التخزين المركبة"
 }

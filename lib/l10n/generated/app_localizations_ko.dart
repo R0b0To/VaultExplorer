@@ -7986,4 +7986,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return '$duration 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)';
   }
+
+  @override
+  String get badgeExperimental => '실험적';
+
+  @override
+  String get createCompositeHintPrompt => '캐리어 파일에 분산 숨김 처리된 볼륨을 찾으시나요?';
+
+  @override
+  String get createCompositeHintAction => '복합 볼륨 마법사 열기';
 }

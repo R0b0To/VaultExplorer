@@ -13926,6 +13926,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Locks after {duration} of inactivity (resets while using the app)'**
   String autoLockIndicatorLocksAfterTooltip(String duration);
+
+  /// Badge label indicating an experimental feature
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental'**
+  String get badgeExperimental;
+
+  /// Prompt on container create screen suggesting composite container creation
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for distributed volumes hidden across carrier files?'**
+  String get createCompositeHintPrompt;
+
+  /// Action label to open the composite container wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Open Composite Wizard'**
+  String get createCompositeHintAction;
 }
 
 class _AppLocalizationsDelegate

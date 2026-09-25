@@ -10617,5 +10617,17 @@
         "type": "String"
       }
     }
+  },
+  "badgeExperimental": "Experimental",
+  "@badgeExperimental": {
+    "description": "Badge label indicating an experimental feature"
+  },
+  "createCompositeHintPrompt": "Looking for distributed volumes hidden across carrier files?",
+  "@createCompositeHintPrompt": {
+    "description": "Prompt on container create screen suggesting composite container creation"
+  },
+  "createCompositeHintAction": "Open Composite Wizard",
+  "@createCompositeHintAction": {
+    "description": "Action label to open the composite container wizard"
   }
 }

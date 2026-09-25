@@ -8444,4 +8444,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Sperrt nach $duration Inaktivität (wird bei App-Nutzung zurückgesetzt)';
   }
+
+  @override
+  String get badgeExperimental => 'Experimentell';
+
+  @override
+  String get createCompositeHintPrompt =>
+      'Suchen Sie nach verteilten Volumes, die in Trägerdateien verborgen sind?';
+
+  @override
+  String get createCompositeHintAction => 'Composite-Assistenten öffnen';
 }

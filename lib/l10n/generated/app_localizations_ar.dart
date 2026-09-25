@@ -8506,4 +8506,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'يُقفل بعد $duration من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)';
   }
+
+  @override
+  String get badgeExperimental => 'تجريبي';
+
+  @override
+  String get createCompositeHintPrompt =>
+      'هل تبحث عن وحدات تخزين موزعة ومخفية داخل ملفات وسيطة؟';
+
+  @override
+  String get createCompositeHintAction => 'فتح معالج وحدة التخزين المركبة';
 }

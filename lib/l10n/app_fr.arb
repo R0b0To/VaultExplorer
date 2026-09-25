@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Verrouillage d'inactivité : {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Verrouillage à l'extinction",
   "autoLockIndicatorNeverLocks": "Ne se verrouille pas automatiquement",
-  "autoLockIndicatorLocksAfterTooltip": "Se verrouille après {duration} d'inactivité (réinitialisé lors de l'utilisation)"
+  "autoLockIndicatorLocksAfterTooltip": "Se verrouille après {duration} d'inactivité (réinitialisé lors de l'utilisation)",
+  "badgeExperimental": "Expérimental",
+  "createCompositeHintPrompt": "Vous recherchez des volumes distribués cachés dans des fichiers porteurs ?",
+  "createCompositeHintAction": "Ouvrir l'assistant de volume composite"
 }

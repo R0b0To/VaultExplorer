@@ -7879,4 +7879,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return '闲置 $duration 后锁定（使用应用时重置）';
   }
+
+  @override
+  String get badgeExperimental => '实验性';
+
+  @override
+  String get createCompositeHintPrompt => '寻找隐藏并分布在载体文件中的卷？';
+
+  @override
+  String get createCompositeHintAction => '打开复合卷向导';
 }

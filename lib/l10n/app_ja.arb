@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "無操作ロック: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "画面オフ時ロック",
   "autoLockIndicatorNeverLocks": "自動ロックしません",
-  "autoLockIndicatorLocksAfterTooltip": "無操作が{duration}続くとロック（操作中はリセット）"
+  "autoLockIndicatorLocksAfterTooltip": "無操作が{duration}続くとロック（操作中はリセット）",
+  "badgeExperimental": "実験的",
+  "createCompositeHintPrompt": "キャリアファイル内に隠蔽・分散されたボリュームをお探しですか？",
+  "createCompositeHintAction": "コンポジットウィザードを開く"
 }

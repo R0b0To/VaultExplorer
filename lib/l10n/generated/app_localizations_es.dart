@@ -8459,4 +8459,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Se bloquea tras $duration de inactividad (se reinicia al usar la app)';
   }
+
+  @override
+  String get badgeExperimental => 'Experimental';
+
+  @override
+  String get createCompositeHintPrompt =>
+      '¿Buscas volúmenes distribuidos ocultos en archivos portadores?';
+
+  @override
+  String get createCompositeHintAction =>
+      'Abrir asistente de volumen compuesto';
 }

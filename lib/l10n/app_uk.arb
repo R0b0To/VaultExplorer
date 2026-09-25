@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Блокування за бездіяльністю: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Блокування після вимкнення екрана",
   "autoLockIndicatorNeverLocks": "Не блокується автоматично",
-  "autoLockIndicatorLocksAfterTooltip": "Блокується після {duration} бездіяльності (скидається під час використання програми)"
+  "autoLockIndicatorLocksAfterTooltip": "Блокується після {duration} бездіяльності (скидається під час використання програми)",
+  "badgeExperimental": "Експериментальний",
+  "createCompositeHintPrompt": "Шукаєте розподілені томи, приховані у файлах-носіях?",
+  "createCompositeHintAction": "Відкрити майстер композитного тому"
 }

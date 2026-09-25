@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Bloqueio por inatividade: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Bloqueio ao desligar tela",
   "autoLockIndicatorNeverLocks": "Não bloqueia automaticamente",
-  "autoLockIndicatorLocksAfterTooltip": "Bloqueia após {duration} de inatividade (reinicia ao usar o app)"
+  "autoLockIndicatorLocksAfterTooltip": "Bloqueia após {duration} de inatividade (reinicia ao usar o app)",
+  "badgeExperimental": "Experimental",
+  "createCompositeHintPrompt": "Procurando volumes distribuídos ocultos em arquivos de suporte?",
+  "createCompositeHintAction": "Abrir assistente composto"
 }

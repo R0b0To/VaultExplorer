@@ -7987,4 +7987,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return '無操作が$duration続くとロック（操作中はリセット）';
   }
+
+  @override
+  String get badgeExperimental => '実験的';
+
+  @override
+  String get createCompositeHintPrompt => 'キャリアファイル内に隠蔽・分散されたボリュームをお探しですか？';
+
+  @override
+  String get createCompositeHintAction => 'コンポジットウィザードを開く';
 }

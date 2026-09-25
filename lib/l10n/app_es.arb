@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "Bloqueo por inactividad: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "Bloqueo al apagar pantalla",
   "autoLockIndicatorNeverLocks": "No se bloqueará automáticamente",
-  "autoLockIndicatorLocksAfterTooltip": "Se bloquea tras {duration} de inactividad (se reinicia al usar la app)"
+  "autoLockIndicatorLocksAfterTooltip": "Se bloquea tras {duration} de inactividad (se reinicia al usar la app)",
+  "badgeExperimental": "Experimental",
+  "createCompositeHintPrompt": "¿Buscas volúmenes distribuidos ocultos en archivos portadores?",
+  "createCompositeHintAction": "Abrir asistente de volumen compuesto"
 }

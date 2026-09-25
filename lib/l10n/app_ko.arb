@@ -2295,5 +2295,8 @@
   "autoLockIndicatorLocksAfter": "비활동 잠금: {duration}",
   "autoLockIndicatorLocksOnScreenOff": "화면 꺼짐 시 잠금",
   "autoLockIndicatorNeverLocks": "자동 잠금 안 함",
-  "autoLockIndicatorLocksAfterTooltip": "{duration} 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)"
+  "autoLockIndicatorLocksAfterTooltip": "{duration} 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)",
+  "badgeExperimental": "실험적",
+  "createCompositeHintPrompt": "캐리어 파일에 분산 숨김 처리된 볼륨을 찾으시나요?",
+  "createCompositeHintAction": "복합 볼륨 마법사 열기"
 }

@@ -962,8 +962,9 @@ open class MainActivity : FlutterFragmentActivity() {
      ChannelMethods.SAF_LIST_DIRECTORY -> {
                     val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
                     val dirPath = call.argument<String>("dirPath") ?: ""
+                    val refresh = call.argument<Boolean>("refresh") ?: false
                     ioExecutor.execute {
-                        val entries = safStorageManager.listDirectory(treeUri, dirPath)
+                        val entries = safStorageManager.listDirectory(treeUri, dirPath, refresh)
                         val list = entries.map { entry ->
                             mapOf(
                                 "name" to entry.name,

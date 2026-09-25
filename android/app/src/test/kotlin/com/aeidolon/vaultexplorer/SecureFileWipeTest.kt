@@ -3,16 +3,25 @@ package com.aeidolon.vaultexplorer
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-@RunWith(AndroidJUnit4::class)
+// RobolectricTestRunner (matching every other unit test in this module,
+// e.g. SafDocumentOpsTest, VaultAutomationReceiverTest), not
+// androidx.test.ext.junit.runners.AndroidJUnit4 -- that class lives in the
+// androidx.test.ext:junit artifact, which this module doesn't depend on
+// (only androidx.test:core is declared), so it fails to resolve at
+// compile time. RobolectricTestRunner needs nothing beyond the
+// org.robolectric:robolectric dependency already present.
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class SecureFileWipeTest {
 
     private lateinit var context: Context
@@ -21,6 +30,17 @@ class SecureFileWipeTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        // Deliberately cacheDir, not filesDir: RawFileResolver.isAppPrivatePath
+        // only recognizes context.filesDir and getExternalFilesDirs(), so a
+        // cacheDir path falls outside it and (combined with Robolectric not
+        // granting storage permission by default) forces
+        // RawFileResolver.getRawFileFromUri to return null here -- which is
+        // what makes secureDeleteSafDocument/secureDeleteSafTree actually
+        // exercise the ContentResolver fallback path below (the "rw"/"rwt"
+        // negotiation, the NIO channel writes, force(true)) instead of just
+        // re-testing the raw-file fast path under a different name. Switching
+        // this to filesDir would silently stop covering that path while
+        // every assertion here kept passing.
         testDir = File(context.cacheDir, "wipe_test_${System.currentTimeMillis()}")
         testDir.mkdirs()
     }

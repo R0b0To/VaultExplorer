@@ -436,7 +436,7 @@ class VaultFileIoApi {
       try {
         final rawList = await _channel.invokeMethod(
           ChannelMethods.safListDirectory,
-          {'treeUri': container.uri, 'dirPath': dirPath},
+          {'treeUri': container.uri, 'dirPath': dirPath, 'refresh': refresh},
         );
         VeLog.d('VaultFileIoApi', 'safListDirectory response item count: ${(rawList as List?)?.length}');
         if (rawList == null) return const [];

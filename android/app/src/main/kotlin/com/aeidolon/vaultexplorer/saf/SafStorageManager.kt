@@ -235,8 +235,11 @@ class SafStorageManager(private val context: Context) {
     /**
      * Lists directory contents in a single cursor pass with full metadata.
      */
-    fun listDirectory(treeUri: Uri, relativePath: String): List<SafEntry> {
+    fun listDirectory(treeUri: Uri, relativePath: String, refresh: Boolean = false): List<SafEntry> {
         val clean = normalizePath(relativePath)
+        if (refresh) {
+            dirListingCache.remove(cacheKey(treeUri, clean))
+        }
         val docId = resolveDocumentId(treeUri, clean) ?: return emptyList()
         return queryChildrenInternal(treeUri, docId, clean)
     }
@@ -487,6 +490,32 @@ class SafStorageManager(private val context: Context) {
 
     fun createDirectory(treeUri: Uri, parentPath: String, dirName: String): Boolean {
         val cleanParent = normalizePath(parentPath)
+        val newDirPath = if (cleanParent.isEmpty()) dirName else "$cleanParent/$dirName"
+
+        // Idempotent: SAF providers like ExternalStorageProvider (USB/SD
+        // cards) don't fail or return the existing document on a name
+        // clash -- they silently rename the new one to "name (1)", "name
+        // (2)", etc. Resolve first so a repeat call (e.g. the thumbnail
+        // cache ensuring ".thumbcache" exists on every app launch) reuses
+        // the real directory instead of piling up duplicates.
+        resolveDocumentId(treeUri, newDirPath)?.let { existingId ->
+            val existingUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, existingId)
+            val isDir = try {
+                context.contentResolver.query(
+                    existingUri,
+                    arrayOf(DocumentsContract.Document.COLUMN_MIME_TYPE),
+                    null, null, null
+                )?.use { c ->
+                    c.moveToFirst() && c.getString(0) == DocumentsContract.Document.MIME_TYPE_DIR
+                } ?: false
+            } catch (_: Exception) {
+                false
+            }
+            if (isDir) return true
+            // A file already occupies this name; fall through and let
+            // createDocument's own clash handling apply.
+        }
+
         val parentUri = getDocumentUri(treeUri, cleanParent) ?: return false
 
         return try {
@@ -498,7 +527,6 @@ class SafStorageManager(private val context: Context) {
             )
             if (created != null) {
                 invalidateCache(treeUri, cleanParent)
-                val newDirPath = if (cleanParent.isEmpty()) dirName else "$cleanParent/$dirName"
                 val docId = DocumentsContract.getDocumentId(created)
                 pathDocumentIdCache[cacheKey(treeUri, newDirPath)] = docId
                 true

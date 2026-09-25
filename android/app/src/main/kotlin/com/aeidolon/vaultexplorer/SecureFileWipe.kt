@@ -80,22 +80,29 @@ object SecureFileWipe {
         if (doc.isDirectory) return secureDeleteSafTree(context, doc)
 
         val uri = doc.uri
+
+        // Fast path: Only use raw java.io.File if the kernel grants POSIX write permission.
+        // On USB OTG storage, canWrite() is false; routing through File fails with EACCES.
         val rawFile = try {
             RawFileResolver.getRawFileFromUri(context, uri)
         } catch (_: Exception) {
             null
         }
-        if (rawFile != null && rawFile.exists()) {
+        if (rawFile != null && rawFile.exists() && rawFile.canWrite()) {
             val ok = secureDeleteFile(rawFile)
-            try { doc.delete() } catch (_: Exception) {}
-            return ok
+            if (ok) {
+                try { doc.delete() } catch (_: Exception) {}
+                return true
+            }
         }
 
+        // SAF Path (Required for USB OTG drives and removable media)
         return try {
             var len = doc.length()
+            var zeroWiped = false
 
-            // Try "rw" (in-place overwrite without truncate) first so the existing
-            // filesystem blocks are actually zeroed rather than deallocated.
+            // Try "rw" (in-place overwrite without truncate) so the existing
+            // clusters on the USB drive are written over rather than deallocated.
             val pfd = try {
                 context.contentResolver.openFileDescriptor(uri, "rw")
             } catch (_: Exception) {
@@ -107,30 +114,45 @@ object SecureFileWipe {
             }
 
             if (pfd != null) {
-                pfd.use {
-                    val statSize = it.statSize
-                    if (statSize > 0) len = statSize
-                    if (len > 0) {
-                        FileOutputStream(it.fileDescriptor).use { out ->
-                            writeZeros(len) { buf, writeLen -> out.write(buf, 0, writeLen) }
-                            out.flush()
-                            out.fd.sync()
+                pfd.use { fd ->
+                    val statSize = fd.statSize
+                    val targetLen = if (statSize > 0) statSize else len
+                    if (targetLen > 0) {
+                        FileOutputStream(fd.fileDescriptor).channel.use { channel ->
+                            channel.position(0)
+                            val zeros = ByteArray(CHUNK_SIZE)
+                            var remaining = targetLen
+                            while (remaining > 0) {
+                                val writeLen = minOf(remaining, zeros.size.toLong()).toInt()
+                                val buf = java.nio.ByteBuffer.wrap(zeros, 0, writeLen)
+                                while (buf.hasRemaining()) {
+                                    channel.write(buf)
+                                }
+                                remaining -= writeLen
+                            }
+                            channel.force(true)
                         }
+                        zeroWiped = true
                     }
                 }
-            } else if (len > 0) {
-                // Some SAF providers don't honor openFileDescriptor but do
-                // support an OutputStream.
+            }
+
+            if (!zeroWiped && len > 0) {
+                // Secondary fallback: openOutputStream with "wt" if provider denies openFileDescriptor
                 context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
                     writeZeros(len) { buf, writeLen -> out.write(buf, 0, writeLen) }
                     out.flush()
-                    if (out is FileOutputStream) out.fd.sync()
-                } ?: run {
-                    VeLog.w(TAG) { "secureDeleteSafDocument: no writable stream for $uri, deleting unwiped" }
-                    try { doc.delete() } catch (_: Exception) {}
-                    return false
+                    if (out is FileOutputStream) {
+                        out.fd.sync()
+                    }
+                    zeroWiped = true
                 }
             }
+
+            if (!zeroWiped && len > 0) {
+                VeLog.w(TAG) { "secureDeleteSafDocument: could not zero-wipe $uri before deleting" }
+            }
+
             doc.delete()
         } catch (e: Exception) {
             VeLog.w(TAG, e) { "secureDeleteSafDocument failed for $uri" }
@@ -141,28 +163,27 @@ object SecureFileWipe {
 
     /**
      * Recursively overwrites every file under [doc] with zeros before
-     * deleting it, then removes the now-empty directories bottom-up. Used
-     * for "delete original after import" of a whole folder tree (e.g. a
-     * folder picked from a USB flash drive). Best-effort per entry -- one
-     * unwipable/undeletable file doesn't stop the rest of the tree from
-     * being processed. Returns true only if every entry was both wiped (or
-     * was an emptied directory) and removed.
+     * deleting it, then removes the now-empty directories bottom-up.
      */
     fun secureDeleteSafTree(context: Context, doc: DocumentFile): Boolean {
         if (!doc.exists()) return true
         if (!doc.isDirectory) return secureDeleteSafDocument(context, doc)
 
+        // Only use raw directory walk if the directory has direct POSIX write permission.
         val rawDir = try {
             RawFileResolver.getRawFileFromUri(context, doc.uri)
         } catch (_: Exception) {
             null
         }
-        if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
+        if (rawDir != null && rawDir.exists() && rawDir.isDirectory && rawDir.canWrite()) {
             val ok = secureDeleteRawTree(rawDir)
-            try { doc.delete() } catch (_: Exception) {}
-            return ok
+            if (ok) {
+                try { doc.delete() } catch (_: Exception) {}
+                return true
+            }
         }
 
+        // SAF tree walk fallback (for USB OTG drives)
         return try {
             var allOk = true
             for (child in doc.listFiles()) {

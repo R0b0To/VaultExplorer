@@ -4243,7 +4243,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '$free libres · $total au total';
+    return '$free libres / $total';
   }
 
   @override
@@ -8524,7 +8524,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      'Vous recherchez des volumes distribués cachés dans des fichiers porteurs ?';
+      'Masquer un coffre en associant ses fragments à d\'autres fichiers ?';
 
   @override
   String get createCompositeHintAction =>

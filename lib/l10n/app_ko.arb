@@ -1152,7 +1152,7 @@
   "viewModeAction": "보기 모드",
   "sortAction": "정렬",
   "playMediaAction": "미디어 재생",
-  "containerSpaceSummary": "여유 {free} · 전체 {total}",
+  "containerSpaceSummary": "{free} 여유 / {total}",
   "volMountedSummary": "볼륨 {volId} · 마운트됨",
   "vaultOccupiedSpaceSummary": "{used} 사용됨",
   "incorrectPasswordOrKeyfilesDriveError": "비밀번호/키파일이 잘못되었거나 지원되지 않는 드라이브입니다",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "자동 잠금 안 함",
   "autoLockIndicatorLocksAfterTooltip": "{duration} 동안 활동이 없으면 잠김 (사용 중에는 초기화됨)",
   "badgeExperimental": "실험적",
-  "createCompositeHintPrompt": "캐리어 파일에 분산 숨김 처리된 볼륨을 찾으시나요?",
+  "createCompositeHintPrompt": "볼트 조각을 일반 파일에 첨부하여 숨기시겠습니까?",
   "createCompositeHintAction": "복합 볼륨 마법사 열기",
   "plainDiskImageNotice": "암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다."
 }

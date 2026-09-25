@@ -1152,7 +1152,7 @@
   "viewModeAction": "查看模式",
   "sortAction": "排序",
   "playMediaAction": "播放媒体",
-  "containerSpaceSummary": "剩余{free} · 共{total}",
+  "containerSpaceSummary": "{free} 可用 / {total}",
   "volMountedSummary": "卷{volId} · 已挂载",
   "vaultOccupiedSpaceSummary": "已用{used}",
   "incorrectPasswordOrKeyfilesDriveError": "密码/密钥文件不正确，或驱动器不受支持",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "不会自动锁定",
   "autoLockIndicatorLocksAfterTooltip": "闲置 {duration} 后锁定（使用应用时重置）",
   "badgeExperimental": "实验性",
-  "createCompositeHintPrompt": "寻找隐藏并分布在载体文件中的卷？",
+  "createCompositeHintPrompt": "想通过将文件库分块附加到普通文件来隐藏它吗？",
   "createCompositeHintAction": "打开复合卷向导",
   "plainDiskImageNotice": "检测到未加密的磁盘映像。装载此卷无需密码。"
 }

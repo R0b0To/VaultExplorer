@@ -3993,7 +3993,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '여유 $free · 전체 $total';
+    return '$free 여유 / $total';
   }
 
   @override
@@ -7991,7 +7991,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get badgeExperimental => '실험적';
 
   @override
-  String get createCompositeHintPrompt => '캐리어 파일에 분산 숨김 처리된 볼륨을 찾으시나요?';
+  String get createCompositeHintPrompt => '볼트 조각을 일반 파일에 첨부하여 숨기시겠습니까?';
 
   @override
   String get createCompositeHintAction => '복합 볼륨 마법사 열기';

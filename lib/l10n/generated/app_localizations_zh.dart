@@ -3941,7 +3941,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '剩余$free · 共$total';
+    return '$free 可用 / $total';
   }
 
   @override
@@ -7884,7 +7884,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get badgeExperimental => '实验性';
 
   @override
-  String get createCompositeHintPrompt => '寻找隐藏并分布在载体文件中的卷？';
+  String get createCompositeHintPrompt => '想通过将文件库分块附加到普通文件来隐藏它吗？';
 
   @override
   String get createCompositeHintAction => '打开复合卷向导';

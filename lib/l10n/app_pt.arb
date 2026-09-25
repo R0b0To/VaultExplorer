@@ -1152,7 +1152,7 @@
   "viewModeAction": "Modo de exibição",
   "sortAction": "Ordenar",
   "playMediaAction": "Reproduzir mídia",
-  "containerSpaceSummary": "{free} livres · {total} no total",
+  "containerSpaceSummary": "{free} livres / {total}",
   "volMountedSummary": "Vol {volId} · Montado",
   "vaultOccupiedSpaceSummary": "{used} usados",
   "incorrectPasswordOrKeyfilesDriveError": "Senha/arquivos-chave incorretos ou unidade não suportada",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "Não bloqueia automaticamente",
   "autoLockIndicatorLocksAfterTooltip": "Bloqueia após {duration} de inatividade (reinicia ao usar o app)",
   "badgeExperimental": "Experimental",
-  "createCompositeHintPrompt": "Procurando volumes distribuídos ocultos em arquivos de suporte?",
+  "createCompositeHintPrompt": "Ocultar um cofre anexando suas partes a outros arquivos?",
   "createCompositeHintAction": "Abrir assistente composto",
   "plainDiskImageNotice": "Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume."
 }

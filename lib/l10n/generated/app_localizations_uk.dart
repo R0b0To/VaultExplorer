@@ -4229,7 +4229,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return 'вільно $free · всього $total';
+    return '$free вільно / $total';
   }
 
   @override
@@ -8528,7 +8528,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      'Шукаєте розподілені томи, приховані у файлах-носіях?';
+      'Сховати сховище, прикріпивши його частини до звичайних файлів?';
 
   @override
   String get createCompositeHintAction => 'Відкрити майстер композитного тому';

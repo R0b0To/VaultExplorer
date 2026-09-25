@@ -4204,7 +4204,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '$free liberi · $total totali';
+    return '$free liberi / $total';
   }
 
   @override
@@ -8448,7 +8448,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      'Cerchi volumi distribuiti nascosti nei file contenitore?';
+      'Nascondere una cassaforte allegando le sue parti ad altri file?';
 
   @override
   String get createCompositeHintAction => 'Apri procedura guidata composita';

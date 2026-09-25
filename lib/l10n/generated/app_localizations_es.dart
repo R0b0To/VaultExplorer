@@ -4215,7 +4215,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '$free libres · $total en total';
+    return '$free libres / $total';
   }
 
   @override
@@ -8465,7 +8465,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      '¿Buscas volúmenes distribuidos ocultos en archivos portadores?';
+      '¿Ocultar una bóveda adjuntando sus fragmentos a otros archivos?';
 
   @override
   String get createCompositeHintAction =>

@@ -1152,7 +1152,7 @@
   "viewModeAction": "Mode d'affichage",
   "sortAction": "Trier",
   "playMediaAction": "Lire les médias",
-  "containerSpaceSummary": "{free} libres · {total} au total",
+  "containerSpaceSummary": "{free} libres / {total}",
   "volMountedSummary": "Vol {volId} · Monté",
   "vaultOccupiedSpaceSummary": "{used} utilisés",
   "incorrectPasswordOrKeyfilesDriveError": "Mot de passe/fichiers-clés incorrects ou lecteur non pris en charge",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "Ne se verrouille pas automatiquement",
   "autoLockIndicatorLocksAfterTooltip": "Se verrouille après {duration} d'inactivité (réinitialisé lors de l'utilisation)",
   "badgeExperimental": "Expérimental",
-  "createCompositeHintPrompt": "Vous recherchez des volumes distribués cachés dans des fichiers porteurs ?",
+  "createCompositeHintPrompt": "Masquer un coffre en associant ses fragments à d'autres fichiers ?",
   "createCompositeHintAction": "Ouvrir l'assistant de volume composite",
   "plainDiskImageNotice": "Image disque non chiffrée détectée. Aucun mot de passe n'est requis pour monter ce volume."
 }

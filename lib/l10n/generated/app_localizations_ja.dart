@@ -3993,7 +3993,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '空き$free・合計$total';
+    return '$free 空き / $total';
   }
 
   @override
@@ -7992,7 +7992,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get badgeExperimental => '実験的';
 
   @override
-  String get createCompositeHintPrompt => 'キャリアファイル内に隠蔽・分散されたボリュームをお探しですか？';
+  String get createCompositeHintPrompt => 'チャンクを通常のファイルに添付して保管庫を隠しますか？';
 
   @override
   String get createCompositeHintAction => 'コンポジットウィザードを開く';

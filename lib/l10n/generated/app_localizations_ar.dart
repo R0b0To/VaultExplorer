@@ -4250,7 +4250,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '$free حرة · $total إجمالي';
+    return '$free متاح / $total';
   }
 
   @override
@@ -8512,7 +8512,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      'هل تبحث عن وحدات تخزين موزعة ومخفية داخل ملفات وسيطة؟';
+      'هل تريد إخفاء خزنة عن طريق إرفاق أجزائها بملفات عادية؟';
 
   @override
   String get createCompositeHintAction => 'فتح معالج وحدة التخزين المركبة';

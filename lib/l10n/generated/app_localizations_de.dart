@@ -4214,7 +4214,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String containerSpaceSummary(String free, String total) {
-    return '$free frei · $total gesamt';
+    return '$free frei / $total';
   }
 
   @override
@@ -8450,7 +8450,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get createCompositeHintPrompt =>
-      'Suchen Sie nach verteilten Volumes, die in Trägerdateien verborgen sind?';
+      'Einen Tresor verstecken, indem Teile an gewöhnliche Dateien angehängt werden?';
 
   @override
   String get createCompositeHintAction => 'Composite-Assistenten öffnen';

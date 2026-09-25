@@ -1152,7 +1152,7 @@
   "viewModeAction": "Modalità visualizzazione",
   "sortAction": "Ordina",
   "playMediaAction": "Riproduci contenuto multimediale",
-  "containerSpaceSummary": "{free} liberi · {total} totali",
+  "containerSpaceSummary": "{free} liberi / {total}",
   "volMountedSummary": "Vol {volId} · Montato",
   "vaultOccupiedSpaceSummary": "{used} occupati",
   "incorrectPasswordOrKeyfilesDriveError": "Password/file chiave errati o unità non supportata",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "Non si blocca automaticamente",
   "autoLockIndicatorLocksAfterTooltip": "Si blocca dopo {duration} di inattività (si azzera usando l'app)",
   "badgeExperimental": "Sperimentale",
-  "createCompositeHintPrompt": "Cerchi volumi distribuiti nascosti nei file contenitore?",
+  "createCompositeHintPrompt": "Nascondere una cassaforte allegando le sue parti ad altri file?",
   "createCompositeHintAction": "Apri procedura guidata composita",
   "plainDiskImageNotice": "Rilevata immagine disco non crittografata. Non è richiesta alcuna password per montare questo volume."
 }

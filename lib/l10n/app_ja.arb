@@ -1152,7 +1152,7 @@
   "viewModeAction": "表示モード",
   "sortAction": "並べ替え",
   "playMediaAction": "メディアを再生",
-  "containerSpaceSummary": "空き{free}・合計{total}",
+  "containerSpaceSummary": "{free} 空き / {total}",
   "volMountedSummary": "ボリューム{volId}・マウント中",
   "vaultOccupiedSpaceSummary": "使用済み{used}",
   "incorrectPasswordOrKeyfilesDriveError": "パスワード/キーファイルが正しくないか、サポートされていないドライブです",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "自動ロックしません",
   "autoLockIndicatorLocksAfterTooltip": "無操作が{duration}続くとロック（操作中はリセット）",
   "badgeExperimental": "実験的",
-  "createCompositeHintPrompt": "キャリアファイル内に隠蔽・分散されたボリュームをお探しですか？",
+  "createCompositeHintPrompt": "チャンクを通常のファイルに添付して保管庫を隠しますか？",
   "createCompositeHintAction": "コンポジットウィザードを開く",
   "plainDiskImageNotice": "暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。"
 }

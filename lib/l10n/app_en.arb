@@ -5441,7 +5441,7 @@
   "@playMediaAction": {
     "description": "Label for play media toolbar action"
   },
-  "containerSpaceSummary": "{free} free · {total} total",
+  "containerSpaceSummary": "{free} free / {total}",
   "@containerSpaceSummary": {
     "description": "Storage space summary shown on mounted container card",
     "placeholders": {
@@ -10622,7 +10622,7 @@
   "@badgeExperimental": {
     "description": "Badge label indicating an experimental feature"
   },
-  "createCompositeHintPrompt": "Looking for distributed volumes hidden across carrier files?",
+  "createCompositeHintPrompt": "Hide a vault by attaching its chunks to ordinary files?",
   "@createCompositeHintPrompt": {
     "description": "Prompt on container create screen suggesting composite container creation"
   },

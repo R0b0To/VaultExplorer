@@ -1152,7 +1152,7 @@
   "viewModeAction": "وضع العرض",
   "sortAction": "فرز",
   "playMediaAction": "تشغيل الوسائط",
-  "containerSpaceSummary": "{free} حرة · {total} إجمالي",
+  "containerSpaceSummary": "{free} متاح / {total}",
   "volMountedSummary": "المجلد {volId} · مثبَّت",
   "vaultOccupiedSpaceSummary": "{used} مستخدمة",
   "incorrectPasswordOrKeyfilesDriveError": "كلمة مرور/ملفات مفاتيح غير صحيحة أو محرك غير مدعوم",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "لن يُقفل تلقائيًا",
   "autoLockIndicatorLocksAfterTooltip": "يُقفل بعد {duration} من عدم النشاط (يُعاد ضبطه أثناء الاستخدام)",
   "badgeExperimental": "تجريبي",
-  "createCompositeHintPrompt": "هل تبحث عن وحدات تخزين موزعة ومخفية داخل ملفات وسيطة؟",
+  "createCompositeHintPrompt": "هل تريد إخفاء خزنة عن طريق إرفاق أجزائها بملفات عادية؟",
   "createCompositeHintAction": "فتح معالج وحدة التخزين المركبة",
   "plainDiskImageNotice": "تم اكتشاف صورة قرص غير مشفرة. لا يلزم وجود كلمة مرور لفتح هذا المجلد."
 }

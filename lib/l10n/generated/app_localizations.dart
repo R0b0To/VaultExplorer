@@ -7053,7 +7053,7 @@ abstract class AppLocalizations {
   /// Storage space summary shown on mounted container card
   ///
   /// In en, this message translates to:
-  /// **'{free} free · {total} total'**
+  /// **'{free} free / {total}'**
   String containerSpaceSummary(String free, String total);
 
   /// Fallback summary shown on mounted container card when total space is unknown
@@ -13936,7 +13936,7 @@ abstract class AppLocalizations {
   /// Prompt on container create screen suggesting composite container creation
   ///
   /// In en, this message translates to:
-  /// **'Looking for distributed volumes hidden across carrier files?'**
+  /// **'Hide a vault by attaching its chunks to ordinary files?'**
   String get createCompositeHintPrompt;
 
   /// Action label to open the composite container wizard

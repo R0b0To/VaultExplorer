@@ -1154,7 +1154,7 @@
   "viewModeAction": "Вигляд",
   "sortAction": "Сортування",
   "playMediaAction": "Відтворити",
-  "containerSpaceSummary": "вільно {free} · всього {total}",
+  "containerSpaceSummary": "{free} вільно / {total}",
   "volMountedSummary": "Том {volId} · Змонтовано",
   "vaultOccupiedSpaceSummary": "Використано {used}",
   "incorrectPasswordOrKeyfilesDriveError": "Неправильний пароль / ключ. файл або непідтримуваний диск",
@@ -2297,7 +2297,7 @@
   "autoLockIndicatorNeverLocks": "Не блокується автоматично",
   "autoLockIndicatorLocksAfterTooltip": "Блокується після {duration} бездіяльності (скидається під час використання програми)",
   "badgeExperimental": "Експериментальний",
-  "createCompositeHintPrompt": "Шукаєте розподілені томи, приховані у файлах-носіях?",
+  "createCompositeHintPrompt": "Сховати сховище, прикріпивши його частини до звичайних файлів?",
   "createCompositeHintAction": "Відкрити майстер композитного тому",
   "plainDiskImageNotice": "Виявлено незашифрований образ диска. Для монтування цього тому пароль не потрібен."
 }

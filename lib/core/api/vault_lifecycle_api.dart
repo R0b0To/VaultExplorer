@@ -818,6 +818,19 @@ class VaultLifecycleApi {
   /// (vault_explorer_api_container_lifecycle.dart) for the full doc
   /// comment; kept in sync with it here for the same reason every other
   /// method in this file is.
+  Future<String> probeContainerFormat(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<String>(
+        ChannelMethods.probeContainerFormat,
+        {'filePath': filePath},
+      );
+      return result ?? 'unknown';
+    } catch (e) {
+      logSwallowed('probeContainerFormat', e, expected: true);
+      return 'unknown';
+    }
+  }
+
   Future<bool> detectsAsPlainDiskImage(String filePath) async {
     try {
       final result = await _channel.invokeMethod<bool>(

@@ -49,6 +49,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
 // take ownership of [fd] (unlike prepareSession): the caller must close it
 // afterwards either way. See the .cpp doc comment for exactly what this
 // does and doesn't cover.
+const char* probeContainerFormat(int fd);
 bool detectsAsPlainDiskImage(int fd);
 
 

@@ -21,12 +21,15 @@ object ContainerEngine {
     fun lastDerivedKeyMaterial(volId: Int): ByteArray? =
         NativeEngine.getLastDerivedKeyMaterialNative(volId)
 
-    // Cheap, read-only pre-check the unlock UI can call right after a file
+   // Cheap, read-only pre-check the unlock UI can call right after a file
     // is picked, before ever prompting for a password: true only for a
     // VHD/VHDX whose virtual disk (or a partition within it) carries a
     // directly-recognizable, unencrypted filesystem. Does not take
     // ownership of [fd].
     fun detectsAsPlainDiskImage(fd: Int): Boolean = NativeEngine.detectsAsPlainDiskImageNative(fd)
+
+    fun probeContainerFormat(fd: Int): String =
+        NativeEngine.probeContainerFormatNative(fd) ?: "unknown"
 
     fun unlockFile(
         fd: Int, password: String, pim: Int, volId: Int, cipherId: Int = 255,

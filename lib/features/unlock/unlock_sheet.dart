@@ -92,7 +92,21 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   /// While true, the password field's real characters can't be revealed
   /// via the show/hide toggle or copied via text selection — see
   /// [_prefillCleared].
-  bool get _revealLocked => (widget.prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
+   bool get _revealLocked => (widget.prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
+
+  bool _isKnownFormat(UnlockState state) =>
+      widget.initialUri != null ||
+      widget.initialCompositeCarriers != null ||
+      (state.selectedUri != null && state.containerFormat != 'container');
+
+  bool _isKnownVeraCrypt(UnlockState state) =>
+      _isKnownFormat(state) && (state.isVeraCrypt || state.isComposite);
+
+  bool _isKnownLuks(UnlockState state) =>
+      _isKnownFormat(state) && state.isLuks;
+
+  bool _hasDirectOptions(UnlockState state) =>
+      _isKnownVeraCrypt(state) || _isKnownLuks(state);
 
   @override
   void initState() {
@@ -521,7 +535,7 @@ Widget _buildVaultKindSegmentedButton(
               _buildVaultKindSplitRow(context, state),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              leading: Container(
+             leading: Container(
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
@@ -535,13 +549,19 @@ Widget _buildVaultKindSegmentedButton(
                         color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
                         size: 22,
                       )
-                    : ContainerFormatIcon(
-                        format: hasSelection
-                            ? ContainerFormat.fromWire(state.containerFormat)
-                            : ContainerFormat.directoryVault,
-                        color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                        size: 22,
-                      ),
+                    : (state.isPlainDiskImage || state.containerFormat == 'plain'
+                        ? Icon(
+                            Icons.album_outlined,
+                            color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                            size: 22,
+                          )
+                        : ContainerFormatIcon(
+                            format: hasSelection
+                                ? ContainerFormat.fromWire(state.containerFormat)
+                                : ContainerFormat.directoryVault,
+                            color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                            size: 22,
+                          )),
               ),
               title: Text(
                 state.selectedName ??
@@ -930,12 +950,13 @@ Widget _buildVaultKindSegmentedButton(
         ];
 
 case _UnlockCredentialState.password:
-        final isUnlock = widget.initialUri != null || widget.initialCompositeCarriers != null;
-        final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
-        final isKnownLuks = isUnlock && state.isLuks;
-        final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+        final isKnownVeraCrypt = _isKnownVeraCrypt(state);
+        final isKnownLuks = _isKnownLuks(state);
+        final hasDirectOptions = _hasDirectOptions(state);
         final hasSelection = state.selectedUri != null;
         final canConfigure = hasSelection && !state.loading;
+
+         final isPlain = state.isPlainDiskImage || state.containerFormat == 'plain';
 
         return [
           AnimatedOpacity(
@@ -943,61 +964,68 @@ case _UnlockCredentialState.password:
             opacity: canConfigure ? 1.0 : 0.45,
             child: SectionCard(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  controller: _passwordCtrl,
-                  enabled: canConfigure,
-                  // Stay obscured — and block text selection, so the real
-                  // characters can't be copied out either — while
-                  // _revealLocked: a saved credential shouldn't be
-                  // revealable in plain text just by editing around it.
-                  obscureText: _revealLocked ? true : _obscure,
-                  enableInteractiveSelection: !_revealLocked && canConfigure,
-                  autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                  onChanged: (val) {
-                    if (val.isEmpty) _prefillCleared = true;
-                    setState(() {});
-                  },
-                  onSubmitted: (_) => _onUnlock(),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: cs.surfaceContainerHighest,
-                    labelText: state.isPlainDiskImage
-                        ? context.l10n.passwordOptionalFieldLabel
-                        : context.l10n.passwordFieldLabel,
-                    hintText: state.isPlainDiskImage
-                        ? context.l10n.plainDiskImagePasswordHint
-                        : state.isFolderVault
-                            ? context.l10n.passwordHintFolderVault
-                            : state.isBitlocker
-                                ? context.l10n.passwordHintBitlocker
-                                : state.isComposite
-                                    ? context.l10n.compositePasswordHint
-                                    : context.l10n.passwordHintContainer,
-                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_passwordPrefilled)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Tooltip(
-                              message: context.l10n.usingSavedPasswordTooltip,
-                              child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
+              if (isPlain) ...[
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: InlineBanner(
+                    context.l10n.plainDiskImageNotice,
+                    tone: AppBannerTone.info,
+                    icon: Icons.album_outlined,
+                  ),
+                ),
+              ] else ...[
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TextField(
+                    controller: _passwordCtrl,
+                    enabled: canConfigure,
+                    // Stay obscured — and block text selection, so the real
+                    // characters can't be copied out either — while
+                    // _revealLocked: a saved credential shouldn't be
+                    // revealable in plain text just by editing around it.
+                    obscureText: _revealLocked ? true : _obscure,
+                    enableInteractiveSelection: !_revealLocked && canConfigure,
+                    autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                    onChanged: (val) {
+                      if (val.isEmpty) _prefillCleared = true;
+                      setState(() {});
+                    },
+                    onSubmitted: (_) => _onUnlock(),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: cs.surfaceContainerHighest,
+                      labelText: context.l10n.passwordFieldLabel,
+                      hintText: state.isFolderVault
+                          ? context.l10n.passwordHintFolderVault
+                          : state.isBitlocker
+                              ? context.l10n.passwordHintBitlocker
+                              : state.isComposite
+                                  ? context.l10n.compositePasswordHint
+                                  : context.l10n.passwordHintContainer,
+                      prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_passwordPrefilled)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Tooltip(
+                                message: context.l10n.usingSavedPasswordTooltip,
+                                child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
+                              ),
                             ),
+                          PasswordVisibilityToggle(
+                            obscured: _revealLocked ? true : _obscure,
+                            enabled: !_revealLocked && canConfigure,
+                            onToggle: () => setState(() => _obscure = !_obscure),
                           ),
-                        PasswordVisibilityToggle(
-                          obscured: _revealLocked ? true : _obscure,
-                          enabled: !_revealLocked && canConfigure,
-                          onToggle: () => setState(() => _obscure = !_obscure),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
+                          const SizedBox(width: 4),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
               if (isKnownVeraCrypt) ...[
                 PimInputField(
                   controller: _pimCtrl,
@@ -1087,10 +1115,7 @@ List<Widget> _buildAdvancedOptionsSection(
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final isUnlock = widget.initialUri != null || widget.initialCompositeCarriers != null;
-    final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
-    final isKnownLuks = isUnlock && state.isLuks;
-    final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+    final hasDirectOptions = _hasDirectOptions(state);
     final hasSelection = state.selectedUri != null;
     final canConfigure = hasSelection && !state.loading;
 
@@ -1102,9 +1127,8 @@ List<Widget> _buildAdvancedOptionsSection(
             enabled: canConfigure,
             onSubmitted: (_) => _onUnlock(),
           ),
-        
         ],
-         Padding(
+        Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
           child: KeyfilesPicker(
             keyfiles: state.keyfiles,
@@ -1114,15 +1138,6 @@ List<Widget> _buildAdvancedOptionsSection(
             onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
           ),
         ),
-        if (state.isLuks && state.keyfiles.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Text(
-              context.l10n.luksKeyfileReplacesPasswordNote,
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ),
-        ],
       ],
       if (state.isVeraCrypt || state.isComposite) ...[
         AdvancedParamsPanel(
@@ -1316,9 +1331,11 @@ List<Widget> _buildAdvancedOptionsSection(
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
               )
             : Text(
-                state.isFolderVault
-                    ? context.l10n.unlockVaultButtonLabel
-                    : context.l10n.unlockContainerLabel,
+                state.isPlainDiskImage || state.containerFormat == 'plain'
+                    ? context.l10n.mountContainerTitle
+                    : (state.isFolderVault
+                        ? context.l10n.unlockVaultButtonLabel
+                        : context.l10n.unlockContainerLabel),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
       ),

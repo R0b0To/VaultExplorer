@@ -137,6 +137,17 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_detectsAsPlainDiskImageNative(
     JNI_CATCH_RETURN(JNI_FALSE)
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_probeContainerFormatNative(
+        JNIEnv* env, jobject, jint fd) {
+    JNI_TRY
+
+    const char* fmt = probeContainerFormat(fd);
+    return env->NewStringUTF(fmt ? fmt : "unknown");
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId) {
     JNI_TRY

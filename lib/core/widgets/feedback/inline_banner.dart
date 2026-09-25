@@ -57,8 +57,6 @@ return Align(
       mainAxisSize: MainAxisSize.max, // Allows the row to fill the container width
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon ?? defaultIcon, size: AppIconSize.standard, color: fg),
-        const SizedBox(width: 10),
         Expanded( // Takes up all remaining space between icon and trailing
           child: Text(
             message,

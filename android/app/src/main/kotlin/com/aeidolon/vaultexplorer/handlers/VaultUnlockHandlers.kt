@@ -215,6 +215,33 @@ class VaultUnlockHandlers(
      * this check and closes it again immediately either way; this never
      * mounts anything and never touches ContainerSessionRegistry.
      */
+   fun handleProbeContainerFormat(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        if (uriString == null) {
+            result.error("INVALID_ARGS", "filePath required", null)
+            return
+        }
+        ioExecutor.execute {
+            var pfd: ParcelFileDescriptor? = null
+            val format = try {
+                val uri = Uri.parse(uriString)
+                pfd = activity.contentResolver.openFileDescriptor(uri, "r")
+                val fd = pfd?.fd
+                if (fd != null) ContainerEngine.probeContainerFormat(fd) else "unknown"
+            } catch (e: Exception) {
+                VeLog.w("VaultExplorer_FormatProbe") {
+                    "probeContainerFormat failed for ${censorUri(uriString)}: ${e.message}"
+                }
+                "unknown"
+            } finally {
+                runCatching { pfd?.close() }
+            }
+            activity.runOnUiThread {
+                result.success(format)
+            }
+        }
+    }
+
     fun handleDetectsAsPlainDiskImage(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         if (uriString == null) {

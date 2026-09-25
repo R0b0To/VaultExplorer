@@ -82,8 +82,9 @@ private object ChannelMethods {
     const val CREATE_CONTAINER          = "createContainer"
     const val CREATE_USB_CONTAINER      = "createUsbContainer"
     const val GET_USB_DEVICE_CAPACITY   = "getUsbDeviceCapacity"
-    const val UNLOCK_CONTAINER          = "unlockContainer"
+   const val UNLOCK_CONTAINER          = "unlockContainer"
     const val DETECTS_AS_PLAIN_DISK_IMAGE = "detectsAsPlainDiskImage"
+    const val PROBE_CONTAINER_FORMAT    = "probeContainerFormat"
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
@@ -882,6 +883,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_CONTAINER -> vaultUnlockHandlers.handleUnlockContainer(call, result)
                 ChannelMethods.UNLOCK_SPLIT_CONTAINER -> vaultUnlockHandlers.handleUnlockContainer(call, result)
                 ChannelMethods.DETECTS_AS_PLAIN_DISK_IMAGE -> vaultUnlockHandlers.handleDetectsAsPlainDiskImage(call, result)
+                ChannelMethods.PROBE_CONTAINER_FORMAT -> vaultUnlockHandlers.handleProbeContainerFormat(call, result)
                 ChannelMethods.UNLOCK_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleUnlockCryptomatorVault(call, result)
                 ChannelMethods.UNLOCK_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleUnlockGocryptfsVault(call, result)
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)

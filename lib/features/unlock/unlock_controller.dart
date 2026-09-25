@@ -139,8 +139,14 @@ class UnlockState {
       compositeCarrierUris.isNotEmpty ||
       (selectedUri?.startsWith('composite:') ?? false) ||
       containerFormat == 'composite';
-  bool get isVeraCrypt => !isLuks && !isFolderVault && !isBitlocker && !isComposite;
-  bool get hasAdvancedSettings => isVeraCrypt || isLuks || isComposite;
+  bool get isVeraCrypt =>
+      !isLuks &&
+      !isFolderVault &&
+      !isBitlocker &&
+      !isComposite &&
+      !isPlainDiskImage &&
+      containerFormat != 'plain';
+  bool get hasAdvancedSettings => (isVeraCrypt || isComposite) && !isPlainDiskImage && containerFormat != 'plain';
   int get compositeCarrierCount => compositeCarrierUris.length;
 
   /// [compositeCarrierUris] paired with their display names, in selection order.
@@ -371,7 +377,7 @@ class UnlockController extends _$UnlockController {
     return initial;
   }
 
-  Future<void> _init(UnlockParams params) async {
+   Future<void> _init(UnlockParams params) async {
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final hasAccess = await lifecycle.hasAllFilesAccess();
     state = state._copy(hasAllStorageAccess: hasAccess);
@@ -379,7 +385,7 @@ class UnlockController extends _$UnlockController {
     if (params.initialUri != null) {
       if (!params.initialUri!.startsWith('composite:')) {
         lifecycle.warmContainer(params.initialUri!);
-        unawaited(_checkPlainDiskImage(params.initialUri!));
+        unawaited(_probeContainerFormat(params.initialUri!));
       }
       await _initUnlockMethod(params.initialUri!);
     } else {
@@ -387,23 +393,17 @@ class UnlockController extends _$UnlockController {
     }
   }
 
-  /// Cheap, read-only pre-check run right after a file is selected
-  /// (freshly picked, or reopened via a saved [UnlockParams.initialUri]),
-  /// before the person ever needs to type a password: true only if [uri]
-  /// is a VHD/VHDX whose virtual disk (or a partition within it) carries a
-  /// directly-recognizable, unencrypted filesystem -- see
-  /// detectsAsPlainDiskImage's doc comment in session_prepare.cpp for the
-  /// exact scope. Guards against a stale result landing after the
-  /// selection has since changed (or been cleared) while the
-  /// platform-channel round trip was in flight; errors already resolve to
-  /// false inside detectsAsPlainDiskImage itself, so there's nothing else
-  /// to catch here.
-  Future<void> _checkPlainDiskImage(String uri) async {
-    final isPlain = await ref
+  Future<void> _probeContainerFormat(String uri) async {
+    final format = await ref
         .read(vaultLifecycleApiProvider)
-        .detectsAsPlainDiskImage(uri);
+        .probeContainerFormat(uri);
     if (ref.mounted && state.selectedUri == uri) {
-      state = state._copy(isPlainDiskImage: isPlain);
+      final isPlain = format == 'plain';
+      final resolvedFormat = format != 'unknown' ? format : state.containerFormat;
+      state = state._copy(
+        containerFormat: resolvedFormat,
+        isPlainDiskImage: isPlain,
+      );
     }
   }
 
@@ -815,7 +815,7 @@ class UnlockController extends _$UnlockController {
             false, // re-checked below; don't carry over a stale true
       );
       lifecycle.warmContainer(single.uri);
-      unawaited(_checkPlainDiskImage(single.uri));
+      unawaited(_probeContainerFormat(single.uri));
     } catch (e) {
       state = state._copy(error: l10n.filePickerFailed(e.toString()));
     }
@@ -919,7 +919,7 @@ class UnlockController extends _$UnlockController {
         isPlainDiskImage:
             false, // re-checked below; don't carry over a stale true
       );
-      unawaited(_checkPlainDiskImage(migrated.uri));
+     unawaited(_probeContainerFormat(migrated.uri));
 
       if (state.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));

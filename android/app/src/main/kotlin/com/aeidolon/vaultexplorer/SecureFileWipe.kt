@@ -1,14 +1,19 @@
 package com.aeidolon.vaultexplorer
 
+import android.content.Context
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 
 /**
- * Shared helper for removing plaintext scratch files -- decrypted vault
- * content staged in cacheDir for thumbnailing, export, video recording,
- * etc. -- so a deleted file isn't just unlinked (which on most Android
- * filesystems leaves the content readable until the underlying blocks are
- * reused) but is actually overwritten first.
+ * Shared helper for removing plaintext content -- decrypted vault content
+ * staged in cacheDir for thumbnailing, export, video recording, etc., and
+ * (via [secureDeleteSafDocument]/[secureDeleteSafTree]) the on-device
+ * originals a user chooses to delete after importing them into a vault --
+ * so a deleted file isn't just unlinked (which on most Android filesystems
+ * and removable media leaves the content readable until the underlying
+ * blocks are reused) but is actually overwritten first.
  *
  * Originally lived only inside VaultVideoRecorder; pulled out so every
  * other call site that stages plaintext in cacheDir (thumbnails, exports)
@@ -16,6 +21,7 @@ import java.io.RandomAccessFile
  */
 object SecureFileWipe {
     private const val TAG = "SecureFileWipe"
+    private const val CHUNK_SIZE = 64 * 1024
 
     /** Overwrites [file] with zeros before deleting it. Returns false if the
      *  file couldn't be fully wiped -- the caller falls back to at least
@@ -37,13 +43,7 @@ object SecureFileWipe {
                     // which is the actual security property we need -- it just
                     // costs one flush instead of one per chunk.
                     RandomAccessFile(file, "rw").use { raf ->
-                        val zeros = ByteArray(64 * 1024)
-                        var remaining = len
-                        while (remaining > 0) {
-                            val writeLen = minOf(remaining, zeros.size.toLong()).toInt()
-                            raf.write(zeros, 0, writeLen)
-                            remaining -= writeLen
-                        }
+                        writeZeros(len) { buf, writeLen -> raf.write(buf, 0, writeLen) }
                         raf.fd.sync()
                     }
                 }
@@ -55,6 +55,145 @@ object SecureFileWipe {
             VeLog.w(TAG, e) { "secureDeleteFile failed" }
             try { file.delete() } catch (_: Exception) {}
             false
+        }
+    }
+
+    /**
+     * Overwrites the on-device document [doc] with zeros before deleting it.
+     * Used for "delete original after import" -- unlike [secureDeleteFile],
+     * [doc] may live on removable/external media (SD card, USB OTG flash
+     * drive) reached only through SAF, not always as a raw path the app can
+     * open a [RandomAccessFile] on.
+     *
+     * Tries a raw `java.io.File` first (fast path with a single fsync, same
+     * as [secureDeleteFile]) via [RawFileResolver] -- this covers internal
+     * storage and, with All-Files-Access granted, the primary SD card. Falls
+     * back to a SAF `ParcelFileDescriptor`/`OutputStream` write for anything
+     * that isn't reachable as a raw path, which is the common case for USB
+     * OTG flash drives and other removable media: exactly the scenario a
+     * "delete original" after importing from external storage needs to
+     * cover. Returns false if the content couldn't be fully overwritten --
+     * the caller falls back to at least having tried delete().
+     */
+    fun secureDeleteSafDocument(context: Context, doc: DocumentFile): Boolean {
+        if (!doc.exists()) return true
+        if (doc.isDirectory) return secureDeleteSafTree(context, doc)
+
+        val uri = doc.uri
+        val rawFile = try {
+            RawFileResolver.getRawFileFromUri(context, uri)
+        } catch (_: Exception) {
+            null
+        }
+        if (rawFile != null && rawFile.exists()) {
+            val ok = secureDeleteFile(rawFile)
+            try { doc.delete() } catch (_: Exception) {}
+            return ok
+        }
+
+        return try {
+            var len = doc.length()
+
+            // Try "rw" (in-place overwrite without truncate) first so the existing
+            // filesystem blocks are actually zeroed rather than deallocated.
+            val pfd = try {
+                context.contentResolver.openFileDescriptor(uri, "rw")
+            } catch (_: Exception) {
+                try {
+                    context.contentResolver.openFileDescriptor(uri, "rwt")
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            if (pfd != null) {
+                pfd.use {
+                    val statSize = it.statSize
+                    if (statSize > 0) len = statSize
+                    if (len > 0) {
+                        FileOutputStream(it.fileDescriptor).use { out ->
+                            writeZeros(len) { buf, writeLen -> out.write(buf, 0, writeLen) }
+                            out.flush()
+                            out.fd.sync()
+                        }
+                    }
+                }
+            } else if (len > 0) {
+                // Some SAF providers don't honor openFileDescriptor but do
+                // support an OutputStream.
+                context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                    writeZeros(len) { buf, writeLen -> out.write(buf, 0, writeLen) }
+                    out.flush()
+                    if (out is FileOutputStream) out.fd.sync()
+                } ?: run {
+                    VeLog.w(TAG) { "secureDeleteSafDocument: no writable stream for $uri, deleting unwiped" }
+                    try { doc.delete() } catch (_: Exception) {}
+                    return false
+                }
+            }
+            doc.delete()
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "secureDeleteSafDocument failed for $uri" }
+            try { doc.delete() } catch (_: Exception) {}
+            false
+        }
+    }
+
+    /**
+     * Recursively overwrites every file under [doc] with zeros before
+     * deleting it, then removes the now-empty directories bottom-up. Used
+     * for "delete original after import" of a whole folder tree (e.g. a
+     * folder picked from a USB flash drive). Best-effort per entry -- one
+     * unwipable/undeletable file doesn't stop the rest of the tree from
+     * being processed. Returns true only if every entry was both wiped (or
+     * was an emptied directory) and removed.
+     */
+    fun secureDeleteSafTree(context: Context, doc: DocumentFile): Boolean {
+        if (!doc.exists()) return true
+        if (!doc.isDirectory) return secureDeleteSafDocument(context, doc)
+
+        val rawDir = try {
+            RawFileResolver.getRawFileFromUri(context, doc.uri)
+        } catch (_: Exception) {
+            null
+        }
+        if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
+            val ok = secureDeleteRawTree(rawDir)
+            try { doc.delete() } catch (_: Exception) {}
+            return ok
+        }
+
+        return try {
+            var allOk = true
+            for (child in doc.listFiles()) {
+                if (!secureDeleteSafTree(context, child)) allOk = false
+            }
+            doc.delete() && allOk
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "secureDeleteSafTree failed on ${doc.uri}" }
+            try { doc.delete() } catch (_: Exception) {}
+            false
+        }
+    }
+
+    private fun secureDeleteRawTree(dir: File): Boolean {
+        var allOk = true
+        val children = dir.listFiles() ?: emptyArray()
+        for (child in children) {
+            val ok = if (child.isDirectory) secureDeleteRawTree(child) else secureDeleteFile(child)
+            if (!ok) allOk = false
+        }
+        return dir.delete() && allOk
+    }
+
+    /** Streams [len] zero bytes out through [write] in [CHUNK_SIZE] pieces. */
+    private inline fun writeZeros(len: Long, write: (ByteArray, Int) -> Unit) {
+        val zeros = ByteArray(CHUNK_SIZE)
+        var remaining = len
+        while (remaining > 0) {
+            val writeLen = minOf(remaining, zeros.size.toLong()).toInt()
+            write(zeros, writeLen)
+            remaining -= writeLen
         }
     }
 

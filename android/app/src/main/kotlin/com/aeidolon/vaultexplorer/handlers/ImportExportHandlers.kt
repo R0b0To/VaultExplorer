@@ -1047,7 +1047,11 @@ class ImportExportHandlers(
     /**
      * Deletes the original device-storage document(s) picked during the
      * import identified by [opId] (single/multi files, or the one tree Uri
-     * for a folder import). Best-effort per item; returns the count deleted.
+     * for a folder import) -- overwriting each file's content with zeros
+     * first via [SecureFileWipe], so the source (which may be removable
+     * media such as a USB OTG flash drive) can't be forensically recovered
+     * after being imported and "deleted". Best-effort per item; returns the
+     * count deleted.
      */
     fun handleDeleteImportSources(call: MethodCall, result: MethodChannel.Result) {
         val opId = call.argument<Number>("opId")?.toInt()
@@ -1067,7 +1071,15 @@ class ImportExportHandlers(
                 try {
                     val doc = if (isTree) DocumentFile.fromTreeUri(activity, uri)
                               else DocumentFile.fromSingleUri(activity, uri)
-                    if (doc != null && doc.delete()) deleted++
+                    val wiped = when {
+                        doc == null -> false
+                        // A folder import records the single picked tree Uri;
+                        // its DocumentFile is the root directory, so it needs
+                        // the recursive tree wipe, not a single-file wipe.
+                        isTree -> SecureFileWipe.secureDeleteSafTree(activity, doc)
+                        else -> SecureFileWipe.secureDeleteSafDocument(activity, doc)
+                    }
+                    if (wiped) deleted++
                 } catch (_: Exception) {
                     // Best-effort — skip and keep going.
                 }

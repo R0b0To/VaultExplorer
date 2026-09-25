@@ -2299,5 +2299,6 @@
   "badgeExperimental": "Expérimental",
   "createCompositeHintPrompt": "Masquer un coffre en associant ses fragments à d'autres fichiers ?",
   "createCompositeHintAction": "Ouvrir l'assistant de volume composite",
-  "plainDiskImageNotice": "Image disque non chiffrée détectée. Aucun mot de passe n'est requis pour monter ce volume."
+  "plainDiskImageNotice": "Image disque non chiffrée détectée. Aucun mot de passe n'est requis pour monter ce volume.",
+  "storageLocationUnavailable": "L'emplacement de stockage « {name} » est indisponible ou déconnecté."
 }

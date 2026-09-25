@@ -13950,6 +13950,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unencrypted disk image detected. No password is required to mount this volume.'**
   String get plainDiskImageNotice;
+
+  /// Error message shown when a selected external storage location cannot be accessed or is disconnected
+  ///
+  /// In en, this message translates to:
+  /// **'Storage location \"{name}\" is unavailable or disconnected.'**
+  String storageLocationUnavailable(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -7999,4 +7999,9 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       '암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return '저장 위치 \"$name\"을(를) 사용할 수 없거나 연결이 끊어졌습니다.';
+  }
 }

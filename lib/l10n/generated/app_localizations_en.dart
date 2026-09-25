@@ -8328,4 +8328,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Unencrypted disk image detected. No password is required to mount this volume.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'Storage location \"$name\" is unavailable or disconnected.';
+  }
 }

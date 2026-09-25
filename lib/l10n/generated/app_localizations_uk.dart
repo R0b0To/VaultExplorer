@@ -8536,4 +8536,9 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Виявлено незашифрований образ диска. Для монтування цього тому пароль не потрібен.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'Місце зберігання \"$name\" недоступне або відключено.';
+  }
 }

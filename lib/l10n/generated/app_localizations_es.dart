@@ -8474,4 +8474,9 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'La ubicación de almacenamiento \"$name\" no está disponible o está desconectada.';
+  }
 }

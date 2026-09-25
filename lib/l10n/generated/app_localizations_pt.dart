@@ -8460,4 +8460,9 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'O local de armazenamento \"$name\" está indisponível ou desconectado.';
+  }
 }

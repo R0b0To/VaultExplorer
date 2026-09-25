@@ -10633,5 +10633,14 @@
   "plainDiskImageNotice": "Unencrypted disk image detected. No password is required to mount this volume.",
   "@plainDiskImageNotice": {
     "description": "Notice shown when an unencrypted plain disk image is selected in the unlock screen"
+  },
+  "storageLocationUnavailable": "Storage location \"{name}\" is unavailable or disconnected.",
+  "@storageLocationUnavailable": {
+    "description": "Error message shown when a selected external storage location cannot be accessed or is disconnected",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   }
 }

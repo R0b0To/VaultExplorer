@@ -8533,4 +8533,9 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Image disque non chiffrée détectée. Aucun mot de passe n\'est requis pour monter ce volume.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'L\'emplacement de stockage « $name » est indisponible ou déconnecté.';
+  }
 }

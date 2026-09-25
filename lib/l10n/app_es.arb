@@ -2299,5 +2299,6 @@
   "badgeExperimental": "Experimental",
   "createCompositeHintPrompt": "¿Ocultar una bóveda adjuntando sus fragmentos a otros archivos?",
   "createCompositeHintAction": "Abrir asistente de volumen compuesto",
-  "plainDiskImageNotice": "Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen."
+  "plainDiskImageNotice": "Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen.",
+  "storageLocationUnavailable": "La ubicación de almacenamiento \"{name}\" no está disponible o está desconectada."
 }

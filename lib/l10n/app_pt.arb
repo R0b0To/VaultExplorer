@@ -2299,5 +2299,6 @@
   "badgeExperimental": "Experimental",
   "createCompositeHintPrompt": "Ocultar um cofre anexando suas partes a outros arquivos?",
   "createCompositeHintAction": "Abrir assistente composto",
-  "plainDiskImageNotice": "Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume."
+  "plainDiskImageNotice": "Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume.",
+  "storageLocationUnavailable": "O local de armazenamento \"{name}\" está indisponível ou desconectado."
 }

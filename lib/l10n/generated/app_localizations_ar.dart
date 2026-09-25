@@ -8520,4 +8520,9 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'تم اكتشاف صورة قرص غير مشفرة. لا يلزم وجود كلمة مرور لفتح هذا المجلد.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'موقع التخزين \"$name\" غير متوفر أو تم فصله.';
+  }
 }

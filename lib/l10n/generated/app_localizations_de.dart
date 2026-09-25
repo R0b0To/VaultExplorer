@@ -8458,4 +8458,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'Speicherort „$name“ ist nicht verfügbar oder getrennt.';
+  }
 }

@@ -2299,5 +2299,6 @@
   "badgeExperimental": "実験的",
   "createCompositeHintPrompt": "チャンクを通常のファイルに添付して保管庫を隠しますか？",
   "createCompositeHintAction": "コンポジットウィザードを開く",
-  "plainDiskImageNotice": "暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。"
+  "plainDiskImageNotice": "暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。",
+  "storageLocationUnavailable": "ストレージの場所「{name}」は利用できないか、切断されています。"
 }

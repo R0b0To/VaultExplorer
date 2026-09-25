@@ -2299,5 +2299,6 @@
   "badgeExperimental": "실험적",
   "createCompositeHintPrompt": "볼트 조각을 일반 파일에 첨부하여 숨기시겠습니까?",
   "createCompositeHintAction": "복합 볼륨 마법사 열기",
-  "plainDiskImageNotice": "암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다."
+  "plainDiskImageNotice": "암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다.",
+  "storageLocationUnavailable": "저장 위치 \"{name}\"을(를) 사용할 수 없거나 연결이 끊어졌습니다."
 }

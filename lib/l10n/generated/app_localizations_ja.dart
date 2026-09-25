@@ -8000,4 +8000,9 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       '暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'ストレージの場所「$name」は利用できないか、切断されています。';
+  }
 }

@@ -2299,5 +2299,6 @@
   "badgeExperimental": "Experimentell",
   "createCompositeHintPrompt": "Einen Tresor verstecken, indem Teile an gewöhnliche Dateien angehängt werden?",
   "createCompositeHintAction": "Composite-Assistenten öffnen",
-  "plainDiskImageNotice": "Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich."
+  "plainDiskImageNotice": "Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich.",
+  "storageLocationUnavailable": "Speicherort „{name}“ ist nicht verfügbar oder getrennt."
 }

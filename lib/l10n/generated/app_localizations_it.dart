@@ -8456,4 +8456,9 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get plainDiskImageNotice =>
       'Rilevata immagine disco non crittografata. Non è richiesta alcuna password per montare questo volume.';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return 'La posizione di archiviazione \"$name\" non è disponibile o è disconnessa.';
+  }
 }

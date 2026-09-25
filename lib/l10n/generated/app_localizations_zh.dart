@@ -7891,4 +7891,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get plainDiskImageNotice => '检测到未加密的磁盘映像。装载此卷无需密码。';
+
+  @override
+  String storageLocationUnavailable(String name) {
+    return '存储位置“$name”不可用或已断开连接。';
+  }
 }

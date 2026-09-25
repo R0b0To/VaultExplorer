@@ -2299,5 +2299,6 @@
   "badgeExperimental": "实验性",
   "createCompositeHintPrompt": "想通过将文件库分块附加到普通文件来隐藏它吗？",
   "createCompositeHintAction": "打开复合卷向导",
-  "plainDiskImageNotice": "检测到未加密的磁盘映像。装载此卷无需密码。"
+  "plainDiskImageNotice": "检测到未加密的磁盘映像。装载此卷无需密码。",
+  "storageLocationUnavailable": "存储位置“{name}”不可用或已断开连接。"
 }

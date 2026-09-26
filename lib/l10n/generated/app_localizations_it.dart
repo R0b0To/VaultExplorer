@@ -2467,6 +2467,26 @@ class AppLocalizationsIt extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'Impostazioni visualizzatore';
 
   @override
+  String get textEditorSwitchToReadModeTooltip =>
+      'Passa alla modalità di sola lettura';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip =>
+      'Passa alla modalità di modifica';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'Sola lettura';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'Sposta il cursore a sinistra';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'Sposta il cursore a destra';
+
+  @override
+  String get textEditorSelectWordTooltip => 'Seleziona parola';
+
+  @override
   String get textEditorSaveConfirmTitle => 'Modifiche non salvate';
 
   @override

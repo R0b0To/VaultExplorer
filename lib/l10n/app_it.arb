@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "Salva nella cassaforte",
   "cameraContinueCaptureTooltip": "Scatta un'altra foto",
   "cameraBatchCount": "{count, plural, =1{1 foto} other{{count} foto}}",
-  "cameraReviewPhotosTooltip": "Rivedi foto scattate"
+  "cameraReviewPhotosTooltip": "Rivedi foto scattate",
+  "textEditorSwitchToReadModeTooltip": "Passa alla modalità di sola lettura",
+  "textEditorSwitchToEditModeTooltip": "Passa alla modalità di modifica",
+  "textEditorReadOnlyIndicatorLabel": "Sola lettura",
+  "textEditorMoveCursorLeftTooltip": "Sposta il cursore a sinistra",
+  "textEditorMoveCursorRightTooltip": "Sposta il cursore a destra",
+  "textEditorSelectWordTooltip": "Seleziona parola"
 }

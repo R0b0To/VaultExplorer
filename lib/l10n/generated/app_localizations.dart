@@ -4062,6 +4062,42 @@ abstract class AppLocalizations {
   /// **'Viewer Settings'**
   String get advancedViewerSettingsTitle;
 
+  /// Tooltip for the button that locks the text editor into read-only/inspection mode and disables the on-screen keyboard
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to read-only mode'**
+  String get textEditorSwitchToReadModeTooltip;
+
+  /// Tooltip for the button that unlocks the text editor for editing again
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to edit mode'**
+  String get textEditorSwitchToEditModeTooltip;
+
+  /// Status bar label shown while the text editor is locked to read-only/inspection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get textEditorReadOnlyIndicatorLabel;
+
+  /// Tooltip for the accessory key bar button that moves the caret one character left
+  ///
+  /// In en, this message translates to:
+  /// **'Move cursor left'**
+  String get textEditorMoveCursorLeftTooltip;
+
+  /// Tooltip for the accessory key bar button that moves the caret one character right
+  ///
+  /// In en, this message translates to:
+  /// **'Move cursor right'**
+  String get textEditorMoveCursorRightTooltip;
+
+  /// Tooltip for the accessory key bar button that selects the word at the caret
+  ///
+  /// In en, this message translates to:
+  /// **'Select word'**
+  String get textEditorSelectWordTooltip;
+
   /// Title for unsaved changes confirm dialog in text editor
   ///
   /// In en, this message translates to:

@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "حفظ في الخزنة",
   "cameraContinueCaptureTooltip": "التقاط صورة أخرى",
   "cameraBatchCount": "{count, plural, =1{صورة واحدة} other{{count} صور}}",
-  "cameraReviewPhotosTooltip": "مراجعة الصور الملتقطة"
+  "cameraReviewPhotosTooltip": "مراجعة الصور الملتقطة",
+  "textEditorSwitchToReadModeTooltip": "التبديل إلى وضع القراءة فقط",
+  "textEditorSwitchToEditModeTooltip": "التبديل إلى وضع التعديل",
+  "textEditorReadOnlyIndicatorLabel": "للقراءة فقط",
+  "textEditorMoveCursorLeftTooltip": "تحريك المؤشر لليسار",
+  "textEditorMoveCursorRightTooltip": "تحريك المؤشر لليمين",
+  "textEditorSelectWordTooltip": "تحديد الكلمة"
 }

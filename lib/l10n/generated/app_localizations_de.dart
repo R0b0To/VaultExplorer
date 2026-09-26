@@ -2475,6 +2475,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'Betrachter-Einstellungen';
 
   @override
+  String get textEditorSwitchToReadModeTooltip =>
+      'In den schreibgeschützten Modus wechseln';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip =>
+      'In den Bearbeitungsmodus wechseln';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'Schreibgeschützt';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'Cursor nach links bewegen';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'Cursor nach rechts bewegen';
+
+  @override
+  String get textEditorSelectWordTooltip => 'Wort auswählen';
+
+  @override
   String get textEditorSaveConfirmTitle => 'Nicht gespeicherte Änderungen';
 
   @override

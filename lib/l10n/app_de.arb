@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "Im Tresor speichern",
   "cameraContinueCaptureTooltip": "Weiteres Foto aufnehmen",
   "cameraBatchCount": "{count, plural, =1{1 Foto} other{{count} Fotos}}",
-  "cameraReviewPhotosTooltip": "Aufgenommene Fotos ansehen"
+  "cameraReviewPhotosTooltip": "Aufgenommene Fotos ansehen",
+  "textEditorSwitchToReadModeTooltip": "In den schreibgeschützten Modus wechseln",
+  "textEditorSwitchToEditModeTooltip": "In den Bearbeitungsmodus wechseln",
+  "textEditorReadOnlyIndicatorLabel": "Schreibgeschützt",
+  "textEditorMoveCursorLeftTooltip": "Cursor nach links bewegen",
+  "textEditorMoveCursorRightTooltip": "Cursor nach rechts bewegen",
+  "textEditorSelectWordTooltip": "Wort auswählen"
 }

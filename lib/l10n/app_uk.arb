@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "Зберегти у сховище",
   "cameraContinueCaptureTooltip": "Зробити ще одне фото",
   "cameraBatchCount": "{count, plural, =1{1 фото} other{{count} фото}}",
-  "cameraReviewPhotosTooltip": "Переглянути зроблені фото"
+  "cameraReviewPhotosTooltip": "Переглянути зроблені фото",
+  "textEditorSwitchToReadModeTooltip": "Перемкнути в режим лише для читання",
+  "textEditorSwitchToEditModeTooltip": "Перемкнути в режим редагування",
+  "textEditorReadOnlyIndicatorLabel": "Лише читання",
+  "textEditorMoveCursorLeftTooltip": "Перемістити курсор ліворуч",
+  "textEditorMoveCursorRightTooltip": "Перемістити курсор праворуч",
+  "textEditorSelectWordTooltip": "Виділити слово"
 }

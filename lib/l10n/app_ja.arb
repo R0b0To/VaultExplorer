@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "金庫に保存",
   "cameraContinueCaptureTooltip": "別の写真を撮影",
   "cameraBatchCount": "{count}枚の写真",
-  "cameraReviewPhotosTooltip": "撮影した写真を確認"
+  "cameraReviewPhotosTooltip": "撮影した写真を確認",
+  "textEditorSwitchToReadModeTooltip": "読み取り専用モードに切り替え",
+  "textEditorSwitchToEditModeTooltip": "編集モードに切り替え",
+  "textEditorReadOnlyIndicatorLabel": "読み取り専用",
+  "textEditorMoveCursorLeftTooltip": "カーソルを左へ移動",
+  "textEditorMoveCursorRightTooltip": "カーソルを右へ移動",
+  "textEditorSelectWordTooltip": "単語を選択"
 }

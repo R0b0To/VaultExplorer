@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "Guardar en bóveda",
   "cameraContinueCaptureTooltip": "Tomar otra foto",
   "cameraBatchCount": "{count, plural, =1{1 foto} other{{count} fotos}}",
-  "cameraReviewPhotosTooltip": "Revisar fotos capturadas"
+  "cameraReviewPhotosTooltip": "Revisar fotos capturadas",
+  "textEditorSwitchToReadModeTooltip": "Cambiar a modo de solo lectura",
+  "textEditorSwitchToEditModeTooltip": "Cambiar a modo de edición",
+  "textEditorReadOnlyIndicatorLabel": "Solo lectura",
+  "textEditorMoveCursorLeftTooltip": "Mover el cursor a la izquierda",
+  "textEditorMoveCursorRightTooltip": "Mover el cursor a la derecha",
+  "textEditorSelectWordTooltip": "Seleccionar palabra"
 }

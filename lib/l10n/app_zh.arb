@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "保存到保险库",
   "cameraContinueCaptureTooltip": "再拍一张照片",
   "cameraBatchCount": "{count}张照片",
-  "cameraReviewPhotosTooltip": "查看已拍摄照片"
+  "cameraReviewPhotosTooltip": "查看已拍摄照片",
+  "textEditorSwitchToReadModeTooltip": "切换至只读模式",
+  "textEditorSwitchToEditModeTooltip": "切换至编辑模式",
+  "textEditorReadOnlyIndicatorLabel": "只读",
+  "textEditorMoveCursorLeftTooltip": "光标向左移动",
+  "textEditorMoveCursorRightTooltip": "光标向右移动",
+  "textEditorSelectWordTooltip": "选择单词"
 }

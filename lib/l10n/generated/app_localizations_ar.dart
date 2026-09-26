@@ -2504,6 +2504,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'إعدادات العارض';
 
   @override
+  String get textEditorSwitchToReadModeTooltip => 'التبديل إلى وضع القراءة فقط';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => 'التبديل إلى وضع التعديل';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'للقراءة فقط';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'تحريك المؤشر لليسار';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'تحريك المؤشر لليمين';
+
+  @override
+  String get textEditorSelectWordTooltip => 'تحديد الكلمة';
+
+  @override
   String get textEditorSaveConfirmTitle => 'تغييرات غير محفوظة';
 
   @override

@@ -2482,6 +2482,27 @@ class AppLocalizationsFr extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'Paramètres de la visionneuse';
 
   @override
+  String get textEditorSwitchToReadModeTooltip =>
+      'Passer en mode lecture seule';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => 'Passer en mode édition';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'Lecture seule';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip =>
+      'Déplacer le curseur vers la gauche';
+
+  @override
+  String get textEditorMoveCursorRightTooltip =>
+      'Déplacer le curseur vers la droite';
+
+  @override
+  String get textEditorSelectWordTooltip => 'Sélectionner le mot';
+
+  @override
   String get textEditorSaveConfirmTitle => 'Modifications non enregistrées';
 
   @override

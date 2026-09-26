@@ -2308,5 +2308,11 @@
   "cameraSaveMediaTooltip": "보관함에 저장",
   "cameraContinueCaptureTooltip": "다른 사진 촬영",
   "cameraBatchCount": "사진 {count}장",
-  "cameraReviewPhotosTooltip": "촬영한 사진 검토"
+  "cameraReviewPhotosTooltip": "촬영한 사진 검토",
+  "textEditorSwitchToReadModeTooltip": "읽기 전용 모드로 전환",
+  "textEditorSwitchToEditModeTooltip": "편집 모드로 전환",
+  "textEditorReadOnlyIndicatorLabel": "읽기 전용",
+  "textEditorMoveCursorLeftTooltip": "커서를 왼쪽으로 이동",
+  "textEditorMoveCursorRightTooltip": "커서를 오른쪽으로 이동",
+  "textEditorSelectWordTooltip": "단어 선택"
 }

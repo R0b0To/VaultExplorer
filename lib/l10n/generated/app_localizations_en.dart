@@ -2430,6 +2430,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'Viewer Settings';
 
   @override
+  String get textEditorSwitchToReadModeTooltip => 'Switch to read-only mode';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => 'Switch to edit mode';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'Read-only';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'Move cursor left';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'Move cursor right';
+
+  @override
+  String get textEditorSelectWordTooltip => 'Select word';
+
+  @override
   String get textEditorSaveConfirmTitle => 'Unsaved Changes';
 
   @override

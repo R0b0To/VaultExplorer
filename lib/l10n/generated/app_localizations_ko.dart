@@ -2336,6 +2336,24 @@ class AppLocalizationsKo extends AppLocalizations {
   String get advancedViewerSettingsTitle => '뷰어 설정';
 
   @override
+  String get textEditorSwitchToReadModeTooltip => '읽기 전용 모드로 전환';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => '편집 모드로 전환';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => '읽기 전용';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => '커서를 왼쪽으로 이동';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => '커서를 오른쪽으로 이동';
+
+  @override
+  String get textEditorSelectWordTooltip => '단어 선택';
+
+  @override
   String get textEditorSaveConfirmTitle => '저장되지 않은 변경 사항';
 
   @override

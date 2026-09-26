@@ -2336,6 +2336,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'ビューア設定';
 
   @override
+  String get textEditorSwitchToReadModeTooltip => '読み取り専用モードに切り替え';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => '編集モードに切り替え';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => '読み取り専用';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'カーソルを左へ移動';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'カーソルを右へ移動';
+
+  @override
+  String get textEditorSelectWordTooltip => '単語を選択';
+
+  @override
   String get textEditorSaveConfirmTitle => '未保存の変更';
 
   @override

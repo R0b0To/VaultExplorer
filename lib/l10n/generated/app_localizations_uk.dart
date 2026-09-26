@@ -2493,6 +2493,26 @@ class AppLocalizationsUk extends AppLocalizations {
   String get advancedViewerSettingsTitle => 'Налаштування переглядача';
 
   @override
+  String get textEditorSwitchToReadModeTooltip =>
+      'Перемкнути в режим лише для читання';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip =>
+      'Перемкнути в режим редагування';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => 'Лише читання';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => 'Перемістити курсор ліворуч';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => 'Перемістити курсор праворуч';
+
+  @override
+  String get textEditorSelectWordTooltip => 'Виділити слово';
+
+  @override
   String get textEditorSaveConfirmTitle => 'Незбережені зміни';
 
   @override

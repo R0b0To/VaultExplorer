@@ -2300,6 +2300,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedViewerSettingsTitle => '查看器设置';
 
   @override
+  String get textEditorSwitchToReadModeTooltip => '切换至只读模式';
+
+  @override
+  String get textEditorSwitchToEditModeTooltip => '切换至编辑模式';
+
+  @override
+  String get textEditorReadOnlyIndicatorLabel => '只读';
+
+  @override
+  String get textEditorMoveCursorLeftTooltip => '光标向左移动';
+
+  @override
+  String get textEditorMoveCursorRightTooltip => '光标向右移动';
+
+  @override
+  String get textEditorSelectWordTooltip => '选择单词';
+
+  @override
   String get textEditorSaveConfirmTitle => '未保存的更改';
 
   @override

@@ -122,6 +122,10 @@ class VaultCameraController {
   final StreamController<Map<String, dynamic>> _eventsController = StreamController.broadcast();
 
   Stream<Map<String, dynamic>> get events => _eventsController.stream;
+
+  Stream<String> get qrCodes => events
+      .where((e) => e['event'] == 'qr_code' && e['data'] is String)
+      .map((e) => e['data'] as String);
   int? get sessionId => _sessionId;
   int? get textureId => _textureId;
   String? get cameraId => _cameraId;
@@ -172,11 +176,12 @@ class VaultCameraController {
     }
   }
 
-  Future<VaultCameraSessionInfo> open({
+ Future<VaultCameraSessionInfo> open({
     String? cameraId,
     String facing = 'back',
     String quality = 'fhd',
     String photoResolution = 'max',
+    bool scanMode = false,
   }) async {
     await close();
 
@@ -185,6 +190,7 @@ class VaultCameraController {
       'facing': facing,
       'quality': quality,
       'photoResolution': photoResolution,
+      'scanMode': scanMode,
     });
 
     if (res == null) throw Exception('Failed to open camera');
@@ -465,6 +471,15 @@ class VaultCameraController {
     if (sId == null) return;
     await _channel.invokeMethod('resetFocusAndExposure', {
       'sessionId': sId,
+    });
+  }
+
+  Future<void> setScanMode(bool enable) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setScanMode', {
+      'sessionId': sId,
+      'enable': enable,
     });
   }
 

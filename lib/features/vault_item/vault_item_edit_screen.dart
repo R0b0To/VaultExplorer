@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart'
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
+import 'package:vaultexplorer/features/authenticator/widgets/qr_scanner_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 
 import '../../core/filesystem/filesystem_type.dart';
@@ -48,6 +49,57 @@ class _VaultItemEditScreenState extends ConsumerState<VaultItemEditScreen> {
   late final String _initialTitle;
   late final Map<String, String> _initialFieldValues;
   bool _wasDirty = false;
+
+   Future<void> _scanQrCode() async {
+    final scannedUri = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (scannedUri == null || !mounted) return;
+
+    try {
+      final uri = Uri.parse(scannedUri);
+      final qp = uri.queryParameters;
+      final secret = qp['secret'] ?? scannedUri;
+      String issuer = qp['issuer'] ?? '';
+
+      final pathLabel = Uri.decodeComponent(uri.path.replaceFirst(RegExp(r'^/'), ''));
+      String account = '';
+      if (pathLabel.contains(':')) {
+        final parts = pathLabel.split(':');
+        if (issuer.isEmpty) issuer = parts.first.trim();
+        account = parts.sublist(1).join(':').trim();
+      } else {
+        account = pathLabel.trim();
+      }
+
+      setState(() {
+        _ctrls['totp_secret']?.text = secret;
+        if (_titleCtrl.text.isEmpty) {
+          _titleCtrl.text = issuer.isNotEmpty ? issuer : account;
+        }
+        if (_ctrls['issuer'] != null && _ctrls['issuer']!.text.isEmpty && issuer.isNotEmpty) {
+          _ctrls['issuer']!.text = issuer;
+        }
+        if (_ctrls['account'] != null && _ctrls['account']!.text.isEmpty && account.isNotEmpty) {
+          _ctrls['account']!.text = account;
+        }
+        if (_ctrls['totp_algorithm'] != null && qp.containsKey('algorithm')) {
+          _ctrls['totp_algorithm']!.text = qp['algorithm']!;
+        }
+        if (_ctrls['totp_digits'] != null && qp.containsKey('digits')) {
+          _ctrls['totp_digits']!.text = qp['digits']!;
+        }
+        if (_ctrls['totp_period'] != null && qp.containsKey('period')) {
+          _ctrls['totp_period']!.text = qp['period']!;
+        }
+      });
+      _onTextChanged();
+      showAppSnackBar(context, message: context.l10n.qrCodeScannedSuccess, tone: AppBannerTone.success);
+    } catch (_) {
+      showAppSnackBar(context, message: context.l10n.invalidQrCodeError, tone: AppBannerTone.error);
+    }
+  }
 
   Future<void> _copySecret(VaultField field, String value) async {
     await ref.read(sensitiveClipboardProvider).copy(value);
@@ -293,6 +345,7 @@ class _VaultItemEditScreenState extends ConsumerState<VaultItemEditScreen> {
                     () => _revealed[f.key] = !(_revealed[f.key] ?? false),
                   ),
                   onCopy: () => _copySecret(f, _ctrls[f.key]!.text),
+                  onScanQr: f.key == 'totp_secret' ? _scanQrCode : null,
                 ),
               ),
             )),
@@ -323,6 +376,7 @@ class _FieldInput extends StatelessWidget {
   final bool revealed;
   final VoidCallback onToggleReveal;
   final VoidCallback onCopy;
+  final VoidCallback? onScanQr;
 
   const _FieldInput({
     required this.field,
@@ -330,6 +384,7 @@ class _FieldInput extends StatelessWidget {
     required this.revealed,
     required this.onToggleReveal,
     required this.onCopy,
+    this.onScanQr,
   });
 
   @override
@@ -365,6 +420,12 @@ class _FieldInput extends StatelessWidget {
                     onPressed: onCopy,
                     tooltip: context.l10n.copy,
                   ),
+                  if (onScanQr != null)
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                      onPressed: onScanQr,
+                      tooltip: context.l10n.scanQrCodeTooltip,
+                    ),
                 ],
               )
             : null,

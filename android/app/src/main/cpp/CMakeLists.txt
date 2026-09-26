@@ -92,6 +92,23 @@ elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(mbedcrypto PRIVATE -mfpu=neon)
 endif()
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 1z. ZXing-C++ (Lightweight offline barcode/QR decoder)
+FetchContent_Declare(
+    zxing_cpp
+    GIT_REPOSITORY https://github.com/zxing-cpp/zxing-cpp.git
+    GIT_TAG        v3.1.1
+)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_BLACKBOX_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(ZXING_READERS ON CACHE BOOL "" FORCE)
+set(ZXING_WRITERS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(zxing_cpp)
+
 # 1a. Archive engine (libarchive + its compression filters) -- see
 # archive_deps.cmake's file-level comment for what's vendored vs. reused
 # from the NDK/BoringSSL, and for a caveat on what could/couldn't be
@@ -446,6 +463,7 @@ add_library(
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
         archive/archive_engine.cpp
+        jni/qr_bridge.cpp
 )
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -477,6 +495,7 @@ target_compile_definitions(vaultexplorer PRIVATE
 target_include_directories(
         vaultexplorer PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${zxing_cpp_SOURCE_DIR}/core/src
         ${CMAKE_CURRENT_SOURCE_DIR}/Common
         ${CMAKE_CURRENT_SOURCE_DIR}/crypto
         ${CMAKE_CURRENT_SOURCE_DIR}/jni
@@ -509,6 +528,8 @@ else()
     set(log-lib "")
 endif()
 
+target_compile_features(vaultexplorer PRIVATE cxx_std_20)
+
 target_link_libraries(
         vaultexplorer
         ${log-lib}
@@ -522,7 +543,8 @@ target_link_libraries(
         dislocker_lib
         avif
         libgav1_static
-        ${ARCHIVE_ENGINE_LIBRARY})
+        ${ARCHIVE_ENGINE_LIBRARY}
+        ZXing::ZXing)
 
 
 set_source_files_properties(

@@ -115,7 +115,11 @@ class VaultCameraPlugin(
                     })
                     eventChannels[id] = eventChannel
 
+                   val scanMode = (args["scanMode"] as? Boolean) ?: false
                     session.open(cameraId, quality, photoRes) { ok, error ->
+                        if (ok && scanMode) {
+                            session.setScanMode(true)
+                        }
                         mainHandler.post {
                             if (ok) {
                                 VeLog.d(TAG) { "open: ok camera=$cameraId preview=${session.previewWidth}x${session.previewHeight} sensorOrientation=${session.sensorOrientationDegrees}" }
@@ -170,6 +174,11 @@ class VaultCameraPlugin(
                 }
                 "resetFocusAndExposure" -> withSession(call, result) { session, _ ->
                     session.resetFocusAndExposure()
+                    result.success(null)
+                }
+                "setScanMode" -> withSession(call, result) { session, args ->
+                    val enable = (args["enable"] as? Boolean) ?: false
+                    session.setScanMode(enable)
                     result.success(null)
                 }
                 "setWhiteBalance" -> withSession(call, result) { session, args ->

@@ -48,7 +48,19 @@ class VaultCameraSession(
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
     private var jpegReader: ImageReader? = null
+    private var analysisReader: ImageReader? = null
     private var videoRecorder: VaultVideoRecorder? = null
+    private var isScanMode = false
+    private var isScanningFrame = false
+    private var lastScanTime = 0L
+
+    private external fun nativeScanQrCode(
+        yBytes: ByteArray,
+        width: Int,
+        height: Int,
+        rowStride: Int,
+        rotationDegrees: Int
+    ): String?
 
     private var activeCameraId: String = ""
     private var characteristics: CameraCharacteristics? = null
@@ -125,11 +137,56 @@ class VaultCameraSession(
         }
     }
 
+   fun setScanMode(enable: Boolean) {
+        runOnCameraThread {
+            if (isScanMode == enable) return@runOnCameraThread
+            isScanMode = enable
+            updateRepeatingRequest()
+        }
+    }
+
+    private fun onAnalysisFrameAvailable(reader: ImageReader) {
+        val image = try { reader.acquireLatestImage() } catch (_: Exception) { null } ?: return
+        try {
+            if (!isScanMode || isScanningFrame) return
+            val now = System.currentTimeMillis()
+            if (now - lastScanTime < 140) return // Throttled to ~7 fps to minimize battery & CPU
+            lastScanTime = now
+            isScanningFrame = true
+
+            val plane = image.planes[0]
+            val buffer = plane.buffer
+            val yBytes = ByteArray(buffer.remaining())
+            buffer.get(yBytes)
+            val w = image.width
+            val h = image.height
+            val stride = plane.rowStride
+            val rot = sensorOrientationDegrees
+
+            bgHandler.post {
+                try {
+                    val text = nativeScanQrCode(yBytes, w, h, stride, rot)
+                    if (text != null && text.isNotEmpty()) {
+                        onEvent(mapOf("event" to "qr_code", "data" to text))
+                    }
+                } catch (e: Exception) {
+                    VeLog.w(TAG, e) { "nativeScanQrCode failed" }
+                } finally {
+                    isScanningFrame = false
+                }
+            }
+        } finally {
+            image.close()
+        }
+    }
+
     fun dispose() {
         runOnCameraThread {
             closeCameraOnly {
                 jpegReader?.close()
                 jpegReader = null
+                analysisReader?.close()
+                analysisReader = null
                 previewSurface?.release()
                 previewSurface = null
                 try { textureEntry.release() } catch (_: Exception) {}
@@ -274,10 +331,18 @@ class VaultCameraSession(
         surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
         previewSurface = Surface(surfaceTexture)
 
-        jpegReader?.close()
+         jpegReader?.close()
         val reader = ImageReader.newInstance(photoSize.width, photoSize.height, ImageFormat.JPEG, 2)
         reader.setOnImageAvailableListener({ r -> onJpegAvailable(r) }, bgHandler)
         jpegReader = reader
+
+        analysisReader?.close()
+        // Fast, power-efficient resolution for QR scanning (closest to 720p or 480p)
+        val yuvSizes = map.getOutputSizes(ImageFormat.YUV_420_888)?.toList().orEmpty()
+        val scanSize = chooseSize(yuvSizes, 720, capAt1080p = true)
+        val aReader = ImageReader.newInstance(scanSize.width, scanSize.height, ImageFormat.YUV_420_888, 2)
+        aReader.setOnImageAvailableListener({ r -> onAnalysisFrameAvailable(r) }, bgHandler)
+        analysisReader = aReader
 
         currentPreviewWidth = previewSize.width
         currentPreviewHeight = previewSize.height
@@ -326,10 +391,10 @@ class VaultCameraSession(
         captureSession?.let { try { it.close() } catch (_: Exception) {} }
         captureSession = null
 
-        val outputs = if (isRecording) {
+         val outputs = if (isRecording) {
             listOfNotNull(previewSurface, videoRecorder?.inputSurface)
         } else {
-            listOfNotNull(previewSurface, jpegReader?.surface)
+            listOfNotNull(previewSurface, jpegReader?.surface, analysisReader?.surface)
         }
 
         val stateCallback = object : CameraCaptureSession.StateCallback() {
@@ -433,12 +498,13 @@ class VaultCameraSession(
         }
     }
 
-    private fun newRequestBuilder(): CaptureRequest.Builder {
+  private fun newRequestBuilder(): CaptureRequest.Builder {
         val device = cameraDevice ?: throw IllegalStateException("no camera device")
         val template = if (isRecording) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW
         val builder = device.createCaptureRequest(template)
         previewSurface?.let { builder.addTarget(it) }
         if (isRecording) videoRecorder?.inputSurface?.let { builder.addTarget(it) }
+        if (isScanMode) analysisReader?.surface?.let { builder.addTarget(it) }
         applyControls(builder)
         return builder
     }

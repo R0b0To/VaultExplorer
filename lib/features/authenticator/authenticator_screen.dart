@@ -13,7 +13,9 @@ import 'package:vaultexplorer/features/authenticator/authenticator_settings_scre
 import 'package:vaultexplorer/features/authenticator/widgets/totp_code_tile.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/features/authenticator/widgets/qr_scanner_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 
 class AuthenticatorScreen extends ConsumerStatefulWidget {
@@ -138,6 +140,66 @@ class _AuthenticatorScreenState extends ConsumerState<AuthenticatorScreen> {
       ),
     );
     if (target == null || !context.mounted) return;
+
+   final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.qr_code_scanner_rounded),
+              title: Text(context.l10n.scanQrCodeTooltip),
+              onTap: () => Navigator.pop(sheetContext, 'scan'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_note_rounded),
+              title: Text(context.l10n.newItemTooltip),
+              onTap: () => Navigator.pop(sheetContext, 'manual'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+
+    if (choice == 'scan') {
+      final qrUri = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+      );
+      if (qrUri == null || !context.mounted) return;
+
+      final config = TotpConfig.fromFields({'totp_secret': qrUri});
+      final uri = Uri.tryParse(qrUri);
+      final qp = uri?.queryParameters ?? {};
+      final issuer = qp['issuer'] ?? '';
+      final pathLabel = uri != null ? Uri.decodeComponent(uri.path.replaceFirst(RegExp(r'^/'), '')) : '';
+
+      final title = issuer.isNotEmpty ? issuer : (pathLabel.isNotEmpty ? pathLabel : 'Authenticator');
+
+      final finalPath = await ref.read(vaultItemEditProvider(target!.volId).notifier).save(
+        container: target,
+        type: VaultItemType.authenticator,
+        existing: null,
+        filePath: null,
+        currentDirPath: '',
+        newTitle: title,
+        fieldMap: {
+          'totp_secret': config.secret,
+          'issuer': issuer,
+          'account': pathLabel,
+          'totp_algorithm': config.algorithm.wireName,
+          'totp_digits': '${config.digits}',
+          'totp_period': '${config.period}',
+        },
+      );
+      if (finalPath != null && context.mounted) {
+        showAppSnackBar(context, message: context.l10n.qrCodeScannedSuccess, tone: AppBannerTone.success);
+      }
+      return;
+    }
 
     final resultPath = await Navigator.push<String>(
       context,

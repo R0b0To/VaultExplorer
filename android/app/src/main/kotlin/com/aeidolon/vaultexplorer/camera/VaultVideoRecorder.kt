@@ -1,8 +1,11 @@
 package com.aeidolon.vaultexplorer.camera
 
 import android.content.Context
+import android.media.MediaCodec
 import android.media.MediaCodecList
+import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.os.Build
 import android.view.Surface
@@ -10,6 +13,7 @@ import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.io.File
 import java.io.FileInputStream
 import java.io.RandomAccessFile
+import java.nio.ByteBuffer
 import com.aeidolon.vaultexplorer.VeLog
 
 class VaultChunkWriter(
@@ -167,6 +171,107 @@ class VaultVideoRecorder(
                 false
             }
         }
+
+        fun streamFileToSinkAndWipe(file: File, sink: ChunkSink): Boolean {
+            if (!file.exists() || file.length() == 0L) return false
+            try {
+                java.io.BufferedInputStream(FileInputStream(file), 64 * 1024).use { bis ->
+                    val buffer = ByteArray(64 * 1024)
+                    var bytesRead: Int
+                    while (bis.read(buffer).also { bytesRead = it } != -1) {
+                        if (bytesRead > 0) {
+                            val chunk = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
+                            if (!sink.write(chunk)) return false
+                        }
+                    }
+                }
+                return sink.finish()
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "streamFileToSinkAndWipe failed" }
+                return false
+            } finally {
+                secureDeleteFile(file)
+            }
+        }
+
+        fun trimVideo(sourcePath: String, startMs: Long, endMs: Long): String? {
+            val srcFile = File(sourcePath)
+            if (!srcFile.exists() || startMs >= endMs) return sourcePath
+            val destFile = File.createTempFile("vx_vid_trim_", ".mp4", srcFile.parentFile)
+
+            var extractor: MediaExtractor? = null
+            var muxer: MediaMuxer? = null
+            try {
+                extractor = MediaExtractor()
+                extractor.setDataSource(sourcePath)
+                val trackCount = extractor.trackCount
+                muxer = MediaMuxer(destFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
+                val indexMap = HashMap<Int, Int>(trackCount)
+                var maxBufferSize = 1024 * 1024
+                for (i in 0 until trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                    if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                        val dstIndex = muxer.addTrack(format)
+                        indexMap[i] = dstIndex
+                        if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+                            val inputSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+                            if (inputSize > maxBufferSize) maxBufferSize = inputSize
+                        }
+                        if (format.containsKey(MediaFormat.KEY_ROTATION)) {
+                            muxer.setOrientationHint(format.getInteger(MediaFormat.KEY_ROTATION))
+                        }
+                    }
+                }
+
+                muxer.start()
+
+                val startUs = startMs * 1000L
+                val endUs = endMs * 1000L
+                val buffer = ByteBuffer.allocateDirect(maxBufferSize)
+                val bufferInfo = MediaCodec.BufferInfo()
+
+                for (i in 0 until trackCount) {
+                    if (!indexMap.containsKey(i)) continue
+                    val dstIndex = indexMap[i]!!
+                    for (t in 0 until trackCount) {
+                        try { extractor.unselectTrack(t) } catch (_: Exception) {}
+                    }
+                    extractor.selectTrack(i)
+                    extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+
+                    var firstPtsUs = -1L
+                    while (true) {
+                        bufferInfo.offset = 0
+                        bufferInfo.size = extractor.readSampleData(buffer, 0)
+                        if (bufferInfo.size < 0) break
+
+                        val sampleTimeUs = extractor.sampleTime
+                        if (sampleTimeUs > endUs) break
+
+                        if (sampleTimeUs >= startUs) {
+                            if (firstPtsUs == -1L) firstPtsUs = sampleTimeUs
+                            bufferInfo.presentationTimeUs = maxOf(0L, sampleTimeUs - firstPtsUs)
+                            bufferInfo.flags = extractor.sampleFlags
+                            muxer.writeSampleData(dstIndex, buffer, bufferInfo)
+                        }
+                        extractor.advance()
+                    }
+                }
+
+                muxer.stop()
+                secureDeleteFile(srcFile)
+                return destFile.absolutePath
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "trimVideo failed" }
+                secureDeleteFile(destFile)
+                return sourcePath
+            } finally {
+                try { muxer?.release() } catch (_: Exception) {}
+                try { extractor?.release() } catch (_: Exception) {}
+            }
+        }
     }
 
     var inputSurface: Surface? = null
@@ -272,17 +377,23 @@ class VaultVideoRecorder(
         }
     }
 
-    fun releaseEncoder() {
+ val tempFilePath: String? get() = tempFile?.absolutePath
+
+    fun releaseRecorderOnly() {
         try {
             mediaRecorder?.reset()
             mediaRecorder?.release()
         } catch (_: Exception) {}
         mediaRecorder = null
         inputSurface = null
+    }
+
+    fun releaseEncoder() {
+        releaseRecorderOnly()
         secureDeleteTempFile()
     }
 
-    private fun secureDeleteTempFile() {
+    fun secureDeleteTempFile() {
         val temp = tempFile ?: return
         tempFile = null
         secureDeleteFile(temp)

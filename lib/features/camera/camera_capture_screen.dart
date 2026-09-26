@@ -16,7 +16,9 @@ import 'camera_capture_controls_controller.dart';
 import 'camera_capture_lock_controller.dart';
 import 'camera_capture_session_controller.dart';
 import 'camera_ui_components.dart';
+import 'camera_media_review_view.dart';
 import 'vault_camera_controller.dart';
+import '../image_editor/image_editor_screen.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -59,8 +61,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   DateTime? _recordingStart;
   Timer? _timer;
 
-  String? _currentRecordingName;
+ String? _currentRecordingName;
   String? _currentRecordingPath;
+  final List<CapturedMediaItem> _capturedMedia = [];
+  bool _isReviewingMedia = false;
 
   StreamSubscription<({double x, double y, double z})>? _sensorSubscription;
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
@@ -448,48 +452,103 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     await _takePhoto();
   }
 
-  void _triggerShutterFlash() {
+   void _triggerShutterFlash() {
     setState(() => _showShutterFlash = true);
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 60), () {
       if (mounted) setState(() => _showShutterFlash = false);
     });
   }
 
-  Future<void> _takePhoto() async {
+   Future<void> _takePhoto() async {
     if (!_cameraController.isInitialized || _isEncrypting) return;
 
     _triggerShutterFlash();
 
-    _captureSessionController.setEncrypting(
-      true,
-      label: context.l10n.cameraEncryptingPhotoLabel,
-    );
-    await Future.delayed(const Duration(milliseconds: 50));
-
     try {
-      final name = await _vaultService.nextAvailableName(isPhoto: true);
-      final virtualPath = _vaultService.buildVirtualPath(name);
-
       await _cameraController.setOrientationDegrees(
         _computeDeviceRotationDegrees(),
       );
 
-      final result = await _cameraController.takePhoto(
-        volId: widget.container.volId,
-        virtualPath: virtualPath,
-      );
+      final isFirstMedia = _capturedMedia.isEmpty;
+      final result = await _cameraController.capturePhoto();
 
-      if (result.success) {
-        await _vaultService.finalizeVaultWrite(virtualPath);
-        if (mounted) {
-          Navigator.pop(context, (savedName: name, isVideo: false));
-        }
+      if (result.success && result.bytes != null && mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _capturedMedia.add(
+            CapturedMediaItem.photo(
+              photoBytes: result.bytes!,
+              thumbnailBytes: result.thumbnail ?? result.bytes!,
+            ),
+          );
+          if (isFirstMedia) {
+            _isReviewingMedia = true;
+          }
+        });
       } else {
         if (mounted) {
           _showErrorToast(
             result.error ?? context.l10n.cameraPhotoCaptureFailedMessage,
           );
         }
+      }
+    } catch (_) {
+      if (mounted) {
+        _showErrorToast(context.l10n.cameraPhotoCaptureFailedMessage);
+      }
+    }
+  }
+
+  Future<void> _commitAllMediaToVault(List<CapturedMediaItem> mediaToSave) async {
+    if (mediaToSave.isEmpty) return;
+
+    _captureSessionController.setEncrypting(
+      true,
+      label: context.l10n.savingToVault,
+    );
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    try {
+      String? firstName;
+      bool hasVideo = false;
+
+      for (int i = 0; i < mediaToSave.length; i++) {
+        final item = mediaToSave[i];
+        if (item.isPhoto && item.fullPhotoBytes != null) {
+          final name = await _vaultService.nextAvailableName(isPhoto: true);
+          firstName ??= name;
+          final virtualPath = _vaultService.buildVirtualPath(name);
+          final ok = await _cameraController.savePhotoToVault(
+            bytes: item.fullPhotoBytes!,
+            volId: widget.container.volId,
+            virtualPath: virtualPath,
+          );
+          if (ok) await _vaultService.finalizeVaultWrite(virtualPath);
+        } else if (item.isVideo && item.videoPath != null) {
+          hasVideo = true;
+          var finalVideoPath = item.videoPath!;
+          if (item.trimStartMs > 0 || (item.trimEndMs > 0 && item.trimEndMs < item.videoDurationMs)) {
+            final trimmed = await _cameraController.trimVideo(
+              videoPath: item.videoPath!,
+              startMs: item.trimStartMs,
+              endMs: item.trimEndMs,
+            );
+            if (trimmed != null) finalVideoPath = trimmed;
+          }
+          final name = await _vaultService.nextAvailableName(isPhoto: false);
+          firstName ??= name;
+          final virtualPath = _vaultService.buildVirtualPath(name);
+          final ok = await _cameraController.saveVideoToVault(
+            videoPath: finalVideoPath,
+            volId: widget.container.volId,
+            virtualPath: virtualPath,
+          );
+          if (ok) await _vaultService.finalizeVaultWrite(virtualPath);
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context, (savedName: firstName ?? 'media', isVideo: hasVideo));
       }
     } finally {
       if (mounted) _captureSessionController.setEncrypting(false);
@@ -576,42 +635,35 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _recordingStart = null;
     setState(() => _isRecording = false);
 
-    _captureSessionController.setEncrypting(
-      true,
-      label: context.l10n.cameraEncryptingVideoLabel,
-    );
-    await Future.delayed(const Duration(milliseconds: 50));
-
     try {
-      final result = await _cameraController.stopVideoRecording();
+      final isFirstMedia = _capturedMedia.isEmpty;
+      final result = await _cameraController.stopVideoRecordingForReview();
 
       final elapsedMs = startedAt == null
           ? 9999
           : DateTime.now().difference(startedAt).inMilliseconds;
-      if (elapsedMs < 500) {
+      if (elapsedMs < 500 || !result.success || result.videoPath == null) {
+        if (result.videoPath != null) {
+          await _cameraController.discardVideo(result.videoPath!);
+        }
         if (mounted) {
           _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
         }
         return;
       }
 
-      if (result.success) {
-        if (_currentRecordingPath != null) {
-          await _vaultService.finalizeVaultWrite(_currentRecordingPath!);
+      setState(() {
+        _capturedMedia.add(
+          CapturedMediaItem.video(
+            videoPath: result.videoPath!,
+            videoDurationMs: result.durationMs,
+            thumbnailBytes: result.thumbnail ?? Uint8List(0),
+          ),
+        );
+        if (isFirstMedia) {
+          _isReviewingMedia = true;
         }
-        if (mounted) {
-          Navigator.pop(context, (
-            savedName: _currentRecordingName,
-            isVideo: true,
-          ));
-        }
-      } else {
-        if (mounted) {
-          _showErrorToast(
-            result.error ?? context.l10n.cameraCouldNotSaveRecordingMessage,
-          );
-        }
-      }
+      });
     } catch (e) {
       if (mounted) {
         _showErrorToast(
@@ -625,8 +677,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _backgroundRecordingActive = false;
         unawaited(_fileIoApi.stopBackgroundRecording());
       }
-      if (mounted) _captureSessionController.setEncrypting(false);
     }
+  }
+
+  void _discardAllMedia() {
+    for (final item in _capturedMedia) {
+      if (item.isVideo && item.videoPath != null) {
+        _cameraController.discardVideo(item.videoPath!);
+      }
+    }
+    setState(() {
+      _capturedMedia.clear();
+      _isReviewingMedia = false;
+    });
   }
 
   void _showErrorToast(String msg) {
@@ -635,8 +698,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
     ref.watch(cameraCaptureSessionProvider(_captureControlsKey));
     final isContainerLocked = ref.watch(
@@ -648,8 +712,34 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         body: SizedBox.expand(),
       );
     }
+    if (_isReviewingMedia && _capturedMedia.isNotEmpty) {
+      return CameraMediaReviewView(
+        initialMedia: _capturedMedia,
+        iconTurns: _iconTurns,
+        onMediaChanged: (updated) {
+          setState(() {
+            _capturedMedia
+              ..clear()
+              ..addAll(updated);
+          });
+        },
+        onDiscard: _discardAllMedia,
+        onTakeMoreMedia: () {
+          setState(() => _isReviewingMedia = false);
+        },
+        onSaveMedia: _commitAllMediaToVault,
+      );
+    }
+
     return PopScope(
-      canPop: !_isRecording && !_isEncrypting && !_isCountingDown,
+      canPop: !_isRecording && !_isEncrypting && !_isCountingDown && _capturedMedia.isEmpty,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_capturedMedia.isNotEmpty) {
+          HapticFeedback.lightImpact();
+          _discardAllMedia();
+        }
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -742,7 +832,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               ),
             ),
 
-            // Bottom Bar
+         // Bottom Bar
             Positioned(
               bottom: 0,
               left: 0,
@@ -750,11 +840,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               child: _buildBottomControls(),
             ),
 
-            IgnorePointer(
+           // In LANDSCAPE, place the tray above the flip camera button on the left so they never overlap
+            if (isLandscape && _capturedMedia.isNotEmpty && !_isRecording && !_isCountingDown)
+              Positioned(
+                left: 16.0 + MediaQuery.paddingOf(context).left,
+                bottom: 76.0 + MediaQuery.paddingOf(context).bottom,
+                child: _buildCapturedMediaTray(),
+              ),
+
+             IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _showShutterFlash ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 60),
-                child: Container(color: Colors.black),
+                duration: const Duration(milliseconds: 50),
+                child: Container(color: Colors.white.withValues(alpha: 0.65)),
               ),
             ),
 
@@ -803,7 +901,137 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
   }
 
+  Widget _buildCapturedMediaTray() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isLandscape ? 160 : 180),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (int i = 0; i < _capturedMedia.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 8, left: 4),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              setState(() => _isReviewingMedia = true);
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white54, width: 1.5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    _capturedMedia[i].thumbnailBytes.isNotEmpty
+                                        ? Image.memory(
+                                            _capturedMedia[i].thumbnailBytes,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Container(color: Colors.grey.shade900),
+                                    if (_capturedMedia[i].isVideo)
+                                      Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: -10,
+                            right: -10,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                final removed = _capturedMedia.removeAt(i);
+                                if (removed.isVideo && removed.videoPath != null) {
+                                  _cameraController.discardVideo(removed.videoPath!);
+                                }
+                                setState(() {});
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.9),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 1.2),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.close_rounded, color: Colors.white, size: 13),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: () {
+              setState(() => _isReviewingMedia = true);
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${_capturedMedia.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_forward_rounded, size: 14),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomControls() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -812,12 +1040,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           colors: [Colors.black87, Colors.black54, Colors.transparent],
         ),
       ),
-      padding: const EdgeInsets.only(bottom: 32, top: 16),
+      padding: EdgeInsets.only(
+        bottom: isLandscape ? 12 : 32,
+        top: isLandscape ? 8 : 16,
+      ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Live captured media tray: stacked above controls ONLY in PORTRAIT
+            if (!isLandscape && _capturedMedia.isNotEmpty && !_isRecording && !_isCountingDown)
+              _buildCapturedMediaTray(),
+
             if (!_isRecording && !_isCountingDown) ...[
               CameraZoomIndicator(
                 currentZoom: _currentZoom,
@@ -829,13 +1064,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                   await applyZoomLogged(_cameraController, zoom, logTag: 'CameraCaptureScreen');
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isLandscape ? 6 : 16),
             ],
-            const SizedBox(height: 24),
+            SizedBox(height: isLandscape ? 8 : 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                buildRotatedWidget(
+               buildRotatedWidget(
                   iconTurns: _iconTurns,
                   child: IconButton(
                     icon: const Icon(

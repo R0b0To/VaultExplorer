@@ -235,7 +235,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           mountedNotifier: _mountedNotifier,
           onNavigateTab: _onTabTap,
         ),
-        ToolsScreen(mountedContainers: _mountedNotifier),
+        ToolsScreen(mountedContainers: _mountedNotifier, onNavigateTab: _onTabTap),
         const AppSettingsScreen(),
       ],
     );

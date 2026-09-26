@@ -92,8 +92,9 @@ class VaultCameraSession(
 
     private var pendingOpenResult: ((Boolean, String?) -> Unit)? = null
     private var pendingCloseCallback: (() -> Unit)? = null
-    private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
+  private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
     private var pendingPhotoWriter: ChunkSink? = null
+    private var pendingPhotoBytesCallback: ((Boolean, ByteArray?, ByteArray?, String?) -> Unit)? = null
     private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
 
     val currentCameraId: String get() = activeCameraId
@@ -668,6 +669,33 @@ class VaultCameraSession(
         }
     }
 
+    fun capturePhoto(callback: (Boolean, ByteArray?, ByteArray?, String?) -> Unit) {
+        runOnCameraThread {
+            val device = cameraDevice
+            val session = captureSession
+            val reader = jpegReader
+            if (device == null || session == null || reader == null) {
+                callback(false, null, null, "camera not ready")
+                return@runOnCameraThread
+            }
+            if (isRecording) {
+                callback(false, null, null, "cannot take photo while recording")
+                return@runOnCameraThread
+            }
+            pendingPhotoBytesCallback = callback
+            try {
+                val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                builder.addTarget(reader.surface)
+                applyControls(builder)
+                builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
+                session.capture(builder.build(), null, bgHandler)
+            } catch (e: Exception) {
+                pendingPhotoBytesCallback = null
+                callback(false, null, null, e.message)
+            }
+        }
+    }
+
     fun takePhoto(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
         capturePhotoInternal(VaultChunkWriter(volId, virtualPath), callback)
     }
@@ -719,6 +747,30 @@ class VaultCameraSession(
             val buffer = image.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
+
+          val bytesCb = pendingPhotoBytesCallback
+            if (bytesCb != null) {
+                pendingPhotoBytesCallback = null
+                val thumbBytes = try {
+                    val opts = android.graphics.BitmapFactory.Options().apply {
+                        inSampleSize = 8
+                    }
+                    val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                    if (bmp != null) {
+                        val thumb = android.media.ThumbnailUtils.extractThumbnail(bmp, 160, 160)
+                        val stream = java.io.ByteArrayOutputStream()
+                        thumb.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, stream)
+                        if (thumb !== bmp) thumb.recycle()
+                        bmp.recycle()
+                        stream.toByteArray()
+                    } else null
+                } catch (_: Exception) {
+                    null
+                }
+                bytesCb.invoke(true, bytes, thumbBytes, null)
+                return
+            }
+
             val writer = pendingPhotoWriter
             val cb = pendingPhotoCallback
             pendingPhotoWriter = null
@@ -768,6 +820,50 @@ class VaultCameraSession(
             // MediaRecorder.start() happens in onSessionReady() once the
             // [preview, recorder] session is configured and repeating.
             pendingRecordStart = callback
+            createSessionLocked()
+        }
+    }
+
+     fun stopRecordingForReview(callback: (Boolean, String?, Long, ByteArray?, String?) -> Unit) {
+        runOnCameraThread {
+            val recorder = videoRecorder
+            if (recorder == null || !isRecording) {
+                callback(false, null, 0, null, "not recording")
+                return@runOnCameraThread
+            }
+            isRecording = false
+            videoRecorder = null
+            recordingChunkWriter = null
+            try {
+                captureSession?.stopRepeating()
+                captureSession?.abortCaptures()
+            } catch (_: Exception) {}
+            val result = recorder.requestStop()
+            val path = recorder.tempFilePath
+            recorder.releaseRecorderOnly()
+
+            val thumbBytes = if (path != null) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(path)
+                    val frame = retriever.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?: retriever.frameAtTime
+                    retriever.release()
+                    if (frame != null) {
+                        val thumb = android.media.ThumbnailUtils.extractThumbnail(frame, 160, 160)
+                        val stream = java.io.ByteArrayOutputStream()
+                        thumb.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, stream)
+                        if (thumb !== frame) thumb.recycle()
+                        frame.recycle()
+                        stream.toByteArray()
+                    } else null
+                } catch (e: Exception) {
+                    VeLog.w(TAG, e) { "Failed to extract video thumbnail" }
+                    null
+                }
+            } else null
+
+            callback(true, path, result.durationMs, thumbBytes, null)
             createSessionLocked()
         }
     }

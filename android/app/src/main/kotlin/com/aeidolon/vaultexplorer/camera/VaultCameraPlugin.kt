@@ -187,6 +187,36 @@ class VaultCameraPlugin(
                     session.setOrientationDegrees(degrees)
                     result.success(null)
                 }
+                  "capturePhoto" -> withSession(call, result) { session, _ ->
+                    session.capturePhoto { ok, bytes, thumbBytes, error ->
+                        mainHandler.post {
+                            if (ok && bytes != null) {
+                                result.success(
+                                    mapOf<String, Any?>(
+                                        "success" to true,
+                                        "bytes" to bytes,
+                                        "thumbnail" to thumbBytes,
+                                    )
+                                )
+                            } else {
+                                result.success(mapOf<String, Any?>("success" to false, "error" to error))
+                            }
+                        }
+                    }
+                }
+                "savePhotoToVault" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val volId = (args["volId"] as? Number)?.toInt()
+                    val virtualPath = args["virtualPath"] as? String
+                    val bytes = args["bytes"] as? ByteArray
+                    if (volId == null || virtualPath == null || bytes == null) {
+                        result.error("bad_args", "volId, virtualPath and bytes are required", null)
+                        return
+                    }
+                    val writer = VaultChunkWriter(volId, virtualPath)
+                    val ok = writer.write(bytes) && writer.finish()
+                    result.success(mapOf("success" to ok))
+                }
                 "takePhoto" -> withSession(call, result) { session, args ->
                     val volId = (args["volId"] as? Number)?.toInt() ?: return@withSession result.error("bad_args", "volId required", null)
                     val path = args["virtualPath"] as? String ?: return@withSession result.error("bad_args", "virtualPath required", null)
@@ -230,6 +260,76 @@ class VaultCameraPlugin(
                             result.success(mapOf("success" to ok, "error" to error))
                         }
                     }
+                }
+                   "stopVideoRecordingForReview" -> withSession(call, result) { session, _ ->
+                    session.stopRecordingForReview { ok, videoPath, durationMs, thumbBytes, error ->
+                        mainHandler.post {
+                            result.success(
+                                mapOf<String, Any?>(
+                                    "success" to ok,
+                                    "videoPath" to videoPath,
+                                    "durationMs" to durationMs,
+                                    "thumbnail" to thumbBytes,
+                                    "error" to error,
+                                )
+                            )
+                        }
+                    }
+                }
+                 "trimVideo" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val videoPath = args["videoPath"] as? String
+                    val startMs = (args["startMs"] as? Number)?.toLong() ?: 0L
+                    val endMs = (args["endMs"] as? Number)?.toLong() ?: 0L
+                    if (videoPath == null) {
+                        result.error("bad_args", "videoPath required", null)
+                        return
+                    }
+                    val trimmedPath = VaultVideoRecorder.trimVideo(videoPath, startMs, endMs)
+                    result.success(mapOf<String, Any?>("videoPath" to trimmedPath))
+                }
+                "saveVideoToVault" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val volId = (args["volId"] as? Number)?.toInt()
+                    val virtualPath = args["virtualPath"] as? String
+                    val videoPath = args["videoPath"] as? String
+                    if (volId == null || virtualPath == null || videoPath == null) {
+                        result.error("bad_args", "volId, virtualPath and videoPath required", null)
+                        return
+                    }
+                    val ok = VaultVideoRecorder.streamFileToSinkAndWipe(
+                        java.io.File(videoPath),
+                        VaultChunkWriter(volId, virtualPath)
+                    )
+                    result.success(mapOf<String, Any?>("success" to ok))
+                }
+                "saveVideoToScratchpad" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val token = args["sessionToken"] as? String
+                    val scratchpadPath = args["scratchpadPath"] as? String
+                    val videoPath = args["videoPath"] as? String
+                    if (token == null || scratchpadPath == null || videoPath == null) {
+                        result.error("bad_args", "sessionToken, scratchpadPath and videoPath required", null)
+                        return
+                    }
+                    val key = ScratchpadKeyStore.get(token)
+                    if (key == null) {
+                        result.error("no_such_session", "Scratchpad session expired", null)
+                        return
+                    }
+                    val ok = VaultVideoRecorder.streamFileToSinkAndWipe(
+                        java.io.File(videoPath),
+                        ScratchpadChunkWriter(java.io.File(scratchpadPath), key)
+                    )
+                    result.success(mapOf<String, Any?>("success" to ok))
+                }
+                "discardVideo" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val videoPath = args["videoPath"] as? String
+                    if (videoPath != null) {
+                        VaultVideoRecorder.secureDeleteFile(java.io.File(videoPath))
+                    }
+                    result.success(null)
                 }
                 "stopVideoRecording" -> withSession(call, result) { session, _ ->
                     VeLog.d(TAG) { "stopVideoRecording" }

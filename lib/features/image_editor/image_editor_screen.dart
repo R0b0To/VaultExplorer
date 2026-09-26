@@ -53,16 +53,36 @@ class _EditorSnapshot {
   }
 }
 
+sealed class ImageEditorResult {
+  const ImageEditorResult();
+}
+
+class ImageEditorSaveResult extends ImageEditorResult {
+  final Uint8List bytes;
+  const ImageEditorSaveResult(this.bytes);
+}
+
+class ImageEditorAddAnotherResult extends ImageEditorResult {
+  final Uint8List bytes;
+  const ImageEditorAddAnotherResult(this.bytes);
+}
+
 class ImageEditorScreen extends ConsumerStatefulWidget {
-  final MountedContainer container;
-  final String filePath;
+  final MountedContainer? container;
+  final String? filePath;
+  final Uint8List? imageBytes;
   final ThumbnailQuality thumbnailQuality;
+  final bool allowSequentialCapture;
+  final int batchIndex;
 
   const ImageEditorScreen({
     super.key,
-    required this.container,
-    required this.filePath,
+    this.container,
+    this.filePath,
+    this.imageBytes,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.allowSequentialCapture = false,
+    this.batchIndex = 1,
   });
 
   @override
@@ -93,7 +113,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   ValueNotifier<Rect>? _cropRectNotifier;
   Size? _cropBoxSize;
 
-  String get _controlsKey => '${widget.container.uri}\u0000${widget.filePath}';
+  String get _controlsKey => widget.imageBytes != null
+      ? 'in_memory_image_editor_${widget.imageBytes.hashCode}'
+      : '${widget.container?.uri ?? ""}\u0000${widget.filePath ?? ""}';
 
   ImageEditorControlsState get _controls =>
       ref.read(imageEditorControlsProvider(_controlsKey));
@@ -131,9 +153,16 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   bool get _canUndo => _undoStack.isNotEmpty || _annotations.isNotEmpty;
 
-  String get _fileName {
-    final idx = widget.filePath.lastIndexOf('/');
-    return idx == -1 ? widget.filePath : widget.filePath.substring(idx + 1);
+String get _fileName {
+    final path = widget.filePath;
+    if (path == null) {
+      if (widget.allowSequentialCapture) {
+        return 'Photo ${widget.batchIndex}';
+      }
+      return 'photo.jpg';
+    }
+    final idx = path.lastIndexOf('/');
+    return idx == -1 ? path : path.substring(idx + 1);
   }
 
   String get _fileExtension {
@@ -211,11 +240,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   Future<void> _load() async {
     _documentController.startLoading();
     try {
-      var bytes = FullResImageCache.get(widget.container, widget.filePath);
-      bytes ??= await _fileIoApi.readWholeFile(
-        widget.container,
-        widget.filePath,
-      );
+      Uint8List? bytes = widget.imageBytes;
+      if (bytes == null && widget.container != null && widget.filePath != null) {
+        bytes = FullResImageCache.get(widget.container!, widget.filePath!);
+        bytes ??= await _fileIoApi.readWholeFile(
+          widget.container!,
+          widget.filePath!,
+        );
+      }
       if (!mounted) return;
       if (bytes == null || bytes.isEmpty) {
         _documentController.loadFailed(
@@ -655,7 +687,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Future<void> _onSavePressed() async {
     if (_document.isSaving ||
-        widget.container.readOnly ||
+        (widget.container?.readOnly ?? false) ||
         _workingImage == null) {
       return;
     }
@@ -677,24 +709,38 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         return;
       }
 
-      final lastSlash = widget.filePath.lastIndexOf('/');
+      if (widget.imageBytes != null) {
+        _documentController.setSaving(false);
+        Navigator.of(context).pop(ImageEditorSaveResult(encodedBytes));
+        return;
+      }
+
+      final container = widget.container;
+      final targetPath = widget.filePath;
+      if (container == null || targetPath == null) {
+        _documentController.setSaving(false);
+        Navigator.of(context).pop(encodedBytes);
+        return;
+      }
+
+      final lastSlash = targetPath.lastIndexOf('/');
       final dirPath = lastSlash == -1
           ? ''
-          : widget.filePath.substring(0, lastSlash);
+          : targetPath.substring(0, lastSlash);
       final baseName = lastSlash == -1
-          ? widget.filePath
-          : widget.filePath.substring(lastSlash + 1);
+          ? targetPath
+          : targetPath.substring(lastSlash + 1);
 
       var existingEntries = <RawEntry>[];
       try {
-        final raw = await _fileIoApi.listDirectory(widget.container, dirPath);
+        final raw = await _fileIoApi.listDirectory(container, dirPath);
         if (raw != null) existingEntries = RawEntry.parseAll(raw);
       } catch (e) {
         VeLog.w('ImageEditorScreen', 'Directory listing failed at ${VeLog.censorUri(dirPath)} during rename conflict check', e);
       }
       if (!mounted) return;
 
-      final fsType = resolveFilesystemType(widget.container);
+      final fsType = resolveFilesystemType(container);
       final caseSensitive = FilesystemRules.of(fsType).caseSensitive;
       final suggested = _uniqueEditedName(
         baseName,
@@ -716,9 +762,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
       switch (choice) {
         case SaveAsNewFile(:final fileName):
-          await _saveAsNewFile(dirPath, fileName, fsType, encodedBytes);
+          await _saveAsNewFile(container, dirPath, fileName, fsType, encodedBytes);
         case OverwriteOriginal():
-          await _saveOverwrite(encodedBytes);
+          await _saveOverwrite(container, targetPath, encodedBytes);
       }
     } catch (e) {
       if (!mounted) return;
@@ -732,6 +778,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _saveAsNewFile(
+    MountedContainer container,
     String dirPath,
     String fileName,
     FilesystemType fsType,
@@ -754,7 +801,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         );
       case PathBuildSuccess(:final path):
         final ok = await _fileIoApi.writeWholeFile(
-          widget.container,
+          container,
           path,
           bytes,
         );
@@ -779,10 +826,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     }
   }
 
-  Future<void> _saveOverwrite(Uint8List bytes) async {
+  Future<void> _saveOverwrite(
+    MountedContainer container,
+    String filePath,
+    Uint8List bytes,
+  ) async {
     final ok = await _fileIoApi.writeWholeFile(
-      widget.container,
-      widget.filePath,
+      container,
+      filePath,
       bytes,
     );
     if (!mounted) return;
@@ -798,12 +849,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       return;
     }
     _overwroteOriginal = true;
-    FullResImageCache.invalidate(widget.container, widget.filePath);
+    FullResImageCache.invalidate(container, filePath);
     await ref
         .read(thumbnailCacheServiceProvider)
         .invalidate(
-          widget.container,
-          widget.filePath,
+          container,
+          filePath,
           qualities: {
             widget.thumbnailQuality,
             ThumbnailQuality.defaultQuality,
@@ -841,7 +892,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                 Navigator.of(dialogContext).pop(_ExitChoice.discard),
             child: Text(l10n.discardButton),
           ),
-          if (!widget.container.readOnly)
+         if (!(widget.container?.readOnly ?? false))
             FilledButton(
               onPressed: () =>
                   Navigator.of(dialogContext).pop(_ExitChoice.save),
@@ -953,6 +1004,23 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     );
   }
 
+   Future<void> _onContinueCapturePressed() async {
+    if (_document.isSaving || _workingImage == null) return;
+    _documentController.setSaving(true);
+    try {
+      await _flattenPendingAnnotations();
+      if (!mounted) return;
+      final encodedBytes = await _encodeWorkingImage();
+      if (!mounted) return;
+      _documentController.setSaving(false);
+      if (encodedBytes != null) {
+        Navigator.of(context).pop(ImageEditorAddAnotherResult(encodedBytes));
+      }
+    } catch (_) {
+      if (mounted) _documentController.setSaving(false);
+    }
+  }
+
   List<Widget> _buildAppBarActions(AppLocalizations l10n) {
     if (_controls.activeTool == EditorTool.crop) {
       return [
@@ -975,7 +1043,18 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         onPressed: _canReset ? _resetToOriginal : null,
       ),
     ];
-    if (!widget.container.readOnly) {
+
+    if (widget.allowSequentialCapture) {
+      actions.add(
+        IconButton(
+          icon: const Icon(Icons.add_a_photo_outlined),
+          tooltip: l10n.cameraContinueCaptureTooltip,
+          onPressed: _onContinueCapturePressed,
+        ),
+      );
+    }
+
+    if (!(widget.container?.readOnly ?? false)) {
       actions.add(
         _document.isSaving
             ? const Padding(
@@ -990,9 +1069,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                 ),
               )
             : IconButton(
-                icon: const Icon(Icons.save_rounded),
-                tooltip: l10n.saveChangesTooltip,
-                onPressed: _isDirty ? _onSavePressed : null,
+                icon: const Icon(Icons.check_rounded),
+                tooltip: l10n.cameraSaveMediaTooltip,
+                onPressed: _onSavePressed,
               ),
       );
     }

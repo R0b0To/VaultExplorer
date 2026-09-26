@@ -258,6 +258,38 @@ class VaultCameraController {
     });
   }
 
+   Future<({bool success, Uint8List? bytes, Uint8List? thumbnail, String? error})> capturePhoto() async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, bytes: null, thumbnail: null, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('capturePhoto', {
+      'sessionId': sId,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final bytes = res?['bytes'] as Uint8List?;
+    final thumbnail = res?['thumbnail'] as Uint8List?;
+    final error = res?['error'] as String?;
+    return (success: ok, bytes: bytes, thumbnail: thumbnail, error: error);
+  }
+
+  Future<bool> savePhotoToVault({
+    required Uint8List bytes,
+    required int volId,
+    required String virtualPath,
+  }) async {
+    try {
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('savePhotoToVault', {
+        'bytes': bytes,
+        'volId': volId,
+        'virtualPath': virtualPath,
+      });
+      return res?['success'] as bool? ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<({bool success, String? error})> takePhoto({
     required int volId,
     required String virtualPath,
@@ -331,6 +363,79 @@ class VaultCameraController {
     final ok = res?['success'] as bool? ?? false;
     final error = res?['error'] as String?;
     return (success: ok, error: error);
+  }
+
+   Future<({bool success, String? videoPath, int durationMs, Uint8List? thumbnail, String? error})> stopVideoRecordingForReview() async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, videoPath: null, durationMs: 0, thumbnail: null, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('stopVideoRecordingForReview', {
+      'sessionId': sId,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final videoPath = res?['videoPath'] as String?;
+    final durationMs = (res?['durationMs'] as num?)?.toInt() ?? 0;
+    final thumbnail = res?['thumbnail'] as Uint8List?;
+    final error = res?['error'] as String?;
+    return (success: ok, videoPath: videoPath, durationMs: durationMs, thumbnail: thumbnail, error: error);
+  }
+
+  Future<String?> trimVideo({
+    required String videoPath,
+    required int startMs,
+    required int endMs,
+  }) async {
+    try {
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('trimVideo', {
+        'videoPath': videoPath,
+        'startMs': startMs,
+        'endMs': endMs,
+      });
+      return res?['videoPath'] as String?;
+    } catch (_) {
+      return videoPath;
+    }
+  }
+
+  Future<bool> saveVideoToVault({
+    required String videoPath,
+    required int volId,
+    required String virtualPath,
+  }) async {
+    try {
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('saveVideoToVault', {
+        'videoPath': videoPath,
+        'volId': volId,
+        'virtualPath': virtualPath,
+      });
+      return res?['success'] as bool? ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> saveVideoToScratchpad({
+    required String videoPath,
+    required String sessionToken,
+    required String scratchpadPath,
+  }) async {
+    try {
+      final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('saveVideoToScratchpad', {
+        'videoPath': videoPath,
+        'sessionToken': sessionToken,
+        'scratchpadPath': scratchpadPath,
+      });
+      return res?['success'] as bool? ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> discardVideo(String videoPath) async {
+    try {
+      await _channel.invokeMethod('discardVideo', {'videoPath': videoPath});
+    } catch (_) {}
   }
 
   Future<({bool success, int durationMs, String? error})> stopVideoRecording() async {

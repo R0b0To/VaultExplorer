@@ -76,7 +76,19 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                   child: TextField(
                     controller: _ctrl,
                     focusNode: _focusNode,
-                    enableSuggestions: false,
+                    // enableSuggestions: false is deliberately NOT set here.
+                    // On Android, Flutter's engine can only make IMEs
+                    // (Gboard, Samsung Keyboard, ...) actually honor "no
+                    // suggestions" by setting the native
+                    // TYPE_TEXT_VARIATION_VISIBLE_PASSWORD input flag under
+                    // the hood (flutter/engine#46037). Keyboards treat that
+                    // as a password field and swap to a reduced layout --
+                    // no emoji key, no suggestion strip, sometimes no
+                    // autocapitalization -- instead of the normal keyboard
+                    // every other text field in the app gets. Search gains
+                    // little from suppressing suggestions, so it's left on;
+                    // autocorrect alone is enough to stop it "correcting"
+                    // a real filename mid-search.
                     autocorrect: false,
                     onChanged: widget.onChanged,
                     textInputAction: TextInputAction.search,

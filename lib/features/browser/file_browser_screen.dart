@@ -2296,6 +2296,10 @@ void _navigateUp() {
       _navNotifier.removeItemsByName(deletedNames);
     }
 
+    if (mounted && deletedPaths.isNotEmpty && _searchActive) {
+      _searchNotifier.removeDeletedPaths(deletedPaths, _currentDirPath);
+    }
+
     await _pinsBookmarksNotifier.removeDeletedPaths(widget.container, deletedPaths);
     if (!mounted) return;
     await _loadDirectoryContents(_currentDirPath, refresh: true);
@@ -3816,9 +3820,16 @@ Future<void> _extractSelectedArchive() async {
       ),
 
       // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
+      // bottom is offset by the keyboard inset (same fix BottomSearchBar
+      // already applies to itself) -- the Scaffold above uses
+      // resizeToAvoidBottomInset: false, so nothing else shifts this bar
+      // out from under the on-screen keyboard. Without it, entering
+      // selection mode while the keyboard is up (e.g. selecting a result
+      // while search is active) pins the bar to the physical bottom of the
+      // screen, underneath the keyboard, where it's invisible and untappable.
       Positioned(
         key: const Key('browser_selection_bottom_bar_overlay_container'),
-        bottom: 0,
+        bottom: MediaQuery.of(context).viewInsets.bottom,
         left: 0,
         right: 0,
         child: AnimatedSwitcher(

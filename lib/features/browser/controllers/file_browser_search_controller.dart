@@ -82,6 +82,34 @@ class FileBrowserSearch extends _$FileBrowserSearch {
     state = _emptySearch;
   }
 
+  /// Prunes [deletedFullPaths] out of the cached scan results, mirroring
+  /// FileBrowserNavigation.removeItemsByName / FileBrowserPinsBookmarks's
+  /// own removeDeletedPaths -- without this, a delete made while search is
+  /// active (in particular deep-search mode, where the visible list comes
+  /// straight from [deepSearchResults]) leaves the removed entry on screen
+  /// until the next query edit happens to trigger a fresh scan.
+  ///
+  /// A result entry's `name` is stored relative to the directory the scan
+  /// was run from -- `relativePrefix/name` for anything found in a
+  /// subfolder (see [_toResultEntry]) -- so [searchRootPath] (the screen's
+  /// current directory path at call time) is required to rebuild the same
+  /// full path [FileBrowserScreen] itself computes for these entries via
+  /// `fullPathOf`/[joinPath], for an exact match against [deletedFullPaths].
+  void removeDeletedPaths(Set<String> deletedFullPaths, String searchRootPath) {
+    if (deletedFullPaths.isEmpty || state.deepSearchResults.isEmpty) return;
+    final updated = state.deepSearchResults
+        .where((e) => !deletedFullPaths.contains(joinPath(e.name, searchRootPath)))
+        .toList();
+    if (updated.length == state.deepSearchResults.length) return;
+    state = (
+      active: state.active,
+      query: state.query,
+      isDeepSearch: state.isDeepSearch,
+      isSearchingSubfolders: state.isSearchingSubfolders,
+      deepSearchResults: updated,
+    );
+  }
+
   /// [container]/[archiveContext]/[archiveRootPath] are only needed when
   /// the debounced scan actually runs; pass archiveContext/archiveRootPath
   /// as null when not currently browsing inside an in-memory archive

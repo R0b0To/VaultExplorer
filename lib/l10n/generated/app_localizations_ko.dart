@@ -8008,4 +8008,27 @@ class AppLocalizationsKo extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return '저장 위치 \"$name\"을(를) 사용할 수 없거나 연결이 끊어졌습니다.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => '사진 편집';
+
+  @override
+  String get cameraTrimVideoTooltip => '동영상 자르기';
+
+  @override
+  String get cameraDiscardMediaTooltip => '삭제';
+
+  @override
+  String get cameraSaveMediaTooltip => '보관함에 저장';
+
+  @override
+  String get cameraContinueCaptureTooltip => '다른 사진 촬영';
+
+  @override
+  String cameraBatchCount(int count) {
+    return '사진 $count장';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => '촬영한 사진 검토';
 }

@@ -8009,4 +8009,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'ストレージの場所「$name」は利用できないか、切断されています。';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => '写真を編集';
+
+  @override
+  String get cameraTrimVideoTooltip => '動画をトリミング';
+
+  @override
+  String get cameraDiscardMediaTooltip => '破棄';
+
+  @override
+  String get cameraSaveMediaTooltip => '金庫に保存';
+
+  @override
+  String get cameraContinueCaptureTooltip => '別の写真を撮影';
+
+  @override
+  String cameraBatchCount(int count) {
+    return '$count枚の写真';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => '撮影した写真を確認';
 }

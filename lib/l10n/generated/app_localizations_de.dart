@@ -8467,4 +8467,33 @@ class AppLocalizationsDe extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Speicherort „$name“ ist nicht verfügbar oder getrennt.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => 'Foto bearbeiten';
+
+  @override
+  String get cameraTrimVideoTooltip => 'Video schneiden';
+
+  @override
+  String get cameraDiscardMediaTooltip => 'Verwerfen';
+
+  @override
+  String get cameraSaveMediaTooltip => 'Im Tresor speichern';
+
+  @override
+  String get cameraContinueCaptureTooltip => 'Weiteres Foto aufnehmen';
+
+  @override
+  String cameraBatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Fotos',
+      one: '1 Foto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => 'Aufgenommene Fotos ansehen';
 }

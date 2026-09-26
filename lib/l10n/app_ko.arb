@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "볼트 조각을 일반 파일에 첨부하여 숨기시겠습니까?",
   "createCompositeHintAction": "복합 볼륨 마법사 열기",
   "plainDiskImageNotice": "암호화되지 않은 디스크 이미지가 감지되었습니다. 볼륨을 마운트하는 데 비밀번호가 필요하지 않습니다.",
-  "storageLocationUnavailable": "저장 위치 \"{name}\"을(를) 사용할 수 없거나 연결이 끊어졌습니다."
+  "storageLocationUnavailable": "저장 위치 \"{name}\"을(를) 사용할 수 없거나 연결이 끊어졌습니다.",
+  "cameraEditPhotoTooltip": "사진 편집",
+  "cameraTrimVideoTooltip": "동영상 자르기",
+  "cameraDiscardMediaTooltip": "삭제",
+  "cameraSaveMediaTooltip": "보관함에 저장",
+  "cameraContinueCaptureTooltip": "다른 사진 촬영",
+  "cameraBatchCount": "사진 {count}장",
+  "cameraReviewPhotosTooltip": "촬영한 사진 검토"
 }

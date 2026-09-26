@@ -10646,5 +10646,38 @@
         "type": "String"
       }
     }
+  },
+  "cameraEditPhotoTooltip": "Edit photo",
+  "@cameraEditPhotoTooltip": {
+    "description": "Tooltip for the edit photo button in camera preview"
+  },
+  "cameraTrimVideoTooltip": "Trim video",
+  "@cameraTrimVideoTooltip": {
+    "description": "Tooltip for the trim video button in camera preview"
+  },
+  "cameraDiscardMediaTooltip": "Discard",
+  "@cameraDiscardMediaTooltip": {
+    "description": "Tooltip for discarding captured photo/video and returning to camera"
+  },
+  "cameraSaveMediaTooltip": "Save to vault",
+  "@cameraSaveMediaTooltip": {
+    "description": "Tooltip for saving captured photo/video into the vault"
+  },
+  "cameraContinueCaptureTooltip": "Take another photo",
+  "@cameraContinueCaptureTooltip": {
+    "description": "Tooltip for continuing sequential photo capture"
+  },
+  "cameraBatchCount": "{count, plural, =1{1 photo} other{{count} photos}}",
+  "@cameraBatchCount": {
+    "description": "Badge or label showing the number of captured photos in a batch",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cameraReviewPhotosTooltip": "Review captured photos",
+  "@cameraReviewPhotosTooltip": {
+    "description": "Tooltip for opening review screen from the camera tray"
   }
 }

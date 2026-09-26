@@ -8483,4 +8483,33 @@ class AppLocalizationsEs extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'La ubicación de almacenamiento \"$name\" no está disponible o está desconectada.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => 'Editar foto';
+
+  @override
+  String get cameraTrimVideoTooltip => 'Recortar video';
+
+  @override
+  String get cameraDiscardMediaTooltip => 'Descartar';
+
+  @override
+  String get cameraSaveMediaTooltip => 'Guardar en bóveda';
+
+  @override
+  String get cameraContinueCaptureTooltip => 'Tomar otra foto';
+
+  @override
+  String cameraBatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fotos',
+      one: '1 foto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => 'Revisar fotos capturadas';
 }

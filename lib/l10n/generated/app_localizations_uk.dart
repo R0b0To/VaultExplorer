@@ -8545,4 +8545,33 @@ class AppLocalizationsUk extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Місце зберігання \"$name\" недоступне або відключено.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => 'Редагувати фото';
+
+  @override
+  String get cameraTrimVideoTooltip => 'Обрізати відео';
+
+  @override
+  String get cameraDiscardMediaTooltip => 'Відхилити';
+
+  @override
+  String get cameraSaveMediaTooltip => 'Зберегти у сховище';
+
+  @override
+  String get cameraContinueCaptureTooltip => 'Зробити ще одне фото';
+
+  @override
+  String cameraBatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count фото',
+      one: '1 фото',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => 'Переглянути зроблені фото';
 }

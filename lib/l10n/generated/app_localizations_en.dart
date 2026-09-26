@@ -8337,4 +8337,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Storage location \"$name\" is unavailable or disconnected.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => 'Edit photo';
+
+  @override
+  String get cameraTrimVideoTooltip => 'Trim video';
+
+  @override
+  String get cameraDiscardMediaTooltip => 'Discard';
+
+  @override
+  String get cameraSaveMediaTooltip => 'Save to vault';
+
+  @override
+  String get cameraContinueCaptureTooltip => 'Take another photo';
+
+  @override
+  String cameraBatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos',
+      one: '1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => 'Review captured photos';
 }

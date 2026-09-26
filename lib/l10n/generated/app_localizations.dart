@@ -13962,6 +13962,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Storage location \"{name}\" is unavailable or disconnected.'**
   String storageLocationUnavailable(String name);
+
+  /// Tooltip for the edit photo button in camera preview
+  ///
+  /// In en, this message translates to:
+  /// **'Edit photo'**
+  String get cameraEditPhotoTooltip;
+
+  /// Tooltip for the trim video button in camera preview
+  ///
+  /// In en, this message translates to:
+  /// **'Trim video'**
+  String get cameraTrimVideoTooltip;
+
+  /// Tooltip for discarding captured photo/video and returning to camera
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get cameraDiscardMediaTooltip;
+
+  /// Tooltip for saving captured photo/video into the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Save to vault'**
+  String get cameraSaveMediaTooltip;
+
+  /// Tooltip for continuing sequential photo capture
+  ///
+  /// In en, this message translates to:
+  /// **'Take another photo'**
+  String get cameraContinueCaptureTooltip;
+
+  /// Badge or label showing the number of captured photos in a batch
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 photo} other{{count} photos}}'**
+  String cameraBatchCount(int count);
+
+  /// Tooltip for opening review screen from the camera tray
+  ///
+  /// In en, this message translates to:
+  /// **'Review captured photos'**
+  String get cameraReviewPhotosTooltip;
 }
 
 class _AppLocalizationsDelegate

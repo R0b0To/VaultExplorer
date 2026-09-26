@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "Nascondere una cassaforte allegando le sue parti ad altri file?",
   "createCompositeHintAction": "Apri procedura guidata composita",
   "plainDiskImageNotice": "Rilevata immagine disco non crittografata. Non è richiesta alcuna password per montare questo volume.",
-  "storageLocationUnavailable": "La posizione di archiviazione \"{name}\" non è disponibile o è disconnessa."
+  "storageLocationUnavailable": "La posizione di archiviazione \"{name}\" non è disponibile o è disconnessa.",
+  "cameraEditPhotoTooltip": "Modifica foto",
+  "cameraTrimVideoTooltip": "Taglia video",
+  "cameraDiscardMediaTooltip": "Scarta",
+  "cameraSaveMediaTooltip": "Salva nella cassaforte",
+  "cameraContinueCaptureTooltip": "Scatta un'altra foto",
+  "cameraBatchCount": "{count, plural, =1{1 foto} other{{count} foto}}",
+  "cameraReviewPhotosTooltip": "Rivedi foto scattate"
 }

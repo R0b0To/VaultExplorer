@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "¿Ocultar una bóveda adjuntando sus fragmentos a otros archivos?",
   "createCompositeHintAction": "Abrir asistente de volumen compuesto",
   "plainDiskImageNotice": "Imagen de disco no cifrada detectada. No se requiere contraseña para montar este volumen.",
-  "storageLocationUnavailable": "La ubicación de almacenamiento \"{name}\" no está disponible o está desconectada."
+  "storageLocationUnavailable": "La ubicación de almacenamiento \"{name}\" no está disponible o está desconectada.",
+  "cameraEditPhotoTooltip": "Editar foto",
+  "cameraTrimVideoTooltip": "Recortar video",
+  "cameraDiscardMediaTooltip": "Descartar",
+  "cameraSaveMediaTooltip": "Guardar en bóveda",
+  "cameraContinueCaptureTooltip": "Tomar otra foto",
+  "cameraBatchCount": "{count, plural, =1{1 foto} other{{count} fotos}}",
+  "cameraReviewPhotosTooltip": "Revisar fotos capturadas"
 }

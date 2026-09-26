@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "هل تريد إخفاء خزنة عن طريق إرفاق أجزائها بملفات عادية؟",
   "createCompositeHintAction": "فتح معالج وحدة التخزين المركبة",
   "plainDiskImageNotice": "تم اكتشاف صورة قرص غير مشفرة. لا يلزم وجود كلمة مرور لفتح هذا المجلد.",
-  "storageLocationUnavailable": "موقع التخزين \"{name}\" غير متوفر أو تم فصله."
+  "storageLocationUnavailable": "موقع التخزين \"{name}\" غير متوفر أو تم فصله.",
+  "cameraEditPhotoTooltip": "تعديل الصورة",
+  "cameraTrimVideoTooltip": "قص الفيديو",
+  "cameraDiscardMediaTooltip": "تجاهل",
+  "cameraSaveMediaTooltip": "حفظ في الخزنة",
+  "cameraContinueCaptureTooltip": "التقاط صورة أخرى",
+  "cameraBatchCount": "{count, plural, =1{صورة واحدة} other{{count} صور}}",
+  "cameraReviewPhotosTooltip": "مراجعة الصور الملتقطة"
 }

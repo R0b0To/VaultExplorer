@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "想通过将文件库分块附加到普通文件来隐藏它吗？",
   "createCompositeHintAction": "打开复合卷向导",
   "plainDiskImageNotice": "检测到未加密的磁盘映像。装载此卷无需密码。",
-  "storageLocationUnavailable": "存储位置“{name}”不可用或已断开连接。"
+  "storageLocationUnavailable": "存储位置“{name}”不可用或已断开连接。",
+  "cameraEditPhotoTooltip": "编辑照片",
+  "cameraTrimVideoTooltip": "裁剪视频",
+  "cameraDiscardMediaTooltip": "丢弃",
+  "cameraSaveMediaTooltip": "保存到保险库",
+  "cameraContinueCaptureTooltip": "再拍一张照片",
+  "cameraBatchCount": "{count}张照片",
+  "cameraReviewPhotosTooltip": "查看已拍摄照片"
 }

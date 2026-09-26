@@ -8529,4 +8529,33 @@ class AppLocalizationsAr extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'موقع التخزين \"$name\" غير متوفر أو تم فصله.';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => 'تعديل الصورة';
+
+  @override
+  String get cameraTrimVideoTooltip => 'قص الفيديو';
+
+  @override
+  String get cameraDiscardMediaTooltip => 'تجاهل';
+
+  @override
+  String get cameraSaveMediaTooltip => 'حفظ في الخزنة';
+
+  @override
+  String get cameraContinueCaptureTooltip => 'التقاط صورة أخرى';
+
+  @override
+  String cameraBatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صور',
+      one: 'صورة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => 'مراجعة الصور الملتقطة';
 }

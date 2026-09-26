@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "チャンクを通常のファイルに添付して保管庫を隠しますか？",
   "createCompositeHintAction": "コンポジットウィザードを開く",
   "plainDiskImageNotice": "暗号化されていないディスクイメージが検出されました。マウントにパスワードは必要ありません。",
-  "storageLocationUnavailable": "ストレージの場所「{name}」は利用できないか、切断されています。"
+  "storageLocationUnavailable": "ストレージの場所「{name}」は利用できないか、切断されています。",
+  "cameraEditPhotoTooltip": "写真を編集",
+  "cameraTrimVideoTooltip": "動画をトリミング",
+  "cameraDiscardMediaTooltip": "破棄",
+  "cameraSaveMediaTooltip": "金庫に保存",
+  "cameraContinueCaptureTooltip": "別の写真を撮影",
+  "cameraBatchCount": "{count}枚の写真",
+  "cameraReviewPhotosTooltip": "撮影した写真を確認"
 }

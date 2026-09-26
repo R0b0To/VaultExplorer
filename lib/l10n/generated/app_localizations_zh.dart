@@ -7900,4 +7900,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return '存储位置“$name”不可用或已断开连接。';
   }
+
+  @override
+  String get cameraEditPhotoTooltip => '编辑照片';
+
+  @override
+  String get cameraTrimVideoTooltip => '裁剪视频';
+
+  @override
+  String get cameraDiscardMediaTooltip => '丢弃';
+
+  @override
+  String get cameraSaveMediaTooltip => '保存到保险库';
+
+  @override
+  String get cameraContinueCaptureTooltip => '再拍一张照片';
+
+  @override
+  String cameraBatchCount(int count) {
+    return '$count张照片';
+  }
+
+  @override
+  String get cameraReviewPhotosTooltip => '查看已拍摄照片';
 }

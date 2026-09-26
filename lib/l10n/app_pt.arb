@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "Ocultar um cofre anexando suas partes a outros arquivos?",
   "createCompositeHintAction": "Abrir assistente composto",
   "plainDiskImageNotice": "Imagem de disco não criptografada detectada. Nenhuma senha é necessária para montar este volume.",
-  "storageLocationUnavailable": "O local de armazenamento \"{name}\" está indisponível ou desconectado."
+  "storageLocationUnavailable": "O local de armazenamento \"{name}\" está indisponível ou desconectado.",
+  "cameraEditPhotoTooltip": "Editar foto",
+  "cameraTrimVideoTooltip": "Cortar vídeo",
+  "cameraDiscardMediaTooltip": "Descartar",
+  "cameraSaveMediaTooltip": "Salvar no cofre",
+  "cameraContinueCaptureTooltip": "Tirar outra foto",
+  "cameraBatchCount": "{count, plural, =1{1 foto} other{{count} fotos}}",
+  "cameraReviewPhotosTooltip": "Revisar fotos capturadas"
 }

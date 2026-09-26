@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "Einen Tresor verstecken, indem Teile an gewöhnliche Dateien angehängt werden?",
   "createCompositeHintAction": "Composite-Assistenten öffnen",
   "plainDiskImageNotice": "Unverschlüsseltes Datenträgerabbild erkannt. Zum Einbinden ist kein Passwort erforderlich.",
-  "storageLocationUnavailable": "Speicherort „{name}“ ist nicht verfügbar oder getrennt."
+  "storageLocationUnavailable": "Speicherort „{name}“ ist nicht verfügbar oder getrennt.",
+  "cameraEditPhotoTooltip": "Foto bearbeiten",
+  "cameraTrimVideoTooltip": "Video schneiden",
+  "cameraDiscardMediaTooltip": "Verwerfen",
+  "cameraSaveMediaTooltip": "Im Tresor speichern",
+  "cameraContinueCaptureTooltip": "Weiteres Foto aufnehmen",
+  "cameraBatchCount": "{count, plural, =1{1 Foto} other{{count} Fotos}}",
+  "cameraReviewPhotosTooltip": "Aufgenommene Fotos ansehen"
 }

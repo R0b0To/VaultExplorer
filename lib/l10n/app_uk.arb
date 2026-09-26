@@ -2301,5 +2301,12 @@
   "createCompositeHintPrompt": "Сховати сховище, прикріпивши його частини до звичайних файлів?",
   "createCompositeHintAction": "Відкрити майстер композитного тому",
   "plainDiskImageNotice": "Виявлено незашифрований образ диска. Для монтування цього тому пароль не потрібен.",
-  "storageLocationUnavailable": "Місце зберігання \"{name}\" недоступне або відключено."
+  "storageLocationUnavailable": "Місце зберігання \"{name}\" недоступне або відключено.",
+  "cameraEditPhotoTooltip": "Редагувати фото",
+  "cameraTrimVideoTooltip": "Обрізати відео",
+  "cameraDiscardMediaTooltip": "Відхилити",
+  "cameraSaveMediaTooltip": "Зберегти у сховище",
+  "cameraContinueCaptureTooltip": "Зробити ще одне фото",
+  "cameraBatchCount": "{count, plural, =1{1 фото} other{{count} фото}}",
+  "cameraReviewPhotosTooltip": "Переглянути зроблені фото"
 }

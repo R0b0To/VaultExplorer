@@ -88,6 +88,9 @@ engine straight into these views.
 | `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports almost everywhere in this project (one file, `lib/features/share_import/share_import_flow.dart`, still imports `package:flutter/material.dart` directly -- not a licensing concern either way since both come from the Flutter SDK/its own packages, just noted so this table doesn't overstate how complete the migration is). |
 | `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |
 | `riverpod_annotation` | MIT | Annotations consumed by `flutter_riverpod`; no separate codegen at runtime. |
+| `re_editor` | MIT | In-app text/code editor widget (`reqable.com`) backing `TextEditorScreen` -- line numbers, active-line indication, and syntax highlighting. Checked against upstream `reqable/re-editor`, not just pub.dev's badge. |
+| `re_highlight` | MIT | `re_editor`'s syntax-highlighting engine (Dart port of `highlight.js`, itself BSD-3-Clause upstream -- the Dart translation is independently MIT-licensed by `reqable.com`). Supplies the bundled language grammars and color themes used by the editor. |
+| `isolate_manager` | MIT | Transitive dependency of `re_editor`; runs syntax highlighting off the UI isolate for large files. |
 
 `archive` (MIT) is present only as a transitive/test-time package now -- it
 is not a direct `pubspec.yaml` dependency and ships in no release code
@@ -105,6 +108,12 @@ dart-lang / invertase), and to the test-only mocking packages
 `path_provider_platform_interface`/`plugin_platform_interface` (both
 BSD-3-Clause, official Flutter-team packages): none of these are packaged
 into the release binary.
+
+## Fonts (`assets/fonts/`)
+
+| Component | Upstream | License | Notes |
+|---|---|---|---|
+| JetBrains Mono (Regular, Bold, Italic) | `JetBrains/JetBrainsMono` | SIL Open Font License 1.1 | Bundled as the code editor's monospace typeface (`TextEditorScreen`), falling back to the platform's system monospace font if it fails to load. OFL permits embedding/redistribution in an application; full license text kept at `assets/licenses/JetBrainsMono-OFL.txt`. Not sold on its own, satisfying the OFL's one real restriction. |
 
 ## Distribution notes
 

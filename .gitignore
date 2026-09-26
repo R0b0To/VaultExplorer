@@ -54,3 +54,6 @@ android/.vscode
 android/**/.cxx/
 # Widget Preview related
 .widget_preview/
+**/android/key.properties
+**/android/app/*.jks
+**/android/app/*.keystore

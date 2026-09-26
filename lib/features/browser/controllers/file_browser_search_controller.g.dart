@@ -58,7 +58,7 @@ final class FileBrowserSearchProvider
   }
 }
 
-String _$fileBrowserSearchHash() => r'be86e5cebb7adc1dbb3053d11f1f9d0dec436536';
+String _$fileBrowserSearchHash() => r'f6996cb5df70d9fa9ca263d0f992653abbbe5ae3';
 
 final class FileBrowserSearchFamily extends $Family
     with

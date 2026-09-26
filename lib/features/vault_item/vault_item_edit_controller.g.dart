@@ -58,7 +58,7 @@ final class VaultItemEditProvider
   }
 }
 
-String _$vaultItemEditHash() => r'7d849c646f0d7e91febfece85971c28e2dbef720';
+String _$vaultItemEditHash() => r'ac1efab9077dcac8f30899387153390ad339b2b4';
 
 final class VaultItemEditFamily extends $Family
     with

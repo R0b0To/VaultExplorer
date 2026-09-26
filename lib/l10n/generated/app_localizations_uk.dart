@@ -8685,4 +8685,19 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => 'Імпорт та експорт';
+
+  @override
+  String get scanQrCodeTooltip => 'Сканувати QR-код';
+
+  @override
+  String get qrScannerTitle => 'Сканувати QR-код';
+
+  @override
+  String get qrScannerHint => 'Вирівняйте QR-код у рамці';
+
+  @override
+  String get qrCodeScannedSuccess => 'QR-код успішно відскановано';
+
+  @override
+  String get invalidQrCodeError => 'Недійсний 2FA QR-код';
 }

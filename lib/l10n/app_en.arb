@@ -10819,5 +10819,25 @@
   "authenticatorInterchangeSection": "Import & Export",
   "@authenticatorInterchangeSection": {
     "description": "Section header for password and 2FA import/export in authenticator settings"
+  },
+  "scanQrCodeTooltip": "Scan QR code",
+  "@scanQrCodeTooltip": {
+    "description": "Tooltip for button that opens the QR code scanner"
+  },
+  "qrScannerTitle": "Scan QR Code",
+  "@qrScannerTitle": {
+    "description": "AppBar title for the QR code scanner screen"
+  },
+  "qrScannerHint": "Align QR code within the frame",
+  "@qrScannerHint": {
+    "description": "On-screen hint inside the camera viewfinder"
+  },
+  "qrCodeScannedSuccess": "QR code scanned successfully",
+  "@qrCodeScannedSuccess": {
+    "description": "Snackbar confirming QR code was read"
+  },
+  "invalidQrCodeError": "Not a valid 2FA QR code",
+  "@invalidQrCodeError": {
+    "description": "Error shown when a scanned QR code is not an otpauth URI"
   }
 }

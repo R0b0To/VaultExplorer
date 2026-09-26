@@ -14214,6 +14214,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import & Export'**
   String get authenticatorInterchangeSection;
+
+  /// Tooltip for button that opens the QR code scanner
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR code'**
+  String get scanQrCodeTooltip;
+
+  /// AppBar title for the QR code scanner screen
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR Code'**
+  String get qrScannerTitle;
+
+  /// On-screen hint inside the camera viewfinder
+  ///
+  /// In en, this message translates to:
+  /// **'Align QR code within the frame'**
+  String get qrScannerHint;
+
+  /// Snackbar confirming QR code was read
+  ///
+  /// In en, this message translates to:
+  /// **'QR code scanned successfully'**
+  String get qrCodeScannedSuccess;
+
+  /// Error shown when a scanned QR code is not an otpauth URI
+  ///
+  /// In en, this message translates to:
+  /// **'Not a valid 2FA QR code'**
+  String get invalidQrCodeError;
 }
 
 class _AppLocalizationsDelegate

@@ -8138,4 +8138,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => '가져오기 및 내보내기';
+
+  @override
+  String get scanQrCodeTooltip => 'QR 코드 스캔';
+
+  @override
+  String get qrScannerTitle => 'QR 코드 스캔';
+
+  @override
+  String get qrScannerHint => '프레임 안에 QR 코드를 맞춰주세요';
+
+  @override
+  String get qrCodeScannedSuccess => 'QR 코드를 성공적으로 스캔했습니다';
+
+  @override
+  String get invalidQrCodeError => '올바른 2FA QR 코드가 아닙니다';
 }

@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "موضع شريط البحث",
   "authenticatorPlacementBottom": "أسفل",
   "authenticatorPlacementTop": "أعلى",
-  "authenticatorInterchangeSection": "الاستيراد والتصدير"
+  "authenticatorInterchangeSection": "الاستيراد والتصدير",
+  "scanQrCodeTooltip": "مسح رمز الاستجابة السريعة",
+  "qrScannerTitle": "مسح رمز الاستجابة السريعة",
+  "qrScannerHint": "قم بمحاذاة الرمز داخل الإطار",
+  "qrCodeScannedSuccess": "تم مسح الرمز بنجاح",
+  "invalidQrCodeError": "رمز الاستجابة السريعة للمصادقة غير صالح"
 }

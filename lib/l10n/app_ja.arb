@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "検索バーの配置",
   "authenticatorPlacementBottom": "下部",
   "authenticatorPlacementTop": "上部",
-  "authenticatorInterchangeSection": "インポートとエクスポート"
+  "authenticatorInterchangeSection": "インポートとエクスポート",
+  "scanQrCodeTooltip": "QRコードをスキャン",
+  "qrScannerTitle": "QRコードをスキャン",
+  "qrScannerHint": "フレーム内にQRコードを合わせてください",
+  "qrCodeScannedSuccess": "QRコードを正常にスキャンしました",
+  "invalidQrCodeError": "有効な2FA QRコードではありません"
 }

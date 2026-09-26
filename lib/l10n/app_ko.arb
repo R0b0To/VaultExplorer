@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "검색창 위치",
   "authenticatorPlacementBottom": "하단",
   "authenticatorPlacementTop": "상단",
-  "authenticatorInterchangeSection": "가져오기 및 내보내기"
+  "authenticatorInterchangeSection": "가져오기 및 내보내기",
+  "scanQrCodeTooltip": "QR 코드 스캔",
+  "qrScannerTitle": "QR 코드 스캔",
+  "qrScannerHint": "프레임 안에 QR 코드를 맞춰주세요",
+  "qrCodeScannedSuccess": "QR 코드를 성공적으로 스캔했습니다",
+  "invalidQrCodeError": "올바른 2FA QR 코드가 아닙니다"
 }

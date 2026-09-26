@@ -8030,4 +8030,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => '导入与导出';
+
+  @override
+  String get scanQrCodeTooltip => '扫描二维码';
+
+  @override
+  String get qrScannerTitle => '扫描二维码';
+
+  @override
+  String get qrScannerHint => '将二维码对齐在框内';
+
+  @override
+  String get qrCodeScannedSuccess => '二维码扫描成功';
+
+  @override
+  String get invalidQrCodeError => '无效的双重验证二维码';
 }

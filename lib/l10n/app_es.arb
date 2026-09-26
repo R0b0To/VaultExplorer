@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "Ubicación de la barra de búsqueda",
   "authenticatorPlacementBottom": "Abajo",
   "authenticatorPlacementTop": "Arriba",
-  "authenticatorInterchangeSection": "Importar y exportar"
+  "authenticatorInterchangeSection": "Importar y exportar",
+  "scanQrCodeTooltip": "Escanear código QR",
+  "qrScannerTitle": "Escanear código QR",
+  "qrScannerHint": "Alinea el código QR dentro del marco",
+  "qrCodeScannedSuccess": "Código QR escaneado con éxito",
+  "invalidQrCodeError": "Código QR 2FA no válido"
 }

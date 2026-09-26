@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "Position der Suchleiste",
   "authenticatorPlacementBottom": "Unten",
   "authenticatorPlacementTop": "Oben",
-  "authenticatorInterchangeSection": "Importieren & Exportieren"
+  "authenticatorInterchangeSection": "Importieren & Exportieren",
+  "scanQrCodeTooltip": "QR-Code scannen",
+  "qrScannerTitle": "QR-Code scannen",
+  "qrScannerHint": "QR-Code im Rahmen ausrichten",
+  "qrCodeScannedSuccess": "QR-Code erfolgreich gescannt",
+  "invalidQrCodeError": "Ungültiger 2FA-QR-Code"
 }

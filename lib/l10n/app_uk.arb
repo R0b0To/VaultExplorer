@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "Розташування панелі пошуку",
   "authenticatorPlacementBottom": "Знизу",
   "authenticatorPlacementTop": "Згори",
-  "authenticatorInterchangeSection": "Імпорт та експорт"
+  "authenticatorInterchangeSection": "Імпорт та експорт",
+  "scanQrCodeTooltip": "Сканувати QR-код",
+  "qrScannerTitle": "Сканувати QR-код",
+  "qrScannerHint": "Вирівняйте QR-код у рамці",
+  "qrCodeScannedSuccess": "QR-код успішно відскановано",
+  "invalidQrCodeError": "Недійсний 2FA QR-код"
 }

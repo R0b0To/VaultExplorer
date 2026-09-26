@@ -2343,5 +2343,10 @@
   "authenticatorSearchPlacementLabel": "搜索栏位置",
   "authenticatorPlacementBottom": "底部",
   "authenticatorPlacementTop": "顶部",
-  "authenticatorInterchangeSection": "导入与导出"
+  "authenticatorInterchangeSection": "导入与导出",
+  "scanQrCodeTooltip": "扫描二维码",
+  "qrScannerTitle": "扫描二维码",
+  "qrScannerHint": "将二维码对齐在框内",
+  "qrCodeScannedSuccess": "二维码扫描成功",
+  "invalidQrCodeError": "无效的双重验证二维码"
 }

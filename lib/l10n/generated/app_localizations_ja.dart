@@ -8139,4 +8139,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => 'インポートとエクスポート';
+
+  @override
+  String get scanQrCodeTooltip => 'QRコードをスキャン';
+
+  @override
+  String get qrScannerTitle => 'QRコードをスキャン';
+
+  @override
+  String get qrScannerHint => 'フレーム内にQRコードを合わせてください';
+
+  @override
+  String get qrCodeScannedSuccess => 'QRコードを正常にスキャンしました';
+
+  @override
+  String get invalidQrCodeError => '有効な2FA QRコードではありません';
 }

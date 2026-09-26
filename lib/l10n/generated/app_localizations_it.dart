@@ -8605,4 +8605,19 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => 'Importa ed esporta';
+
+  @override
+  String get scanQrCodeTooltip => 'Scansiona codice QR';
+
+  @override
+  String get qrScannerTitle => 'Scansiona codice QR';
+
+  @override
+  String get qrScannerHint => 'Allinea il codice QR nella cornice';
+
+  @override
+  String get qrCodeScannedSuccess => 'Codice QR scansionato con successo';
+
+  @override
+  String get invalidQrCodeError => 'Codice QR 2FA non valido';
 }

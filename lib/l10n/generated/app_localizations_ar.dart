@@ -8667,4 +8667,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get authenticatorInterchangeSection => 'الاستيراد والتصدير';
+
+  @override
+  String get scanQrCodeTooltip => 'مسح رمز الاستجابة السريعة';
+
+  @override
+  String get qrScannerTitle => 'مسح رمز الاستجابة السريعة';
+
+  @override
+  String get qrScannerHint => 'قم بمحاذاة الرمز داخل الإطار';
+
+  @override
+  String get qrCodeScannedSuccess => 'تم مسح الرمز بنجاح';
+
+  @override
+  String get invalidQrCodeError => 'رمز الاستجابة السريعة للمصادقة غير صالح';
 }

@@ -14040,6 +14040,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review captured photos'**
   String get cameraReviewPhotosTooltip;
+
+  /// Vault item type name: a standalone TOTP (2FA) authenticator entry
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator'**
+  String get vaultItemTypeAuthenticator;
+
+  /// Authenticator item field: the service or organization name, e.g. GitHub
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer'**
+  String get fieldIssuer;
+
+  /// Authenticator item field: the account name or email the code belongs to
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get fieldAuthenticatorAccount;
+
+  /// Authenticator item field: the base32 TOTP secret
+  ///
+  /// In en, this message translates to:
+  /// **'Secret Key'**
+  String get fieldSecretKey;
+
+  /// Authenticator item field: HMAC algorithm used to generate codes, e.g. SHA1/SHA256/SHA512
+  ///
+  /// In en, this message translates to:
+  /// **'Algorithm (default: SHA1)'**
+  String get fieldTotpAlgorithm;
+
+  /// Authenticator item field: number of digits in the generated code
+  ///
+  /// In en, this message translates to:
+  /// **'Digits (default: 6)'**
+  String get fieldTotpDigits;
+
+  /// Authenticator item field: how often the code refreshes, in seconds
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Interval, seconds (default: 30)'**
+  String get fieldTotpPeriod;
+
+  /// AppBar title for the Authenticator screen listing live TOTP codes
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator'**
+  String get authenticatorScreenTitle;
+
+  /// Tooltip for the AppBar icon that opens the Authenticator screen
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator codes'**
+  String get authenticatorAppBarTooltip;
+
+  /// Empty state title on the Authenticator screen when no TOTP-capable items exist
+  ///
+  /// In en, this message translates to:
+  /// **'No authenticator codes yet'**
+  String get authenticatorEmptyStateTitle;
+
+  /// Empty state message on the Authenticator screen
+  ///
+  /// In en, this message translates to:
+  /// **'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.'**
+  String get authenticatorEmptyStateMessage;
+
+  /// Shown on the Authenticator screen when no vault is currently unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock a vault to see its authenticator codes here.'**
+  String get authenticatorNoVaultsUnlockedMessage;
+
+  /// Generic label for a TOTP code, e.g. in the "Code copied" confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get authenticatorCodeLabel;
+
+  /// Shown in place of a TOTP code when the stored secret isn't valid base32
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid secret'**
+  String get authenticatorInvalidSecretError;
+
+  /// Tooltip for the button that creates a new Authenticator item
+  ///
+  /// In en, this message translates to:
+  /// **'Add authenticator'**
+  String get authenticatorAddButtonTooltip;
+
+  /// Title of the sheet letting the user pick which unlocked vault to save a new Authenticator item into
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a vault'**
+  String get authenticatorChooseVaultTitle;
+
+  /// Tooltip for the chevron button on an Authenticator list row that opens the underlying item's detail screen
+  ///
+  /// In en, this message translates to:
+  /// **'Open item'**
+  String get authenticatorOpenItemTooltip;
 }
 
 class _AppLocalizationsDelegate

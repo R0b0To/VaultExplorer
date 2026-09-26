@@ -10703,5 +10703,73 @@
   "cameraReviewPhotosTooltip": "Review captured photos",
   "@cameraReviewPhotosTooltip": {
     "description": "Tooltip for opening review screen from the camera tray"
+  },
+  "vaultItemTypeAuthenticator": "Authenticator",
+  "@vaultItemTypeAuthenticator": {
+    "description": "Vault item type name: a standalone TOTP (2FA) authenticator entry"
+  },
+  "fieldIssuer": "Issuer",
+  "@fieldIssuer": {
+    "description": "Authenticator item field: the service or organization name, e.g. GitHub"
+  },
+  "fieldAuthenticatorAccount": "Account",
+  "@fieldAuthenticatorAccount": {
+    "description": "Authenticator item field: the account name or email the code belongs to"
+  },
+  "fieldSecretKey": "Secret Key",
+  "@fieldSecretKey": {
+    "description": "Authenticator item field: the base32 TOTP secret"
+  },
+  "fieldTotpAlgorithm": "Algorithm (default: SHA1)",
+  "@fieldTotpAlgorithm": {
+    "description": "Authenticator item field: HMAC algorithm used to generate codes, e.g. SHA1/SHA256/SHA512"
+  },
+  "fieldTotpDigits": "Digits (default: 6)",
+  "@fieldTotpDigits": {
+    "description": "Authenticator item field: number of digits in the generated code"
+  },
+  "fieldTotpPeriod": "Refresh Interval, seconds (default: 30)",
+  "@fieldTotpPeriod": {
+    "description": "Authenticator item field: how often the code refreshes, in seconds"
+  },
+  "authenticatorScreenTitle": "Authenticator",
+  "@authenticatorScreenTitle": {
+    "description": "AppBar title for the Authenticator screen listing live TOTP codes"
+  },
+  "authenticatorAppBarTooltip": "Authenticator codes",
+  "@authenticatorAppBarTooltip": {
+    "description": "Tooltip for the AppBar icon that opens the Authenticator screen"
+  },
+  "authenticatorEmptyStateTitle": "No authenticator codes yet",
+  "@authenticatorEmptyStateTitle": {
+    "description": "Empty state title on the Authenticator screen when no TOTP-capable items exist"
+  },
+  "authenticatorEmptyStateMessage": "Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.",
+  "@authenticatorEmptyStateMessage": {
+    "description": "Empty state message on the Authenticator screen"
+  },
+  "authenticatorNoVaultsUnlockedMessage": "Unlock a vault to see its authenticator codes here.",
+  "@authenticatorNoVaultsUnlockedMessage": {
+    "description": "Shown on the Authenticator screen when no vault is currently unlocked"
+  },
+  "authenticatorCodeLabel": "Code",
+  "@authenticatorCodeLabel": {
+    "description": "Generic label for a TOTP code, e.g. in the \"Code copied\" confirmation"
+  },
+  "authenticatorInvalidSecretError": "Invalid secret",
+  "@authenticatorInvalidSecretError": {
+    "description": "Shown in place of a TOTP code when the stored secret isn't valid base32"
+  },
+  "authenticatorAddButtonTooltip": "Add authenticator",
+  "@authenticatorAddButtonTooltip": {
+    "description": "Tooltip for the button that creates a new Authenticator item"
+  },
+  "authenticatorChooseVaultTitle": "Choose a vault",
+  "@authenticatorChooseVaultTitle": {
+    "description": "Title of the sheet letting the user pick which unlocked vault to save a new Authenticator item into"
+  },
+  "authenticatorOpenItemTooltip": "Open item",
+  "@authenticatorOpenItemTooltip": {
+    "description": "Tooltip for the chevron button on an Authenticator list row that opens the underlying item's detail screen"
   }
 }

@@ -2314,5 +2314,22 @@
   "textEditorReadOnlyIndicatorLabel": "읽기 전용",
   "textEditorMoveCursorLeftTooltip": "커서를 왼쪽으로 이동",
   "textEditorMoveCursorRightTooltip": "커서를 오른쪽으로 이동",
-  "textEditorSelectWordTooltip": "단어 선택"
+  "textEditorSelectWordTooltip": "단어 선택",
+  "vaultItemTypeAuthenticator": "Authenticator",
+  "fieldIssuer": "Issuer",
+  "fieldAuthenticatorAccount": "Account",
+  "fieldSecretKey": "Secret Key",
+  "fieldTotpAlgorithm": "Algorithm (default: SHA1)",
+  "fieldTotpDigits": "Digits (default: 6)",
+  "fieldTotpPeriod": "Refresh Interval, seconds (default: 30)",
+  "authenticatorScreenTitle": "Authenticator",
+  "authenticatorAppBarTooltip": "Authenticator codes",
+  "authenticatorEmptyStateTitle": "No authenticator codes yet",
+  "authenticatorEmptyStateMessage": "Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.",
+  "authenticatorNoVaultsUnlockedMessage": "Unlock a vault to see its authenticator codes here.",
+  "authenticatorCodeLabel": "Code",
+  "authenticatorInvalidSecretError": "Invalid secret",
+  "authenticatorAddButtonTooltip": "Add authenticator",
+  "authenticatorChooseVaultTitle": "Choose a vault",
+  "authenticatorOpenItemTooltip": "Open item"
 }

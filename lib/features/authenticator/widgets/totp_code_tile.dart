@@ -139,14 +139,8 @@ class _TotpCodeTileState extends State<TotpCodeTile> {
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.35),
-          width: 1,
-        ),
-      ),
-      color: cs.surfaceContainerLow,
+
+      color: cs.surfaceContainer,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.lg),

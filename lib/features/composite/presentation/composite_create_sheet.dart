@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
@@ -18,7 +19,14 @@ enum _CompositeWizStep { carriers, security, advanced, review }
 /// Linear multi-step wizard for creating a new distributed composite VeraCrypt volume
 /// across multiple carrier files.
 class CompositeCreateSheet extends ConsumerStatefulWidget {
-  const CompositeCreateSheet({super.key});
+  /// Called right after this sheet pops itself, once a composite container
+  /// is actually ready (freshly created, or unlocked via the "already have
+  /// one?" shortcut) — never on cancel/back. Callers use it to get the user
+  /// the rest of the way back to the vault dashboard, the same way the
+  /// normal (non-composite) container wizard already lands there.
+  final VoidCallback? onCreated;
+
+  const CompositeCreateSheet({super.key, this.onCreated});
 
   @override
   ConsumerState<CompositeCreateSheet> createState() => _CompositeCreateSheetState();
@@ -134,6 +142,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
       await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
       if (!mounted) return;
       Navigator.of(context).pop();
+      widget.onCreated?.call();
       showAppSnackBar(
         context,
         message: context.l10n.compositeCreateSuccessMessage,
@@ -409,16 +418,32 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                     await _suppressLock(ctrl.pickCarriers);
                     if (!context.mounted) return;
                     final carriers = ref.read(compositeContainerProvider).pickedCarriers;
-                    if (carriers.isNotEmpty && context.mounted) {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => UnlockSheet(
-                            initialCompositeCarriers: carriers.map((c) => c.uri).toList(),
-                            initialName: context.l10n.compositeDefaultContainerName(carriers.length),
-                            onMounted: (container, {record}) {},
-                          ),
+                    if (carriers.isEmpty || !context.mounted) return;
+
+                    MountedContainer? newlyMountedContainer;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UnlockSheet(
+                          initialCompositeCarriers: carriers.map((c) => c.uri).toList(),
+                          initialName: context.l10n.compositeDefaultContainerName(carriers.length),
+                          onMounted: (container, {record}) {
+                            ref
+                                .read(vaultDashboardControllerProvider.notifier)
+                                .onContainerMounted(container, record: record);
+                            newlyMountedContainer = container;
+                          },
                         ),
-                      );
+                      ),
+                    );
+                    if (!context.mounted) return;
+                    if (newlyMountedContainer != null) {
+                      await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+                      ref
+                          .read(vaultDashboardControllerProvider.notifier)
+                          .refreshContainerSpace(newlyMountedContainer!.volId);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop();
+                      widget.onCreated?.call();
                     }
                   },
             icon: const Icon(Icons.lock_open_rounded, size: 18),

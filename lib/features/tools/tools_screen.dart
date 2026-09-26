@@ -20,8 +20,9 @@ import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+  final ValueChanged<int>? onNavigateTab;
 
-  const ToolsScreen({super.key, required this.mountedContainers});
+  const ToolsScreen({super.key, required this.mountedContainers, this.onNavigateTab});
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +322,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const CompositeCreateSheet(),
+          builder: (_) => CompositeCreateSheet(
+            onCreated: () => onNavigateTab?.call(0),
+          ),
         ),
       ),
     );

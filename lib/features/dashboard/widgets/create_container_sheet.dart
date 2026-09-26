@@ -408,7 +408,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const CompositeCreateSheet(),
+            builder: (_) => CompositeCreateSheet(
+              // This wizard was itself pushed on top of the dashboard, so
+              // popping it here is enough to land back there — same as
+              // creating a normal (non-composite) container.
+              onCreated: () {
+                if (mounted) Navigator.of(context).pop();
+              },
+            ),
           ),
         ),
         child: Padding(

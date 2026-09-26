@@ -7297,6 +7297,10 @@ class AppLocalizationsKo extends AppLocalizations {
       '해당 위치에 직접 접근할 수 없습니다. 저장소 권한을 확인하세요.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      '이미 이 앱의 볼트 저장소이므로 외부 위치로 다시 추가할 수 없습니다. 대신 볼트 목록에서 여세요.';
+
+  @override
   String get internalStorageSubtitle => '내부 저장소';
 
   @override

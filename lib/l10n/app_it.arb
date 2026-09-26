@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "Rimuovere \"{name}\" dalle posizioni? I file non verranno eliminati.",
   "storageLocationAddedSnack": "Posizione di archiviazione aggiunta",
   "storageLocationUnresolvedError": "Impossibile accedere direttamente a questa posizione. Verifica i permessi di archiviazione.",
+  "storageLocationSelfReferenceError": "Questo è già lo spazio di archiviazione di un Vault di questa app, quindi non può essere aggiunto di nuovo come posizione esterna. Aprilo invece dal tuo elenco di Vault.",
   "internalStorageSubtitle": "Memoria interna",
   "mediaViewerActionPlayPause": "Riproduci / Pausa",
   "mediaViewerActionPlaybackMode": "Modalità di riproduzione",

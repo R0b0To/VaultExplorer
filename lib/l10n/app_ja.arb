@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "ストレージの場所から「{name}」を削除しますか？ファイルは削除されません。",
   "storageLocationAddedSnack": "ストレージの場所を追加しました",
   "storageLocationUnresolvedError": "その場所に直接アクセスできませんでした。ストレージの権限を確認してください。",
+  "storageLocationSelfReferenceError": "これはすでにこのアプリのボールトのストレージなので、外部の場所として再度追加することはできません。代わりにボールトの一覧から開いてください。",
   "internalStorageSubtitle": "内部ストレージ",
   "mediaViewerActionPlayPause": "再生 / 一時停止",
   "mediaViewerActionPlaybackMode": "再生モード",

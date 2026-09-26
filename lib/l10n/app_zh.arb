@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "是否从存储位置移除“{name}”？原文件不会被删除。",
   "storageLocationAddedSnack": "已添加存储位置",
   "storageLocationUnresolvedError": "无法直接访问该位置。请确认已授予存储权限。",
+  "storageLocationSelfReferenceError": "这已经是本应用某个保险库自身的存储，无法再作为外部位置添加。请改为从保险库列表中打开它。",
   "internalStorageSubtitle": "内部存储",
   "mediaViewerActionPlayPause": "播放 / 暂停",
   "mediaViewerActionPlaybackMode": "播放模式",

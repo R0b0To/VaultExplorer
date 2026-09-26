@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "\"{name}\" aus Speicherorten entfernen? Dateien werden nicht gelöscht.",
   "storageLocationAddedSnack": "Speicherort hinzugefügt",
   "storageLocationUnresolvedError": "Auf diesen Speicherort konnte nicht direkt zugegriffen werden. Bitte Speicherberechtigungen prüfen.",
+  "storageLocationSelfReferenceError": "Das ist bereits eigener Tresorspeicher dieser App und kann nicht erneut als externer Speicherort hinzugefügt werden. Öffne ihn stattdessen über deine Tresorliste.",
   "internalStorageSubtitle": "Interner Speicher",
   "mediaViewerActionPlayPause": "Wiedergabe / Pause",
   "mediaViewerActionPlaybackMode": "Wiedergabemodus",

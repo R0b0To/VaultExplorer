@@ -12721,6 +12721,12 @@ abstract class AppLocalizations {
   /// **'Could not access that location directly. Make sure storage permissions are granted.'**
   String get storageLocationUnresolvedError;
 
+  /// Error shown when the user picks a folder or vault that this app itself exposed via Storage Access Framework (e.g. its document-provider or an exposed subfolder), which would be a redundant self-reference
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s already this app\'s own vault storage, so it can\'t be added again as an external location. Open it from your list of vaults instead.'**
+  String get storageLocationSelfReferenceError;
+
   /// Subtitle shown under primary internal phone storage
   ///
   /// In en, this message translates to:

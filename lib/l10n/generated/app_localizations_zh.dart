@@ -7201,6 +7201,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageLocationUnresolvedError => '无法直接访问该位置。请确认已授予存储权限。';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      '这已经是本应用某个保险库自身的存储，无法再作为外部位置添加。请改为从保险库列表中打开它。';
+
+  @override
   String get internalStorageSubtitle => '内部存储';
 
   @override

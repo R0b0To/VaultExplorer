@@ -7779,6 +7779,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'تعذر الوصول إلى هذا الموقع مباشرة. تأكد من منح أذونات التخزين.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'هذا بالفعل تخزين خاص بخزنة هذا التطبيق نفسه، لذا لا يمكن إضافته مرة أخرى كموقع خارجي. افتحه بدلاً من ذلك من قائمة الخزنات لديك.';
+
+  @override
   String get internalStorageSubtitle => 'وحدة التخزين الداخلية';
 
   @override

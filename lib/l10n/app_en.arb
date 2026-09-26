@@ -9721,6 +9721,10 @@
   "@storageLocationUnresolvedError": {
     "description": "Error shown when a picked folder cannot be resolved to an accessible path"
   },
+  "storageLocationSelfReferenceError": "That's already this app's own vault storage, so it can't be added again as an external location. Open it from your list of vaults instead.",
+  "@storageLocationSelfReferenceError": {
+    "description": "Error shown when the user picks a folder or vault that this app itself exposed via Storage Access Framework (e.g. its document-provider or an exposed subfolder), which would be a redundant self-reference"
+  },
   "internalStorageSubtitle": "Internal Storage",
   "@internalStorageSubtitle": {
     "description": "Subtitle shown under primary internal phone storage"

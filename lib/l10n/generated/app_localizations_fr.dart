@@ -7769,6 +7769,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible d\'accéder directement à cet emplacement. Vérifiez les autorisations de stockage.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Il s\'agit déjà du stockage propre à un coffre de cette application, il ne peut donc pas être ajouté de nouveau comme emplacement externe. Ouvrez-le plutôt depuis votre liste de coffres.';
+
+  @override
   String get internalStorageSubtitle => 'Stockage interne';
 
   @override

@@ -7701,6 +7701,10 @@ class AppLocalizationsIt extends AppLocalizations {
       'Impossibile accedere direttamente a questa posizione. Verifica i permessi di archiviazione.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Questo è già lo spazio di archiviazione di un Vault di questa app, quindi non può essere aggiunto di nuovo come posizione esterna. Aprilo invece dal tuo elenco di Vault.';
+
+  @override
   String get internalStorageSubtitle => 'Memoria interna';
 
   @override

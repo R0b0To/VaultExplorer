@@ -7721,6 +7721,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo acceder directamente a esa ubicación. Comprueba los permisos de almacenamiento.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Eso ya es el propio almacenamiento de una bóveda de esta app, así que no se puede añadir de nuevo como ubicación externa. Ábrelo desde tu lista de bóvedas.';
+
+  @override
   String get internalStorageSubtitle => 'Almacenamiento interno';
 
   @override

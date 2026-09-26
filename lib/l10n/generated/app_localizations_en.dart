@@ -7588,6 +7588,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not access that location directly. Make sure storage permissions are granted.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'That\'s already this app\'s own vault storage, so it can\'t be added again as an external location. Open it from your list of vaults instead.';
+
+  @override
   String get internalStorageSubtitle => 'Internal Storage';
 
   @override

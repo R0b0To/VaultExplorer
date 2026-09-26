@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "هل تريد إزالة \"{name}\" من مواقع التخزين؟ لن يتم حذف الملفات.",
   "storageLocationAddedSnack": "تمت إضافة موقع التخزين",
   "storageLocationUnresolvedError": "تعذر الوصول إلى هذا الموقع مباشرة. تأكد من منح أذونات التخزين.",
+  "storageLocationSelfReferenceError": "هذا بالفعل تخزين خاص بخزنة هذا التطبيق نفسه، لذا لا يمكن إضافته مرة أخرى كموقع خارجي. افتحه بدلاً من ذلك من قائمة الخزنات لديك.",
   "internalStorageSubtitle": "وحدة التخزين الداخلية",
   "mediaViewerActionPlayPause": "تشغيل / إيقاف مؤقت",
   "mediaViewerActionPlaybackMode": "وضع التشغيل",

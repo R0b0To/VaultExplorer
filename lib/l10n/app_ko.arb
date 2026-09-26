@@ -2093,6 +2093,7 @@
   "removeStorageLocationConfirm": "저장소 위치에서 \"{name}\"을(를) 제거하시겠습니까? 파일은 삭제되지 않습니다.",
   "storageLocationAddedSnack": "저장소 위치가 추가되었습니다",
   "storageLocationUnresolvedError": "해당 위치에 직접 접근할 수 없습니다. 저장소 권한을 확인하세요.",
+  "storageLocationSelfReferenceError": "이미 이 앱의 볼트 저장소이므로 외부 위치로 다시 추가할 수 없습니다. 대신 볼트 목록에서 여세요.",
   "internalStorageSubtitle": "내부 저장소",
   "mediaViewerActionPlayPause": "재생 / 일시 정지",
   "mediaViewerActionPlaybackMode": "재생 모드",

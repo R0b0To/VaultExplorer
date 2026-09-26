@@ -7297,6 +7297,10 @@ class AppLocalizationsJa extends AppLocalizations {
       'その場所に直接アクセスできませんでした。ストレージの権限を確認してください。';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'これはすでにこのアプリのボールトのストレージなので、外部の場所として再度追加することはできません。代わりにボールトの一覧から開いてください。';
+
+  @override
   String get internalStorageSubtitle => '内部ストレージ';
 
   @override

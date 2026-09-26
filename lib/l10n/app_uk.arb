@@ -2095,6 +2095,7 @@
   "removeStorageLocationConfirm": "Вилучити «{name}» з місць зберігання? Файли не буде видалено.",
   "storageLocationAddedSnack": "Місце зберігання додано",
   "storageLocationUnresolvedError": "Не вдалося отримати прямий доступ до цього місця зберігання. Переконайтеся, що надано відповідні дозволи.",
+  "storageLocationSelfReferenceError": "Це вже власне сховище цього додатка, тому додати його ще раз як зовнішнє розташування не можна. Відкрийте його зі списку своїх сховищ.",
   "internalStorageSubtitle": "Внутрішня пам'ять",
   "mediaViewerActionPlayPause": "Відтворити / Пауза",
   "mediaViewerActionPlaybackMode": "Режим відтворення",

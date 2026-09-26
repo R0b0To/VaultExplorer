@@ -7767,6 +7767,10 @@ class AppLocalizationsUk extends AppLocalizations {
       'Не вдалося отримати прямий доступ до цього місця зберігання. Переконайтеся, що надано відповідні дозволи.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Це вже власне сховище цього додатка, тому додати його ще раз як зовнішнє розташування не можна. Відкрийте його зі списку своїх сховищ.';
+
+  @override
   String get internalStorageSubtitle => 'Внутрішня пам\'ять';
 
   @override

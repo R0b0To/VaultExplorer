@@ -7710,6 +7710,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível acessar esse local diretamente. Verifique as permissões de armazenamento.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Isso já é o armazenamento de um cofre deste app, portanto não pode ser adicionado novamente como um local externo. Abra-o pela sua lista de cofres.';
+
+  @override
   String get internalStorageSubtitle => 'Armazenamento interno';
 
   @override

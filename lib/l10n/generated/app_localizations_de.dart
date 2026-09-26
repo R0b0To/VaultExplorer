@@ -7701,6 +7701,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Auf diesen Speicherort konnte nicht direkt zugegriffen werden. Bitte Speicherberechtigungen prüfen.';
 
   @override
+  String get storageLocationSelfReferenceError =>
+      'Das ist bereits eigener Tresorspeicher dieser App und kann nicht erneut als externer Speicherort hinzugefügt werden. Öffne ihn stattdessen über deine Tresorliste.';
+
+  @override
   String get internalStorageSubtitle => 'Interner Speicher';
 
   @override

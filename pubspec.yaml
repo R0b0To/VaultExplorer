@@ -21,6 +21,12 @@ dependencies:
   meta: ^1.19.0
   kpasslib: ^1.1.2
   csv: ^8.0.0
+  re_editor: ^0.10.0
+  re_highlight: ^0.0.3
+  # Already resolved transitively (kpasslib depends on it) -- promoted to a
+  # direct dependency for the built-in TOTP authenticator's HMAC-SHA1/256/512
+  # (RFC 6238), so no new package enters the dependency tree.
+  crypto: ^3.0.7
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -39,6 +45,14 @@ flutter:
   assets:
     - assets/images/app_icon.png
     - assets/data/eff_large_wordlist.txt
+  fonts:
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/JetBrainsMono-Italic.ttf
+          style: italic
 flutter_launcher_icons:
   android: true
   image_path: "assets/images/app_icon.png"

@@ -10,7 +10,8 @@ enum VaultItemType {
   identity,
   secureNote,
   bankAccount,
-  softwareLicense;
+  softwareLicense,
+  authenticator;
 
   String label(AppLocalizations l10n) => switch (this) {
         VaultItemType.password => l10n.vaultItemTypePassword,
@@ -19,6 +20,7 @@ enum VaultItemType {
         VaultItemType.secureNote => l10n.vaultItemTypeSecureNote,
         VaultItemType.bankAccount => l10n.vaultItemTypeBankAccount,
         VaultItemType.softwareLicense => l10n.vaultItemTypeSoftwareLicense,
+        VaultItemType.authenticator => l10n.vaultItemTypeAuthenticator,
       };
 
   String get icon => switch (this) {
@@ -28,6 +30,7 @@ enum VaultItemType {
         VaultItemType.secureNote => 'note',
         VaultItemType.bankAccount => 'account_balance',
         VaultItemType.softwareLicense => 'computer',
+        VaultItemType.authenticator => 'verified_user',
       };
 
   String toJson() => name;
@@ -39,6 +42,7 @@ enum VaultItemType {
         'secureNote' => VaultItemType.secureNote,
         'bankAccount' => VaultItemType.bankAccount,
         'softwareLicense' => VaultItemType.softwareLicense,
+        'authenticator' => VaultItemType.authenticator,
         _ => VaultItemType.secureNote,
       };
 }
@@ -145,6 +149,23 @@ class VaultItemTemplate {
             {'key': 'purchase_date', 'label': l10n.fieldPurchaseDate, 'type': 'date'},
             {'key': 'expiry_date', 'label': l10n.fieldExpiryRenewalDate, 'type': 'date'},
             {'key': 'download_url', 'label': l10n.fieldDownloadUrl, 'type': 'url'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
+          ],
+        // A standalone TOTP entry -- the same `totp_secret` field key a
+        // `password` item's optional 2FA field already uses (see that case
+        // above), so both feed the same live-code display and Authenticator
+        // aggregator with no type-specific branching needed there. The
+        // three advanced fields are rarely touched -- left blank, they
+        // default to SHA1/6-digit/30-second at generation time (see
+        // TotpConfig.fromFields), the values essentially every real-world
+        // issuer uses.
+        VaultItemType.authenticator => [
+            {'key': 'issuer', 'label': l10n.fieldIssuer, 'type': 'text'},
+            {'key': 'account', 'label': l10n.fieldAuthenticatorAccount, 'type': 'text'},
+            {'key': 'totp_secret', 'label': l10n.fieldSecretKey, 'type': 'secret', 'required': true},
+            {'key': 'totp_algorithm', 'label': l10n.fieldTotpAlgorithm, 'type': 'text'},
+            {'key': 'totp_digits', 'label': l10n.fieldTotpDigits, 'type': 'number'},
+            {'key': 'totp_period', 'label': l10n.fieldTotpPeriod, 'type': 'number'},
             {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
       };

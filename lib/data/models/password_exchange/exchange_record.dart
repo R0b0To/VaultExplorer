@@ -78,7 +78,7 @@ class ExchangeRecord {
   /// the first non-secret, non-empty field, same rule as
   /// [VaultItem.subtitle], but without needing an [AppLocalizations].
   String get previewSubtitle {
-    for (final key in const ['username', 'url', 'cardholder', 'bank_name', 'full_name', 'product']) {
+    for (final key in const ['issuer', 'account', 'username', 'url', 'cardholder', 'bank_name', 'full_name', 'product']) {
       final v = fields[key];
       if (v != null && v.isNotEmpty) return v;
     }
@@ -99,6 +99,7 @@ class ExchangeRecord {
       VaultItemType.bankAccount: 'account_number',
       VaultItemType.softwareLicense: 'license_key',
       VaultItemType.identity: 'national_id',
+      VaultItemType.authenticator: 'totp_secret',
     };
     final key = byType[type];
     return key == null ? '' : (fields[key] ?? '');

@@ -8102,4 +8102,40 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => '다음 코드';
+
+  @override
+  String get authenticatorNextCodePrefix => '다음';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => '다음 코드 복사';
+
+  @override
+  String get authenticatorSettingsTitle => '인증기 설정';
+
+  @override
+  String get authenticatorEnableTitle => '인증기 활성화';
+
+  @override
+  String get authenticatorEnableSubtitle => '열린 금고를 자동으로 검색하여 2FA 코드 찾기';
+
+  @override
+  String get authenticatorShowCodesTitle => '인증 코드 표시';
+
+  @override
+  String get authenticatorShowCodesSubtitle => '개인정보 보호를 위해 마스킹하는 대신 숫자를 표시';
+
+  @override
+  String get authenticatorSearchPlacementLabel => '검색창 위치';
+
+  @override
+  String get authenticatorPlacementBottom => '하단';
+
+  @override
+  String get authenticatorPlacementTop => '상단';
+
+  @override
+  String get authenticatorInterchangeSection => '가져오기 및 내보내기';
 }

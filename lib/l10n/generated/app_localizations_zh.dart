@@ -7994,4 +7994,40 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => '下一个验证码';
+
+  @override
+  String get authenticatorNextCodePrefix => '下一个';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => '复制下一个验证码';
+
+  @override
+  String get authenticatorSettingsTitle => '验证器设置';
+
+  @override
+  String get authenticatorEnableTitle => '启用验证器';
+
+  @override
+  String get authenticatorEnableSubtitle => '自动扫描已挂载的保险库以查找双重验证码';
+
+  @override
+  String get authenticatorShowCodesTitle => '显示验证码';
+
+  @override
+  String get authenticatorShowCodesSubtitle => '直接显示数字而非为了隐私进行遮挡';
+
+  @override
+  String get authenticatorSearchPlacementLabel => '搜索栏位置';
+
+  @override
+  String get authenticatorPlacementBottom => '底部';
+
+  @override
+  String get authenticatorPlacementTop => '顶部';
+
+  @override
+  String get authenticatorInterchangeSection => '导入与导出';
 }

@@ -8103,4 +8103,40 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => '次のコード';
+
+  @override
+  String get authenticatorNextCodePrefix => '次';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => '次のコードをコピー';
+
+  @override
+  String get authenticatorSettingsTitle => '認証システムの設定';
+
+  @override
+  String get authenticatorEnableTitle => '認証システムを有効化';
+
+  @override
+  String get authenticatorEnableSubtitle => 'ロック解除された保管庫を自動スキャンして2FAコードを検索';
+
+  @override
+  String get authenticatorShowCodesTitle => '確認コードを表示';
+
+  @override
+  String get authenticatorShowCodesSubtitle => 'プライバシー保護のためにマスクせず数字を表示する';
+
+  @override
+  String get authenticatorSearchPlacementLabel => '検索バーの配置';
+
+  @override
+  String get authenticatorPlacementBottom => '下部';
+
+  @override
+  String get authenticatorPlacementTop => '上部';
+
+  @override
+  String get authenticatorInterchangeSection => 'インポートとエクスポート';
 }

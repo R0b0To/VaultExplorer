@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -728,6 +729,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           actions: const [
+            AppBarAuthenticatorButton(),
             AppBarTransferButton(),
             SizedBox(width: 4),
           ],

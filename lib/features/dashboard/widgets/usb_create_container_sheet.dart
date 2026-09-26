@@ -913,7 +913,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
         label: l10n.wizardSummaryPimLabel,
         value: _pimCtrl.text.trim().isEmpty
             ? l10n.wizardSummaryPimDefaultValue
-            : _pimCtrl.text.trim(),
+            : l10n.wizardPasswordSetValue,
       ),
       WizardSummaryRow(
         icon: Icons.bolt_rounded,

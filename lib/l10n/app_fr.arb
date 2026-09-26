@@ -2331,5 +2331,17 @@
   "authenticatorInvalidSecretError": "Invalid secret",
   "authenticatorAddButtonTooltip": "Add authenticator",
   "authenticatorChooseVaultTitle": "Choose a vault",
-  "authenticatorOpenItemTooltip": "Open item"
+  "authenticatorOpenItemTooltip": "Open item",
+  "authenticatorNextCodeLabel": "Code suivant",
+  "authenticatorNextCodePrefix": "Suivant",
+  "authenticatorCopyNextCodeTooltip": "Copier le code suivant",
+  "authenticatorSettingsTitle": "Paramètres de l'authentificateur",
+  "authenticatorEnableTitle": "Activer l'authentificateur",
+  "authenticatorEnableSubtitle": "Analyser automatiquement les coffres ouverts pour trouver des codes 2FA",
+  "authenticatorShowCodesTitle": "Afficher les codes de vérification",
+  "authenticatorShowCodesSubtitle": "Afficher les chiffres au lieu de les masquer par confidentialité",
+  "authenticatorSearchPlacementLabel": "Emplacement de la barre de recherche",
+  "authenticatorPlacementBottom": "En bas",
+  "authenticatorPlacementTop": "En haut",
+  "authenticatorInterchangeSection": "Importer et exporter"
 }

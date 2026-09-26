@@ -8567,4 +8567,42 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'Codice successivo';
+
+  @override
+  String get authenticatorNextCodePrefix => 'Succ.';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'Copia codice successivo';
+
+  @override
+  String get authenticatorSettingsTitle => 'Impostazioni autenticatore';
+
+  @override
+  String get authenticatorEnableTitle => 'Abilita autenticatore';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'Scansiona automaticamente le casseforti aperte per i codici 2FA';
+
+  @override
+  String get authenticatorShowCodesTitle => 'Mostra codici di verifica';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'Mostra le cifre invece di mascherarle per motivi di privacy';
+
+  @override
+  String get authenticatorSearchPlacementLabel => 'Posizione barra di ricerca';
+
+  @override
+  String get authenticatorPlacementBottom => 'In basso';
+
+  @override
+  String get authenticatorPlacementTop => 'In alto';
+
+  @override
+  String get authenticatorInterchangeSection => 'Importa ed esporta';
 }

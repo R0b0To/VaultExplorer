@@ -43,13 +43,13 @@ class BitwardenJsonCodec implements PasswordFormatCodec {
   @override
   bool get isEncrypted => false;
 
-  @override
+ @override
   bool looksLikeThisFormat({required String fileName, Uint8List? bytes}) {
-    if (fileName.toLowerCase().endsWith('.json')) return true;
-    if (bytes == null) return false;
+    if (!fileName.toLowerCase().endsWith('.json')) return false;
+    if (bytes == null) return true;
     try {
       final text = utf8.decode(bytes.take(4096).toList(), allowMalformed: true);
-      return text.contains('"encrypted"') && text.contains('"items"');
+      return text.contains('"items"');
     } catch (_) {
       return false;
     }
@@ -358,6 +358,27 @@ class BitwardenJsonCodec implements PasswordFormatCodec {
         base['notes'] = _emptyToNull(take('notes'));
         base['type'] = _bwTypeSecureNote;
         base['secureNote'] = {'type': 0};
+        break;
+      case VaultItemType.authenticator:
+        // Also no native Bitwarden type, but unlike bankAccount/
+        // softwareLicense above, `login.totp` *is* a real Bitwarden slot
+        // (it's exactly what Bitwarden itself uses for a login's 2FA) --
+        // exporting as a login with just totp/username set (no password)
+        // is a standalone-TOTP entry both Bitwarden's own app and its
+        // importer already understand, rather than an inert secure note.
+        // `issuer` has no matching slot; it rides along as a custom field
+        // via the generic `f.isNotEmpty` block below, same as any
+        // unmapped key.
+        final account = take('account');
+        final totp = take('totp_secret');
+        base['notes'] = _emptyToNull(take('notes'));
+        base['type'] = _bwTypeLogin;
+        base['login'] = {
+          'username': _emptyToNull(account),
+          'password': null,
+          'totp': _emptyToNull(totp),
+          'uris': const <dynamic>[],
+        };
         break;
     }
 

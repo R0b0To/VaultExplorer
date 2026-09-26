@@ -8645,4 +8645,44 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'Code suivant';
+
+  @override
+  String get authenticatorNextCodePrefix => 'Suivant';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'Copier le code suivant';
+
+  @override
+  String get authenticatorSettingsTitle => 'Paramètres de l\'authentificateur';
+
+  @override
+  String get authenticatorEnableTitle => 'Activer l\'authentificateur';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'Analyser automatiquement les coffres ouverts pour trouver des codes 2FA';
+
+  @override
+  String get authenticatorShowCodesTitle =>
+      'Afficher les codes de vérification';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'Afficher les chiffres au lieu de les masquer par confidentialité';
+
+  @override
+  String get authenticatorSearchPlacementLabel =>
+      'Emplacement de la barre de recherche';
+
+  @override
+  String get authenticatorPlacementBottom => 'En bas';
+
+  @override
+  String get authenticatorPlacementTop => 'En haut';
+
+  @override
+  String get authenticatorInterchangeSection => 'Importer et exporter';
 }

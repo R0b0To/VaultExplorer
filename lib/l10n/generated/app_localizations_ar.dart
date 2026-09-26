@@ -8629,4 +8629,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'الرمز التالي';
+
+  @override
+  String get authenticatorNextCodePrefix => 'التالي';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'نسخ الرمز التالي';
+
+  @override
+  String get authenticatorSettingsTitle => 'إعدادات المصادقة';
+
+  @override
+  String get authenticatorEnableTitle => 'تفعيل المصادقة';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'فحص الخزائن المفتوحة تلقائيًا بحثًا عن رموز التحقق';
+
+  @override
+  String get authenticatorShowCodesTitle => 'إظهار رموز التحقق';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'عرض الأرقام بدلاً من إخفائها للخصوصية';
+
+  @override
+  String get authenticatorSearchPlacementLabel => 'موضع شريط البحث';
+
+  @override
+  String get authenticatorPlacementBottom => 'أسفل';
+
+  @override
+  String get authenticatorPlacementTop => 'أعلى';
+
+  @override
+  String get authenticatorInterchangeSection => 'الاستيراد والتصدير';
 }

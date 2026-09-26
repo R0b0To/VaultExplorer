@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'package:flutter/rendering.dart' show AxisDirection;
+import 'package:flutter/scheduler.dart' show SchedulerBinding, SchedulerPhase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:re_editor/re_editor.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_language.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/editor_accessory_key_bar.dart';
 
 class TextEditorScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -22,10 +27,14 @@ class TextEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
-  final TextEditingController _textController = TextEditingController();
-  late final UndoHistoryController _undoController;
+  // re_editor's own controller -- carries the buffer, selection, and undo
+  // history (replacing the plain TextEditingController + UndoHistoryController
+  // pair the TextField-based editor used). Starts empty and is populated
+  // once via `.text =` the moment the file finishes decrypting; see the
+  // ref.listen callback in build().
+  final CodeLineEditingController _codeController = CodeLineEditingController.fromText('');
 
-  // Genuinely ephemeral UI state -- tied to the TextField's own listener,
+  // Genuinely ephemeral UI state -- tied to the controller's own listener,
   // not domain data. Load/save/error state lives in TextEditorLoad.
   bool _isSaving = false;
   bool _isAutosaving = false;
@@ -34,6 +43,14 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
   int _charCount = 0;
   DateTime? _lastSavedAt;
   bool _appliedInitialText = false;
+  String _lastKnownText = '';
+  Object? _lastCodeLines;
+
+  // Read/inspection-mode lock (Phase 1, item 3). Locking closes the
+  // soft-keyboard IME connection outright rather than merely hiding it --
+  // see `_toggleReadOnly` -- while still allowing tap-to-select/scroll,
+  // since re_editor's readOnly flag only blocks edits, not selection.
+  bool _readOnly = false;
 
   Timer? _autosaveTimer;
   final FocusNode _focusNode = FocusNode();
@@ -41,8 +58,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _undoController = UndoHistoryController();
-    _textController.addListener(_onTextChanged);
+    _codeController.addListener(_onTextChanged);
     // context.l10n needs didChangeDependencies to have run first, so defer
     // to a microtask (runs right after initState, before the first build).
     Future.microtask(_loadFile);
@@ -61,22 +77,39 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
   @override
   void dispose() {
     _autosaveTimer?.cancel();
-    _textController.removeListener(_onTextChanged);
-    _textController.dispose();
-    _undoController.dispose();
+    _codeController.removeListener(_onTextChanged);
+    _codeController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
-    final text = _textController.text;
-    final lines = text.isEmpty ? 0 : text.split('\n').length;
+    final codeLines = _codeController.value.codeLines;
+    if (identical(codeLines, _lastCodeLines)) {
+      return;
+    }
+    final currentText = _codeController.text;
+    if (currentText == _lastKnownText) {
+      _lastCodeLines = codeLines;
+      return;
+    }
+    _lastCodeLines = codeLines;
+    _lastKnownText = currentText;
 
-    setState(() {
-      _isDirty = true;
-      _lineCount = lines;
-      _charCount = text.length;
-    });
+    void updateState() {
+      if (!mounted) return;
+      setState(() {
+        _isDirty = true;
+        _lineCount = _codeController.lineCount;
+        _charCount = currentText.length;
+      });
+    }
+
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => updateState());
+    } else {
+      updateState();
+    }
 
     // Debounced autosave: triggers 2.5s after user stops typing
     _autosaveTimer?.cancel();
@@ -101,13 +134,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
       }
     });
 
-    final content = _textController.text;
+    final content = _codeController.text;
     final error = await ref
         .read(textEditorLoadProvider(widget.container.volId, widget.filePath).notifier)
         .save(widget.container, content, context.l10n.textEditorWriteBackFailedMessage);
 
-    if (error == null) {
+   if (error == null) {
       if (mounted) {
+        _lastKnownText = content;
+        _lastCodeLines = _codeController.value.codeLines;
         setState(() {
           _isSaving = false;
           _isAutosaving = false;
@@ -188,25 +223,52 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
 
   String get _fileName => widget.filePath.split('/').last;
 
+  void _toggleReadOnly() {
+    setState(() => _readOnly = !_readOnly);
+    if (_readOnly) {
+      // Flipping `readOnly` alone only stops *future* IME connections from
+      // opening (see re_editor's `_CodeInputController.readOnly` setter) --
+      // it doesn't close one that's already open. Unfocus explicitly so
+      // locking the editor dismisses an active soft keyboard right away.
+      _focusNode.unfocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final loadState = ref.watch(textEditorLoadProvider(widget.container.volId, widget.filePath));
 
     ref.listen(textEditorLoadProvider(widget.container.volId, widget.filePath), (previous, next) {
-      // Apply loaded text to the TextEditingController exactly once, the
-      // moment it goes from null to non-null -- matches the original
-      // synchronous `_textController.text = text` inside _loadFile.
+      // Apply loaded text to the controller exactly once, the moment it
+      // goes from null to non-null -- matches the original synchronous
+      // `_textController.text = text` inside _loadFile. clearHistory()
+      // matters here: without it this initial assignment would itself be
+      // undoable, letting a fresh, unedited open of the file show a live
+      // "Undo" button that reverts it to blank.
       if (!_appliedInitialText && next.loadedText != null) {
         _appliedInitialText = true;
-        _textController.text = next.loadedText!;
+        final initialText = next.loadedText!;
+        _lastKnownText = initialText;
+        _codeController.text = initialText;
+        _lastCodeLines = _codeController.value.codeLines;
+        _codeController.clearHistory();
         _autosaveTimer?.cancel();
-        final lines = next.loadedText!.isEmpty ? 0 : next.loadedText!.split('\n').length;
-        setState(() {
-          _isDirty = false;
-          _lineCount = lines;
-          _charCount = next.loadedText!.length;
-        });
+
+        void updateInitial() {
+          if (!mounted) return;
+          setState(() {
+            _isDirty = false;
+            _lineCount = _codeController.lineCount;
+            _charCount = initialText.length;
+          });
+        }
+
+        if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => updateInitial());
+        } else {
+          updateInitial();
+        }
       }
     });
 
@@ -224,25 +286,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
           title: Text(_fileName),
           actions: [
             if (!loadState.isLoading && !loadState.hasError) ...[
-              ValueListenableBuilder<UndoHistoryValue>(
-                valueListenable: _undoController,
-                builder: (context, value, _) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.undo_rounded),
-                        tooltip: context.l10n.undoTooltip,
-                        onPressed: value.canUndo ? () => _undoController.undo() : null,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.redo_rounded),
-                        tooltip: context.l10n.redoTooltip,
-                        onPressed: value.canRedo ? () => _undoController.redo() : null,
-                      ),
-                    ],
-                  );
-                },
+              IconButton(
+                icon: Icon(_readOnly ? Icons.edit_rounded : Icons.lock_outline_rounded),
+                tooltip: _readOnly
+                    ? context.l10n.textEditorSwitchToEditModeTooltip
+                    : context.l10n.textEditorSwitchToReadModeTooltip,
+                onPressed: _toggleReadOnly,
               ),
               IconButton(
                 icon: (_isSaving || _isAutosaving)
@@ -317,38 +366,67 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
         ),
       );
     }
-    return GestureDetector(
-      onTap: () {
-        if (!_focusNode.hasFocus) {
-          _focusNode.requestFocus();
-        }
-      },
-      child: Container(
-        color: Colors.transparent,
-        height: double.infinity,
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SingleChildScrollView(
-          child: TextField(
-            controller: _textController,
-            undoController: _undoController,
-            focusNode: _focusNode,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-            ),
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 14,
-              height: 1.5,
+
+    final syntaxStyle = resolveEditorSyntaxStyle(widget.filePath, Theme.of(context).brightness, cs);
+    // The accessory key bar only makes sense while the soft keyboard (and
+    // therefore touch typing) is actually up -- it tracks the same inset
+    // a hardware keyboard never pushes, so it naturally stays out of the
+    // way when one is attached instead of needing separate detection.
+    final softKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    return Column(
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: CodeEditor(
+              controller: _codeController,
+              focusNode: _focusNode,
+              readOnly: _readOnly,
+              showCursorWhenReadOnly: true,
+              wordWrap: true,
+              autofocus: false,
+              // Folding isn't exposed yet (no indicator/UI for it in this
+              // pass), so skip the analysis pass that would otherwise run
+              // on every edit to support it.
+              chunkAnalyzer: const NonCodeChunkAnalyzer(),
+              style: CodeEditorStyle(
+                fontFamily: 'JetBrains Mono',
+                fontFamilyFallback: const ['monospace'],
+                fontSize: 14,
+                fontHeight: 1.5,
+                backgroundColor: syntaxStyle.backgroundColor,
+                textColor: syntaxStyle.textColor,
+                cursorColor: cs.primary,
+                cursorLineColor: cs.primary.withValues(alpha: 0.35),
+                selectionColor: cs.primary.withValues(alpha: 0.28),
+                codeTheme: syntaxStyle.codeTheme,
+              ),
+              indicatorBuilder: (context, editingController, chunkController, notifier) {
+                return DefaultCodeLineNumber(
+                  controller: editingController,
+                  notifier: notifier,
+                  textStyle: TextStyle(
+                    color: syntaxStyle.textColor.withValues(alpha: 0.45),
+                    fontFamily: 'JetBrains Mono',
+                    fontFamilyFallback: const ['monospace'],
+                    fontSize: 13,
+                  ),
+                  focusedTextStyle: TextStyle(
+                    color: cs.primary,
+                    fontFamily: 'JetBrains Mono',
+                    fontFamilyFallback: const ['monospace'],
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                );
+              },
             ),
           ),
         ),
-      ),
+        if (!_readOnly && softKeyboardVisible)
+          EditorAccessoryKeyBar(controller: _codeController, editorFocusNode: _focusNode),
+      ],
     );
   }
 
@@ -370,7 +448,18 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const Spacer(),
-          if (_isAutosaving) ...[
+          if (_readOnly) ...[
+            Icon(Icons.lock_outline_rounded, size: 14, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              context.l10n.textEditorReadOnlyIndicatorLabel,
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ] else if (_isAutosaving) ...[
             SizedBox(
               width: 12,
               height: 12,

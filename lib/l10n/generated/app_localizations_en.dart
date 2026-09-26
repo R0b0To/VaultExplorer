@@ -8437,4 +8437,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'Next code';
+
+  @override
+  String get authenticatorNextCodePrefix => 'Next';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'Copy next code';
+
+  @override
+  String get authenticatorSettingsTitle => 'Authenticator Settings';
+
+  @override
+  String get authenticatorEnableTitle => 'Enable Authenticator';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'Automatically scan mounted vaults for 2FA verification codes';
+
+  @override
+  String get authenticatorShowCodesTitle => 'Show Verification Codes';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'Display digits openly instead of masking them for privacy';
+
+  @override
+  String get authenticatorSearchPlacementLabel => 'Search Bar Placement';
+
+  @override
+  String get authenticatorPlacementBottom => 'Bottom';
+
+  @override
+  String get authenticatorPlacementTop => 'Top';
+
+  @override
+  String get authenticatorInterchangeSection => 'Import & Export';
 }

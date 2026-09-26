@@ -6,6 +6,8 @@
 // here is exactly the domain/async part: the container-locked listener and
 // the actual save (uniqueness resolution, rename-on-title-change, item
 // persistence).
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -13,6 +15,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
+import 'package:vaultexplorer/features/authenticator/authenticator_registry_controller.dart';
 
 part 'vault_item_edit_controller.g.dart';
 
@@ -120,6 +123,16 @@ class VaultItemEdit extends _$VaultItemEdit {
       final ok = await ref
           .read(vaultItemsServiceProvider)
           .saveItem(container, finalPath, item);
+
+      // Fire-and-forget: keeps the Authenticator screen/AppBar icon live
+      // for this vault immediately after a TOTP-capable item is added,
+      // edited, or has its title changed -- rather than only refreshing on
+      // the next lock/unlock cycle. Cheap even when the saved item has
+      // nothing to do with TOTP (one rescan of just this vault, not every
+      // mounted one).
+      if (ok) {
+        unawaited(ref.read(authenticatorRegistryProvider.notifier).refreshContainer(container));
+      }
 
       return ok ? finalPath : null;
     } finally {

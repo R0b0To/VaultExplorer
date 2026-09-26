@@ -2331,5 +2331,17 @@
   "authenticatorInvalidSecretError": "Invalid secret",
   "authenticatorAddButtonTooltip": "Add authenticator",
   "authenticatorChooseVaultTitle": "Choose a vault",
-  "authenticatorOpenItemTooltip": "Open item"
+  "authenticatorOpenItemTooltip": "Open item",
+  "authenticatorNextCodeLabel": "次のコード",
+  "authenticatorNextCodePrefix": "次",
+  "authenticatorCopyNextCodeTooltip": "次のコードをコピー",
+  "authenticatorSettingsTitle": "認証システムの設定",
+  "authenticatorEnableTitle": "認証システムを有効化",
+  "authenticatorEnableSubtitle": "ロック解除された保管庫を自動スキャンして2FAコードを検索",
+  "authenticatorShowCodesTitle": "確認コードを表示",
+  "authenticatorShowCodesSubtitle": "プライバシー保護のためにマスクせず数字を表示する",
+  "authenticatorSearchPlacementLabel": "検索バーの配置",
+  "authenticatorPlacementBottom": "下部",
+  "authenticatorPlacementTop": "上部",
+  "authenticatorInterchangeSection": "インポートとエクスポート"
 }

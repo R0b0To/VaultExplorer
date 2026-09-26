@@ -8647,4 +8647,42 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'Наступний код';
+
+  @override
+  String get authenticatorNextCodePrefix => 'Наступний';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'Скопіювати наступний код';
+
+  @override
+  String get authenticatorSettingsTitle => 'Налаштування автентифікатора';
+
+  @override
+  String get authenticatorEnableTitle => 'Увімкнути автентифікатор';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'Автоматично сканувати відкриті сховища на наявність 2FA-кодів';
+
+  @override
+  String get authenticatorShowCodesTitle => 'Показувати коди підтвердження';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'Показувати цифри відкрито замість маскування для конфіденційності';
+
+  @override
+  String get authenticatorSearchPlacementLabel => 'Розташування панелі пошуку';
+
+  @override
+  String get authenticatorPlacementBottom => 'Знизу';
+
+  @override
+  String get authenticatorPlacementTop => 'Згори';
+
+  @override
+  String get authenticatorInterchangeSection => 'Імпорт та експорт';
 }

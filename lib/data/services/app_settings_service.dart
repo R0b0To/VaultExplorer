@@ -34,6 +34,17 @@ const _kMasterPinHash = 'vc_master_pin_hash_v1';
 /// without the master password ever being re-typed, exactly like a correct
 /// fingerprint already did for [masterPasswordIsFingerprint] before this
 /// enum replaced it.
+enum AuthenticatorSearchPlacement {
+  bottom,
+  top;
+
+  String toJson() => name;
+  static AuthenticatorSearchPlacement fromJson(String? value) => switch (value) {
+    'top' => AuthenticatorSearchPlacement.top,
+    _ => AuthenticatorSearchPlacement.bottom,
+  };
+}
+
 enum MasterUnlockMethod {
   password,
   biometrics,
@@ -106,7 +117,10 @@ class AppSettings {
   DeleteAfterImportMode deleteAfterImportMode;
   bool videoMuted;
   bool showStorageLocationsInDrawer;
-  bool autoLockOnShareImport;
+ bool autoLockOnShareImport;
+  bool enableAuthenticator;
+  bool authenticatorShowNumbers;
+  AuthenticatorSearchPlacement authenticatorSearchPlacement;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
   String? _masterPatternHash;
@@ -140,6 +154,9 @@ class AppSettings {
     this.videoMuted = false,
     this.showStorageLocationsInDrawer = true,
     this.autoLockOnShareImport = true,
+    this.enableAuthenticator = true,
+    this.authenticatorShowNumbers = true,
+    this.authenticatorSearchPlacement = AuthenticatorSearchPlacement.bottom,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
@@ -214,6 +231,9 @@ class AppSettings {
     bool? videoMuted,
     bool? showStorageLocationsInDrawer,
     bool? autoLockOnShareImport,
+    bool? enableAuthenticator,
+    bool? authenticatorShowNumbers,
+    AuthenticatorSearchPlacement? authenticatorSearchPlacement,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -255,6 +275,9 @@ class AppSettings {
       videoMuted: videoMuted ?? this.videoMuted,
       showStorageLocationsInDrawer: showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
       autoLockOnShareImport: autoLockOnShareImport ?? this.autoLockOnShareImport,
+      enableAuthenticator: enableAuthenticator ?? this.enableAuthenticator,
+      authenticatorShowNumbers: authenticatorShowNumbers ?? this.authenticatorShowNumbers,
+      authenticatorSearchPlacement: authenticatorSearchPlacement ?? this.authenticatorSearchPlacement,
     );
   }
 
@@ -290,8 +313,11 @@ class AppSettings {
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
     'videoMuted': videoMuted,
-    'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
+     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'autoLockOnShareImport': autoLockOnShareImport,
+    'enableAuthenticator': enableAuthenticator,
+    'authenticatorShowNumbers': authenticatorShowNumbers,
+    'authenticatorSearchPlacement': authenticatorSearchPlacement.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -356,6 +382,11 @@ class AppSettings {
     videoMuted: j['videoMuted'] as bool? ?? false,
     showStorageLocationsInDrawer: j['showStorageLocationsInDrawer'] as bool? ?? true,
     autoLockOnShareImport: j['autoLockOnShareImport'] as bool? ?? true,
+    enableAuthenticator: j['enableAuthenticator'] as bool? ?? true,
+    authenticatorShowNumbers: j['authenticatorShowNumbers'] as bool? ?? true,
+    authenticatorSearchPlacement: AuthenticatorSearchPlacement.fromJson(
+      j['authenticatorSearchPlacement'] as String?,
+    ),
   );
 }
 

@@ -2331,5 +2331,17 @@
   "authenticatorInvalidSecretError": "Invalid secret",
   "authenticatorAddButtonTooltip": "Add authenticator",
   "authenticatorChooseVaultTitle": "Choose a vault",
-  "authenticatorOpenItemTooltip": "Open item"
+  "authenticatorOpenItemTooltip": "Open item",
+  "authenticatorNextCodeLabel": "الرمز التالي",
+  "authenticatorNextCodePrefix": "التالي",
+  "authenticatorCopyNextCodeTooltip": "نسخ الرمز التالي",
+  "authenticatorSettingsTitle": "إعدادات المصادقة",
+  "authenticatorEnableTitle": "تفعيل المصادقة",
+  "authenticatorEnableSubtitle": "فحص الخزائن المفتوحة تلقائيًا بحثًا عن رموز التحقق",
+  "authenticatorShowCodesTitle": "إظهار رموز التحقق",
+  "authenticatorShowCodesSubtitle": "عرض الأرقام بدلاً من إخفائها للخصوصية",
+  "authenticatorSearchPlacementLabel": "موضع شريط البحث",
+  "authenticatorPlacementBottom": "أسفل",
+  "authenticatorPlacementTop": "أعلى",
+  "authenticatorInterchangeSection": "الاستيراد والتصدير"
 }

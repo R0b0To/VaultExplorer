@@ -2331,5 +2331,17 @@
   "authenticatorInvalidSecretError": "Invalid secret",
   "authenticatorAddButtonTooltip": "Add authenticator",
   "authenticatorChooseVaultTitle": "Choose a vault",
-  "authenticatorOpenItemTooltip": "Open item"
+  "authenticatorOpenItemTooltip": "Open item",
+  "authenticatorNextCodeLabel": "下一个验证码",
+  "authenticatorNextCodePrefix": "下一个",
+  "authenticatorCopyNextCodeTooltip": "复制下一个验证码",
+  "authenticatorSettingsTitle": "验证器设置",
+  "authenticatorEnableTitle": "启用验证器",
+  "authenticatorEnableSubtitle": "自动扫描已挂载的保险库以查找双重验证码",
+  "authenticatorShowCodesTitle": "显示验证码",
+  "authenticatorShowCodesSubtitle": "直接显示数字而非为了隐私进行遮挡",
+  "authenticatorSearchPlacementLabel": "搜索栏位置",
+  "authenticatorPlacementBottom": "底部",
+  "authenticatorPlacementTop": "顶部",
+  "authenticatorInterchangeSection": "导入与导出"
 }

@@ -305,6 +305,7 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
   final _pwCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
   bool _obscure = true;
+  bool _obscurePim = true;
 
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
@@ -389,12 +390,16 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
                 TextField(
                   controller: _pimCtrl,
                   keyboardType: TextInputType.number,
-                  obscureText: true,
+                  obscureText: _obscurePim,
                   obscuringCharacter: '*',
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: cs.surfaceContainerHighest,
                     labelText: context.l10n.pimOptionalLabel,
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _obscurePim,
+                      onToggle: () => setState(() => _obscurePim = !_obscurePim),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,

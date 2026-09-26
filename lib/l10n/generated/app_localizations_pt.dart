@@ -8571,4 +8571,43 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get authenticatorOpenItemTooltip => 'Open item';
+
+  @override
+  String get authenticatorNextCodeLabel => 'Próximo código';
+
+  @override
+  String get authenticatorNextCodePrefix => 'Próximo';
+
+  @override
+  String get authenticatorCopyNextCodeTooltip => 'Copiar próximo código';
+
+  @override
+  String get authenticatorSettingsTitle => 'Configurações do autenticador';
+
+  @override
+  String get authenticatorEnableTitle => 'Ativar autenticador';
+
+  @override
+  String get authenticatorEnableSubtitle =>
+      'Verificar automaticamente cofres abertos para encontrar códigos 2FA';
+
+  @override
+  String get authenticatorShowCodesTitle => 'Mostrar códigos de verificação';
+
+  @override
+  String get authenticatorShowCodesSubtitle =>
+      'Exibir dígitos abertamente em vez de mascará-los por privacidade';
+
+  @override
+  String get authenticatorSearchPlacementLabel =>
+      'Posição da barra de pesquisa';
+
+  @override
+  String get authenticatorPlacementBottom => 'Inferior';
+
+  @override
+  String get authenticatorPlacementTop => 'Superior';
+
+  @override
+  String get authenticatorInterchangeSection => 'Importar e exportar';
 }

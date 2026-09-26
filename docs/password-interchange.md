@@ -58,29 +58,34 @@ delete it from device storage once you're done importing or sharing it.
 
 Exporting creates one top-level group per item type that actually has
 entries -- `Logins`, `Payment Cards`, `Identities`, `Secure Notes`,
-`Bank Accounts`, `Software Licenses` -- with each entry's vault subfolder
-recreated as nested groups underneath. This keeps the file genuinely useful
-if you open it in real KeePass, not just round-trippable through
-VaultExplorer.
+`Bank Accounts`, `Software Licenses`, `Authenticators` -- with each entry's
+vault subfolder recreated as nested groups underneath. This keeps the file
+genuinely useful if you open it in real KeePass, not just round-trippable
+through VaultExplorer.
 
 Within an entry:
 
 - `Title`, `UserName`, `Password`, `URL`, and `Notes` are used wherever a
   VaultExplorer field means the same thing, so they show up normally in any
-  KeePass-compatible app.
-- A TOTP secret is written to a custom field named `otp` (protected) -- the
-  same convention KeePassXC, Strongbox, and KeeWeb use to show a live code.
+  KeePass-compatible app. A standalone Authenticator item's `account` field
+  is written as `UserName`.
+- A TOTP secret -- whether from a `password` item's optional 2FA field or a
+  standalone Authenticator item -- is written to a custom field named `otp`
+  (protected). That's the same convention KeePassXC, Strongbox, and KeeWeb
+  use to show a live code, so either kind of VaultExplorer entry already
+  shows a working TOTP code if you open the export in one of those apps.
 - Every other field is written as a custom string field named after
   VaultExplorer's own internal field key (e.g. `account_number`, `cvv`,
-  `passport_no`, `iban`). This is what makes round-tripping through
+  `passport_no`, `iban`, `issuer`). This is what makes round-tripping through
   VaultExplorer exact, and it's still self-explanatory if you're looking at
   the file in another KeePass client.
 
 Importing a `.kdbx` file *not* created by VaultExplorer (no groups matching
 the names above) falls back to a simple rule: an entry with a non-empty
-password or username becomes a `password` item; everything else becomes a
-`secureNote`, with its standard fields folded into the note body so nothing
-is dropped.
+password or username becomes a `password` item; an otherwise-empty entry
+with just an `otp` field becomes a standalone `authenticator` item;
+everything else becomes a `secureNote`, with its standard fields folded
+into the note body so nothing is dropped.
 
 ---
 

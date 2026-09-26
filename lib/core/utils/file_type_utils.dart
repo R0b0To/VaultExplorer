@@ -134,6 +134,7 @@ IconData? vaultIconForExt(String ext) => switch (ext) {
   'secureNote'      => Icons.sticky_note_2_rounded,
   'bankAccount'     => Icons.account_balance_rounded,
   'softwareLicense' => Icons.computer_rounded,
+  'authenticator'   => Icons.verified_user_rounded,
   _                 => null,
 };
 
@@ -146,5 +147,6 @@ Color? vaultColorForExt(String ext) => switch (ext) {
   'secureNote'      => const Color(0xFFFFCC80),
   'bankAccount'     => const Color(0xFF80DEEA),
   'softwareLicense' => const Color(0xFFA5D6A7),
+  'authenticator'   => const Color(0xFFF48FB1),
   _                 => null,
 };

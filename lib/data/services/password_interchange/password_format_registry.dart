@@ -4,6 +4,7 @@ import 'package:vaultexplorer/data/services/password_interchange/bitwarden_json_
 import 'package:vaultexplorer/data/services/password_interchange/csv_codec.dart';
 import 'package:vaultexplorer/data/services/password_interchange/kdbx_codec.dart';
 import 'package:vaultexplorer/data/services/password_interchange/password_format_codec.dart';
+import 'package:vaultexplorer/data/services/password_interchange/proton_json_codec.dart';
 
 /// Every interchange format this build understands, in the order they
 /// should be offered in the UI. Adding a new format is just adding another
@@ -11,6 +12,7 @@ import 'package:vaultexplorer/data/services/password_interchange/password_format
 /// about individual formats.
 const List<PasswordFormatCodec> kPasswordFormatCodecs = [
   KdbxCodec(),
+  ProtonJsonCodec(),
   BitwardenJsonCodec(),
   CsvCodec(),
 ];

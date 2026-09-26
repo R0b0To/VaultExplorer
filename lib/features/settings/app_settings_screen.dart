@@ -1084,7 +1084,7 @@ class _SecuritySettingsScreenState
 
                 const SizedBox(height: 16),
 
-                // 3c. Quick Capture (a productivity shortcut, not a stealth
+            // 3c. Quick Capture (a productivity shortcut, not a stealth
                 // or emergency feature -- its own section)
                 SectionHeader(context.l10n.quickCaptureSettingsTitle),
                 SectionCard(
@@ -1104,6 +1104,30 @@ class _SecuritySettingsScreenState
                         context,
                         MaterialPageRoute(builder: (_) => const QuickCaptureSettingsScreen()),
                       ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 3d. Authenticator (TOTP 2FA)
+                SectionHeader(context.l10n.authenticatorSettingsTitle),
+                SectionCard(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      title: Text(
+                        context.l10n.authenticatorEnableTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        context.l10n.authenticatorEnableSubtitle,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      value: state.settings.enableAuthenticator,
+                      onChanged: (v) => ref
+                          .read(appSettingsControllerProvider.notifier)
+                          .updateSettings((s) => s.copyWith(enableAuthenticator: v)),
                     ),
                   ],
                 ),

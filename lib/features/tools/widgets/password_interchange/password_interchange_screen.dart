@@ -23,6 +23,7 @@ IconData _iconForType(VaultItemType type) => switch (type) {
       VaultItemType.secureNote => Icons.note_rounded,
       VaultItemType.bankAccount => Icons.account_balance_rounded,
       VaultItemType.softwareLicense => Icons.computer_rounded,
+      VaultItemType.authenticator => Icons.verified_user_rounded,
     };
 
 /// Tools -> Import / Export Passwords: converts between the Item Vault and

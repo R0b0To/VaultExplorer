@@ -27,7 +27,7 @@ const Set<String> kBrowserFilterDocumentExtensions = {
 /// Kept as a flat key list rather than switching on [VaultItemType] so a
 /// future field named `username`/`email` on another item type is picked up
 /// automatically.
-const List<String> kVaultItemSearchableFieldKeys = ['username', 'email'];
+const List<String> kVaultItemSearchableFieldKeys = ['username', 'email', 'issuer', 'account'];
 
 /// Whether [name]'s extension identifies it as an Item Vault entry
 /// (password/card/identity/note/bank account/license) rather than an

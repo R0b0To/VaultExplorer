@@ -10771,5 +10771,53 @@
   "authenticatorOpenItemTooltip": "Open item",
   "@authenticatorOpenItemTooltip": {
     "description": "Tooltip for the chevron button on an Authenticator list row that opens the underlying item's detail screen"
+  },
+  "authenticatorNextCodeLabel": "Next code",
+  "@authenticatorNextCodeLabel": {
+    "description": "Clipboard label for the upcoming TOTP code preview"
+  },
+  "authenticatorNextCodePrefix": "Next",
+  "@authenticatorNextCodePrefix": {
+    "description": "Prefix label shown before the upcoming TOTP code preview"
+  },
+  "authenticatorCopyNextCodeTooltip": "Copy next code",
+  "@authenticatorCopyNextCodeTooltip": {
+    "description": "Tooltip for the next TOTP code preview button"
+  },
+  "authenticatorSettingsTitle": "Authenticator Settings",
+  "@authenticatorSettingsTitle": {
+    "description": "AppBar title for the authenticator settings screen"
+  },
+  "authenticatorEnableTitle": "Enable Authenticator",
+  "@authenticatorEnableTitle": {
+    "description": "Title for switch enabling TOTP authenticator"
+  },
+  "authenticatorEnableSubtitle": "Automatically scan mounted vaults for 2FA verification codes",
+  "@authenticatorEnableSubtitle": {
+    "description": "Subtitle explaining background vault scanning for authenticator items"
+  },
+  "authenticatorShowCodesTitle": "Show Verification Codes",
+  "@authenticatorShowCodesTitle": {
+    "description": "Title for switch toggling code visibility"
+  },
+  "authenticatorShowCodesSubtitle": "Display digits openly instead of masking them for privacy",
+  "@authenticatorShowCodesSubtitle": {
+    "description": "Subtitle explaining masked code visibility"
+  },
+  "authenticatorSearchPlacementLabel": "Search Bar Placement",
+  "@authenticatorSearchPlacementLabel": {
+    "description": "Label for search bar placement picker"
+  },
+  "authenticatorPlacementBottom": "Bottom",
+  "@authenticatorPlacementBottom": {
+    "description": "Bottom placement option"
+  },
+  "authenticatorPlacementTop": "Top",
+  "@authenticatorPlacementTop": {
+    "description": "Top placement option"
+  },
+  "authenticatorInterchangeSection": "Import & Export",
+  "@authenticatorInterchangeSection": {
+    "description": "Section header for password and 2FA import/export in authenticator settings"
   }
 }

@@ -6,11 +6,14 @@
 // a container. `initialItem`/`filePath` only seed the state -- once
 // loaded, the current values live in `state.item`/`state.filePath`, not
 // re-read from the family key.
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
+import 'package:vaultexplorer/features/authenticator/authenticator_registry_controller.dart';
 
 part 'vault_item_detail_controller.g.dart';
 
@@ -63,8 +66,12 @@ class VaultItemDetail extends _$VaultItemDetail {
     );
   }
 
-  Future<void> delete(MountedContainer container) =>
-      ref.read(vaultFileIoApiProvider).deleteFile(container, state.filePath);
+  Future<void> delete(MountedContainer container) async {
+    await ref.read(vaultFileIoApiProvider).deleteFile(container, state.filePath);
+    // Keeps the Authenticator screen/AppBar icon from continuing to show a
+    // code for an item that no longer exists.
+    unawaited(ref.read(authenticatorRegistryProvider.notifier).refreshContainer(container));
+  }
 
   /// Called after VaultItemEditScreen returns a new file path (the edit
   /// may have renamed the item), reloading the saved item from disk.
@@ -82,6 +89,7 @@ class VaultItemDetail extends _$VaultItemDetail {
         isContainerLocked: state.isContainerLocked,
         revealed: state.revealed,
       );
+      unawaited(ref.read(authenticatorRegistryProvider.notifier).refreshContainer(container));
     }
   }
 

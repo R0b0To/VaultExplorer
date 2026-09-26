@@ -215,6 +215,16 @@ class CsvCodec implements PasswordFormatCodec {
         if (username.isNotEmpty) fields.putIfAbsent('_imported_username', () => username);
         if (url.isNotEmpty) fields.putIfAbsent('_imported_url', () => url);
         break;
+      case VaultItemType.authenticator:
+        // Only reached for our own re-imported export (see _resolveType --
+        // a foreign CSV's totp column always attaches to a `password` row
+        // above, matching how real password managers store 2FA). `issuer`
+        // and the advanced algorithm/digits/period fields aren't CSV
+        // columns; they already rode along via extraJsonRaw above.
+        fields.putIfAbsent('account', () => username);
+        fields.putIfAbsent('notes', () => notes);
+        if (totp.isNotEmpty) fields.putIfAbsent('totp_secret', () => totp);
+        break;
     }
 
     return ExchangeRecord(
@@ -275,6 +285,15 @@ class CsvCodec implements PasswordFormatCodec {
         case VaultItemType.softwareLicense:
           pwd = take('license_key');
           url = take('download_url');
+          notes = take('notes');
+          break;
+        case VaultItemType.authenticator:
+          // `issuer` and the advanced algorithm/digits/period fields have
+          // no dedicated CSV column -- they ride along in the `extra` JSON
+          // blob below instead, same as any field this codec's fixed
+          // schema doesn't have a slot for.
+          username = take('account');
+          totp = take('totp_secret');
           notes = take('notes');
           break;
         default:

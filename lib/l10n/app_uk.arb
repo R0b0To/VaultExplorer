@@ -2331,5 +2331,17 @@
   "authenticatorInvalidSecretError": "Invalid secret",
   "authenticatorAddButtonTooltip": "Add authenticator",
   "authenticatorChooseVaultTitle": "Choose a vault",
-  "authenticatorOpenItemTooltip": "Open item"
+  "authenticatorOpenItemTooltip": "Open item",
+  "authenticatorNextCodeLabel": "Наступний код",
+  "authenticatorNextCodePrefix": "Наступний",
+  "authenticatorCopyNextCodeTooltip": "Скопіювати наступний код",
+  "authenticatorSettingsTitle": "Налаштування автентифікатора",
+  "authenticatorEnableTitle": "Увімкнути автентифікатор",
+  "authenticatorEnableSubtitle": "Автоматично сканувати відкриті сховища на наявність 2FA-кодів",
+  "authenticatorShowCodesTitle": "Показувати коди підтвердження",
+  "authenticatorShowCodesSubtitle": "Показувати цифри відкрито замість маскування для конфіденційності",
+  "authenticatorSearchPlacementLabel": "Розташування панелі пошуку",
+  "authenticatorPlacementBottom": "Знизу",
+  "authenticatorPlacementTop": "Згори",
+  "authenticatorInterchangeSection": "Імпорт та експорт"
 }

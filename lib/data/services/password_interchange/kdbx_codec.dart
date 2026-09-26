@@ -10,8 +10,8 @@
 // Layout convention (see also docs/password-interchange.md):
 //   - One top-level group per VaultItemType VaultExplorer actually has
 //     items for ("Logins", "Payment Cards", "Identities", "Secure Notes",
-//     "Bank Accounts", "Software Licenses"), with [ExchangeRecord.folderPath]
-//     mirrored as nested subgroups under that.
+//     "Bank Accounts", "Software Licenses", "Authenticators"), with
+//     [ExchangeRecord.folderPath] mirrored as nested subgroups under that.
 //   - The four fields every KeePass client already knows how to show
 //     (Title/UserName/Password/URL/Notes) are used wherever a VaultExplorer
 //     field means the same thing, so a VaultExplorer export is immediately
@@ -55,6 +55,7 @@ const Map<VaultItemType, String> _groupNameForType = {
   VaultItemType.secureNote: 'Secure Notes',
   VaultItemType.bankAccount: 'Bank Accounts',
   VaultItemType.softwareLicense: 'Software Licenses',
+  VaultItemType.authenticator: 'Authenticators',
 };
 
 /// Accepted spellings for each group name when *reading* a file -- a bit
@@ -76,6 +77,10 @@ final Map<String, VaultItemType> _typeForGroupName = {
   'software license': VaultItemType.softwareLicense,
   'licenses': VaultItemType.softwareLicense,
   'licences': VaultItemType.softwareLicense,
+  'authenticator': VaultItemType.authenticator,
+  '2fa': VaultItemType.authenticator,
+  'totp': VaultItemType.authenticator,
+  'otp': VaultItemType.authenticator,
 };
 
 const String _fieldTitle = 'Title';
@@ -105,6 +110,9 @@ const Map<VaultItemType, Map<String, String>> _standardFieldMap = {
     'download_url': _fieldUrl,
     'notes': _fieldNotes,
   },
+  // 'totp_secret' is handled by the same explicit branches as the password
+  // type's, extended below, for the same protected-flag reason.
+  VaultItemType.authenticator: {'account': _fieldUserName, 'notes': _fieldNotes},
 };
 
 class KdbxCodec implements PasswordFormatCodec {
@@ -221,7 +229,7 @@ class KdbxCodec implements PasswordFormatCodec {
     final notes = raw.remove(_fieldNotes) ?? '';
     final otp = raw.remove(_fieldOtp) ?? '';
 
-    final type = groupType ?? _inferForeignType(username: username, password: password);
+    final type = groupType ?? _inferForeignType(username: username, password: password, otp: otp);
     final fields = <String, String>{};
     final template = _standardFieldMap[type] ?? const {};
     // Reverse of _standardFieldMap: which VaultExplorer key(s) pull from
@@ -249,6 +257,13 @@ class KdbxCodec implements PasswordFormatCodec {
       fields['url'] = url;
       if (otp.isNotEmpty) fields['totp_secret'] = otp;
     }
+    // Authenticator entries: 'account' already came from the reverse
+    // _standardFieldMap loop above; only 'otp' needs its own handling here
+    // (same reason as password's totp_secret -- see _standardFieldMap's
+    // doc comment).
+    if (type == VaultItemType.authenticator && otp.isNotEmpty) {
+      fields['totp_secret'] = otp;
+    }
     // A foreign entry outside any recognized group still carries its
     // UserName/URL/Notes even when inferred as a secureNote, so nothing
     // typed into those standard fields is silently dropped.
@@ -269,8 +284,21 @@ class KdbxCodec implements PasswordFormatCodec {
     return ExchangeRecord(type: type, title: title, fields: fields, folderPath: path);
   }
 
-  VaultItemType _inferForeignType({required String username, required String password}) =>
-      (username.isNotEmpty || password.isNotEmpty) ? VaultItemType.password : VaultItemType.secureNote;
+  /// A .kdbx made by a real KeePass client won't have this codec's own
+  /// group names -- entries outside any recognized group fall back to this
+  /// heuristic. An otherwise-empty entry with just an `otp` field (the
+  /// pattern a standalone TOTP entry created by hand in KeePassXC/Strongbox
+  /// would have) becomes an [VaultItemType.authenticator] rather than a
+  /// blank-looking [VaultItemType.secureNote].
+  VaultItemType _inferForeignType({
+    required String username,
+    required String password,
+    required String otp,
+  }) {
+    if (username.isNotEmpty || password.isNotEmpty) return VaultItemType.password;
+    if (otp.isNotEmpty) return VaultItemType.authenticator;
+    return VaultItemType.secureNote;
+  }
 
   @override
   Future<Uint8List> encode(List<ExchangeRecord> records, {String? password}) async {
@@ -346,7 +374,10 @@ class KdbxCodec implements PasswordFormatCodec {
         out[standardName] = e.value;
         continue;
       }
-      if (record.type == VaultItemType.password) {
+      if (record.type == VaultItemType.password || record.type == VaultItemType.authenticator) {
+        // Authenticator records never populate 'username'/'password'/'url'
+        // (see VaultItemTemplate.fieldsFor) -- those cases below are
+        // unreachable for them; only 'totp_secret' applies.
         switch (key) {
           case 'username':
             out[_fieldUserName] = e.value;

@@ -14142,6 +14142,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open item'**
   String get authenticatorOpenItemTooltip;
+
+  /// Clipboard label for the upcoming TOTP code preview
+  ///
+  /// In en, this message translates to:
+  /// **'Next code'**
+  String get authenticatorNextCodeLabel;
+
+  /// Prefix label shown before the upcoming TOTP code preview
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get authenticatorNextCodePrefix;
+
+  /// Tooltip for the next TOTP code preview button
+  ///
+  /// In en, this message translates to:
+  /// **'Copy next code'**
+  String get authenticatorCopyNextCodeTooltip;
+
+  /// AppBar title for the authenticator settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator Settings'**
+  String get authenticatorSettingsTitle;
+
+  /// Title for switch enabling TOTP authenticator
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Authenticator'**
+  String get authenticatorEnableTitle;
+
+  /// Subtitle explaining background vault scanning for authenticator items
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically scan mounted vaults for 2FA verification codes'**
+  String get authenticatorEnableSubtitle;
+
+  /// Title for switch toggling code visibility
+  ///
+  /// In en, this message translates to:
+  /// **'Show Verification Codes'**
+  String get authenticatorShowCodesTitle;
+
+  /// Subtitle explaining masked code visibility
+  ///
+  /// In en, this message translates to:
+  /// **'Display digits openly instead of masking them for privacy'**
+  String get authenticatorShowCodesSubtitle;
+
+  /// Label for search bar placement picker
+  ///
+  /// In en, this message translates to:
+  /// **'Search Bar Placement'**
+  String get authenticatorSearchPlacementLabel;
+
+  /// Bottom placement option
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get authenticatorPlacementBottom;
+
+  /// Top placement option
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get authenticatorPlacementTop;
+
+  /// Section header for password and 2FA import/export in authenticator settings
+  ///
+  /// In en, this message translates to:
+  /// **'Import & Export'**
+  String get authenticatorInterchangeSection;
 }
 
 class _AppLocalizationsDelegate

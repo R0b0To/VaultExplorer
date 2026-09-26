@@ -196,7 +196,18 @@ class StorageLocationsSheet extends ConsumerWidget {
               ),
               onTap: () async {
                 final notifier = ref.read(externalStorageLocationsProvider.notifier);
-                final loc = await notifier.promptAndAddLocation();
+                ExternalStorageLocation? loc;
+                try {
+                  loc = await notifier.promptAndAddLocation();
+                } on SelfReferentialStorageException {
+                  if (!context.mounted) return;
+                  showAppSnackBar(
+                    context,
+                    message: context.l10n.storageLocationSelfReferenceError,
+                    tone: AppBannerTone.warning,
+                  );
+                  return;
+                }
                 if (!context.mounted) return;
                 if (loc != null) {
                   Navigator.pop(context);

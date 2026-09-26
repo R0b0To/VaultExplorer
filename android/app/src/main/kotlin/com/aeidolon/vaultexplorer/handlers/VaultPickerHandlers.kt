@@ -10,6 +10,7 @@ import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 import com.aeidolon.vaultexplorer.saf.SafFolderGrants
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
@@ -374,6 +375,26 @@ class VaultPickerHandlers(
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
+
+            // Refuse to let the user add one of this app's own exposed SAF
+            // roots back to itself as an "external storage" location -- the
+            // whole-vault root and every per-folder root (see
+            // FolderDocumentProviderHandlers) are all served by this one
+            // ContainerDocumentsProvider authority, so that content is
+            // already reachable directly inside the app. Looping it back in
+            // through SAF would just be a confusing, redundant alias for
+            // the same data (and, if pointed at a currently-unlocked
+            // session, is nonsensical to browse "as" a separate storage).
+            // Checked before taking a persistable permission grant, so we
+            // don't bother acquiring one for content we're about to reject.
+            if (uri.authority == ContainerDocumentsProvider.AUTHORITY) {
+                VeLog.i("VaultPickerHandlers") { "pickExtractFolder: rejected self-referential pick, uri=$uri" }
+                activity.runOnUiThread {
+                    res.success(mapOf("selfReference" to true))
+                }
+                return@registerForActivityResult
+            }
+
             val takeFlags = (data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
             try {
                 activity.contentResolver.takePersistableUriPermission(uri, takeFlags)

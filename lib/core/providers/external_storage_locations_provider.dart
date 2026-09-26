@@ -9,8 +9,41 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/external_storage_repository.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
+/// Thrown by [ExternalStorageLocationsNotifier.promptAndAddLocation] when
+/// the user picked a SAF tree that is this app's own exposed vault (or an
+/// exposed subfolder of one) -- see [ExternalStorageLocationsNotifier]'s
+/// `_isOwnDocumentsProviderUri` doc comment for why that's refused.
+class SelfReferentialStorageException implements Exception {
+  const SelfReferentialStorageException();
+}
+
 class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLocation>> {
   static const ExternalStorageRepository _repo = ExternalStorageRepository();
+
+  /// SAF authority of this app's own `ContainerDocumentsProvider` (see the
+  /// Kotlin class of that name, and `FolderDocumentProviderHandlers`, which
+  /// mounts a single subfolder as its own root under the same provider).
+  /// Both "expose the whole unlocked vault" and "expose one subfolder of
+  /// it" publish their SAF roots through this one authority, so comparing
+  /// against it alone is enough to catch either case -- content already
+  /// reachable directly inside the app must not also be pickable back in
+  /// as an "external storage" location, which would just be a confusing,
+  /// redundant alias for the same data. Must be kept in sync with the
+  /// `<provider android:authorities=...>` entry in AndroidManifest.xml.
+  static const _kOwnDocumentsProviderAuthority = 'com.aeidolon.vaultexplorer.documents';
+
+  /// True if [treeUri] is (or lives under) this app's own SAF document
+  /// provider. Compares the URI's authority component only -- not a
+  /// string prefix -- so it can't be fooled or missed by query-string or
+  /// path differences between roots.
+  static bool _isOwnDocumentsProviderUri(String? treeUri) {
+    if (treeUri == null || treeUri.isEmpty) return false;
+    try {
+      return Uri.parse(treeUri).authority == _kOwnDocumentsProviderAuthority;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   List<ExternalStorageLocation> build() {
@@ -29,9 +62,31 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
     );
     if (result == null) return null;
 
+    // Fast path: the native picker already recognized this as one of our
+    // own exposed SAF roots (see `VaultPickerHandlers.pickExtractFolder`)
+    // and skipped taking a persistable permission grant for it.
+    if (result['selfReference'] == true) {
+      VeLog.w(
+        'ExternalStorage',
+        'promptAndAddLocation: rejected self-referential pick (native flagged it)',''
+      );
+      throw const SelfReferentialStorageException();
+    }
+
     final rawPath = result['path'] as String?;
     final treeUri = result['treeUri'] as String?;
     var displayName = result['displayName'] as String? ?? '';
+
+    // Defense in depth: refuse it here too, purely from the returned
+    // treeUri, in case some other caller ever reaches this point without
+    // going through that native check.
+    if (_isOwnDocumentsProviderUri(treeUri)) {
+      VeLog.w(
+        'ExternalStorage',
+        'promptAndAddLocation: rejected self-referential pick (treeUri=$treeUri)',''
+      );
+      throw const SelfReferentialStorageException();
+    }
 
     // NOTE: this only decides what gets stored in `.path` for display/legacy
     // purposes (e.g. showing a real folder path instead of a content:// URI

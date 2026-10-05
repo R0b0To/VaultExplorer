@@ -18,6 +18,7 @@ import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry
 import com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry
+import com.aeidolon.vaultexplorer.saf.MirrorPushEvents
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.concurrent.withLock
@@ -37,6 +38,12 @@ private const val CONTAINER_DOCUMENTS_AUTHORITY = "com.aeidolon.vaultexplorer.do
  * kill the process, with no chance to unmount cleanly.
  */
 class VaultKeepAliveService : Service() {
+    private val mirrorPushListener = MirrorPushEvents.Listener {
+        if (isRunning && ContainerSessionRegistry.hasAnyActiveSessions()) {
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, buildNotification())
+        }
+    }
 
     companion object {
         private const val TAG = "VaultKeepAliveService"
@@ -109,6 +116,7 @@ class VaultKeepAliveService : Service() {
     }
 
     private lateinit var executor: ExecutorService
+    private var observingMirrorPush = false
     private var cachedContentIntent: PendingIntent? = null
     private var cachedLockAllIntent: PendingIntent? = null
 
@@ -125,6 +133,10 @@ class VaultKeepAliveService : Service() {
                 "${ContainerSessionRegistry.activeSessions.keys.toList()}"
         }
         startForeground(NOTIFICATION_ID, buildNotification())
+        if (!observingMirrorPush) {
+            MirrorPushEvents.addListener(mirrorPushListener)
+            observingMirrorPush = true
+        }
         if (intent?.action == ACTION_LOCK_ALL) {
             VeLog.i(TAG) { "onStartCommand: ACTION_LOCK_ALL -> locking every active session" }
             lockAllAndMaybeStop()
@@ -147,6 +159,7 @@ class VaultKeepAliveService : Service() {
     override fun onBind(intent: Intent?) = null
 
     override fun onDestroy() {
+        if (observingMirrorPush) MirrorPushEvents.removeListener(mirrorPushListener)
         instance = null
         isRunning = false
         hasActiveOperations = false
@@ -251,6 +264,8 @@ class VaultKeepAliveService : Service() {
 
         val contentIntent = getContentIntent()
         val lockAllIntent = getLockAllIntent()
+        val mirrorPushActive = !hasActiveOperations && MirrorPushEvents.snapshot().activeCount > 0
+        val showingProgress = hasActiveOperations || mirrorPushActive
 
         val contentTitle: String
         val contentText: String
@@ -258,7 +273,7 @@ class VaultKeepAliveService : Service() {
         val smallIcon: Int
         if (decoyActive) {
             contentTitle = localized.getString(R.string.decoy_app_name)
-            contentText = if (hasActiveOperations) {
+            contentText = if (showingProgress) {
                 currentProgressText ?: localized.getString(R.string.vault_keep_alive_notification_text_decoy)
             } else {
                 localized.getString(R.string.vault_keep_alive_notification_text_decoy)
@@ -272,6 +287,9 @@ class VaultKeepAliveService : Service() {
                 contentText = currentProgressText ?: localized.resources.getQuantityString(
                     R.plurals.vault_keep_alive_notification_text, openCount, openCount,
                 )
+            } else if (mirrorPushActive) {
+                contentTitle = localized.getString(R.string.mirror_push_notification_title)
+                contentText = localized.getString(R.string.mirror_push_notification_text)
             } else {
                 contentTitle = currentIdentityLabel()
                 contentText = localized.resources.getQuantityString(
@@ -293,11 +311,13 @@ class VaultKeepAliveService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
 
-        if (hasActiveOperations) {
+        if (showingProgress) {
             if (isIndeterminate) {
                 builder.setProgress(0, 0, true)
             } else if (currentProgress != null) {
                 builder.setProgress(maxProgress, currentProgress!!.coerceIn(0, maxProgress), false)
+            } else if (mirrorPushActive) {
+                builder.setProgress(0, 0, true)
             }
         } else {
             builder.setProgress(0, 0, false)

@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "إظهار أو إخفاء علامات تبويب الملفات المفتوحة. يمكنك التبديل بين الملفات من الشريط الجانبي.",
   "textEditorAutoHideTabBarLabel": "إخفاء علامات التبويب عند التمرير",
   "textEditorAutoHideTabBarDescription": "إخفاء شريط علامات التبويب عند التمرير لأسفل، والتمرير لأعلى لإظهاره.",
-  "lockWaitingForOperationsMessage": "جارٍ انتظار انتهاء العمليات الحالية قبل القفل…"
+  "lockWaitingForOperationsMessage": "جارٍ انتظار انتهاء العمليات الحالية قبل القفل…",
+  "mirrorSyncActivityLabel": "جارٍ حفظ تغييرات الخزنة إلى وحدة التخزين"
 }

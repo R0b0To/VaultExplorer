@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "열린 파일의 탭을 표시하거나 숨깁니다. 사이드바에서도 파일을 전환할 수 있습니다.",
   "textEditorAutoHideTabBarLabel": "스크롤할 때 탭 숨기기",
   "textEditorAutoHideTabBarDescription": "아래로 스크롤하면 탭 표시줄을 숨기고 위로 스크롤하면 다시 표시합니다.",
-  "lockWaitingForOperationsMessage": "잠그기 전에 진행 중인 작업이 완료되기를 기다리는 중…"
+  "lockWaitingForOperationsMessage": "잠그기 전에 진행 중인 작업이 완료되기를 기다리는 중…",
+  "mirrorSyncActivityLabel": "볼트 변경 사항을 저장소에 저장 중"
 }

@@ -9001,4 +9001,7 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       '잠그기 전에 진행 중인 작업이 완료되기를 기다리는 중…';
+
+  @override
+  String get mirrorSyncActivityLabel => '볼트 변경 사항을 저장소에 저장 중';
 }

@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Tabs für geöffnete Dateien anzeigen oder ausblenden. Du kannst Dateien weiterhin über die Seitenleiste öffnen.",
   "textEditorAutoHideTabBarLabel": "Tabs beim Scrollen ausblenden",
   "textEditorAutoHideTabBarDescription": "Die Tab-Leiste beim Scrollen nach unten ausblenden und beim Scrollen nach oben wieder einblenden.",
-  "lockWaitingForOperationsMessage": "Warte, bis die laufenden Vorgänge abgeschlossen sind, bevor der Container gesperrt wird …"
+  "lockWaitingForOperationsMessage": "Warte, bis die laufenden Vorgänge abgeschlossen sind, bevor der Container gesperrt wird …",
+  "mirrorSyncActivityLabel": "Tresoränderungen werden im Speicher gesichert"
 }

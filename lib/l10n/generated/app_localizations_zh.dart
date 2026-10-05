@@ -8876,4 +8876,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lockWaitingForOperationsMessage => '正在等待当前操作完成后再锁定…';
+
+  @override
+  String get mirrorSyncActivityLabel => '正在将保险库更改保存到存储空间';
 }

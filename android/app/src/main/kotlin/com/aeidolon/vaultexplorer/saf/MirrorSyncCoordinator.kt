@@ -714,7 +714,21 @@ class MirrorSyncCoordinator(
         throw MirrorPushException("copyAndVerify: failed to upload and verify $targetUri after 3 attempts", lastFailure)
     }
 
-    fun pushFileWrite(mirrored: File, realParent: DocumentFile?, existingRealDoc: DocumentFile?, displayName: String, mimeType: String) {
+    private inline fun <T> withPushActivity(block: () -> T): T {
+        val activityId = MirrorPushEvents.begin()
+        try {
+            return block()
+        } finally {
+            MirrorPushEvents.finish(activityId)
+        }
+    }
+
+    fun pushFileWrite(mirrored: File, realParent: DocumentFile?, existingRealDoc: DocumentFile?, displayName: String, mimeType: String) =
+        withPushActivity {
+            pushFileWriteInternal(mirrored, realParent, existingRealDoc, displayName, mimeType)
+        }
+
+    private fun pushFileWriteInternal(mirrored: File, realParent: DocumentFile?, existingRealDoc: DocumentFile?, displayName: String, mimeType: String) {
         // Defensive re-stat with a short retry -- but only when
         // existingRealDoc is non-null, i.e. this push is expected to carry
         // real content (a completed write being synced back to an already-
@@ -1081,35 +1095,43 @@ class MirrorSyncCoordinator(
     }
 
     fun pushCreateDirectory(realParent: DocumentFile, name: String): DocumentFile {
-        return realOps.createDirectorySafe(realParent, name)
-            ?: throw MirrorPushException("pushCreateDirectory: could not create $name on real SAF tree")
+        return withPushActivity {
+            realOps.createDirectorySafe(realParent, name)
+                ?: throw MirrorPushException("pushCreateDirectory: could not create $name on real SAF tree")
+        }
     }
 
     fun pushRename(realDoc: DocumentFile, newName: String, realParent: DocumentFile?): DocumentFile {
-        try {
-            return realOps.renameDocumentAndGet(realDoc, newName, realParent)
-        } catch (e: Exception) {
-            throw MirrorPushException("pushRename failed for ${realDoc.uri} -> $newName", e)
+        return withPushActivity {
+            try {
+                realOps.renameDocumentAndGet(realDoc, newName, realParent)
+            } catch (e: Exception) {
+                throw MirrorPushException("pushRename failed for ${realDoc.uri} -> $newName", e)
+            }
         }
     }
 
     fun pushMove(realDoc: DocumentFile, realOldParent: DocumentFile, realNewParent: DocumentFile) {
-        try {
-            realOps.movePhysicalDocument(realDoc, realOldParent, realNewParent)
-        } catch (e: Exception) {
-            throw MirrorPushException("pushMove failed for ${realDoc.uri}", e)
+        withPushActivity {
+            try {
+                realOps.movePhysicalDocument(realDoc, realOldParent, realNewParent)
+            } catch (e: Exception) {
+                throw MirrorPushException("pushMove failed for ${realDoc.uri}", e)
+            }
         }
     }
 
     fun pushDelete(realDoc: DocumentFile) {
-        claimDeferred(realDoc)
-        realContent.remove(realDoc.uri.toString())
-        try {
-            realOps.deleteRecursively(realDoc)
-        } catch (e: Exception) {
-            throw MirrorPushException("pushDelete failed for ${realDoc.uri}", e)
-        } finally {
-            registry.forget(realDoc.uri.toString())
+        withPushActivity {
+            claimDeferred(realDoc)
+            realContent.remove(realDoc.uri.toString())
+            try {
+                realOps.deleteRecursively(realDoc)
+            } catch (e: Exception) {
+                throw MirrorPushException("pushDelete failed for ${realDoc.uri}", e)
+            } finally {
+                registry.forget(realDoc.uri.toString())
+            }
         }
     }
 }

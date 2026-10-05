@@ -9580,4 +9580,8 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'En attente de la fin des opérations en cours avant de verrouiller…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Enregistrement des modifications du coffre dans le stockage';
 }

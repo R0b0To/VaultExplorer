@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Afficher ou masquer les onglets des fichiers ouverts. Vous pouvez toujours changer de fichier depuis la barre latérale.",
   "textEditorAutoHideTabBarLabel": "Masquer les onglets au défilement",
   "textEditorAutoHideTabBarDescription": "Masquer la barre des onglets en faisant défiler vers le bas et la réafficher en faisant défiler vers le haut.",
-  "lockWaitingForOperationsMessage": "En attente de la fin des opérations en cours avant de verrouiller…"
+  "lockWaitingForOperationsMessage": "En attente de la fin des opérations en cours avant de verrouiller…",
+  "mirrorSyncActivityLabel": "Enregistrement des modifications du coffre dans le stockage"
 }

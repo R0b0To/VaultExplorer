@@ -9556,4 +9556,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'جارٍ انتظار انتهاء العمليات الحالية قبل القفل…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'جارٍ حفظ تغييرات الخزنة إلى وحدة التخزين';
 }

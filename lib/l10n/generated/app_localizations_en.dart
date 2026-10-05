@@ -9361,4 +9361,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'Waiting for current operations to finish before locking…';
+
+  @override
+  String get mirrorSyncActivityLabel => 'Saving vault changes to storage';
 }

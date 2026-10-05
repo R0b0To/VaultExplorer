@@ -25,6 +25,8 @@
     <string name="vault_keep_alive_lock_all_action">Lock all vaults</string>
     <string name="vault_keep_alive_notification_text_decoy">Archive Explorer is running</string>
     <string name="vault_keep_alive_close_action_decoy">Close</string>
+    <string name="mirror_push_notification_title">Saving vault changes</string>
+    <string name="mirror_push_notification_text">Uploading changes to storage</string>
 
     <string name="camera_recording_channel_description">Ongoing recording status</string>
     <string name="camera_recording_notification_title">Recording video</string>

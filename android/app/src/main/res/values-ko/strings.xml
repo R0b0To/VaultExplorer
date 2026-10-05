@@ -6,4 +6,5 @@
     <string name="panickit_unpaired_notification_title">패닉 트리거 연결 해제됨</string><string name="panickit_unpaired_notification_text">이제 %1$s에서 이 앱의 패닉 대응을 실행할 수 없습니다</string><string name="panickit_unpaired_notification_text_decoy">연결된 앱이 삭제되었습니다</string><string name="panickit_unknown_app">앱</string>
     <string name="vault_keep_alive_lock_all_action">모든 볼트 잠금</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer 실행 중</string><string name="vault_keep_alive_close_action_decoy">닫기</string>
     <string name="camera_recording_channel_description">녹화 상태 알림</string><string name="camera_recording_notification_title">동영상 녹화 중</string><string name="camera_recording_notification_text">저장 위치: %1$s</string><string name="camera_recording_stop_action">중지 및 저장</string><string name="camera_recording_notification_text_decoy">Archive Explorer 실행 중</string><string name="camera_recording_stop_action_decoy">닫기</string>
+    <string name="mirror_push_notification_title">볼트 변경 사항 저장 중</string><string name="mirror_push_notification_text">저장소에 변경 사항 업로드 중</string>
 </resources>

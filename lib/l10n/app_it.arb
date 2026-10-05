@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Mostra o nascondi le schede dei file aperti. Puoi comunque cambiare file dalla barra laterale.",
   "textEditorAutoHideTabBarLabel": "Nascondi schede durante lo scorrimento",
   "textEditorAutoHideTabBarDescription": "Nascondi la barra delle schede scorrendo verso il basso e mostrala di nuovo scorrendo verso l’alto.",
-  "lockWaitingForOperationsMessage": "Attendo che le operazioni in corso terminino prima di bloccare…"
+  "lockWaitingForOperationsMessage": "Attendo che le operazioni in corso terminino prima di bloccare…",
+  "mirrorSyncActivityLabel": "Salvataggio delle modifiche del vault nell’archivio"
 }

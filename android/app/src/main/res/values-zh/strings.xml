@@ -6,4 +6,5 @@
     <string name="panickit_unpaired_notification_title">紧急触发器已断开</string><string name="panickit_unpaired_notification_text">%1$s 现在无法触发此应用的紧急响应</string><string name="panickit_unpaired_notification_text_decoy">已移除一个已连接的应用</string><string name="panickit_unknown_app">应用</string>
     <string name="vault_keep_alive_lock_all_action">锁定所有保险库</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer 正在运行</string><string name="vault_keep_alive_close_action_decoy">关闭</string>
     <string name="camera_recording_channel_description">持续录制状态</string><string name="camera_recording_notification_title">正在录制视频</string><string name="camera_recording_notification_text">正在保存到 %1$s</string><string name="camera_recording_stop_action">停止并保存</string><string name="camera_recording_notification_text_decoy">Archive Explorer 正在运行</string><string name="camera_recording_stop_action_decoy">关闭</string>
+    <string name="mirror_push_notification_title">正在保存保险库更改</string><string name="mirror_push_notification_text">正在将更改上传到存储空间</string>
 </resources>

@@ -11915,5 +11915,9 @@
   "lockWaitingForOperationsMessage": "Waiting for current operations to finish before locking…",
   "@lockWaitingForOperationsMessage": {
     "description": "Snackbar shown when locking a container takes longer because active operations must finish first"
+  },
+  "mirrorSyncActivityLabel": "Saving vault changes to storage",
+  "@mirrorSyncActivityLabel": {
+    "description": "Status shown while a mirror proxy is still writing vault changes to its storage provider."
   }
 }

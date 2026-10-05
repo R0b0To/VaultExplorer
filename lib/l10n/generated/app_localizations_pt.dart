@@ -9503,4 +9503,8 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'A aguardar que as operações em curso terminem antes de bloquear…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Salvando alterações do cofre no armazenamento';
 }

@@ -24,6 +24,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
 
   bool _isDebouncePassed = false;
   bool _initialEvaluating = false;
+  DateTime? _mirrorPushStartedAt;
   final Set<FileOperation> _observedOps = {};
 
   // Store reference in a field instead of reading 'ref' on every getter access
@@ -101,8 +102,14 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     final svc = _svc;
     final ops = svc.operations;
     final activeOps = svc.activeOperations;
-    final activeCount = activeOps.length;
     final now = DateTime.now();
+    final mirrorPushActive = svc.mirrorPushActiveCount > 0;
+    if (mirrorPushActive) {
+      _mirrorPushStartedAt ??= now;
+    } else {
+      _mirrorPushStartedAt = null;
+    }
+    final hasActiveActivity = activeOps.isNotEmpty || mirrorPushActive;
 
     final hasErrors = ops.any(
       (op) =>
@@ -112,7 +119,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     );
 
     // 1. If there are no operations at all, reset debounce and cancel timers.
-    if (ops.isEmpty) {
+    if (ops.isEmpty && !mirrorPushActive) {
       _showDebounceTimer?.cancel();
       _showDebounceTimer = null;
       _lingerTimer?.cancel();
@@ -122,13 +129,15 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     }
 
     // 2. If there are active operations:
-    if (activeCount > 0) {
+    if (hasActiveActivity) {
       _lingerTimer?.cancel();
       _lingerTimer = null;
 
-      final earliestStart = activeOps
-          .map((op) => op.runStartTime ?? op.createdAt)
-          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final earliestStart = activeOps.isEmpty
+          ? (_mirrorPushStartedAt ?? now)
+          : activeOps
+                .map((op) => op.runStartTime ?? op.createdAt)
+                .reduce((a, b) => a.isBefore(b) ? a : b);
       final elapsed = now.difference(earliestStart);
 
       if (elapsed >= _kShowDelay) {
@@ -149,7 +158,8 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
       _showDebounceTimer?.cancel();
       _showDebounceTimer = Timer(remaining, () {
         _showDebounceTimer = null;
-        if (mounted && _svc.operations.isNotEmpty) {
+        if (mounted &&
+            (_svc.operations.isNotEmpty || _svc.mirrorPushActiveCount > 0)) {
           setState(() => _isDebouncePassed = true);
         }
       });
@@ -213,8 +223,11 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   }
 
   double? _calculateAggregateProgress() {
+    if (_svc.mirrorPushActiveCount > 0) return null;
     final active = _svc.activeOperations;
-    if (active.isEmpty) return 1.0;
+    if (active.isEmpty) {
+      return _svc.mirrorPushActiveCount > 0 ? null : 1.0;
+    }
 
     int totalBytes = 0;
     int transferredBytes = 0;
@@ -248,13 +261,12 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isDebouncePassed) return const SizedBox.shrink();
-
     final svc = _svc;
     final ops = svc.operations;
-    if (ops.isEmpty) return const SizedBox.shrink();
+    final isVisible =
+        _isDebouncePassed && (ops.isNotEmpty || svc.mirrorPushActiveCount > 0);
 
-    final activeCount = svc.activeCount;
+    final activeCount = svc.combinedActivityCount;
     final hasActive = activeCount > 0;
 
     final cs = Theme.of(context).colorScheme;
@@ -265,71 +277,88 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
           op.status == FileOperationStatus.failed ||
           op.status == FileOperationStatus.diskFull,
     );
-    final isWarning = !isError && ops.any(
-      (op) => op.status == FileOperationStatus.completedWithErrors,
-    );
+    final isWarning =
+        !isError &&
+        ops.any((op) => op.status == FileOperationStatus.completedWithErrors);
 
     final Color statusColor = isError
         ? cs.error
         : isWarning
-            ? semantic.warning
-            : cs.primary;
+        ? semantic.warning
+        : cs.primary;
 
     final double? progress = hasActive ? _calculateAggregateProgress() : 1.0;
 
-    return Tooltip(
-      message: context.l10n.transferActivityTooltip,
-      child: IconButton(
-        padding: const EdgeInsets.all(8.0),
-        onPressed: () => FileOperationsSheet.show(context),
-        icon: Badge(
-          isLabelVisible: activeCount > 1,
-          label: Text(
-            '$activeCount',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
-          ),
-          backgroundColor: cs.primary,
-          textColor: cs.onPrimary,
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Circular Progress Ring
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 2.5,
-                    color: statusColor,
-                    backgroundColor: statusColor.withValues(alpha: 0.2),
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: AnimatedOpacity(
+        opacity: isVisible ? 1 : 0,
+        duration: AppMotion.short2,
+        child: IgnorePointer(
+          ignoring: !isVisible,
+          child: ExcludeSemantics(
+            excluding: !isVisible,
+            child: Tooltip(
+              message: context.l10n.transferActivityTooltip,
+              child: IconButton(
+                padding: const EdgeInsets.all(8.0),
+                onPressed: () => FileOperationsSheet.show(context),
+                icon: Badge(
+                  isLabelVisible: activeCount > 1,
+                  label: Text(
+                    '$activeCount',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
                   ),
-                ),
-                // Center Icon
-                AnimatedSwitcher(
-                  duration: AppMotion.short2,
-                  switchInCurve: AppMotion.standard,
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: FadeTransition(opacity: animation, child: child),
-                  ),
-                  child: hasActive
-                      ? Icon(
-                          Icons.swap_horiz_rounded,
-                          key: const ValueKey('active'),
-                          size: 15,
-                          color: statusColor,
-                        )
-                      : isError
-                          ? Icon(
-                              Icons.error_outline_rounded,
-                              key: const ValueKey('error'),
-                              size: 15,
-                              color: cs.error,
-                            )
-                          : isWarning
+                  backgroundColor: cs.primary,
+                  textColor: cs.onPrimary,
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Circular Progress Ring
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 2.5,
+                            color: statusColor,
+                            backgroundColor: statusColor.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        // Center Icon
+                        AnimatedSwitcher(
+                          duration: AppMotion.short2,
+                          switchInCurve: AppMotion.standard,
+                          transitionBuilder: (child, animation) =>
+                              ScaleTransition(
+                                scale: animation,
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              ),
+                          child: hasActive
+                              ? Icon(
+                                  Icons.swap_horiz_rounded,
+                                  key: const ValueKey('active'),
+                                  size: 15,
+                                  color: statusColor,
+                                )
+                              : isError
+                              ? Icon(
+                                  Icons.error_outline_rounded,
+                                  key: const ValueKey('error'),
+                                  size: 15,
+                                  color: cs.error,
+                                )
+                              : isWarning
                               ? Icon(
                                   Icons.warning_amber_rounded,
                                   key: const ValueKey('warning'),
@@ -342,8 +371,12 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
                                   size: 15,
                                   color: cs.primary,
                                 ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
         ),

@@ -9503,4 +9503,8 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'Warte, bis die laufenden Vorgänge abgeschlossen sind, bevor der Container gesperrt wird …';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Tresoränderungen werden im Speicher gesichert';
 }

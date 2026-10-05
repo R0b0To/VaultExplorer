@@ -9517,4 +9517,8 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'Esperando a que terminen las operaciones en curso antes de bloquear…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Guardando cambios de la bóveda en el almacenamiento';
 }

@@ -9583,4 +9583,7 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'Очікування завершення поточних операцій перед блокуванням…';
+
+  @override
+  String get mirrorSyncActivityLabel => 'Збереження змін сховища у сховище';
 }

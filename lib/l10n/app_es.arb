@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Mostrar u ocultar las pestañas de los archivos abiertos. También puedes cambiar de archivo desde la barra lateral.",
   "textEditorAutoHideTabBarLabel": "Ocultar pestañas al desplazarse",
   "textEditorAutoHideTabBarDescription": "Ocultar la barra de pestañas al desplazarte hacia abajo y mostrarla de nuevo al desplazarte hacia arriba.",
-  "lockWaitingForOperationsMessage": "Esperando a que terminen las operaciones en curso antes de bloquear…"
+  "lockWaitingForOperationsMessage": "Esperando a que terminen las operaciones en curso antes de bloquear…",
+  "mirrorSyncActivityLabel": "Guardando cambios de la bóveda en el almacenamiento"
 }

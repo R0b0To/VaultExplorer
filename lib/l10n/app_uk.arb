@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Показувати або приховувати вкладки відкритих файлів. Перемикатися між файлами також можна на бічній панелі.",
   "textEditorAutoHideTabBarLabel": "Приховувати вкладки під час прокручування",
   "textEditorAutoHideTabBarDescription": "Приховувати панель вкладок під час прокручування вниз і показувати її знову під час прокручування вгору.",
-   "lockWaitingForOperationsMessage": "Очікування завершення поточних операцій перед блокуванням…"
+  "lockWaitingForOperationsMessage": "Очікування завершення поточних операцій перед блокуванням…",
+  "mirrorSyncActivityLabel": "Збереження змін сховища у сховище"
 }

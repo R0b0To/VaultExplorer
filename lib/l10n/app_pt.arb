@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "Mostrar ou ocultar abas dos arquivos abertos. Você também pode alternar entre arquivos pela barra lateral.",
   "textEditorAutoHideTabBarLabel": "Ocultar abas ao rolar",
   "textEditorAutoHideTabBarDescription": "Ocultar a barra de abas ao rolar para baixo e mostrá-la novamente ao rolar para cima.",
-  "lockWaitingForOperationsMessage": "A aguardar que as operações em curso terminem antes de bloquear…"
+  "lockWaitingForOperationsMessage": "A aguardar que as operações em curso terminem antes de bloquear…",
+  "mirrorSyncActivityLabel": "Salvando alterações do cofre no armazenamento"
 }

@@ -41,7 +41,9 @@ class FileOperationsSheet extends ConsumerWidget {
           builder: (context, _) {
             final ops = svc.operations.reversed
                 .toList();
-            final hasActive = svc.activeCount > 0;
+            final mirrorPushCount = svc.mirrorPushActiveCount;
+            final hasMirrorPush = mirrorPushCount > 0 && svc.activeCount == 0;
+            final hasActive = svc.activeCount > 0 || hasMirrorPush;
 
             return Column(
               children: [
@@ -99,15 +101,21 @@ class FileOperationsSheet extends ConsumerWidget {
 
                 // ── Operation list ───────────────────────────────────────────
                 Expanded(
-                  child: ops.isEmpty
+                  child: ops.isEmpty && !hasMirrorPush
                       ? const _EmptyState()
                       : ListView.separated(
                           controller: scrollController,
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: ops.length,
+                          itemCount: ops.length + (hasMirrorPush ? 1 : 0),
                           separatorBuilder: (_, _) =>
                               const Divider(height: 1, indent: 20),
-                          itemBuilder: (_, i) => _OperationRow(op: ops[i]),
+                          itemBuilder: (_, i) {
+                            if (hasMirrorPush && i == 0) {
+                              return const _MirrorActivityRow();
+                            }
+                            final opIndex = i - (hasMirrorPush ? 1 : 0);
+                            return _OperationRow(op: ops[opIndex]);
+                          },
                         ),
                 ),
               ],
@@ -115,6 +123,48 @@ class FileOperationsSheet extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _MirrorActivityRow extends StatelessWidget {
+  const _MirrorActivityRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md + 4,
+        vertical: AppSpacing.md - 2,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: cs.primary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm + 4),
+          Expanded(
+            child: Text(
+              context.l10n.mirrorSyncActivityLabel,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(Icons.cloud_upload_outlined, color: cs.onSurfaceVariant),
+        ],
+      ),
     );
   }
 }

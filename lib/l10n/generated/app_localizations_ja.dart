@@ -9002,4 +9002,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get lockWaitingForOperationsMessage => 'ロックする前に、進行中の操作が完了するのを待っています…';
+
+  @override
+  String get mirrorSyncActivityLabel => '保管庫の変更をストレージに保存中';
 }

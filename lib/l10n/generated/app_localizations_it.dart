@@ -9500,4 +9500,8 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get lockWaitingForOperationsMessage =>
       'Attendo che le operazioni in corso terminino prima di bloccare…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Salvataggio delle modifiche del vault nell’archivio';
 }

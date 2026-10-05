@@ -83,6 +83,23 @@ class VaultEngineEvents {
   void notifyContainerLocked(int volId) =>
       _containerLockedRegistry.notify(volId);
 
+  final ListenerRegistry<int> _mirrorPushActivityRegistry =
+      ListenerRegistry<int>();
+  int _mirrorPushActiveCount = 0;
+  int get mirrorPushActiveCount => _mirrorPushActiveCount;
+  void addMirrorPushActivityListener(void Function(int activeCount) listener) =>
+      _mirrorPushActivityRegistry.add(listener);
+  void removeMirrorPushActivityListener(
+    void Function(int activeCount) listener,
+  ) => _mirrorPushActivityRegistry.remove(listener);
+
+  void _setMirrorPushActivity(int activeCount) {
+    final next = activeCount < 0 ? 0 : activeCount;
+    if (_mirrorPushActiveCount == next) return;
+    _mirrorPushActiveCount = next;
+    _mirrorPushActivityRegistry.notify(next);
+  }
+
   final ListenerRegistry<int> _backgroundRecordingStopRequestedRegistry =
       ListenerRegistry<int>();
   void addBackgroundRecordingStopRequestedListener(
@@ -274,7 +291,10 @@ class VaultEngineEvents {
   /// `VaultExplorerApi.initMethodCallHandler()` static call from `main()`.
   void registerHandler(MethodChannel channel) {
     channel.setMethodCallHandler((call) async {
-      if (call.method == 'onAppSelected') {
+      if (call.method == 'onMirrorPushActivity') {
+        final args = call.arguments as Map<Object?, Object?>?;
+        _setMirrorPushActivity((args?['activeCount'] as num?)?.toInt() ?? 0);
+      } else if (call.method == 'onAppSelected') {
         final ext = call.arguments['extension'] as String?;
         final pkg = call.arguments['package'] as String?;
         if (ext != null && pkg != null) {
@@ -533,5 +553,19 @@ class VaultEngineEvents {
         CacheCoordinator.trimAll(trimLevel);
       }
     });
+
+    // Flutter may not have installed its method-call handler yet when the
+    // native activity first attaches. Pull the current snapshot so an upload
+    // already in progress is still visible when the dashboard opens.
+    unawaited(() async {
+      try {
+        final args = await channel.invokeMapMethod<String, Object?>(
+          'getMirrorPushActivity',
+        );
+        _setMirrorPushActivity((args?['activeCount'] as num?)?.toInt() ?? 0);
+      } catch (_) {
+        // Older native builds and non-Android platforms have no mirror proxy.
+      }
+    }());
   }
 }

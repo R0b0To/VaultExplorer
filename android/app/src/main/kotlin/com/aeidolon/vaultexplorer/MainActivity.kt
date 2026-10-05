@@ -29,6 +29,7 @@ import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.IncomingShareBridge
 import com.aeidolon.vaultexplorer.bridge.LocalIncomingShareBridge
+import com.aeidolon.vaultexplorer.bridge.MirrorPushBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
@@ -38,6 +39,7 @@ import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.bridge.VideoEditProgressBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.service.VaultCameraRecordingService
+import com.aeidolon.vaultexplorer.saf.MirrorPushEvents
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.CameraRecordingServiceHandlers
@@ -90,6 +92,7 @@ private object ChannelMethods {
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
+    const val GET_MIRROR_PUSH_ACTIVITY = "getMirrorPushActivity"
     const val SET_NOTIFICATION_LOCALE = "setNotificationLocale"
     const val START_BACKGROUND_RECORDING = "startBackgroundRecording"
     const val STOP_BACKGROUND_RECORDING = "stopBackgroundRecording"
@@ -481,6 +484,7 @@ open class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        MirrorPushBridge.detach(methodChannel)
         chooserReceiver?.let { unregisterReceiver(it) }
         usbPermissionReceiver?.let { unregisterReceiver(it) }
         usbDetachReceiver?.let { unregisterReceiver(it) }
@@ -759,6 +763,7 @@ open class MainActivity : FlutterFragmentActivity() {
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
+        MirrorPushBridge.attach(channel)
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
         ExportProgressBridge.channel = channel
@@ -971,6 +976,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
                 ChannelMethods.UPDATE_BACKGROUND_SERVICE_PROGRESS -> backgroundServiceHandlers.handleUpdateProgress(call, result)
+                ChannelMethods.GET_MIRROR_PUSH_ACTIVITY -> result.success(
+                    mapOf("activeCount" to MirrorPushEvents.snapshot().activeCount),
+                )
                 ChannelMethods.SET_NOTIFICATION_LOCALE -> backgroundServiceHandlers.handleSetNotificationLocale(call, result)
                 ChannelMethods.START_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStartBackgroundRecording(call, result)
                 ChannelMethods.STOP_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStopBackgroundRecording(call, result)

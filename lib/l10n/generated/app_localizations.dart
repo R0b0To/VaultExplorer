@@ -15756,6 +15756,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for current operations to finish before locking…'**
   String get lockWaitingForOperationsMessage;
+
+  /// Status shown while a mirror proxy is still writing vault changes to its storage provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving vault changes to storage'**
+  String get mirrorSyncActivityLabel;
 }
 
 class _AppLocalizationsDelegate

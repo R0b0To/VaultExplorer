@@ -2608,5 +2608,6 @@
   "textEditorShowTabBarDescription": "显示或隐藏已打开文件的标签页。你也可以通过侧边栏切换文件。",
   "textEditorAutoHideTabBarLabel": "滚动时隐藏标签页",
   "textEditorAutoHideTabBarDescription": "向下滚动时隐藏标签栏，向上滚动时重新显示。",
-  "lockWaitingForOperationsMessage": "正在等待当前操作完成后再锁定…"
+  "lockWaitingForOperationsMessage": "正在等待当前操作完成后再锁定…",
+  "mirrorSyncActivityLabel": "正在将保险库更改保存到存储空间"
 }

@@ -22,6 +22,8 @@ class FileOperationService extends ChangeNotifier {
     this._fileIoApi,
     this._lifecycleApi,
   ) {
+    _mirrorPushActiveCount = _engineEvents.mirrorPushActiveCount;
+    _engineEvents.addMirrorPushActivityListener(_onMirrorPushActivityChanged);
     _engineEvents.addImportItemFinishedListener((event) {
       final op = _operations.cast<FileOperation?>().firstWhere(
         (o) => o?.id == event.opId,
@@ -103,6 +105,14 @@ class FileOperationService extends ChangeNotifier {
   int _nextId = 1;
   final List<FileOperation> _operations = [];
   final Map<FileOperation, VoidCallback> _opListeners = {};
+  int _mirrorPushActiveCount = 0;
+  int get mirrorPushActiveCount => _mirrorPushActiveCount;
+
+  void _onMirrorPushActivityChanged(int activeCount) {
+    if (_mirrorPushActiveCount == activeCount) return;
+    _mirrorPushActiveCount = activeCount;
+    notifyListeners();
+  }
 
   Timer? _notificationThrottleTimer;
   DateTime? _lastNotificationPushTime;
@@ -118,6 +128,13 @@ class FileOperationService extends ChangeNotifier {
       .toList();
 
   int get activeCount => activeOperations.length;
+
+  /// Mirrors are the storage-commit phase of a transfer, so they extend an
+  /// active transfer instead of incrementing the app-bar operation count.
+  /// A mirror activity without a tracked transfer still represents one item.
+  int get combinedActivityCount => activeCount > 0
+      ? activeCount
+      : (_mirrorPushActiveCount > 0 ? 1 : 0);
 
   List<RawEntry> getActivePlaceholders(int volId, String dirPath) {
     final placeholders = <RawEntry>[];

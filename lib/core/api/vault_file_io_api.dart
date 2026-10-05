@@ -1140,6 +1140,7 @@ class VaultFileIoApi {
     String fileName, {
     int quality = 60,
     int targetSize = 180,
+    int? timeUs,
   }) async {
     try {
       final Uint8List? bytes = await _channel
@@ -1149,6 +1150,7 @@ class VaultFileIoApi {
             'quality': quality,
             'targetSize': targetSize,
             'isLocalStorage': container.isLocalStorage,
+            if (timeUs != null) 'timeUs': timeUs,
           });
       return bytes;
     } catch (e) {

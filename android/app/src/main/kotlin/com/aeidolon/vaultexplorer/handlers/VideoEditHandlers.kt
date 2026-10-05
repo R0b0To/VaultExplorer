@@ -1,6 +1,8 @@
 package com.aeidolon.vaultexplorer.handlers
 
+import android.content.Context
 import android.media.MediaExtractor
+import android.os.PowerManager
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VeLog
@@ -88,6 +90,8 @@ class VideoEditHandlers(
                     "keyframesUs" to probe.keyframesUs.toList(),
                     "keyframesComplete" to probe.keyframesComplete,
                     "outputExtension" to probe.outputExtension,
+                    "hasSubtitles" to probe.hasSubtitles,
+                    "subtitleTracks" to probe.subtitleTracks,
                 )
                 activity.runOnUiThread { result.success(map) }
             } catch (e: Exception) {
@@ -132,10 +136,46 @@ class VideoEditHandlers(
         }
 
         ioExecutor.execute {
+            val powerManager = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VaultExplorer:VideoExport")
+            wakeLock?.acquire(15 * 60 * 1000L) // 15 mins timeout
             val tempFiles = ArrayList<File>()
             // Outputs created so far (successfully or not) -- rolled back if the export fails or is cancelled.
             val created = ArrayList<String>()
             try {
+                // Free-space preflight check: estimate required space based on source file size and cuts.
+                val sourceSize = if (isLocal) {
+                    File(filePath).length().coerceAtLeast(1L)
+                } else {
+                    ContainerFileSystem.getFileSize(volId, filePath).coerceAtLeast(1L)
+                }
+                val estimatedBytes = ((sourceSize * 1.2).toLong() + 5 * 1024 * 1024L).coerceAtLeast(10 * 1024 * 1024L)
+
+                val cacheUsable = activity.cacheDir.usableSpace
+                if (cacheUsable in 1 until estimatedBytes) {
+                    val needMb = estimatedBytes / (1024 * 1024)
+                    val freeMb = cacheUsable / (1024 * 1024)
+                    throw IOException("Not enough free space in app cache (need $needMb MB, only $freeMb MB available)")
+                }
+
+                if (isLocal) {
+                    val destDir = File(outputPaths[0]).parentFile ?: File(outputPaths[0])
+                    val localUsable = destDir.usableSpace
+                    if (localUsable in 1 until estimatedBytes) {
+                        val needMb = estimatedBytes / (1024 * 1024)
+                        val freeMb = localUsable / (1024 * 1024)
+                        throw IOException("Not enough free space on storage (need $needMb MB, only $freeMb MB available)")
+                    }
+                } else {
+                    val freeBytes = ContainerFileSystem.getSpaceInfo(volId)
+                        ?.let { if (it.size > 1) it[1] else null }
+                    if (freeBytes != null && freeBytes in 1 until estimatedBytes) {
+                        val needMb = estimatedBytes / (1024 * 1024)
+                        val freeMb = freeBytes / (1024 * 1024)
+                        throw IOException("Not enough free space in vault (need $needMb MB, only $freeMb MB available)")
+                    }
+                }
+
                 val factory = extractorFactory(volId, filePath, isLocal)
                 var dropped = 0
                 val actual = ArrayList<List<Long>>()
@@ -200,6 +240,9 @@ class VideoEditHandlers(
             } finally {
                 tempFiles.forEach { SecureFileWipe.secureDeleteFile(it) }
                 VideoEditCancellation.clear(opId)
+                if (wakeLock?.isHeld == true) {
+                    runCatching { wakeLock.release() }
+                }
             }
         }
     }

@@ -45,6 +45,8 @@ object LosslessVideoCutter {
         val keyframesComplete: Boolean,
         /** File extension (no dot) the output container will use: "mp4" or "webm". */
         val outputExtension: String,
+        val hasSubtitles: Boolean = false,
+        val subtitleTracks: Int = 0,
     )
 
     class Range(val startUs: Long, val endUs: Long)
@@ -144,6 +146,15 @@ object LosslessVideoCutter {
                 LongArray(0) to true
             }
 
+            var subtitleTracks = 0
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("text/") || mime.contains("subtitle") || mime.contains("subrip") || mime.contains("vtt")) {
+                    subtitleTracks++
+                }
+            }
+
             return Probe(
                 durationUs = durationUs,
                 width = width,
@@ -156,6 +167,8 @@ object LosslessVideoCutter {
                 keyframesUs = keyframes,
                 keyframesComplete = complete,
                 outputExtension = chooseContainer(plan).second,
+                hasSubtitles = subtitleTracks > 0,
+                subtitleTracks = subtitleTracks,
             )
         } finally {
             runCatching { extractor.release() }

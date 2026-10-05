@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +23,7 @@ import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 import 'models/edit_segment.dart';
@@ -28,15 +31,11 @@ import 'models/video_edit_math.dart';
 import 'video_edit_providers.dart';
 import 'video_editor_controller.dart';
 import 'widgets/video_export_sheet.dart';
+import 'widgets/video_segments_sheet.dart';
 import 'widgets/video_timeline.dart';
 
-/// A simple lossless video editor: trim, cut out parts, split, and merge
-/// clips without re-encoding (see `LosslessVideoCutter.kt`). The workflow
-///  move the playhead, set a segment's start and end,
-/// choose whether the segments are kept or cut out, export.
-///
-/// [filePath] is container-relative (as everywhere else in the file browser);
-/// results are written next to the original as new files.
+/// A lossless video editor: trim, cut out parts, split, and merge clips
+/// without re-encoding (see `LosslessVideoCutter.kt`).
 class VideoEditorScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
@@ -61,6 +60,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   VideoProbe? _probe;
   String? _loadError;
 
+  /// Filmstrip thumbnails loaded across the timeline.
+  List<FilmstripEntry>? _filmstripFrames;
+
   /// The playhead in microseconds. Follows the player, except while the user
   /// is scrubbing or a seek is still in flight, when it holds the requested
   /// position so the UI doesn't jump back.
@@ -71,6 +73,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   bool _scrubbing = false;
   bool _resumeAfterScrub = false;
   bool _exporting = false;
+  bool _previewResult = false;
+  bool _skippingGap = false;
+  double _playbackSpeed = 1.0;
 
   // Seek pump: only the latest requested position is ever sent, one at a time.
   int? _pendingSeekUs;
@@ -97,20 +102,23 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Normal exits already went through [_shutdownPlayer] (see the PopScope
-    // in build); this only catches the route being removed some other way.
     unawaited(_shutdownPlayer());
+    _disposeFilmstrip();
     _editor?.dispose();
     _playhead.dispose();
     super.dispose();
   }
 
+  void _disposeFilmstrip() {
+    if (_filmstripFrames != null) {
+      for (final f in _filmstripFrames!) {
+        f.image.dispose();
+      }
+      _filmstripFrames = null;
+    }
+  }
+
   /// Releases the native player and clears the playback-active flag.
-  ///
-  /// There is one native player for the whole app, so this must finish
-  /// *before* the screen pops: the media viewer re-initializes its own player
-  /// as soon as the pop completes, and a `release` from this screen landing
-  /// after that would tear the viewer's new player down.
   Future<void> _shutdownPlayer() async {
     final player = _player;
     if (player == null) return;
@@ -122,6 +130,32 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
 
   Future<void> _onPopRequested(bool didPop, Object? result) async {
     if (didPop || _exporting) return;
+    final editor = _editor;
+    if (editor != null && editor.hasUnsavedChanges) {
+      final l10n = context.l10n;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.videoEditorDiscardTitle),
+          content: Text(l10n.videoEditorDiscardMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: ctx.colors.error,
+                foregroundColor: ctx.colors.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.videoEditorDiscardAction),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+    }
     await _shutdownPlayer();
     if (mounted) Navigator.of(context).pop();
   }
@@ -172,6 +206,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         _probe = probe;
         _editor = editor;
       });
+
+      // Load filmstrip in background
+      unawaited(_loadFilmstrip(probe));
     } on VideoEditException catch (e) {
       if (mounted) setState(() => _loadError = e.message);
     } catch (e) {
@@ -180,14 +217,101 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     }
   }
 
+  Future<void> _loadFilmstrip(VideoProbe probe) async {
+    if (probe.durationUs <= 0) return;
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    const count = 10;
+    final stepUs = probe.durationUs ~/ count;
+    final targets = <int>[];
+    for (var i = 0; i < count; i++) {
+      final t = i * stepUs;
+      final kf = keyframeAtOrBefore(probe.keyframesUs, t) ?? t;
+      if (!targets.contains(kf)) targets.add(kf);
+    }
+
+    final loaded = <FilmstripEntry>[];
+    for (final t in targets) {
+      if (!mounted) break;
+      try {
+        final bytes = await fileIo.getVideoThumbnail(
+          widget.container,
+          widget.filePath,
+          targetSize: 80,
+          quality: 40,
+          timeUs: t,
+        );
+        if (bytes != null && mounted) {
+          final codec = await ui.instantiateImageCodec(bytes);
+          final fi = await codec.getNextFrame();
+          loaded.add((timeUs: t, image: fi.image));
+        }
+      } catch (_) {
+        // Thumbnail load error gracefully ignored
+      }
+    }
+    if (mounted && loaded.isNotEmpty) {
+      setState(() => _filmstripFrames = loaded);
+    }
+  }
+
   void _onPlayerChanged() {
     if (_scrubbing || _seeking) return;
     final player = _player;
     final editor = _editor;
-    if (player == null) return;
+    if (player == null || editor == null) return;
     var us = player.value.position.inMicroseconds;
-    if (editor != null && us > editor.durationUs) us = editor.durationUs;
+    if (us > editor.durationUs) us = editor.durationUs;
     if (us != _playhead.value) _playhead.value = us;
+
+    // "Preview result" playback: skips over gaps between exported ranges
+    if (_previewResult && player.value.isPlaying && !_skippingGap) {
+      final ranges = editor.snappedRanges;
+      if (ranges.isEmpty) {
+        unawaited(player.pause());
+        return;
+      }
+
+      var inRange = false;
+      for (var i = 0; i < ranges.length; i++) {
+        final r = ranges[i];
+        if (us >= r.startUs && us < r.endUs) {
+          inRange = true;
+          // Approaching end of this segment
+          if (us >= r.endUs - 80000) {
+            _skippingGap = true;
+            if (i < ranges.length - 1) {
+              unawaited(_seekToUs(ranges[i + 1].startUs).then((_) {
+                _skippingGap = false;
+              }));
+            } else {
+              // Reached end of last segment: pause and park at start of first segment
+              unawaited(player.pause().then((_) {
+                return _seekToUs(ranges.first.startUs);
+              }).then((_) {
+                _skippingGap = false;
+              }));
+            }
+          }
+          break;
+        }
+      }
+
+      if (!inRange) {
+        _skippingGap = true;
+        final next = ranges.where((r) => r.startUs > us).firstOrNull;
+        if (next != null) {
+          unawaited(_seekToUs(next.startUs).then((_) {
+            _skippingGap = false;
+          }));
+        } else {
+          unawaited(player.pause().then((_) {
+            return _seekToUs(ranges.first.startUs);
+          }).then((_) {
+            _skippingGap = false;
+          }));
+        }
+      }
+    }
   }
 
   // ── Seeking / transport ────────────────────────────────────────────────
@@ -215,8 +339,6 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         _pendingSeekUs = null;
         final player = _player;
         if (player == null || player.isDisposed) break;
-        // The player seeks in whole milliseconds; rounding down would land one
-        // frame *before* a keyframe that sits mid-millisecond.
         await player.seekTo(Duration(milliseconds: (us + 999) ~/ 1000));
       }
     } catch (e) {
@@ -254,7 +376,18 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       await player.pause();
       return;
     }
-    if (_playhead.value >= editor.durationUs - 200000) {
+
+    if (_previewResult) {
+      final ranges = editor.snappedRanges;
+      if (ranges.isNotEmpty) {
+        final cur = _playhead.value;
+        final inside = ranges.any((r) => cur >= r.startUs && cur < r.endUs - 80000);
+        if (!inside) {
+          final next = ranges.where((r) => r.startUs >= cur).firstOrNull ?? ranges.first;
+          await _seekToUs(next.startUs);
+        }
+      }
+    } else if (_playhead.value >= editor.durationUs - 200000) {
       await _seekToUs(0);
     }
     await player.play();
@@ -323,18 +456,23 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     await _player?.pause();
     if (!mounted) return;
 
+    final dot = _fileName.lastIndexOf('.');
+    final defaultStem = dot > 0 ? _fileName.substring(0, dot) : _fileName;
+
     final choice = await VideoExportSheet.show(
       context,
       clipCount: editor.plannedRanges.length,
       totalDurationUs: editor.totalSnappedUs,
+      defaultBaseName: '${defaultStem}_cut',
+      extension: probe.outputExtension,
+      isReadOnly: widget.container.readOnly,
+      hasSubtitles: probe.hasSubtitles,
     );
     if (choice == null || !mounted) return;
 
     final ranges = editor.exportRanges(merge: choice.merge);
     final outputCount = choice.merge ? 1 : ranges.length;
 
-    // Name the outputs next to the original, never colliding with anything
-    // already in the folder or with each other.
     final container = widget.container;
     final slash = widget.filePath.lastIndexOf('/');
     final dirPath = slash == -1 ? '' : widget.filePath.substring(0, slash);
@@ -355,8 +493,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     if (!mounted) return;
 
     final fsType = resolveFilesystemType(container);
+    final baseSourceName = choice.customName != null
+        ? '${choice.customName}.${probe.outputExtension}'
+        : _fileName;
+
     final names = planOutputNames(
-      sourceFileName: _fileName,
+      sourceFileName: baseSourceName,
       extension: probe.outputExtension,
       count: outputCount,
       existingLowercase: {for (final e in existing) e.name.toLowerCase()},
@@ -386,15 +528,28 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         ? [for (final r in relativePaths) p.join(container.uri, r)]
         : relativePaths;
 
-    await _runExport(
+    final result = await _runExport(
       ranges: ranges,
       merge: choice.merge,
       outputPaths: nativeOutputs,
       outputCount: outputCount,
     );
+
+    // If replaceOriginal was chosen and export succeeded, replace the original file
+    if (choice.replaceOriginal && result != null && relativePaths.isNotEmpty) {
+      try {
+        final fileIo = ref.read(vaultFileIoApiProvider);
+        final cutPath = relativePaths.first;
+        await fileIo.deleteFile(container, widget.filePath);
+        await fileIo.renameFile(container, cutPath, _fileName);
+        _toast(l10n.videoEditorSaved(1), tone: AppBannerTone.success);
+      } catch (e) {
+        VeLog.w(_tag, 'Failed to replace original file with cut', e);
+      }
+    }
   }
 
-  Future<void> _runExport({
+  Future<VideoExportResult?> _runExport({
     required List<TimeRange> ranges,
     required bool merge,
     required List<String> outputPaths,
@@ -402,6 +557,8 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   }) async {
     final api = ref.read(vaultVideoEditApiProvider);
     final events = ref.read(vaultEngineEventsProvider);
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    final lockController = ref.read(sessionLockControllerProvider);
     final l10n = context.l10n;
     final navigator = Navigator.of(context, rootNavigator: true);
     final opId = ++_opCounter;
@@ -431,36 +588,40 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
 
     VideoExportResult? result;
     VideoEditException? failure;
+    await fileIo.setKeepScreenOn(true);
     try {
-      result = await api.export(
-        volId: widget.container.volId,
-        filePath: _nativePath,
-        isLocalStorage: _isLocal,
-        segmentsUs: ranges,
-        merge: merge,
-        outputPaths: outputPaths,
-        opId: opId,
-      );
+      await lockController.withLockSuppression(() async {
+        result = await api.export(
+          volId: widget.container.volId,
+          filePath: _nativePath,
+          isLocalStorage: _isLocal,
+          segmentsUs: ranges,
+          merge: merge,
+          outputPaths: outputPaths,
+          opId: opId,
+        );
+      });
     } on VideoEditException catch (e) {
       failure = e;
     } catch (e) {
       VeLog.w(_tag, 'Export failed unexpectedly', e);
       failure = VideoEditException('EXPORT_FAILED', e.toString());
     } finally {
+      await fileIo.setKeepScreenOn(false);
       events.removeVideoEditProgressListener(onProgress);
     }
 
-    if (navigator.mounted) navigator.pop(); // close the progress dialog
-    if (!mounted) return;
+    if (navigator.mounted) navigator.pop(); // close progress dialog
+    if (!mounted) return result;
     setState(() => _exporting = false);
 
     if (result != null) {
-      final count = result.outputPaths.length;
+      final count = result!.outputPaths.length;
       _toast(
-        result.droppedAudioTracks > 0
+        result!.droppedAudioTracks > 0
             ? '${l10n.videoEditorSaved(count)} ${l10n.videoEditorAudioDropped}'
             : l10n.videoEditorSaved(count),
-        tone: result.droppedAudioTracks > 0
+        tone: result!.droppedAudioTracks > 0
             ? AppBannerTone.warning
             : AppBannerTone.success,
       );
@@ -474,6 +635,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         );
       }
     }
+    return result;
   }
 
   // ── Build ──────────────────────────────────────────────────────────────
@@ -501,12 +663,13 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                       icon: const Icon(Icons.undo_rounded),
                       onPressed: editor.canUndo ? editor.undo : null,
                     ),
+                    IconButton(
+                      tooltip: l10n.redoTooltip,
+                      icon: const Icon(Icons.redo_rounded),
+                      onPressed: editor.canRedo ? editor.redo : null,
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(right: 12, left: 4),
-                      // The app theme gives FilledButton an infinite minimum
-                      // width (for full-width sheet buttons); AppBar actions
-                      // have unbounded width, so override it here or the whole
-                      // app bar fails to lay out.
                       child: FilledButton(
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 40),
@@ -559,7 +722,19 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       );
     }
     if (editor == null || player == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              l10n.videoEditorAnalyzing,
+              style: context.typography.bodyMedium,
+            ),
+          ],
+        ),
+      );
     }
 
     final preview = _buildPreview(player);
@@ -580,18 +755,11 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
             ],
           );
         }
-        return LayoutBuilder(
-          builder: (context, constraints) => Column(
-            children: [
-              Expanded(child: preview),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: constraints.maxHeight * 0.65,
-                ),
-                child: SingleChildScrollView(child: controls),
-              ),
-            ],
-          ),
+        return Column(
+          children: [
+            Expanded(child: preview),
+            controls,
+          ],
         );
       },
     );
@@ -644,12 +812,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     final summaryStyle = text.bodySmall?.copyWith(color: cs.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Time readout + zoom.
+          // Row 1: Time readout + zoom controls
           Row(
             children: [
               ValueListenableBuilder<int>(
@@ -681,6 +849,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
             ],
           ),
 
+          // Row 2: Timeline with draggable handles & filmstrip
           VideoTimeline(
             key: _timelineKey,
             durationUs: editor.durationUs,
@@ -688,33 +857,61 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
             selectedId: editor.selectedId,
             mode: editor.mode,
             keyframes: editor.keyframes,
-            snappedFor: editor.snappedFor,
+            snappedExportRanges: editor.snappedRanges,
+            filmstripFrames: _filmstripFrames,
             playheadUs: _playhead,
             onScrubStart: _onScrubStart,
             onScrub: _onScrub,
             onScrubEnd: _onScrubEnd,
             onTapAt: _onTimelineTap,
+            onHandleDragStart: editor.beginHandleDrag,
+            onHandleDragUpdate: (isStart, us) {
+              if (isStart) {
+                editor.updateSelectedStart(us);
+              } else {
+                editor.updateSelectedEnd(us);
+              }
+            },
+            onHandleDragEnd: editor.endHandleDrag,
           ),
           const SizedBox(height: 4),
-          if (selected != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                l10n.videoEditorSelectedSegmentSummary(
-                  editor.selectedIndex + 1,
-                  segments.length,
-                  formatTimecode(selected.startUs),
-                  formatTimecode(selected.endUs),
-                  formatTimecode(selected.endUs - selected.startUs),
-                ),
-                style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+
+          // Row 3: Selected segment timestamps + segments chip
+          Row(
+            children: [
+              Expanded(
+                child: selected != null
+                    ? Text(
+                        '${formatTimecode(selected.startUs)} – ${formatTimecode(selected.endUs)}'
+                        '  (${formatTimecode(selected.lengthUs, millis: false)})'
+                        '${snapNote != null ? '  ⤑ $snapNote' : ''}',
+                        style: summaryStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    : Text(
+                        segments.isEmpty
+                            ? l10n.videoEditorNoSegments
+                            : '${segments.length} ${segments.length == 1 ? 'segment' : 'segments'}',
+                        style: summaryStyle,
+                        maxLines: 1,
+                      ),
               ),
-            ),
+              ActionChip(
+                avatar: const Icon(Icons.layers_rounded, size: 18),
+                label: Text('${segments.length}'),
+                tooltip: l10n.videoEditorSegments,
+                onPressed: () => VideoSegmentsSheet.show(
+                  context,
+                  editor: editor,
+                  onSeekTo: (us) => unawaited(_seekToUs(us)),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
 
-          // Transport. Scales down rather than overflowing on narrow screens.
+          // Row 4: Transport + preview cut + 2× speed
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(
@@ -726,7 +923,6 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                   onPressed: () => _jumpKeyframe(forward: false),
                 ),
                 _StepButton(label: '−1s', onTap: () => _step(-1000000)),
-                _StepButton(label: '−0.1s', onTap: () => _step(-100000)),
                 ValueListenableBuilder<NativeVideoValue>(
                   valueListenable: player,
                   builder: (context, v, _) => IconButton.filled(
@@ -743,155 +939,101 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                     onPressed: () => unawaited(_togglePlay()),
                   ),
                 ),
-                _StepButton(label: '+0.1s', onTap: () => _step(100000)),
                 _StepButton(label: '+1s', onTap: () => _step(1000000)),
                 IconButton(
                   tooltip: l10n.videoEditorNextKeyframe,
                   icon: const Icon(Icons.skip_next_rounded),
                   onPressed: () => _jumpKeyframe(forward: true),
                 ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: _previewResult ? cs.primaryContainer : null,
+                    foregroundColor: _previewResult ? cs.onPrimaryContainer : null,
+                  ),
+                  tooltip: l10n.videoEditorPreviewCut,
+                  icon: Icon(
+                    _previewResult
+                        ? Icons.content_cut_rounded
+                        : Icons.content_cut_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() => _previewResult = !_previewResult);
+                  },
+                ),
+                const SizedBox(width: 4),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: _playbackSpeed > 1.0 ? cs.primaryContainer : null,
+                    foregroundColor: _playbackSpeed > 1.0 ? cs.onPrimaryContainer : null,
+                  ),
+                  tooltip: _playbackSpeed > 1.0 ? '1×' : '2×',
+                  icon: Text(
+                    _playbackSpeed > 1.0 ? '2×' : '1×',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _playbackSpeed > 1.0 ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                    ),
+                  ),
+                  onPressed: () {
+                    final next = _playbackSpeed > 1.0 ? 1.0 : 2.0;
+                    _player?.setPlaybackSpeed(next);
+                    setState(() => _playbackSpeed = next);
+                  },
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-
-          // Segment tools.
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _ToolButton(
-                  icon: Icons.first_page_rounded,
-                  label: l10n.videoEditorSetStart,
-                  onTap: selected == null ? null : _setStart,
-                ),
-                _ToolButton(
-                  icon: Icons.last_page_rounded,
-                  label: l10n.videoEditorSetEnd,
-                  onTap: selected == null ? null : _setEnd,
-                ),
-                _ToolButton(
-                  icon: Icons.add_rounded,
-                  label: l10n.videoEditorAddSegment,
-                  onTap: _addSegment,
-                ),
-                _ToolButton(
-                  icon: Icons.call_split_rounded,
-                  label: l10n.videoEditorSplit,
-                  onTap: _splitSegment,
-                ),
-                _ToolButton(
-                  icon: Icons.delete_outline_rounded,
-                  label: l10n.videoEditorDeleteSegment,
-                  onTap: selected == null ? null : editor.deleteSelected,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Keep vs cut out.
-          SegmentedButton<VideoEditMode>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: VideoEditMode.keep,
-                icon: const Icon(Icons.check_rounded),
-                label: Text(l10n.videoEditorModeKeep),
-              ),
-              ButtonSegment(
-                value: VideoEditMode.cutOut,
-                icon: const Icon(Icons.content_cut_rounded),
-                label: Text(l10n.videoEditorModeCutOut),
-              ),
-            ],
-            selected: {editor.mode},
-            onSelectionChanged: (s) => editor.setMode(s.first),
           ),
           const SizedBox(height: 4),
-          Text(
-            editor.mode == VideoEditMode.keep
-                ? l10n.videoEditorKeepModeDescription
-                : l10n.videoEditorCutOutModeDescription,
-            style: summaryStyle,
-          ),
-          const SizedBox(height: 8),
 
-          // Segment chips.
-          if (segments.isEmpty)
-            Text(l10n.videoEditorNoSegments, style: summaryStyle)
-          else
-            SizedBox(
-              height: 40,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: segments.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final s = segments[i];
-                  return ChoiceChip(
-                    label: Text(
-                      '${i + 1} · ${formatTimecode(s.startUs, millis: false)}'
-                      '–${formatTimecode(s.endUs, millis: false)}',
-                    ),
-                    selected: s.id == editor.selectedId,
-                    onSelected: (_) {
-                      editor.select(s.id);
-                      unawaited(_seekToUs(s.startUs));
-                    },
-                  );
-                },
+          // Row 5: Tools (icon-only, normal size)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: l10n.videoEditorSetStart,
+                icon: const Icon(Icons.first_page_rounded),
+                onPressed: selected == null ? null : _setStart,
               ),
-            ),
-          const SizedBox(height: 8),
-
-          SizedBox(
-            height: MediaQuery.textScalerOf(context).scale(36.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l10n.videoEditorOutputSummary(
-                    editor.plannedRanges.length,
-                    formatTimecode(editor.totalSnappedUs, millis: false),
-                  ),
-                  style: summaryStyle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (snapNote != null)
-                  Text(
-                    snapNote,
-                    style: summaryStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
+              IconButton(
+                tooltip: l10n.videoEditorSetEnd,
+                icon: const Icon(Icons.last_page_rounded),
+                onPressed: selected == null ? null : _setEnd,
+              ),
+              IconButton(
+                tooltip: l10n.videoEditorSplit,
+                icon: const Icon(Icons.call_split_rounded),
+                onPressed: _splitSegment,
+              ),
+              IconButton(
+                tooltip: l10n.videoEditorRemoveSection,
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: selected == null ? null : editor.deleteSelected,
+              ),
+              IconButton(
+                tooltip: l10n.videoEditorAddSegment,
+                icon: const Icon(Icons.add_rounded),
+                onPressed: _addSegment,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// "Will start at the keyframe 0:08.500" -- shown when the selected clip's
-  /// real export range differs from what's drawn, so the snapping is never a
-  /// surprise. Only meaningful in keep mode (in cut-out mode the selected
-  /// segment is what gets removed).
+  /// Only shown in keep mode when the selected clip's real export range differs from what's drawn.
   String? _snapNote(
     BuildContext context,
     VideoEditorController editor,
     EditSegment? selected,
   ) {
-    if (selected == null ||
-        editor.mode != VideoEditMode.keep ||
-        editor.keyframes.isEmpty) {
+    if (editor.keyframes.isEmpty || editor.mode != VideoEditMode.keep || selected == null) {
       return null;
     }
     final snapped = editor.snappedFor(selected);
-    if (snapped.startUs == selected.startUs &&
-        snapped.endUs == selected.endUs) {
+    if (snapped.startUs == selected.startUs && snapped.endUs == selected.endUs) {
       return null;
     }
     return context.l10n.videoEditorSnapNote(
@@ -919,29 +1061,6 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-class _ToolButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  const _ToolButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: AppIconSize.small),
-        label: Text(label),
-      ),
-    );
-  }
-}
-
 /// Non-dismissible progress dialog for a running export, with Cancel.
 class _ExportProgressDialog extends StatelessWidget {
   final ValueListenable<VideoEditProgress?> progress;
@@ -954,7 +1073,6 @@ class _ExportProgressDialog extends StatelessWidget {
     required this.onCancel,
   });
 
-  /// Cutting is the long phase; the copy into the vault gets the last 15%.
   static double? _overall(VideoEditProgress? e) {
     if (e == null) return null;
     final within = e.phase == 'saving'

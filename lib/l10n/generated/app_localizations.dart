@@ -15439,6 +15439,72 @@ abstract class AppLocalizations {
   /// **'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.'**
   String get videoEditorLosslessNote;
 
+  /// Progress message shown while probing video and keyframes
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing video…'**
+  String get videoEditorAnalyzing;
+
+  /// Title of confirmation dialog when exiting with unsaved edits
+  ///
+  /// In en, this message translates to:
+  /// **'Discard edits?'**
+  String get videoEditorDiscardTitle;
+
+  /// Message of confirmation dialog when exiting with unsaved edits
+  ///
+  /// In en, this message translates to:
+  /// **'You have unsaved changes. Are you sure you want to discard them?'**
+  String get videoEditorDiscardMessage;
+
+  /// Button to confirm discarding unsaved edits
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get videoEditorDiscardAction;
+
+  /// Tooltip and label for toggle that previews the cut without gaps
+  ///
+  /// In en, this message translates to:
+  /// **'Preview cut'**
+  String get videoEditorPreviewCut;
+
+  /// Title of segments bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Segments'**
+  String get videoEditorSegments;
+
+  /// Checkbox or option to overwrite the source file with the edited result
+  ///
+  /// In en, this message translates to:
+  /// **'Replace original video'**
+  String get videoEditorReplaceOriginal;
+
+  /// Subtitle describing the replace original option
+  ///
+  /// In en, this message translates to:
+  /// **'The original video will be replaced with the exported cut.'**
+  String get videoEditorReplaceOriginalHint;
+
+  /// Field label for entering a custom file name during export
+  ///
+  /// In en, this message translates to:
+  /// **'Output file name'**
+  String get videoEditorCustomFileName;
+
+  /// Warning shown in export sheet when the source video has subtitle tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Note: Embedded subtitle tracks cannot be preserved in lossless export.'**
+  String get videoEditorSubtitlesWarning;
+
+  /// Button to remove / delete the selected segment
+  ///
+  /// In en, this message translates to:
+  /// **'Remove section'**
+  String get videoEditorRemoveSection;
+
   /// AppBar title of the screen where the file manager skin is chosen
   ///
   /// In en, this message translates to:

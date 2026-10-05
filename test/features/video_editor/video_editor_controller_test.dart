@@ -205,4 +205,48 @@ void main() {
       expect(notifications, 1);
     });
   });
+
+  group('redo and dirty state', () {
+    test('redo restores undone state and clears on new edit', () {
+      final c = _controller(withKeyframes: false);
+      expect(c.isPristine, isTrue);
+      expect(c.hasUnsavedChanges, isFalse);
+      expect(c.canRedo, isFalse);
+
+      c.setSelectedStart(2 * _s);
+      expect(c.isPristine, isFalse);
+      expect(c.hasUnsavedChanges, isTrue);
+      expect(c.canUndo, isTrue);
+      expect(c.canRedo, isFalse);
+
+      c.undo();
+      expect(c.selected!.startUs, 0);
+      expect(c.canRedo, isTrue);
+
+      c.redo();
+      expect(c.selected!.startUs, 2 * _s);
+      expect(c.canRedo, isFalse);
+
+      // Undoing then making a new edit wipes redo history
+      c.undo();
+      expect(c.canRedo, isTrue);
+      c.setSelectedEnd(8 * _s);
+      expect(c.canRedo, isFalse);
+    });
+
+    test('handle dragging updates boundaries without spamming history', () {
+      final c = _controller(withKeyframes: false);
+      c.beginHandleDrag();
+      c.updateSelectedStart(1 * _s);
+      c.updateSelectedStart(2 * _s);
+      c.updateSelectedStart(3 * _s);
+      c.endHandleDrag();
+
+      expect(c.selected!.startUs, 3 * _s);
+      // Only 1 undo step was created by beginHandleDrag
+      c.undo();
+      expect(c.selected!.startUs, 0);
+      expect(c.canUndo, isFalse);
+    });
+  });
 }

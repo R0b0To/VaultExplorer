@@ -23,6 +23,12 @@ class VideoProbe {
   /// `mp4` or `webm` -- the container the lossless cut will write.
   final String outputExtension;
 
+  /// True if the video contains embedded subtitle/text tracks that cannot be preserved in lossless cut.
+  final bool hasSubtitles;
+
+  /// Number of detected subtitle tracks.
+  final int subtitleTracks;
+
   const VideoProbe({
     required this.durationUs,
     required this.width,
@@ -35,6 +41,8 @@ class VideoProbe {
     required this.keyframesUs,
     required this.keyframesComplete,
     required this.outputExtension,
+    this.hasSubtitles = false,
+    this.subtitleTracks = 0,
   });
 
   factory VideoProbe.fromMap(Map<Object?, Object?> m) => VideoProbe(
@@ -52,6 +60,8 @@ class VideoProbe {
         ],
         keyframesComplete: m['keyframesComplete'] as bool? ?? false,
         outputExtension: m['outputExtension'] as String? ?? 'mp4',
+        hasSubtitles: m['hasSubtitles'] as bool? ?? false,
+        subtitleTracks: (m['subtitleTracks'] as num?)?.toInt() ?? 0,
       );
 }
 

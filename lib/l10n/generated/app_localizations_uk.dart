@@ -9409,6 +9409,42 @@ class AppLocalizationsUk extends AppLocalizations {
       'Нарізка відбувається без втрат якості, без перекодування. Кожен фрагмент починається з найближчого ключового кадру перед початковою точкою та закінчується наступним ключовим кадром після кінцевої точки. Тонкі смужки під шкалою показують, що саме буде збережено.';
 
   @override
+  String get videoEditorAnalyzing => 'Analyzing video…';
+
+  @override
+  String get videoEditorDiscardTitle => 'Discard edits?';
+
+  @override
+  String get videoEditorDiscardMessage =>
+      'You have unsaved changes. Are you sure you want to discard them?';
+
+  @override
+  String get videoEditorDiscardAction => 'Discard';
+
+  @override
+  String get videoEditorPreviewCut => 'Preview cut';
+
+  @override
+  String get videoEditorSegments => 'Segments';
+
+  @override
+  String get videoEditorReplaceOriginal => 'Replace original video';
+
+  @override
+  String get videoEditorReplaceOriginalHint =>
+      'The original video will be replaced with the exported cut.';
+
+  @override
+  String get videoEditorCustomFileName => 'Output file name';
+
+  @override
+  String get videoEditorSubtitlesWarning =>
+      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+
+  @override
+  String get videoEditorRemoveSection => 'Remove section';
+
+  @override
   String get fileSkinScreenTitle => 'Тема оформлення файлового менеджера';
 
   @override

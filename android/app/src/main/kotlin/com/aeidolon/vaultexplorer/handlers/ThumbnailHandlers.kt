@@ -455,6 +455,7 @@ class ThumbnailHandlers(
         quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
+        explicitTimeUs: Long? = null,
     ): VideoFrameResult? {
         if (isPlaybackActive) {
             VeLog.d(TAG) { "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})" }
@@ -469,7 +470,7 @@ class ThumbnailHandlers(
             if (isPlaybackActive) {
                 return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
             }
-            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs)
         } finally {
             videoDecoderLock.unlock()
         }
@@ -487,6 +488,7 @@ class ThumbnailHandlers(
         quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
+        explicitTimeUs: Long? = null,
     ): VideoFrameResult? {
         var retriever: MediaMetadataRetriever? = null
         try {
@@ -502,7 +504,7 @@ class ThumbnailHandlers(
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
             val durationUs = durationMs * 1000L
-            val timeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
+            val timeUs = explicitTimeUs ?: VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
 
             val metaW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val metaH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
@@ -512,7 +514,7 @@ class ThumbnailHandlers(
             val srcHeight = if (rot == 90 || rot == 270) metaW ?: 0 else metaH ?: 0
 
             var frame = tryExtractFrame(retriever, timeUs, targetSize)
-            if (frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
+            if (explicitTimeUs == null && frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
                 val alternate = tryAlternateFrameIfBlank(retriever, durationMs, targetSize)
                 if (alternate != null) {
                     frame.recycle()
@@ -779,7 +781,8 @@ class ThumbnailHandlers(
                 }
 
                 val quality = call.argument<Int>("quality") ?: 60
-                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+                val explicitTimeUs = call.argument<Number>("timeUs")?.toLong()
+                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs)
 
                 if (frameResult != null) {
                     activity.runOnUiThread { result.success(onFrame(frameResult)) }

@@ -1,17 +1,8 @@
 {
   "@@locale": "de",
   "usbAttachPromptTitle": "USB-Verbindungshinweis anzeigen",
-  "@usbAttachPromptTitle": {
-    "description": "Einstellung zum Aktivieren oder Deaktivieren von VaultExplorer als Android-App bei angeschlossenem USB-Massenspeicher"
-  },
   "usbAttachPromptSubtitle": "Wenn diese Option aktiviert ist, bietet Android VaultExplorer an, sobald ein USB-Laufwerk angeschlossen wird. Deaktiviere sie, um diesen Hinweis zu unterdrücken; Laufwerke kannst du weiterhin über „USB-Laufwerk einbinden“ öffnen.",
-  "@usbAttachPromptSubtitle": {
-    "description": "Erklärt, dass Android VaultExplorer bei deaktivierter Option nicht mehr beim Anschließen anbietet; USB-Laufwerke lassen sich weiterhin manuell in der App einbinden"
-  },
   "usbAttachPromptUpdateErrorMessage": "Die USB-Verbindungseinstellung konnte nicht geändert werden.",
-  "@usbAttachPromptUpdateErrorMessage": {
-    "description": "Wird angezeigt, wenn Android den USB-Verbindungsstatus nicht ändern konnte"
-  },
   "cancel": "Abbrechen",
   "close": "Schließen",
   "search": "Suchen",
@@ -2557,6 +2548,17 @@
   "videoEditorExportSeparate": "Save as separate videos",
   "videoEditorExportSeparateHint": "{count, plural, =1{One new file} other{{count} new files}}",
   "videoEditorLosslessNote": "Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.",
+  "videoEditorAnalyzing": "Analyzing video…",
+  "videoEditorDiscardTitle": "Discard edits?",
+  "videoEditorDiscardMessage": "You have unsaved changes. Are you sure you want to discard them?",
+  "videoEditorDiscardAction": "Discard",
+  "videoEditorPreviewCut": "Preview cut",
+  "videoEditorSegments": "Segments",
+  "videoEditorReplaceOriginal": "Replace original video",
+  "videoEditorReplaceOriginalHint": "The original video will be replaced with the exported cut.",
+  "videoEditorCustomFileName": "Output file name",
+  "videoEditorSubtitlesWarning": "Note: Embedded subtitle tracks cannot be preserved in lossless export.",
+  "videoEditorRemoveSection": "Remove section",
   "fileSkinScreenTitle": "Dateimanager-Skin",
   "fileSkinSectionHeader": "Darstellung",
   "fileSkinEntryTitle": "Skin",

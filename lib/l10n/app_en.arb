@@ -11661,6 +11661,50 @@
   "@videoEditorLosslessNote": {
     "description": "Explanation in the export sheet of why cut points snap to keyframes"
   },
+  "videoEditorAnalyzing": "Analyzing video…",
+  "@videoEditorAnalyzing": {
+    "description": "Progress message shown while probing video and keyframes"
+  },
+  "videoEditorDiscardTitle": "Discard edits?",
+  "@videoEditorDiscardTitle": {
+    "description": "Title of confirmation dialog when exiting with unsaved edits"
+  },
+  "videoEditorDiscardMessage": "You have unsaved changes. Are you sure you want to discard them?",
+  "@videoEditorDiscardMessage": {
+    "description": "Message of confirmation dialog when exiting with unsaved edits"
+  },
+  "videoEditorDiscardAction": "Discard",
+  "@videoEditorDiscardAction": {
+    "description": "Button to confirm discarding unsaved edits"
+  },
+  "videoEditorPreviewCut": "Preview cut",
+  "@videoEditorPreviewCut": {
+    "description": "Tooltip and label for toggle that previews the cut without gaps"
+  },
+  "videoEditorSegments": "Segments",
+  "@videoEditorSegments": {
+    "description": "Title of segments bottom sheet"
+  },
+  "videoEditorReplaceOriginal": "Replace original video",
+  "@videoEditorReplaceOriginal": {
+    "description": "Checkbox or option to overwrite the source file with the edited result"
+  },
+  "videoEditorReplaceOriginalHint": "The original video will be replaced with the exported cut.",
+  "@videoEditorReplaceOriginalHint": {
+    "description": "Subtitle describing the replace original option"
+  },
+  "videoEditorCustomFileName": "Output file name",
+  "@videoEditorCustomFileName": {
+    "description": "Field label for entering a custom file name during export"
+  },
+  "videoEditorSubtitlesWarning": "Note: Embedded subtitle tracks cannot be preserved in lossless export.",
+  "@videoEditorSubtitlesWarning": {
+    "description": "Warning shown in export sheet when the source video has subtitle tracks"
+  },
+  "videoEditorRemoveSection": "Remove section",
+  "@videoEditorRemoveSection": {
+    "description": "Button to remove / delete the selected segment"
+  },
   "fileSkinScreenTitle": "File Manager Skin",
   "@fileSkinScreenTitle": {
     "description": "AppBar title of the screen where the file manager skin is chosen"

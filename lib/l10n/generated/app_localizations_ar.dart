@@ -9382,6 +9382,42 @@ class AppLocalizationsAr extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
+  String get videoEditorAnalyzing => 'Analyzing video…';
+
+  @override
+  String get videoEditorDiscardTitle => 'Discard edits?';
+
+  @override
+  String get videoEditorDiscardMessage =>
+      'You have unsaved changes. Are you sure you want to discard them?';
+
+  @override
+  String get videoEditorDiscardAction => 'Discard';
+
+  @override
+  String get videoEditorPreviewCut => 'Preview cut';
+
+  @override
+  String get videoEditorSegments => 'Segments';
+
+  @override
+  String get videoEditorReplaceOriginal => 'Replace original video';
+
+  @override
+  String get videoEditorReplaceOriginalHint =>
+      'The original video will be replaced with the exported cut.';
+
+  @override
+  String get videoEditorCustomFileName => 'Output file name';
+
+  @override
+  String get videoEditorSubtitlesWarning =>
+      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+
+  @override
+  String get videoEditorRemoveSection => 'Remove section';
+
+  @override
   String get fileSkinScreenTitle => 'مظهر مدير الملفات';
 
   @override

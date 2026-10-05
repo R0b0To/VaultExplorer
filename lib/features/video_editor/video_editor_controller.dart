@@ -48,6 +48,7 @@ class VideoEditorController extends ChangeNotifier {
   final bool keyframesComplete;
 
   List<EditSegment> _segments = [];
+  List<EditSegment>? _cachedSegments;
   String? _selectedId;
   VideoEditMode _mode = VideoEditMode.keep;
   int _nextId = 1;
@@ -57,13 +58,18 @@ class VideoEditorController extends ChangeNotifier {
   bool _pristine = true;
 
   final List<_Snapshot> _history = [];
+  final List<_Snapshot> _redoHistory = [];
 
   // ── Read state ─────────────────────────────────────────────────────────
 
-  List<EditSegment> get segments => List.unmodifiable(_segments);
+  List<EditSegment> get segments =>
+      _cachedSegments ??= List.unmodifiable(_segments);
   String? get selectedId => _selectedId;
   VideoEditMode get mode => _mode;
   bool get canUndo => _history.isNotEmpty;
+  bool get canRedo => _redoHistory.isNotEmpty;
+  bool get isPristine => _pristine;
+  bool get hasUnsavedChanges => !_pristine || _history.isNotEmpty;
 
   int get selectedIndex =>
       _selectedId == null ? -1 : _segments.indexWhere((s) => s.id == _selectedId);
@@ -143,6 +149,7 @@ class VideoEditorController extends ChangeNotifier {
     if (t > s.endUs - kMinSegmentUs) return false;
     if (t != s.startUs) {
       _pushHistory();
+      _cachedSegments = null;
       _segments[i] = s.copyWith(startUs: t);
       _pristine = false;
       notifyListeners();
@@ -162,11 +169,72 @@ class VideoEditorController extends ChangeNotifier {
     if (t < s.startUs + kMinSegmentUs) return false;
     if (t != s.endUs) {
       _pushHistory();
+      _cachedSegments = null;
       _segments[i] = s.copyWith(endUs: t);
       _pristine = false;
       notifyListeners();
     }
     return true;
+  }
+
+  // ── Handle dragging (continuous updates during gesture) ────────────────
+
+  /// Called once when user begins dragging an edge handle. Saves undo history.
+  void beginHandleDrag() {
+    final i = selectedIndex;
+    if (i < 0) return;
+    _pushHistory();
+    _pristine = false;
+  }
+
+  /// Updates start during continuous handle drag without adding multiple history entries.
+  bool updateSelectedStart(int us) {
+    final i = selectedIndex;
+    if (i < 0) return false;
+    final s = _segments[i];
+    final floor = i == 0 ? 0 : _segments[i - 1].endUs;
+    var t = us.clamp(0, durationUs).toInt();
+    if (t < floor) t = floor;
+    if (t > s.endUs - kMinSegmentUs) t = s.endUs - kMinSegmentUs;
+    if (t != s.startUs) {
+      _cachedSegments = null;
+      _segments[i] = s.copyWith(startUs: t);
+      _pristine = false;
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Updates end during continuous handle drag without adding multiple history entries.
+  bool updateSelectedEnd(int us) {
+    final i = selectedIndex;
+    if (i < 0) return false;
+    final s = _segments[i];
+    final ceiling = i == _segments.length - 1 ? durationUs : _segments[i + 1].startUs;
+    var t = us.clamp(0, durationUs).toInt();
+    if (t > ceiling) t = ceiling;
+    if (t < s.startUs + kMinSegmentUs) t = s.startUs + kMinSegmentUs;
+    if (t != s.endUs) {
+      _cachedSegments = null;
+      _segments[i] = s.copyWith(endUs: t);
+      _pristine = false;
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Called when user finishes dragging a handle to normalize slack onto keyframe.
+  void endHandleDrag() {
+    final i = selectedIndex;
+    if (i < 0) return;
+    final s = _segments[i];
+    final normStart = _normalize(s.startUs);
+    final normEnd = _normalize(s.endUs);
+    if (normStart != s.startUs || normEnd != s.endUs) {
+      _cachedSegments = null;
+      _segments[i] = s.copyWith(startUs: normStart, endUs: normEnd);
+      notifyListeners();
+    }
   }
 
   /// Adds a segment starting at [us], up to [kDefaultNewSegmentUs] long but
@@ -188,6 +256,7 @@ class VideoEditorController extends ChangeNotifier {
     _pushHistory();
     final added = _newSegment(t, end);
     _segments = [...others, added]..sort((a, b) => a.startUs.compareTo(b.startUs));
+    _cachedSegments = null;
     _selectedId = added.id;
     _pristine = false;
     notifyListeners();
@@ -207,6 +276,7 @@ class VideoEditorController extends ChangeNotifier {
     final right = _newSegment(t, s.endUs);
     _segments[i] = s.copyWith(endUs: t);
     _segments.insert(i + 1, right);
+    _cachedSegments = null;
     _pristine = false;
     notifyListeners();
     return true;
@@ -217,6 +287,7 @@ class VideoEditorController extends ChangeNotifier {
     if (i < 0) return;
     _pushHistory();
     _segments.removeAt(i);
+    _cachedSegments = null;
     _selectedId = _segments.isEmpty
         ? null
         : _segments[i.clamp(0, _segments.length - 1).toInt()].id;
@@ -232,8 +303,21 @@ class VideoEditorController extends ChangeNotifier {
 
   void undo() {
     if (_history.isEmpty) return;
+    _redoHistory.add(_Snapshot([..._segments], _selectedId, _pristine));
     final snap = _history.removeLast();
     _segments = [...snap.segments];
+    _cachedSegments = null;
+    _selectedId = snap.selectedId;
+    _pristine = snap.pristine;
+    notifyListeners();
+  }
+
+  void redo() {
+    if (_redoHistory.isEmpty) return;
+    _history.add(_Snapshot([..._segments], _selectedId, _pristine));
+    final snap = _redoHistory.removeLast();
+    _segments = [...snap.segments];
+    _cachedSegments = null;
     _selectedId = snap.selectedId;
     _pristine = snap.pristine;
     notifyListeners();
@@ -246,6 +330,7 @@ class VideoEditorController extends ChangeNotifier {
 
   void _pushHistory() {
     _history.add(_Snapshot([..._segments], _selectedId, _pristine));
+    _redoHistory.clear();
     if (_history.length > _kMaxHistory) _history.removeAt(0);
   }
 

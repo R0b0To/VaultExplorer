@@ -1,17 +1,8 @@
 {
   "@@locale": "uk",
   "usbAttachPromptTitle": "Показувати запит під час підключення USB",
-  "@usbAttachPromptTitle": {
-    "description": "Назва параметра для показу VaultExplorer серед програм Android під час підключення USB-накопичувача"
-  },
   "usbAttachPromptSubtitle": "Якщо ввімкнено, Android пропонує VaultExplorer після підключення USB-накопичувача. Вимкніть, щоб прибрати цей запит; накопичувачі й надалі можна відкривати через «Підключити USB-накопичувач».",
-  "@usbAttachPromptSubtitle": {
-    "description": "Пояснює, що після вимкнення Android не пропонуватиме VaultExplorer під час підключення USB, але накопичувач можна й надалі підключати вручну в програмі"
-  },
   "usbAttachPromptUpdateErrorMessage": "Не вдалося змінити налаштування підключення USB.",
-  "@usbAttachPromptUpdateErrorMessage": {
-    "description": "Показується, якщо Android не вдалося змінити стан обробника підключення USB"
-  },
   "cancel": "Скасувати",
   "close": "Закрити",
   "search": "Пошук",
@@ -2557,6 +2548,17 @@
   "videoEditorExportSeparate": "Зберегти окремими відео",
   "videoEditorExportSeparateHint": "{count, plural, one{1 новий файл} few{{count} нові файли} many{{count} нових файлів} other{{count} нових файлів}}",
   "videoEditorLosslessNote": "Нарізка відбувається без втрат якості, без перекодування. Кожен фрагмент починається з найближчого ключового кадру перед початковою точкою та закінчується наступним ключовим кадром після кінцевої точки. Тонкі смужки під шкалою показують, що саме буде збережено.",
+  "videoEditorAnalyzing": "Analyzing video…",
+  "videoEditorDiscardTitle": "Discard edits?",
+  "videoEditorDiscardMessage": "You have unsaved changes. Are you sure you want to discard them?",
+  "videoEditorDiscardAction": "Discard",
+  "videoEditorPreviewCut": "Preview cut",
+  "videoEditorSegments": "Segments",
+  "videoEditorReplaceOriginal": "Replace original video",
+  "videoEditorReplaceOriginalHint": "The original video will be replaced with the exported cut.",
+  "videoEditorCustomFileName": "Output file name",
+  "videoEditorSubtitlesWarning": "Note: Embedded subtitle tracks cannot be preserved in lossless export.",
+  "videoEditorRemoveSection": "Remove section",
   "fileSkinScreenTitle": "Тема оформлення файлового менеджера",
   "fileSkinSectionHeader": "Вигляд",
   "fileSkinEntryTitle": "Тема оформлення",

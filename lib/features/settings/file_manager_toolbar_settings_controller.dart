@@ -390,6 +390,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> resetMediaViewerConfigToDefaults() {
     final updated = state.config.copyWith(
       mediaViewerToolbarConfig: MediaViewerToolbarConfig.defaults(),
+      showMediaCarousel: true,
     );
     return _updateConfig(updated);
   }

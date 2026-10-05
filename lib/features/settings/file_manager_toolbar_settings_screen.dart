@@ -827,28 +827,6 @@ SectionCard(
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            value: state.config.showMediaCarousel,
-                            onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setShowMediaCarousel(v),
-                            title: Text(
-                              context.l10n.showPlaylistCarouselLabel,
-                              style: textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              context.l10n.showPlaylistCarouselDesc,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            secondary: Icon(
-                              Icons.view_carousel_rounded,
-                              color: cs.primary,
-                            ),
-                          ),
                           OptionPickerTile<PlaylistTransitionEffect>(
                             label: context.l10n.playlistTransitionAnimationLabel,
                             value: state.config.playlistTransitionEffect,

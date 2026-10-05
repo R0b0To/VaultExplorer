@@ -357,16 +357,24 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   MediaViewerToolbarConfig _effectiveToolbarConfig(
     MediaViewerToolbarConfig config,
   ) {
-    if (!widget._isPreviewOnly) return config;
+    final hideCarouselAction = !_enableCarousel;
+    if (!widget._isPreviewOnly && !hideCarouselAction) return config;
     List<MediaViewerAction> filter(List<MediaViewerAction> actions) =>
-        actions.where(_archivePreviewActions.contains).toList();
+        actions.where((action) {
+          if (widget._isPreviewOnly &&
+              !_archivePreviewActions.contains(action)) {
+            return false;
+          }
+          return !hideCarouselAction ||
+              action != MediaViewerAction.thumbnailCarousel;
+        }).toList();
     return config.copyWith(
       topBarActions: filter(config.topBarActions),
       bottomBarActions: filter(config.bottomBarActions),
       moreMenuActions: filter(config.moreMenuActions),
       advancedSettingsActions: filter(config.advancedSettingsActions),
-      showPreviousNext: false,
-      showStatusBadge: false,
+      showPreviousNext: widget._isPreviewOnly ? false : config.showPreviousNext,
+      showStatusBadge: widget._isPreviewOnly ? false : config.showStatusBadge,
     );
   }
 
@@ -2407,6 +2415,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         if (previous?.config.mediaViewerToolbarConfig.swipeToSeekEnabled !=
             next.config.mediaViewerToolbarConfig.swipeToSeekEnabled) {
           _updateSwipePhysics();
+        }
+        if (previous?.config.showMediaCarousel !=
+            next.config.showMediaCarousel) {
+          _sessionController.setEnableCarousel(next.config.showMediaCarousel);
+          if (!next.config.showMediaCarousel) {
+            _sessionController.setCarouselVisible(false);
+          }
         }
       },
     );

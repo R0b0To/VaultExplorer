@@ -290,6 +290,29 @@ class MediaViewerToolbarSettingsScreen extends ConsumerWidget {
                           color: cs.primary,
                         ),
                       ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
+                        value: state.config.showMediaCarousel,
+                        onChanged: controller.setShowMediaCarousel,
+                        title: Text(
+                          l10n.showPlaylistCarouselLabel,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          l10n.showPlaylistCarouselDesc,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        secondary: Icon(
+                          Icons.view_carousel_rounded,
+                          color: cs.primary,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),

@@ -1356,6 +1356,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       );
     }
 
+    // Capture this during build because the tap recognizer can finish after
+    // this playlist item is deactivated.
+    final tapViewportWidth = MediaQuery.sizeOf(context).width;
+
     // Outer detector captures double-taps anywhere across the entire viewport
     // (including the black letterbox bars and out-of-bounds space) to reset zoom.
     corePlayerWidget = GestureDetector(
@@ -1368,7 +1372,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             _showRightIndicator) {
           return;
         }
-        final width = MediaQuery.sizeOf(context).width;
+        final width = tapViewportWidth;
         final x = details.globalPosition.dx;
         if (widget.tapEdgesToNavigate &&
             !_isZoomed &&

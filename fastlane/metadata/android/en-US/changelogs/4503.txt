@@ -1,0 +1,2 @@
+• Fixed playlist issues on Android 11
+• Moved carousel playlist toggle from File Manager to Media Player Control settings

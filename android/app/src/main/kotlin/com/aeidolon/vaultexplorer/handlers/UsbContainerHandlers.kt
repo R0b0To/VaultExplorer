@@ -130,11 +130,27 @@ class UsbContainerHandlers(
         } else {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
-        val permissionIntent = PendingIntent.getBroadcast(
-            activity, 0, Intent(actionUsbPermission), flags
-        )
-        VeLog.i(TAG) { "requestUsbPermission: requesting for deviceName=$deviceName" }
-        usbManager.requestPermission(device, permissionIntent)
+        try {
+            // Android 14+ rejects mutable PendingIntents wrapping implicit
+            // intents for apps targeting API 34+. Keep the callback scoped to
+            // this app so UsbManager can add its device/grant extras safely.
+            val permissionIntent = PendingIntent.getBroadcast(
+                activity,
+                deviceName.hashCode(),
+                Intent(actionUsbPermission).setPackage(activity.packageName),
+                flags,
+            )
+            VeLog.i(TAG) { "requestUsbPermission: requesting for deviceName=$deviceName" }
+            usbManager.requestPermission(device, permissionIntent)
+        } catch (e: Exception) {
+            val pending = pendingUsbPermissions.take(deviceName)
+            VeLog.e(TAG, e) { "requestUsbPermission: failed to start request for deviceName=$deviceName" }
+            (pending?.result ?: result).error(
+                "USB_PERMISSION_REQUEST_FAILED",
+                e.message ?: "Failed to request USB device permission",
+                null,
+            )
+        }
     }
 
     /** Called by MainActivity's usbPermissionReceiver for every

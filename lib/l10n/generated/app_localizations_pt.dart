@@ -9330,40 +9330,40 @@ class AppLocalizationsPt extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => 'Analisando vídeo…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => 'Descartar edições?';
 
   @override
   String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+      'Você tem alterações não salvas. Tem certeza de que deseja descartá-las?';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => 'Descartar';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'Pré-visualizar corte';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'Segmentos';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => 'Substituir vídeo original';
 
   @override
   String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+      'O vídeo original será substituído pelo corte exportado.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => 'Nome do arquivo de saída';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      'Nota: faixas de legendas incorporadas não podem ser preservadas na exportação sem perdas.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'Remover seção';
 
   @override
   String get fileSkinScreenTitle => 'Tema do Gerenciador de Arquivos';

@@ -9344,40 +9344,40 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => 'Analizando video…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => '¿Descartar cambios?';
 
   @override
   String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+      'Tienes cambios sin guardar. ¿Seguro que quieres descartarlos?';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => 'Descartar';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'Vista previa del corte';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'Segmentos';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => 'Reemplazar video original';
 
   @override
   String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+      'El video original se reemplazará por el corte exportado.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => 'Nombre del archivo de salida';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      'Nota: Las pistas de subtítulos incrustadas no se pueden conservar en la exportación sin pérdidas.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'Eliminar sección';
 
   @override
   String get fileSkinScreenTitle => 'Aspecto del gestor de archivos';

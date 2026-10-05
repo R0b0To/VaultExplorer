@@ -8832,40 +8832,38 @@ class AppLocalizationsKo extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => '동영상 분석 중…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => '편집 내용을 취소하시겠습니까?';
 
   @override
-  String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+  String get videoEditorDiscardMessage => '저장되지 않은 변경사항이 있습니다. 정말 삭제하시겠습니까?';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => '삭제';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => '컷 미리보기';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => '구간';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => '원본 동영상 대체';
 
   @override
-  String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+  String get videoEditorReplaceOriginalHint => '원본 동영상이 내보낸 컷으로 대체됩니다.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => '출력 파일 이름';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      '참고: 무손실 내보내기에서는 내장된 자막 트랙을 유지할 수 없습니다.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => '구간 삭제';
 
   @override
   String get fileSkinScreenTitle => '파일 관리자 스킨';

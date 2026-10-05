@@ -8835,40 +8835,37 @@ class AppLocalizationsJa extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => '動画を解析中…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => '編集を破棄しますか？';
 
   @override
-  String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+  String get videoEditorDiscardMessage => '保存されていない変更があります。破棄してもよろしいですか？';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => '破棄';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'カットをプレビュー';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'セグメント';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => '元の動画を置き換える';
 
   @override
-  String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+  String get videoEditorReplaceOriginalHint => '元の動画はエクスポートされたカットに置き換えられます。';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => '出力ファイル名';
 
   @override
-  String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+  String get videoEditorSubtitlesWarning => '注意：無劣化エクスポートでは埋め込み字幕トラックを保持できません。';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'セクションを削除';
 
   @override
   String get fileSkinScreenTitle => 'ファイルマネージャーのスキン';

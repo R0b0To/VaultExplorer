@@ -9382,40 +9382,40 @@ class AppLocalizationsAr extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => 'جارٍ تحليل الفيديو…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => 'تجاهل التعديلات؟';
 
   @override
   String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+      'لديك تغييرات غير محفوظة. هل أنت متأكد من رغبتك في تجاهلها؟';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => 'تجاهل';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'معاينة القص';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'المقاطع';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => 'استبدال الفيديو الأصلي';
 
   @override
   String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+      'سيتم استبدال الفيديو الأصلي بالمقطع المُصدَّر.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => 'اسم ملف الإخراج';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      'ملاحظة: لا يمكن الاحتفاظ بمسارات الترجمة المضمنة أثناء التصدير بدون فقدان الجودة.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'إزالة المقطع';
 
   @override
   String get fileSkinScreenTitle => 'مظهر مدير الملفات';

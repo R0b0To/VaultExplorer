@@ -8713,40 +8713,37 @@ class AppLocalizationsZh extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => '正在分析视频…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => '放弃编辑？';
 
   @override
-  String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+  String get videoEditorDiscardMessage => '你有未保存的更改。确定要放弃吗？';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => '放弃';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => '预览剪辑';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => '片段';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => '替换原视频';
 
   @override
-  String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+  String get videoEditorReplaceOriginalHint => '原视频将被导出的剪辑内容替换。';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => '输出文件名';
 
   @override
-  String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+  String get videoEditorSubtitlesWarning => '注意：无损导出无法保留内嵌字幕轨。';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => '删除片段';
 
   @override
   String get fileSkinScreenTitle => '文件管理器皮肤';

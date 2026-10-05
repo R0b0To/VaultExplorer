@@ -9326,40 +9326,40 @@ class AppLocalizationsIt extends AppLocalizations {
       'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => 'Analisi del video…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => 'Scartare le modifiche?';
 
   @override
   String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+      'Hai modifiche non salvate. Vuoi davvero scartarle?';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => 'Scarta';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'Anteprima taglio';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'Segmenti';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => 'Sostituisci video originale';
 
   @override
   String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+      'Il video originale verrà sostituito con il taglio esportato.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => 'Nome del file di output';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      'Nota: le tracce dei sottotitoli incorporate non possono essere mantenute nell\'esportazione senza perdita di dati.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'Rimuovi sezione';
 
   @override
   String get fileSkinScreenTitle => 'Skin del file manager';

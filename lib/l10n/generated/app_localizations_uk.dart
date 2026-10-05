@@ -9409,40 +9409,40 @@ class AppLocalizationsUk extends AppLocalizations {
       'Нарізка відбувається без втрат якості, без перекодування. Кожен фрагмент починається з найближчого ключового кадру перед початковою точкою та закінчується наступним ключовим кадром після кінцевої точки. Тонкі смужки під шкалою показують, що саме буде збережено.';
 
   @override
-  String get videoEditorAnalyzing => 'Analyzing video…';
+  String get videoEditorAnalyzing => 'Аналіз відео…';
 
   @override
-  String get videoEditorDiscardTitle => 'Discard edits?';
+  String get videoEditorDiscardTitle => 'Відкинути зміни?';
 
   @override
   String get videoEditorDiscardMessage =>
-      'You have unsaved changes. Are you sure you want to discard them?';
+      'У вас є незбережені зміни. Справді відкинути їх?';
 
   @override
-  String get videoEditorDiscardAction => 'Discard';
+  String get videoEditorDiscardAction => 'Відкинути';
 
   @override
-  String get videoEditorPreviewCut => 'Preview cut';
+  String get videoEditorPreviewCut => 'Попередній перегляд обрізки';
 
   @override
-  String get videoEditorSegments => 'Segments';
+  String get videoEditorSegments => 'Сегменти';
 
   @override
-  String get videoEditorReplaceOriginal => 'Replace original video';
+  String get videoEditorReplaceOriginal => 'Замінити оригінальне відео';
 
   @override
   String get videoEditorReplaceOriginalHint =>
-      'The original video will be replaced with the exported cut.';
+      'Оригінальне відео буде замінено експортованим фрагментом.';
 
   @override
-  String get videoEditorCustomFileName => 'Output file name';
+  String get videoEditorCustomFileName => 'Назва вихідного файлу';
 
   @override
   String get videoEditorSubtitlesWarning =>
-      'Note: Embedded subtitle tracks cannot be preserved in lossless export.';
+      'Примітка: вбудовані доріжки субтитрів не можна зберегти під час експорту без втрат.';
 
   @override
-  String get videoEditorRemoveSection => 'Remove section';
+  String get videoEditorRemoveSection => 'Видалити розділ';
 
   @override
   String get fileSkinScreenTitle => 'Тема оформлення файлового менеджера';

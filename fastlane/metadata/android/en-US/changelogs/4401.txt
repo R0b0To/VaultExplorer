@@ -1,0 +1,4 @@
+• Added feedback for ongoing SAF/cloud storage operations
+• Option to suppress USB permission prompts on connect
+• Video editor stability and UI/UX improvements
+• Minor UI/UX refinements across various screens

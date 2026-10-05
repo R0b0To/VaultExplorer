@@ -9,6 +9,16 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'USB 연결 안내 표시';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      '켜져 있으면 USB 드라이브를 연결할 때 Android에서 VaultExplorer를 제안합니다. 안내를 표시하지 않으려면 끄세요. USB 드라이브는 계속 USB 드라이브 마운트에서 직접 열 수 있습니다.';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage => 'USB 연결 설정을 변경하지 못했습니다.';
+
+  @override
   String get cancel => '취소';
 
   @override

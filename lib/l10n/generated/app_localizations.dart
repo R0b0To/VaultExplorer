@@ -116,6 +116,24 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// Settings toggle title for enabling or disabling VaultExplorer as an Android handler when a USB mass-storage device is connected
+  ///
+  /// In en, this message translates to:
+  /// **'Show USB connection prompt'**
+  String get usbAttachPromptTitle;
+
+  /// Explains that disabling the setting stops Android from offering VaultExplorer on USB insertion but leaves manual USB mounting available in the app
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, Android offers VaultExplorer when a USB drive is connected. Turn it off to stop this prompt; you can still open drives from Mount USB Drive.'**
+  String get usbAttachPromptSubtitle;
+
+  /// Shown if Android could not change the USB attach-handler component state
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the USB connection setting.'**
+  String get usbAttachPromptUpdateErrorMessage;
+
   /// Generic Cancel button label
   ///
   /// In en, this message translates to:

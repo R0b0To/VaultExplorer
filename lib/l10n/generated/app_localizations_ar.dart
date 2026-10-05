@@ -9,6 +9,16 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'إظهار مطالبة اتصال USB';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'عند التفعيل، يعرض Android تطبيق VaultExplorer عند توصيل محرك USB. أوقف هذا الخيار لإيقاف المطالبة؛ لا يزال بإمكانك فتح المحركات من «تركيب محرك USB».';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage => 'تعذر تحديث إعداد اتصال USB.';
+
+  @override
   String get cancel => 'إلغاء';
 
   @override

@@ -1,5 +1,17 @@
 {
   "@@locale": "de",
+  "usbAttachPromptTitle": "USB-Verbindungshinweis anzeigen",
+  "@usbAttachPromptTitle": {
+    "description": "Einstellung zum Aktivieren oder Deaktivieren von VaultExplorer als Android-App bei angeschlossenem USB-Massenspeicher"
+  },
+  "usbAttachPromptSubtitle": "Wenn diese Option aktiviert ist, bietet Android VaultExplorer an, sobald ein USB-Laufwerk angeschlossen wird. Deaktiviere sie, um diesen Hinweis zu unterdrücken; Laufwerke kannst du weiterhin über „USB-Laufwerk einbinden“ öffnen.",
+  "@usbAttachPromptSubtitle": {
+    "description": "Erklärt, dass Android VaultExplorer bei deaktivierter Option nicht mehr beim Anschließen anbietet; USB-Laufwerke lassen sich weiterhin manuell in der App einbinden"
+  },
+  "usbAttachPromptUpdateErrorMessage": "Die USB-Verbindungseinstellung konnte nicht geändert werden.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Wird angezeigt, wenn Android den USB-Verbindungsstatus nicht ändern konnte"
+  },
   "cancel": "Abbrechen",
   "close": "Schließen",
   "search": "Suchen",

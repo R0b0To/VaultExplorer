@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -398,44 +399,66 @@ class ThumbnailCacheService {
       } else {
         // Mode: inContainer
         final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
+        final queue = _getPackQueue(container);
 
-        // 1. Check in-memory pending flush queue
-        final pending = _getPackQueue(container).getPending(keyHex);
+        // 1. Anything queued for, or being written to, a pack right now.
+        final pending = queue.getPending(keyHex);
         if (pending != null) {
           putInMemory(container, filePath, pending.data, quality, pending.width, pending.height);
           return (pending.data, pending.width, pending.height);
         }
 
-        // 2. Query binary pack index
-        final entry = await _getInContainerPackEntry(container, keyHex);
+        // 2. The pack index. Null means "couldn't tell right now" (a transient
+        //    read failure), which is a miss -- never an excuse to start over.
+        final index = await queue.ensureIndex();
+        if (index == null) return null;
+
+        final entry = index.entries[keyHex];
         if (entry != null) {
-          final packName = 'pack_${entry.packId.toString().padLeft(4, '0')}.bin';
           final chunk = await _fileIo.readFileChunk(
             container,
-            '$inContainerDir/$packName',
+            '$inContainerDir/${_packFileName(entry.packId)}',
             entry.offset,
             entry.length,
           );
-          if (chunk != null && _looksLikeValidImage(chunk)) {
+          if (chunk != null &&
+              chunk.length == entry.length &&
+              _looksLikeValidImage(chunk)) {
             putInMemory(container, filePath, chunk, quality, entry.width, entry.height);
             return (chunk, entry.width, entry.height);
           }
         }
 
-        // 3. Backward compatibility fallback: check legacy loose file
-        final legacyPath = '$inContainerDir/$keyHex';
-        final stored = await _fileIo.readFileChunk(
-          container,
-          legacyPath,
-          0,
-          _inContainerReadCap,
-        );
-        if (stored != null && stored.isNotEmpty && _looksLikeValidImage(stored)) {
-          final dims = _extractImageDimensions(stored);
-          final width = dims?.$1;
-          final height = dims?.$2;
-          putInMemory(container, filePath, stored, quality, width, height);
-          return (stored, width, height);
+        // 3. Old one-file-per-thumbnail entry. The directory listing taken
+        //    when the index loaded says exactly which ones exist, so a miss
+        //    costs nothing -- no native read per tile.
+        if (index.legacyFiles.containsKey(keyHex)) {
+          final stored = await _fileIo.readFileChunk(
+            container,
+            '$inContainerDir/$keyHex',
+            0,
+            _inContainerReadCap,
+          );
+          if (stored != null && stored.isNotEmpty && _looksLikeValidImage(stored)) {
+            final dims = _extractImageDimensions(stored);
+            final width = dims?.$1;
+            final height = dims?.$2;
+            putInMemory(container, filePath, stored, quality, width, height);
+            // Move it into a pack (which also deletes the loose file) the
+            // first time it's used, so the loose files drain away over time.
+            unawaited(
+              queue.enqueue(
+                _PendingPackThumb(
+                  keyHex: keyHex,
+                  data: stored,
+                  width: width ?? 180,
+                  height: height ?? 180,
+                ),
+                _fileIo,
+              ),
+            );
+            return (stored, width, height);
+          }
         }
         return null;
       }
@@ -523,6 +546,8 @@ class ThumbnailCacheService {
       } else {
         // Mode: inContainer
         final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
+        // Pack index keys are 16-byte digests; anything else can't be indexed.
+        if (!_cacheKeyRe.hasMatch(keyHex)) return;
         final resolvedDims = (width != null && height != null && width > 0 && height > 0)
             ? (width, height)
             : _extractImageDimensions(data) ?? (180, 180);
@@ -548,9 +573,33 @@ class ThumbnailCacheService {
   }
 
   // ── In-Container Pack-File Architecture ────────────────────────────────────
+  //
+  // Thumbnails are batched into immutable `pack_<n>.bin` files plus one
+  // `index.bin` mapping key -> (pack, offset, length, size). The rules that
+  // keep a transient failure from costing the whole cache:
+  //   * The index is only ever replaced after the pack it points at was
+  //     written, and an index that couldn't be READ is never overwritten.
+  //   * Every index mutation (flush, invalidate, eviction) runs one at a time
+  //     through the container's queue, so two of them can't clobber each other.
+
+  static const String _inContainerIndexName = 'index.bin';
+  static final RegExp _packNameRe = RegExp(r'^pack_(\d+)\.bin$');
+  static final RegExp _legacyNameRe = RegExp(r'^[0-9a-f]{32}$');
+  static final RegExp _cacheKeyRe = RegExp(r'^[0-9a-f]{32}$');
 
   static final Map<String, _InContainerPackIndex> _inContainerIndices = {};
   static final Map<String, _InContainerPackQueue> _inContainerQueues = {};
+
+  static String _packFileName(int id) =>
+      'pack_${id.toString().padLeft(4, '0')}.bin';
+
+  /// Numeric id of a pack file name, or null if [name] isn't one. Ids must be
+  /// compared as numbers: as strings `pack_10000.bin` sorts before
+  /// `pack_9999.bin`.
+  static int? _packIdFromName(String name) {
+    final m = _packNameRe.firstMatch(name);
+    return m == null ? null : int.tryParse(m.group(1)!);
+  }
 
   static _InContainerPackQueue _getPackQueue(MountedContainer container) {
     return _inContainerQueues.putIfAbsent(
@@ -559,92 +608,187 @@ class ThumbnailCacheService {
     );
   }
 
-  static Future<_PackEntry?> _getInContainerPackEntry(
-    MountedContainer container,
-    String keyHex,
-  ) async {
-    final uriStr = container.uri.toString();
-    var index = _inContainerIndices[uriStr];
-    if (index == null) {
-      index = await _loadInContainerIndex(container);
-      _inContainerIndices[uriStr] = index;
-    }
-    return index.entries[keyHex];
-  }
-
-  static Future<_InContainerPackIndex> _loadInContainerIndex(
+  /// Lists the cache directory. Null means the listing itself failed (as
+  /// opposed to an empty or missing directory, which is an empty list).
+  static Future<List<RawEntry>?> _listInContainerDir(
     MountedContainer container,
   ) async {
     try {
-      final bytes = await _fileIo.readWholeFile(container, inContainerIndexFile);
-      if (bytes != null && bytes.length >= 16) {
-        final byteData = ByteData.sublistView(bytes);
-        final magic = utf8.decode(bytes.sublist(0, 4));
-        // Reject legacy TPK1 format to self-heal any previous corrupt indices
-        if (magic == 'TPK2') {
-          final nextPackId = byteData.getUint16(6);
-          final entryCount = byteData.getUint32(12);
-
-          final entries = <String, _PackEntry>{};
-          var offset = 16;
-          for (var i = 0; i < entryCount && offset + 32 <= bytes.length; i++) {
-            final keyHex = _bytesToHex(bytes.sublist(offset, offset + 16));
-            final packId = byteData.getUint16(offset + 16);
-            final chunkOffset = byteData.getUint32(offset + 18);
-            final chunkLength = byteData.getUint32(offset + 22);
-            final width = byteData.getUint16(offset + 26);
-            final height = byteData.getUint16(offset + 28);
-
-            entries[keyHex] = _PackEntry(
-              packId: packId,
-              offset: chunkOffset,
-              length: chunkLength,
-              width: width,
-              height: height,
-            );
-            offset += 32;
-          }
-
-          return _InContainerPackIndex(
-            nextPackId: nextPackId,
-            entries: entries,
-          );
+      final raw = await _fileIo.listDirectory(container, inContainerDir);
+      if (raw == null) return const <RawEntry>[];
+      final out = <RawEntry>[];
+      for (final line in raw) {
+        if (line.startsWith('System:')) continue;
+        try {
+          out.add(RawEntry.parse(line));
+        } on FormatException {
+          continue;
         }
       }
-    } catch (_) {}
+      return out;
+    } catch (_) {
+      return null;
+    }
+  }
 
+  /// Builds the in-memory index from what is on disk.
+  ///
+  /// Returns null when the on-disk state can't be determined right now (the
+  /// listing failed, or `index.bin` exists but couldn't be read). Callers
+  /// must then neither serve from, nor write over, the index: a transient
+  /// failure used to be indistinguishable from "no index", and the next
+  /// flush would replace a perfectly good index with an empty one, orphaning
+  /// every pack.
+  static Future<_InContainerPackIndex?> _loadInContainerIndex(
+    MountedContainer container,
+  ) async {
+    final listing = await _listInContainerDir(container);
+    if (listing == null) return null;
+
+    var hasIndexFile = false;
+    var maxPackId = -1;
+    final packNames = <String>[];
+    final legacy = <String, ({int size, int modifiedSecs})>{};
+    for (final e in listing) {
+      if (e.isDir) continue;
+      if (e.name == _inContainerIndexName) {
+        hasIndexFile = true;
+        continue;
+      }
+      final id = _packIdFromName(e.name);
+      if (id != null) {
+        packNames.add(e.name);
+        if (id > maxPackId) maxPackId = id;
+        continue;
+      }
+      if (_legacyNameRe.hasMatch(e.name)) {
+        legacy[e.name] = (size: e.sizeBytes, modifiedSecs: e.modifiedSecs);
+      }
+    }
+
+    Uint8List? bytes;
+    try {
+      bytes = await _fileIo.readWholeFile(container, inContainerIndexFile);
+    } catch (_) {
+      bytes = null;
+    }
+
+    if (bytes == null) {
+      // Listed but unreadable: unknown, so leave it alone.
+      if (hasIndexFile) return null;
+      // Genuinely no index yet (fresh cache, or its index never got written).
+      // Any packs already present are unreachable but still occupy ids and
+      // budget; start numbering past them and let eviction retire them.
+      return _InContainerPackIndex(
+        nextPackId: maxPackId + 1,
+        entries: {},
+        legacyFiles: legacy,
+      );
+    }
+
+    final parsed = _parseIndex(bytes);
+    if (parsed == null) {
+      // Readable but not a valid index (corrupt, or the pre-release TPK1):
+      // everything it described is unreachable, so reclaim the space.
+      for (final name in packNames) {
+        try {
+          await _fileIo.deleteFile(container, '$inContainerDir/$name');
+        } catch (_) {}
+      }
+      return _InContainerPackIndex(
+        nextPackId: maxPackId + 1,
+        entries: {},
+        legacyFiles: legacy,
+      );
+    }
+
+    if (parsed.nextPackId <= maxPackId) parsed.nextPackId = maxPackId + 1;
+    parsed.legacyFiles.addAll(legacy);
+    return parsed;
+  }
+
+  // Index file layout (big-endian). Written as TPK3; TPK2 (16-bit pack ids)
+  // is still read so an index from the previous build keeps working.
+  //   header 16 B: magic(4) | version u16 | reserved u16 | nextPackId u32 |
+  //                entryCount u32
+  //   entry  32 B: key(16) | packId u32 | offset u32 | length u32 |
+  //                width u16 | height u16
+  static const int _indexHeaderSize = 16;
+  static const int _indexEntrySize = 32;
+
+  /// Null if [bytes] isn't a complete, well-formed index.
+  static _InContainerPackIndex? _parseIndex(Uint8List bytes) {
+    if (bytes.length < _indexHeaderSize) return null;
+    final bd = ByteData.sublistView(bytes);
+    final magic = String.fromCharCodes(bytes.sublist(0, 4));
+    final int nextPackId;
+    final bool v3;
+    if (magic == 'TPK3') {
+      v3 = true;
+      nextPackId = bd.getUint32(8);
+    } else if (magic == 'TPK2') {
+      v3 = false;
+      nextPackId = bd.getUint16(6);
+    } else {
+      return null;
+    }
+    final count = bd.getUint32(12);
+    if (bytes.length != _indexHeaderSize + count * _indexEntrySize) return null;
+
+    final entries = <String, _PackEntry>{};
+    var o = _indexHeaderSize;
+    for (var i = 0; i < count; i++) {
+      final key = _bytesToHex(Uint8List.sublistView(bytes, o, o + 16));
+      if (v3) {
+        entries[key] = _PackEntry(
+          packId: bd.getUint32(o + 16),
+          offset: bd.getUint32(o + 20),
+          length: bd.getUint32(o + 24),
+          width: bd.getUint16(o + 28),
+          height: bd.getUint16(o + 30),
+        );
+      } else {
+        entries[key] = _PackEntry(
+          packId: bd.getUint16(o + 16),
+          offset: bd.getUint32(o + 18),
+          length: bd.getUint32(o + 22),
+          width: bd.getUint16(o + 26),
+          height: bd.getUint16(o + 28),
+        );
+      }
+      o += _indexEntrySize;
+    }
     return _InContainerPackIndex(
-      nextPackId: 0,
-      entries: {},
+      nextPackId: nextPackId,
+      entries: entries,
+      legacyFiles: {},
     );
   }
 
   static Uint8List _serializeIndex(_InContainerPackIndex index) {
-    final totalSize = 16 + index.entries.length * 32;
-    final buffer = Uint8List(totalSize);
+    final buffer = Uint8List(_indexHeaderSize + index.entries.length * _indexEntrySize);
     final bd = ByteData.sublistView(buffer);
 
-    buffer.setRange(0, 4, utf8.encode('TPK2'));
-    bd.setUint16(4, 2); // Version 2
-    bd.setUint16(6, index.nextPackId);
-    bd.setUint32(8, 0); // Reserved
+    buffer.setRange(0, 4, utf8.encode('TPK3'));
+    bd.setUint16(4, 3); // version
+    bd.setUint16(6, 0); // reserved
+    bd.setUint32(8, index.nextPackId);
     bd.setUint32(12, index.entries.length);
 
-    var offset = 16;
+    var o = _indexHeaderSize;
     for (final entry in index.entries.entries) {
-      final keyBytes = _hexToBytes(entry.key);
-      buffer.setRange(offset, offset + 16, keyBytes);
-      bd.setUint16(offset + 16, entry.value.packId);
-      bd.setUint32(offset + 18, entry.value.offset);
-      bd.setUint32(offset + 22, entry.value.length);
-      bd.setUint16(offset + 26, entry.value.width);
-      bd.setUint16(offset + 28, entry.value.height);
-      bd.setUint16(offset + 30, 0); // Reserved
-      offset += 32;
+      buffer.setRange(o, o + 16, _hexToBytes(entry.key));
+      bd.setUint32(o + 16, entry.value.packId);
+      bd.setUint32(o + 20, entry.value.offset);
+      bd.setUint32(o + 24, entry.value.length);
+      bd.setUint16(o + 28, _u16(entry.value.width));
+      bd.setUint16(o + 30, _u16(entry.value.height));
+      o += _indexEntrySize;
     }
-
     return buffer;
   }
+
+  static int _u16(int v) => v < 0 ? 0 : (v > 0xFFFF ? 0xFFFF : v);
 
   static String _bytesToHex(Uint8List bytes) {
     final sb = StringBuffer();
@@ -655,26 +799,67 @@ class ThumbnailCacheService {
   }
 
   static Uint8List _hexToBytes(String hex) {
-    final len = min(16, hex.length ~/ 2);
     final result = Uint8List(16);
-    for (var i = 0; i < len; i++) {
+    for (var i = 0; i < 16 && i * 2 + 2 <= hex.length; i++) {
       result[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
     }
     return result;
+  }
+
+  /// Writes any thumbnails still buffered for [container] to its packs and
+  /// completes only once they are on disk (or definitively failed). Waits for
+  /// a flush that is already running instead of returning early.
+  static Future<void> flushInContainerCache(MountedContainer container) =>
+      flushInContainerCacheForUri(container.uri.toString());
+
+  /// Same as [flushInContainerCache], by container URI. Used right before a
+  /// container is locked, while it is still mounted. No-op (and never
+  /// throws) when nothing is buffered.
+  static Future<void> flushInContainerCacheForUri(String uri) async {
+    final queue = _inContainerQueues[uri];
+    if (queue == null) return;
+    try {
+      await queue.flushNow();
+    } catch (_) {}
+  }
+
+  /// Drops all in-container cache state held in memory. For tests.
+  @visibleForTesting
+  static void resetInContainerStateForTesting() {
+    for (final q in _inContainerQueues.values) {
+      q.dispose();
+    }
+    _inContainerQueues.clear();
+    _inContainerIndices.clear();
+    _ensuredThumbDirs.clear();
+    _inFlightPuts.clear();
   }
 
   // ── Cache Invalidation & Management ────────────────────────────────────────
 
  static Duration inContainerDebounceDuration = const Duration(milliseconds: 2500);
 
-  /// Called on every container lock (F-16). Flushes any pending in-container
-  /// pack batch to disk before wiping the decrypted memory tier.
+  /// Called on every container lock (F-16). Wipes the decrypted memory tier
+  /// and releases this mount's in-container pack state, so the next unlock
+  /// reads the index fresh from disk instead of trusting one that a sync may
+  /// have replaced while the vault was locked.
+  ///
+  /// It also flushes whatever is still buffered, but by the time this runs
+  /// the volume is usually already unmounted (it is driven by the
+  /// container-locked event), so that flush can only succeed for locks that
+  /// go through `VaultLifecycleApi.lockContainer`, which now flushes first via
+  /// [flushInContainerCacheForUri]. A flush that fails here is detected and
+  /// dropped, never half-applied.
   static Future<void> clearAppCacheFor(MountedContainer container) async {
-    final queue = _inContainerQueues[container.uri.toString()];
+    final uriStr = container.uri.toString();
+    final queue = _inContainerQueues[uriStr];
     if (queue != null) {
       try {
         await queue.flushNow();
       } catch (_) {}
+      _inContainerQueues.remove(uriStr)?.dispose();
+      _inContainerIndices.remove(uriStr);
+      _ensuredThumbDirs.remove(uriStr);
     }
     _memoryCache.removeWhere((key) => key.startsWith('${container.volId}:'));
     _latestKeyByFile.removeWhere(
@@ -705,6 +890,9 @@ class ThumbnailCacheService {
     _inContainerIndices.remove(uri);
     final queue = _inContainerQueues.remove(uri);
     queue?.dispose();
+    // A commit that is already running must finish before the files go, or
+    // it would recreate them right after.
+    if (queue != null) await queue.settle();
     try {
       final entries = await _channel.invokeMethod<List<Object?>>(
         'listDirectory',
@@ -753,33 +941,38 @@ class ThumbnailCacheService {
     _sizeCache.removeWhere((key, _) => key.startsWith(prefix));
     _latestKeyByFile.remove(prefix);
 
-    final dir = await _thumbDir(container);
+    final inContainerKeys = <String>[];
     for (final quality in qualities) {
       try {
-        final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
-        final file = File('$dir/$cacheKey');
-        if (await file.exists()) await file.delete();
-        final metaFile = File('${file.path}.meta');
-        if (await metaFile.exists()) await metaFile.delete();
-        final baseKey = await _encodeKey(filePath);
-        final baseFile = File('$dir/$baseKey');
-        if (await baseFile.exists()) await baseFile.delete();
+        inContainerKeys.add(await _encodeKey(_qualifiedPath(filePath, quality)));
       } catch (_) {}
+    }
 
-      try {
-        final key = await _encodeKey(_qualifiedPath(filePath, quality));
-        final uriStr = container.uri.toString();
-        final index = _inContainerIndices[uriStr];
-        if (index != null && index.entries.containsKey(key)) {
-          index.entries.remove(key);
-          await _fileIo.writeWholeFile(
-            container,
-            inContainerIndexFile,
-            _serializeIndex(index),
-          );
-        }
-        await _fileIo.deleteFile(container, '$inContainerDir/$key');
-      } catch (_) {}
+    // App-cache tier (best effort, like everything here).
+    try {
+      final dir = await _thumbDir(container);
+      for (final quality in qualities) {
+        try {
+          final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+          final file = File('$dir/$cacheKey');
+          if (await file.exists()) await file.delete();
+          final metaFile = File('${file.path}.meta');
+          if (await metaFile.exists()) await metaFile.delete();
+          final baseKey = await _encodeKey(filePath);
+          final baseFile = File('$dir/$baseKey');
+          if (await baseFile.exists()) await baseFile.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // In-container tier, all qualities in one go (one index write). This also
+    // drops copies still queued for a pack, and works even if the index
+    // hasn't been loaded yet this session -- otherwise the stale pre-edit
+    // thumbnail would stay on disk and come back after a restart.
+    try {
+      await _getPackQueue(container).invalidate(inContainerKeys);
+    } catch (e) {
+      VeLog.w('ThumbnailCacheService', 'in-container invalidate failed', e);
     }
   }
 
@@ -834,51 +1027,74 @@ class ThumbnailCacheService {
     int maxBytes = defaultMaxInContainerCacheBytes,
   ]) async {
     try {
-      final totalBytes = await _fileIo.getFolderSize(container, inContainerDir);
-      if (totalBytes <= maxBytes) return;
-
-      final rawEntries = await _fileIo.listDirectory(container, inContainerDir);
-      if (rawEntries == null || rawEntries.isEmpty) return;
-
-      final packEntries = rawEntries
-          .where((raw) => !raw.startsWith('System:'))
-          .map(RawEntry.parse)
-          .where((e) => !e.isDir && e.name.startsWith('pack_') && e.name.endsWith('.bin'))
-          .toList()
-        ..sort((a, b) => a.name.compareTo(b.name));
-
-      final targetBytes = (maxBytes * 0.8).toInt();
-      var runningBytes = totalBytes;
-      final deletedPackIds = <int>{};
-
-      for (final entry in packEntries) {
-        if (runningBytes <= targetBytes) break;
-        final deleted = await _fileIo.deleteFile(
-          container,
-          '$inContainerDir/${entry.name}',
-        );
-        if (deleted) {
-          runningBytes -= entry.sizeBytes;
-          final idStr = entry.name.replaceAll('pack_', '').replaceAll('.bin', '');
-          final packId = int.tryParse(idStr);
-          if (packId != null) deletedPackIds.add(packId);
-        }
-      }
-
-      if (deletedPackIds.isNotEmpty) {
-        final uriStr = container.uri.toString();
-        var index = _inContainerIndices[uriStr];
-        index ??= await _loadInContainerIndex(container);
-        index.entries.removeWhere((_, e) => deletedPackIds.contains(e.packId));
-        await _fileIo.writeWholeFile(
-          container,
-          inContainerIndexFile,
-          _serializeIndex(index),
-        );
-      }
+      final queue = _getPackQueue(container);
+      await queue.exclusive(
+        () => _evictInContainer(container, queue, maxBytes),
+      );
     } catch (e) {
       VeLog.e('ThumbnailCacheService', 'In-container disk budget eviction failed', e);
     }
+  }
+
+  /// Runs inside the container queue's exclusive section. Leftover
+  /// one-file-per-thumbnail files go first (oldest first); then packs, oldest
+  /// first by NUMERIC id. Without the first step, a vault whose old loose
+  /// files alone exceed the budget would have every pack deleted on each
+  /// pass while the loose files stayed.
+  static Future<void> _evictInContainer(
+    MountedContainer container,
+    _InContainerPackQueue queue,
+    int maxBytes,
+  ) async {
+    final index = await queue.ensureIndex();
+    if (index == null) return; // can't tell what is still referenced
+    final listing = await _listInContainerDir(container);
+    if (listing == null) return;
+
+    var total = 0;
+    final packs = <({int id, String name, int size})>[];
+    final loose = <RawEntry>[];
+    for (final e in listing) {
+      if (e.isDir) continue;
+      total += e.sizeBytes;
+      final id = _packIdFromName(e.name);
+      if (id != null) {
+        packs.add((id: id, name: e.name, size: e.sizeBytes));
+      } else if (_legacyNameRe.hasMatch(e.name)) {
+        loose.add(e);
+      }
+    }
+    if (total <= maxBytes) return;
+    final target = (maxBytes * 0.8).toInt();
+
+    loose.sort((a, b) => a.modifiedSecs.compareTo(b.modifiedSecs));
+    for (final e in loose) {
+      if (total <= target) return;
+      if (await _fileIo.deleteFile(container, '$inContainerDir/${e.name}')) {
+        total -= e.sizeBytes;
+        index.legacyFiles.remove(e.name);
+      }
+    }
+
+    packs.sort((a, b) => a.id.compareTo(b.id));
+    final deletedIds = <int>{};
+    for (final pack in packs) {
+      if (total <= target) break;
+      if (await _fileIo.deleteFile(container, '$inContainerDir/${pack.name}')) {
+        total -= pack.size;
+        deletedIds.add(pack.id);
+      }
+    }
+
+    // Only touch index.bin if it referenced something that just went away
+    // (or an earlier write of it failed); deleting unreferenced packs
+    // needs no index write.
+    if (deletedIds.isNotEmpty) {
+      final before = index.entries.length;
+      index.entries.removeWhere((_, e) => deletedIds.contains(e.packId));
+      if (index.entries.length != before) index.dirty = true;
+    }
+    if (index.dirty && await queue.persist(index)) index.dirty = false;
   }
 
   static Future<void> pruneStaleAppCache(Set<String> activeContainerUris) async {
@@ -1060,9 +1276,20 @@ class _InContainerPackIndex {
   int nextPackId;
   final Map<String, _PackEntry> entries;
 
+  /// Old one-file-per-thumbnail entries still on disk, by file name. Known
+  /// from the one directory listing taken when the index loads, so a lookup
+  /// for a key that isn't here never touches native code.
+  final Map<String, ({int size, int modifiedSecs})> legacyFiles;
+
+  /// True when the in-memory entries are ahead of `index.bin` (a write
+  /// failed, or a deferred invalidation was applied); the next successful
+  /// write clears it.
+  bool dirty = false;
+
   _InContainerPackIndex({
     required this.nextPackId,
     required this.entries,
+    required this.legacyFiles,
   });
 }
 
@@ -1081,125 +1308,308 @@ class _PendingPackThumb {
   });
 }
 
+/// Per-container write buffer and the one place that mutates that container's
+/// pack set and index. Everything that changes either (flush, invalidate,
+/// eviction) goes through [exclusive], so two of them can never interleave
+/// and overwrite each other's index.
 class _InContainerPackQueue {
   final MountedContainer container;
   final Map<String, _PendingPackThumb> _pending = {};
+
+  /// The batch currently being written, still readable so a lookup during the
+  /// write doesn't miss.
+  Map<String, _PendingPackThumb> _inFlight = const {};
+
+  /// Invalidations requested while the index couldn't be loaded; applied the
+  /// moment it can.
+  final Set<String> _deferredInvalidations = {};
+
   Timer? _debounceTimer;
-  bool _isFlushing = false;
+  Future<void> _tail = Future<void>.value();
+  Future<_InContainerPackIndex?>? _loading;
+  int _failedCommits = 0;
+  DateTime? _pausedUntil;
+  bool _disposed = false;
 
   static const int _maxPendingItems = 40;
+  static const int _maxFailedCommits = 3;
+  static const Duration _pauseAfterFailures = Duration(minutes: 1);
 
   _InContainerPackQueue(this.container);
 
+  String get _uri => container.uri.toString();
+
   void dispose() {
+    _disposed = true;
     _debounceTimer?.cancel();
-    _pending.clear();
+    _debounceTimer = null;
+    _dropPending();
   }
 
-  _PendingPackThumb? getPending(String keyHex) => _pending[keyHex];
+  /// Completes once everything queued on [exclusive] so far has finished.
+  Future<void> settle() => _tail;
 
-  Future<void> flushNow([VaultFileIoApi? fileIo]) =>
-      _drain(fileIo ?? ThumbnailCacheService._fileIo);
+  _PendingPackThumb? getPending(String keyHex) =>
+      _pending[keyHex] ?? _inFlight[keyHex];
 
-  Future<void> enqueue(
-    _PendingPackThumb thumb,
-    VaultFileIoApi fileIo,
-  ) {
+  /// Runs [task] after every earlier exclusive task, one at a time.
+  Future<T> exclusive<T>(Future<T> Function() task) {
+    final previous = _tail;
+    final gate = Completer<void>();
+    _tail = gate.future;
+    return previous.then((_) => task()).whenComplete(gate.complete);
+  }
+
+  // ── Index access ──────────────────────────────────────────────────────────
+
+  /// The loaded index, loading it once per mount. Null means the on-disk
+  /// state couldn't be determined right now; that result is not cached, so
+  /// the next call retries.
+  Future<_InContainerPackIndex?> ensureIndex() {
+    final cached = ThumbnailCacheService._inContainerIndices[_uri];
+    if (cached != null) return Future.value(cached);
+    return _loading ??= _loadAndPublish().whenComplete(() => _loading = null);
+  }
+
+  Future<_InContainerPackIndex?> _loadAndPublish() async {
+    final index = await ThumbnailCacheService._loadInContainerIndex(container);
+    if (index == null || _disposed) return index;
+    ThumbnailCacheService._inContainerIndices[_uri] = index;
+
+    if (_deferredInvalidations.isNotEmpty) {
+      var changed = false;
+      for (final key in _deferredInvalidations) {
+        if (index.entries.remove(key) != null) changed = true;
+        index.legacyFiles.remove(key);
+      }
+      _deferredInvalidations.clear();
+      if (changed) {
+        index.dirty = true;
+        unawaited(flushIndexIfDirty());
+      }
+    }
+    return index;
+  }
+
+  Future<bool> persist(_InContainerPackIndex index) =>
+      _writeIndex(index, ThumbnailCacheService._fileIo);
+
+  Future<bool> _writeIndex(_InContainerPackIndex index, VaultFileIoApi io) async {
+    try {
+      return await io.writeWholeFile(
+        container,
+        ThumbnailCacheService.inContainerIndexFile,
+        ThumbnailCacheService._serializeIndex(index),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> flushIndexIfDirty() => exclusive(() async {
+    final index = ThumbnailCacheService._inContainerIndices[_uri];
+    if (index == null || !index.dirty) return;
+    if (await persist(index)) index.dirty = false;
+  }).catchError((Object _) {});
+
+  // ── Write path ────────────────────────────────────────────────────────────
+
+  Future<void> enqueue(_PendingPackThumb thumb, VaultFileIoApi fileIo) {
+    if (_disposed) return Future.value();
+    final pausedUntil = _pausedUntil;
+    if (pausedUntil != null) {
+      if (DateTime.now().isBefore(pausedUntil)) return Future.value();
+      _pausedUntil = null;
+      _failedCommits = 0;
+    }
+
     final completer = Completer<void>();
     thumb.completer = completer;
+    final replaced = _pending[thumb.keyHex];
+    if (replaced != null) _complete(replaced);
     _pending[thumb.keyHex] = thumb;
 
     _debounceTimer?.cancel();
     if (_pending.length >= _maxPendingItems) {
-      unawaited(_drain(fileIo));
+      unawaited(flushNow(fileIo));
     } else {
-      _debounceTimer = Timer(ThumbnailCacheService.inContainerDebounceDuration, () {
-        unawaited(_drain(fileIo));
-      });
+      _debounceTimer = Timer(
+        ThumbnailCacheService.inContainerDebounceDuration,
+        () => unawaited(flushNow(fileIo)),
+      );
     }
     return completer.future;
   }
 
-  Future<void> _drain(VaultFileIoApi fileIo) async {
-    if (_isFlushing || _pending.isEmpty) return;
-    _isFlushing = true;
+  /// Writes everything queued so far. If a flush is already running this
+  /// waits for it (and then for whatever it left behind) instead of
+  /// returning early. Never throws.
+  Future<void> flushNow([VaultFileIoApi? fileIo]) {
     _debounceTimer?.cancel();
+    _debounceTimer = null;
+    return exclusive(() => _drainLocked(fileIo)).catchError((Object _) {});
+  }
 
-    try {
-      while (_pending.isNotEmpty) {
-        final batch = _pending.values.toList();
-        _pending.clear();
+  Future<void> _drainLocked(VaultFileIoApi? fileIoOverride) async {
+    while (_pending.isNotEmpty) {
+      final io = fileIoOverride ?? ThumbnailCacheService._fileIo;
+      final batch = _pending.values.toList();
+      _pending.clear();
+      _inFlight = {for (final t in batch) t.keyHex: t};
 
-        try {
-          await _commitBatch(batch, fileIo);
-          for (final item in batch) {
-            if (item.completer != null && !item.completer!.isCompleted) {
-              item.completer!.complete();
-            }
-          }
-        } catch (e) {
-          for (final item in batch) {
-            if (item.completer != null && !item.completer!.isCompleted) {
-              item.completer!.completeError(e);
-            }
-          }
-        }
+      var ok = false;
+      try {
+        ok = await _commitBatch(batch, io);
+      } catch (_) {
+        ok = false;
+      } finally {
+        _inFlight = const {};
       }
-    } finally {
-      _isFlushing = false;
+
+      // Thumbnails are disposable: a failed batch is dropped, not retried and
+      // not reported, but it is counted so a read-only or failing volume
+      // doesn't get hammered forever.
+      for (final item in batch) {
+        _complete(item);
+      }
+      if (ok) {
+        _failedCommits = 0;
+      } else if (++_failedCommits >= _maxFailedCommits) {
+        _pausedUntil = DateTime.now().add(_pauseAfterFailures);
+        _dropPending();
+        return;
+      }
     }
   }
 
-  Future<void> _commitBatch(
+  /// Writes [batch] as one new pack and records it in the index.
+  ///
+  /// Order matters: the pack is written first, the index only after, and the
+  /// in-memory index changes only once BOTH succeeded. A failure at any point
+  /// leaves the index (on disk and in memory) exactly as it was, with at most
+  /// an unreferenced pack that gets deleted or evicted later.
+  Future<bool> _commitBatch(
     List<_PendingPackThumb> batch,
-    VaultFileIoApi fileIo,
+    VaultFileIoApi io,
   ) async {
-    final uriStr = container.uri.toString();
-    if (!ThumbnailCacheService._ensuredThumbDirs.containsKey(uriStr)) {
-      ThumbnailCacheService._ensuredThumbDirs[uriStr] = fileIo.createDirectory(
-        container,
-        ThumbnailCacheService.inContainerDir,
-      );
-    }
-    await ThumbnailCacheService._ensuredThumbDirs[uriStr];
+    final index = await ensureIndex();
+    if (index == null) return false; // unknown on-disk state: never write over it
+    if (!await _ensureDir(io)) return false;
 
-    var index = ThumbnailCacheService._inContainerIndices[uriStr];
-    index ??= await ThumbnailCacheService._loadInContainerIndex(container);
-    ThumbnailCacheService._inContainerIndices[uriStr] = index;
-
-    final currentPackId = index.nextPackId;
-    index.nextPackId++;
-
-    final packFileName =
-        'pack_${currentPackId.toString().padLeft(4, '0')}.bin';
-    final packPath = '${ThumbnailCacheService.inContainerDir}/$packFileName';
-
+    final packId = index.nextPackId;
     final builder = BytesBuilder(copy: false);
-    var currentOffset = 0;
-
+    final fresh = <String, _PackEntry>{};
+    var offset = 0;
     for (final item in batch) {
       builder.add(item.data);
-      index.entries[item.keyHex] = _PackEntry(
-        packId: currentPackId,
-        offset: currentOffset,
+      fresh[item.keyHex] = _PackEntry(
+        packId: packId,
+        offset: offset,
         length: item.data.length,
-        width: item.width,
-        height: item.height,
+        width: ThumbnailCacheService._u16(item.width),
+        height: ThumbnailCacheService._u16(item.height),
       );
-      currentOffset += item.data.length;
+      offset += item.data.length;
     }
 
-    final packBytes = builder.takeBytes();
+    final dir = ThumbnailCacheService.inContainerDir;
+    final packPath = '$dir/${ThumbnailCacheService._packFileName(packId)}';
+    if (!await io.writeWholeFile(container, packPath, builder.takeBytes())) {
+      return false;
+    }
 
-    // 1. Write the new immutable pack segment file
-    await fileIo.writeWholeFile(container, packPath, packBytes);
-
-    // 2. Commit updated binary index
-    final serializedIndex = ThumbnailCacheService._serializeIndex(index);
-    await fileIo.writeWholeFile(
-      container,
-      ThumbnailCacheService.inContainerIndexFile,
-      serializedIndex,
+    final next = _InContainerPackIndex(
+      nextPackId: packId + 1,
+      entries: {...index.entries, ...fresh},
+      legacyFiles: const {},
     );
+    if (!await _writeIndex(next, io)) {
+      try {
+        await io.deleteFile(container, packPath);
+      } catch (_) {}
+      return false;
+    }
+
+    index.entries.addAll(fresh);
+    index.nextPackId = packId + 1;
+    index.dirty = false;
+
+    // Anything that now lives in a pack no longer needs its old loose file.
+    for (final item in batch) {
+      if (index.legacyFiles.remove(item.keyHex) != null) {
+        try {
+          await io.deleteFile(container, '$dir/${item.keyHex}');
+        } catch (_) {}
+      }
+    }
+    return true;
+  }
+
+  Future<bool> _ensureDir(VaultFileIoApi io) async {
+    final dirs = ThumbnailCacheService._ensuredThumbDirs;
+    var pending = dirs[_uri];
+    pending ??= dirs[_uri] = io
+        .createDirectory(container, ThumbnailCacheService.inContainerDir)
+        .then((_) {});
+    try {
+      await pending;
+      return true;
+    } catch (_) {
+      dirs.remove(_uri); // don't cache a failure
+      return false;
+    }
+  }
+
+  // ── Invalidation ──────────────────────────────────────────────────────────
+
+  /// Makes every key in [keys] a miss, durably.
+  Future<void> invalidate(List<String> keys) {
+    if (keys.isEmpty) return Future.value();
+
+    // Queued copies go first and synchronously, so a flush that starts while
+    // we wait can't write them out after the file changed.
+    for (final key in keys) {
+      final queued = _pending.remove(key);
+      if (queued != null) _complete(queued);
+    }
+
+    return exclusive(() async {
+      final index = await ensureIndex();
+      if (index == null) {
+        // Can't edit what we can't read; apply it as soon as we can.
+        _deferredInvalidations.addAll(keys);
+        return;
+      }
+
+      final io = ThumbnailCacheService._fileIo;
+      var changed = false;
+      for (final key in keys) {
+        if (index.entries.remove(key) != null) changed = true;
+        if (index.legacyFiles.remove(key) != null) {
+          try {
+            await io.deleteFile(
+              container,
+              '${ThumbnailCacheService.inContainerDir}/$key',
+            );
+          } catch (_) {}
+        }
+      }
+      if (!changed && !index.dirty) return;
+      index.dirty = !await persist(index);
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  static void _complete(_PendingPackThumb thumb) {
+    final c = thumb.completer;
+    if (c != null && !c.isCompleted) c.complete();
+  }
+
+  void _dropPending() {
+    for (final item in _pending.values) {
+      _complete(item);
+    }
+    _pending.clear();
   }
 }

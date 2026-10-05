@@ -220,6 +220,8 @@ abstract final class ChannelMethods {
   // lib/features/share_import/).
   static const setShareTargetEnabled = 'setShareTargetEnabled';
   static const isShareTargetEnabled = 'isShareTargetEnabled';
+  static const setUsbAttachPromptEnabled = 'setUsbAttachPromptEnabled';
+  static const isUsbAttachPromptEnabled = 'isUsbAttachPromptEnabled';
   static const checkPendingShareRequest = 'checkPendingShareRequest';
   static const cancelPendingShareRequest = 'cancelPendingShareRequest';
   static const returnToSharingApp = 'returnToSharingApp';

@@ -9,6 +9,17 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'Afficher l’invite de connexion USB';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'Lorsqu’il est activé, Android propose VaultExplorer à la connexion d’un lecteur USB. Désactivez-le pour ne plus voir cette invite ; vous pourrez toujours ouvrir les lecteurs depuis Monter un lecteur USB.';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage =>
+      'Impossible de modifier le réglage de connexion USB.';
+
+  @override
   String get cancel => 'Annuler';
 
   @override

@@ -1,5 +1,17 @@
 {
   "@@locale": "ja",
+  "usbAttachPromptTitle": "USB接続時の確認を表示",
+  "@usbAttachPromptTitle": {
+    "description": "USBストレージの接続時に Android が VaultExplorer を候補として表示する機能の設定タイトル"
+  },
+  "usbAttachPromptSubtitle": "オンにすると、USBドライブの接続時に Android が VaultExplorer を表示します。確認を表示しない場合はオフにしてください。USBドライブは引き続き「USBドライブをマウント」から開けます。",
+  "@usbAttachPromptSubtitle": {
+    "description": "オフにすると接続時に VaultExplorer が表示されなくなりますが、アプリ内から手動でUSBドライブをマウントできます"
+  },
+  "usbAttachPromptUpdateErrorMessage": "USB接続の設定を変更できませんでした。",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Android の USB 接続ハンドラー状態を変更できなかった場合に表示"
+  },
   "cancel": "キャンセル",
   "close": "閉じる",
   "search": "検索",

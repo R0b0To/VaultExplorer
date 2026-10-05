@@ -25,6 +25,7 @@ class AppSettingsViewState {
   final bool exportBusy;
   final bool importBusy;
   final bool shareTargetEnabled;
+  final bool usbAttachPromptEnabled;
 
   bool get backupBusy => exportBusy || importBusy;
 
@@ -41,6 +42,7 @@ class AppSettingsViewState {
     this.exportBusy = false,
     this.importBusy = false,
     this.shareTargetEnabled = false,
+    this.usbAttachPromptEnabled = true,
   });
 
   AppSettingsViewState _copy({
@@ -57,6 +59,7 @@ class AppSettingsViewState {
     bool? exportBusy,
     bool? importBusy,
     bool? shareTargetEnabled,
+    bool? usbAttachPromptEnabled,
   }) => AppSettingsViewState(
     settings: settings ?? this.settings,
     loading: loading ?? this.loading,
@@ -70,6 +73,8 @@ class AppSettingsViewState {
     exportBusy: exportBusy ?? this.exportBusy,
     importBusy: importBusy ?? this.importBusy,
     shareTargetEnabled: shareTargetEnabled ?? this.shareTargetEnabled,
+    usbAttachPromptEnabled:
+        usbAttachPromptEnabled ?? this.usbAttachPromptEnabled,
   );
 }
 
@@ -150,6 +155,14 @@ class AppSettingsController extends _$AppSettingsController {
     }
     if (!ref.mounted) return;
 
+    bool usbAttachPromptEnabled = true;
+    try {
+      usbAttachPromptEnabled = await lifecycle.isUsbAttachPromptEnabled();
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'USB attach handler lookup failed', e);
+    }
+    if (!ref.mounted) return;
+
     state = state._copy(
       settings: s,
       biometricAvailable: bioAvail,
@@ -157,6 +170,7 @@ class AppSettingsController extends _$AppSettingsController {
       androidSdkInt: sdkInt,
       disguiseMode: disguiseMode,
       shareTargetEnabled: shareTargetEnabled,
+      usbAttachPromptEnabled: usbAttachPromptEnabled,
       loading: false,
     );
   }
@@ -355,6 +369,20 @@ class AppSettingsController extends _$AppSettingsController {
       final actual = await lifecycle.isShareTargetEnabled();
       if (!ref.mounted) return false;
       state = state._copy(shareTargetEnabled: actual);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> setUsbAttachPromptEnabled(bool enable) async {
+    try {
+      final lifecycle = ref.read(vaultLifecycleApiProvider);
+      await lifecycle.setUsbAttachPromptEnabled(enable);
+      if (!ref.mounted) return false;
+      final actual = await lifecycle.isUsbAttachPromptEnabled();
+      if (!ref.mounted) return false;
+      state = state._copy(usbAttachPromptEnabled: actual);
       return true;
     } catch (_) {
       return false;

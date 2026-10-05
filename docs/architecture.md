@@ -473,7 +473,7 @@ is spelled out by name.
 | Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |
 | Background service & camera | `syncBackgroundService`, `updateBackgroundServiceProgress`, `start/stopBackgroundRecording` |
 | Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile` |
-| USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity` |
+| USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity`, `set/isUsbAttachPromptEnabled` |
 | System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
 
 ### 5.2 Native → Dart (event callbacks)

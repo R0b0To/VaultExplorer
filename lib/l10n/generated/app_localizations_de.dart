@@ -9,6 +9,17 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'USB-Verbindungshinweis anzeigen';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'Wenn diese Option aktiviert ist, bietet Android VaultExplorer an, sobald ein USB-Laufwerk angeschlossen wird. Deaktiviere sie, um diesen Hinweis zu unterdrücken; Laufwerke kannst du weiterhin über „USB-Laufwerk einbinden“ öffnen.';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage =>
+      'Die USB-Verbindungseinstellung konnte nicht geändert werden.';
+
+  @override
   String get cancel => 'Abbrechen';
 
   @override

@@ -9,6 +9,16 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => '显示 USB 连接提示';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      '启用后，连接 USB 驱动器时 Android 会提供 VaultExplorer。关闭此选项即可停止提示；你仍可在“挂载 USB 驱动器”中手动打开驱动器。';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage => '无法更新 USB 连接设置。';
+
+  @override
   String get cancel => '取消';
 
   @override

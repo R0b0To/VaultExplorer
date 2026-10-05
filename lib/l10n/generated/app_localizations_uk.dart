@@ -9,6 +9,17 @@ class AppLocalizationsUk extends AppLocalizations {
   AppLocalizationsUk([String locale = 'uk']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'Показувати запит під час підключення USB';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'Якщо ввімкнено, Android пропонує VaultExplorer після підключення USB-накопичувача. Вимкніть, щоб прибрати цей запит; накопичувачі й надалі можна відкривати через «Підключити USB-накопичувач».';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage =>
+      'Не вдалося змінити налаштування підключення USB.';
+
+  @override
   String get cancel => 'Скасувати';
 
   @override

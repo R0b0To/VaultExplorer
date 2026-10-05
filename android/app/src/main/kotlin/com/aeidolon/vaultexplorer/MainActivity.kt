@@ -273,6 +273,8 @@ private object ChannelMethods {
     // Android Share Sheet integration (see ShareIntentHandlers).
     const val SET_SHARE_TARGET_ENABLED = "setShareTargetEnabled"
     const val IS_SHARE_TARGET_ENABLED = "isShareTargetEnabled"
+    const val SET_USB_ATTACH_PROMPT_ENABLED = "setUsbAttachPromptEnabled"
+    const val IS_USB_ATTACH_PROMPT_ENABLED = "isUsbAttachPromptEnabled"
     const val CHECK_PENDING_SHARE_REQUEST = "checkPendingShareRequest"
     const val CANCEL_PENDING_SHARE_REQUEST = "cancelPendingShareRequest"
     const val RETURN_TO_SHARING_APP = "returnToSharingApp"
@@ -1222,6 +1224,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_COMPOSITE_CONTAINER -> compositeHandlers.handleUnlockCompositeContainer(call, result)
                 ChannelMethods.SET_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleSetShareTargetEnabled(call, result)
                 ChannelMethods.IS_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleIsShareTargetEnabled(call, result)
+                ChannelMethods.SET_USB_ATTACH_PROMPT_ENABLED -> usbHandlers.handleSetAttachPromptEnabled(call, result)
+                ChannelMethods.IS_USB_ATTACH_PROMPT_ENABLED -> usbHandlers.handleIsAttachPromptEnabled(call, result)
                 ChannelMethods.CHECK_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCheckPendingShareRequest(call, result)
                 ChannelMethods.CANCEL_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCancelPendingShareRequest(call, result)
                 ChannelMethods.CHECK_PENDING_QUICK_CAPTURE_REQUEST ->

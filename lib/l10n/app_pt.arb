@@ -1,5 +1,17 @@
 {
   "@@locale": "pt",
+  "usbAttachPromptTitle": "Mostrar aviso de conexão USB",
+  "@usbAttachPromptTitle": {
+    "description": "Título da opção para ativar ou desativar o VaultExplorer como aplicativo oferecido pelo Android ao conectar um dispositivo USB de armazenamento"
+  },
+  "usbAttachPromptSubtitle": "Quando ativado, o Android oferece o VaultExplorer ao conectar uma unidade USB. Desative para parar de ver este aviso; você ainda pode abrir unidades em Montar unidade USB.",
+  "@usbAttachPromptSubtitle": {
+    "description": "Explica que desativar a opção impede o Android de oferecer o VaultExplorer ao conectar USB, mas mantém a montagem manual disponível no aplicativo"
+  },
+  "usbAttachPromptUpdateErrorMessage": "Não foi possível atualizar a configuração de conexão USB.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Exibido se o Android não conseguiu alterar o estado do componente de conexão USB"
+  },
   "cancel": "Cancelar",
   "close": "Fechar",
   "search": "Pesquisar",

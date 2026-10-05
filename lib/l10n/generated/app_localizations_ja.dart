@@ -9,6 +9,16 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'USB接続時の確認を表示';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'オンにすると、USBドライブの接続時に Android が VaultExplorer を表示します。確認を表示しない場合はオフにしてください。USBドライブは引き続き「USBドライブをマウント」から開けます。';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage => 'USB接続の設定を変更できませんでした。';
+
+  @override
   String get cancel => 'キャンセル';
 
   @override

@@ -1,5 +1,17 @@
 {
   "@@locale": "it",
+  "usbAttachPromptTitle": "Mostra richiesta di connessione USB",
+  "@usbAttachPromptTitle": {
+    "description": "Titolo dell’impostazione per attivare o disattivare VaultExplorer come app proposta da Android quando si collega un dispositivo di archiviazione USB"
+  },
+  "usbAttachPromptSubtitle": "Se attiva, Android propone VaultExplorer quando colleghi un’unità USB. Disattivala per non visualizzare più la richiesta; puoi comunque aprire le unità da Monta unità USB.",
+  "@usbAttachPromptSubtitle": {
+    "description": "Spiega che disattivando l’opzione Android non propone più VaultExplorer al collegamento USB, ma resta possibile montare manualmente le unità dall’app"
+  },
+  "usbAttachPromptUpdateErrorMessage": "Impossibile aggiornare l’impostazione di connessione USB.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Mostrato se Android non è riuscito a modificare lo stato del componente per la connessione USB"
+  },
   "cancel": "Annulla",
   "close": "Chiudi",
   "search": "Cerca",

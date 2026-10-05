@@ -9,6 +9,17 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'Show USB connection prompt';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'When enabled, Android offers VaultExplorer when a USB drive is connected. Turn it off to stop this prompt; you can still open drives from Mount USB Drive.';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage =>
+      'Could not update the USB connection setting.';
+
+  @override
   String get cancel => 'Cancel';
 
   @override

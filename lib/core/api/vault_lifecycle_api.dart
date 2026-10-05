@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
 import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
@@ -263,6 +264,28 @@ class VaultLifecycleApi {
     await _channel.invokeMethod<void>(ChannelMethods.setShareTargetEnabled, {
       'enabled': enabled,
     });
+  }
+
+  /// Whether Android offers VaultExplorer as an app to open when a USB
+  /// mass-storage device is connected. USB host access from inside the app
+  /// remains available when this attach handler is disabled.
+  Future<bool> isUsbAttachPromptEnabled() async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.isUsbAttachPromptEnabled,
+      );
+      return result ?? true;
+    } catch (e) {
+      logSwallowed('isUsbAttachPromptEnabled', e);
+      return true;
+    }
+  }
+
+  Future<void> setUsbAttachPromptEnabled(bool enabled) async {
+    await _channel.invokeMethod<void>(
+      ChannelMethods.setUsbAttachPromptEnabled,
+      {'enabled': enabled},
+    );
   }
 
   /// Android API level (`Build.VERSION.SDK_INT`) of the running device.
@@ -1204,6 +1227,15 @@ class VaultLifecycleApi {
     // and commit its ledger while the container is still mounted. Never
     // throws and is bounded in time, so it can't block a lock.
     await _syncLockBarrier?.cancelAndWait(filePath);
+    // Thumbnails are buffered for a couple of seconds before being written
+    // into the container's pack files. Write them out while the container is
+    // still mounted: the container-locked event that normally triggers the
+    // cache cleanup fires after the unmount, when every write would fail.
+    // Never throws and is bounded in time, so it can't hold a lock up.
+    try {
+      await ThumbnailCacheService.flushInContainerCacheForUri(filePath)
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {}
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
       {'filePath': filePath},

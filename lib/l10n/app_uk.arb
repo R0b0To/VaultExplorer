@@ -1,5 +1,17 @@
 {
   "@@locale": "uk",
+  "usbAttachPromptTitle": "Показувати запит під час підключення USB",
+  "@usbAttachPromptTitle": {
+    "description": "Назва параметра для показу VaultExplorer серед програм Android під час підключення USB-накопичувача"
+  },
+  "usbAttachPromptSubtitle": "Якщо ввімкнено, Android пропонує VaultExplorer після підключення USB-накопичувача. Вимкніть, щоб прибрати цей запит; накопичувачі й надалі можна відкривати через «Підключити USB-накопичувач».",
+  "@usbAttachPromptSubtitle": {
+    "description": "Пояснює, що після вимкнення Android не пропонуватиме VaultExplorer під час підключення USB, але накопичувач можна й надалі підключати вручну в програмі"
+  },
+  "usbAttachPromptUpdateErrorMessage": "Не вдалося змінити налаштування підключення USB.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Показується, якщо Android не вдалося змінити стан обробника підключення USB"
+  },
   "cancel": "Скасувати",
   "close": "Закрити",
   "search": "Пошук",

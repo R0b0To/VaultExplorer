@@ -1,5 +1,17 @@
 {
   "@@locale": "en",
+  "usbAttachPromptTitle": "Show USB connection prompt",
+  "@usbAttachPromptTitle": {
+    "description": "Settings toggle title for enabling or disabling VaultExplorer as an Android handler when a USB mass-storage device is connected"
+  },
+  "usbAttachPromptSubtitle": "When enabled, Android offers VaultExplorer when a USB drive is connected. Turn it off to stop this prompt; you can still open drives from Mount USB Drive.",
+  "@usbAttachPromptSubtitle": {
+    "description": "Explains that disabling the setting stops Android from offering VaultExplorer on USB insertion but leaves manual USB mounting available in the app"
+  },
+  "usbAttachPromptUpdateErrorMessage": "Could not update the USB connection setting.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Shown if Android could not change the USB attach-handler component state"
+  },
   "cancel": "Cancel",
   "@cancel": {
     "description": "Generic Cancel button label"

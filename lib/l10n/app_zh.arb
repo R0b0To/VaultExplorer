@@ -1,5 +1,17 @@
 {
   "@@locale": "zh",
+  "usbAttachPromptTitle": "显示 USB 连接提示",
+  "@usbAttachPromptTitle": {
+    "description": "启用或停用 Android 在连接 USB 存储设备时提供 VaultExplorer 的设置标题"
+  },
+  "usbAttachPromptSubtitle": "启用后，连接 USB 驱动器时 Android 会提供 VaultExplorer。关闭此选项即可停止提示；你仍可在“挂载 USB 驱动器”中手动打开驱动器。",
+  "@usbAttachPromptSubtitle": {
+    "description": "说明关闭后 Android 不再在连接 USB 时提供 VaultExplorer，但仍可在应用中手动挂载驱动器"
+  },
+  "usbAttachPromptUpdateErrorMessage": "无法更新 USB 连接设置。",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "Android 无法更改 USB 连接处理组件状态时显示"
+  },
   "cancel": "取消",
   "close": "关闭",
   "search": "搜索",

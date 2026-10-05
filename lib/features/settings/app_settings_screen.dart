@@ -1530,6 +1530,35 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
+                      context.l10n.usbAttachPromptTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      context.l10n.usbAttachPromptSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    value: state.usbAttachPromptEnabled,
+                    onChanged: (v) async {
+                      final ok = await ref
+                          .read(appSettingsControllerProvider.notifier)
+                          .setUsbAttachPromptEnabled(v);
+                      if (!ok && context.mounted) {
+                        showAppSnackBar(
+                          context,
+                          message:
+                              context.l10n.usbAttachPromptUpdateErrorMessage,
+                          tone: AppBannerTone.warning,
+                        );
+                      }
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    title: Text(
                       context.l10n.androidFileProviderTitle,
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,

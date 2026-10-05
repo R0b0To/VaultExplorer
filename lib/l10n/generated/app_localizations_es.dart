@@ -9,6 +9,17 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get usbAttachPromptTitle => 'Mostrar aviso de conexión USB';
+
+  @override
+  String get usbAttachPromptSubtitle =>
+      'Al activarlo, Android ofrece VaultExplorer cuando se conecta una unidad USB. Desactívalo para dejar de mostrar este aviso; aún puedes abrir unidades desde Montar unidad USB.';
+
+  @override
+  String get usbAttachPromptUpdateErrorMessage =>
+      'No se pudo cambiar la opción de conexión USB.';
+
+  @override
   String get cancel => 'Cancelar';
 
   @override

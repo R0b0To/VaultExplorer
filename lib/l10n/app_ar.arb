@@ -1,5 +1,17 @@
 {
   "@@locale": "ar",
+  "usbAttachPromptTitle": "إظهار مطالبة اتصال USB",
+  "@usbAttachPromptTitle": {
+    "description": "عنوان إعداد تشغيل أو إيقاف عرض VaultExplorer كتطبيق عند توصيل وحدة تخزين USB"
+  },
+  "usbAttachPromptSubtitle": "عند التفعيل، يعرض Android تطبيق VaultExplorer عند توصيل محرك USB. أوقف هذا الخيار لإيقاف المطالبة؛ لا يزال بإمكانك فتح المحركات من «تركيب محرك USB».",
+  "@usbAttachPromptSubtitle": {
+    "description": "يوضح أن إيقاف الخيار يمنع Android من عرض VaultExplorer عند توصيل USB مع إبقاء التركيب اليدوي متاحًا داخل التطبيق"
+  },
+  "usbAttachPromptUpdateErrorMessage": "تعذر تحديث إعداد اتصال USB.",
+  "@usbAttachPromptUpdateErrorMessage": {
+    "description": "رسالة عند تعذر تغيير حالة مكوّن استقبال توصيل USB في Android"
+  },
   "cancel": "إلغاء",
   "close": "إغلاق",
   "search": "بحث",

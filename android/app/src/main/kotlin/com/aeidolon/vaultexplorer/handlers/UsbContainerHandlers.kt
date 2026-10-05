@@ -2,9 +2,11 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.ComponentName
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
+import android.content.pm.PackageManager
 import android.provider.DocumentsContract
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -39,6 +41,42 @@ class UsbContainerHandlers(
     private val derivedKeyHandlers: DerivedKeyHandlers,
 ) {
     private val usbManager: UsbManager get() = activity.usbManager
+
+    // UsbContainerHandlers is constructed as a MainActivity property, before
+    // Android has attached the Activity's Context. Resolve the package only
+    // on first use, after onCreate/Flutter method-channel setup.
+    private val attachAlias by lazy {
+        ComponentName(
+            activity.packageName,
+            "${activity.packageName}.UsbAttachAlias",
+        )
+    }
+
+    /** Toggle only the USB attach entry point; the main/launcher activity stays enabled. */
+    fun handleSetAttachPromptEnabled(call: MethodCall, result: MethodChannel.Result) {
+        val enabled = call.argument<Boolean>("enabled") ?: false
+        try {
+            activity.packageManager.setComponentEnabledSetting(
+                attachAlias,
+                if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("USB_ATTACH_PROMPT_ERROR", e.message, null)
+        }
+    }
+
+    /** The alias defaults to enabled in the manifest; consult PackageManager as the source of truth. */
+    fun handleIsAttachPromptEnabled(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val setting = activity.packageManager.getComponentEnabledSetting(attachAlias)
+            result.success(setting != PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+        } catch (e: Exception) {
+            result.error("USB_ATTACH_PROMPT_ERROR", e.message, null)
+        }
+    }
 
     // Per-device (not global) pending permission requests — see
     // PendingUsbPermissions' doc comment for why a single global

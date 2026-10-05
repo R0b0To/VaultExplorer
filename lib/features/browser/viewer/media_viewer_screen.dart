@@ -172,6 +172,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   double _viewportHeight = 0.0;
   bool _isSwiping = false;
   bool _isProgrammaticScrolling = false;
+  int _viewportCorrectionToken = 0;
 
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
@@ -2449,14 +2450,28 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               _viewportWidth = newWidth;
               _viewportHeight = newHeight;
               if (_scrollMode.isContinuous) {
-                final targetOffset = _geometry.offsetForIndex(
-                  _playlistController.currentIndex,
-                  newWidth,
-                  newHeight,
-                );
+                final viewportIndex = _playlistController.currentIndex;
                 if (_listScrollController.hasClients &&
                     _listScrollController.positions.length == 1) {
-                  _listScrollController.jumpTo(targetOffset);
+                  final correctionToken = ++_viewportCorrectionToken;
+                  _isProgrammaticScrolling = true;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted ||
+                        correctionToken != _viewportCorrectionToken) {
+                      return;
+                    }
+                    if (_listScrollController.hasClients &&
+                        _listScrollController.positions.length == 1) {
+                      _listScrollController.jumpTo(
+                        _geometry.offsetForIndex(
+                          viewportIndex,
+                          _viewportWidth,
+                          _viewportHeight,
+                        ),
+                      );
+                    }
+                    _isProgrammaticScrolling = false;
+                  });
                 }
               } else {
                 if (_pageController.hasClients &&
@@ -2478,12 +2493,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               }
             }
 
+            // Preserve the scrollable when system bars or orientation change
+            // the viewport size. Remounting it here resets its offset to zero.
             final builderKey = ValueKey(
               '${_playlistController.isPlaylistMode}_'
               '${_playlistController.selectedFolder}_'
               '${_playlistController.isShuffled}_'
-              '${_scrollMode}_'
-              '${_viewportWidth}_$_viewportHeight',
+              '${_scrollMode}',
             );
 
             // Builds the actual scrollable (PageView or continuous ListView)

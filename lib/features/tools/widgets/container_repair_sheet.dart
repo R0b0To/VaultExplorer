@@ -623,9 +623,8 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
       height: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF141414),
+        color: cs.surfaceContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
       ),
       child: state.logLines.isEmpty
           ? Center(
@@ -660,7 +659,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: color,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                         height: 1.4,
                       ),
                     ),

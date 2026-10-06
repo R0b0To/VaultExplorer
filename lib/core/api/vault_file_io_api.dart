@@ -314,7 +314,7 @@ class VaultFileIoApi {
   }) async {
     try {
       final Uint8List? bytes = await _channel
-          .invokeMethod<Uint8List>('getImageThumbnail', {
+          .invokeMethod<Uint8List>(ChannelMethods.getImageThumbnail, {
             'filePath': container.uri,
             'fileName': fileName,
             'targetSize': targetSize,
@@ -664,7 +664,7 @@ class VaultFileIoApi {
     if (container.isLocalStorage) {
       return _local.writeFileChunk(container.uri, fileName, offset, data);
     }
-    final result = await _channel.invokeMethod<bool>('writeFileChunk', {
+    final result = await _channel.invokeMethod<bool>(ChannelMethods.writeFileChunk, {
       'filePath': container.uri,
       'fileName': fileName,
       'offset': offset,
@@ -1343,7 +1343,7 @@ class VaultFileIoApi {
 
   Future<bool> isCryfsVault(String uri) async {
     try {
-      final result = await _channel.invokeMethod<bool>('isCryfsVault', {
+      final result = await _channel.invokeMethod<bool>(ChannelMethods.isCryfsVault, {
         'uri': uri,
       });
       return result ?? false;

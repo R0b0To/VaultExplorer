@@ -66,7 +66,9 @@ class TwoFasJsonCodec implements PasswordFormatCodec {
     Object? root;
     try {
       root = text == null ? null : jsonDecode(text);
-    } catch (_) {}
+    } on FormatException {
+      // Not JSON at all: fall through to the format error below. (Never log this exception -- a FormatException quotes the input, which is secret here.)
+    }
     if (root is! Map || root['schemaVersion'] == null) {
       throw const PasswordFileFormatException('This doesn\'t look like a 2FAS backup.');
     }

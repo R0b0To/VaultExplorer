@@ -88,6 +88,106 @@ rather than Flutter plugins — video via AndroidX Media3/ExoPlayer, PDF via
 the AndroidX Jetpack PDF library (`androidx.pdf`) — both decode through the
 OS's own codec/renderer.
 
+### 1.3 Feature areas outside the vault core
+
+These sit on top of the engine rather than inside it: each is a Flutter
+feature folder that talks to the same `MethodChannel` through a
+`core/api` slice, and none of them holds key material or session state of
+its own (§2).
+
+**Item Vault (`lib/features/vault_item`).** A built-in password manager.
+`VaultItemsService` reads and writes one JSON-encoded `VaultItem` per file
+inside a mounted container, so the container's own encryption is the only
+protection and the decrypted item exists in memory only while it is viewed
+or edited. The item's type is the file extension (`password`, `paymentCard`,
+`identity`, `secureNote`, `bankAccount`, `softwareLicense`, `authenticator`);
+`isVaultItemFileName` in `file_browser_predicates.dart` is the check, and
+`authenticator_registry_controller.dart` and `password_interchange_service.dart`
+each keep a deliberate small copy of it rather than importing across features.
+
+**Authenticator (`lib/features/authenticator`).** An AppBar button
+(`AppBarAuthenticatorButton`, shown on the dashboard) opens a screen listing
+every TOTP-capable Item Vault entry across all currently mounted vaults.
+`AuthenticatorRegistry` scans each mounted vault and publishes results
+incrementally, so a small vault's codes appear before a large vault finishes;
+it also tracks which vaults are mid-scan so the UI can show per-vault loading
+state. An entry's identity is its volume slot plus its path, so it does not
+survive a lock/unlock cycle (slots are reused). The registry rescans one vault
+when an item in it is saved or deleted (`refreshContainer`) and all vaults on
+`refreshAll`. Codes come from `TotpEngine` (`core/utils/totp_engine.dart`):
+RFC 6238 TOTP, RFC 4226 HOTP (the counter is stored on the item as
+`hotp_counter` and only advances when the person asks for a new code, via
+`AuthenticatorRegistry.advanceHotpCounter`) and Steam Guard, with SHA-1,
+SHA-256 or SHA-512. The HMAC is computed natively through
+`VaultCryptoApi.hmac`; no third-party Dart hashing is involved. Importing
+from other apps goes through the codecs in
+`lib/data/services/password_interchange/` (Aegis, andOTP, 2FAS, Raivo, LastPass
+Authenticator, Ente Auth, Google Authenticator migration, `otpauth://` lists,
+plus Bitwarden, Proton, KDBX and CSV), registered in
+`PasswordFormatRegistry`. The encrypted backup formats share the helpers in
+`authenticator_backup_crypto.dart`, which call the native crypto API on the
+engine channel; `openAesCbc` validates key size, IV length and block alignment
+itself before calling native code, because the native handler reports a bad
+padding block (a wrong password) and a malformed input as the same error.
+
+**Video editor (`lib/features/video_editor`).** Lossless trim, cut and merge:
+the selected segments are stream-copied, not re-encoded. Dart side:
+`VaultVideoEditApi` (`videoEditProbe`, `videoEditExport`, `cancelVideoEdit`);
+native side: `VideoEditHandlers` is the channel plumbing and
+`LosslessVideoCutter` does the cutting. `videoEditExport` takes the source,
+a list of `[startUs, endUs]` segments, a `merge` flag (one output holding every
+segment, or one output per segment) and the output paths (container-relative
+for a vault, absolute for local storage). The *source* is never copied out: for
+a vault it is read through `ContainerMediaDataSource`, decrypting on demand.
+The *output* is the exception to "no plaintext temp file": `MediaMuxer` needs a
+real seekable file, so each output is muxed into a temp file in the app's
+cache directory (prefix `vx_vid_`) and then moved into the vault with
+`writeBackFile`. The temp file is zero-filled and deleted as soon as it has
+been copied, and again in `finally`; `VaultVideoRecorder.sweepOrphanedTempFiles`
+wipes any that a crash or force-stop leaves behind at the next startup. The
+archive handlers and the recording pipeline use the same temp-then-wipe
+sequence. Local storage (the decoy's plain-folder file manager) is the same
+flow with real paths in and out.
+
+**Image editor (`lib/features/image_editor`).** Loads the whole file through
+`VaultFileIoApi.readWholeFile`, decodes it in Dart (AVIF frames via the native
+`decodeAvifFrame`), keeps edits as an in-memory document with annotations, and
+encodes the result natively with `encodeImage`. `SaveImageSheet` offers two
+outcomes: write a new file with a validated, de-conflicted name and leave the
+original untouched, or replace the original file's bytes; either way the write
+goes back into the vault through `writeWholeFile`.
+
+### 1.4 Android Share Sheet Integration
+
+An opt-in feature that lets other apps share one or more files straight into a
+vault via `ACTION_SEND` / `ACTION_SEND_MULTIPLE`. Native side:
+`ShareIntentHandlers` (toggling the alias, deciding whether an incoming
+intent should be acted on, extracting its metadata) and `VaultShareActivity`
+(a dedicated activity in an isolated task window that inherits the Flutter
+engine and handlers from `MainActivity`, so `finish()` removes only that
+task). `ImportExportHandlers.handlePrepareShareImport` turns the result into
+an actual import, reusing the same `pickedFilesByToken` bookkeeping as
+`handlePickImportFiles`. Dart side: `lib/features/share_import`. Channel
+methods: `setShareTargetEnabled`/`isShareTargetEnabled` (the opt-in),
+`checkPendingShareRequest`, `cancelPendingShareRequest`, `returnToSharingApp`
+and `prepareShareImport`.
+
+- **No native lock check.** Whether the app is currently asking for a master
+  password is a Dart-owned UI-navigation concept (§1.1), so native code never
+  tries to observe it. An incoming share waits in `IncomingShareBridge` until
+  the screen that is actually on top asks for it (`MainShell.initState`,
+  which only runs once `LockGateScreen` has let the person through).
+- **Mask Mode routes, it doesn't drop.** While the decoy identity is active,
+  metadata goes to `LocalIncomingShareBridge` instead -- a separate buffer
+  that only the decoy file manager (`lib/features/decoy/local/decoy_share_import_flow.dart`)
+  drains, with plain storage and no auth prompt, so the decoy behaves like a
+  genuine file manager receiving a file. Reaching the real vault with a shared
+  file while disguised still goes through `HiddenVaultTrigger`.
+- **Exactly one share-target alias is enabled at a time.** `ShareTargetAlias`
+  (real identity) and `ShareTargetDecoyAlias` (decoy identity) are kept in sync
+  with Mask Mode by `DisguiseModeHandlers.syncShareTargetIdentity`, the same
+  way the launcher aliases are (§6).
+
 ---
 
 ## 2. Ownership & invariants
@@ -440,18 +540,25 @@ The stable cross-language contract for interactive use is a single
 a constant in **`ChannelMethods`** (Dart) mirrored by a Kotlin
 `ChannelMethods` object inside `MainActivity` — that pairing is the API
 contract and both sides must be updated together. The two lists are
-near-identical rather than exact mirrors: `exportLogFile` exists only on the
-Kotlin side (Dart calls it by string literal in `logcat_service.dart`), and
-`onTrimMemory` exists only on the Dart side. Automation (§5.4) is a
+exact mirrors except that `onTrimMemory` exists only on the Dart side. Dart
+code that calls the engine channel uses the `ChannelMethods` constants rather
+than string literals, and the channel's name is spelled out in exactly one
+place, `lib/core/api/vault_engine_channel.dart`. Code with a `ref` takes the
+channel from `vaultEngineChannelProvider`; the few plain const objects that
+can't (`AppSecureStorage`, `ThumbnailCacheService`, `LogcatService`,
+`FileOperationService.withEngineEvents`, `authenticator_backup_crypto`) use the
+`kVaultEngineChannel` constant. That list is an allow-list enforced in CI by
+`scripts/check_code_boundaries.py`, which also rejects raw method-name strings
+in engine-channel files and empty `catch` blocks. Automation (§5.4) is a
 separate, headless entry point that does not go through this channel, and
 Mask Mode (§6.3) has its own dedicated channel.
 
 ### 5.1 Dart → native (method calls)
 
 This is organized by group below rather than listed exhaustively —
-`ChannelMethods` (Kotlin) currently defines 224 constants (Dart also
-defines 224); the groups below are a guide to them, and not every constant
-is spelled out by name.
+`ChannelMethods` currently defines 234 constants in Kotlin and 235 in Dart
+(the extra one is `onTrimMemory`); the groups below are a guide to them, and
+not every constant is spelled out by name.
 
 | Group | Methods |
 |---|---|
@@ -460,21 +567,25 @@ is spelled out by name.
 | Composite containers (§1) | `profileCarriers` (scan candidate carrier files and report allocatable space at a given growth %), `createCompositeContainer`, `unlockCompositeContainer` |
 | File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `pickImportFiles`/`pickImportFolder`, `cancelImport`/`cancelExport`/`cancelPickedImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `beginBatchWrite`/`endBatchWrite`, `beginBatchDelete`/`endBatchDelete`, `finishWrite`, `writeBackFile`, `getSpaceInfo`, `getVaultInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
 | Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `copyFile`/`cancelCopy`/`clearCopyState`, `deleteFile`, `setLastModifiedTime` |
-| Media/thumbnails | `openWithApp`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive`, `get/decodeAvif*` |
+| Media/thumbnails | `openWithApp`, `shareFile`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive`, `getAvifInfo`/`decodeAvifFrame`, `encodeImage` (image editor, §1.3) |
+| Video editor (§1.3) | `videoEditProbe`, `videoEditExport`, `cancelVideoEdit` |
 | Native PDF viewer (`pdf/`, backs the AndroidX Jetpack platform view, NOTICE.md) | `openPdf`, `getPdfPageSize`, `renderPdfPage`, `closePdf`, `isJetpackPdfViewerSupported`, `register/revokeJetpackPdfSession`, `printPdf` |
-| Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, plus `pickArchiveFile`/`pickExtractFolder` |
+| Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, `archiveStageBrowseEntry`/`archiveDiscardBrowseFile`, plus `pickArchiveFile`/`pickExtractFolder` |
 | Header backup & repair ("Check & Repair" tool) | `diagnoseUnmountedContainerFile`, `diagnoseMountedVolumeFilesystem`, `runMountedVolumeFilesystemCheck`, `exportContainerHeader`, `restoreBackupHeaderUnmounted`/`restoreContainerHeaderRegion`, `pickFolderVaultForRepair`, `checkFolderVault`, `repairFolderVault`, `resolveFolderVaultConfigFile`/`restoreFolderVaultConfig` |
 | Split & Join | `splitContainer`, `joinContainer`, `cancelSplitJoin`, `unlockSplitContainer` |
 | Single-file crypto ("Encrypt/Decrypt Files" tool) | `encryptSingleFile`, `decryptSingleFile`, `pickCryptoFiles` |
 | Hash Verifier | `computeExternalFileHash`/`cancelHashCompute`, `hashBytesSha256`/`hashBytesMd5`, `begin/update/finish/discardHashSession`, `readExternalFileBytes`/`writeExternalFileBytes` |
-| Crypto | `hashPassword`/`hashPasswordSha256`, `aesGcmEncrypt`/`aesGcmDecrypt`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey`, `setDerivedKeyExpiry`/`getDerivedKeyExpiry`, `purgeExpiredDerivedKeys` |
+| Crypto | `hashPassword`/`hashPasswordSha256`, `aesGcmEncrypt`/`aesGcmDecrypt`, `aesCbcDecrypt`, `hmac`, `pbkdf2`, `scrypt`, `argon2id`, `xchacha20Poly1305Open` (the primitives the password-interchange codecs, §1.3, build on), `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey`, `setDerivedKeyExpiry`/`getDerivedKeyExpiry`, `purgeExpiredDerivedKeys` |
 | Secure storage | `read/write/deleteSecure`, `deleteAllSecure`, `readAllSecure`, `containsKeySecure` |
 | Automation settings (per-vault, gates §5.4) | `get/regenerateAutomationToken`, `getAutomationVaultConfig`, `setAutomationTier`, `set/getAutomationPassword`/`Keyfiles`/`Pim`, `setAutomationCaptureEnabled` |
+| Share sheet (§1.4) | `setShareTargetEnabled`/`isShareTargetEnabled`, `checkPendingShareRequest`, `cancelPendingShareRequest`, `returnToSharingApp`, `prepareShareImport` |
+| Document providers & SAF storage | `safListDirectory`, `safCheckTreeAccess`, `safGetFileSize`, `safReadFileChunk`/`safWriteFileChunk`, `safCreateFile`/`safCreateDirectory`, `safRenameFile`, `safDeleteFile`, `safCopyFile`, `safGetSpaceInfo`, `safGetThumbnail`, `safOpenWithApp`, `safShareFiles`, `safGetDocumentUri`, `getStorageVolumes`, `getMirrorPushActivity` |
+| Panic & quick capture | `getPanicSettings`, `setPanicTier`, `setQuickTileEnabled`, `triggerPanic`, the `*PanicKit*` and `*PanicBootTrigger*` settings calls, `getQuickCaptureSettings`, `setQuickCaptureTileEnabled`, `checkPendingQuickCaptureRequest`, `requestPinQuickCaptureShortcut` |
 | Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |
 | Background service & camera | `syncBackgroundService`, `updateBackgroundServiceProgress`, `start/stopBackgroundRecording` |
 | Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile` |
 | USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity`, `set/isUsbAttachPromptEnabled` |
-| System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
+| System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `probeContainerFormat`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `installApk`, `getApkIcon`, `hasOverlayPermission`/`requestOverlayPermission`, `setNotificationLocale`, `exportLogFile` (in-app log viewer), `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
 
 ### 5.2 Native → Dart (event callbacks)
 

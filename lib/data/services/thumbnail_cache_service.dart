@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
@@ -19,8 +20,10 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
+import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 
 part 'thumbnail_cache_service.g.dart';
 
@@ -143,7 +146,7 @@ class ThumbnailCacheService {
   Future<void> clearInContainerCacheForUri(String uri) =>
       clearInContainerCacheByUri(uri);
 
-  static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
+  static const _channel = kVaultEngineChannel;
 
   // ── Constants ──────────────────────────────────────────────────────────────
   static const inContainerDir = '.thumbcache';
@@ -693,7 +696,9 @@ class ThumbnailCacheService {
       for (final name in packNames) {
         try {
           await _fileIo.deleteFile(container, '$inContainerDir/$name');
-        } catch (_) {}
+        } catch (e) {
+          logSwallowed('_loadInContainerIndex', e, expected: true);
+        }
       }
       return _InContainerPackIndex(
         nextPackId: maxPackId + 1,
@@ -820,7 +825,9 @@ class ThumbnailCacheService {
     if (queue == null) return;
     try {
       await queue.flushNow();
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('flushInContainerCacheForUri', e, expected: true);
+    }
   }
 
   /// Drops all in-container cache state held in memory. For tests.
@@ -856,7 +863,9 @@ class ThumbnailCacheService {
     if (queue != null) {
       try {
         await queue.flushNow();
-      } catch (_) {}
+      } catch (e) {
+        logSwallowed('clearAppCacheFor', e, expected: true);
+      }
       _inContainerQueues.remove(uriStr)?.dispose();
       _inContainerIndices.remove(uriStr);
       _ensuredThumbDirs.remove(uriStr);
@@ -879,7 +888,9 @@ class ThumbnailCacheService {
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('clearAppCacheByUri', e, expected: true);
+    }
     _memoryCache.clear();
     _latestKeyByFile.clear();
     _sizeCache.clear();
@@ -895,7 +906,7 @@ class ThumbnailCacheService {
     if (queue != null) await queue.settle();
     try {
       final entries = await _channel.invokeMethod<List<Object?>>(
-        'listDirectory',
+        ChannelMethods.listDirectory,
         {'filePath': uri, 'dirPath': inContainerDir},
       );
       if (entries != null) {
@@ -903,13 +914,13 @@ class ThumbnailCacheService {
         for (final raw in casted) {
           if (raw.startsWith('System:')) continue;
           final name = RawEntry.parse(raw).name;
-          await _channel.invokeMethod<bool>('deleteFile', {
+          await _channel.invokeMethod<bool>(ChannelMethods.deleteFile, {
             'filePath': uri,
             'fileName': '$inContainerDir/$name',
           });
         }
       }
-      await _channel.invokeMethod<bool>('deleteFile', {
+      await _channel.invokeMethod<bool>(ChannelMethods.deleteFile, {
         'filePath': uri,
         'fileName': inContainerDir,
       });
@@ -924,7 +935,9 @@ class ThumbnailCacheService {
       final root = await _getAppCacheRoot();
       final dir = Directory('$root/thumbs');
       if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('clearAllAppCache', e, expected: true);
+    }
     _memoryCache.clear();
     _latestKeyByFile.clear();
     _sizeCache.clear();
@@ -945,7 +958,9 @@ class ThumbnailCacheService {
     for (final quality in qualities) {
       try {
         inContainerKeys.add(await _encodeKey(_qualifiedPath(filePath, quality)));
-      } catch (_) {}
+      } catch (e) {
+        logSwallowed('invalidateFile', e, expected: true);
+      }
     }
 
     // App-cache tier (best effort, like everything here).
@@ -961,9 +976,13 @@ class ThumbnailCacheService {
           final baseKey = await _encodeKey(filePath);
           final baseFile = File('$dir/$baseKey');
           if (await baseFile.exists()) await baseFile.delete();
-        } catch (_) {}
+        } catch (e) {
+          logSwallowed('invalidateFile', e, expected: true);
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('invalidateFile', e, expected: true);
+    }
 
     // In-container tier, all qualities in one go (one index write). This also
     // drops copies still queued for a pack, and works even if the index
@@ -999,7 +1018,9 @@ class ThumbnailCacheService {
           final stat = await entity.stat();
           files.add((file: entity, size: stat.size, modified: stat.modified));
           totalBytes += stat.size;
-        } catch (_) {}
+        } catch (e) {
+          logSwallowed('enforceDiskBudget', e, expected: true);
+        }
       }
 
       if (totalBytes <= maxBytes) return;
@@ -1012,7 +1033,9 @@ class ThumbnailCacheService {
         try {
           await entry.file.delete();
           totalBytes -= entry.size;
-        } catch (_) {}
+        } catch (e) {
+          logSwallowed('enforceDiskBudget', e, expected: true);
+        }
       }
     } catch (e) {
       VeLog.e('ThumbnailCacheService', 'App-cache disk budget eviction failed', e);
@@ -1114,7 +1137,9 @@ class ThumbnailCacheService {
           await e.delete(recursive: true);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('pruneStaleAppCache', e, expected: true);
+    }
   }
 
   // ── Dimension Parsers ──────────────────────────────────────────────────────
@@ -1526,7 +1551,9 @@ class _InContainerPackQueue {
     if (!await _writeIndex(next, io)) {
       try {
         await io.deleteFile(container, packPath);
-      } catch (_) {}
+      } catch (e) {
+        logSwallowed('_commitBatch', e, expected: true);
+      }
       return false;
     }
 
@@ -1539,7 +1566,9 @@ class _InContainerPackQueue {
       if (index.legacyFiles.remove(item.keyHex) != null) {
         try {
           await io.deleteFile(container, '$dir/${item.keyHex}');
-        } catch (_) {}
+        } catch (e) {
+          logSwallowed('_commitBatch', e, expected: true);
+        }
       }
     }
     return true;
@@ -1591,7 +1620,9 @@ class _InContainerPackQueue {
               container,
               '${ThumbnailCacheService.inContainerDir}/$key',
             );
-          } catch (_) {}
+          } catch (e) {
+            logSwallowed('invalidate', e, expected: true);
+          }
         }
       }
       if (!changed && !index.dirty) return;

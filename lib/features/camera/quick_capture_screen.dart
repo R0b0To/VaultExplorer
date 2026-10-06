@@ -18,6 +18,7 @@ import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
 import 'camera_capture_session_controller.dart';
 import 'camera_ui_components.dart';
+import 'capture_screen_mixin.dart';
 import 'camera_media_review_view.dart';
 import 'vault_camera_controller.dart';
 import '../image_editor/image_editor_screen.dart';
@@ -36,148 +37,56 @@ class QuickCaptureScreen extends ConsumerStatefulWidget {
 enum _Phase { camera, reviewing, saving }
 
 class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
-    with WidgetsBindingObserver {
-  late final VaultFileIoApi _fileIoApi;
-  late final VaultLifecycleApi _lifecycleApi;
-  late final VaultEngineEvents _engineEvents;
-  late final QuickCaptureApi _quickCaptureApi;
-  late final VaultCameraController _cameraController;
+    with WidgetsBindingObserver, CaptureScreenStateMixin<QuickCaptureScreen> {
+  @override
+  String get captureControlsKey => _quickCaptureControlsKey;
 
-  AppLifecycleState _lastLifecycleState = AppLifecycleState.resumed;
-  Future<void>? _backgroundingFuture;
-  bool _isOpeningCamera = false;
+  @override
+  String get captureSessionKey => _quickCaptureSessionKey;
+
+  @override
+  String get captureLogTag => 'QuickCaptureScreen';
+
+  @override
+  void enterReviewing() {
+    _phase = _Phase.reviewing;
+  }
+
+  late final QuickCaptureApi _quickCaptureApi;
 
   _Phase _phase = _Phase.camera;
+
   ScratchpadSession? _pendingScratchpad;
-  final List<CapturedMediaItem> _capturedMedia = [];
-  final ScrollController _trayScrollController = ScrollController();
-  int _pendingPhotoCount = 0;
-  bool _isTakingPhoto = false;
+
   String? _saveError;
 
-  bool _isRecording = false;
-  bool _pendingStopAfterStart = false;
-  bool _showShutterFlash = false;
-  double _baseZoom = 1.0;
-  Timer? _exposureHideTimer;
-  Offset? _focusPoint;
-
-  DateTime? _recordingStart;
-  Timer? _timer;
-
-  StreamSubscription<({double x, double y, double z})>? _sensorSubscription;
-  StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
-  double _deviceTurns = 0.0;
-  int _displayRotation = 0;
-
-  double get _iconTurns => cameraIconTurns(
-    deviceTurns: _deviceTurns,
-    displayRotation: _displayRotation,
-  );
-
-  CameraCaptureControlsState get _captureControls =>
-      ref.read(cameraCaptureControlsProvider(_quickCaptureControlsKey));
-
-  CameraCaptureControls get _captureControlsController =>
-      ref.read(cameraCaptureControlsProvider(_quickCaptureControlsKey).notifier);
-
-  CameraCaptureSessionState get _captureSession =>
-      ref.read(cameraCaptureSessionProvider(_quickCaptureSessionKey));
-
-  CameraCaptureSession get _captureSessionController =>
-      ref.read(cameraCaptureSessionProvider(_quickCaptureSessionKey).notifier);
-
-  bool get _isInitialized => _captureSession.isInitialized;
-  String get _selectedCameraId => _captureSession.selectedCameraId;
-  List<NativeCameraLens> get _lenses => _captureSession.lenses;
-  bool get _isEncrypting => _captureSession.isEncrypting;
-  bool get _isStartingVideo => _captureSession.isStartingVideo;
-  String? get _permissionError => _captureSession.permissionError;
-  bool get _isCountingDown => _captureSession.countdownValue > 0 && _captureSession.isCountingDown;
-  int get _countdownValue => _captureSession.countdownValue;
-  String get _busyLabel => _captureSession.busyLabel;
-  String get _timerText => _captureSession.timerText;
-  double get _currentZoom => _captureSession.currentZoom;
-  double get _minZoom => _captureSession.minZoom;
-  double get _maxZoom => _captureSession.maxZoom;
-  double get _currentExposureEv => _captureSession.currentExposureEv;
-  double get _minExposureEv => _captureSession.minExposureEv;
-  double get _maxExposureEv => _captureSession.maxExposureEv;
-  bool get _showExposureSlider => _captureSession.showExposureSlider;
+  @override
+  bool get captureIsCountingDown => captureSession.countdownValue > 0 && captureSession.isCountingDown;
 
   @override
   void initState() {
     super.initState();
-    _fileIoApi = ref.read(vaultFileIoApiProvider);
-    _lifecycleApi = ref.read(vaultLifecycleApiProvider);
-    _engineEvents = ref.read(vaultEngineEventsProvider);
+    captureFileIoApi = ref.read(vaultFileIoApiProvider);
+    captureLifecycleApi = ref.read(vaultLifecycleApiProvider);
+    engineEvents = ref.read(vaultEngineEventsProvider);
     _quickCaptureApi = ref.read(quickCaptureApiProvider);
-    _cameraController = VaultCameraController(_engineEvents);
+    cameraController = VaultCameraController(engineEvents);
 
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     WidgetsBinding.instance.addObserver(this);
-    _cameraEventSubscription = _cameraController.events.listen(
-      _handleCameraEvent,
+    cameraEventSubscription = cameraController.events.listen(
+      handleCameraEvent,
     );
-    _initCamera();
-    _startSensorListener();
-    unawaited(_refreshDisplayRotation());
-  }
-
-  void _handleCameraEvent(Map<String, dynamic> event) {
-    if (event['event'] != 'error' || !mounted) return;
-    _captureSessionController.setPermissionError(
-      context.l10n.cameraDisconnectedError(
-        event['message'] ?? context.l10n.unknownErrorFallback,
-      ),
-    );
-  }
-
-  void _startSensorListener() {
-    _sensorSubscription = VaultCameraController.accelerometerEventStream()
-        .listen((event) {
-          double magnitude = math.sqrt(event.x * event.x + event.y * event.y);
-          if (magnitude < 2.0) return;
-
-          double angle = math.atan2(event.x, event.y);
-          double turns = angle / (2 * math.pi);
-          double snappedTurns = (turns * 4).round() / 4.0;
-          if (snappedTurns == -0.5) snappedTurns = 0.5;
-
-          if (_deviceTurns != snappedTurns && mounted) {
-            setState(() => _deviceTurns = snappedTurns);
-            unawaited(applyOrientationSilent(_cameraController, _computeDeviceRotationDegrees()));
-          }
-        });
-  }
-
-  int _computeDeviceRotationDegrees() {
-    return ((_deviceTurns * 360).round() % 360 + 360) % 360;
+    initCamera();
+    startSensorListener();
+    unawaited(refreshDisplayRotation());
   }
 
   @override
   void didChangeMetrics() {
-    unawaited(_refreshDisplayRotation());
-  }
-
-  Future<void> _refreshDisplayRotation() async {
-    final rotation = await VaultCameraController.getDisplayRotation();
-    if (!mounted || rotation == _displayRotation) return;
-    setState(() => _displayRotation = rotation);
-  }
-
-  void _scrollToEndOfTray() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_trayScrollController.hasClients) {
-        _trayScrollController.animateTo(
-          _trayScrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    });
+    unawaited(refreshDisplayRotation());
   }
 
   bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
@@ -185,17 +94,17 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
-    if (_phase == _Phase.reviewing && _capturedMedia.isNotEmpty) {
+    if (_phase == _Phase.reviewing && capturedMedia.isNotEmpty) {
       return true;
     }
-    if (_isRecording ||
-        _isEncrypting ||
-        _isCountingDown ||
+    if (captureIsRecording ||
+        isEncrypting ||
+        captureIsCountingDown ||
         _phase == _Phase.saving ||
-        _pendingPhotoCount > 0) {
+        pendingPhotoCount > 0) {
       return true;
     }
-    if (_capturedMedia.isNotEmpty) {
+    if (capturedMedia.isNotEmpty) {
       return true;
     }
     return false;
@@ -210,9 +119,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   @override
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
-    if (_phase == _Phase.reviewing && _capturedMedia.isNotEmpty) {
+    if (_phase == _Phase.reviewing && capturedMedia.isNotEmpty) {
       setState(() => _phase = _Phase.camera);
-    } else if (_capturedMedia.isNotEmpty) {
+    } else if (capturedMedia.isNotEmpty) {
       HapticFeedback.lightImpact();
       _discardAllMedia();
     }
@@ -221,15 +130,15 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _trayScrollController.dispose();
-    _timer?.cancel();
-    _exposureHideTimer?.cancel();
-    _sensorSubscription?.cancel();
-    _cameraEventSubscription?.cancel();
-    unawaited(_cameraController.dispose());
+    trayScrollController.dispose();
+    timer?.cancel();
+    exposureHideTimer?.cancel();
+    sensorSubscription?.cancel();
+    cameraEventSubscription?.cancel();
+    unawaited(cameraController.dispose());
 
-    if (_isRecording) {
-      unawaited(_fileIoApi.setKeepScreenOn(false));
+    if (captureIsRecording) {
+      unawaited(captureFileIoApi.setKeepScreenOn(false));
     }
 
     final pending = _pendingScratchpad;
@@ -251,54 +160,56 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   }
 
  @override
+
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _lastLifecycleState = state;
+    lastLifecycleState = state;
     if (_phase != _Phase.camera) return;
 
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
-      _backgroundingFuture = _handleGoingBackground();
-    } else if (state == AppLifecycleState.resumed && _backgroundingFuture != null) {
+      backgroundingFuture = _handleGoingBackground();
+    } else if (state == AppLifecycleState.resumed && backgroundingFuture != null) {
       unawaited(_handleResumed());
     }
   }
 
   Future<void> _handleGoingBackground() async {
-    if (_isRecording) {
-      await _stopVideoRecording();
+    if (captureIsRecording) {
+      await stopVideoRecording();
     }
-    await _cameraController.close();
+    await cameraController.close();
     if (mounted && _phase == _Phase.camera) {
-      _captureSessionController.setUninitialized();
+      captureSessionController.setUninitialized();
     }
   }
 
   Future<void> _handleResumed() async {
-    final bgFuture = _backgroundingFuture;
-    _backgroundingFuture = null;
-    unawaited(_refreshDisplayRotation());
+    final bgFuture = backgroundingFuture;
+    backgroundingFuture = null;
+    unawaited(refreshDisplayRotation());
     if (bgFuture != null) {
       await bgFuture;
     }
     if (!mounted || _phase != _Phase.camera) return;
-    if (!_cameraController.isInitialized) {
-      await _initCamera(
-        cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
+    if (!cameraController.isInitialized) {
+      await initCamera(
+        cameraId: selectedCameraId.isNotEmpty ? selectedCameraId : null,
       );
     }
   }
 
-  Future<void> _initCamera({String? cameraId}) async {
-    if (_isOpeningCamera) return;
-    _isOpeningCamera = true;
+  @override
+  Future<void> initCamera({String? cameraId}) async {
+    if (isOpeningCamera) return;
+    isOpeningCamera = true;
     try {
-      await _captureControlsController.loadPersisted();
+      await captureControlsController.loadPersisted();
 
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
-        final granted = await _cameraController.requestPermissions();
+        final granted = await cameraController.requestPermissions();
         if (!granted) {
           if (mounted) {
-            _captureSessionController.setPermissionError(
+            captureSessionController.setPermissionError(
               context.l10n.cameraPermissionsRequiredMessage,
             );
           }
@@ -306,228 +217,73 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         }
       }
 
-      final info = await _cameraController.open(
+      final info = await cameraController.open(
         cameraId: cameraId,
-        facing: _captureControls.preferredFacing,
-        quality: _captureControls.videoQuality,
-        photoResolution: _captureControls.photoResolution,
+        facing: captureControls.preferredFacing,
+        quality: captureControls.videoQuality,
+        photoResolution: captureControls.photoResolution,
       );
 
       if (!mounted) return;
 
       if (_phase != _Phase.camera ||
-          _lastLifecycleState == AppLifecycleState.paused ||
-          _lastLifecycleState == AppLifecycleState.hidden) {
-        await _cameraController.close();
+          lastLifecycleState == AppLifecycleState.paused ||
+          lastLifecycleState == AppLifecycleState.hidden) {
+        await cameraController.close();
         return;
       }
 
-      _captureSessionController.setCameraOpened(info);
-      await _cameraController.setFlash(_captureControls.flashMode);
-      await _cameraController.setZoom(_currentZoom);
+      captureSessionController.setCameraOpened(info);
+      await cameraController.setFlash(captureControls.flashMode);
+      await cameraController.setZoom(captureCurrentZoom);
     } catch (e) {
       if (mounted) {
-        _captureSessionController.setPermissionError(
+        captureSessionController.setPermissionError(
           context.l10n.cameraErrorMessage('$e'),
         );
       }
     } finally {
-      _isOpeningCamera = false;
+      isOpeningCamera = false;
     }
-  }
-
-  Future<void> _flipCamera() async {
-    if (_isRecording ||
-        _isEncrypting ||
-        _isCountingDown ||
-        _isStartingVideo ||
-        _lenses.length <= 1) {
-      return;
-    }
-    HapticFeedback.lightImpact();
-
-    final currentLens = _lenses.firstWhere(
-      (l) => l.cameraId == _selectedCameraId,
-      orElse: () => _lenses.first,
-    );
-    final targetFacing = currentLens.facing == 'back' ? 'front' : 'back';
-    final targetLens = _lenses.firstWhere(
-      (l) => l.facing == targetFacing,
-      orElse: () => _lenses.firstWhere(
-        (l) => l.cameraId != _selectedCameraId,
-        orElse: () => currentLens,
-      ),
-    );
-
-    if (targetLens.cameraId != _selectedCameraId) {
-      _captureControlsController.setPreferredFacing(targetFacing);
-      _captureSessionController.setUninitialized(cancelCountdown: false);
-      await _initCamera(cameraId: targetLens.cameraId);
-    }
-  }
-
-  Future<void> _changeQuality(String quality) async {
-    if (_isRecording ||
-        _isEncrypting ||
-        _isCountingDown ||
-        _isStartingVideo ||
-        _captureControls.videoQuality == quality) {
-      return;
-    }
-    _captureControlsController.selectVideoQuality(quality);
-    _captureSessionController.setUninitialized(cancelCountdown: false);
-    await _initCamera(cameraId: _selectedCameraId);
-  }
-
-  Future<void> _changePhotoResolution(String resolution) async {
-    if (_isRecording ||
-        _isEncrypting ||
-        _isCountingDown ||
-        _isStartingVideo ||
-        _captureControls.photoResolution == resolution) {
-      return;
-    }
-    _captureControlsController.selectPhotoResolution(resolution);
-    _captureSessionController.setUninitialized(cancelCountdown: false);
-    await _initCamera(cameraId: _selectedCameraId);
   }
 
   void _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
-    if (!_cameraController.isInitialized) return;
+    if (!cameraController.isInitialized) return;
 
     final natural = cameraDisplayPointToNatural(
       details.localPosition.dx / constraints.maxWidth,
       details.localPosition.dy / constraints.maxHeight,
-      _displayRotation,
+      captureDisplayRotation,
     );
     final nx = natural.x;
     final ny = natural.y;
 
-    setState(() => _focusPoint = details.localPosition);
-    _captureSessionController.setShowExposureSlider(true);
+    setState(() => captureFocusPoint = details.localPosition);
+    captureSessionController.setShowExposureSlider(true);
 
-    await applyFocusAndExposurePoint(_cameraController, nx, ny, logTag: 'QuickCaptureScreen');
+    await applyFocusAndExposurePoint(cameraController, nx, ny, logTag: 'QuickCaptureScreen');
 
-    _exposureHideTimer?.cancel();
-    _exposureHideTimer = Timer(const Duration(seconds: 4), () {
+    exposureHideTimer?.cancel();
+    exposureHideTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) {
-        _captureSessionController.setShowExposureSlider(false);
-        setState(() => _focusPoint = null);
-        unawaited(_cameraController.resetFocusAndExposure());
+        captureSessionController.setShowExposureSlider(false);
+        setState(() => captureFocusPoint = null);
+        unawaited(cameraController.resetFocusAndExposure());
       }
     });
   }
 
-  void _onCaptureClicked() {
-    if (_isEncrypting) return;
-    HapticFeedback.mediumImpact();
-
-    if (_isCountingDown) {
-      _captureSessionController.stopCountdown();
+  @override
+  Future<void> setVideoMode(bool videoMode) async {
+    if (captureIsRecording ||
+        isEncrypting ||
+        captureIsCountingDown ||
+        isStartingVideo ||
+        captureControls.isVideoMode == videoMode) {
       return;
     }
-
-    if (_captureControls.isVideoMode) {
-      if (_isRecording) {
-        _stopVideoRecording();
-      } else if (_isStartingVideo) {
-        _pendingStopAfterStart = true;
-      } else {
-        _startVideoRecording();
-      }
-    } else {
-      _captureControls.timerDelaySeconds > 0
-          ? _startPhotoCountdownAndCapture()
-          : _takePhoto();
-    }
-  }
-
-  Future<void> _startPhotoCountdownAndCapture() async {
-    final delay = _captureControls.timerDelaySeconds;
-    _captureSessionController.startCountdown(delay);
-
-    for (int i = delay; i > 0; i--) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted || !_isCountingDown) return;
-      HapticFeedback.lightImpact();
-      _captureSessionController.updateCountdown(i - 1);
-    }
-
-    _captureSessionController.stopCountdown();
-    await _takePhoto();
-  }
-
-  Future<void> _setVideoMode(bool videoMode) async {
-    if (_isRecording ||
-        _isEncrypting ||
-        _isCountingDown ||
-        _isStartingVideo ||
-        _captureControls.isVideoMode == videoMode) {
-      return;
-    }
-    _captureControlsController.setVideoMode(videoMode);
-    await applyFlash(_cameraController, _captureControls.flashMode, logTag: 'QuickCaptureScreen');
-  }
-
-  void _triggerShutterFlash() {
-    setState(() => _showShutterFlash = true);
-    Future.delayed(const Duration(milliseconds: 60), () {
-      if (mounted) setState(() => _showShutterFlash = false);
-    });
-  }
-
-  Future<void> _takePhoto() async {
-    if (!_cameraController.isInitialized || _isEncrypting || _isTakingPhoto) return;
-    _isTakingPhoto = true;
-
-    _triggerShutterFlash();
-
-    setState(() {
-      _pendingPhotoCount++;
-    });
-    _scrollToEndOfTray();
-
-    try {
-      await _cameraController.setOrientationDegrees(
-        _computeDeviceRotationDegrees(),
-      );
-
-      final isFirstMedia = _capturedMedia.isEmpty;
-      final result = await _cameraController.capturePhoto();
-
-      if (result.success && result.bytes != null && mounted) {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _capturedMedia.add(
-            CapturedMediaItem.photo(
-              photoBytes: result.bytes!,
-              thumbnailBytes: result.thumbnail ?? result.bytes!,
-            ),
-          );
-          if (isFirstMedia) {
-            _phase = _Phase.reviewing;
-          }
-        });
-        _scrollToEndOfTray();
-      } else {
-        if (mounted) {
-          _showErrorToast(
-            result.error ?? context.l10n.cameraPhotoCaptureFailedMessage,
-          );
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        _showErrorToast(context.l10n.cameraPhotoCaptureFailedMessage);
-      }
-    } finally {
-      _isTakingPhoto = false;
-      if (mounted) {
-        setState(() {
-          _pendingPhotoCount = math.max(0, _pendingPhotoCount - 1);
-        });
-      }
-    }
+    captureControlsController.setVideoMode(videoMode);
+    await applyFlash(cameraController, captureControls.flashMode, logTag: 'QuickCaptureScreen');
   }
 
   /// Quick Capture opens without the app lock gate. If this launch skipped
@@ -572,8 +328,8 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     final vaultService = CameraVaultService(
       container: container,
       targetDirPath: destination.relativePath!,
-      fileIoApi: _fileIoApi,
-      lifecycleApi: _lifecycleApi,
+      fileIoApi: captureFileIoApi,
+      lifecycleApi: captureLifecycleApi,
     );
 
     try {
@@ -586,7 +342,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           final name = await vaultService.nextAvailableName(isPhoto: true);
           firstName ??= name;
           final virtualPath = vaultService.buildVirtualPath(name);
-          final ok = await _cameraController.savePhotoToVault(
+          final ok = await cameraController.savePhotoToVault(
             bytes: item.fullPhotoBytes!,
             volId: container.volId,
             virtualPath: virtualPath,
@@ -596,7 +352,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           hasVideo = true;
           var finalVideoPath = item.videoPath!;
           if (item.trimStartMs > 0 || (item.trimEndMs > 0 && item.trimEndMs < item.videoDurationMs)) {
-            final trimmed = await _cameraController.trimVideo(
+            final trimmed = await cameraController.trimVideo(
               videoPath: item.videoPath!,
               startMs: item.trimStartMs,
               endMs: item.trimEndMs,
@@ -606,7 +362,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           final name = await vaultService.nextAvailableName(isPhoto: false);
           firstName ??= name;
           final virtualPath = vaultService.buildVirtualPath(name);
-          final ok = await _cameraController.saveVideoToVault(
+          final ok = await cameraController.saveVideoToVault(
             videoPath: finalVideoPath,
             volId: container.volId,
             virtualPath: virtualPath,
@@ -623,7 +379,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       };
 
       if (shouldRelock) {
-        await _lifecycleApi.lockContainer(container.uri);
+        await captureLifecycleApi.lockContainer(container.uri);
       }
 
       if (mounted) {
@@ -634,34 +390,35 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       }
     } catch (_) {
       if (mounted) {
-        _showErrorToast(context.l10n.cameraCouldNotSaveRecordingMessage);
+        showErrorToast(context.l10n.cameraCouldNotSaveRecordingMessage);
         setState(() => _phase = _Phase.camera);
       }
     }
   }
 
-  Future<void> _startVideoRecording() async {
-    if (!_cameraController.isInitialized ||
-        _isEncrypting ||
-        _isRecording ||
-        _isStartingVideo) {
+  @override
+  Future<void> startVideoRecording() async {
+    if (!cameraController.isInitialized ||
+        isEncrypting ||
+        captureIsRecording ||
+        isStartingVideo) {
       return;
     }
 
-    _captureSessionController.setStartingVideo(true);
+    captureSessionController.setStartingVideo(true);
     try {
       final session = await _quickCaptureApi.openSession();
       if (session == null) {
-        _showErrorToast(context.l10n.cameraRecordingFailedMessage);
+        showErrorToast(context.l10n.cameraRecordingFailedMessage);
         return;
       }
       _pendingScratchpad = session;
 
-      await _cameraController.setOrientationDegrees(
-        _computeDeviceRotationDegrees(),
+      await cameraController.setOrientationDegrees(
+        computeDeviceRotationDegrees(),
       );
 
-      final result = await _cameraController.startVideoRecordingToScratchpad(
+      final result = await cameraController.startVideoRecordingToScratchpad(
         sessionToken: session.sessionToken,
         scratchpadPath: session.scratchpadPath,
       );
@@ -669,49 +426,50 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       if (!result.success) {
         await _quickCaptureApi.discardSession(session.sessionToken);
         _pendingScratchpad = null;
-        _showErrorToast(
+        showErrorToast(
           result.error ?? context.l10n.cameraRecordingFailedMessage,
         );
         return;
       }
 
-      _recordingStart = DateTime.now();
-      _isRecording = true;
+      recordingStart = DateTime.now();
+      captureIsRecording = true;
       if (!mounted) return;
-      _captureSessionController.startRecording();
-      unawaited(_fileIoApi.setKeepScreenOn(true));
+      captureSessionController.startRecording();
+      unawaited(captureFileIoApi.setKeepScreenOn(true));
 
-      _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (!mounted || _recordingStart == null) return;
-        final elapsed = DateTime.now().difference(_recordingStart!).inSeconds;
-        _captureSessionController.updateTimerText(
+      timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (!mounted || recordingStart == null) return;
+        final elapsed = DateTime.now().difference(recordingStart!).inSeconds;
+        captureSessionController.updateTimerText(
           '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
         );
       });
     } catch (e) {
-      _showErrorToast(
+      showErrorToast(
         context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
       );
     } finally {
-      _captureSessionController.setStartingVideo(false);
-      if (_pendingStopAfterStart) {
-        _pendingStopAfterStart = false;
-        if (_isRecording) _stopVideoRecording();
+      captureSessionController.setStartingVideo(false);
+      if (pendingStopAfterStart) {
+        pendingStopAfterStart = false;
+        if (captureIsRecording) stopVideoRecording();
       }
     }
   }
 
-  Future<void> _stopVideoRecording() async {
-    if (!_cameraController.isInitialized || !_isRecording) return;
+  @override
+  Future<void> stopVideoRecording() async {
+    if (!cameraController.isInitialized || !captureIsRecording) return;
 
-    _timer?.cancel();
-    final startedAt = _recordingStart;
-    _recordingStart = null;
-    _isRecording = false;
+    timer?.cancel();
+    final startedAt = recordingStart;
+    recordingStart = null;
+    captureIsRecording = false;
 
     try {
-      final isFirstMedia = _capturedMedia.isEmpty;
-      final result = await _cameraController.stopVideoRecordingForReview();
+      final isFirstMedia = capturedMedia.isEmpty;
+      final result = await cameraController.stopVideoRecordingForReview();
       final elapsedMs = startedAt == null
           ? 9999
           : DateTime.now().difference(startedAt).inMilliseconds;
@@ -722,17 +480,17 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           await _quickCaptureApi.discardSession(session.sessionToken);
         }
         if (result.videoPath != null) {
-          await _cameraController.discardVideo(result.videoPath!);
+          await cameraController.discardVideo(result.videoPath!);
         }
         _pendingScratchpad = null;
         if (mounted) {
-          _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
+          showErrorToast(context.l10n.cameraRecordingTooShortMessage);
         }
         return;
       }
 
       setState(() {
-        _capturedMedia.add(
+        capturedMedia.add(
           CapturedMediaItem.video(
             videoPath: result.videoPath!,
             videoDurationMs: result.durationMs,
@@ -750,19 +508,19 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       }
       _pendingScratchpad = null;
       if (mounted) {
-        _showErrorToast(
+        showErrorToast(
           context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'),
         );
       }
     } finally {
-      unawaited(_fileIoApi.setKeepScreenOn(false));
+      unawaited(captureFileIoApi.setKeepScreenOn(false));
     }
   }
 
   void _discardAllMedia() {
-    for (final item in _capturedMedia) {
+    for (final item in capturedMedia) {
       if (item.isVideo && item.videoPath != null) {
-        _cameraController.discardVideo(item.videoPath!);
+        cameraController.discardVideo(item.videoPath!);
       }
     }
     final session = _pendingScratchpad;
@@ -771,16 +529,10 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       unawaited(_quickCaptureApi.discardSession(session.sessionToken));
     }
     setState(() {
-      _capturedMedia.clear();
+      capturedMedia.clear();
       _phase = _Phase.camera;
       _saveError = null;
     });
-  }
-
-  void _showErrorToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
-    );
   }
 
   @override
@@ -789,14 +541,14 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     ref.watch(cameraCaptureControlsProvider(_quickCaptureControlsKey));
     ref.watch(cameraCaptureSessionProvider(_quickCaptureSessionKey));
 
-    final isReviewing = _phase == _Phase.reviewing && _capturedMedia.isNotEmpty;
+    final isReviewing = _phase == _Phase.reviewing && capturedMedia.isNotEmpty;
     final canPop = !isReviewing &&
-        !_isRecording &&
-        !_isEncrypting &&
-        !_isCountingDown &&
+        !captureIsRecording &&
+        !isEncrypting &&
+        !captureIsCountingDown &&
         _phase != _Phase.saving &&
-        _capturedMedia.isEmpty &&
-        _pendingPhotoCount == 0;
+        capturedMedia.isEmpty &&
+        pendingPhotoCount == 0;
 
     return PopScope(
       canPop: canPop,
@@ -804,21 +556,21 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         if (didPop) return;
         if (isReviewing) {
           setState(() => _phase = _Phase.camera);
-        } else if (_capturedMedia.isNotEmpty) {
+        } else if (capturedMedia.isNotEmpty) {
           HapticFeedback.lightImpact();
           _discardAllMedia();
         }
       },
       child: isReviewing
           ? CameraMediaReviewView(
-              initialMedia: _capturedMedia,
-              iconTurns: _iconTurns,
+              initialMedia: capturedMedia,
+              iconTurns: captureIconTurns,
               onMediaChanged: (updated) {
                 setState(() {
-                  _capturedMedia
+                  capturedMedia
                     ..clear()
                     ..addAll(updated);
-                  if (_capturedMedia.isEmpty) {
+                  if (capturedMedia.isEmpty) {
                     _phase = _Phase.camera;
                   }
                 });
@@ -834,45 +586,45 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
               body: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (_isInitialized && _cameraController.textureId != null)
+                  if (isInitialized && cameraController.textureId != null)
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final bool isLandscapeFrame =
                             constraints.maxWidth > constraints.maxHeight;
 
                         return GestureDetector(
-                          onScaleStart: (_) => _baseZoom = _currentZoom,
+                          onScaleStart: (_) => baseZoom = captureCurrentZoom,
                           onScaleUpdate: (d) async {
-                            double target = (_baseZoom * d.scale).clamp(
-                              _minZoom,
-                              _maxZoom,
+                            double target = (baseZoom * d.scale).clamp(
+                              captureMinZoom,
+                              captureMaxZoom,
                             );
-                            if (target != _currentZoom) {
-                              _captureSessionController.setZoom(target);
-                              await applyZoomSilent(_cameraController, target);
+                            if (target != captureCurrentZoom) {
+                              captureSessionController.setZoom(target);
+                              await applyZoomSilent(cameraController, target);
                             }
                           },
                           onTapDown: (details) => _onTapToFocus(details, constraints),
                           child: Center(
                             child: CameraPreviewView(
-                              textureId: _cameraController.textureId!,
-                              previewWidth: _cameraController.previewWidth,
-                              previewHeight: _cameraController.previewHeight,
-                              sensorOrientation: _cameraController.sensorOrientation,
-                              displayRotation: _displayRotation,
+                              textureId: cameraController.textureId!,
+                              previewWidth: cameraController.previewWidth,
+                              previewHeight: cameraController.previewHeight,
+                              sensorOrientation: cameraController.sensorOrientation,
+                              displayRotation: captureDisplayRotation,
                               frameAspectRatio: isLandscapeFrame
-                                  ? _captureControls.aspectRatio
-                                  : 1 / _captureControls.aspectRatio,
-                              showShutterFlash: _showShutterFlash,
+                                  ? captureControls.aspectRatio
+                                  : 1 / captureControls.aspectRatio,
+                              showShutterFlash: captureShowShutterFlash,
                             ),
                           ),
                         );
                       },
                     )
-                  else if (_permissionError != null)
+                  else if (permissionError != null)
                     Center(
                       child: Text(
-                        _permissionError!,
+                        permissionError!,
                         style: const TextStyle(color: Colors.white),
                       ),
                     )
@@ -883,14 +635,14 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
                   if (_phase == _Phase.camera)
                     CameraFocusExposureOverlay(
-                      focusPoint: _focusPoint,
-                      showExposureSlider: _showExposureSlider,
-                      currentExposureEv: _currentExposureEv,
-                      minExposureEv: _minExposureEv,
-                      maxExposureEv: _maxExposureEv,
+                      focusPoint: captureFocusPoint,
+                      showExposureSlider: captureShowExposureSlider,
+                      currentExposureEv: captureCurrentExposureEv,
+                      minExposureEv: captureMinExposureEv,
+                      maxExposureEv: captureMaxExposureEv,
                       onExposureChanged: (val) async {
-                        _captureSessionController.setExposureEv(val);
-                        await applyExposureOffsetSilent(_cameraController, val);
+                        captureSessionController.setExposureEv(val);
+                        await applyExposureOffsetSilent(cameraController, val);
                       },
                     ),
 
@@ -900,29 +652,29 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                       left: 0,
                       right: 0,
                       child: CameraTopControlsBar(
-                        isVideoMode: _captureControls.isVideoMode,
-                        isRecording: _isRecording,
-                        isCountingDown: _isCountingDown,
-                        timerText: _timerText,
-                        videoQuality: _captureControls.videoQuality,
-                        photoResolution: _captureControls.photoResolution,
-                        photoResolutions: _captureSession.photoResolutions,
-                        videoQualities: _captureSession.videoQualities,
-                        selectedAspectRatio: _captureControls.aspectRatio,
-                        onAspectRatioChanged: _captureControlsController.selectAspectRatio,
-                        timerDelaySeconds: _captureControls.timerDelaySeconds,
-                        flashMode: _captureControls.flashMode,
-                        iconTurns: _iconTurns,
+                        isVideoMode: captureControls.isVideoMode,
+                        isRecording: captureIsRecording,
+                        isCountingDown: captureIsCountingDown,
+                        timerText: captureTimerText,
+                        videoQuality: captureControls.videoQuality,
+                        photoResolution: captureControls.photoResolution,
+                        photoResolutions: captureSession.photoResolutions,
+                        videoQualities: captureSession.videoQualities,
+                        selectedAspectRatio: captureControls.aspectRatio,
+                        onAspectRatioChanged: captureControlsController.selectAspectRatio,
+                        timerDelaySeconds: captureControls.timerDelaySeconds,
+                        flashMode: captureControls.flashMode,
+                        iconTurns: captureIconTurns,
                         onClose: () {
                           if (_phase == _Phase.saving) return;
                           Navigator.pop(context);
                         },
-                        onVideoQualityChanged: _changeQuality,
-                        onPhotoResolutionChanged: _changePhotoResolution,
-                        onCycleTimerDelay: _captureControlsController.cycleTimerDelay,
+                        onVideoQualityChanged: changeQuality,
+                        onPhotoResolutionChanged: changePhotoResolution,
+                        onCycleTimerDelay: captureControlsController.cycleTimerDelay,
                         onCycleFlashMode: () {
-                          final nextMode = _captureControlsController.cyclePhotoFlashMode();
-                          unawaited(applyFlash(_cameraController, nextMode, logTag: 'QuickCaptureScreen'));
+                          final nextMode = captureControlsController.cyclePhotoFlashMode();
+                          unawaited(applyFlash(cameraController, nextMode, logTag: 'QuickCaptureScreen'));
                         },
                       ),
                     ),
@@ -931,23 +683,23 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      child: _buildBottomControls(),
+                      child: buildBottomControls(),
                     ),
 
-                    if (isLandscape && (_capturedMedia.isNotEmpty || _pendingPhotoCount > 0) && !_isRecording && !_isCountingDown)
+                    if (isLandscape && (capturedMedia.isNotEmpty || pendingPhotoCount > 0) && !captureIsRecording && !captureIsCountingDown)
                       Positioned(
                         left: 16.0 + MediaQuery.paddingOf(context).left,
                         bottom: 76.0 + MediaQuery.paddingOf(context).bottom,
-                        child: _buildCapturedMediaTray(),
+                        child: buildCapturedMediaTray(),
                       ),
                   ],
 
-                  if (_isCountingDown)
+                  if (captureIsCountingDown)
                     Center(
                       child: buildRotatedWidget(
-                        iconTurns: _iconTurns,
+                        iconTurns: captureIconTurns,
                         child: Text(
-                          '$_countdownValue',
+                          '$countdownValue',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 120,
@@ -957,12 +709,12 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                       ),
                     ),
 
-                  if (_isEncrypting || _phase == _Phase.saving)
+                  if (isEncrypting || _phase == _Phase.saving)
                     Container(
                       color: Colors.black54,
                       child: Center(
                         child: buildRotatedWidget(
-                          iconTurns: _iconTurns,
+                          iconTurns: captureIconTurns,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -971,7 +723,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                               Text(
                                 _phase == _Phase.saving
                                     ? context.l10n.savingToVault
-                                    : _busyLabel,
+                                    : busyLabel,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -986,291 +738,6 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildCapturedMediaTray() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final totalCount = _capturedMedia.length + _pendingPhotoCount;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isLandscape ? 160 : 180),
-            child: SingleChildScrollView(
-              controller: _trayScrollController,
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (int i = 0; i < _capturedMedia.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 8, left: 4),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              setState(() => _phase = _Phase.reviewing);
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    _capturedMedia[i].thumbnailBytes.isNotEmpty
-                                        ? Image.memory(
-                                            _capturedMedia[i].thumbnailBytes,
-                                            fit: BoxFit.cover,
-                                          )
-                                        : Container(color: Colors.grey.shade900),
-                                    if (_capturedMedia[i].isVideo)
-                                      Center(
-                                        child: Container(
-                                          padding: const EdgeInsets.all(3),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.black54,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: -10,
-                            right: -10,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                final removed = _capturedMedia.removeAt(i);
-                                if (removed.isVideo && removed.videoPath != null) {
-                                  _cameraController.discardVideo(removed.videoPath!);
-                                }
-                                setState(() {});
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.9),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 1.2),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(Icons.close_rounded, color: Colors.white, size: 13),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  for (int p = 0; p < _pendingPhotoCount; p++)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 8, left: 4),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.8), width: 1.5),
-                        ),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.amber,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: _capturedMedia.isNotEmpty
-                ? () {
-                    setState(() => _phase = _Phase.reviewing);
-                  }
-                : null,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$totalCount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward_rounded, size: 14),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomControls() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Colors.black87, Colors.black54, Colors.transparent],
-        ),
-      ),
-      padding: EdgeInsets.only(
-        bottom: isLandscape ? 12 : 32,
-        top: isLandscape ? 8 : 16,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isLandscape && (_capturedMedia.isNotEmpty || _pendingPhotoCount > 0) && !_isRecording && !_isCountingDown)
-              _buildCapturedMediaTray(),
-
-            if (!_isRecording && !_isCountingDown) ...[
-              CameraZoomIndicator(
-                currentZoom: _currentZoom,
-                minZoom: _minZoom,
-                maxZoom: _maxZoom,
-                iconTurns: _iconTurns,
-                onSetZoom: (zoom) async {
-                  _captureSessionController.setZoom(zoom);
-                  await applyZoomLogged(_cameraController, zoom, logTag: 'QuickCaptureScreen');
-                },
-              ),
-              SizedBox(height: isLandscape ? 6 : 16),
-            ],
-            SizedBox(height: isLandscape ? 8 : 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                buildRotatedWidget(
-                  iconTurns: _iconTurns,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.flip_camera_ios_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                    onPressed: _flipCamera,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _onCaptureClicked,
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      width: _captureControls.isVideoMode && _isRecording ? 30 : 60,
-                      height: _captureControls.isVideoMode && _isRecording ? 30 : 60,
-                      decoration: BoxDecoration(
-                        color: _captureControls.isVideoMode
-                            ? Colors.red
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(
-                          _captureControls.isVideoMode && _isRecording ? 8 : 30,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (!_isRecording && !_isCountingDown)
-                  _buildModeToggle()
-                else
-                  const SizedBox(width: 48),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeToggle() {
-    Widget modeButton({
-      required bool selected,
-      required IconData icon,
-      required VoidCallback onTap,
-    }) {
-      return GestureDetector(
-        onTap: onTap,
-        child: buildRotatedWidget(
-          iconTurns: _iconTurns,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected ? Colors.amber : Colors.black45,
-            ),
-            child: Icon(
-              icon,
-              color: selected ? Colors.black : Colors.white,
-              size: 20,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        modeButton(
-          selected: !_captureControls.isVideoMode,
-          icon: Icons.photo_camera_rounded,
-          onTap: () => _setVideoMode(false),
-        ),
-        const SizedBox(height: 10),
-        modeButton(
-          selected: _captureControls.isVideoMode,
-          icon: Icons.videocam_rounded,
-          onTap: () => _setVideoMode(true),
-        ),
-      ],
     );
   }
 }

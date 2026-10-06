@@ -560,7 +560,7 @@ class VaultEngineEvents {
     unawaited(() async {
       try {
         final args = await channel.invokeMapMethod<String, Object?>(
-          'getMirrorPushActivity',
+          ChannelMethods.getMirrorPushActivity,
         );
         _setMirrorPushActivity((args?['activeCount'] as num?)?.toInt() ?? 0);
       } catch (_) {

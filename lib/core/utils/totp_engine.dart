@@ -246,7 +246,9 @@ class TotpConfig {
         if (qp.containsKey('counter')) {
           uriCounter = int.tryParse(qp['counter']!);
         }
-      } catch (_) {}
+      } catch (_) {
+        // A malformed otpauth:// URI just leaves the defaults in place. Not logged: the exception text can quote the secret.
+      }
     }
 
     final typeField = (fields['totp_type'] ?? '').trim();

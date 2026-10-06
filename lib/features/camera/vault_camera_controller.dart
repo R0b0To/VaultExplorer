@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 
 class NativeCameraLens {
   final String cameraId;
@@ -475,7 +476,9 @@ class VaultCameraController {
   Future<void> discardVideo(String videoPath) async {
     try {
       await _channel.invokeMethod('discardVideo', {'videoPath': videoPath});
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('discardVideo', e, expected: true);
+    }
   }
 
   Future<({bool success, int durationMs, String? error})> stopVideoRecording() async {
@@ -597,7 +600,9 @@ Future<void> applyZoomSilent(
 ) async {
   try {
     await controller.setZoom(zoom);
-  } catch (_) {}
+  } catch (e) {
+    VeLog.d('VaultCameraController', 'setZoom: ignored (${e.runtimeType})');
+  }
 }
 
 /// Exposure slider drag. Fires on every pointer-move, same reasoning as
@@ -608,7 +613,9 @@ Future<void> applyExposureOffsetSilent(
 ) async {
   try {
     await controller.setExposureOffset(ev);
-  } catch (_) {}
+  } catch (e) {
+    VeLog.d('VaultCameraController', 'setExposureOffset: ignored (${e.runtimeType})');
+  }
 }
 
 /// Device-rotation counter-rotation, called from the accelerometer stream
@@ -622,5 +629,7 @@ Future<void> applyOrientationSilent(
 ) async {
   try {
     await controller.setOrientationDegrees(degrees);
-  } catch (_) {}
+  } catch (e) {
+    VeLog.d('VaultCameraController', 'setOrientationDegrees: ignored (${e.runtimeType})');
+  }
 }

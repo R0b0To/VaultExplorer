@@ -84,10 +84,15 @@ abstract final class VeLog {
     developer.log(msg, name: tag, level: 800);
   }
 
-  /// Warning (level 5).
-  static void w(String tag, String msg, Object e) {
+  /// Warning (level 5).  Attach the caught [error] object for extra context.
+  static void w(String tag, String msg, [Object? error]) {
     if (!enabled) return;
-    developer.log(msg, name: tag, level: 900);
+    developer.log(
+      error != null ? '$msg — $error' : msg,
+      name: tag,
+      level: 900,
+      error: error,
+    );
   }
 
   /// Error (level 6).  Attach the caught [error] object for extra context.

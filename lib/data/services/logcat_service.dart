@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
+import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 part 'logcat_service.g.dart';
 
@@ -31,9 +33,7 @@ class LogcatService {
   // injected through Riverpod so this stays a plain static-method wrapper
   // like the rest of the class. Mirrors ThumbnailCacheService/
   // AppSecureStorage, which do the same for the same reason.
-  static const MethodChannel _channel = MethodChannel(
-    'com.aeidolon.vaultexplorer/engine',
-  );
+  static const MethodChannel _channel = kVaultEngineChannel;
 
   static DateTime? _lastClearedAt;
 
@@ -180,7 +180,7 @@ class LogcatService {
   ) async {
     try {
       final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
-        'exportLogFile',
+        ChannelMethods.exportLogFile,
         {'contents': content, 'fileName': buildExportFileName()},
       );
       if (raw == null) return null; // user cancelled the picker

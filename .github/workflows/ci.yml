@@ -26,6 +26,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Check code boundaries
+        run: python3 scripts/check_code_boundaries.py
+
       - name: Fetch Flutter tags
         run: git -C .flutter fetch --tags
 

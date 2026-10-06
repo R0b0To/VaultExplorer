@@ -53,15 +53,12 @@ class FileOperationService extends ChangeNotifier {
       }
     });
   }
-  static const _legacyEngineChannel = MethodChannel(
-    'com.aeidolon.vaultexplorer/engine',
-  );
 
   FileOperationService.withEngineEvents(VaultEngineEvents engineEvents)
     : this._(
         engineEvents,
-        VaultFileIoApi(_legacyEngineChannel),
-        VaultLifecycleApi(_legacyEngineChannel, engineEvents),
+        VaultFileIoApi(kVaultEngineChannel),
+        VaultLifecycleApi(kVaultEngineChannel, engineEvents),
       );
 
   FileOperationService.withEngineApis({

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 
 part 'camera_capture_controls_controller.g.dart';
 
@@ -122,7 +123,9 @@ class CameraCaptureControls extends _$CameraCaptureControls {
         cachedStates[key] = loaded;
         state = loaded;
       }
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('_loadFromStorage', e);
+    }
   }
 
   Future<void> _persistState() async {
@@ -137,7 +140,9 @@ class CameraCaptureControls extends _$CameraCaptureControls {
           value: jsonStr,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('_persistState', e);
+    }
   }
 
   void selectVideoQuality(String value) {

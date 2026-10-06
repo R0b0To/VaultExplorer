@@ -14,15 +14,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/data/services/password_interchange/password_format_codec.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 /// The native crypto the codecs use unless a caller (a test, say) injects
 /// another [VaultCryptoApi]. Same channel `vaultCryptoApiProvider` wraps;
 /// constructed directly, as `app_secure_storage.dart` does, because a
 /// codec is a plain const object with no `ref` to read a provider from.
-const VaultCryptoApi kDefaultBackupCrypto = VaultCryptoApi(
-  MethodChannel('com.aeidolon.vaultexplorer/engine'),
-);
+const VaultCryptoApi kDefaultBackupCrypto = VaultCryptoApi(kVaultEngineChannel);
 
 /// Limits on the key-derivation cost a backup file may ask for. The
 /// parameters are read straight out of the (untrusted) file, so without a
@@ -40,7 +40,9 @@ void zeroizeBytes(Uint8List? bytes) {
   if (bytes == null) return;
   try {
     bytes.fillRange(0, bytes.length, 0);
-  } catch (_) {}
+  } catch (e) {
+    VeLog.w('authenticator_backup_crypto', 'zeroizeBytes: buffer not wiped (${e.runtimeType})');
+  }
 }
 
 Future<Uint8List> openAesGcm(
@@ -76,6 +78,19 @@ Future<Uint8List> openAesCbc(
   required Uint8List iv,
   required Uint8List ciphertext,
 }) async {
+  // The native handler reports every failure -- a bad padding block (the
+  // wrong-password signature) and a malformed input alike -- as the same
+  // `C++_ERROR`, so shape problems are caught here, where they can be told
+  // apart from a wrong password.
+  if (key.length != 16 && key.length != 24 && key.length != 32) {
+    throw const PasswordFileFormatException('This backup uses an unsupported key size.');
+  }
+  if (iv.length != 16) {
+    throw const PasswordFileFormatException('This backup has an invalid IV.');
+  }
+  if (ciphertext.isEmpty || ciphertext.length % 16 != 0) {
+    throw const PasswordFileFormatException('This backup\'s encrypted data is truncated or corrupt.');
+  }
   try {
     final plain = await crypto.aesCbcDecrypt(
       key: key,

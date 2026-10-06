@@ -300,7 +300,9 @@ class _FastScrollbarState extends State<FastScrollbar>
       // deliberately unlogged — haptics are also unsupported on some
       // devices, which is an expected, non-actionable failure.
       HapticFeedback.selectionClick();
-    } catch (_) {}
+    } catch (_) {
+      // Haptics are unavailable on some devices; non-actionable (see above).
+    }
 
     setState(() {});
   }

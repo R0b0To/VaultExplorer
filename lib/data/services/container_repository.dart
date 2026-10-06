@@ -173,7 +173,9 @@ class ContainerRepository {
             '(method=${record.unlockMethod.name})',
           );
         }
-      } catch (_) {}
+      } catch (e) {
+        _logSwallowed('save/droppedPasswordDiagnostic', e);
+      }
       await _deleteKeyWithLegacyCleanup(
         record.uri,
         pwKey,

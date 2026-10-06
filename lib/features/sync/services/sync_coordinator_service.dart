@@ -23,6 +23,7 @@ import 'package:vaultexplorer/features/sync/services/live_watch_service.dart';
 import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 import 'package:vaultexplorer/features/sync/services/sync_notification_bridge.dart';
 import 'package:vaultexplorer/features/sync/services/sync_status.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 
 /// One unlocked vault's sync state. All of a vault's runs go through its
 /// [scheduler], one at a time, because they share [ledger].
@@ -682,7 +683,9 @@ class SyncCoordinatorService {
       try {
         // Fails harmlessly for folders that already exist.
         await _io.createDirectory(vault, current);
-      } catch (_) {}
+      } catch (e) {
+        logSwallowed('_ensureVaultFolder', e, expected: true);
+      }
     }
   }
 

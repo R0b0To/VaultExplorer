@@ -58,7 +58,9 @@ class EnteAuthJsonCodec implements PasswordFormatCodec {
     Object? root;
     try {
       root = text == null ? null : jsonDecode(text);
-    } catch (_) {}
+    } on FormatException {
+      // Not JSON at all: fall through to the format error below. (Never log this exception -- a FormatException quotes the input, which is secret here.)
+    }
     if (root is! Map ||
         root['kdfParams'] is! Map ||
         root['encryptedData'] == null ||
@@ -133,7 +135,9 @@ class EnteAuthJsonCodec implements PasswordFormatCodec {
       if (line.startsWith('"') && line.endsWith('"')) {
         try {
           line = (jsonDecode(line) as String).trim();
-        } catch (_) {}
+        } on FormatException {
+          // Not a JSON-quoted string after all: keep the line as it is. (Plaintext -- never log it or the exception.)
+        }
       }
       if (!line.startsWith('otpauth://')) continue;
 

@@ -6,6 +6,7 @@ import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 import '../api/vault_archive_api.dart';
 import '../api/vault_automation_api.dart';
 import '../api/vault_crypto_api.dart';
+import '../api/vault_engine_channel.dart';
 import '../api/vault_engine_events.dart';
 import '../api/vault_file_io_api.dart';
 import '../api/vault_hash_api.dart';
@@ -20,15 +21,12 @@ import '../api/quick_capture_api.dart';
 
 part 'vault_engine_providers.g.dart';
 
-const _vaultEngineChannelName = 'com.aeidolon.vaultexplorer/engine';
-
 /// The single platform channel every VaultXxxApi class talks over --
 /// matches the `const _channel = MethodChannel(...)` top-level constant the
 /// pre-migration VaultExplorerApi used, but resolvable/overridable through
 /// Riverpod instead of being a bare global.
 @Riverpod(keepAlive: true)
-MethodChannel vaultEngineChannel(Ref ref) =>
-    const MethodChannel(_vaultEngineChannelName);
+MethodChannel vaultEngineChannel(Ref ref) => kVaultEngineChannel;
 
 /// Cross-cutting native-event listener registries + the method-call
 /// dispatch that used to live as static state directly on VaultExplorerApi.

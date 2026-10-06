@@ -1235,7 +1235,9 @@ class VaultLifecycleApi {
     try {
       await ThumbnailCacheService.flushInContainerCacheForUri(filePath)
           .timeout(const Duration(seconds: 3));
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('lockContainer/flushThumbnailCache', e, expected: true);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
       {'filePath': filePath},

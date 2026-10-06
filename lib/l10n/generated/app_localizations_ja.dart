@@ -1960,10 +1960,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get couldNotDeleteOriginals => '元のファイルを削除できませんでした';
 
   @override
-  String get videoCapturedEncrypted => '動画を撮影して暗号化しました';
+  String get videoCapturedEncrypted => '動画を保存しました';
 
   @override
-  String get photoCapturedEncrypted => '写真を撮影して暗号化しました';
+  String get photoCapturedEncrypted => '写真を保存しました';
 
   @override
   String cameraCaptureFailed(String type) {

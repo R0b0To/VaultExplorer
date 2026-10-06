@@ -2111,10 +2111,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get couldNotDeleteOriginals => 'تعذّر حذف الملفات الأصلية';
 
   @override
-  String get videoCapturedEncrypted => 'تم التقاط الفيديو وتشفيره';
+  String get videoCapturedEncrypted => 'تم حفظ الفيديو';
 
   @override
-  String get photoCapturedEncrypted => 'تم التقاط الصورة وتشفيرها';
+  String get photoCapturedEncrypted => 'تم حفظ الصورة';
 
   @override
   String cameraCaptureFailed(String type) {

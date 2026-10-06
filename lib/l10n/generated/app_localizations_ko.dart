@@ -1960,10 +1960,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get couldNotDeleteOriginals => '원본을 삭제할 수 없습니다';
 
   @override
-  String get videoCapturedEncrypted => '동영상을 촬영하고 암호화했습니다';
+  String get videoCapturedEncrypted => '동영상이 저장되었습니다';
 
   @override
-  String get photoCapturedEncrypted => '사진을 촬영하고 암호화했습니다';
+  String get photoCapturedEncrypted => '사진이 저장되었습니다';
 
   @override
   String cameraCaptureFailed(String type) {

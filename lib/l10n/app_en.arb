@@ -2711,13 +2711,13 @@
   "@couldNotDeleteOriginals": {
     "description": "Error status when deleting import source files fails"
   },
-  "videoCapturedEncrypted": "Video captured and encrypted",
+  "videoCapturedEncrypted": "Video saved",
   "@videoCapturedEncrypted": {
-    "description": "Status message after successfully capturing a video with the in-app camera"
+    "description": "Status message after successfully saving a captured video"
   },
-  "photoCapturedEncrypted": "Photo captured and encrypted",
+  "photoCapturedEncrypted": "Photo saved",
   "@photoCapturedEncrypted": {
-    "description": "Status message after successfully capturing a photo with the in-app camera"
+    "description": "Status message after successfully saving a captured photo"
   },
   "cameraCaptureFailed": "Camera capture failed: {type}",
   "@cameraCaptureFailed": {

@@ -3384,16 +3384,16 @@ abstract class AppLocalizations {
   /// **'Could not delete original(s)'**
   String get couldNotDeleteOriginals;
 
-  /// Status message after successfully capturing a video with the in-app camera
+  /// Status message after successfully saving a captured video
   ///
   /// In en, this message translates to:
-  /// **'Video captured and encrypted'**
+  /// **'Video saved'**
   String get videoCapturedEncrypted;
 
-  /// Status message after successfully capturing a photo with the in-app camera
+  /// Status message after successfully saving a captured photo
   ///
   /// In en, this message translates to:
-  /// **'Photo captured and encrypted'**
+  /// **'Photo saved'**
   String get photoCapturedEncrypted;
 
   /// Error status when in-app camera capture throws

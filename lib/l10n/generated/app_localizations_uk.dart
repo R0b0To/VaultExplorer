@@ -2096,10 +2096,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get couldNotDeleteOriginals => 'Не вдалося видалити оригінал(и)';
 
   @override
-  String get videoCapturedEncrypted => 'Відео записано та зашифровано';
+  String get videoCapturedEncrypted => 'Відео збережено';
 
   @override
-  String get photoCapturedEncrypted => 'Фото зроблено та зашифровано';
+  String get photoCapturedEncrypted => 'Фото збережено';
 
   @override
   String cameraCaptureFailed(String type) {

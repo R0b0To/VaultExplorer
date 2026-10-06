@@ -1930,10 +1930,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get couldNotDeleteOriginals => '无法删除原始文件';
 
   @override
-  String get videoCapturedEncrypted => '视频已拍摄并加密';
+  String get videoCapturedEncrypted => '视频已保存';
 
   @override
-  String get photoCapturedEncrypted => '照片已拍摄并加密';
+  String get photoCapturedEncrypted => '照片已保存';
 
   @override
   String cameraCaptureFailed(String type) {

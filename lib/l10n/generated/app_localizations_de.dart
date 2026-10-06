@@ -2079,10 +2079,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Original(e) konnte(n) nicht gelöscht werden';
 
   @override
-  String get videoCapturedEncrypted => 'Video aufgenommen und verschlüsselt';
+  String get videoCapturedEncrypted => 'Video gespeichert';
 
   @override
-  String get photoCapturedEncrypted => 'Foto aufgenommen und verschlüsselt';
+  String get photoCapturedEncrypted => 'Foto gespeichert';
 
   @override
   String cameraCaptureFailed(String type) {

@@ -2074,10 +2074,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível excluir o(s) original(is)';
 
   @override
-  String get videoCapturedEncrypted => 'Vídeo capturado e criptografado';
+  String get videoCapturedEncrypted => 'Vídeo salvo';
 
   @override
-  String get photoCapturedEncrypted => 'Foto capturada e criptografada';
+  String get photoCapturedEncrypted => 'Foto salva';
 
   @override
   String cameraCaptureFailed(String type) {

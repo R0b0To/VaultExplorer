@@ -37,6 +37,9 @@ class UsbMassStorageDevice private constructor(
         private const val CSW_SIGNATURE = 0x53425355 // "USBS"
         private const val TIMEOUT_MS = 5000
         private const val TAG = "UsbMassStorage"
+        private const val READINESS_RETRY_ATTEMPTS = 5
+        private const val CAPACITY_RETRY_ATTEMPTS = 3
+        private const val CAPACITY_RETRY_DELAY_MS = 250L
         
         // CRITICAL: Linux kernel drivers/usb/core/devio.c enforces MAX_USBFS_BUFFER_SIZE = 16384.
         // Single bulkTransfer calls larger than 16 KB fail with -EINVAL (-1) immediately.
@@ -99,7 +102,10 @@ class UsbMassStorageDevice private constructor(
                     val msd = UsbMassStorageDevice(connection, intf, epIn, epOut)
                     val capacityOk = msd.readCapacity()
                     if (!capacityOk) {
-                        VeLog.w(TAG) { "open: READ CAPACITY failed for ${device.deviceName}" }
+                        VeLog.w(TAG) {
+                            "open: READ CAPACITY failed for ${device.deviceName} " +
+                                "lastError=${msd.lastError?.toLogString() ?: "none"}"
+                        }
                         msd.close()
                         return UsbOpenResult.Failure("USB_CAPACITY_FAILED", "Failed to read USB device capacity")
                     }
@@ -276,12 +282,92 @@ class UsbMassStorageDevice private constructor(
     }
 
     private fun readCapacity(): Boolean {
-        if (!readCapacity10()) return false
-        if (sectorCount == 0x100000000L) {
-            if (!readCapacity16()) return false
+        prepareLun()
+        if (!readCapacity10WithRetry()) {
+            // READ CAPACITY(10) is normally sufficient for a 1 TB device, but
+            // some bridges only implement the 16-byte form correctly.
+            if (lastError?.senseKey != 0x05 || !readCapacity16WithRetry()) return false
+            use16ByteCdb = true
+        } else if (sectorCount == 0x100000000L) {
+            if (!readCapacity16WithRetry()) return false
             use16ByteCdb = true
         }
         return sectorSize > 0 && sectorCount > 0
+    }
+
+    /**
+     * Some USB-to-NVMe bridges report UNIT ATTENTION or NOT READY briefly after
+     * their interface is claimed. Run the usual SCSI discovery/readiness probes
+     * first, but keep them best-effort so a bridge with incomplete support for
+     * either command can still pass the authoritative READ CAPACITY check.
+     */
+    private fun prepareLun() {
+        val inquiry = byteArrayOf(0x12, 0, 0, 0, 36, 0)
+        if (!executeCommand(inquiry, ByteArray(36), 0, 36, dirIn = true)) {
+            VeLog.d(TAG) { "prepareLun: INQUIRY failed; continuing with readiness probe" }
+        }
+
+        val testUnitReady = byteArrayOf(0, 0, 0, 0, 0, 0)
+        for (attempt in 0 until READINESS_RETRY_ATTEMPTS) {
+            if (executeCommand(testUnitReady, null, 0, 0, dirIn = false)) return
+            val error = lastError
+            val unitAttention = error?.senseKey == 0x06
+            val becomingReady = error?.senseKey == 0x02
+            if ((!unitAttention && !becomingReady) || attempt == READINESS_RETRY_ATTEMPTS - 1) {
+                VeLog.d(TAG) {
+                    "prepareLun: TEST UNIT READY did not succeed; continuing to READ CAPACITY " +
+                        "lastError=${error?.toLogString() ?: "none"}"
+                }
+                return
+            }
+            if (!waitBeforeRetry(attempt)) return
+        }
+    }
+
+    private fun readCapacity10WithRetry(): Boolean = retryCapacityRead("READ CAPACITY(10)") {
+        readCapacity10()
+    }
+
+    private fun readCapacity16WithRetry(): Boolean = retryCapacityRead("READ CAPACITY(16)") {
+        readCapacity16()
+    }
+
+    private inline fun retryCapacityRead(command: String, read: () -> Boolean): Boolean {
+        for (attempt in 0 until CAPACITY_RETRY_ATTEMPTS) {
+            if (read()) return true
+            val error = lastError
+            val retryable = when (error?.stage) {
+                "CSW_STATUS" -> error.senseKey == 0x02 || error.senseKey == 0x06
+                // One retry can recover a transient BOT transfer failure; do
+                // not repeatedly wait for the full USB timeout on a dead link.
+                "CBW_SEND", "DATA_TRANSFER", "CSW_READ", "CSW_SIGNATURE" -> attempt == 0
+                else -> false
+            }
+            if (!retryable || attempt == CAPACITY_RETRY_ATTEMPTS - 1) {
+                VeLog.d(TAG) {
+                    "$command stopped retrying at attempt ${attempt + 1}; " +
+                        "lastError=${error?.toLogString() ?: "none"}"
+                }
+                return false
+            }
+            VeLog.d(TAG) {
+                "$command retry ${attempt + 1}/${CAPACITY_RETRY_ATTEMPTS - 1}; " +
+                    "lastError=${error?.toLogString() ?: "none"}"
+            }
+            if (!waitBeforeRetry(attempt)) return false
+        }
+        return false
+    }
+
+    private fun waitBeforeRetry(attempt: Int): Boolean {
+        val delayMs = CAPACITY_RETRY_DELAY_MS * (attempt + 1)
+        return try {
+            Thread.sleep(delayMs)
+            true
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
     }
 
     private fun readCapacity10(): Boolean {

@@ -112,3 +112,16 @@ jobs:
       - name: Run tests (ctest)
         working-directory: build-host-tests
         run: ctest --output-on-failure
+
+  native_ext_backend_tests:
+    name: Native ext backend tests (real ext2/3/4 images, e2fsck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools and filesystem tools
+        run: sudo apt-get update && sudo apt-get install -y g++ libext2fs-dev e2fsprogs libssl-dev libmbedtls-dev
+
+      - name: Build and run ext_backend_test
+        run: sh android/app/src/main/cpp/filesystems/test/run_ext_backend_test.sh

@@ -80,7 +80,9 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
         const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
         const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
         ext2_ino_t parent = 0;
-        if (name.empty() || !extResolvePath(fs, parentPath, &parent)) return false;
+        // A name longer than EXT2_NAME_LEN doesn't fail in ext2fs_link(): the on-disk
+        // length byte wraps and a different, shorter name is stored.
+        if (name.empty() || name.size() > EXT2_NAME_LEN || !extResolvePath(fs, parentPath, &parent)) return false;
         struct ext2_inode inode{};
         if (ext2fs_new_inode(fs, parent, LINUX_S_IFREG | 0644, nullptr, &inodeNumber) != 0) return false;
         inode.i_mode = LINUX_S_IFREG | 0644;
@@ -96,9 +98,24 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
         if (linkErr != 0) {
             EXT_LOGE("extOpenFile: ext2fs_link failed for '%s' in parent %u err=%lu (%s)",
                      name.c_str(), parent, (unsigned long)linkErr, error_message(linkErr));
+            // The inode was already written (links_count=1) but never marked
+            // allocated or linked; left as is, e2fsck reports it as an unattached
+            // inode with a bitmap mismatch. Put the slot back the way ext2fs_new_inode() found it.
+            struct ext2_inode unused{};
+            ext2fs_write_inode(fs, inodeNumber, &unused);
             return false;
         }
         ext2fs_inode_alloc_stats2(fs, inodeNumber, +1, 0);
+    }
+    if (write) {
+        // ext2fs_file_open() doesn't care what kind of inode it's handed, so
+        // without this a write aimed at an existing directory's path overwrote
+        // the directory's own blocks (e2fsck: "directory corrupted").
+        struct ext2_inode target{};
+        if (ext2fs_read_inode(fs, inodeNumber, &target) != 0 || !LINUX_S_ISREG(target.i_mode)) {
+            EXT_LOGE("extOpenFile: refusing to open a non-regular file for writing: %s", path.c_str());
+            return false;
+        }
     }
     const errcode_t openErr = ext2fs_file_open(fs, inodeNumber, write ? EXT2_FILE_WRITE : 0, out);
     if (openErr != 0) {
@@ -820,6 +837,16 @@ bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
     auto& srcV = volumes[srcVolId];
     auto& destV = volumes[destVolId];
     ensureExtBitmapsLoaded(destVolId);
+    if (srcVolId == destVolId) {
+        // The destination is truncated before the first read, so copying a file
+        // onto itself (or onto another hard link to it) used to empty it.
+        ext2_ino_t srcIno = 0, destIno = 0;
+        if (extResolvePath(srcV.extFs, srcPath, &srcIno) && extResolvePath(destV.extFs, destPath, &destIno) &&
+            srcIno == destIno) {
+            EXT_LOGE("extCopyFile: refusing to copy '%s' onto itself", srcPath.c_str());
+            return false;
+        }
+    }
     ext2_file_t srcFile = nullptr;
     if (!extOpenFile(srcV.extFs, srcPath, false, false, &srcFile)) return false;
     ext2_file_t destFile = nullptr;
@@ -875,6 +902,57 @@ bool extReleaseInodeIfUnlinked(ext2_filsys fs, ext2_ino_t ino, bool isDir) {
     ext2fs_inode_alloc_stats2(fs, ino, -1, isDir ? 1 : 0);
     return true;
 }
+int extNonDotEntryCallback(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
+    if (!entry->inode) return 0;
+    const int nameLen = ext2fs_dirent_name_len(entry);
+    const bool isDot = nameLen == 1 && entry->name[0] == '.';
+    const bool isDotDot = nameLen == 2 && entry->name[0] == '.' && entry->name[1] == '.';
+    if (isDot || isDotDot) return 0;
+    *static_cast<bool*>(data) = true;
+    return DIRENT_ABORT;
+}
+bool extIsDirectory(ext2_filsys fs, ext2_ino_t ino) {
+    struct ext2_inode inode{};
+    return ext2fs_read_inode(fs, ino, &inode) == 0 && LINUX_S_ISDIR(inode.i_mode);
+}
+// Whether [dir] already has an entry called [name]; deliberately does not
+// follow symlinks, matching what ext2fs_mkdir()/ext2fs_link() check internally.
+bool extEntryExists(ext2_filsys fs, ext2_ino_t dir, const std::string& name) {
+    ext2_ino_t found = 0;
+    return ext2fs_lookup(fs, dir, name.c_str(), static_cast<int>(name.size()), nullptr, &found) == 0;
+}
+// True only when [dir] is readable and has nothing in it but "." and "..".
+bool extDirectoryIsEmpty(ext2_filsys fs, ext2_ino_t dir) {
+    bool foundEntry = false;
+    const errcode_t err = ext2fs_dir_iterate2(fs, dir, 0, nullptr, extNonDotEntryCallback, &foundEntry);
+    return err == 0 && !foundEntry;
+}
+// An empty directory's i_links_count is 2 ("." plus its entry in the parent)
+// -- not 1 like a plain file -- so extReleaseInodeIfUnlinked()'s single
+// decrement used to leave it allocated but unreachable (e2fsck: "Unconnected
+// directory inode"), leaking the inode and its block on every folder delete.
+// This is rmdir(2)'s tail: drop both links, free the inode and its blocks, and
+// give the parent back the link its ".." entry represented.
+bool extReleaseDirectoryInode(ext2_filsys fs, ext2_ino_t parentIno, ext2_ino_t ino) {
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(fs, ino, &inode) != 0) return false;
+    inode.i_links_count = 0;
+    inode.i_dtime = static_cast<__u32>(time(nullptr));
+    if (ext2fs_write_inode(fs, ino, &inode) != 0) return false;
+    if (ext2fs_inode_has_valid_blocks2(fs, &inode)) {
+        ext2fs_block_iterate3(fs, ino, BLOCK_FLAG_READ_ONLY, nullptr,
+                               extReleaseBlockCallback, nullptr);
+    }
+    ext2fs_inode_alloc_stats2(fs, ino, -1, 1);
+    struct ext2_inode parentInode{};
+    // > 1, not > 0: ext4's dir_nlink feature parks a huge directory's count at 1
+    // ("unknown"); that must not be decremented to 0.
+    if (ext2fs_read_inode(fs, parentIno, &parentInode) == 0 && parentInode.i_links_count > 1) {
+        --parentInode.i_links_count;
+        ext2fs_write_inode(fs, parentIno, &parentInode);
+    }
+    return true;
+}
 }
 bool extDeleteFile(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
@@ -889,8 +967,15 @@ bool extDeleteFile(int volumeId, const std::string& path) {
         struct ext2_inode inode{};
         const bool isDir = ext2fs_read_inode(v.extFs, ino, &inode) == 0 &&
                             LINUX_S_ISDIR(inode.i_mode);
+        if (isDir && !extDirectoryIsEmpty(v.extFs, ino)) {
+            // Like rmdir(2): refuse rather than unlink a populated directory
+            // and strand its contents. The Dart layer deletes children first.
+            EXT_LOGE("extDeleteFile: refusing to delete non-empty directory '%s'", path.c_str());
+            return false;
+        }
         if (ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
-            success = extReleaseInodeIfUnlinked(v.extFs, ino, isDir);
+            success = isDir ? extReleaseDirectoryInode(v.extFs, parent, ino)
+                            : extReleaseInodeIfUnlinked(v.extFs, ino, false);
             ext2fs_flush(v.extFs);
         }
     }
@@ -904,7 +989,12 @@ bool extCreateDirectory(int volumeId, const std::string& path) {
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
     ext2_ino_t parent = 0;
-    if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent)) {
+    // ext2fs_mkdir() allocates the new inode and block *before* it checks that the
+    // name is free and the parent is a directory, and doesn't give them back
+    // when that check fails -- every refused mkdir leaked an unconnected
+    // directory. So refuse up front, before anything is allocated.
+    if (!name.empty() && name.size() <= EXT2_NAME_LEN && extResolvePath(v.extFs, parentPath, &parent) &&
+        extIsDirectory(v.extFs, parent) && !extEntryExists(v.extFs, parent, name)) {
         errcode_t mkdirErr = ext2fs_mkdir(v.extFs, parent, 0, name.c_str());
         if (mkdirErr == EXT2_ET_DIR_NO_SPACE) {
             if (ext2fs_expand_dir(v.extFs, parent) == 0) {
@@ -921,6 +1011,22 @@ bool extCreateDirectory(int volumeId, const std::string& path) {
     }
     return success;
 }
+namespace {
+// True if [candidate] is [ancestor] or lies somewhere below it, found by
+// walking ".." up to the root. Fails closed: anything unreadable, looping or
+// absurdly deep counts as "inside", so the caller refuses the operation.
+bool extIsSelfOrDescendant(ext2_filsys fs, ext2_ino_t candidate, ext2_ino_t ancestor) {
+    ext2_ino_t current = candidate;
+    for (int depth = 0; depth < 4096; ++depth) {
+        if (current == ancestor) return true;
+        if (current == EXT2_ROOT_INO) return false;
+        ext2_ino_t parent = 0;
+        if (ext2fs_lookup(fs, current, "..", 2, nullptr, &parent) != 0 || parent == current) return true;
+        current = parent;
+    }
+    return true;
+}
+}  // namespace
 bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath) {
     auto& v = volumes[volumeId];
     bool success = false;
@@ -932,7 +1038,7 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
     const std::string newParentPath = newSlash == std::string::npos ? "" : newPath.substr(0, newSlash);
     const std::string newName = newSlash == std::string::npos ? newPath : newPath.substr(newSlash + 1);
     ext2_ino_t oldParentIno = 0, newParentIno = 0, srcIno = 0;
-    if (!oldName.empty() && !newName.empty() &&
+    if (!oldName.empty() && !newName.empty() && newName.size() <= EXT2_NAME_LEN &&
         extResolvePath(v.extFs, oldParentPath, &oldParentIno) &&
         extResolvePath(v.extFs, newParentPath, &newParentIno) &&
         extResolvePath(v.extFs, oldPath, &srcIno)) {
@@ -942,6 +1048,15 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
         const int fileType = isDir ? EXT2_FT_DIR : EXT2_FT_REG_FILE;
         ext2_ino_t destIno = 0;
         if (extResolvePath(v.extFs, newPath, &destIno) && destIno != srcIno) {
+            return false;
+        }
+        if (isDir && extIsSelfOrDescendant(v.extFs, newParentIno, srcIno)) {
+            // Moving a directory into itself would link it under its own
+            // subtree and then unlink it from the root, detaching the whole
+            // branch (rename(2) fails with EINVAL here). The UI guards this too,
+            // but the native layer shouldn't depend on every caller doing so.
+            EXT_LOGE("extRenameFile: refusing to move directory '%s' into itself ('%s')",
+                     oldPath.c_str(), newPath.c_str());
             return false;
         }
         errcode_t linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);

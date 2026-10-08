@@ -12,7 +12,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get usbAttachPromptTitle => '显示 USB 连接提示';
 
   @override
-  String get usbAttachPromptSubtitle => '启用后，连接 USB 驱动器时 Android 会提供 VaultExplorer。关闭此选项即可停止提示；你仍可在“挂载 USB 驱动器”中手动打开驱动器。';
+  String get usbAttachPromptSubtitle =>
+      '启用后，连接 USB 驱动器时 Android 会提供 VaultExplorer。关闭此选项即可停止提示；你仍可在“挂载 USB 驱动器”中手动打开驱动器。';
 
   @override
   String get usbAttachPromptUpdateErrorMessage => '无法更新 USB 连接设置。';
@@ -286,7 +287,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String validationNameTooLong(int length, String unit, String fsLabel, int maxLength, String noun) {
+  String validationNameTooLong(
+    int length,
+    String unit,
+    String fsLabel,
+    int maxLength,
+    String noun,
+  ) {
     return '此名称长度为$length$unit；$fsLabel允许每个$noun名称最多$maxLength$unit。';
   }
 
@@ -301,7 +308,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String conflictCrossType(String existingNoun, String name, String candidateNoun) {
+  String conflictCrossType(
+    String existingNoun,
+    String name,
+    String candidateNoun,
+  ) {
     return '此处已存在名为“$name”的$existingNoun——它不能与$candidateNoun共用同一个名称。';
   }
 
@@ -309,7 +320,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readOnlyContainerWarning => '此容器已以只读方式挂载。';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning => '对此外部卷的写入本会损坏隐藏卷，因此已被阻止。此容器在本次会话的剩余时间内已切换为只读。';
+  String get hiddenVolumeProtectionTriggeredWarning =>
+      '对此外部卷的写入本会损坏隐藏卷，因此已被阻止。此容器在本次会话的剩余时间内已切换为只读。';
 
   @override
   String get protectHiddenVolumeToggleTitle => '保护隐藏卷';
@@ -419,7 +431,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hiddenVolumeErrorCredentialsRequired => '创建隐藏卷时需要提供隐藏密码或密钥文件';
 
   @override
-  String get hiddenVolumeErrorCredentialsMustDiffer => '隐藏卷的凭据（密码、PIM和密钥文件）不能与外部卷的凭据相同。';
+  String get hiddenVolumeErrorCredentialsMustDiffer =>
+      '隐藏卷的凭据（密码、PIM和密钥文件）不能与外部卷的凭据相同。';
 
   @override
   String get vaultItemTypePassword => '密码';
@@ -707,7 +720,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get archiveExplorerPermissionTitle => '需要存储访问权限';
 
   @override
-  String get archiveExplorerPermissionMessage => '允许访问您的文件，以便浏览和解压“下载”文件夹中的.zip压缩包。';
+  String get archiveExplorerPermissionMessage =>
+      '允许访问您的文件，以便浏览和解压“下载”文件夹中的.zip压缩包。';
 
   @override
   String get archiveExplorerGrantAccess => '授予访问权限';
@@ -893,10 +907,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keepVaultsRunningInBackgroundTitle => '在后台保持保险库运行';
 
   @override
-  String get keepVaultsRunningInBackgroundSubtitle => '显示通知，并在您离开应用后使已打开的保险库保持可用。保险库密钥会一直保留在内存中，直到锁定为止。';
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      '显示通知，并在您离开应用后使已打开的保险库保持可用。保险库密钥会一直保留在内存中，直到锁定为止。';
 
   @override
-  String get notificationPermissionDeniedMessage => '通知权限被拒绝。保险库仍会保持打开，但不会显示持续通知。';
+  String get notificationPermissionDeniedMessage =>
+      '通知权限被拒绝。保险库仍会保持打开，但不会显示持续通知。';
 
   @override
   String get discreteModeTitle => '伪装模式';
@@ -914,7 +930,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get disableDiscreteModeTitle => '关闭伪装模式？';
 
   @override
-  String get enableDiscreteModeMessage => '主屏幕上的应用图标和名称将变为“Archive Explorer”。它将作为zip压缩包浏览及解压工具运行。\n\n要访问您的保险库，请打开Archive Explorer，并长按标题2秒。';
+  String get enableDiscreteModeMessage =>
+      '主屏幕上的应用图标和名称将变为“Archive Explorer”。它将作为zip压缩包浏览及解压工具运行。\n\n要访问您的保险库，请打开Archive Explorer，并长按标题2秒。';
 
   @override
   String get disableDiscreteModeMessage => '主屏幕上的应用图标和名称将恢复为“Vault Explorer”。';
@@ -1022,22 +1039,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get enableFastStorageAccessTitle => '启用快速存储访问';
 
   @override
-  String get enableFastStorageAccessMessage => '授予“所有文件访问权限”可让Vault Explorer执行直接的POSIX文件操作，将文件夹保险库的性能提升高达1000倍。';
+  String get enableFastStorageAccessMessage =>
+      '授予“所有文件访问权限”可让Vault Explorer执行直接的POSIX文件操作，将文件夹保险库的性能提升高达1000倍。';
 
   @override
   String get disableStorageAccessTitle => '关闭存储访问权限';
 
   @override
-  String get disableStorageAccessMessage => 'Android要求在系统设置中关闭“所有文件访问权限”。是否打开设置将其关闭？';
+  String get disableStorageAccessMessage =>
+      'Android要求在系统设置中关闭“所有文件访问权限”。是否打开设置将其关闭？';
 
   @override
   String get enableStoragePermissionLegacyTitle => '允许存储访问';
 
   @override
-  String get enableStoragePermissionLegacyMessage => 'Vault Explorer需要存储权限才能执行直接文件操作，从而提升文件夹保险库的性能。系统现在会请求您确认。';
+  String get enableStoragePermissionLegacyMessage =>
+      'Vault Explorer需要存储权限才能执行直接文件操作，从而提升文件夹保险库的性能。系统现在会请求您确认。';
 
   @override
-  String get disableStoragePermissionLegacyMessage => 'Android要求在系统设置中关闭存储权限。是否打开设置将其关闭？';
+  String get disableStoragePermissionLegacyMessage =>
+      'Android要求在系统设置中关闭存储权限。是否打开设置将其关闭？';
 
   @override
   String get openSettings => '打开设置';
@@ -1380,7 +1401,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get containerAlreadyMounted => '此容器已挂载。';
 
   @override
-  String get noVaultFolderFormatDetected => '在该文件夹中未找到masterkey.cryptomator、gocryptfs.conf或cryfs.config。';
+  String get noVaultFolderFormatDetected =>
+      '在该文件夹中未找到masterkey.cryptomator、gocryptfs.conf或cryfs.config。';
 
   @override
   String get savedContainerSettingsNotFound => '找不到此容器的已保存设置。';
@@ -1405,7 +1427,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get slowPerformanceWarningTitle => '性能缓慢警告';
 
   @override
-  String get slowPerformanceWarningMessage => '快速存储访问当前已禁用。\n\nCryFS将文件分散存储在数千个小块中。通过Android SAF打开非空的CryFS保险库将非常缓慢。\n\n是否打开设置以授予“所有文件访问权限”以获得更快速度？';
+  String get slowPerformanceWarningMessage =>
+      '快速存储访问当前已禁用。\n\nCryFS将文件分散存储在数千个小块中。通过Android SAF打开非空的CryFS保险库将非常缓慢。\n\n是否打开设置以授予“所有文件访问权限”以获得更快速度？';
 
   @override
   String get unlockAnyway => '仍然解锁';
@@ -1968,7 +1991,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createArchivePasswordHint => '可选密码（AES-256）';
 
   @override
-  String get createArchivePasswordUnavailableForFormat => '密码保护仅适用于 ZIP 和 7-Zip 格式';
+  String get createArchivePasswordUnavailableForFormat =>
+      '密码保护仅适用于 ZIP 和 7-Zip 格式';
 
   @override
   String get closeSearchTooltip => '关闭搜索';
@@ -2113,7 +2137,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tapToChooseVaultLocation => '点击选择保险库的创建位置…';
 
   @override
-  String get folderVaultLimitationsNote => '文件夹保险库不支持密钥文件、PIM、隐藏卷或VeraCrypt/LUKS加密算法选择。';
+  String get folderVaultLimitationsNote =>
+      '文件夹保险库不支持密钥文件、PIM、隐藏卷或VeraCrypt/LUKS加密算法选择。';
 
   @override
   String get createVaultButton => '创建保险库';
@@ -2488,7 +2513,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get thumbnailCacheHiddenFolderLabel => '隐藏文件夹';
 
   @override
-  String get thumbnailCacheHiddenFolderDesc => '存储在根目录下的隐藏 .thumbcache 文件夹中。与应用缓存不同，它不会自动清除。';
+  String get thumbnailCacheHiddenFolderDesc =>
+      '存储在根目录下的隐藏 .thumbcache 文件夹中。与应用缓存不同，它不会自动清除。';
 
   @override
   String get thumbnailCacheDisabledLabel => '已禁用';
@@ -2581,10 +2607,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unlockVaultButtonLabel => '解锁保险库';
 
   @override
-  String get cryfsStorageAccessWarning => 'CryFS保险库使用数千个小型块文件。若没有快速存储访问，性能将明显变慢。';
+  String get cryfsStorageAccessWarning =>
+      'CryFS保险库使用数千个小型块文件。若没有快速存储访问，性能将明显变慢。';
 
   @override
-  String get folderVaultStorageAccessWarning => '快速存储访问已禁用。在文件夹保险库中打开和读取文件的速度可能较慢。';
+  String get folderVaultStorageAccessWarning =>
+      '快速存储访问已禁用。在文件夹保险库中打开和读取文件的速度可能较慢。';
 
   @override
   String get requestingPermission => '正在请求权限…';
@@ -2853,7 +2881,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get enableJavaScriptDialogTitle => '启用JavaScript？';
 
   @override
-  String get enableJavaScriptDialogMessage => '该页面将被允许运行其自身的本地脚本。它仍然没有网络访问权限——此保险库中的任何内容都无法通过互联网发送或接收。';
+  String get enableJavaScriptDialogMessage =>
+      '该页面将被允许运行其自身的本地脚本。它仍然没有网络访问权限——此保险库中的任何内容都无法通过互联网发送或接收。';
 
   @override
   String get disableJavaScriptMenu => '禁用JavaScript';
@@ -3084,7 +3113,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get clearThumbnailCacheDialogTitle => '清除缩略图缓存？';
 
   @override
-  String get clearThumbnailCacheDialogMessage => '这将删除此保险库的缓存缩略图。下次浏览媒体时会重新生成它们。';
+  String get clearThumbnailCacheDialogMessage =>
+      '这将删除此保险库的缓存缩略图。下次浏览媒体时会重新生成它们。';
 
   @override
   String get clearCacheButton => '清除缓存';
@@ -3120,7 +3150,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get securityOptionsLockedTitle => '安全选项已锁定';
 
   @override
-  String get authenticateOriginalCredentialsMessage => '使用容器的原始凭据进行身份验证以修改安全设置。';
+  String get authenticateOriginalCredentialsMessage =>
+      '使用容器的原始凭据进行身份验证以修改安全设置。';
 
   @override
   String get unlockCredentialsLabel => '解锁凭据';
@@ -3132,7 +3163,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get patternSetupRequiredBeforeSaving => '保存前请先设置图案。';
 
   @override
-  String get passwordKeystoreEncryptedHelperText => '密码使用Android Keystore加密。如果仅使用密钥文件，请留空。';
+  String get passwordKeystoreEncryptedHelperText =>
+      '密码使用Android Keystore加密。如果仅使用密钥文件，请留空。';
 
   @override
   String get changePatternButton => '更改图案';
@@ -3144,7 +3176,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cacheDerivedKeyLabel => '缓存派生密钥';
 
   @override
-  String get cryfsSkipScryptKdfSubtitle => '下次跳过CryFS的scrypt KDF（密钥保存在Android Keystore中）';
+  String get cryfsSkipScryptKdfSubtitle =>
+      '下次跳过CryFS的scrypt KDF（密钥保存在Android Keystore中）';
 
   @override
   String get reuseKeyMaterialKeystoreSubtitle => '重用Android Keystore中的密钥材料';
@@ -3177,7 +3210,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get changeContainerPasswordTitle => '更改容器密码';
 
   @override
-  String get bitlockerCredentialsChangeNotSupportedMessage => '无法在应用内更改BitLocker凭据。请在Windows上使用“管理BitLocker”。';
+  String get bitlockerCredentialsChangeNotSupportedMessage =>
+      '无法在应用内更改BitLocker凭据。请在Windows上使用“管理BitLocker”。';
 
   @override
   String get systemIntegrationSectionHeader => '系统与集成';
@@ -3300,13 +3334,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultInfoNoValue => '否';
 
   @override
-  String get vaultInfoBitlockerNote => '此应用不解析BitLocker自身的头部元数据，因此这里无法提供加密算法和版本详情。';
+  String get vaultInfoBitlockerNote =>
+      '此应用不解析BitLocker自身的头部元数据，因此这里无法提供加密算法和版本详情。';
 
   @override
   String get patternSetupRequiredAboveBeforeSaving => '保存前请先在上方设置图案。';
 
   @override
-  String get passwordOrCacheDerivedKeyRequiredMessage => '此解锁方式需要密码，或带密钥文件的“缓存派生密钥”。';
+  String get passwordOrCacheDerivedKeyRequiredMessage =>
+      '此解锁方式需要密码，或带密钥文件的“缓存派生密钥”。';
 
   @override
   String get saveConfigurationButton => '保存配置';
@@ -3383,7 +3419,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noContainersYetTitle => '尚无容器';
 
   @override
-  String get dashboardEmptyStateMessage => '挂载一个VeraCrypt容器、连接USB驱动器，或创建一个全新的加密保险库以开始使用。';
+  String get dashboardEmptyStateMessage =>
+      '挂载一个VeraCrypt容器、连接USB驱动器，或创建一个全新的加密保险库以开始使用。';
 
   @override
   String get sortFieldName => '名称';
@@ -3485,7 +3522,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get filterDocumentsOption => '文档';
 
   @override
-  String get folderExposedAsStorageExplanation => '此文件夹被公开为一个独立的存储位置，因此其他应用可以直接浏览和打开其中的文件。';
+  String get folderExposedAsStorageExplanation =>
+      '此文件夹被公开为一个独立的存储位置，因此其他应用可以直接浏览和打开其中的文件。';
 
   @override
   String conflictItemsAlreadyExistTitle(num count) {
@@ -3814,7 +3852,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutVeraCryptLuksTitle => 'VeraCrypt 与 LUKS1/2';
 
   @override
-  String get aboutVeraCryptLuksSubtitle => '标准卷与隐藏卷、自定义PIM、密钥文件、xts-plain64、Argon2id/i';
+  String get aboutVeraCryptLuksSubtitle =>
+      '标准卷与隐藏卷、自定义PIM、密钥文件、xts-plain64、Argon2id/i';
 
   @override
   String get aboutBitLockerTitle => 'BitLocker 与 BitLocker To Go';
@@ -3826,7 +3865,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutDirectoryVaultsTitle => '文件夹保险库';
 
   @override
-  String get aboutDirectoryVaultsSubtitle => 'Cryptomator（v7/v8 SIV_GCM 与 SIV_CTRMAC）、gocryptfs（v2 AES-GCM 与 XChaCha20）、CryFS（v0.10+ XChaCha20 与 AES）';
+  String get aboutDirectoryVaultsSubtitle =>
+      'Cryptomator（v7/v8 SIV_GCM 与 SIV_CTRMAC）、gocryptfs（v2 AES-GCM 与 XChaCha20）、CryFS（v0.10+ XChaCha20 与 AES）';
 
   @override
   String get aboutVhdTitle => '虚拟硬盘（VHD / VHDX）';
@@ -3841,7 +3881,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutCompiledLibrariesTitle => '已编译的C++库';
 
   @override
-  String get aboutCompiledLibrariesBody => '• mbedTLS v3.6.7（ARMv8硬件加密与SHA-2）\n• libavif 与 libgav1（原生AVIF图像解码器）\n• libarchive v3.8.9（ZIP、7-Zip、RAR 与 TAR 归档引擎）\n• ChaN FatFs v4.0.4（FAT12/16/32 与 exFAT）\n• Tuxera NTFS-3G 与内置mkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 与 Cryptomator 元数据）';
+  String get aboutCompiledLibrariesBody =>
+      '• mbedTLS v3.6.7（ARMv8硬件加密与SHA-2）\n• libavif 与 libgav1（原生AVIF图像解码器）\n• libarchive v3.8.9（ZIP、7-Zip、RAR 与 TAR 归档引擎）\n• ChaN FatFs v4.0.4（FAT12/16/32 与 exFAT）\n• Tuxera NTFS-3G 与内置mkntfs\n• e2fsprogs v1.47.4 libext2fs（ext2/ext3/ext4）\n• Dislocker Virtual I/O（BitLocker FVE / To Go）\n• VeraCrypt 1.26.29（Twofish、Serpent、Camellia、Kuznyechik、Whirlpool、Streebog、BLAKE2s、Argon2id/i）\n• cJSON v1.7.18（LUKS2 与 Cryptomator 元数据）';
 
   @override
   String get aboutCommunitySectionHeader => '社区与开源';
@@ -3923,43 +3964,50 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyPointNoNetworkTitle => '无需网络访问';
 
   @override
-  String get privacyPointNoNetworkBody => 'VaultExplorer在Android上不请求android.permission.INTERNET权限。它无法通过任何网络进行通信。';
+  String get privacyPointNoNetworkBody =>
+      'VaultExplorer在Android上不请求android.permission.INTERNET权限。它无法通过任何网络进行通信。';
 
   @override
   String get privacyPointNoDiskLeaksTitle => '在内存中解密';
 
   @override
-  String get privacyPointNoDiskLeaksBody => '解密和重新加密在系统内存中进行。少数需要临时文件的操作（例如录制视频或导出）会将其保存在应用的私有存储中，并在完成后用零覆盖。';
+  String get privacyPointNoDiskLeaksBody =>
+      '解密和重新加密在系统内存中进行。少数需要临时文件的操作（例如录制视频或导出）会将其保存在应用的私有存储中，并在完成后用零覆盖。';
 
   @override
   String get privacyPointNoAnalyticsTitle => '无分析或遥测';
 
   @override
-  String get privacyPointNoAnalyticsBody => '完全没有崩溃报告、使用情况跟踪，或收集您或您设备数据的第三方SDK。';
+  String get privacyPointNoAnalyticsBody =>
+      '完全没有崩溃报告、使用情况跟踪，或收集您或您设备数据的第三方SDK。';
 
   @override
   String get privacyPointKeystoreTitle => '密钥保留在Android Keystore中';
 
   @override
-  String get privacyPointKeystoreBody => '记住的密码、图案以及缓存的派生密钥使用AES-GCM加密，密钥保存在Android Keystore中（设备支持时由硬件提供保护）。';
+  String get privacyPointKeystoreBody =>
+      '记住的密码、图案以及缓存的派生密钥使用AES-GCM加密，密钥保存在Android Keystore中（设备支持时由硬件提供保护）。';
 
   @override
   String get privacyPointPosixTitle => 'POSIX加速与存储访问';
 
   @override
-  String get privacyPointPosixBody => '文件夹保险库内的文件在可能的情况下会被直接读写，绕过Android较慢的SAF层以处理大型文件夹。';
+  String get privacyPointPosixBody =>
+      '文件夹保险库内的文件在可能的情况下会被直接读写，绕过Android较慢的SAF层以处理大型文件夹。';
 
   @override
   String get privacyPointScreenClipboardTitle => '屏幕与剪贴板保护';
 
   @override
-  String get privacyPointScreenClipboardBody => '阻止任务切换器预览，可选阻止截屏（FLAG_SECURE），并在窗口获得焦点时自动清理损坏的剪贴板内容。从项目保险库复制的密码在Android 13及以上版本中会被标记为敏感信息，若30秒内未使用则会自动清除。';
+  String get privacyPointScreenClipboardBody =>
+      '阻止任务切换器预览，可选阻止截屏（FLAG_SECURE），并在窗口获得焦点时自动清理损坏的剪贴板内容。从项目保险库复制的密码在Android 13及以上版本中会被标记为敏感信息，若30秒内未使用则会自动清除。';
 
   @override
   String get privacyPointMaskModeTitle => '伪装模式';
 
   @override
-  String get privacyPointMaskModeBody => '可选择将应用伪装成一个可正常使用的本地文件管理器，使用不同的图标和名称。长按标题2秒即可进入您的真实保险库。';
+  String get privacyPointMaskModeBody =>
+      '可选择将应用伪装成一个可正常使用的本地文件管理器，使用不同的图标和名称。长按标题2秒即可进入您的真实保险库。';
 
   @override
   String get privacyPointExternalLinksTitle => '外部链接在浏览器中打开';
@@ -4456,7 +4504,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String hashVerifierSummaryMessage(Object ok, Object mismatch, Object missing) {
+  String hashVerifierSummaryMessage(
+    Object ok,
+    Object mismatch,
+    Object missing,
+  ) {
     return '匹配$ok个，不匹配$mismatch个，缺失$missing个';
   }
 
@@ -4634,7 +4686,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hashVerifierVaultVerifyButton => '验证整个保险库';
 
   @override
-  String get hashVerifierVaultVerifyRequiresVaultManifestMessage => '验证整个保险库需要从保险库内部加载的清单文件。';
+  String get hashVerifierVaultVerifyRequiresVaultManifestMessage =>
+      '验证整个保险库需要从保险库内部加载的清单文件。';
 
   @override
   String get duplicateFinderTargetLabel => '目标保险库';
@@ -4813,7 +4866,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String singleFileCryptoPartialFailureMessage(Object succeeded, Object total, Object failed) {
+  String singleFileCryptoPartialFailureMessage(
+    Object succeeded,
+    Object total,
+    Object failed,
+  ) {
     return '$total个文件中已处理$succeeded个——$failed个失败';
   }
 
@@ -4933,7 +4990,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keyfilePassphraseGeneratorTitle => '密钥文件与密码短语生成器';
 
   @override
-  String get keyfilePassphraseGeneratorSubtitle => '生成Diceware密码短语、自定义密码和高熵密钥文件';
+  String get keyfilePassphraseGeneratorSubtitle =>
+      '生成Diceware密码短语、自定义密码和高熵密钥文件';
 
   @override
   String get tabPassphrase => '密码短语';
@@ -5199,7 +5257,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get duplicateFinderIntroSubtitle => '无论文件名如何，都能检测出内容完全相同的文件。';
 
   @override
-  String get duplicateFinderStagesDescription => '• 第1阶段：按大小分组（即时元数据扫描）\n• 第2阶段：部分文件头检查（16 KB SHA-256文件头）\n• 第3阶段：完整哈希验证（精确的SHA-256字节匹配）';
+  String get duplicateFinderStagesDescription =>
+      '• 第1阶段：按大小分组（即时元数据扫描）\n• 第2阶段：部分文件头检查（16 KB SHA-256文件头）\n• 第3阶段：完整哈希验证（精确的SHA-256字节匹配）';
 
   @override
   String get duplicateFinderScanningVaultFallback => '正在扫描保险库...';
@@ -5210,7 +5269,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String duplicateFinderScanStatsLabel(Object scanned, Object groups, Object saved) {
+  String duplicateFinderScanStatsLabel(
+    Object scanned,
+    Object groups,
+    Object saved,
+  ) {
     return '已扫描文件：$scanned | 发现重复：$groups组（$saved）';
   }
 
@@ -5230,7 +5293,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String duplicateFinderGroupTitleLabel(Object groupIndex, Object size, Object count) {
+  String duplicateFinderGroupTitleLabel(
+    Object groupIndex,
+    Object size,
+    Object count,
+  ) {
     return '第$groupIndex组：$size（发现$count份副本）';
   }
 
@@ -5369,7 +5436,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncIntroTitle => '比较两个保险库';
 
   @override
-  String get vaultSyncIntroSubtitle => '选择左侧和右侧的保险库（或同一保险库中的两个文件夹），以查看每一侧缺失、已修改或较新的内容。';
+  String get vaultSyncIntroSubtitle =>
+      '选择左侧和右侧的保险库（或同一保险库中的两个文件夹），以查看每一侧缺失、已修改或较新的内容。';
 
   @override
   String get vaultSyncCompareButton => '比较';
@@ -5444,13 +5512,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncDirectionLeftToRight => '左侧 → 右侧（单向）';
 
   @override
-  String get vaultSyncDirectionLeftToRightSubtitle => '将新增和更新的文件从左侧推送到右侧；绝不更改左侧';
+  String get vaultSyncDirectionLeftToRightSubtitle =>
+      '将新增和更新的文件从左侧推送到右侧；绝不更改左侧';
 
   @override
   String get vaultSyncDirectionRightToLeft => '右侧 → 左侧（单向）';
 
   @override
-  String get vaultSyncDirectionRightToLeftSubtitle => '将新增和更新的文件从右侧推送到左侧；绝不更改右侧';
+  String get vaultSyncDirectionRightToLeftSubtitle =>
+      '将新增和更新的文件从右侧推送到左侧；绝不更改右侧';
 
   @override
   String get vaultSyncSearchHint => '搜索差异';
@@ -5480,7 +5550,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncFolderOnlyRightDetail => '文件夹——仅右侧';
 
   @override
-  String vaultSyncBothSidesDetail(Object leftSize, Object leftDate, Object rightSize, Object rightDate) {
+  String vaultSyncBothSidesDetail(
+    Object leftSize,
+    Object leftDate,
+    Object rightSize,
+    Object rightDate,
+  ) {
     return '左：$leftSize · $leftDate  →  右：$rightSize · $rightDate';
   }
 
@@ -5526,7 +5601,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncOverlapWarning => 'Left and Right must not be the same folder or nested inside each other.';
+  String get vaultSyncOverlapWarning =>
+      'Left and Right must not be the same folder or nested inside each other.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
@@ -5549,13 +5625,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncAddStorageTooltip => 'Add storage location';
 
   @override
-  String get vaultSyncEnableLocalStorageTooltip => 'Enable Local Storage access';
+  String get vaultSyncEnableLocalStorageTooltip =>
+      'Enable Local Storage access';
 
   @override
   String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
 
   @override
-  String get vaultSyncNoStoragesMessage => 'Add a folder or document provider with the + button, or mount a vault.';
+  String get vaultSyncNoStoragesMessage =>
+      'Add a folder or document provider with the + button, or mount a vault.';
 
   @override
   String get vaultSyncReadOnlyBadge => '只读';
@@ -5570,7 +5648,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncNotEnoughSpaceTitle => '空间不足';
 
   @override
-  String vaultSyncNotEnoughSpaceMessage(Object side, Object required, Object free) {
+  String vaultSyncNotEnoughSpaceMessage(
+    Object side,
+    Object required,
+    Object free,
+  ) {
     return '$side空间不足——需要$required，仅剩$free可用。';
   }
 
@@ -5623,10 +5705,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationPasswordSectionHeader => '自动化密码';
 
   @override
-  String get automationPasswordStoredHint => '已为无人值守的UNLOCK_VAULT调用存储了密码。保存新密码即可替换，或保存空字段以清除它——自动化也可以直接在广播中提供密码，而不依赖此设置。';
+  String get automationPasswordStoredHint =>
+      '已为无人值守的UNLOCK_VAULT调用存储了密码。保存新密码即可替换，或保存空字段以清除它——自动化也可以直接在广播中提供密码，而不依赖此设置。';
 
   @override
-  String get automationPasswordNotStoredHint => '可选。若未存储密码，自动化必须在每次UNLOCK_VAULT广播中提供一个。';
+  String get automationPasswordNotStoredHint =>
+      '可选。若未存储密码，自动化必须在每次UNLOCK_VAULT广播中提供一个。';
 
   @override
   String get automationNewPasswordFieldLabel => '新密码';
@@ -5644,7 +5728,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationTokenSectionHeader => 'API令牌';
 
   @override
-  String get automationTokenDescription => '由所有已启用自动化访问权限的保险库共享。自动化会在每次广播时将其发回；令牌错误或缺失会被静默忽略，不会报错。';
+  String get automationTokenDescription =>
+      '由所有已启用自动化访问权限的保险库共享。自动化会在每次广播时将其发回；令牌错误或缺失会被静默忽略，不会报错。';
 
   @override
   String get automationRegenerateTokenButton => '重新生成令牌';
@@ -5653,7 +5738,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationRegenerateTokenDialogTitle => '重新生成令牌？';
 
   @override
-  String get automationRegenerateTokenDialogMessage => '在您用新令牌更新之前，任何使用当前令牌的Tasker配置文件或MacroDroid宏都将静默失效。';
+  String get automationRegenerateTokenDialogMessage =>
+      '在您用新令牌更新之前，任何使用当前令牌的Tasker配置文件或MacroDroid宏都将静默失效。';
 
   @override
   String get automationRegenerateConfirmLabel => '重新生成';
@@ -5680,7 +5766,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationConfigSectionHeader => '配置字符串';
 
   @override
-  String get automationConfigIntro => '点击下方任意值即可复制。在Tasker中，使用“Send Intent”操作；在MacroDroid中，使用Intent Type设置为Broadcast的“Intent”操作——而非Activity或Service，后者会因“unable to find explicit activity class”而失败。';
+  String get automationConfigIntro =>
+      '点击下方任意值即可复制。在Tasker中，使用“Send Intent”操作；在MacroDroid中，使用Intent Type设置为Broadcast的“Intent”操作——而非Activity或Service，后者会因“unable to find explicit activity class”而失败。';
 
   @override
   String get automationConfigPackageLabel => '包名';
@@ -5716,7 +5803,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationActionEmergencyPurgeLabel => '紧急清除';
 
   @override
-  String get automationDocCommentFootnote => '完整的附加参数和结果广播约定记录在VaultAutomationReceiver.kt中。';
+  String get automationDocCommentFootnote =>
+      '完整的附加参数和结果广播约定记录在VaultAutomationReceiver.kt中。';
 
   @override
   String get automationTierOffLabel => '关闭';
@@ -6209,10 +6297,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameMonthsFull => '一月|二月|三月|四月|五月|六月|七月|八月|九月|十月|十一月|十二月';
+  String get advancedRenameMonthsFull =>
+      '一月|二月|三月|四月|五月|六月|七月|八月|九月|十月|十一月|十二月';
 
   @override
-  String get advancedRenameMonthsAbbr => '1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月';
+  String get advancedRenameMonthsAbbr =>
+      '1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月';
 
   @override
   String get advancedRenameDaysFull => '星期一|星期二|星期三|星期四|星期五|星期六|星期日';
@@ -6232,7 +6322,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationKeyfilesPimSectionHeader => '密钥文件与 PIM';
 
   @override
-  String get automationKeyfilesPimDescription => '与上面的自动化密码一同存储，并以相同方式用于 UNLOCK_VAULT 调用——适用于通常使用密钥文件和/或非默认 PIM（而非仅密码）解锁的 VeraCrypt/LUKS 保险库。';
+  String get automationKeyfilesPimDescription =>
+      '与上面的自动化密码一同存储，并以相同方式用于 UNLOCK_VAULT 调用——适用于通常使用密钥文件和/或非默认 PIM（而非仅密码）解锁的 VeraCrypt/LUKS 保险库。';
 
   @override
   String get automationSavePimButton => '保存 PIM';
@@ -6241,7 +6332,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationCameraSectionHeader => '相机自动化';
 
   @override
-  String get automationCameraDescription => '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
+  String get automationCameraDescription =>
+      '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
 
   @override
   String get automationAllowCameraCapture => '允许相机拍摄';
@@ -6250,7 +6342,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationOverlayPermissionTitle => '在其他应用上层显示';
 
   @override
-  String get automationOverlayPermissionMessage => 'Android 14+ 上的后台相机拍摄需要“在其他应用上层显示”权限。请授予此权限，以便在屏幕锁定或应用处于后台时允许自动拍摄。';
+  String get automationOverlayPermissionMessage =>
+      'Android 14+ 上的后台相机拍摄需要“在其他应用上层显示”权限。请授予此权限，以便在屏幕锁定或应用处于后台时允许自动拍摄。';
 
   @override
   String get automationPimSavedMessage => 'PIM 已保存';
@@ -6582,13 +6675,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get headerBackupTargetContainerSubtitle => 'VeraCrypt、LUKS1 或 LUKS2';
 
   @override
-  String get headerBackupTargetFolderSubtitle => 'gocryptfs、CryFS 或 Cryptomator';
+  String get headerBackupTargetFolderSubtitle =>
+      'gocryptfs、CryFS 或 Cryptomator';
 
   @override
-  String get headerBackupExportInfoBanner => '容器的头部包含其密钥材料——如果丢失（坏道、写入损坏），即使数据区域完好无损也无法恢复。文件夹保险库在其根目录的一个小型配置文件中保存相同的内容。请将此备份保存在与容器本身分开的地方。';
+  String get headerBackupExportInfoBanner =>
+      '容器的头部包含其密钥材料——如果丢失（坏道、写入损坏），即使数据区域完好无损也无法恢复。文件夹保险库在其根目录的一个小型配置文件中保存相同的内容。请将此备份保存在与容器本身分开的地方。';
 
   @override
-  String get headerBackupRestoreInfoBanner => '恢复将使用备份覆盖目标的当前头部（或配置文件）——首先会验证备份对此格式是否真实有效，但请确保您选择了正确的目标。';
+  String get headerBackupRestoreInfoBanner =>
+      '恢复将使用备份覆盖目标的当前头部（或配置文件）——首先会验证备份对此格式是否真实有效，但请确保您选择了正确的目标。';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
@@ -6614,7 +6710,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get headerBackupMismatchFolderVaultError => '此备份适用于文件夹保险库，但所选目标是容器文件。';
 
   @override
-  String get headerBackupMismatchContainerFileError => '此备份适用于容器文件，但所选目标是文件夹保险库。';
+  String get headerBackupMismatchContainerFileError =>
+      '此备份适用于容器文件，但所选目标是文件夹保险库。';
 
   @override
   String get headerBackupRestoredSuccess => '头部已恢复。';
@@ -6676,7 +6773,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compositeRememberContainerTitle => '记住此容器';
 
   @override
-  String get compositeRememberContainerSubtitle => '将其固定在仪表板上，下次无需重新选择这些文件。在本地以加密形式保存关联的文件列表。';
+  String get compositeRememberContainerSubtitle =>
+      '将其固定在仪表板上，下次无需重新选择这些文件。在本地以加密形式保存关联的文件列表。';
 
   @override
   String get compositeEncryptionAndFilesystemHeader => '加密与文件系统';
@@ -6722,7 +6820,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compositeBadgeDefault => '复合容器';
 
   @override
-  String get compositeSingleCarrierWarningBanner => '检测到复合载体。复合容器需要其所有载体文件才能解锁。';
+  String get compositeSingleCarrierWarningBanner =>
+      '检测到复合载体。复合容器需要其所有载体文件才能解锁。';
 
   @override
   String get compositeSelectAllCarriersButton => '选择所有载体';
@@ -6755,7 +6854,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hiddenVolumeConfiguredInNextStepNotice => '隐藏卷参数将在下一步中配置。';
 
   @override
-  String get hiddenVolumeExplanationBanner => '隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。';
+  String get hiddenVolumeExplanationBanner =>
+      '隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。';
 
   @override
   String get hiddenVolumeCredentialsSectionHeader => '隐藏卷凭据';
@@ -6767,7 +6867,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareSheetIntegrationTitle => '分享菜单集成';
 
   @override
-  String get shareSheetIntegrationSubtitle => '允许其他应用通过 Android 分享菜单直接将文件存入保管库。';
+  String get shareSheetIntegrationSubtitle =>
+      '允许其他应用通过 Android 分享菜单直接将文件存入保管库。';
 
   @override
   String get shareSheetIntegrationUpdateErrorMessage => '无法更新分享菜单集成设置。';
@@ -6776,7 +6877,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoLockOnShareImportTitle => '分享导入后自动锁定';
 
   @override
-  String get autoLockOnShareImportSubtitle => '如果保险库是专门为导入共享文件而解锁的，则在导入完成后自动重新锁定';
+  String get autoLockOnShareImportSubtitle =>
+      '如果保险库是专门为导入共享文件而解锁的，则在导入完成后自动重新锁定';
 
   @override
   String get shareImportExpiredMessage => '无导入内容 — 分享请求已过期。';
@@ -6821,13 +6923,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get compositeCarrierGrowthUltraStealthDesc => '极高隐蔽 (~5%)：文件体积几乎无变化，与相机传感器的自然噪点差异完全无法区分。';
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      '极高隐蔽 (~5%)：文件体积几乎无变化，与相机传感器的自然噪点差异完全无法区分。';
 
   @override
-  String get compositeCarrierGrowthRecommendedDesc => '推荐 (~10%)：在隐蔽性与实用的保险库容量之间取得良好平衡。';
+  String get compositeCarrierGrowthRecommendedDesc =>
+      '推荐 (~10%)：在隐蔽性与实用的保险库容量之间取得良好平衡。';
 
   @override
-  String get compositeCarrierGrowthHighCapacityDesc => '高容量 (~20%+)：最大限度提高保险库空间，但载体文件的增大较为明显。';
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      '高容量 (~20%+)：最大限度提高保险库空间，但载体文件的增大较为明显。';
 
   @override
   String get emergencyPanicTitle => '紧急恐慌与胁迫防御';
@@ -6848,7 +6953,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get panicTierCredentialLabel => '级别 2：凭据清除';
 
   @override
-  String get panicTierCredentialSubtitle => '清空仪表盘保险库列表，重置主锁定与应用设置，并清除 Keystore';
+  String get panicTierCredentialSubtitle =>
+      '清空仪表盘保险库列表，重置主锁定与应用设置，并清除 Keystore';
 
   @override
   String get panicTierNuclearLabel => '级别 3：彻底销毁 (Nuclear Wipe)';
@@ -7031,7 +7137,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compositeNoCarrierFilesFoundError => '未找到复合容器的载体文件';
 
   @override
-  String get compositeIncorrectCredentialsOrCarrierMismatchError => '凭据不正确或载体文件集不匹配';
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      '凭据不正确或载体文件集不匹配';
 
   @override
   String get incorrectCredentialsOrInvalidContainer => '凭据不正确或无效的容器';
@@ -7046,7 +7153,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get repairFolderVaultHealthyDeepScan => '未发现问题 —— 所有文件的内容均已验证。';
 
   @override
-  String get repairFolderVaultHealthyStructureOnly => '未发现结构性问题。使用密码运行深度扫描以同时验证文件内容。';
+  String get repairFolderVaultHealthyStructureOnly =>
+      '未发现结构性问题。使用密码运行深度扫描以同时验证文件内容。';
 
   @override
   String repairFolderVaultIssuesCount(num count) {
@@ -7060,7 +7168,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get repairDeepScanWithPasswordButton => '使用密码深度扫描';
 
   @override
-  String repairFolderVaultSummary(Object fixed, Object recovered, Object removed) {
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
     return '修复摘要：已修复 $fixed 项，已恢复 $recovered 项至 /LOST+FOUND，已清理 $removed 项。';
   }
 
@@ -7227,7 +7339,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageLocationUnresolvedError => '无法直接访问该位置。请确认已授予存储权限。';
 
   @override
-  String get storageLocationSelfReferenceError => '这已经是本应用某个保险库自身的存储，无法再作为外部位置添加。请改为从保险库列表中打开它。';
+  String get storageLocationSelfReferenceError =>
+      '这已经是本应用某个保险库自身的存储，无法再作为外部位置添加。请改为从保险库列表中打开它。';
 
   @override
   String get internalStorageSubtitle => '内部存储';
@@ -7522,7 +7635,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncSheetTitle => '自动同步';
 
   @override
-  String get autoSyncSheetIntro => '自动让此文件夹与另一个文件夹保持一致。如果同一文件在两侧都被修改，则会保留两个版本，除非您在下方另行选择。';
+  String get autoSyncSheetIntro =>
+      '自动让此文件夹与另一个文件夹保持一致。如果同一文件在两侧都被修改，则会保留两个版本，除非您在下方另行选择。';
 
   @override
   String get autoSyncTargetSection => '同步对象';
@@ -7549,13 +7663,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncDirectionVaultToTarget => '保险库到文件夹';
 
   @override
-  String get autoSyncDirectionVaultToTargetHint => '用于备份：文件夹跟随保险库。在文件夹中所做的更改不会复制回来。';
+  String get autoSyncDirectionVaultToTargetHint =>
+      '用于备份：文件夹跟随保险库。在文件夹中所做的更改不会复制回来。';
 
   @override
   String get autoSyncDirectionTargetToVault => '文件夹到保险库';
 
   @override
-  String get autoSyncDirectionTargetToVaultHint => '用于导入：保险库跟随文件夹。在保险库中所做的更改不会复制回来。';
+  String get autoSyncDirectionTargetToVaultHint =>
+      '用于导入：保险库跟随文件夹。在保险库中所做的更改不会复制回来。';
 
   @override
   String get autoSyncConflictSection => '如果两侧都修改了同一文件';
@@ -7606,13 +7722,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncDeleteSourceAfterImportTitle => '导入后删除源文件';
 
   @override
-  String get autoSyncDeleteSourceAfterImportSubtitle => '仅适用于从文件夹同步到保险库。保险库副本写入完成且 SHA-256 校验和匹配后，才会删除源文件。';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      '仅适用于从文件夹同步到保险库。保险库副本写入完成且 SHA-256 校验和匹配后，才会删除源文件。';
 
   @override
   String get autoSyncIgnoreLabel => '跳过匹配的文件和文件夹';
 
   @override
-  String get autoSyncIgnoreHelper => '每行一个规则：*.tmp 匹配任意位置的名称；node_modules 跳过该文件夹及其内容；Projects/old 跳过同步根目录下的该路径及其中所有内容。';
+  String get autoSyncIgnoreHelper =>
+      '每行一个规则：*.tmp 匹配任意位置的名称；node_modules 跳过该文件夹及其内容；Projects/old 跳过同步根目录下的该路径及其中所有内容。';
 
   @override
   String get autoSyncNeverSynced => '尚未同步';
@@ -7675,7 +7793,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncProblemOverlapsOtherRule => '此文件夹或其上级、下级文件夹已设置自动同步。';
 
   @override
-  String get autoSyncProblemTargetIsVault => '此文件夹包含某个保险库的加密数据。请先解锁该保险库，然后改为从保险库列表中选择它。';
+  String get autoSyncProblemTargetIsVault =>
+      '此文件夹包含某个保险库的加密数据。请先解锁该保险库，然后改为从保险库列表中选择它。';
 
   @override
   String get autoSyncReadOnlyNotice => '此保险库为只读，无法保存自动同步。';
@@ -7712,7 +7831,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get quickCaptureTileToggleTitle => '快捷设置磁贴';
 
   @override
-  String get quickCaptureTileToggleSubtitle => '直接从快捷设置打开相机，无需输入PIN码或图案。保存任何内容前，您仍需选择并解锁一个保险库。';
+  String get quickCaptureTileToggleSubtitle =>
+      '直接从快捷设置打开相机，无需输入PIN码或图案。保存任何内容前，您仍需选择并解锁一个保险库。';
 
   @override
   String get quickCaptureAddShortcutTitle => '添加到主屏幕';
@@ -7798,7 +7918,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolPasswordInterchangeTitle => '导入 / 导出密码';
 
   @override
-  String get toolPasswordInterchangeSubtitle => '在 KeePass、Bitwarden 和其他密码管理器之间迁移登录信息、卡片和备忘录';
+  String get toolPasswordInterchangeSubtitle =>
+      '在 KeePass、Bitwarden 和其他密码管理器之间迁移登录信息、卡片和备忘录';
 
   @override
   String get toolsSectionPasswordManager => '密码管理器';
@@ -8016,10 +8137,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
 
   @override
-  String get authenticatorEmptyStateMessage => 'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+  String get authenticatorEmptyStateMessage =>
+      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
 
   @override
-  String get authenticatorNoVaultsUnlockedMessage => 'Unlock a vault to see its authenticator codes here.';
+  String get authenticatorNoVaultsUnlockedMessage =>
+      'Unlock a vault to see its authenticator codes here.';
 
   @override
   String get authenticatorCodeLabel => 'Code';
@@ -8327,7 +8450,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authenticatorScanQrSubtitle => '扫描单个验证码或 Google 身份验证器转移二维码';
 
   @override
-  String get authenticatorImportBackupsSubtitle => '从 Aegis、2FAS、Bitwarden、Ente、Proton 或 andOTP 备份导入';
+  String get authenticatorImportBackupsSubtitle =>
+      '从 Aegis、2FAS、Bitwarden、Ente、Proton 或 andOTP 备份导入';
 
   @override
   String authenticatorGoogleAuthImportSuccess(int count) {
@@ -8338,7 +8462,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authenticatorMultiQrTitle => '检测到其他二维码';
 
   @override
-  String get authenticatorMultiQrMessage => 'Google 身份验证器将此导出分成了多个二维码。现在扫描下一个吗？';
+  String get authenticatorMultiQrMessage =>
+      'Google 身份验证器将此导出分成了多个二维码。现在扫描下一个吗？';
 
   @override
   String get authenticatorScanNextQr => '扫描下一个';
@@ -8480,7 +8605,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorModeCutOut => 'Cut out';
 
   @override
-  String get videoEditorNoSegments => 'No segments yet. Move the playhead and tap Add.';
+  String get videoEditorNoSegments =>
+      'No segments yet. Move the playhead and tap Add.';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
@@ -8499,7 +8625,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorBoundaryInvalid => 'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid =>
+      'That would leave the segment too short.';
 
   @override
   String get videoEditorNoRoom => 'There is no room for a segment here.';
@@ -8508,7 +8635,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorNothingToExport => 'Nothing to export.';
 
   @override
-  String get videoEditorReadOnly => 'This vault is read-only, so the edited video can\'t be saved.';
+  String get videoEditorReadOnly =>
+      'This vault is read-only, so the edited video can\'t be saved.';
 
   @override
   String videoEditorLoadFailed(String message) {
@@ -8556,7 +8684,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorAudioDropped => 'Some audio tracks couldn\'t be copied.';
+  String get videoEditorAudioDropped =>
+      'Some audio tracks couldn\'t be copied.';
 
   @override
   String videoEditorExportFailed(String message) {
@@ -8590,7 +8719,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorExportMerge => 'Merge into one video';
 
   @override
-  String get videoEditorExportMergeHint => 'Clips are joined in timeline order.';
+  String get videoEditorExportMergeHint =>
+      'Clips are joined in timeline order.';
 
   @override
   String get videoEditorExportSeparate => 'Save as separate videos';
@@ -8607,7 +8737,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorLosslessNote => 'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+  String get videoEditorLosslessNote =>
+      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
 
   @override
   String get videoEditorAnalyzing => '正在分析视频…';
@@ -8751,13 +8882,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileSkinPresetCustom => '自定义';
 
   @override
-  String get compositeArchiveCarrierBlockingWarning => '要继续，请从所选文件中移除压缩包。压缩包不能用作组合保险库的载体，因为添加保险库可能会损坏它。';
+  String get compositeArchiveCarrierBlockingWarning =>
+      '要继续，请从所选文件中移除压缩包。压缩包不能用作组合保险库的载体，因为添加保险库可能会损坏它。';
 
   @override
   String get compositeArchiveCarrierRowWarning => '不支持此压缩包，请将其从所选文件中移除。';
 
   @override
-  String videoEditorSelectedSegmentSummary(int current, int total, String start, String end, String duration) {
+  String videoEditorSelectedSegmentSummary(
+    int current,
+    int total,
+    String start,
+    String end,
+    String duration,
+  ) {
     return '片段 $current/$total：$start – $end ($duration)';
   }
 
@@ -8867,7 +9005,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncLocalRootDeleteWarningTitle => '要删除本地存储根目录中的文件吗？';
 
   @override
-  String get autoSyncLocalRootDeleteWarningMessage => '此单向同步会扫描整个本地存储根目录。启用“导入后删除源文件”后，复制到保险库的文件在通过 SHA-256 校验后可能会从设备中删除。只有在确实要删除这些原始文件时才继续。';
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      '此单向同步会扫描整个本地存储根目录。启用“导入后删除源文件”后，复制到保险库的文件在通过 SHA-256 校验后可能会从设备中删除。只有在确实要删除这些原始文件时才继续。';
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => '我已了解';
@@ -8876,7 +9015,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncScheduledTitle => '保险库锁定时每天运行';
 
   @override
-  String get autoSyncScheduledSubtitle => '应用关闭后也会在后台运行。Android 可能会延迟任务或停止长时间运行的任务。同步完成后会重新锁定保险库。';
+  String get autoSyncScheduledSubtitle =>
+      '应用关闭后也会在后台运行。Android 可能会延迟任务或停止长时间运行的任务。同步完成后会重新锁定保险库。';
 
   @override
   String get autoSyncScheduledSetupRequired => '需要启用完整自动化权限并保存保险库密码。';
@@ -8888,13 +9028,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncScheduleWarningTitle => '启用计划同步？';
 
   @override
-  String get autoSyncScheduleWarningMessage => '应用每天会在后台解锁此保险库一次，并在同步后重新锁定。Android 可能会延迟任务。如果启用了导入后删除，只有在保险库副本写入完成且文件大小与 SHA-256 校验和匹配后，才会删除源文件。';
+  String get autoSyncScheduleWarningMessage =>
+      '应用每天会在后台解锁此保险库一次，并在同步后重新锁定。Android 可能会延迟任务。如果启用了导入后删除，只有在保险库副本写入完成且文件大小与 SHA-256 校验和匹配后，才会删除源文件。';
 
   @override
   String get autoSyncScheduleEnable => '启用计划';
 
   @override
-  String get autoSyncScheduleNotificationRequired => '请允许通知，以便 Android 在后台同步时显示“正在同步保险库...”。';
+  String get autoSyncScheduleNotificationRequired =>
+      '请允许通知，以便 Android 在后台同步时显示“正在同步保险库...”。';
 
   @override
   String get autoSyncScheduleFailed => '规则已保存，但无法启用计划同步。';

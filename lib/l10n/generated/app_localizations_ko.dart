@@ -9138,4 +9138,35 @@ class AppLocalizationsKo extends AppLocalizations {
   String get autoSyncLocalRootDeleteWarningConfirm => '이해했습니다';
 
   @override
-  String get autoSyncScheduledTitle => '볼트가 잠겨 있을 때 매일 실
+  String get autoSyncScheduledTitle => '볼트가 잠겨 있을 때 매일 실행';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      '앱을 닫아도 백그라운드에서 실행됩니다. Android가 지연하거나 오래 실행되는 작업을 중지할 수 있습니다. 동기화가 끝나면 볼트가 다시 잠깁니다.';
+
+  @override
+  String get autoSyncScheduledSetupRequired => '전체 자동화 권한과 저장된 볼트 비밀번호가 필요합니다.';
+
+  @override
+  String get autoSyncScheduledConfigure => '백그라운드 액세스 설정';
+
+  @override
+  String get autoSyncScheduleWarningTitle => '예약 동기화를 사용 설정할까요?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      '앱이 하루에 한 번 백그라운드에서 이 볼트를 잠금 해제하고 동기화 후 다시 잠급니다. Android가 실행을 지연할 수 있습니다. 가져온 후 원본 삭제가 켜져 있으면 볼트 복사본을 기록하고 크기와 SHA-256 체크섬이 일치하는지 확인한 뒤에만 원본 파일을 삭제합니다.';
+
+  @override
+  String get autoSyncScheduleEnable => '예약 사용 설정';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      '백그라운드 동기화 중 Android가 “볼트 동기화 중...”을 표시하도록 알림을 허용하세요.';
+
+  @override
+  String get autoSyncScheduleFailed => '규칙은 저장했지만 예약 동기화를 사용 설정하지 못했습니다.';
+
+  @override
+  String get autoSyncSavedScheduled => '규칙과 일일 일정을 저장했습니다.';
+}

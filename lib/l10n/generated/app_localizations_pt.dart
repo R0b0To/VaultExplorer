@@ -9567,4 +9567,124 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get textEditorAutoHideTabBarDescription =>
-      'Ocultar a barra de aba
+      'Ocultar a barra de abas ao rolar para baixo e mostrá-la novamente ao rolar para cima.';
+
+  @override
+  String get lockWaitingForOperationsMessage =>
+      'A aguardar que as operações em curso terminem antes de bloquear…';
+
+  @override
+  String get mirrorSyncActivityLabel =>
+      'Salvando alterações do cofre no armazenamento';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Sensibilidade do gesto de busca';
+
+  @override
+  String get volumeGestureSensitivityTitle =>
+      'Sensibilidade do gesto de volume';
+
+  @override
+  String get brightnessGestureSensitivityTitle =>
+      'Sensibilidade do gesto de brilho';
+
+  @override
+  String get thumbnailSettingsHeader => 'Geração de miniaturas';
+
+  @override
+  String get thumbnailGenerationStrategyTitle =>
+      'Estratégia do quadro da miniatura';
+
+  @override
+  String get thumbnailFirstFrameOption => 'Primeiro quadro';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Quadro em uma posição';
+
+  @override
+  String get thumbnailHybridOption => 'Híbrido (ignorar início em branco)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'Posição preferida do quadro';
+
+  @override
+  String get volumeBoostHeader => 'Aumento de volume';
+
+  @override
+  String get volumeBoostTitle => 'Ativar aumento de volume';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Aumenta o áudio baixo dos vídeos acima do volume normal do player.';
+
+  @override
+  String get volumeBoostGainTitle => 'Nível de aumento';
+
+  @override
+  String get decoderSelectionHeader => 'Seleção do decodificador';
+
+  @override
+  String get videoDecoderTitle => 'Decodificador de vídeo';
+
+  @override
+  String get audioDecoderTitle => 'Decodificador de áudio';
+
+  @override
+  String get decoderAutoOption => 'Automático';
+
+  @override
+  String get decoderHardwareOption => 'Hardware';
+
+  @override
+  String get decoderSoftwareOption => 'Software';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Excluir arquivos da raiz do armazenamento local?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Esta sincronização unidirecional verificará toda a raiz do armazenamento local. Se a opção de excluir arquivos de origem após a importação estiver ativada, os arquivos copiados para o cofre poderão ser removidos do dispositivo após a verificação SHA-256. Continue apenas se quiser excluir esses originais.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Entendi';
+
+  @override
+  String get autoSyncScheduledTitle =>
+      'Executar diariamente com o cofre bloqueado';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'Executa em segundo plano com a aplicação fechada. O Android pode adiar ou interromper tarefas longas. O cofre é bloqueado novamente quando a sincronização termina.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Requer acesso de automação completa e uma palavra-passe do cofre guardada.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Configurar acesso em segundo plano';
+
+  @override
+  String get autoSyncScheduleWarningTitle => 'Ativar a sincronização agendada?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'A aplicação desbloqueia este cofre em segundo plano uma vez por dia e volta a bloqueá-lo após a sincronização. O Android pode adiar a execução. Se a eliminação após importação estiver ativa, o ficheiro de origem só é eliminado depois de a cópia no cofre ser gravada e o tamanho e a soma SHA-256 coincidirem.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Ativar agendamento';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Permita notificações para que o Android mostre «A sincronizar cofre...» durante a sincronização em segundo plano.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Regra guardada, mas não foi possível ativar a sincronização agendada.';
+
+  @override
+  String get autoSyncSavedScheduled => 'Regra e agendamento diário guardados.';
+}

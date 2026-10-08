@@ -9,14 +9,11 @@
 // jni/filesystem_bridge.cpp (openStream/readStream/closeStream, which
 // actually create and use them).
 
-extern "C" {
-#include <ext2fs/ext2fs.h>
-}
-
 struct _ntfs_inode;
 typedef struct _ntfs_inode ntfs_inode;
 struct _ntfs_attr;
 typedef struct _ntfs_attr ntfs_attr;
+struct ext2_file;
 
 struct NtfsStream {
     ntfs_inode* inode = nullptr;
@@ -24,5 +21,5 @@ struct NtfsStream {
 };
 
 struct ExtStream {
-    ext2_file_t file = nullptr;
+    ext2_file* file = nullptr;
 };

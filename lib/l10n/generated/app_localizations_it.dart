@@ -1090,7 +1090,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'Mostra l\'archiviazione locale e le posizioni di archiviazione aggiunte nella barra laterale';
+      'Mostra la memoria locale e le posizioni aggiunte. Per aprire la memoria locale è necessario l’accesso a tutti i file.';
 
   @override
   String get localStorageCardTitle => 'Archiviazione locale';
@@ -9707,4 +9707,22 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Impossibile aprire le impostazioni degli allarmi Android. Attiva “Sveglie e promemoria” per Vault Explorer nelle impostazioni di sistema e riprova.';
+
+  @override
+  String get localStoragePermissionTitle =>
+      'Consenti l’accesso alla memoria locale';
+
+  @override
+  String get localStorageGrantAccess => 'Consenti accesso';
+
+  @override
+  String get hideStorageLocationsTitle =>
+      'Nascondere le posizioni di archiviazione?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'L’accesso a tutti i file non è stato concesso. Vuoi nascondere la memoria locale e le posizioni aggiunte dalla barra laterale? Puoi mostrarle di nuovo nelle Impostazioni.';
+
+  @override
+  String get hide => 'Nascondi';
 }

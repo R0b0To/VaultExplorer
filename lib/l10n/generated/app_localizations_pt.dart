@@ -1091,7 +1091,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'Exibe o armazenamento local e os locais de armazenamento adicionados na barra lateral';
+      'Mostra o armazenamento local e os locais adicionados. É necessário acesso a todos os arquivos para abrir o armazenamento local.';
 
   @override
   String get localStorageCardTitle => 'Armazenamento local';
@@ -9709,4 +9709,21 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Não foi possível abrir as configurações de alarmes do Android. Ative “Alarmes e lembretes” para o Vault Explorer nas configurações do sistema e tente novamente.';
+
+  @override
+  String get localStoragePermissionTitle =>
+      'Permitir acesso ao armazenamento local';
+
+  @override
+  String get localStorageGrantAccess => 'Conceder acesso';
+
+  @override
+  String get hideStorageLocationsTitle => 'Ocultar locais de armazenamento?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'O acesso a todos os arquivos não foi concedido. Quer ocultar o armazenamento local e os locais adicionados da barra lateral? Pode voltar a mostrá-los nas Definições.';
+
+  @override
+  String get hide => 'Ocultar';
 }

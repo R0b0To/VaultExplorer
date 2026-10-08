@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Accesso a tutti i file concesso (velocità massima)",
   "fastStorageAccessNotGrantedSubtitle": "Concedi l'accesso a tutti i file nelle impostazioni di sistema per la massima velocità",
   "showStorageLocationsTitle": "Mostra le posizioni di archiviazione nella barra laterale",
-  "showStorageLocationsSubtitle": "Mostra l'archiviazione locale e le posizioni di archiviazione aggiunte nella barra laterale",
+  "showStorageLocationsSubtitle": "Mostra la memoria locale e le posizioni aggiunte. Per aprire la memoria locale è necessario l’accesso a tutti i file.",
   "localStorageCardTitle": "Archiviazione locale",
   "localStorageCardSubtitle": "Non crittografato — per trasferimenti rapidi con i vault",
   "enableFastStorageAccessTitle": "Attiva accesso rapido all'archiviazione",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "Consentire allarmi esatti per la sincronizzazione giornaliera?",
   "autoSyncExactAlarmAccessMessage": "Android richiede l’accesso “Sveglie e promemoria” affinché Vault Explorer possa avviare la sincronizzazione giornaliera all’ora scelta quando l’app è chiusa. Consentilo nella schermata successiva, torna qui e riattiva la sincronizzazione programmata.",
   "autoSyncExactAlarmAccessOpen": "Apri impostazioni",
-  "autoSyncExactAlarmAccessUnavailable": "Impossibile aprire le impostazioni degli allarmi Android. Attiva “Sveglie e promemoria” per Vault Explorer nelle impostazioni di sistema e riprova."
+  "autoSyncExactAlarmAccessUnavailable": "Impossibile aprire le impostazioni degli allarmi Android. Attiva “Sveglie e promemoria” per Vault Explorer nelle impostazioni di sistema e riprova.",
+  "localStoragePermissionTitle": "Consenti l’accesso alla memoria locale",
+  "localStorageGrantAccess": "Consenti accesso",
+  "hideStorageLocationsTitle": "Nascondere le posizioni di archiviazione?",
+  "hideStorageLocationsPrompt": "L’accesso a tutti i file non è stato concesso. Vuoi nascondere la memoria locale e le posizioni aggiunte dalla barra laterale? Puoi mostrarle di nuovo nelle Impostazioni.",
+  "hide": "Nascondi"
 }

@@ -1075,7 +1075,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'Lists Local Storage and your added storage locations in the sidebar';
+      'Shows Local Storage and added locations. Opening Local Storage requires All files access.';
 
   @override
   String get localStorageCardTitle => 'Local Storage';
@@ -9560,4 +9560,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Could not open Android alarm settings. Enable Alarms & reminders for Vault Explorer in system settings, then try again.';
+
+  @override
+  String get localStoragePermissionTitle => 'Allow access to Local Storage';
+
+  @override
+  String get localStorageGrantAccess => 'Grant Access';
+
+  @override
+  String get hideStorageLocationsTitle => 'Hide storage locations?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'All files access was not granted. Hide Local Storage and added locations from the sidebar? You can show them again in Settings.';
+
+  @override
+  String get hide => 'Hide';
 }

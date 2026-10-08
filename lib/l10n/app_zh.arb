@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "已授予所有文件访问权限（最高速度）",
   "fastStorageAccessNotGrantedSubtitle": "在系统设置中授予所有文件访问权限以获得最佳速度",
   "showStorageLocationsTitle": "在侧边栏显示存储位置",
-  "showStorageLocationsSubtitle": "在侧边栏中显示本地存储和已添加的存储位置",
+  "showStorageLocationsSubtitle": "显示本地存储和已添加的位置。打开本地存储需要“所有文件访问”权限。",
   "localStorageCardTitle": "本地存储",
   "localStorageCardSubtitle": "未加密 —— 用于与保险库快速传输",
   "enableFastStorageAccessTitle": "启用快速存储访问",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "允许每日同步使用精确闹钟？",
   "autoSyncExactAlarmAccessMessage": "Android 需要“闹钟和提醒”访问权限，才能在应用关闭时于你选择的时间启动 Vault Explorer 的每日同步。请在下一屏允许访问，返回此处后再次开启计划同步。",
   "autoSyncExactAlarmAccessOpen": "打开设置",
-  "autoSyncExactAlarmAccessUnavailable": "无法打开 Android 闹钟设置。请在系统设置中为 Vault Explorer 启用“闹钟和提醒”，然后重试。"
+  "autoSyncExactAlarmAccessUnavailable": "无法打开 Android 闹钟设置。请在系统设置中为 Vault Explorer 启用“闹钟和提醒”，然后重试。",
+  "localStoragePermissionTitle": "允许访问本地存储",
+  "localStorageGrantAccess": "授予访问权限",
+  "hideStorageLocationsTitle": "隐藏存储位置？",
+  "hideStorageLocationsPrompt": "尚未授予“所有文件访问”权限。要从侧边栏隐藏本地存储和已添加的位置吗？你可以在设置中重新显示。",
+  "hide": "隐藏"
 }

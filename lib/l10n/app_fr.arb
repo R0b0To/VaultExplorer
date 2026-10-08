@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Accès à tous les fichiers accordé (vitesse maximale)",
   "fastStorageAccessNotGrantedSubtitle": "Accordez l'accès à tous les fichiers dans les paramètres système pour une vitesse optimale",
   "showStorageLocationsTitle": "Afficher les emplacements de stockage dans la barre latérale",
-  "showStorageLocationsSubtitle": "Affiche le stockage local et vos emplacements de stockage ajoutés dans la barre latérale",
+  "showStorageLocationsSubtitle": "Affiche le stockage local et les emplacements ajoutés. L’accès à tous les fichiers est nécessaire pour ouvrir le stockage local.",
   "localStorageCardTitle": "Stockage local",
   "localStorageCardSubtitle": "Non chiffré — pour des transferts rapides avec les coffres",
   "enableFastStorageAccessTitle": "Activer l'accès rapide au stockage",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "Autoriser les alarmes exactes pour la synchronisation quotidienne ?",
   "autoSyncExactAlarmAccessMessage": "Android exige l’accès « Alarmes et rappels » pour que Vault Explorer lance la synchronisation quotidienne à l’heure choisie lorsque l’application est fermée. Autorisez-le sur l’écran suivant, revenez ici, puis réactivez la synchronisation programmée.",
   "autoSyncExactAlarmAccessOpen": "Ouvrir les paramètres",
-  "autoSyncExactAlarmAccessUnavailable": "Impossible d’ouvrir les paramètres d’alarmes Android. Activez « Alarmes et rappels » pour Vault Explorer dans les paramètres système, puis réessayez."
+  "autoSyncExactAlarmAccessUnavailable": "Impossible d’ouvrir les paramètres d’alarmes Android. Activez « Alarmes et rappels » pour Vault Explorer dans les paramètres système, puis réessayez.",
+  "localStoragePermissionTitle": "Autoriser l’accès au stockage local",
+  "localStorageGrantAccess": "Autoriser l’accès",
+  "hideStorageLocationsTitle": "Masquer les emplacements de stockage ?",
+  "hideStorageLocationsPrompt": "L’accès à tous les fichiers n’a pas été accordé. Masquer le stockage local et les emplacements ajoutés dans la barre latérale ? Vous pourrez les réafficher dans les paramètres.",
+  "hide": "Masquer"
 }

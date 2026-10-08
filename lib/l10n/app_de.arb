@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Zugriff auf alle Dateien gewährt (maximale Geschwindigkeit)",
   "fastStorageAccessNotGrantedSubtitle": "Gewähren Sie in den Systemeinstellungen Zugriff auf alle Dateien für optimale Geschwindigkeit",
   "showStorageLocationsTitle": "Speicherorte in der Seitenleiste anzeigen",
-  "showStorageLocationsSubtitle": "Zeigt den lokalen Speicher und deine hinzugefügten Speicherorte in der Seitenleiste an",
+  "showStorageLocationsSubtitle": "Zeigt den lokalen Speicher und hinzugefügte Speicherorte. Zum Öffnen des lokalen Speichers ist Zugriff auf alle Dateien erforderlich.",
   "localStorageCardTitle": "Lokaler Speicher",
   "localStorageCardSubtitle": "Nicht verschlüsselt – für schnelle Übertragungen mit Tresoren",
   "enableFastStorageAccessTitle": "Schnellen Speicherzugriff aktivieren",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "Exakte Alarme für die tägliche Synchronisierung erlauben?",
   "autoSyncExactAlarmAccessMessage": "Android benötigt den Zugriff auf „Alarme und Erinnerungen“, damit Vault Explorer die tägliche Synchronisierung zur gewählten Zeit starten kann, wenn die App geschlossen ist. Erlaube den Zugriff auf dem nächsten Bildschirm, kehre hierher zurück und aktiviere die geplante Synchronisierung erneut.",
   "autoSyncExactAlarmAccessOpen": "Einstellungen öffnen",
-  "autoSyncExactAlarmAccessUnavailable": "Die Android-Alarmeinstellungen konnten nicht geöffnet werden. Erlaube „Alarme und Erinnerungen“ für Vault Explorer in den Systemeinstellungen und versuche es erneut."
+  "autoSyncExactAlarmAccessUnavailable": "Die Android-Alarmeinstellungen konnten nicht geöffnet werden. Erlaube „Alarme und Erinnerungen“ für Vault Explorer in den Systemeinstellungen und versuche es erneut.",
+  "localStoragePermissionTitle": "Zugriff auf den lokalen Speicher erlauben",
+  "localStorageGrantAccess": "Zugriff erlauben",
+  "hideStorageLocationsTitle": "Speicherorte ausblenden?",
+  "hideStorageLocationsPrompt": "Der Zugriff auf alle Dateien wurde nicht erteilt. Möchtest du den lokalen Speicher und hinzugefügte Speicherorte in der Seitenleiste ausblenden? Du kannst sie in den Einstellungen wieder anzeigen.",
+  "hide": "Ausblenden"
 }

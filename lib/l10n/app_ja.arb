@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "すべてのファイルへのアクセスが許可されています（最大速度）",
   "fastStorageAccessNotGrantedSubtitle": "最適な速度のため、システム設定で「すべてのファイルへのアクセス」を許可してください",
   "showStorageLocationsTitle": "サイドバーにストレージの場所を表示",
-  "showStorageLocationsSubtitle": "ローカルストレージと追加したストレージの場所をサイドバーに表示します",
+  "showStorageLocationsSubtitle": "ローカルストレージと追加した保存場所を表示します。ローカルストレージを開くには、すべてのファイルへのアクセスが必要です。",
   "localStorageCardTitle": "ローカルストレージ",
   "localStorageCardSubtitle": "暗号化されていません — 保管庫との迅速な転送用",
   "enableFastStorageAccessTitle": "高速ストレージアクセスを有効にする",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "毎日の同期に正確なアラームを許可しますか？",
   "autoSyncExactAlarmAccessMessage": "アプリを閉じている間に選択した時刻に毎日の同期を開始するには、Android の「アラームとリマインダー」へのアクセスが必要です。次の画面で許可し、ここに戻ってからスケジュール同期をもう一度有効にしてください。",
   "autoSyncExactAlarmAccessOpen": "設定を開く",
-  "autoSyncExactAlarmAccessUnavailable": "Android のアラーム設定を開けませんでした。システム設定で Vault Explorer の「アラームとリマインダー」を有効にして、もう一度お試しください。"
+  "autoSyncExactAlarmAccessUnavailable": "Android のアラーム設定を開けませんでした。システム設定で Vault Explorer の「アラームとリマインダー」を有効にして、もう一度お試しください。",
+  "localStoragePermissionTitle": "ローカルストレージへのアクセスを許可",
+  "localStorageGrantAccess": "アクセスを許可",
+  "hideStorageLocationsTitle": "保存場所を非表示にしますか？",
+  "hideStorageLocationsPrompt": "すべてのファイルへのアクセスが許可されませんでした。ローカルストレージと追加した保存場所をサイドバーから非表示にしますか？設定から再表示できます。",
+  "hide": "非表示"
 }

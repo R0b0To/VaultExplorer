@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Надано доступ до всіх файлів (максимальна швидкість)",
   "fastStorageAccessNotGrantedSubtitle": "Надайте доступ до всіх файлів у налаштуваннях для максимальної швидкості",
   "showStorageLocationsTitle": "Показувати місця зберігання в бічній панелі",
-  "showStorageLocationsSubtitle": "Показує локальне сховище та додані місця зберігання в бічній панелі",
+  "showStorageLocationsSubtitle": "Показує локальне сховище й додані розташування. Щоб відкрити локальне сховище, потрібен доступ до всіх файлів.",
   "localStorageCardTitle": "Локальне сховище",
   "localStorageCardSubtitle": "Не зашифровано — для швидкого обміну зі сховищами",
   "enableFastStorageAccessTitle": "Увімкнути швидкий доступ",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "Дозволити точні будильники для щоденної синхронізації?",
   "autoSyncExactAlarmAccessMessage": "Android вимагає доступу до «Будильників і нагадувань», щоб Vault Explorer запускав щоденну синхронізацію у вибраний час, коли застосунок закрито. Дозвольте доступ на наступному екрані, поверніться сюди й увімкніть заплановану синхронізацію знову.",
   "autoSyncExactAlarmAccessOpen": "Відкрити налаштування",
-  "autoSyncExactAlarmAccessUnavailable": "Не вдалося відкрити налаштування будильників Android. Увімкніть «Будильники й нагадування» для Vault Explorer у системних налаштуваннях і спробуйте ще раз."
+  "autoSyncExactAlarmAccessUnavailable": "Не вдалося відкрити налаштування будильників Android. Увімкніть «Будильники й нагадування» для Vault Explorer у системних налаштуваннях і спробуйте ще раз.",
+  "localStoragePermissionTitle": "Надати доступ до локального сховища",
+  "localStorageGrantAccess": "Надати доступ",
+  "hideStorageLocationsTitle": "Приховати сховища?",
+  "hideStorageLocationsPrompt": "Доступ до всіх файлів не надано. Приховати локальне сховище й додані розташування на бічній панелі? Їх можна знову показати в налаштуваннях.",
+  "hide": "Приховати"
 }

@@ -1041,7 +1041,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'ローカルストレージと追加したストレージの場所をサイドバーに表示します';
+      'ローカルストレージと追加した保存場所を表示します。ローカルストレージを開くには、すべてのファイルへのアクセスが必要です。';
 
   @override
   String get localStorageCardTitle => 'ローカルストレージ';
@@ -9192,4 +9192,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Android のアラーム設定を開けませんでした。システム設定で Vault Explorer の「アラームとリマインダー」を有効にして、もう一度お試しください。';
+
+  @override
+  String get localStoragePermissionTitle => 'ローカルストレージへのアクセスを許可';
+
+  @override
+  String get localStorageGrantAccess => 'アクセスを許可';
+
+  @override
+  String get hideStorageLocationsTitle => '保存場所を非表示にしますか？';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'すべてのファイルへのアクセスが許可されませんでした。ローカルストレージと追加した保存場所をサイドバーから非表示にしますか？設定から再表示できます。';
+
+  @override
+  String get hide => '非表示';
 }

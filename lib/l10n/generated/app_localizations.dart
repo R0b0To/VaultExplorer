@@ -1842,10 +1842,10 @@ abstract class AppLocalizations {
   /// **'Show storage locations in sidebar'**
   String get showStorageLocationsTitle;
 
-  /// Settings toggle subtitle explaining that the Storage Locations section is shown in the navigation drawer
+  /// Settings subtitle for the sidebar storage locations visibility option
   ///
   /// In en, this message translates to:
-  /// **'Lists Local Storage and your added storage locations in the sidebar'**
+  /// **'Shows Local Storage and added locations. Opening Local Storage requires All files access.'**
   String get showStorageLocationsSubtitle;
 
   /// Title of the pinned dashboard card that opens real device storage, and the app bar title of the screen it opens
@@ -16110,6 +16110,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open Android alarm settings. Enable Alarms & reminders for Vault Explorer in system settings, then try again.'**
   String get autoSyncExactAlarmAccessUnavailable;
+
+  /// Title of the permission prompt shown when opening Local Storage without All files access
+  ///
+  /// In en, this message translates to:
+  /// **'Allow access to Local Storage'**
+  String get localStoragePermissionTitle;
+
+  /// Button label to grant the permission needed to browse Local Storage
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Access'**
+  String get localStorageGrantAccess;
+
+  /// Title of the prompt asking whether to hide storage locations after access is declined
+  ///
+  /// In en, this message translates to:
+  /// **'Hide storage locations?'**
+  String get hideStorageLocationsTitle;
+
+  /// Prompt asking whether to hide Local Storage and other storage locations after permission is declined
+  ///
+  /// In en, this message translates to:
+  /// **'All files access was not granted. Hide Local Storage and added locations from the sidebar? You can show them again in Settings.'**
+  String get hideStorageLocationsPrompt;
+
+  /// Button label for hiding a storage location section from the sidebar
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get hide;
 }
 
 class _AppLocalizationsDelegate

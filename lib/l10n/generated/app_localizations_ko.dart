@@ -1039,7 +1039,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get showStorageLocationsTitle => '사이드바에 저장소 위치 표시';
 
   @override
-  String get showStorageLocationsSubtitle => '로컬 저장소와 추가한 저장소 위치를 사이드바에 표시합니다';
+  String get showStorageLocationsSubtitle =>
+      '로컬 저장소와 추가한 저장 위치를 표시합니다. 로컬 저장소를 열려면 모든 파일 접근 권한이 필요합니다.';
 
   @override
   String get localStorageCardTitle => '로컬 저장소';
@@ -9190,4 +9191,20 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Android 알람 설정을 열 수 없습니다. 시스템 설정에서 Vault Explorer의 ‘알람 및 리마인더’를 허용한 뒤 다시 시도하세요.';
+
+  @override
+  String get localStoragePermissionTitle => '로컬 저장소 접근 허용';
+
+  @override
+  String get localStorageGrantAccess => '접근 허용';
+
+  @override
+  String get hideStorageLocationsTitle => '저장 위치를 숨길까요?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      '모든 파일 접근 권한이 허용되지 않았습니다. 사이드바에서 로컬 저장소와 추가한 저장 위치를 숨길까요? 설정에서 다시 표시할 수 있습니다.';
+
+  @override
+  String get hide => '숨기기';
 }

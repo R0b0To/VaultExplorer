@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "تم منح الوصول إلى جميع الملفات (أقصى سرعة)",
   "fastStorageAccessNotGrantedSubtitle": "امنح إذن الوصول إلى جميع الملفات في إعدادات النظام للحصول على أفضل سرعة",
   "showStorageLocationsTitle": "إظهار مواقع التخزين في الشريط الجانبي",
-  "showStorageLocationsSubtitle": "يعرض التخزين المحلي ومواقع التخزين المضافة في الشريط الجانبي",
+  "showStorageLocationsSubtitle": "يعرض التخزين المحلي والمواقع المضافة. يتطلب فتح التخزين المحلي إذن الوصول إلى جميع الملفات.",
   "localStorageCardTitle": "التخزين المحلي",
   "localStorageCardSubtitle": "غير مشفّر — لعمليات النقل السريعة مع الخزائن",
   "enableFastStorageAccessTitle": "تفعيل الوصول السريع لوحدة التخزين",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "السماح بالتنبيهات الدقيقة للمزامنة اليومية؟",
   "autoSyncExactAlarmAccessMessage": "يتطلب Android إذن «المنبّهات والتذكيرات» لكي يبدأ Vault Explorer المزامنة اليومية في الوقت الذي تختاره والتطبيق مغلق. اسمح بذلك في الشاشة التالية، ثم عُد إلى هنا وفعّل المزامنة المجدولة مرة أخرى.",
   "autoSyncExactAlarmAccessOpen": "فتح الإعدادات",
-  "autoSyncExactAlarmAccessUnavailable": "تعذّر فتح إعدادات التنبيهات في Android. فعّل «المنبّهات والتذكيرات» لـ Vault Explorer من إعدادات النظام ثم حاول مرة أخرى."
+  "autoSyncExactAlarmAccessUnavailable": "تعذّر فتح إعدادات التنبيهات في Android. فعّل «المنبّهات والتذكيرات» لـ Vault Explorer من إعدادات النظام ثم حاول مرة أخرى.",
+  "localStoragePermissionTitle": "السماح بالوصول إلى التخزين المحلي",
+  "localStorageGrantAccess": "منح الإذن",
+  "hideStorageLocationsTitle": "إخفاء مواقع التخزين؟",
+  "hideStorageLocationsPrompt": "لم يتم منح إذن الوصول إلى جميع الملفات. هل تريد إخفاء التخزين المحلي والمواقع المضافة من الشريط الجانبي؟ يمكنك إظهارها مجددًا من الإعدادات.",
+  "hide": "إخفاء"
 }

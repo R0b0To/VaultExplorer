@@ -1116,7 +1116,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'يعرض التخزين المحلي ومواقع التخزين المضافة في الشريط الجانبي';
+      'يعرض التخزين المحلي والمواقع المضافة. يتطلب فتح التخزين المحلي إذن الوصول إلى جميع الملفات.';
 
   @override
   String get localStorageCardTitle => 'التخزين المحلي';
@@ -9756,4 +9756,20 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'تعذّر فتح إعدادات التنبيهات في Android. فعّل «المنبّهات والتذكيرات» لـ Vault Explorer من إعدادات النظام ثم حاول مرة أخرى.';
+
+  @override
+  String get localStoragePermissionTitle => 'السماح بالوصول إلى التخزين المحلي';
+
+  @override
+  String get localStorageGrantAccess => 'منح الإذن';
+
+  @override
+  String get hideStorageLocationsTitle => 'إخفاء مواقع التخزين؟';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'لم يتم منح إذن الوصول إلى جميع الملفات. هل تريد إخفاء التخزين المحلي والمواقع المضافة من الشريط الجانبي؟ يمكنك إظهارها مجددًا من الإعدادات.';
+
+  @override
+  String get hide => 'إخفاء';
 }

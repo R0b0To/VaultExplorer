@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Acesso a Todos os Arquivos concedido (velocidade máxima)",
   "fastStorageAccessNotGrantedSubtitle": "Conceda Acesso a Todos os Arquivos nas Configurações do Sistema para velocidade ideal",
   "showStorageLocationsTitle": "Mostrar locais de armazenamento na barra lateral",
-  "showStorageLocationsSubtitle": "Exibe o armazenamento local e os locais de armazenamento adicionados na barra lateral",
+  "showStorageLocationsSubtitle": "Mostra o armazenamento local e os locais adicionados. É necessário acesso a todos os arquivos para abrir o armazenamento local.",
   "localStorageCardTitle": "Armazenamento local",
   "localStorageCardSubtitle": "Não criptografado — para transferências rápidas com cofres",
   "enableFastStorageAccessTitle": "Ativar Acesso Rápido ao Armazenamento",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "Permitir alarmes exatos para a sincronização diária?",
   "autoSyncExactAlarmAccessMessage": "O Android exige acesso a “Alarmes e lembretes” para que o Vault Explorer inicie a sincronização diária no horário escolhido enquanto o app estiver fechado. Permita na próxima tela, volte aqui e ative a sincronização agendada novamente.",
   "autoSyncExactAlarmAccessOpen": "Abrir configurações",
-  "autoSyncExactAlarmAccessUnavailable": "Não foi possível abrir as configurações de alarmes do Android. Ative “Alarmes e lembretes” para o Vault Explorer nas configurações do sistema e tente novamente."
+  "autoSyncExactAlarmAccessUnavailable": "Não foi possível abrir as configurações de alarmes do Android. Ative “Alarmes e lembretes” para o Vault Explorer nas configurações do sistema e tente novamente.",
+  "localStoragePermissionTitle": "Permitir acesso ao armazenamento local",
+  "localStorageGrantAccess": "Conceder acesso",
+  "hideStorageLocationsTitle": "Ocultar locais de armazenamento?",
+  "hideStorageLocationsPrompt": "O acesso a todos os arquivos não foi concedido. Quer ocultar o armazenamento local e os locais adicionados da barra lateral? Pode voltar a mostrá-los nas Definições.",
+  "hide": "Ocultar"
 }

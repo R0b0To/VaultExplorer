@@ -286,7 +286,7 @@
   "fastStorageAccessGrantedSubtitle": "Acceso a todos los archivos concedido (velocidad máxima)",
   "fastStorageAccessNotGrantedSubtitle": "Concede el acceso a todos los archivos en los ajustes del sistema para obtener la velocidad óptima",
   "showStorageLocationsTitle": "Mostrar ubicaciones de almacenamiento en la barra lateral",
-  "showStorageLocationsSubtitle": "Muestra el almacenamiento local y tus ubicaciones de almacenamiento añadidas en la barra lateral",
+  "showStorageLocationsSubtitle": "Muestra el almacenamiento local y las ubicaciones añadidas. Para abrir el almacenamiento local se necesita acceso a todos los archivos.",
   "localStorageCardTitle": "Almacenamiento local",
   "localStorageCardSubtitle": "No cifrado — para transferencias rápidas con las bóvedas",
   "enableFastStorageAccessTitle": "Activar acceso rápido al almacenamiento",
@@ -2658,5 +2658,10 @@
   "autoSyncExactAlarmAccessTitle": "¿Permitir alarmas exactas para la sincronización diaria?",
   "autoSyncExactAlarmAccessMessage": "Android requiere el acceso a «Alarmas y recordatorios» para que Vault Explorer inicie la sincronización diaria a la hora que elijas cuando la app esté cerrada. Permítelo en la siguiente pantalla, vuelve aquí y activa de nuevo la sincronización programada.",
   "autoSyncExactAlarmAccessOpen": "Abrir ajustes",
-  "autoSyncExactAlarmAccessUnavailable": "No se pudieron abrir los ajustes de alarmas de Android. Activa «Alarmas y recordatorios» para Vault Explorer en los ajustes del sistema y vuelve a intentarlo."
+  "autoSyncExactAlarmAccessUnavailable": "No se pudieron abrir los ajustes de alarmas de Android. Activa «Alarmas y recordatorios» para Vault Explorer en los ajustes del sistema y vuelve a intentarlo.",
+  "localStoragePermissionTitle": "Permitir acceso al almacenamiento local",
+  "localStorageGrantAccess": "Conceder acceso",
+  "hideStorageLocationsTitle": "¿Ocultar ubicaciones de almacenamiento?",
+  "hideStorageLocationsPrompt": "No se concedió acceso a todos los archivos. ¿Quieres ocultar el almacenamiento local y las ubicaciones añadidas de la barra lateral? Puedes volver a mostrarlas en Ajustes.",
+  "hide": "Ocultar"
 }

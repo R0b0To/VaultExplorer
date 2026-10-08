@@ -1027,7 +1027,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showStorageLocationsTitle => '在侧边栏显示存储位置';
 
   @override
-  String get showStorageLocationsSubtitle => '在侧边栏中显示本地存储和已添加的存储位置';
+  String get showStorageLocationsSubtitle =>
+      '显示本地存储和已添加的位置。打开本地存储需要“所有文件访问”权限。';
 
   @override
   String get localStorageCardTitle => '本地存储';
@@ -9064,4 +9065,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       '无法打开 Android 闹钟设置。请在系统设置中为 Vault Explorer 启用“闹钟和提醒”，然后重试。';
+
+  @override
+  String get localStoragePermissionTitle => '允许访问本地存储';
+
+  @override
+  String get localStorageGrantAccess => '授予访问权限';
+
+  @override
+  String get hideStorageLocationsTitle => '隐藏存储位置？';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      '尚未授予“所有文件访问”权限。要从侧边栏隐藏本地存储和已添加的位置吗？你可以在设置中重新显示。';
+
+  @override
+  String get hide => '隐藏';
 }

@@ -1091,7 +1091,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'Zeigt den lokalen Speicher und deine hinzugefügten Speicherorte in der Seitenleiste an';
+      'Zeigt den lokalen Speicher und hinzugefügte Speicherorte. Zum Öffnen des lokalen Speichers ist Zugriff auf alle Dateien erforderlich.';
 
   @override
   String get localStorageCardTitle => 'Lokaler Speicher';
@@ -9708,4 +9708,21 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Die Android-Alarmeinstellungen konnten nicht geöffnet werden. Erlaube „Alarme und Erinnerungen“ für Vault Explorer in den Systemeinstellungen und versuche es erneut.';
+
+  @override
+  String get localStoragePermissionTitle =>
+      'Zugriff auf den lokalen Speicher erlauben';
+
+  @override
+  String get localStorageGrantAccess => 'Zugriff erlauben';
+
+  @override
+  String get hideStorageLocationsTitle => 'Speicherorte ausblenden?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'Der Zugriff auf alle Dateien wurde nicht erteilt. Möchtest du den lokalen Speicher und hinzugefügte Speicherorte in der Seitenleiste ausblenden? Du kannst sie in den Einstellungen wieder anzeigen.';
+
+  @override
+  String get hide => 'Ausblenden';
 }

@@ -1105,7 +1105,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get showStorageLocationsSubtitle =>
-      'Показує локальне сховище та додані місця зберігання в бічній панелі';
+      'Показує локальне сховище й додані розташування. Щоб відкрити локальне сховище, потрібен доступ до всіх файлів.';
 
   @override
   String get localStorageCardTitle => 'Локальне сховище';
@@ -9783,4 +9783,21 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get autoSyncExactAlarmAccessUnavailable =>
       'Не вдалося відкрити налаштування будильників Android. Увімкніть «Будильники й нагадування» для Vault Explorer у системних налаштуваннях і спробуйте ще раз.';
+
+  @override
+  String get localStoragePermissionTitle =>
+      'Надати доступ до локального сховища';
+
+  @override
+  String get localStorageGrantAccess => 'Надати доступ';
+
+  @override
+  String get hideStorageLocationsTitle => 'Приховати сховища?';
+
+  @override
+  String get hideStorageLocationsPrompt =>
+      'Доступ до всіх файлів не надано. Приховати локальне сховище й додані розташування на бічній панелі? Їх можна знову показати в налаштуваннях.';
+
+  @override
+  String get hide => 'Приховати';
 }

@@ -796,23 +796,34 @@ than take this summary on faith:
   `containers/test/usb_create_diagnostics_test.cpp`) are self-contained,
   build with plain `g++ -std=c++17`, and pass, but are not registered with
   CTest.
-- **The ext2/3/4 backend has its own host test that runs the real
-  `ext_backend.cpp` against real images, with `e2fsck` as the oracle**
-  (`filesystems/test/ext_backend_test.cpp`, built and run by
-  `filesystems/test/run_ext_backend_test.sh`; the `native_ext_backend_tests`
-  CI job). Only the bottom of the stack is faked: FatFs's
-  `disk_read`/`disk_write` seam, which in the app decrypts container sectors,
-  is implemented over plain image files, so mount, `formatExtVolume`, the
-  encrypted-sector I/O manager and every `ext*` operation are production code.
-  It is a separate script rather than a CTest target on purpose: the
-  `native_host_tests` job builds an explicit target list, and this test needs
-  the system `libext2fs-dev`/`e2fsprogs` rather than the vendored,
-  Android-targeted e2fsprogs build. It pins behaviours that were broken before
-  it existed: deleting a directory freed neither its inode nor its parent link,
-  a directory could be moved into its own subtree, writes could target a
-  directory, `mkdir` onto an existing name leaked an inode, names over 255
-  bytes were silently truncated, and copying a file onto itself emptied it.
-  The NTFS and FAT backends have no equivalent yet.
+- **The ext2/3/4 and NTFS backends have their own host tests that run the real
+  backend code against real images, with independent tools as oracles**
+  (`filesystems/test/ext_backend_test.cpp` with `e2fsck`, and
+  `filesystems/test/ntfs_backend_test.cpp` with `ntfsfix`, `ntfsls` and
+  `ntfscat`; built and run by `run_ext_backend_test.sh` /
+  `run_ntfs_backend_test.sh`; the `native_ext_backend_tests` and
+  `native_ntfs_backend_tests` CI jobs). Only the bottom of the stack is faked:
+  FatFs's `disk_read`/`disk_write` seam (ext) and `physicalRead`/
+  `physicalWrite` (NTFS), which in the app decrypt container sectors, are
+  implemented over plain image files, so mount, format (`formatExtVolume`, and
+  the embedded `mkntfs` for NTFS), the encrypted-sector I/O managers and every
+  `ext*`/`ntfs*` operation are production code. The NTFS test builds ntfs-3g
+  at the commit `CMakeLists.txt` pins, with the same generated `config.h` and
+  file list, into a cache directory. They are separate scripts rather than
+  CTest targets on purpose: the `native_host_tests` job builds an explicit
+  target list, and the ext test needs the system `libext2fs-dev`/`e2fsprogs`
+  rather than the vendored, Android-targeted e2fsprogs build.
+  Between them they pin behaviours that were broken before the tests existed:
+  deleting an ext directory freed neither its inode nor its parent link; a
+  directory could be moved into its own subtree (ext and NTFS), detaching it
+  from the root; writes could target a directory (ext and NTFS); ext `mkdir`
+  onto an existing name leaked an inode; names over the filesystem limit were
+  silently truncated to a shorter, different name (ext and NTFS); copying an ext
+  file onto itself emptied it; NTFS mutations on a read-only volume reported
+  success while changing nothing; and a second `mkntfs` in the same process
+  failed or walked freed memory (`filesystems/mkntfs_embedded.c.in` resets its
+  global state). Not covered: the BitLocker, VHD/VHDX and cipher layers, FAT,
+  and Windows' own `chkdsk` (`ntfsfix` is a much weaker check than `e2fsck`).
 - **`file_browser_screen.dart`'s selection-mode and sort-mode state live in
   reusable `SelectionMixin<T>`/`SortMixin<T>` mixins**, not inline in the
   screen's `State` class (`lib/features/browser/mixins/`).

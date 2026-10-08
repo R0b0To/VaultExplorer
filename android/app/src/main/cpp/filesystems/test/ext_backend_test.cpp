@@ -54,74 +54,10 @@ DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     return written == count ? RES_OK : RES_ERROR;
 }
 
-// ---- Tiny test framework ------------------------------------------------------------
-static int g_failures = 0;
-static int g_checks = 0;
-static int g_skips = 0;
-static const char* g_currentTest = "";
+#include "fs_test_support.h"
 
-#define CHECK(cond)                                                                   \
-    do {                                                                              \
-        ++g_checks;                                                                   \
-        if (!(cond)) {                                                                \
-            ++g_failures;                                                             \
-            std::printf("    FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);           \
-        }                                                                             \
-    } while (0)
-#define CHECK_EQ(a, b)                                                                \
-    do {                                                                              \
-        ++g_checks;                                                                   \
-        const auto va_ = (a);                                                         \
-        const auto vb_ = (b);                                                         \
-        if (!(va_ == vb_)) {                                                          \
-            ++g_failures;                                                             \
-            std::printf("    FAIL %s:%d: %s == %s\n", __FILE__, __LINE__, #a, #b);    \
-        }                                                                             \
-    } while (0)
-
-using Bytes = std::vector<uint8_t>;
-
-static bool commandExists(const char* name) {
-    const std::string cmd = std::string("command -v ") + name + " >/dev/null 2>&1";
-    return std::system(cmd.c_str()) == 0;
-}
 static const bool g_haveFsck = commandExists("e2fsck");
 static const bool g_haveMkfs = commandExists("mkfs.ext4");
-
-static std::string g_tmp;
-
-static Bytes pseudoRandom(size_t n, uint64_t seed) {
-    Bytes out(n);
-    uint64_t x = seed * 0x9E3779B97F4A7C15ull + 1;
-    for (size_t i = 0; i < n; ++i) {
-        x ^= x << 13; x ^= x >> 7; x ^= x << 17;  // xorshift64
-        out[i] = static_cast<uint8_t>(x >> 24);
-    }
-    return out;
-}
-
-static bool writeHostFile(const std::string& path, const Bytes& data) {
-    FILE* f = fopen(path.c_str(), "wb");
-    if (!f) return false;
-    const bool ok = fwrite(data.data(), 1, data.size(), f) == data.size();
-    fclose(f);
-    return ok;
-}
-static Bytes readHostFile(const std::string& path) {
-    Bytes out;
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return out;
-    uint8_t buf[65536];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) out.insert(out.end(), buf, buf + n);
-    fclose(f);
-    return out;
-}
-static uint64_t hashHostFile(const std::string& path) {  // FNV-1a
-    uint64_t h = 1469598103934665603ull;
-    for (uint8_t b : readHostFile(path)) { h ^= b; h *= 1099511628211ull; }
-    return h;
-}
 
 // One image file bound to a volume slot.
 struct Vol {
@@ -650,15 +586,18 @@ static void test_read_only_mount_changes_nothing() {
 }
 
 // ---- Runner -------------------------------------------------------------------------
-struct TestCase { const char* name; void (*fn)(); };
-#define T(fn) {#fn, fn}
+static void closeAllVolumes() {
+    for (int i = 0; i < FF_VOLUMES; ++i) {
+        Vol v;
+        v.id = i;
+        v.closeFs();
+        if (g_images[i]) { fclose(g_images[i]); g_images[i] = nullptr; }
+    }
+}
 
 int main() {
-    char tmpl[] = "/tmp/ext_backend_test.XXXXXX";
-    if (!mkdtemp(tmpl)) { std::perror("mkdtemp"); return 2; }
-    g_tmp = tmpl;
+    if (!makeScratchDir("ext_backend_test")) return 2;
     if (!g_haveFsck) std::printf("NOTE: e2fsck not found; filesystem-consistency checks will be skipped.\n");
-
     const TestCase tests[] = {
         T(test_format_variants_pass_fsck),
         T(test_mounts_images_made_by_system_mkfs),
@@ -679,20 +618,5 @@ int main() {
         T(test_streams_read_ranges),
         T(test_read_only_mount_changes_nothing),
     };
-    int failedTests = 0;
-    for (const auto& t : tests) {
-        g_currentTest = t.name;
-        const int before = g_failures;
-        std::printf("[ RUN  ] %s\n", t.name);
-        t.fn();
-        for (int i = 0; i < FF_VOLUMES; ++i) { Vol v; v.id = i; v.closeFs(); if (g_images[i]) { fclose(g_images[i]); g_images[i] = nullptr; } }
-        const bool ok = g_failures == before;
-        if (!ok) ++failedTests;
-        std::printf("[ %s ] %s\n", ok ? "  OK" : "FAIL", t.name);
-    }
-    const std::string cleanup = "rm -rf '" + g_tmp + "'";
-    std::system(cleanup.c_str());
-    std::printf("\n%zu tests, %d checks, %d failed checks (%d failed tests), %d skipped checks\n",
-                sizeof(tests) / sizeof(tests[0]), g_checks, g_failures, failedTests, g_skips);
-    return g_failures == 0 ? 0 : 1;
+    return runTests("ext_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

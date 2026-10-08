@@ -392,8 +392,9 @@ if(ANDROID_ABI MATCHES "x86")
 endif()
 
 set(MKNTFS_EMBEDDED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c)
-file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
-"#include <ntfs-3g/device.h>\nextern struct ntfs_device_operations vExplorer_ntfs_ops;\n#undef ntfs_device_default_io_ops\n#define ntfs_device_default_io_ops vExplorer_ntfs_ops\n#define VERSION \"embedded\"\n#define main vaultexplorer_mkntfs_main\n#include \"${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c\"\n")
+set(NTFS3G_MKNTFS_SOURCE ${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in ${MKNTFS_EMBEDDED_SOURCE} @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in)
 
 # 4. Build target
 add_library(

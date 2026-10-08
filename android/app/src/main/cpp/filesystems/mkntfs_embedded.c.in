@@ -1,0 +1,35 @@
+/*
+ * ntfs-3g's mkntfs, compiled into the app and run in-process (see the
+ * container_create*.cpp files). CMake turns this template into
+ * ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c with configure_file(@ONLY);
+ * filesystems/test/run_ntfs_backend_test.sh does the same substitution with sed.
+ *
+ * mkntfs was written to be the whole life of a process, but here it is called
+ * once per volume formatted, so any state it keeps in globals outlives the call:
+ *
+ *  - getopt(): optind (and glibc's internal scan state) is process-global. Left
+ *    alone, the second call parses its argv from wherever the first one stopped
+ *    -- on glibc it fails with "You must specify a device"; a BSD-derived libc
+ *    would silently skip every option. optind = 0 is the portable "start over".
+ *  - g_allocation: mkntfs_cleanup() frees the cluster-allocation list but leaves
+ *    the pointer dangling, so the next run's bitmap_allocate() walks freed
+ *    memory (use-after-free; a segfault under AddressSanitizer). Because this
+ *    file #includes mkntfs.c, the file-static pointer is reachable from here.
+ */
+#include <ntfs-3g/device.h>
+#include <unistd.h>
+extern struct ntfs_device_operations vExplorer_ntfs_ops;
+#undef ntfs_device_default_io_ops
+#define ntfs_device_default_io_ops vExplorer_ntfs_ops
+#define VERSION "embedded"
+#define main vaultexplorer_mkntfs_main_once
+#include "@NTFS3G_MKNTFS_SOURCE@"
+#undef main
+
+extern int optind;
+
+int vaultexplorer_mkntfs_main(int argc, char* argv[]) {
+    optind = 0;
+    g_allocation = NULL;
+    return vaultexplorer_mkntfs_main_once(argc, argv);
+}

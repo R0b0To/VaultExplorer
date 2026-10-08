@@ -638,6 +638,41 @@ bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
     return true;
 }
 
+// NTFS names are at most 255 UTF-16 units, and ntfs_create()/ntfs_link() take the
+// length as a u8: a longer name doesn't fail, the count wraps and a different,
+// shorter name is stored (256 units wrap to 0 and are rejected by luck).
+static bool ntfsNameLengthOk(int unicodeLength) {
+    return unicodeLength > 0 && unicodeLength <= NTFS_MAX_NAME_LEN;
+}
+
+static bool ntfsIsDirectoryInode(const ntfs_inode* ni) {
+    return (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+}
+
+// True if [dir] is the directory with MFT number [ancestorMftNo] or lies somewhere
+// below it, found by walking ".." up to the root. Fails closed: an unreadable
+// parent counts as "inside", so the caller refuses the operation. [dir] stays
+// owned by the caller.
+static bool ntfsIsSelfOrDescendant(ntfs_inode* dir, u64 ancestorMftNo) {
+    ntfs_inode* current = dir;
+    bool owned = false;
+    for (int depth = 0; depth < 4096; ++depth) {
+        const bool hit = current->mft_no == ancestorMftNo;
+        const bool atRoot = current->mft_no == FILE_root;
+        if (hit || atRoot) {
+            if (owned) ntfs_inode_close(current);
+            return hit;
+        }
+        ntfs_inode* parent = ntfs_dir_parent_inode(current);
+        if (owned) ntfs_inode_close(current);
+        if (!parent) return true;
+        current = parent;
+        owned = true;
+    }
+    if (owned) ntfs_inode_close(current);
+    return true;
+}
+
 ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {
     const size_t slash = path.find_last_of('/');
     std::string parentPath = path.substr(0, slash);
@@ -648,10 +683,10 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {
     ntfschar* unicodeName = nullptr;
     const int unicodeLength = ntfs_mbstoucs(name.c_str(), &unicodeName);
     ntfs_inode* created = nullptr;
-    if (unicodeLength >= 0) {
+    if (ntfsNameLengthOk(unicodeLength)) {
         created = ntfs_create(parent, 0, unicodeName, unicodeLength, S_IFREG);
-        free(unicodeName);
     }
+    free(unicodeName);
     ntfs_inode_close(parent);
     return created;
 }
@@ -695,11 +730,20 @@ bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, s
 
 bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
     auto& v = volumes[volumeId];
+    // The low-level write path already refuses (io/block_io.cpp), but libntfs-3g applies changes in
+    // memory first, so without this a write to a read-only volume -- including one made read-only
+    // mid-session by hidden-volume protection -- would report success and silently vanish.
+    if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
     if (!ni) {
         ni = createNtfsFile(v.ntfsVol, fullPath);
+    }
+    if (ni && ntfsIsDirectoryInode(ni)) {
+        // Without this the code below adds an unnamed $DATA stream to the directory.
+        ntfs_inode_close(ni);
+        ni = nullptr;
     }
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
@@ -724,6 +768,7 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
                    const CopyProgressCallback& onProgress) {
     auto& srcV = volumes[srcVolId];
     auto& destV = volumes[destVolId];
+    if (destV.readOnly) return false;
     std::string srcFullPath = "/" + srcPath;
     std::string destFullPath = "/" + destPath;
     ntfs_inode* src_ni = ntfs_pathname_to_inode(srcV.ntfsVol, NULL, srcFullPath.c_str());
@@ -731,6 +776,10 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
     ntfs_inode* dest_ni = ntfs_pathname_to_inode(destV.ntfsVol, NULL, destFullPath.c_str());
     if (!dest_ni) {
         dest_ni = createNtfsFile(destV.ntfsVol, destFullPath);
+    }
+    if (dest_ni && ntfsIsDirectoryInode(dest_ni)) {
+        ntfs_inode_close(dest_ni);
+        dest_ni = nullptr;
     }
     if (!dest_ni) {
         ntfs_inode_close(src_ni);
@@ -798,11 +847,16 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
                         const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + targetPath;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
     if (!ni) {
         ni = createNtfsFile(v.ntfsVol, fullPath);
+    }
+    if (ni && ntfsIsDirectoryInode(ni)) {
+        ntfs_inode_close(ni);
+        ni = nullptr;
     }
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
@@ -883,6 +937,7 @@ bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::str
 
 bool ntfsDeleteFile(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
@@ -909,6 +964,7 @@ bool ntfsDeleteFile(int volumeId, const std::string& path) {
 
 bool ntfsCreateDirectory(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
     size_t slashPos = fullPath.find_last_of('/');
@@ -919,14 +975,14 @@ bool ntfsCreateDirectory(int volumeId, const std::string& path) {
     if (parentNi) {
         ntfschar* uChild = nullptr;
         int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
-        if (uChildLen >= 0) {
+        if (ntfsNameLengthOk(uChildLen)) {
             ntfs_inode* ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFDIR);
             if (ni) {
                 success = true;
                 ntfs_inode_close(ni);
             }
-            free(uChild);
         }
+        free(uChild);
         ntfs_inode_close(parentNi);
     }
     return success;
@@ -934,6 +990,7 @@ bool ntfsCreateDirectory(int volumeId, const std::string& path) {
 
 bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath) {
     auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
     bool success = false;
     std::string oldFullPath = "/" + oldPath;
     std::string newFullPath = "/" + newPath;
@@ -949,7 +1006,7 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
     int uOldLen = ntfs_mbstoucs(oldChildName.c_str(), &uOld);
     ntfschar* uNew = nullptr;
     int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
-    if (uOldLen >= 0 && uNewLen >= 0) {
+    if (uOldLen >= 0 && ntfsNameLengthOk(uNewLen)) {
         ntfs_inode* existing_dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
         if (existing_dest_ni) {
             ntfs_inode_close(existing_dest_ni);
@@ -961,7 +1018,15 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
         ntfs_inode* dir_new_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
         ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
         if (old_ni && dir_new_ni && dir_old_ni) {
-            if (ntfs_link(old_ni, dir_new_ni, uNew, static_cast<u8>(uNewLen)) == 0) {
+            // Linking a directory under its own subtree and then removing its old name
+            // would detach the whole branch from the root (rename(2) says EINVAL).
+            const bool movesIntoItself =
+                ntfsIsDirectoryInode(old_ni) && ntfsIsSelfOrDescendant(dir_new_ni, old_ni->mft_no);
+            if (movesIntoItself) {
+                LOGI("ntfsRenameFile: refusing to move directory '%s' into itself ('%s')",
+                     oldFullPath.c_str(), newFullPath.c_str());
+            }
+            if (!movesIntoItself && ntfs_link(old_ni, dir_new_ni, uNew, static_cast<u8>(uNewLen)) == 0) {
                 int delRet = ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni,
                                           uOld, static_cast<u8>(uOldLen));
                 old_ni = nullptr;
@@ -1000,6 +1065,7 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
 
 bool ntfsSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds) {
     auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());

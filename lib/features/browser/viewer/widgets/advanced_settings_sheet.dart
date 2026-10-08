@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class AdvancedSettingsSheet extends ConsumerStatefulWidget {
   final String? initialPage;
@@ -481,6 +482,38 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
           ),
           onTap: () {
             widget.onExecuteAction(MediaViewerAction.mute);
+          },
+        );
+      case MediaViewerAction.decoder:
+        final toolbarConfig = ref
+            .watch(fileManagerToolbarSettingsProvider(null))
+            .config
+            .mediaViewerToolbarConfig;
+        final currentMode = toolbarConfig.videoDecoderMode;
+        final label = switch (currentMode) {
+          MediaDecoderMode.auto => context.l10n.decoderAutoOption,
+          MediaDecoderMode.hardware => context.l10n.decoderHardwareOption,
+          MediaDecoderMode.software => context.l10n.decoderSoftwareOption,
+          MediaDecoderMode.ffmpeg => context.l10n.decoderFfmpegOption,
+        };
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.memory_rounded),
+          title: Text(context.l10n.videoDecoderTitle),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onExecuteAction(MediaViewerAction.decoder);
           },
         );
       default:

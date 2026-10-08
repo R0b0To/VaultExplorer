@@ -71,6 +71,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.imageFit,
       MediaViewerAction.playbackSpeed,
       MediaViewerAction.aspectRatio,
+      MediaViewerAction.decoder,
       MediaViewerAction.subtitles,
       MediaViewerAction.audioTrack,
       MediaViewerAction.slideshowDelay,
@@ -276,11 +277,17 @@ class MediaViewerToolbarConfig {
         ? more
         : [...more, MediaViewerAction.editVideo];
 
+    // A config saved before `decoder` existed doesn't list it anywhere.
+    final placed2 = {...top, ...bottom, ...moreWithNew, ...advanced, ...hidden};
+    final advancedWithDecoder = placed2.contains(MediaViewerAction.decoder)
+        ? advanced
+        : [...advanced, MediaViewerAction.decoder];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
       moreMenuActions: moreWithNew,
-      advancedSettingsActions: advanced,
+      advancedSettingsActions: advancedWithDecoder,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,
       showCenterTransport: j['showCenterTransport'] as bool? ?? true,

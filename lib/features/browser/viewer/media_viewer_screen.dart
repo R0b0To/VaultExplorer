@@ -26,6 +26,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -1742,6 +1743,161 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
   }
 
+  void _showDecoderPicker(BuildContext context) {
+    _menuOpened();
+    final l10n = context.l10n;
+    final isAudio =
+        MediaViewerConstants.isAudio(_playlistController.currentFile);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
+      ),
+      builder: (sheetContext) {
+        String selectedTab = isAudio ? 'audio' : 'video';
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final cs = Theme.of(context).colorScheme;
+            final mediaConfig = ref
+                .watch(fileManagerToolbarSettingsProvider(null))
+                .config
+                .mediaViewerToolbarConfig;
+            final isVideoSelected = selectedTab == 'video';
+            final currentMode = isVideoSelected
+                ? mediaConfig.videoDecoderMode
+                : mediaConfig.audioDecoderMode;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.memory_rounded, color: cs.primary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              l10n.decoderSelectionHeader,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                  if (!isAudio) ...[
+                      const SizedBox(height: 12),
+                      Center(
+                        child: SegmentedButton<String>(
+                          segments: [
+                            ButtonSegment<String>(
+                              value: 'video',
+                              icon: const Icon(Icons.videocam_rounded),
+                              label: Text(l10n.videoDecoderTitle),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'audio',
+                              icon: const Icon(Icons.audiotrack_rounded),
+                              label: Text(l10n.audioDecoderTitle),
+                            ),
+                          ],
+                          selected: {selectedTab},
+                          onSelectionChanged: (newSelection) {
+                            setSheetState(() {
+                              selectedTab = newSelection.first;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ] else ...[
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(left: 8, top: 12, bottom: 4),
+                        child: Text(
+                          l10n.audioDecoderTitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                    for (final mode in MediaDecoderMode.values) ...[
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        selected: currentMode == mode,
+                        selectedTileColor:
+                            cs.primaryContainer.withValues(alpha: 0.3),
+                        title: Text(
+                          _decoderModeLabel(l10n, mode),
+                          style: TextStyle(
+                            fontWeight: currentMode == mode
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: currentMode == mode
+                            ? Icon(Icons.check_rounded, color: cs.primary)
+                            : null,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          final controller = ref.read(
+                            fileManagerToolbarSettingsProvider(null).notifier,
+                          );
+                          if (isVideoSelected) {
+                            controller.setMediaViewerVideoDecoderMode(mode);
+                          } else {
+                            controller.setMediaViewerAudioDecoderMode(mode);
+                          }
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(_menuClosed);
+  }
+
+  static String _decoderModeLabel(
+    AppLocalizations l10n,
+    MediaDecoderMode mode,
+  ) {
+    return switch (mode) {
+      MediaDecoderMode.auto => l10n.decoderAutoOption,
+      MediaDecoderMode.hardware => l10n.decoderHardwareOption,
+      MediaDecoderMode.software => l10n.decoderSoftwareOption,
+      MediaDecoderMode.ffmpeg => l10n.decoderFfmpegOption,
+    };
+  }
+
   void _showPlaylistOptionsMenu() {
     _menuOpened();
     showModalBottomSheet(
@@ -2057,6 +2213,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       case MediaViewerAction.audioTrack:
         _showAdvancedSettings(context, isImage, initialPage: 'audioTracks');
         break;
+      case MediaViewerAction.decoder:
+        _showDecoderPicker(context);
+        break;
       case MediaViewerAction.screenOrientation:
         _cycleScreenOrientation();
         break;
@@ -2115,6 +2274,40 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         });
   }
 
+  Future<void> _openCustomizeControls() async {
+    _menuOpened();
+    _cancelSlideshowTimer();
+    final controller = _playbackManager.activeController;
+    final wasPlaying = controller != null && controller.value.isPlaying;
+    final isImage = MediaViewerConstants.isImage(
+      _playlistController.currentFile,
+    );
+    final wasAutoAdvancing = isImage && _autoAdvance;
+
+    if (wasPlaying) {
+      await controller.pause();
+    }
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MediaViewerToolbarSettingsScreen(),
+      ),
+    );
+    if (!mounted) return;
+    _menuClosed();
+
+    if (wasPlaying) {
+      final active = _playbackManager.activeController;
+      if (active != null && !active.value.isPlaying) {
+        await active.play();
+      }
+    } else if (wasAutoAdvancing) {
+      _startSlideshowTimerIfNeeded();
+    }
+  }
+
   void _showAdvancedSettings(
     BuildContext context,
     bool isImage, {
@@ -2136,15 +2329,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           actions: mediaConfig.advancedSettingsActions,
           isMuted: _isMuted,
           onExecuteAction: _executeMediaAction,
-          onCustomizeControls: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    const MediaViewerToolbarSettingsScreen(initialTab: 1),
-              ),
-            );
-          },
+          onCustomizeControls: _openCustomizeControls,
           isPlaylistMode: _playlistController.isPlaylistMode,
           isImage: isImage,
           currentFileName: _playlistController.currentFile,
@@ -2802,17 +2987,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           },
                           isMuted: _isMuted,
                           onExecuteAction: _executeMediaAction,
-                          onCustomizeControls: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const MediaViewerToolbarSettingsScreen(
-                                  initialTab: 1,
-                                ),
-                              ),
-                            );
-                          },
+                          onCustomizeControls: _openCustomizeControls,
                           isBookmark: _isCurrentFileBookmark,
                           onPlaylistChanged: _onPlaylistChanged,
                           onMenuOpened: _menuOpened,

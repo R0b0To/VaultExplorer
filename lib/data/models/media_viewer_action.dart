@@ -25,6 +25,7 @@ enum MediaViewerAction {
   delete,
   playlistMenu,
   advancedSettings,
+  decoder,
   diagnostics;
 
   IconData get icon => switch (this) {
@@ -51,6 +52,7 @@ enum MediaViewerAction {
         MediaViewerAction.delete => Icons.delete_outline_rounded,
         MediaViewerAction.playlistMenu => Icons.playlist_play_rounded,
         MediaViewerAction.advancedSettings => Icons.tune_rounded,
+        MediaViewerAction.decoder => Icons.memory_rounded,
         MediaViewerAction.diagnostics => Icons.analytics_outlined,
       };
 
@@ -78,6 +80,7 @@ enum MediaViewerAction {
         MediaViewerAction.delete => l10n.deleteFileMenu,
         MediaViewerAction.playlistMenu => l10n.playlistOptionsTooltip,
         MediaViewerAction.advancedSettings => l10n.advancedSettingsTooltip,
+        MediaViewerAction.decoder => l10n.videoDecoderTitle,
         MediaViewerAction.diagnostics => l10n.mediaViewerActionDiagnostics,
       };
 
@@ -89,6 +92,7 @@ enum MediaViewerAction {
           this == MediaViewerAction.audioTrack ||
           this == MediaViewerAction.aspectRatio ||
           this == MediaViewerAction.editVideo ||
+          this == MediaViewerAction.decoder ||
           this == MediaViewerAction.diagnostics) {
         return false;
       }

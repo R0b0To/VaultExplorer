@@ -2748,15 +2748,18 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     if (activeTab.isMarkdownFile && activeTab.showMarkdownPreview) {
-      return SelectionArea(
-        child: MarkdownBodyView(
-          key: activeTab.previewKey,
-          source: activeTab.codeController.text,
-          container: widget.container,
-          currentFilePath: activeTab.filePath,
-          onLinkTap: _handleLinkTap,
-          scrollController: activeTab.previewScrollController,
-          onTaskToggled: _toggleMarkdownTask,
+      return FastScrollbar(
+        controller: activeTab.previewScrollController,
+        child: SelectionArea(
+          child: MarkdownBodyView(
+            key: activeTab.previewKey,
+            source: activeTab.codeController.text,
+            container: widget.container,
+            currentFilePath: activeTab.filePath,
+            onLinkTap: _handleLinkTap,
+            scrollController: activeTab.previewScrollController,
+            onTaskToggled: _toggleMarkdownTask,
+          ),
         ),
       );
     }

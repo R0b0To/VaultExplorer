@@ -125,3 +125,16 @@ jobs:
 
       - name: Build and run ext_backend_test
         run: sh android/app/src/main/cpp/filesystems/test/run_ext_backend_test.sh
+
+  native_ntfs_backend_tests:
+    name: Native NTFS backend tests (pinned ntfs-3g, app's own mkntfs)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools and the ntfs-3g utilities used as independent oracles
+        run: sudo apt-get update && sudo apt-get install -y g++ git ntfs-3g libssl-dev libmbedtls-dev
+
+      - name: Build and run ntfs_backend_test
+        run: sh android/app/src/main/cpp/filesystems/test/run_ntfs_backend_test.sh

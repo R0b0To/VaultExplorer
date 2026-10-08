@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
@@ -146,7 +147,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                           AppCard.rows(
                             dividerIndent: 16,
                             children: [
-                              _buildInfoTile(context, context.l10n.fullPathLabel, _fullPath),
+                              _buildInfoTile(context, context.l10n.fullPathLabel, _fullPath, copyable: true),
                               if (!widget.entry.isDir)
                                 _buildInfoTile(
                                   context,
@@ -303,11 +304,26 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     );
   }
 
-  Widget _buildInfoTile(BuildContext context, String label, String value) {
+  Future<void> _copyValue(BuildContext context, String label, String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: context.l10n.copiedSuffix(label),
+      tone: AppBannerTone.success,
+    );
+  }
+
+  Widget _buildInfoTile(
+    BuildContext context,
+    String label,
+    String value, {
+    bool copyable = false,
+  }) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,8 +342,19 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
               style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
+          if (copyable) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.copy_rounded, size: 18, color: cs.onSurfaceVariant),
+          ],
         ],
       ),
+    );
+
+    if (!copyable) return row;
+    return InkWell(
+      onTap: () => _copyValue(context, label, value),
+      onLongPress: () => _copyValue(context, label, value),
+      child: row,
     );
   }
 }

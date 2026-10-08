@@ -25,6 +25,7 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_sc
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
+  final VoidCallback? onOpenLocalStorage;
   final int selectedTabIndex;
   final ValueChanged<int>? onSelectTab;
   final ValueChanged<MountedContainer>? onSelectContainer;
@@ -37,6 +38,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     super.key,
     this.currentVolId,
     this.primaryLocalContainer,
+    this.onOpenLocalStorage,
     this.selectedTabIndex = 0,
     this.onSelectTab,
     this.onSelectContainer,
@@ -452,7 +454,6 @@ class AppNavigationDrawer extends ConsumerWidget {
                           ),
 
                           if (showStorageLocations) ...[
-                              if (primary != null)
                               ListTile(
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                                 selected: currentVolId == kDecoyLocalVolId,
@@ -470,7 +471,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 onTap: () {
                                   Navigator.pop(context);
                                   if (currentVolId == kDecoyLocalVolId) return;
-                                  onSelectContainer?.call(primary);
+                                  if (onOpenLocalStorage != null) {
+                                    onOpenLocalStorage!();
+                                  } else if (primary != null) {
+                                    onSelectContainer?.call(primary);
+                                  }
                                 },
                               ),
 

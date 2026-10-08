@@ -7,6 +7,9 @@
     <string name="install_no_installer">No app on this device can install APK files</string>
 
     <string name="vault_keep_alive_channel_description">Ongoing status notifications</string>
+    <string name="scheduled_sync_channel_name">Scheduled vault sync</string>
+    <string name="scheduled_sync_channel_description">Status while a scheduled vault sync is running</string>
+    <string name="syncing_vault_notification">Syncing vault...</string>
     <plurals name="vault_keep_alive_notification_text">
         <item quantity="one">%d vault open</item>
         <item quantity="other">%d vaults open</item>

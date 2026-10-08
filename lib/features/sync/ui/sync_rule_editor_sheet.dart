@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/api/vault_automation_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -10,6 +11,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
 import 'package:vaultexplorer/features/sync/domain/folder_vault_detector.dart';
@@ -106,6 +108,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _live = false;
   bool _deletes = false;
   bool _deleteSourceAfterImport = false;
+  bool _scheduledRun = false;
+  bool _scheduleAvailable = false;
 
   String _initialTargetUri = '';
   String _initialTargetSub = '';
@@ -115,6 +119,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _initialLive = false;
   bool _initialDeletes = false;
   bool _initialDeleteSourceAfterImport = false;
+  bool _initialScheduledRun = false;
   String _initialIgnore = '';
 
   bool get _readOnly => widget.vault.readOnly;
@@ -129,6 +134,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
           _live != _initialLive ||
           _deletes != _initialDeletes ||
           _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
+          _scheduledRun != _initialScheduledRun ||
           _ignore.text.trim() != _initialIgnore.trim();
     }
     return _targetUri != _initialTargetUri ||
@@ -139,6 +145,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _live != _initialLive ||
         _deletes != _initialDeletes ||
         _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
+        _scheduledRun != _initialScheduledRun ||
         _ignore.text.trim() != _initialIgnore.trim();
   }
 
@@ -190,6 +197,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         : ref
               .read(syncCoordinatorServiceProvider)
               .lastReportFor(widget.vault, existing.id);
+    final automation = await ref
+        .read(vaultAutomationApiProvider)
+        .getAutomationVaultConfig(widget.vault.uri);
     String? primaryLocalStorageRoot;
     try {
       primaryLocalStorageRoot =
@@ -228,6 +238,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _deleteSourceAfterImport =
             existing.direction == SyncDirection.targetToVault &&
             existing.deleteSourceAfterImport;
+        _scheduledRun = binding?.scheduledRun ?? false;
         _ignore.text = existing.ignorePatterns.join('\n');
       }
       _initialTargetUri = _targetUri;
@@ -238,6 +249,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       _initialLive = _live;
       _initialDeletes = _deletes;
       _initialDeleteSourceAfterImport = _deleteSourceAfterImport;
+      _initialScheduledRun = _scheduledRun;
+      _scheduleAvailable =
+          automation.tier == AutomationTier.full &&
+          automation.hasStoredPassword;
       _initialIgnore = _ignore.text;
       _loading = false;
     });
@@ -356,6 +371,73 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     setState(() => _deleteSourceAfterImport = value);
   }
 
+  Future<void> _setScheduledRun(bool value) async {
+    if (!value) {
+      if (mounted) setState(() => _scheduledRun = false);
+      return;
+    }
+    if (!_scheduleAvailable) {
+      await _openAutomationSettings();
+      return;
+    }
+    final notificationsAllowed = await ref
+        .read(vaultLifecycleApiProvider)
+        .requestNotificationPermission();
+    if (!mounted) return;
+    if (!notificationsAllowed) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.autoSyncScheduleNotificationRequired,
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.autoSyncScheduleWarningTitle),
+        content: Text(l10n.autoSyncScheduleWarningMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.autoSyncScheduleEnable),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      setState(() => _scheduledRun = true);
+    }
+  }
+
+  Future<void> _openAutomationSettings() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AutomationSettingsScreen(
+          uri: widget.vault.uri,
+          containerFormat: widget.vault.containerFormat,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    final automation = await ref
+        .read(vaultAutomationApiProvider)
+        .getAutomationVaultConfig(widget.vault.uri);
+    if (!mounted) return;
+    setState(() {
+      _scheduleAvailable =
+          automation.tier == AutomationTier.full &&
+          automation.hasStoredPassword;
+    });
+  }
+
   List<String> get _patterns => _ignore.text
       .split('\n')
       .map((s) => s.trim())
@@ -423,7 +505,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     final ok = await ref
         .read(syncConfigStoreProvider)
         .save(widget.vault, config.copyWith(rules: rules));
+    var scheduledFailed = false;
     if (ok) {
+      var bindingSaved = true;
       try {
         await ref
             .read(syncTargetBindingStoreProvider)
@@ -434,11 +518,42 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                 uri: _targetUri,
                 displayName: _targetName,
                 subPath: _targetSub,
+                scheduledRun: _scheduledRun,
               ),
             );
       } catch (_) {
+        bindingSaved = false;
         // Without a binding the rule falls back to the config's default
         // target, which for a new rule is this same pick.
+      }
+      final scheduleOk = await ref
+          .read(vaultLifecycleApiProvider)
+          .scheduleVaultSync(
+            enabled: _scheduledRun && bindingSaved,
+            vaultUri: widget.vault.uri,
+            vaultDisplayName: widget.vault.displayName,
+            ruleId: id,
+            targetUri: _targetUri,
+            targetSubPath: _targetSub,
+            targetDisplayName: _targetName,
+          );
+      if (_scheduledRun && (!bindingSaved || !scheduleOk)) {
+        scheduledFailed = true;
+        _scheduledRun = false;
+        try {
+          await ref
+              .read(syncTargetBindingStoreProvider)
+              .write(
+                config.vaultSyncId,
+                id,
+                SyncTargetBinding(
+                  uri: _targetUri,
+                  displayName: _targetName,
+                  subPath: _targetSub,
+                  scheduledRun: false,
+                ),
+              );
+        } catch (_) {}
       }
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
       final syncedPaths = rules
@@ -461,8 +576,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       return;
     }
 
-    var message = l10n.autoSyncSaved;
-    var tone = AppBannerTone.success;
+    var message = scheduledFailed
+        ? l10n.autoSyncScheduleFailed
+        : (_scheduledRun ? l10n.autoSyncSavedScheduled : l10n.autoSyncSaved);
+    var tone = scheduledFailed ? AppBannerTone.warning : AppBannerTone.success;
     if (syncAfter) {
       final started = ref
           .read(syncCoordinatorServiceProvider)
@@ -508,6 +625,19 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         .read(syncConfigStoreProvider)
         .save(widget.vault, config.copyWith(rules: remainingRules));
     if (ok) {
+      await ref
+          .read(vaultLifecycleApiProvider)
+          .scheduleVaultSync(
+            enabled: false,
+            vaultUri: widget.vault.uri,
+            vaultDisplayName: widget.vault.displayName,
+            ruleId: existing.id,
+            targetUri: _targetUri.isNotEmpty
+                ? _targetUri
+                : existing.targetEndpointUri,
+            targetSubPath: _targetSub,
+            targetDisplayName: _targetName,
+          );
       try {
         await ref
             .read(syncTargetBindingStoreProvider)
@@ -812,6 +942,43 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                           value: _live,
                           onChanged: (v) => setState(() => _live = v),
                         ),
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                          title: Text(
+                            l10n.autoSyncScheduledTitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            _scheduleAvailable
+                                ? l10n.autoSyncScheduledSubtitle
+                                : l10n.autoSyncScheduledSetupRequired,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          value: _scheduledRun,
+                          onChanged: _saving ? null : _setScheduledRun,
+                        ),
+                        if (!_scheduleAvailable)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                bottom: 8,
+                              ),
+                              child: TextButton(
+                                onPressed: _saving
+                                    ? null
+                                    : _openAutomationSettings,
+                                child: Text(l10n.autoSyncScheduledConfigure),
+                              ),
+                            ),
+                          ),
                         SwitchListTile(
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,

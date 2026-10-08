@@ -10,6 +10,8 @@ abstract final class ChannelMethods {
   static const probeContainerFormat = 'probeContainerFormat';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
+  static const scheduleVaultSync = 'scheduleVaultSync';
+  static const resolveRawStoragePath = 'resolveRawStoragePath';
   static const startBackgroundRecording = 'startBackgroundRecording';
   static const stopBackgroundRecording = 'stopBackgroundRecording';
   static const updateBackgroundServiceProgress =
@@ -257,6 +259,7 @@ abstract final class ChannelMethods {
 
   // Document Providers & SAF Storage
   static const String safListDirectory = 'safListDirectory';
+  static const String safCanListDirectory = 'safCanListDirectory';
   static const String safCheckTreeAccess = 'safCheckTreeAccess';
   static const String safGetFileSize = 'safGetFileSize';
   static const String safReadFileChunk = 'safReadFileChunk';

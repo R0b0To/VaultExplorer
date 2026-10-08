@@ -374,13 +374,37 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         )
     }
 
-    private fun handleUnlock(context: Context, vaultUri: String, intent: Intent): Outcome {
+    internal fun unlockForScheduledSync(context: Context, vaultUri: String): String? {
+        if (!AutomationSettings.canImportExport(context, vaultUri)) {
+            return "FORBIDDEN: Background sync requires FULL automation opt-in"
+        }
+        if (AutomationSettings.getStoredPassword(context, vaultUri).isNullOrEmpty()) {
+            return "FORBIDDEN: No saved unlock password is available"
+        }
+        val outcome = handleUnlock(
+            context,
+            vaultUri,
+            Intent().putExtra(EXTRA_READ_ONLY, false),
+            startKeepAliveService = false,
+        )
+        return if (outcome.code == "OK") null else "${outcome.code}: ${outcome.message}"
+    }
+
+    private fun handleUnlock(
+        context: Context,
+        vaultUri: String,
+        intent: Intent,
+        startKeepAliveService: Boolean = true,
+    ): Outcome {
         if (!AutomationSettings.canUnlockLock(context, vaultUri)) {
             return Outcome("FORBIDDEN", "This vault is not opted in to automation")
         }
         val existingVolId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
         if (existingVolId != null) {
-            startKeepAlive(context)
+            if (!startKeepAliveService) {
+                return Outcome("BUSY", "Vault became unlocked before scheduled sync started")
+            }
+            if (startKeepAliveService) startKeepAlive(context)
             reportAutomationUnlock(context, existingVolId)
             return Outcome("OK", "Already unlocked")
         }
@@ -411,7 +435,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             )
             return when (result) {
                 is ContainerLifecycleCore.DirectoryVaultOutcome.Success -> {
-                    startKeepAlive(context)
+                    if (startKeepAliveService) startKeepAlive(context)
                     reportAutomationUnlock(context, result.result.volId)
                     Outcome("OK", "Unlocked")
                 }
@@ -446,7 +470,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         )
         return when (result) {
             is ContainerLifecycleCore.UnlockCoreOutcome.Success -> {
-                startKeepAlive(context)
+                if (startKeepAliveService) startKeepAlive(context)
                 reportAutomationUnlock(context, result.result.volId)
                 Outcome("OK", "Unlocked")
             }

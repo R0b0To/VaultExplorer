@@ -120,6 +120,7 @@ class SyncExecutor {
     required SyncCancellationToken token,
     void Function(SyncProgress progress)? onProgress,
     bool incompleteScan = false,
+    bool abortOnFirstFailure = false,
 
     /// Key the ledger rows are filed under; defaults to `rule.id`.
     String? ledgerKey,
@@ -307,6 +308,7 @@ class SyncExecutor {
           // file names are private.
           failed++;
           VeLog.d(_tag, 'action ${action.kind.name} failed: $e');
+          if (abortOnFirstFailure) break;
         }
       }
     } finally {
@@ -406,6 +408,10 @@ class SyncExecutor {
       return false; // Already gone; no cleanup is needed.
     }
 
+    final destinationState = (await destination.stat([rel]))[rel];
+    if (destinationState == null || destinationState.size != sourceBefore.size) {
+      throw const _StepFailed('source-verification');
+    }
     final destinationHash = await destination.hash(rel, token);
     if (token.isCancelled) throw const SyncCancelledException();
     final sourceHash = await source.hash(rel, token);

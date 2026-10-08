@@ -16,7 +16,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 
@@ -36,6 +35,17 @@ class LocalFileIoBackend {
   /// a real filesystem path, so that side is left alone).
   String resolve(String rootPath, String relativePath) =>
       _resolve(rootPath, relativePath);
+
+  Future<bool> canListDirectory(String rootPath, String dirPath) async {
+    try {
+      final directory = Directory(_resolve(rootPath, dirPath));
+      if (!await directory.exists()) return false;
+      await for (final _ in directory.list(followLinks: false)) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<List<String>> listDirectory(
     String rootPath,
@@ -131,7 +141,9 @@ class LocalFileIoBackend {
     try {
       final file = File(_resolve(rootPath, fileName));
       await file.parent.create(recursive: true);
-      raf = await file.open(mode: offset == 0 ? FileMode.write : FileMode.append);
+      raf = await file.open(
+        mode: offset == 0 ? FileMode.write : FileMode.append,
+      );
       await raf.setPosition(offset);
       await raf.writeFrom(data);
       await raf.flush();
@@ -146,7 +158,7 @@ class LocalFileIoBackend {
     }
   }
 
-Future<bool> createDirectory(String rootPath, String dirPath) async {
+  Future<bool> createDirectory(String rootPath, String dirPath) async {
     try {
       final path = _resolve(rootPath, dirPath);
       if (await FileSystemEntity.type(path) != FileSystemEntityType.notFound) {
@@ -200,12 +212,12 @@ Future<bool> createDirectory(String rootPath, String dirPath) async {
     int epochSeconds,
   ) async {
     try {
-      await File(_resolve(rootPath, fileName))
-          .setLastModified(DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000));
+      await File(_resolve(rootPath, fileName)).setLastModified(
+        DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000),
+      );
       return true;
     } catch (_) {
       return false;
     }
   }
-
 }

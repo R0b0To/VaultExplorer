@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.automation
 
 import android.content.Context
 import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore.DirectoryVaultFormat
+import com.aeidolon.vaultexplorer.handlers.ScheduledSyncHandlers
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -124,6 +125,9 @@ class AutomationSettingsHandlers(private val context: Context) {
             return
         }
         AutomationSettings.setTier(context, vaultUri, tier, wireFormatToDirectoryFormat(call.argument<String>("format")))
+        if (tier != AutomationSettings.AutomationTier.FULL) {
+            ScheduledSyncHandlers.cancelSchedulesForVault(context, vaultUri)
+        }
         result.success(true)
     }
 
@@ -133,7 +137,11 @@ class AutomationSettingsHandlers(private val context: Context) {
             result.error("INVALID_ARGS", "vaultUri is required", null)
             return
         }
-        AutomationSettings.setStoredPassword(context, vaultUri, call.argument<String>("password"))
+        val password = call.argument<String>("password")
+        AutomationSettings.setStoredPassword(context, vaultUri, password)
+        if (password.isNullOrEmpty()) {
+            ScheduledSyncHandlers.cancelSchedulesForVault(context, vaultUri)
+        }
         result.success(true)
     }
 

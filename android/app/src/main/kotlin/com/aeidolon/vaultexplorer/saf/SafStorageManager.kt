@@ -273,6 +273,27 @@ class SafStorageManager(private val context: Context) {
     }
 
     /**
+     * Strict scan probe: unlike [listDirectory], this distinguishes an
+     * accessible empty directory from a provider/query failure.
+     */
+    fun canListDirectory(treeUri: Uri, relativePath: String): Boolean {
+        return try {
+            val docId = resolveDocumentId(treeUri, relativePath) ?: return false
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+            context.contentResolver.query(
+                childrenUri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null,
+                null,
+                null,
+            )?.use { true } ?: false
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "Strict directory probe failed for $relativePath: ${e.message}" }
+            false
+        }
+    }
+
+    /**
      * Lists directory contents in a single cursor pass with full metadata.
      */
     fun listDirectory(treeUri: Uri, relativePath: String, refresh: Boolean = false): List<SafEntry> {

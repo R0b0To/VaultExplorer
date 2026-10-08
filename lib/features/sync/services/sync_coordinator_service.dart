@@ -18,12 +18,14 @@ import 'package:vaultexplorer/features/sync/domain/sync_cancellation.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_rule_runner.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_rule_validation.dart';
+import 'package:vaultexplorer/features/sync/domain/sync_ledger_key.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_run_scheduler.dart';
 import 'package:vaultexplorer/features/sync/services/live_watch_service.dart';
 import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 import 'package:vaultexplorer/features/sync/services/sync_notification_bridge.dart';
 import 'package:vaultexplorer/features/sync/services/sync_status.dart';
-import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
+import 'package:vaultexplorer/core/api/vault_engine_types.dart'
+    show logSwallowed;
 
 /// One unlocked vault's sync state. All of a vault's runs go through its
 /// [scheduler], one at a time, because they share [ledger].
@@ -170,7 +172,9 @@ class SyncCoordinatorService {
       final previous = _sessions[vault.uri];
       if (previous == null || previous.locked) {
         final session = _VaultSession(vault, _io);
-        session.scheduler = SyncRunScheduler((ruleId) => _runOne(session, ruleId));
+        session.scheduler = SyncRunScheduler(
+          (ruleId) => _runOne(session, ruleId),
+        );
         _sessions[vault.uri] = session;
         _barrier.register(vault.uri, () => _cancelAndWait(session));
         // If the previous mount of this same vault is still winding down,
@@ -182,7 +186,10 @@ class SyncCoordinatorService {
         );
       }
     } else {
-      VeLog.d(_tag, 'vault is read-only; sync skipped (the ledger can\'t be saved)');
+      VeLog.d(
+        _tag,
+        'vault is read-only; sync skipped (the ledger can\'t be saved)',
+      );
     }
 
     // Rules in other vaults that were waiting for this one to unlock.
@@ -280,7 +287,11 @@ class SyncCoordinatorService {
     try {
       await _quiesce(session).timeout(lockWaitLimit);
     } catch (_) {
-      VeLog.w(_tag, 'sync did not stop within ${lockWaitLimit.inSeconds}s; locking anyway', 'timeout');
+      VeLog.w(
+        _tag,
+        'sync did not stop within ${lockWaitLimit.inSeconds}s; locking anyway',
+        'timeout',
+      );
     }
   }
 
@@ -379,8 +390,12 @@ class SyncCoordinatorService {
       } else if (c.isSafStorage) {
         poll = _safPoll;
       } else {
-        final root = c.uri.endsWith('/') ? c.uri.substring(0, c.uri.length - 1) : c.uri;
-        hostDirectory = target.subPath.isEmpty ? root : '$root/${target.subPath}';
+        final root = c.uri.endsWith('/')
+            ? c.uri.substring(0, c.uri.length - 1)
+            : c.uri;
+        hostDirectory = target.subPath.isEmpty
+            ? root
+            : '$root/${target.subPath}';
       }
     }
     return LiveWatchSpec(
@@ -423,7 +438,8 @@ class SyncCoordinatorService {
 
     // Stamp the config only when something changed: live watching runs
     // often, and idle runs shouldn't rewrite it each time.
-    if (report.completedCleanly && (report.didWork || rule.lastSyncedAt == null)) {
+    if (report.completedCleanly &&
+        (report.didWork || rule.lastSyncedAt == null)) {
       final now = DateTime.now();
       await _configStore.updateLastSynced(session.vault, {ruleId: now});
       // Build on the session's *current* config: the editor may have
@@ -431,7 +447,8 @@ class SyncCoordinatorService {
       final current = session.config ?? config;
       session.config = current.copyWith(
         rules: [
-          for (final r in current.rules) r.id == ruleId ? r.copyWith(lastSyncedAt: now) : r,
+          for (final r in current.rules)
+            r.id == ruleId ? r.copyWith(lastSyncedAt: now) : r,
         ],
       );
     }
@@ -448,7 +465,11 @@ class SyncCoordinatorService {
 
     if (target.container.uri == vault.uri &&
         syncPathsOverlap(rule.vaultRelativePath, target.subPath)) {
-      VeLog.w(_tag, 'rule skipped: source and target folders overlap', 'overlap');
+      VeLog.w(
+        _tag,
+        'rule skipped: source and target folders overlap',
+        'overlap',
+      );
       return null;
     }
 
@@ -474,8 +495,23 @@ class SyncCoordinatorService {
       label: target.displayName,
     );
 
-    final ledgerKey =
-        '${rule.id}#${_fingerprint('${rule.vaultRelativePath}|${target.identity}|${target.subPath}')}';
+    final ledgerKey = syncLedgerKeyFor(
+      rule,
+      targetIdentity: target.identity,
+      targetSubPath: target.subPath,
+    );
+    final targetStoragePath = target.container.isLocalStorage
+        ? await _io.resolveRawStoragePath(target.container.uri) ??
+              target.container.uri
+        : null;
+    final vaultStoragePath = await _io.resolveRawStoragePath(vault.uri) ?? vault.uri;
+    final vaultCiphertextPath = targetStoragePath != null
+        ? SyncIgnoreMatcher.vaultCiphertextPathRelativeToTarget(
+            vaultUri: vaultStoragePath,
+            targetUri: targetStoragePath,
+            targetSubPath: target.subPath,
+          )
+        : null;
 
     final isExplicit = _explicitSyncRules.remove(rule.id);
 
@@ -496,7 +532,8 @@ class SyncCoordinatorService {
     }
 
     void onProgress(SyncProgress p) {
-      if (p.totalActions == 0 && !isExplicit) return; // scanning, or nothing to do: stay quiet
+      if (p.totalActions == 0 && !isExplicit)
+        return; // scanning, or nothing to do: stay quiet
       if (!announced) {
         announced = true;
         _runningCount++;
@@ -523,6 +560,7 @@ class SyncCoordinatorService {
         token: session.token,
         ledgerKey: ledgerKey,
         onProgress: onProgress,
+        protectedPaths: [if (vaultCiphertextPath != null) vaultCiphertextPath],
       );
       return report;
     } finally {
@@ -651,7 +689,7 @@ class SyncCoordinatorService {
       VeLog.w(
         _tag,
         'rule target is the encrypted storage of a ${vaultHit.format.wire} '
-        'vault, not a plain folder; not syncing until that vault is unlocked',
+            'vault, not a plain folder; not syncing until that vault is unlocked',
         'vault-folder-target',
       );
       return null;
@@ -668,7 +706,10 @@ class SyncCoordinatorService {
         volId: -1000000 - (rule.id.hashCode & 0xFFFFF),
       );
 
-  Future<void> _ensureVaultFolder(MountedContainer vault, String relPath) async {
+  Future<void> _ensureVaultFolder(
+    MountedContainer vault,
+    String relPath,
+  ) async {
     try {
       final existing = await _io.listDirectory(vault, relPath);
       // Some engines answer "no such folder" with an empty list rather
@@ -687,15 +728,5 @@ class SyncCoordinatorService {
         logSwallowed('_ensureVaultFolder', e, expected: true);
       }
     }
-  }
-
-  /// FNV-1a: a short, stable, non-secret fingerprint.
-  static String _fingerprint(String input) {
-    var h = 0x811c9dc5;
-    for (final unit in input.codeUnits) {
-      h ^= unit;
-      h = (h * 0x01000193) & 0xFFFFFFFF;
-    }
-    return h.toRadixString(16).padLeft(8, '0');
   }
 }

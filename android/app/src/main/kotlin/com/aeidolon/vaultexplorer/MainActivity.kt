@@ -39,6 +39,7 @@ import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.bridge.VideoEditProgressBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.service.VaultCameraRecordingService
+import com.aeidolon.vaultexplorer.handlers.ScheduledSyncHandlers
 import com.aeidolon.vaultexplorer.saf.MirrorPushEvents
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
@@ -91,6 +92,8 @@ private object ChannelMethods {
     const val PROBE_CONTAINER_FORMAT    = "probeContainerFormat"
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
+    const val SCHEDULE_VAULT_SYNC       = "scheduleVaultSync"
+    const val RESOLVE_RAW_STORAGE_PATH  = "resolveRawStoragePath"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
     const val GET_MIRROR_PUSH_ACTIVITY = "getMirrorPushActivity"
     const val SET_NOTIFICATION_LOCALE = "setNotificationLocale"
@@ -305,6 +308,7 @@ private object ChannelMethods {
 
     // Document Providers & SAF Storage
     const val SAF_LIST_DIRECTORY        = "safListDirectory"
+    const val SAF_CAN_LIST_DIRECTORY    = "safCanListDirectory"
     const val SAF_CHECK_TREE_ACCESS     = "safCheckTreeAccess"
     const val SAF_GET_FILE_SIZE         = "safGetFileSize"
     const val SAF_READ_FILE_CHUNK       = "safReadFileChunk"
@@ -367,6 +371,9 @@ open class MainActivity : FlutterFragmentActivity() {
     private val localFileHandlers = LocalFileHandlers(this, ioExecutor)
     private val shareIntentHandlers = ShareIntentHandlers(this, ioExecutor)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
+    private val scheduledSyncHandlers by lazy(LazyThreadSafetyMode.NONE) {
+        ScheduledSyncHandlers(applicationContext)
+    }
     private val cameraRecordingServiceHandlers = CameraRecordingServiceHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
@@ -1003,6 +1010,19 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
+                ChannelMethods.SCHEDULE_VAULT_SYNC -> scheduledSyncHandlers.handleSchedule(call, result)
+                ChannelMethods.RESOLVE_RAW_STORAGE_PATH -> {
+                    val rawUri = call.argument<String>("uri")
+                    if (rawUri.isNullOrBlank()) {
+                        result.error("INVALID_ARGS", "uri is required", null)
+                    } else {
+                        val resolved = com.aeidolon.vaultexplorer.saf.UriToPath.getRawPath(
+                            this,
+                            Uri.parse(rawUri),
+                        )
+                        result.success(resolved)
+                    }
+                }
                 ChannelMethods.UPDATE_BACKGROUND_SERVICE_PROGRESS -> backgroundServiceHandlers.handleUpdateProgress(call, result)
                 ChannelMethods.GET_MIRROR_PUSH_ACTIVITY -> result.success(
                     mapOf("activeCount" to MirrorPushEvents.snapshot().activeCount),
@@ -1049,6 +1069,14 @@ open class MainActivity : FlutterFragmentActivity() {
                     ioExecutor.execute {
                         val accessible = safStorageManager.isTreeAccessible(treeUri)
                         runOnUiThread { result.success(accessible) }
+                    }
+                }
+                ChannelMethods.SAF_CAN_LIST_DIRECTORY -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val dirPath = call.argument<String>("dirPath") ?: ""
+                    ioExecutor.execute {
+                        val readable = safStorageManager.canListDirectory(treeUri, dirPath)
+                        runOnUiThread { result.success(readable) }
                     }
                 }
                 ChannelMethods.SAF_GET_FILE_SIZE -> {

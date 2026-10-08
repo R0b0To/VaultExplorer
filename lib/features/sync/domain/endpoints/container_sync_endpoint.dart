@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/sync/domain/endpoints/sync_endpoint.dart';
+import 'package:vaultexplorer/features/sync/domain/folder_vault_detector.dart';
 import 'package:vaultexplorer/features/sync/domain/models/sync_rule.dart';
 import 'package:vaultexplorer/features/sync/domain/models/sync_state_record.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_cancellation.dart';
@@ -38,6 +39,10 @@ class ContainerSyncEndpoint implements SyncEndpoint {
   /// Sync root inside [container], normalized (no slashes at either end).
   final String rootPath;
 
+  /// Probe external folder readability so permission or provider failures
+  /// cannot look like empty trees during unattended, delete-enabled runs.
+  final bool failClosedListings;
+
   @override
   final String label;
 
@@ -53,6 +58,7 @@ class ContainerSyncEndpoint implements SyncEndpoint {
     required this.container,
     String rootPath = '',
     String? label,
+    this.failClosedListings = false,
   }) : _io = io,
        _hashApi = hashApi,
        rootPath = normalizeSyncPath(rootPath),
@@ -96,6 +102,17 @@ class ContainerSyncEndpoint implements SyncEndpoint {
       if (token.isCancelled) throw const SyncCancelledException();
       final cur = stack.removeLast();
 
+      if (failClosedListings &&
+          container.isLocalStorage &&
+          !await _io.canListDirectory(container, _abs(cur.rel))) {
+        if (cur.rel.isEmpty) {
+          rootReadable = false;
+        } else {
+          unreadable.add(cur.rel);
+        }
+        continue;
+      }
+
       List<RawEntry>? entries;
       var wasTruncated = false;
       try {
@@ -123,6 +140,19 @@ class ContainerSyncEndpoint implements SyncEndpoint {
         continue;
       }
       if (wasTruncated) truncated.add(cur.rel);
+
+      // A whole-storage-root rule may encounter another encrypted folder
+      // vault below its root. Don't treat its ciphertext as plain files or
+      // create even an empty mirror of that vault in the destination.
+      if (!isEncrypted &&
+          cur.rel.isNotEmpty &&
+          folderVaultFormatFromNames(
+                entries.where((e) => !e.isDir).map((e) => e.name),
+              ) !=
+              null) {
+        dirs.remove(cur.rel);
+        continue;
+      }
 
       for (final e in entries) {
         if (e.isPlaceholder) continue;
@@ -185,7 +215,10 @@ class ContainerSyncEndpoint implements SyncEndpoint {
         for (final rel in group.value) {
           final e = byName[_baseName(rel)];
           if (e != null) {
-            out[rel] = SyncSideState(size: e.sizeBytes, mtimeSecs: e.modifiedSecs);
+            out[rel] = SyncSideState(
+              size: e.sizeBytes,
+              mtimeSecs: e.modifiedSecs,
+            );
           }
         }
       } catch (_) {
@@ -236,7 +269,9 @@ class ContainerSyncEndpoint implements SyncEndpoint {
 
   @override
   Future<bool> ensureDirectory(String relDir) async {
-    final segments = normalizeSyncPath(relDir).split('/').where((s) => s.isNotEmpty);
+    final segments = normalizeSyncPath(
+      relDir,
+    ).split('/').where((s) => s.isNotEmpty);
     var current = rootPath;
     for (final segment in segments) {
       current = current.isEmpty ? segment : '$current/$segment';
@@ -321,7 +356,12 @@ class ContainerSyncEndpoint implements SyncEndpoint {
       while (offset < size) {
         if (token.isCancelled) throw const SyncCancelledException();
         final len = math.min(_chunkSize, size - offset);
-        final chunk = await _io.readFileChunk(src.container, srcAbs, offset, len);
+        final chunk = await _io.readFileChunk(
+          src.container,
+          srcAbs,
+          offset,
+          len,
+        );
         if (chunk == null || chunk.isEmpty) return false;
         final ok = await _io.writeFileChunk(container, dstAbs, offset, chunk);
         if (!ok) return false;

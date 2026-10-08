@@ -443,7 +443,7 @@ class VaultFileIoApi {
         );
         VeLog.d(
           'VaultFileIoApi',
-          'safListDirectory response item count: ${(rawList as List?)?.length}',
+          'safListDirectory response item count: ${rawList?.length}',
         );
         if (rawList == null) return const [];
         final items = (rawList as List).map((it) {
@@ -473,6 +473,48 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
     return result?.cast<String>();
+  }
+
+  /// Strict readability probe used by scheduled sync before an empty
+  /// listing is allowed to influence deletion decisions.
+  Future<bool> canListDirectory(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    if (_isSaf(container)) {
+      try {
+        return await _channel.invokeMethod<bool>(
+              ChannelMethods.safCanListDirectory,
+              {'treeUri': container.uri, 'dirPath': dirPath},
+            ) ??
+            false;
+      } catch (_) {
+        return false;
+      }
+    }
+    if (container.isLocalStorage) {
+      return _local.canListDirectory(container.uri, dirPath);
+    }
+    try {
+      return await listDirectory(container, dirPath, refresh: true) != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Resolves standard Android file/tree document URIs to their backing
+  /// storage path. Used only to exclude a selected vault's ciphertext when
+  /// syncing a wider local-storage root.
+  Future<String?> resolveRawStoragePath(String uri) async {
+    if (uri.startsWith('/')) return uri;
+    try {
+      return await _channel.invokeMethod<String>(
+        ChannelMethods.resolveRawStoragePath,
+        {'uri': uri},
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> createDirectory(

@@ -1260,6 +1260,38 @@ class VaultLifecycleApi {
     }
   }
 
+  /// Schedules or cancels this device's daily background sync for one rule.
+  /// The native scheduler validates the vault's existing automation opt-in
+  /// and never receives a password through this channel.
+  Future<bool> scheduleVaultSync({
+    required bool enabled,
+    required String vaultUri,
+    required String vaultDisplayName,
+    required String ruleId,
+    required String targetUri,
+    required String targetSubPath,
+    required String targetDisplayName,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.scheduleVaultSync,
+        {
+          'enabled': enabled,
+          'vaultUri': vaultUri,
+          'vaultDisplayName': vaultDisplayName,
+          'ruleId': ruleId,
+          'targetUri': targetUri,
+          'targetSubPath': targetSubPath,
+          'targetDisplayName': targetDisplayName,
+        },
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('scheduleVaultSync', e);
+      return false;
+    }
+  }
+
   /// Keeps Android-created notifications in sync with the language selected
   /// in the app. A null or empty code means use the device language.
   Future<void> setNotificationLocale(String? languageCode) async {

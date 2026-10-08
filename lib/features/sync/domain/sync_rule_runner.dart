@@ -31,18 +31,35 @@ class SyncRuleRunner {
     void Function(SyncProgress progress)? onProgress,
     String? ledgerKey,
     DateTime? now,
+    bool failOnIncompleteScan = false,
+    bool abortOnFirstFailure = false,
+    Iterable<String> protectedPaths = const [],
   }) async {
     final key = ledgerKey ?? rule.id;
-    final ignore = SyncIgnoreMatcher(rule.ignorePatterns);
+    final ignore = SyncIgnoreMatcher(
+      rule.ignorePatterns,
+      protectedPaths: protectedPaths,
+    );
 
     try {
       final scans = await Future.wait([
-        _scanAndRecover(vault, ignore, token),
-        _scanAndRecover(target, ignore, token),
+        _scanAndRecover(vault, ignore, token, failClosed: failOnIncompleteScan),
+        _scanAndRecover(
+          target,
+          ignore,
+          token,
+          failClosed: failOnIncompleteScan,
+        ),
       ]);
       final vaultSnap = scans[0];
       final targetSnap = scans[1];
-      if (token.isCancelled) return SyncRunReport(ruleId: rule.id, cancelled: true);
+      if (token.isCancelled) {
+        return SyncRunReport(ruleId: rule.id, cancelled: true);
+      }
+      if (failOnIncompleteScan &&
+          (!vaultSnap.isComplete || !targetSnap.isComplete)) {
+        return SyncRunReport(ruleId: rule.id, failed: 1, incompleteScan: true);
+      }
 
       final plan = await reconciler.reconcile(
         rule: rule,
@@ -53,7 +70,16 @@ class SyncRuleRunner {
             (side == SyncSide.vault ? vault : target).hash(rel, token),
         now: now,
       );
-      if (token.isCancelled) return SyncRunReport(ruleId: rule.id, cancelled: true);
+      if (token.isCancelled) {
+        return SyncRunReport(ruleId: rule.id, cancelled: true);
+      }
+      if (failOnIncompleteScan && plan.deletionsBlocked) {
+        return SyncRunReport(
+          ruleId: rule.id,
+          failed: 1,
+          deletionsBlocked: true,
+        );
+      }
 
       return await executor.execute(
         rule: rule,
@@ -64,6 +90,7 @@ class SyncRuleRunner {
         token: token,
         onProgress: onProgress,
         incompleteScan: !vaultSnap.isComplete || !targetSnap.isComplete,
+        abortOnFirstFailure: abortOnFirstFailure,
         ledgerKey: key,
       );
     } on SyncCancelledException {
@@ -81,9 +108,11 @@ class SyncRuleRunner {
   Future<SyncSnapshot> _scanAndRecover(
     SyncEndpoint endpoint,
     SyncIgnoreMatcher ignore,
-    SyncCancellationToken token,
-  ) async {
+    SyncCancellationToken token, {
+    bool failClosed = false,
+  }) async {
     var snapshot = await endpoint.scan(ignore: ignore, token: token);
+    if (failClosed && !snapshot.isComplete) return snapshot;
     if (snapshot.rootReadable && snapshot.leftovers.isNotEmpty) {
       final handled = await executor.cleanupLeftovers(endpoint, snapshot);
       if (handled > 0) {

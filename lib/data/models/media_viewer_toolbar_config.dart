@@ -2,6 +2,8 @@ import 'media_viewer_action.dart';
 import 'scrub_preview_style.dart';
 import 'video_aspect_ratio_mode.dart';
 import 'resume_playback_mode.dart';
+import 'thumbnail_generation_strategy.dart';
+import 'media_decoder_mode.dart';
 
 class MediaViewerToolbarConfig {
   final List<MediaViewerAction> topBarActions;
@@ -32,6 +34,15 @@ class MediaViewerToolbarConfig {
   final ResumePlaybackMode resumePlaybackMode;
   final bool tapEdgesToNavigate;
   final bool loopPlaylist;
+  final ThumbnailGenerationStrategy thumbnailGenerationStrategy;
+  final double thumbnailFramePosition;
+  final double seekSensitivity;
+  final double volumeGestureSensitivity;
+  final double brightnessGestureSensitivity;
+  final bool volumeBoostEnabled;
+  final int volumeBoostGainMb;
+  final MediaDecoderMode videoDecoderMode;
+  final MediaDecoderMode audioDecoderMode;
 
   const MediaViewerToolbarConfig({
     this.topBarActions = const [
@@ -86,6 +97,15 @@ class MediaViewerToolbarConfig {
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.tapEdgesToNavigate = true,
     this.loopPlaylist = true,
+    this.thumbnailGenerationStrategy = ThumbnailGenerationStrategy.hybrid,
+    this.thumbnailFramePosition = 0.12,
+    this.seekSensitivity = 1.0,
+    this.volumeGestureSensitivity = 1.0,
+    this.brightnessGestureSensitivity = 1.0,
+    this.volumeBoostEnabled = false,
+    this.volumeBoostGainMb = 2000,
+    this.videoDecoderMode = MediaDecoderMode.auto,
+    this.audioDecoderMode = MediaDecoderMode.auto,
   });
 
   factory MediaViewerToolbarConfig.defaults() =>
@@ -116,6 +136,15 @@ class MediaViewerToolbarConfig {
     ResumePlaybackMode? resumePlaybackMode,
     bool? tapEdgesToNavigate,
     bool? loopPlaylist,
+    ThumbnailGenerationStrategy? thumbnailGenerationStrategy,
+    double? thumbnailFramePosition,
+    double? seekSensitivity,
+    double? volumeGestureSensitivity,
+    double? brightnessGestureSensitivity,
+    bool? volumeBoostEnabled,
+    int? volumeBoostGainMb,
+    MediaDecoderMode? videoDecoderMode,
+    MediaDecoderMode? audioDecoderMode,
   }) => MediaViewerToolbarConfig(
     topBarActions: topBarActions ?? this.topBarActions,
     bottomBarActions: bottomBarActions ?? this.bottomBarActions,
@@ -148,6 +177,19 @@ class MediaViewerToolbarConfig {
     resumePlaybackMode: resumePlaybackMode ?? this.resumePlaybackMode,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
     loopPlaylist: loopPlaylist ?? this.loopPlaylist,
+    thumbnailGenerationStrategy:
+        thumbnailGenerationStrategy ?? this.thumbnailGenerationStrategy,
+    thumbnailFramePosition:
+        thumbnailFramePosition ?? this.thumbnailFramePosition,
+    seekSensitivity: seekSensitivity ?? this.seekSensitivity,
+    volumeGestureSensitivity:
+        volumeGestureSensitivity ?? this.volumeGestureSensitivity,
+    brightnessGestureSensitivity:
+        brightnessGestureSensitivity ?? this.brightnessGestureSensitivity,
+    volumeBoostEnabled: volumeBoostEnabled ?? this.volumeBoostEnabled,
+    volumeBoostGainMb: volumeBoostGainMb ?? this.volumeBoostGainMb,
+    videoDecoderMode: videoDecoderMode ?? this.videoDecoderMode,
+    audioDecoderMode: audioDecoderMode ?? this.audioDecoderMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -177,6 +219,15 @@ class MediaViewerToolbarConfig {
     'resumePlaybackMode': resumePlaybackMode.name,
     'tapEdgesToNavigate': tapEdgesToNavigate,
     'loopPlaylist': loopPlaylist,
+    'thumbnailGenerationStrategy': thumbnailGenerationStrategy.name,
+    'thumbnailFramePosition': thumbnailFramePosition,
+    'seekSensitivity': seekSensitivity,
+    'volumeGestureSensitivity': volumeGestureSensitivity,
+    'brightnessGestureSensitivity': brightnessGestureSensitivity,
+    'volumeBoostEnabled': volumeBoostEnabled,
+    'volumeBoostGainMb': volumeBoostGainMb,
+    'videoDecoderMode': videoDecoderMode.name,
+    'audioDecoderMode': audioDecoderMode.name,
   };
 
   factory MediaViewerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -262,6 +313,24 @@ class MediaViewerToolbarConfig {
       ),
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
       loopPlaylist: j['loopPlaylist'] as bool? ?? true,
+      thumbnailGenerationStrategy: ThumbnailGenerationStrategy.fromJson(
+        j['thumbnailGenerationStrategy'] as String?,
+      ),
+      thumbnailFramePosition:
+          (j['thumbnailFramePosition'] as num?)?.toDouble() ?? 0.12,
+      seekSensitivity: (j['seekSensitivity'] as num?)?.toDouble() ?? 1.0,
+      volumeGestureSensitivity:
+          (j['volumeGestureSensitivity'] as num?)?.toDouble() ?? 1.0,
+      brightnessGestureSensitivity:
+          (j['brightnessGestureSensitivity'] as num?)?.toDouble() ?? 1.0,
+      volumeBoostEnabled: j['volumeBoostEnabled'] as bool? ?? false,
+      volumeBoostGainMb: (j['volumeBoostGainMb'] as num?)?.toInt() ?? 2000,
+      videoDecoderMode: MediaDecoderMode.fromJson(
+        j['videoDecoderMode'] as String?,
+      ),
+      audioDecoderMode: MediaDecoderMode.fromJson(
+        j['audioDecoderMode'] as String?,
+      ),
     );
   }
 }

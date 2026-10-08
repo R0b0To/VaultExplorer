@@ -9543,4 +9543,68 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get mirrorSyncActivityLabel =>
       'Salvando alterações do cofre no armazenamento';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Sensibilidade do gesto de busca';
+
+  @override
+  String get volumeGestureSensitivityTitle =>
+      'Sensibilidade do gesto de volume';
+
+  @override
+  String get brightnessGestureSensitivityTitle =>
+      'Sensibilidade do gesto de brilho';
+
+  @override
+  String get thumbnailSettingsHeader => 'Geração de miniaturas';
+
+  @override
+  String get thumbnailGenerationStrategyTitle =>
+      'Estratégia do quadro da miniatura';
+
+  @override
+  String get thumbnailFirstFrameOption => 'Primeiro quadro';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Quadro em uma posição';
+
+  @override
+  String get thumbnailHybridOption => 'Híbrido (ignorar início em branco)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'Posição preferida do quadro';
+
+  @override
+  String get volumeBoostHeader => 'Aumento de volume';
+
+  @override
+  String get volumeBoostTitle => 'Ativar aumento de volume';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Aumenta o áudio baixo dos vídeos acima do volume normal do player.';
+
+  @override
+  String get volumeBoostGainTitle => 'Nível de aumento';
+
+  @override
+  String get decoderSelectionHeader => 'Seleção do decodificador';
+
+  @override
+  String get videoDecoderTitle => 'Decodificador de vídeo';
+
+  @override
+  String get audioDecoderTitle => 'Decodificador de áudio';
+
+  @override
+  String get decoderAutoOption => 'Automático';
+
+  @override
+  String get decoderHardwareOption => 'Hardware';
+
+  @override
+  String get decoderSoftwareOption => 'Software';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

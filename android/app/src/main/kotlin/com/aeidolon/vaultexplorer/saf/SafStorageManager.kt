@@ -19,6 +19,7 @@ import android.provider.DocumentsContract
 import androidx.exifinterface.media.ExifInterface
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -663,7 +664,10 @@ class SafStorageManager(private val context: Context) {
         relativePath: String,
         targetSize: Int,
         quality: Int,
-        isVideo: Boolean
+        isVideo: Boolean,
+        strategy: String = "hybrid",
+        framePosition: Double = 0.12,
+        explicitTimeUs: Long? = null,
     ): Map<String, Any>? {
         val docUri = getDocumentUri(treeUri, relativePath) ?: return null
 
@@ -675,7 +679,19 @@ class SafStorageManager(private val context: Context) {
                         retriever.setDataSource(pfd.fileDescriptor)
                         val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                         val durationMs = durationStr?.toLongOrNull() ?: 0L
-                        val frame = tryExtractVideoFrame(retriever, durationMs, targetSize) ?: return null
+                        var frame = tryExtractVideoFrame(retriever, durationMs, targetSize, strategy, framePosition, explicitTimeUs) ?: return null
+                        if (explicitTimeUs == null && strategy == "hybrid" && VideoThumbnailCoordinator.isLikelyBlankFrame(frame) && durationMs > 0L) {
+                            val alternateUs = (durationMs * 1000L * framePosition.coerceIn(0.05, 0.90)).toLong()
+                            val alternate = runCatching {
+                                retriever.getFrameAtTime(alternateUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            }.getOrNull()
+                            if (alternate != null && !VideoThumbnailCoordinator.isLikelyBlankFrame(alternate)) {
+                                frame.recycle()
+                                frame = alternate
+                            } else {
+                                alternate?.recycle()
+                            }
+                        }
                         val scaled = scaledToFit(frame, targetSize)
                         val stream = ByteArrayOutputStream()
                         scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
@@ -758,18 +774,28 @@ class SafStorageManager(private val context: Context) {
         }
     }
 
-    private fun tryExtractVideoFrame(retriever: MediaMetadataRetriever, durationMs: Long, targetSize: Int): Bitmap? {
-        val frame0 = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+    private fun tryExtractVideoFrame(
+        retriever: MediaMetadataRetriever,
+        durationMs: Long,
+        targetSize: Int,
+        strategy: String,
+        framePosition: Double,
+        explicitTimeUs: Long?,
+    ): Bitmap? {
+        val positionUs = explicitTimeUs ?: if (strategy == "frameAtPercentage" && durationMs > 0L) {
+            (durationMs * 1000L * framePosition.coerceIn(0.05, 0.90)).toLong()
+        } else 0L
+        val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             runCatching {
-                retriever.getScaledFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
-            }.getOrNull() ?: retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                retriever.getScaledFrameAtTime(positionUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetSize, targetSize)
+            }.getOrNull() ?: retriever.getFrameAtTime(positionUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
         } else {
-            retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            retriever.getFrameAtTime(positionUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
         }
-        if (frame0 != null) return frame0
+        if (frame != null) return frame
 
-        if (durationMs > 0L) {
-            val candidateUs = (durationMs * 1000L * 0.1).toLong()
+        if (explicitTimeUs == null && strategy == "hybrid" && durationMs > 0L) {
+            val candidateUs = (durationMs * 1000L * framePosition.coerceIn(0.05, 0.90)).toLong()
             return retriever.getFrameAtTime(candidateUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
         }
         return null

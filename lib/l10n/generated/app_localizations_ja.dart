@@ -9038,4 +9038,64 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mirrorSyncActivityLabel => '保管庫の変更をストレージに保存中';
+
+  @override
+  String get seekGestureSensitivityTitle => 'シークジェスチャーの感度';
+
+  @override
+  String get volumeGestureSensitivityTitle => '音量ジェスチャーの感度';
+
+  @override
+  String get brightnessGestureSensitivityTitle => '明るさジェスチャーの感度';
+
+  @override
+  String get thumbnailSettingsHeader => 'サムネイル生成';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => 'サムネイルのフレーム選択方法';
+
+  @override
+  String get thumbnailFirstFrameOption => '最初のフレーム';
+
+  @override
+  String get thumbnailPercentageFrameOption => '指定位置のフレーム';
+
+  @override
+  String get thumbnailHybridOption => 'ハイブリッド（冒頭の空白をスキップ）';
+
+  @override
+  String get thumbnailFramePositionTitle => '優先するフレーム位置';
+
+  @override
+  String get volumeBoostHeader => '音量ブースト';
+
+  @override
+  String get volumeBoostTitle => '音量ブーストを有効にする';
+
+  @override
+  String get volumeBoostSubtitle => '音量の小さい動画の音声を通常のプレーヤー音量より大きくします。';
+
+  @override
+  String get volumeBoostGainTitle => 'ブースト量';
+
+  @override
+  String get decoderSelectionHeader => 'デコーダーの選択';
+
+  @override
+  String get videoDecoderTitle => '動画デコーダー';
+
+  @override
+  String get audioDecoderTitle => '音声デコーダー';
+
+  @override
+  String get decoderAutoOption => '自動';
+
+  @override
+  String get decoderHardwareOption => 'ハードウェア';
+
+  @override
+  String get decoderSoftwareOption => 'ソフトウェア';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 
 class VideoPlaybackManager {
   final Map<String, NativeVideoController> _controllers = {};
-  final ValueNotifier<String?> currentFileNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<String?> currentFileNotifier = ValueNotifier<String?>(
+    null,
+  );
   String? get currentFileName => currentFileNotifier.value;
   final ValueNotifier<NativeVideoController?> activeControllerNotifier =
       ValueNotifier<NativeVideoController?>(null);
   NativeVideoController? get activeController => activeControllerNotifier.value;
   final Map<String, bool> _subtitlesAvailableMap = {};
-  bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
+  bool isSubtitleAvailable(String fileName) =>
+      _subtitlesAvailableMap[fileName] ?? false;
   int _activationToken = 0;
   Future<void>? _currentActivationFuture;
 
@@ -43,7 +47,7 @@ class VideoPlaybackManager {
     return _controllers[fileName];
   }
 
- Future<void> activate({
+  Future<void> activate({
     required String fileName,
     int? volId,
     String? filePath,
@@ -52,6 +56,10 @@ class VideoPlaybackManager {
     required bool autoPlay,
     required double playbackSpeed,
     bool looping = false,
+    MediaDecoderMode videoDecoderMode = MediaDecoderMode.auto,
+    MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
+    bool volumeBoostEnabled = false,
+    int volumeBoostGainMb = 2000,
   }) async {
     final token = ++_activationToken;
     final previousFuture = _currentActivationFuture;
@@ -71,9 +79,12 @@ class VideoPlaybackManager {
       return;
     }
     try {
-      if (currentFileNotifier.value == fileName && _controllers.containsKey(fileName)) {
+      if (currentFileNotifier.value == fileName &&
+          _controllers.containsKey(fileName)) {
         final ctrl = _controllers[fileName]!;
         if (!ctrl.isDisposed && !ctrl.value.hasError) {
+          await ctrl.setDecoderModes(videoDecoderMode, audioDecoderMode);
+          await ctrl.setVolumeBoost(volumeBoostEnabled, volumeBoostGainMb);
           await ctrl.setPlaybackSpeed(playbackSpeed);
           await ctrl.setLooping(looping);
           if (autoPlay) await ctrl.play();
@@ -98,15 +109,25 @@ class VideoPlaybackManager {
             autoPlay: autoPlay,
             isLocalStorage: isLocalStorage,
             initialSpeed: playbackSpeed,
+            videoDecoderMode: videoDecoderMode,
+            audioDecoderMode: audioDecoderMode,
+            volumeBoostEnabled: volumeBoostEnabled,
+            volumeBoostGainMb: volumeBoostGainMb,
           );
         } else if (contentUriString != null) {
           return NativeVideoController.fromUri(
             contentUriString: contentUriString,
             autoPlay: autoPlay,
             initialSpeed: playbackSpeed,
+            videoDecoderMode: videoDecoderMode,
+            audioDecoderMode: audioDecoderMode,
+            volumeBoostEnabled: volumeBoostEnabled,
+            volumeBoostGainMb: volumeBoostGainMb,
           );
         } else {
-          throw ArgumentError('Either (volId, filePath) or contentUriString must be provided');
+          throw ArgumentError(
+            'Either (volId, filePath) or contentUriString must be provided',
+          );
         }
       }
 
@@ -116,24 +137,33 @@ class VideoPlaybackManager {
           _controllers.remove(fileName)?.dispose();
           controller = createController();
           _controllers[fileName] = controller;
-          unawaited(controller.initialize().then((_) {
-            if (token == _activationToken && !controller.isDisposed) {
-              controller.setLooping(looping);
-            }
-          }));
+          unawaited(
+            controller.initialize().then((_) {
+              if (token == _activationToken && !controller.isDisposed) {
+                controller.setLooping(looping);
+              }
+            }),
+          );
         } else {
           await controller.setPlaybackSpeed(playbackSpeed);
+          await controller.setDecoderModes(videoDecoderMode, audioDecoderMode);
+          await controller.setVolumeBoost(
+            volumeBoostEnabled,
+            volumeBoostGainMb,
+          );
           await controller.setLooping(looping);
           if (autoPlay) await controller.play();
         }
       } else {
         controller = createController();
         _controllers[fileName] = controller;
-        unawaited(controller.initialize().then((_) {
-          if (token == _activationToken && !controller.isDisposed) {
-            controller.setLooping(looping);
-          }
-        }));
+        unawaited(
+          controller.initialize().then((_) {
+            if (token == _activationToken && !controller.isDisposed) {
+              controller.setLooping(looping);
+            }
+          }),
+        );
       }
 
       activeControllerNotifier.value = controller;
@@ -144,8 +174,10 @@ class VideoPlaybackManager {
     }
   }
 
-    void _cleanupOldControllers({required Set<String> keepFiles}) {
-    final keysToRemove = _controllers.keys.where((k) => !keepFiles.contains(k)).toList();
+  void _cleanupOldControllers({required Set<String> keepFiles}) {
+    final keysToRemove = _controllers.keys
+        .where((k) => !keepFiles.contains(k))
+        .toList();
     for (final key in keysToRemove) {
       final oldCtrl = _controllers.remove(key);
       oldCtrl?.dispose();

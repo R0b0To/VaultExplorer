@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';
 
@@ -57,7 +58,8 @@ class NativeVideoValue {
       isBuffering: isBuffering ?? this.isBuffering,
       isMirrorDownloading: isMirrorDownloading ?? this.isMirrorDownloading,
       hasError: hasError ?? this.hasError,
-      hasRenderedFirstFrame: hasRenderedFirstFrame ?? this.hasRenderedFirstFrame,
+      hasRenderedFirstFrame:
+          hasRenderedFirstFrame ?? this.hasRenderedFirstFrame,
       errorDescription: errorDescription ?? this.errorDescription,
       position: position ?? this.position,
       duration: duration ?? this.duration,
@@ -82,14 +84,22 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     this.autoPlay = false,
     this.isLocalStorage = false,
     double initialSpeed = 1.0,
-  })  : _media3 = NativeMedia3Controller(
-          volId: volId,
-          filePath: filePath,
-          autoPlay: autoPlay,
-          isLocalStorage: isLocalStorage,
-          initialSpeed: initialSpeed,
-        ),
-        super(const NativeVideoValue()) {
+    MediaDecoderMode videoDecoderMode = MediaDecoderMode.auto,
+    MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
+    bool volumeBoostEnabled = false,
+    int volumeBoostGainMb = 2000,
+  }) : _media3 = NativeMedia3Controller(
+         volId: volId,
+         filePath: filePath,
+         autoPlay: autoPlay,
+         isLocalStorage: isLocalStorage,
+         initialSpeed: initialSpeed,
+         videoDecoderMode: videoDecoderMode,
+         audioDecoderMode: audioDecoderMode,
+         volumeBoostEnabled: volumeBoostEnabled,
+         volumeBoostGainMb: volumeBoostGainMb,
+       ),
+       super(const NativeVideoValue()) {
     _media3.addListener(_onMedia3StateChanged);
   }
 
@@ -99,6 +109,10 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     required String contentUriString,
     bool autoPlay = false,
     double initialSpeed = 1.0,
+    MediaDecoderMode videoDecoderMode = MediaDecoderMode.auto,
+    MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
+    bool volumeBoostEnabled = false,
+    int volumeBoostGainMb = 2000,
   }) {
     final parsed = _parseContentUri(contentUriString);
     return NativeVideoController(
@@ -106,6 +120,10 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
       filePath: parsed.filePath,
       autoPlay: autoPlay,
       initialSpeed: initialSpeed,
+      videoDecoderMode: videoDecoderMode,
+      audioDecoderMode: audioDecoderMode,
+      volumeBoostEnabled: volumeBoostEnabled,
+      volumeBoostGainMb: volumeBoostGainMb,
     );
   }
 
@@ -124,9 +142,12 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   }
 
   NativeMedia3Controller get media3Controller => _media3;
-  ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier => _media3.audioTracksNotifier;
-  ValueNotifier<List<SubtitleTrackInfo>> get subtitleTracksNotifier => _media3.subtitleTracksNotifier;
-  ValueNotifier<MediaDiagnosticsInfo> get diagnosticsNotifier => _media3.diagnosticsNotifier;
+  ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier =>
+      _media3.audioTracksNotifier;
+  ValueNotifier<List<SubtitleTrackInfo>> get subtitleTracksNotifier =>
+      _media3.subtitleTracksNotifier;
+  ValueNotifier<MediaDiagnosticsInfo> get diagnosticsNotifier =>
+      _media3.diagnosticsNotifier;
   List<AudioTrackInfo> get audioTracks => _media3.audioTracks;
   List<SubtitleTrackInfo> get subtitleTracks => _media3.subtitleTracks;
   MediaDiagnosticsInfo get diagnostics => _media3.diagnostics;
@@ -136,7 +157,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     value = _media3.value;
   }
 
-Future<void> initialize() async {
+  Future<void> initialize() async {
     await _media3.initialize();
   }
 
@@ -154,6 +175,17 @@ Future<void> initialize() async {
 
   Future<void> setVolume(int vol) async {
     await _media3.setVolume(vol);
+  }
+
+  Future<void> setVolumeBoost(bool enabled, int gainMb) async {
+    await _media3.setVolumeBoost(enabled, gainMb);
+  }
+
+  Future<void> setDecoderModes(
+    MediaDecoderMode videoMode,
+    MediaDecoderMode audioMode,
+  ) async {
+    await _media3.setDecoderModes(videoMode, audioMode);
   }
 
   Future<void> setPlaybackSpeed(double speed) async {
@@ -182,8 +214,11 @@ Future<void> initialize() async {
     Duration position, {
     int maxSize = 200,
     int quality = 55,
-  }) =>
-      _media3.getScrubPreviewFrame(position, maxSize: maxSize, quality: quality);
+  }) => _media3.getScrubPreviewFrame(
+    position,
+    maxSize: maxSize,
+    quality: quality,
+  );
 
   Future<void> endScrubPreview() => _media3.endScrubPreview();
 
@@ -203,6 +238,8 @@ class NativeVideoPlayerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NativeMedia3PlayerView(media3Controller: controller.media3Controller);
+    return NativeMedia3PlayerView(
+      media3Controller: controller.media3Controller,
+    );
   }
 }

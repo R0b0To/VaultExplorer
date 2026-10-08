@@ -9,6 +9,8 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -16,6 +18,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 part 'file_manager_toolbar_settings_controller.g.dart';
 
@@ -73,6 +76,11 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
       record = records[containerUri];
     }
     if (!ref.mounted) return;
+    final viewerConfig = config.mediaViewerToolbarConfig;
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      viewerConfig.thumbnailGenerationStrategy,
+      viewerConfig.thumbnailFramePosition,
+    );
     state = state._copy(
       config: config,
       record: record,
@@ -238,13 +246,91 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   void applyImportedConfig(FileManagerToolbarConfig newConfig) {
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      newConfig.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
+      newConfig.mediaViewerToolbarConfig.thumbnailFramePosition,
+    );
     state = state._copy(config: newConfig);
   }
 
   // Media Viewer Controls Customization
-  Future<void> updateMediaViewerConfig(MediaViewerToolbarConfig mediaConfig) =>
-      _updateConfig(
-        state.config.copyWith(mediaViewerToolbarConfig: mediaConfig),
+  Future<void> updateMediaViewerConfig(MediaViewerToolbarConfig mediaConfig) {
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      mediaConfig.thumbnailGenerationStrategy,
+      mediaConfig.thumbnailFramePosition,
+    );
+    return _updateConfig(
+      state.config.copyWith(mediaViewerToolbarConfig: mediaConfig),
+    );
+  }
+
+  Future<void> setThumbnailGenerationStrategy(
+    ThumbnailGenerationStrategy strategy,
+  ) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      thumbnailGenerationStrategy: strategy,
+    );
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      strategy,
+      updated.thumbnailFramePosition,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setThumbnailFramePosition(double position) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      thumbnailFramePosition: position.clamp(0.05, 0.90).toDouble(),
+    );
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      updated.thumbnailGenerationStrategy,
+      updated.thumbnailFramePosition,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerSeekSensitivity(double sensitivity) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(
+          seekSensitivity: sensitivity.clamp(0.25, 2.0).toDouble(),
+        ),
+      );
+
+  Future<void> setMediaViewerVolumeGestureSensitivity(double sensitivity) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(
+          volumeGestureSensitivity: sensitivity.clamp(0.25, 2.0).toDouble(),
+        ),
+      );
+
+  Future<void> setMediaViewerBrightnessGestureSensitivity(double sensitivity) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(
+          brightnessGestureSensitivity: sensitivity.clamp(0.25, 2.0).toDouble(),
+        ),
+      );
+
+  Future<void> setMediaViewerVolumeBoostEnabled(bool enabled) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(
+          volumeBoostEnabled: enabled,
+        ),
+      );
+
+  Future<void> setMediaViewerVolumeBoostGain(int gainMb) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(
+          volumeBoostGainMb: gainMb.clamp(0, 2000).toInt(),
+        ),
+      );
+
+  Future<void> setMediaViewerVideoDecoderMode(MediaDecoderMode mode) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(videoDecoderMode: mode),
+      );
+
+  Future<void> setMediaViewerAudioDecoderMode(MediaDecoderMode mode) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(audioDecoderMode: mode),
       );
 
   Future<void> setMediaViewerTopBarActions(List<MediaViewerAction> actions) {
@@ -388,8 +474,13 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> resetMediaViewerConfigToDefaults() {
+    final defaultMediaConfig = MediaViewerToolbarConfig.defaults();
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      defaultMediaConfig.thumbnailGenerationStrategy,
+      defaultMediaConfig.thumbnailFramePosition,
+    );
     final updated = state.config.copyWith(
-      mediaViewerToolbarConfig: MediaViewerToolbarConfig.defaults(),
+      mediaViewerToolbarConfig: defaultMediaConfig,
       showMediaCarousel: true,
     );
     return _updateConfig(updated);

@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 import 'local_file_io_backend.dart';
 import 'vault_engine_types.dart';
@@ -664,12 +665,13 @@ class VaultFileIoApi {
     if (container.isLocalStorage) {
       return _local.writeFileChunk(container.uri, fileName, offset, data);
     }
-    final result = await _channel.invokeMethod<bool>(ChannelMethods.writeFileChunk, {
-      'filePath': container.uri,
-      'fileName': fileName,
-      'offset': offset,
-      'data': data,
-    });
+    final result = await _channel
+        .invokeMethod<bool>(ChannelMethods.writeFileChunk, {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'offset': offset,
+          'data': data,
+        });
     return result ?? false;
   }
 
@@ -1141,6 +1143,8 @@ class VaultFileIoApi {
     int quality = 60,
     int targetSize = 180,
     int? timeUs,
+    String? strategy,
+    double? framePosition,
   }) async {
     try {
       final Uint8List? bytes = await _channel
@@ -1150,6 +1154,11 @@ class VaultFileIoApi {
             'quality': quality,
             'targetSize': targetSize,
             'isLocalStorage': container.isLocalStorage,
+            'strategy':
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
+            'framePosition':
+                framePosition ??
+                ThumbnailCacheService.videoThumbnailFramePosition,
             if (timeUs != null) 'timeUs': timeUs,
           });
       return bytes;
@@ -1164,6 +1173,8 @@ class VaultFileIoApi {
     String fileName, {
     int quality = 60,
     int targetSize = 180,
+    String? strategy,
+    double? framePosition,
   }) async {
     try {
       final result = await _channel
@@ -1173,6 +1184,11 @@ class VaultFileIoApi {
             'quality': quality,
             'targetSize': targetSize,
             'isLocalStorage': container.isLocalStorage,
+            'strategy':
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
+            'framePosition':
+                framePosition ??
+                ThumbnailCacheService.videoThumbnailFramePosition,
           });
       return ThumbnailWithSize.fromChannelResult(result);
     } catch (e) {
@@ -1343,9 +1359,10 @@ class VaultFileIoApi {
 
   Future<bool> isCryfsVault(String uri) async {
     try {
-      final result = await _channel.invokeMethod<bool>(ChannelMethods.isCryfsVault, {
-        'uri': uri,
-      });
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.isCryfsVault,
+        {'uri': uri},
+      );
       return result ?? false;
     } catch (e) {
       logSwallowed('isCryfsVault', e);

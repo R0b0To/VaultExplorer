@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 @immutable
@@ -115,9 +116,11 @@ class MediaDiagnosticsInfo {
   factory MediaDiagnosticsInfo.fromMap(Map<String, dynamic> map) {
     return MediaDiagnosticsInfo(
       videoDecoderName: map['videoDecoderName'] as String? ?? 'Unknown',
-      isVideoHardwareAccelerated: map['isVideoHardwareAccelerated'] as bool? ?? true,
+      isVideoHardwareAccelerated:
+          map['isVideoHardwareAccelerated'] as bool? ?? true,
       audioDecoderName: map['audioDecoderName'] as String? ?? 'Unknown',
-      isAudioHardwareAccelerated: map['isAudioHardwareAccelerated'] as bool? ?? false,
+      isAudioHardwareAccelerated:
+          map['isAudioHardwareAccelerated'] as bool? ?? false,
       frameRate: (map['frameRate'] as num?)?.toDouble() ?? 0.0,
       videoMimeType: map['videoMimeType'] as String? ?? '',
       audioMimeType: map['audioMimeType'] as String? ?? '',
@@ -132,14 +135,17 @@ class MediaDiagnosticsInfo {
 }
 
 class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
-  static const MethodChannel _cmdChannel =
-      MethodChannel('com.aeidolon.vaultexplorer/player');
-  static const EventChannel _eventChannel =
-      EventChannel('com.aeidolon.vaultexplorer/player_events');
+  static const MethodChannel _cmdChannel = MethodChannel(
+    'com.aeidolon.vaultexplorer/player',
+  );
+  static const EventChannel _eventChannel = EventChannel(
+    'com.aeidolon.vaultexplorer/player_events',
+  );
 
   final int volId;
   final String filePath;
   final bool autoPlay;
+
   /// True when [filePath] is a real, already-plaintext absolute path on
   /// device storage (the decoy's local file manager) rather than a path
   /// inside a mounted, encrypted container -- see
@@ -148,6 +154,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final bool isLocalStorage;
   double _currentSpeed;
   int _currentVolume = 100;
+  MediaDecoderMode _videoDecoderMode;
+  MediaDecoderMode _audioDecoderMode;
+  bool _volumeBoostEnabled;
+  int _volumeBoostGainMb;
 
   /// The last volume level (0-100) applied via [setVolume]. Read by the
   /// edge-swipe volume gesture so a drag continues smoothly from wherever
@@ -174,8 +184,16 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     this.autoPlay = false,
     this.isLocalStorage = false,
     double initialSpeed = 1.0,
-  })  : _currentSpeed = initialSpeed,
-        super(const NativeVideoValue());
+    MediaDecoderMode videoDecoderMode = MediaDecoderMode.auto,
+    MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
+    bool volumeBoostEnabled = false,
+    int volumeBoostGainMb = 2000,
+  }) : _currentSpeed = initialSpeed,
+       _videoDecoderMode = videoDecoderMode,
+       _audioDecoderMode = audioDecoderMode,
+       _volumeBoostEnabled = volumeBoostEnabled,
+       _volumeBoostGainMb = volumeBoostGainMb,
+       super(const NativeVideoValue());
 
   Future<void> initialize() async {
     if (_disposed) return;
@@ -188,15 +206,15 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     );
     await _eventSubscription?.cancel();
     _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
-          _handleNativeEvent,
-          onError: (err) {
-            if (_disposed) return;
-            value = value.copyWith(
-              hasError: true,
-              errorDescription: err.toString(),
-            );
-          },
+      _handleNativeEvent,
+      onError: (err) {
+        if (_disposed) return;
+        value = value.copyWith(
+          hasError: true,
+          errorDescription: err.toString(),
         );
+      },
+    );
 
     try {
       await retryWithBackoff<void>(
@@ -206,6 +224,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
             'volId': volId,
             'filePath': filePath,
             'isLocalStorage': isLocalStorage,
+            'videoDecoderMode': _videoDecoderMode.name,
+            'audioDecoderMode': _audioDecoderMode.name,
+            'volumeBoostEnabled': _volumeBoostEnabled,
+            'volumeBoostGainMb': _volumeBoostGainMb,
           });
           if (result is Map && result.containsKey('textureId')) {
             textureId = (result['textureId'] as num?)?.toInt();
@@ -252,7 +274,6 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     }
   }
 
-
   void _handleNativeEvent(dynamic rawEvent) {
     if (_disposed || rawEvent is! Map) return;
     final eventMap = Map<String, dynamic>.from(rawEvent);
@@ -269,7 +290,8 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
       case 'playbackState':
         final state = eventMap['state'] as String?;
         final isBuffering = state == 'buffering';
-        final isInitialized = state == 'ready' || state == 'buffering' || value.isInitialized;
+        final isInitialized =
+            state == 'ready' || state == 'buffering' || value.isInitialized;
         value = value.copyWith(
           isInitialized: isInitialized,
           isBuffering: isBuffering,
@@ -306,10 +328,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         break;
       case 'error':
         final msg = eventMap['message'] as String? ?? 'Playback error';
-        value = value.copyWith(
-          hasError: true,
-          errorDescription: msg,
-        );
+        value = value.copyWith(hasError: true, errorDescription: msg);
         break;
     }
   }
@@ -319,7 +338,9 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     try {
       final map = await _cmdChannel.invokeMethod('getDiagnostics');
       if (map is Map) {
-        final info = MediaDiagnosticsInfo.fromMap(Map<String, dynamic>.from(map));
+        final info = MediaDiagnosticsInfo.fromMap(
+          Map<String, dynamic>.from(map),
+        );
         diagnosticsNotifier.value = info;
         return info;
       }
@@ -350,7 +371,8 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
 
   String _describeInitError(Object error) {
     final msg = error.toString().toLowerCase();
-    final looksLikeDecoderContention = msg.contains('codec') ||
+    final looksLikeDecoderContention =
+        msg.contains('codec') ||
         msg.contains('decoder') ||
         msg.contains('no_memory') ||
         msg.contains('insufficientresources') ||
@@ -389,6 +411,31 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     if (!_disposed) {
       final double normalized = (vol / 100.0).clamp(0.0, 1.0);
       await _cmdChannel.invokeMethod('setVolume', {'volume': normalized});
+    }
+  }
+
+  Future<void> setVolumeBoost(bool enabled, int gainMb) async {
+    _volumeBoostEnabled = enabled;
+    _volumeBoostGainMb = gainMb.clamp(0, 2000).toInt();
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setVolumeBoost', {
+        'enabled': _volumeBoostEnabled,
+        'gainMb': _volumeBoostGainMb,
+      });
+    }
+  }
+
+  Future<void> setDecoderModes(
+    MediaDecoderMode videoMode,
+    MediaDecoderMode audioMode,
+  ) async {
+    _videoDecoderMode = videoMode;
+    _audioDecoderMode = audioMode;
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setDecoderModes', {
+        'videoMode': videoMode.name,
+        'audioMode': audioMode.name,
+      });
     }
   }
 
@@ -496,7 +543,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    value = const NativeVideoValue(isInitialized: false, hasRenderedFirstFrame: false);
+    value = const NativeVideoValue(
+      isInitialized: false,
+      hasRenderedFirstFrame: false,
+    );
     await _eventSubscription?.cancel();
     _eventSubscription = null;
     audioTracksNotifier.dispose();

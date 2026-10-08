@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
+import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -105,6 +106,13 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final double holdToSpeedMultiplier;
   final bool swipeToSeekEnabled;
   final bool tapEdgesToNavigate;
+  final double seekSensitivity;
+  final double volumeGestureSensitivity;
+  final double brightnessGestureSensitivity;
+  final bool volumeBoostEnabled;
+  final int volumeBoostGainMb;
+  final MediaDecoderMode videoDecoderMode;
+  final MediaDecoderMode audioDecoderMode;
   final ValueChanged<bool>? onEdgeTap;
 
   const MediaPlayerWidget({
@@ -144,6 +152,13 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
     this.tapEdgesToNavigate = true,
+    this.seekSensitivity = 1.0,
+    this.volumeGestureSensitivity = 1.0,
+    this.brightnessGestureSensitivity = 1.0,
+    this.volumeBoostEnabled = false,
+    this.volumeBoostGainMb = 2000,
+    this.videoDecoderMode = MediaDecoderMode.auto,
+    this.audioDecoderMode = MediaDecoderMode.auto,
     this.onEdgeTap,
   });
 
@@ -351,6 +366,26 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         if (!mounted) return;
         _boundController?.setPlaybackSpeed(widget.playbackSpeed);
       });
+    }
+    if (_boundController != null &&
+        (oldWidget.volumeBoostEnabled != widget.volumeBoostEnabled ||
+            oldWidget.volumeBoostGainMb != widget.volumeBoostGainMb)) {
+      unawaited(
+        _boundController!.setVolumeBoost(
+          widget.volumeBoostEnabled,
+          widget.volumeBoostGainMb,
+        ),
+      );
+    }
+    if (_boundController != null &&
+        (oldWidget.videoDecoderMode != widget.videoDecoderMode ||
+            oldWidget.audioDecoderMode != widget.audioDecoderMode)) {
+      unawaited(
+        _boundController!.setDecoderModes(
+          widget.videoDecoderMode,
+          widget.audioDecoderMode,
+        ),
+      );
     }
     _syncBoundController();
   }
@@ -1780,7 +1815,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
     final dy = details.primaryDelta ?? details.delta.dy;
     final delta = -dy; // Dragging upward increases brightness
-    final change = delta / MediaViewerConstants.edgeSwipeFullRangeDistance;
+    final change =
+        delta /
+        MediaViewerConstants.edgeSwipeFullRangeDistance *
+        widget.brightnessGestureSensitivity;
     final newLevel = (_brightnessLevel + change).clamp(0.0, 1.0);
     if ((newLevel - _brightnessLevel).abs() < 0.002) return;
     setState(() => _brightnessLevel = newLevel);
@@ -1836,7 +1874,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
     final dy = details.primaryDelta ?? details.delta.dy;
     final delta = -dy; // Dragging upward increases volume
-    final change = delta / MediaViewerConstants.edgeSwipeFullRangeDistance;
+    final change =
+        delta /
+        MediaViewerConstants.edgeSwipeFullRangeDistance *
+        widget.volumeGestureSensitivity;
     final newLevel = (_volumeLevel + change).clamp(0.0, 1.0);
     if ((newLevel - _volumeLevel).abs() < 0.002) return;
     setState(() => _volumeLevel = newLevel);
@@ -1952,7 +1993,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
 
     final dragFraction = _seekDragAccumulatedDx / width;
-    final deltaSeconds = dragFraction * seekRangeSeconds;
+    final deltaSeconds =
+        dragFraction * seekRangeSeconds * widget.seekSensitivity;
     final deltaMs = (deltaSeconds * 1000).round();
 
     final startMs = _seekDragStartPosition.inMilliseconds;

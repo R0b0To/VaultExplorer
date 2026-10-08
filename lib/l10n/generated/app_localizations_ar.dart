@@ -9596,4 +9596,66 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get mirrorSyncActivityLabel =>
       'جارٍ حفظ تغييرات الخزنة إلى وحدة التخزين';
+
+  @override
+  String get seekGestureSensitivityTitle => 'حساسية إيماءة التقديم أو الترجيع';
+
+  @override
+  String get volumeGestureSensitivityTitle => 'حساسية إيماءة مستوى الصوت';
+
+  @override
+  String get brightnessGestureSensitivityTitle => 'حساسية إيماءة السطوع';
+
+  @override
+  String get thumbnailSettingsHeader => 'إنشاء الصور المصغّرة';
+
+  @override
+  String get thumbnailGenerationStrategyTitle =>
+      'طريقة اختيار إطار الصورة المصغّرة';
+
+  @override
+  String get thumbnailFirstFrameOption => 'الإطار الأول';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'إطار عند موضع محدد';
+
+  @override
+  String get thumbnailHybridOption => 'مختلط (تجاوز البداية الفارغة)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'موضع الإطار المفضّل';
+
+  @override
+  String get volumeBoostHeader => 'تعزيز الصوت';
+
+  @override
+  String get volumeBoostTitle => 'تفعيل تعزيز الصوت';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'ارفع مستوى صوت الفيديوهات الخافتة فوق مستوى المشغّل المعتاد.';
+
+  @override
+  String get volumeBoostGainTitle => 'مقدار التعزيز';
+
+  @override
+  String get decoderSelectionHeader => 'اختيار وحدة فك الترميز';
+
+  @override
+  String get videoDecoderTitle => 'وحدة فك ترميز الفيديو';
+
+  @override
+  String get audioDecoderTitle => 'وحدة فك ترميز الصوت';
+
+  @override
+  String get decoderAutoOption => 'تلقائي';
+
+  @override
+  String get decoderHardwareOption => 'الأجهزة';
+
+  @override
+  String get decoderSoftwareOption => 'البرمجيات';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

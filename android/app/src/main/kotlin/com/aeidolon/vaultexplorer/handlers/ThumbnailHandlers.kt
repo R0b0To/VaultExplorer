@@ -228,6 +228,9 @@ class ThumbnailHandlers(
         quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
+        explicitTimeUs: Long? = null,
+        strategy: String = "hybrid",
+        framePosition: Double = 0.12,
     ): VideoFrameResult? {
         val latch = CountDownLatch(1)
         var extractedBitmap: Bitmap? = null
@@ -331,8 +334,8 @@ class ThumbnailHandlers(
                                 if (copyResult == PixelCopy.SUCCESS) {
                                     val durationMs = player?.duration ?: C.TIME_UNSET
                                     val looksBlank = VideoThumbnailCoordinator.isLikelyBlankFrame(bitmap)
-                                    if (allowBlankRetry && looksBlank && durationMs != C.TIME_UNSET && durationMs > 0) {
-                                        val retryPositionMs = (durationMs * VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS[0])
+                                    if (allowBlankRetry && strategy == "hybrid" && explicitTimeUs == null && looksBlank && durationMs != C.TIME_UNSET && durationMs > 0) {
+                                        val retryPositionMs = (durationMs * framePosition.coerceIn(0.05, 0.90))
                                             .toLong()
                                             .coerceAtLeast(1L)
                                         VeLog.d(TAG) { "ExoPlayer frame at 0 looked blank, retrying at ${retryPositionMs}ms" }
@@ -381,6 +384,19 @@ class ThumbnailHandlers(
                     }
 
                     override fun onRenderedFirstFrame() {
+                        val activePlayer = player
+                        val durationMs = activePlayer?.duration ?: C.TIME_UNSET
+                        val seekPositionMs = explicitTimeUs?.div(1000L)
+                            ?: if (strategy == "frameAtPercentage" && durationMs != C.TIME_UNSET && durationMs > 0L) {
+                                (durationMs * framePosition.coerceIn(0.05, 0.90)).toLong()
+                            } else 0L
+                        if (seekPositionMs > 0L && activePlayer != null && activePlayer.currentPosition + 100L < seekPositionMs) {
+                            activePlayer.seekTo(seekPositionMs)
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                capturePixelCopy(allowBlankRetry = strategy == "hybrid" && explicitTimeUs == null)
+                            }, EXOPLAYER_BLANK_RETRY_DELAY_MS)
+                            return
+                        }
                         capturePixelCopy(allowBlankRetry = true)
                     }
 
@@ -456,10 +472,12 @@ class ThumbnailHandlers(
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
         explicitTimeUs: Long? = null,
+        strategy: String = "hybrid",
+        framePosition: Double = 0.12,
     ): VideoFrameResult? {
         if (isPlaybackActive) {
             VeLog.d(TAG) { "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})" }
-            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
             if (swResult != null) return swResult
             VeLog.d(TAG) { "Software extraction unavailable or failed while playing (len=${fileName.length})" }
             return null
@@ -468,9 +486,9 @@ class ThumbnailHandlers(
         videoDecoderLock.lock()
         try {
             if (isPlaybackActive) {
-                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
             }
-            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs)
+            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
         } finally {
             videoDecoderLock.unlock()
         }
@@ -489,6 +507,8 @@ class ThumbnailHandlers(
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
         explicitTimeUs: Long? = null,
+        strategy: String = "hybrid",
+        framePosition: Double = 0.12,
     ): VideoFrameResult? {
         var retriever: MediaMetadataRetriever? = null
         try {
@@ -504,7 +524,11 @@ class ThumbnailHandlers(
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
             val durationUs = durationMs * 1000L
-            val timeUs = explicitTimeUs ?: VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
+            val timeUs = explicitTimeUs ?: when (strategy) {
+                "firstFrame", "hybrid" -> 0L
+                "frameAtPercentage" -> (durationUs * framePosition.coerceIn(0.05, 0.90)).toLong()
+                else -> 0L
+            }
 
             val metaW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val metaH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
@@ -514,10 +538,12 @@ class ThumbnailHandlers(
             val srcHeight = if (rot == 90 || rot == 270) metaW ?: 0 else metaH ?: 0
 
             var frame = tryExtractFrame(retriever, timeUs, targetSize)
-            if (explicitTimeUs == null && frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
-                val alternate = tryAlternateFrameIfBlank(retriever, durationMs, targetSize)
+            if (explicitTimeUs == null && strategy == "hybrid" &&
+                (frame == null || VideoThumbnailCoordinator.isLikelyBlankFrame(frame))
+            ) {
+                val alternate = tryAlternateFrameIfBlank(retriever, durationMs, targetSize, framePosition)
                 if (alternate != null) {
-                    frame.recycle()
+                    frame?.recycle()
                     frame = alternate
                 }
             }
@@ -531,7 +557,7 @@ class ThumbnailHandlers(
                 )
             }
             // If tryExtractFrame returned null, attempt ExoPlayer fallback
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
         } catch (e: Exception) {
             runCatching { retriever?.release() }
             retriever = null
@@ -544,12 +570,12 @@ class ThumbnailHandlers(
             }
 
             // 2. Try software MediaCodec extraction first (does not contend with HW decoder)
-            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
             if (swResult != null) return swResult
 
             // 3. For unsupported formats (like .flv, .wmv, .webm), fall back to ExoPlayer
             VeLog.w(TAG) { "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer" }
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
         } finally {
             runCatching { retriever?.release() }
         }
@@ -655,10 +681,12 @@ class ThumbnailHandlers(
         retriever: MediaMetadataRetriever,
         durationMs: Long,
         targetSize: Int,
+        preferredPosition: Double = 0.12,
     ): Bitmap? {
         val durationUs = durationMs * 1000L
         if (durationUs <= 0L) return null
-        for (fraction in VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS) {
+        val fractions = (listOf(preferredPosition.coerceIn(0.05, 0.90)) + VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS.toList()).distinct()
+        for (fraction in fractions) {
             val candidateUs = (durationUs * fraction).toLong()
             if (candidateUs <= 0L) continue
             val candidate = runCatching { tryExtractFrame(retriever, candidateUs, targetSize) }.getOrNull()
@@ -709,6 +737,9 @@ class ThumbnailHandlers(
         val fileName  = call.argument<String>("fileName")
         val targetSize = call.argument<Int>("targetSize") ?: 180
         val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+        val strategy = call.argument<String>("strategy") ?: "hybrid"
+        val framePosition = call.argument<Number>("framePosition")?.toDouble() ?: 0.12
+        val explicitTimeUs = call.argument<Number>("timeUs")?.toLong()
 
         if (uriString == null || fileName == null) {
             result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -740,6 +771,9 @@ class ThumbnailHandlers(
                         targetSize,
                         call.argument<Int>("quality") ?: 60,
                         isVideo = true,
+                        strategy = strategy,
+                        framePosition = framePosition,
+                        explicitTimeUs = explicitTimeUs,
                     )
                     if (thumb != null) {
                         val bytes = thumb["bytes"] as ByteArray
@@ -781,8 +815,7 @@ class ThumbnailHandlers(
                 }
 
                 val quality = call.argument<Int>("quality") ?: 60
-                val explicitTimeUs = call.argument<Number>("timeUs")?.toLong()
-                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs)
+                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
 
                 if (frameResult != null) {
                     activity.runOnUiThread { result.success(onFrame(frameResult)) }
@@ -1411,6 +1444,9 @@ class ThumbnailHandlers(
         quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
+        explicitTimeUs: Long? = null,
+        strategy: String = "hybrid",
+        framePosition: Double = 0.12,
     ): VideoFrameResult? {
         var extractor: MediaExtractor? = null
         var codec: MediaCodec? = null
@@ -1459,10 +1495,17 @@ class ThumbnailHandlers(
             val ext = extractor
             val dec = codec
 
-            val seekTimeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
+            val seekTimeUs = explicitTimeUs ?: when (strategy) {
+                "firstFrame", "hybrid" -> 0L
+                "frameAtPercentage" -> (durationUs * framePosition.coerceIn(0.05, 0.90)).toLong()
+                else -> 0L
+            }
             var outputFrame = decodeSoftwareFrameAt(ext, dec, seekTimeUs)
-            if (outputFrame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(outputFrame)) {
-                for (fraction in VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS) {
+            if (strategy == "hybrid" && explicitTimeUs == null &&
+                (outputFrame == null || VideoThumbnailCoordinator.isLikelyBlankFrame(outputFrame))
+            ) {
+                val fractions = (listOf(framePosition.coerceIn(0.05, 0.90)) + VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS.toList()).distinct()
+                for (fraction in fractions) {
                     val candidateUs = (durationUs * fraction).toLong()
                     if (candidateUs <= seekTimeUs) continue
                     val candidate = runCatching { decodeSoftwareFrameAt(ext, dec, candidateUs) }.getOrNull()

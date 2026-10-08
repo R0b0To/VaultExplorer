@@ -620,7 +620,19 @@ open class MainActivity : FlutterFragmentActivity() {
                     val volId = call.argument<Int>("volId") ?: -1
                     val filePath = call.argument<String>("filePath") ?: ""
                     val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
-                    val textureId = nativePlayerManager.initialize(volId, filePath, isLocalStorage)
+                    val videoDecoderMode = call.argument<String>("videoDecoderMode") ?: "AUTO"
+                    val audioDecoderMode = call.argument<String>("audioDecoderMode") ?: "AUTO"
+                    val volumeBoostEnabled = call.argument<Boolean>("volumeBoostEnabled") ?: false
+                    val volumeBoostGainMb = call.argument<Int>("volumeBoostGainMb") ?: 2000
+                    val textureId = nativePlayerManager.initialize(
+                        volId,
+                        filePath,
+                        isLocalStorage,
+                        videoDecoderMode,
+                        audioDecoderMode,
+                        volumeBoostEnabled,
+                        volumeBoostGainMb,
+                    )
                     result.success(mapOf("textureId" to textureId))
                 }
                 "play" -> {
@@ -644,6 +656,18 @@ open class MainActivity : FlutterFragmentActivity() {
                 "setVolume" -> {
                     val volume = call.argument<Number>("volume")?.toFloat() ?: 1.0f
                     nativePlayerManager.setVolume(volume)
+                    result.success(null)
+                }
+                "setVolumeBoost" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val gainMb = call.argument<Int>("gainMb") ?: 2000
+                    nativePlayerManager.setVolumeBoost(enabled, gainMb)
+                    result.success(null)
+                }
+                "setDecoderModes" -> {
+                    val videoMode = call.argument<String>("videoMode") ?: "AUTO"
+                    val audioMode = call.argument<String>("audioMode") ?: "AUTO"
+                    nativePlayerManager.setDecoderModes(videoMode, audioMode)
                     result.success(null)
                 }
                 "getDeviceVolume" -> {

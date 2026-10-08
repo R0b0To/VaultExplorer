@@ -6,7 +6,9 @@ import android.graphics.Matrix
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Surface
@@ -23,11 +25,11 @@ import androidx.media3.common.text.CueGroup
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
@@ -49,6 +51,9 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderManager
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -70,6 +75,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var textureId: Long = -1L
 
     private var player: ExoPlayer? = null
+    private var decoderManager: DecoderManager? = null
+    private var requestedVideoDecoderMode = DecoderMode.AUTO
+    private var requestedAudioDecoderMode = DecoderMode.AUTO
+    private var volumeBoostEnabled = false
+    private var volumeBoostGainMb = 2000
+    private var loudnessEnhancer: LoudnessEnhancer? = null
+    private var loudnessAudioSessionId = 0
     private var currentVolId: Int = -1
     private var currentFilePath: String = ""
     // True when currentFilePath is a real, already-plaintext absolute path
@@ -299,7 +311,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     private fun isSoftwareDecoder(decoderName: String): Boolean {
         val lower = decoderName.lowercase()
-        return lower.startsWith("c2.android.") ||
+        return lower.startsWith("ffmpeg") ||
+               lower.startsWith("c2.android.") ||
                lower.startsWith("omx.google.") ||
                lower.contains(".sw.") ||
                lower.endsWith(".sw")
@@ -337,7 +350,15 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("diagnosticsUpdate", getDiagnosticsMap())
     }
 
-    fun initialize(volId: Int, filePath: String, isLocalStorage: Boolean = false): Long {
+    fun initialize(
+        volId: Int,
+        filePath: String,
+        isLocalStorage: Boolean = false,
+        videoDecoderModeName: String = "AUTO",
+        audioDecoderModeName: String = "AUTO",
+        volumeBoostEnabled: Boolean = false,
+        volumeBoostGainMb: Int = 2000,
+    ): Long {
         // A scrub-preview session from the outgoing video (if the user
         // swiped to the next item mid-drag) is pinned to that video's
         // extractor/codec -- never valid for whatever loads next.
@@ -345,6 +366,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         currentVolId = volId
         currentFilePath = filePath
         currentIsLocalStorage = isLocalStorage
+        requestedVideoDecoderMode = parseDecoderMode(videoDecoderModeName)
+        requestedAudioDecoderMode = parseDecoderMode(audioDecoderModeName)
+        this.volumeBoostEnabled = volumeBoostEnabled
+        this.volumeBoostGainMb = volumeBoostGainMb.coerceIn(0, 2000)
         isMirrorDownloading = false
         videoDecoderName = "Initializing..."
         audioDecoderName = "Initializing..."
@@ -386,7 +411,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         if (exoPlayer == null) {
             val tier = DeviceCapabilityProfiler.tierFor(context)
             val loadControl = buildLoadControl(tier)
-            val renderersFactory = HighPerformanceRenderersFactory(context)
+            val manager = DecoderManager(requestedVideoDecoderMode, requestedAudioDecoderMode)
+            decoderManager = manager
+            val renderersFactory = HighPerformanceRenderersFactory(context, manager)
             exoPlayer = ExoPlayer.Builder(context, renderersFactory)
                 .setLoadControl(loadControl)
                 .setAudioAttributes(
@@ -401,7 +428,12 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             exoPlayer.addListener(this)
             exoPlayer.addAnalyticsListener(analyticsListener)
             player = exoPlayer
+            manager.attach(exoPlayer)
+        } else {
+            decoderManager?.selectVideoDecoder(requestedVideoDecoderMode)
+            decoderManager?.selectAudioDecoder(requestedAudioDecoderMode)
         }
+        applyVolumeBoost(exoPlayer.audioSessionId)
 
         // 5. Connect newSurface to ExoPlayer and prepare
         exoPlayer.setVideoSurface(newSurface)
@@ -460,6 +492,48 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     fun setVolume(volume: Float) {
         player?.volume = volume.coerceIn(0f, 1f)
+    }
+
+    fun setVolumeBoost(enabled: Boolean, gainMb: Int) {
+        volumeBoostEnabled = enabled
+        volumeBoostGainMb = gainMb.coerceIn(0, 2000)
+        player?.let { applyVolumeBoost(it.audioSessionId) }
+    }
+
+    fun setDecoderModes(videoModeName: String, audioModeName: String) {
+        val videoMode = parseDecoderMode(videoModeName)
+        val audioMode = parseDecoderMode(audioModeName)
+        requestedVideoDecoderMode = videoMode
+        requestedAudioDecoderMode = audioMode
+        decoderManager?.let { manager ->
+            manager.selectVideoDecoder(videoMode)
+            manager.selectAudioDecoder(audioMode)
+        }
+    }
+
+    private fun parseDecoderMode(name: String): DecoderMode =
+        runCatching { DecoderMode.valueOf(name.uppercase()) }.getOrDefault(DecoderMode.AUTO)
+
+    private fun applyVolumeBoost(audioSessionId: Int) {
+        if (audioSessionId <= 0) return
+        if (loudnessAudioSessionId != audioSessionId) {
+            runCatching { loudnessEnhancer?.release() }
+            loudnessEnhancer = null
+            loudnessAudioSessionId = audioSessionId
+        }
+        val enhancer = loudnessEnhancer ?: runCatching {
+            LoudnessEnhancer(audioSessionId).also { loudnessEnhancer = it }
+        }.getOrNull() ?: return
+        runCatching {
+            enhancer.setTargetGain(volumeBoostGainMb)
+            enhancer.enabled = volumeBoostEnabled
+        }.onFailure { VeLog.w(TAG) { "Volume boost update failed: ${it.message}" } }
+    }
+
+    private fun releaseVolumeBoost() {
+        runCatching { loudnessEnhancer?.release() }
+        loudnessEnhancer = null
+        loudnessAudioSessionId = 0
     }
 
     fun setLooping(loop: Boolean) {
@@ -772,11 +846,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         isFallbackMode = false
         mainHandler.removeCallbacks(positionUpdateRunnable)
         player?.let { p ->
+            decoderManager?.detach()
             p.clearVideoSurface()
             p.removeListener(this)
             p.release()
         }
         player = null
+        decoderManager = null
+        releaseVolumeBoost()
         surface?.release()
         surface = null
         textureEntry?.release()
@@ -791,6 +868,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     override fun onRenderedFirstFrame() {
         emitEvent("renderedFirstFrame", emptyMap())
+    }
+
+    override fun onAudioSessionIdChanged(audioSessionId: Int) {
+        applyVolumeBoost(audioSessionId)
     }
 
      override fun onPositionDiscontinuity(
@@ -916,25 +997,72 @@ private class HighSpeedMediaCodecVideoRenderer(
     eventListener,
     maxDroppedFramesBeforeNotify
 ) {
+    override fun getMediaFormat(
+        format: Format,
+        codecMimeType: String,
+        codecMaxValues: MediaCodecVideoRenderer.CodecMaxValues,
+        codecOperatingRate: Float,
+        deviceNeedsNoPostProcessWorkaround: Boolean,
+        tunnelingAudioSessionId: Int
+    ): MediaFormat {
+        val mediaFormat = super.getMediaFormat(
+            format,
+            codecMimeType,
+            codecMaxValues,
+            codecOperatingRate,
+            deviceNeedsNoPostProcessWorkaround,
+            tunnelingAudioSessionId
+        )
+
+        val streamFps = if (format.frameRate > 0f) format.frameRate else 30f
+        val pixelRate = format.width.toLong() * format.height.toLong() * streamFps
+        val fourK30PixelRate = 3840L * 2160L * 30L
+        if (format.width > 0 && format.height > 0 && pixelRate > fourK30PixelRate) {
+            // Decoder input timestamps still carry the true frame cadence. Avoid
+            // passing a 60 fps capability hint to vendor decoders that advertise
+            // only 4K30 but can decode this stream when the hint is omitted.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mediaFormat.removeKey(MediaFormat.KEY_FRAME_RATE)
+            } else {
+                mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, 30f)
+            }
+        }
+        return mediaFormat
+    }
+
     override fun getCodecOperatingRateV23(
         targetPlaybackSpeed: Float,
         format: Format,
         streamFormats: Array<out Format>
     ): Float {
+        val streamFps = if (format.frameRate > 0f) format.frameRate else 30f
+        val pixelRate = format.width.toLong() * format.height.toLong() * streamFps
+        val fourK30PixelRate = 3840L * 2160L * 30L
+
+        // KEY_OPERATING_RATE is only a hint, but some vendor codecs treat it as a
+        // hard capability check. On devices that can decode 4K60 without the hint,
+        // explicitly requesting 60 fps can make MediaCodec.configure fail and send
+        // playback to the much slower software decoder. Leave it unset above 4K30;
+        // the codec can still consume the stream at its own supported rate.
+        if (format.width > 0 && format.height > 0 && pixelRate > fourK30PixelRate) {
+            return CODEC_OPERATING_RATE_UNSET
+        }
+
         val defaultRate = super.getCodecOperatingRateV23(targetPlaybackSpeed, format, streamFormats)
         if (defaultRate != CODEC_OPERATING_RATE_UNSET) {
             return defaultRate.coerceAtMost(120f)
         }
-        val streamFps = if (format.frameRate > 0f) format.frameRate else 30f
         return (streamFps * targetPlaybackSpeed).coerceAtMost(120f)
     }
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class HighPerformanceRenderersFactory(
-    context: Context
-) : DefaultRenderersFactory(context) {
+    context: Context,
+    private val decoderManager: DecoderManager,
+) : NextRenderersFactory(context) {
     init {
+        setDecoderManager(decoderManager)
         setEnableDecoderFallback(true)
         setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
         forceEnableMediaCodecAsynchronousQueueing()
@@ -950,15 +1078,53 @@ private class HighPerformanceRenderersFactory(
         allowedVideoJoiningTimeMs: Long,
         out: ArrayList<Renderer>
     ) {
-        val videoRenderer = HighSpeedMediaCodecVideoRenderer(
+        val modeAwareSelector = object : MediaCodecSelector {
+            override fun getDecoderInfos(
+                mimeType: String,
+                requiresSecureDecoder: Boolean,
+                requiresTunnelingDecoder: Boolean,
+            ): List<MediaCodecInfo> {
+                val decoders = mediaCodecSelector.getDecoderInfos(
+                    mimeType,
+                    requiresSecureDecoder,
+                    requiresTunnelingDecoder,
+                )
+                return when (decoderManager.videoMode) {
+                    DecoderMode.AUTO -> decoders
+                    DecoderMode.HARDWARE -> decoders.filter { it.hardwareAccelerated }
+                    DecoderMode.SOFTWARE -> decoders.filter { it.softwareOnly }
+                    DecoderMode.FFMPEG -> emptyList()
+                }
+            }
+        }
+
+        val generatedRenderers = ArrayList<Renderer>()
+        super.buildVideoRenderers(
             context,
-            mediaCodecSelector,
-            allowedVideoJoiningTimeMs,
+            extensionRendererMode,
+            modeAwareSelector,
             enableDecoderFallback,
             eventHandler,
             eventListener,
-            50
+            allowedVideoJoiningTimeMs,
+            generatedRenderers,
         )
-        out.add(videoRenderer)
+        generatedRenderers.forEach { renderer ->
+            if (renderer is MediaCodecVideoRenderer) {
+                out.add(
+                    HighSpeedMediaCodecVideoRenderer(
+                        context,
+                        modeAwareSelector,
+                        allowedVideoJoiningTimeMs,
+                        enableDecoderFallback,
+                        eventHandler,
+                        eventListener,
+                        50,
+                    ),
+                )
+            } else {
+                out.add(renderer)
+            }
+        }
     }
 }

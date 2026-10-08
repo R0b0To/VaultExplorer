@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -805,6 +806,34 @@ SectionCard(
                       SectionHeader(context.l10n.mediaViewerSectionHeader),
                       SectionCard(
                         children: [
+                          ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            leading: Icon(
+                              Icons.tune_rounded,
+                              color: cs.primary,
+                            ),
+                            title: Text(
+                              context.l10n.mediaPlayerControlsTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              '${context.l10n.playbackSettingsTitle}, ${context.l10n.toolbarLayoutSectionHeader}, ${context.l10n.advancedOptionsTitle}',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MediaViewerToolbarSettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),

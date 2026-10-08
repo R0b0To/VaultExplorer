@@ -9400,4 +9400,66 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mirrorSyncActivityLabel => 'Saving vault changes to storage';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Seek gesture sensitivity';
+
+  @override
+  String get volumeGestureSensitivityTitle => 'Volume gesture sensitivity';
+
+  @override
+  String get brightnessGestureSensitivityTitle =>
+      'Brightness gesture sensitivity';
+
+  @override
+  String get thumbnailSettingsHeader => 'Thumbnail Generation';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => 'Thumbnail frame strategy';
+
+  @override
+  String get thumbnailFirstFrameOption => 'First frame';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Frame at position';
+
+  @override
+  String get thumbnailHybridOption => 'Hybrid (skip blank opening)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'Preferred frame position';
+
+  @override
+  String get volumeBoostHeader => 'Volume Boost';
+
+  @override
+  String get volumeBoostTitle => 'Enable volume boost';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Increase quiet video audio above the normal player volume.';
+
+  @override
+  String get volumeBoostGainTitle => 'Boost amount';
+
+  @override
+  String get decoderSelectionHeader => 'Decoder Selection';
+
+  @override
+  String get videoDecoderTitle => 'Video decoder';
+
+  @override
+  String get audioDecoderTitle => 'Audio decoder';
+
+  @override
+  String get decoderAutoOption => 'Automatic';
+
+  @override
+  String get decoderHardwareOption => 'Hardware';
+
+  @override
+  String get decoderSoftwareOption => 'Software';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

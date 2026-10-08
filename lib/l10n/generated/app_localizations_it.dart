@@ -9540,4 +9540,69 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get mirrorSyncActivityLabel =>
       'Salvataggio delle modifiche del vault nell’archivio';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Sensibilità del gesto di ricerca';
+
+  @override
+  String get volumeGestureSensitivityTitle =>
+      'Sensibilità del gesto del volume';
+
+  @override
+  String get brightnessGestureSensitivityTitle =>
+      'Sensibilità del gesto della luminosità';
+
+  @override
+  String get thumbnailSettingsHeader => 'Generazione miniature';
+
+  @override
+  String get thumbnailGenerationStrategyTitle =>
+      'Strategia del fotogramma miniatura';
+
+  @override
+  String get thumbnailFirstFrameOption => 'Primo fotogramma';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Fotogramma in una posizione';
+
+  @override
+  String get thumbnailHybridOption => 'Ibrida (salta l’apertura vuota)';
+
+  @override
+  String get thumbnailFramePositionTitle =>
+      'Posizione preferita del fotogramma';
+
+  @override
+  String get volumeBoostHeader => 'Potenziamento volume';
+
+  @override
+  String get volumeBoostTitle => 'Attiva il potenziamento del volume';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Aumenta l’audio basso dei video oltre il volume normale del lettore.';
+
+  @override
+  String get volumeBoostGainTitle => 'Livello di potenziamento';
+
+  @override
+  String get decoderSelectionHeader => 'Selezione decoder';
+
+  @override
+  String get videoDecoderTitle => 'Decoder video';
+
+  @override
+  String get audioDecoderTitle => 'Decoder audio';
+
+  @override
+  String get decoderAutoOption => 'Automatico';
+
+  @override
+  String get decoderHardwareOption => 'Hardware';
+
+  @override
+  String get decoderSoftwareOption => 'Software';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

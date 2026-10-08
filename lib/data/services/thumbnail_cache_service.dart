@@ -19,11 +19,13 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
+import 'package:vaultexplorer/core/api/vault_engine_types.dart'
+    show logSwallowed;
 
 part 'thumbnail_cache_service.g.dart';
 
@@ -161,8 +163,67 @@ class ThumbnailCacheService {
   static final Map<String, String> _latestKeyByFile = {};
   static final Map<String, (int width, int height)> _sizeCache = {};
 
-  static String _filePrefix(MountedContainer container, String filePath) =>
-      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+  static String _videoThumbnailVariant = 'hybrid-120';
+  static final Set<String> _knownVideoThumbnailVariants = {
+    for (final strategy in ThumbnailGenerationStrategy.values)
+      for (var position = 50; position <= 900; position += 50)
+        '${strategy.name}-$position',
+    for (final strategy in ThumbnailGenerationStrategy.values)
+      '${strategy.name}-120',
+  };
+
+  static String get videoThumbnailVariant => _videoThumbnailVariant;
+
+  static ThumbnailGenerationStrategy _videoThumbnailStrategy =
+      ThumbnailGenerationStrategy.hybrid;
+  static double _videoThumbnailFramePosition = 0.12;
+
+  static ThumbnailGenerationStrategy get videoThumbnailStrategy =>
+      _videoThumbnailStrategy;
+  static double get videoThumbnailFramePosition => _videoThumbnailFramePosition;
+
+  static void setVideoThumbnailSettings(
+    ThumbnailGenerationStrategy strategy,
+    double framePosition,
+  ) {
+    _videoThumbnailStrategy = strategy;
+    _videoThumbnailFramePosition = framePosition.clamp(0.05, 0.90).toDouble();
+    _videoThumbnailVariant =
+        '${strategy.name}-${(_videoThumbnailFramePosition * 1000).round()}';
+    _knownVideoThumbnailVariants.add(_videoThumbnailVariant);
+  }
+
+  static String? _variantForPath(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+    return const {
+          'mp4',
+          'm4v',
+          'webm',
+          'mov',
+          'avi',
+          'mkv',
+          'mpeg',
+          'mpg',
+          'flv',
+          'ts',
+          'wmv',
+          '3gp',
+          'vob',
+          'ogv',
+          'divx',
+          'f4v',
+          'm2ts',
+        }.contains(extension)
+        ? 'video:$_videoThumbnailVariant'
+        : null;
+  }
+
+  static String _filePrefix(MountedContainer container, String filePath) {
+    final base =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final variant = _variantForPath(filePath);
+    return variant == null ? base : '$base$variant|';
+  }
 
   static String? _findResidentKeyForFile(
     MountedContainer container,
@@ -209,8 +270,18 @@ class ThumbnailCacheService {
     return _hash.hashBytesMd5(Uint8List.fromList(utf8.encode(value)));
   }
 
-  static String _qualifiedPath(String filePath, ThumbnailQuality quality) =>
-      '$filePath|${quality.size}|${quality.quality}';
+  static String _qualifiedPath(
+    String filePath,
+    ThumbnailQuality quality, {
+    String? videoVariant,
+  }) {
+    final variant = videoVariant == null
+        ? _variantForPath(filePath)
+        : 'video:$videoVariant';
+    return variant == null
+        ? '$filePath|${quality.size}|${quality.quality}'
+        : '$filePath|$variant|${quality.size}|${quality.quality}';
+  }
 
   static String _memKey(
     MountedContainer container,
@@ -370,7 +441,7 @@ class ThumbnailCacheService {
         final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
         var file = File('$dir/$cacheKey');
 
-        if (!await file.exists()) {
+        if (!await file.exists() && _variantForPath(filePath) == null) {
           final baseKey = await _encodeKey(filePath);
           file = File('$dir/$baseKey');
         }
@@ -407,7 +478,14 @@ class ThumbnailCacheService {
         // 1. Anything queued for, or being written to, a pack right now.
         final pending = queue.getPending(keyHex);
         if (pending != null) {
-          putInMemory(container, filePath, pending.data, quality, pending.width, pending.height);
+          putInMemory(
+            container,
+            filePath,
+            pending.data,
+            quality,
+            pending.width,
+            pending.height,
+          );
           return (pending.data, pending.width, pending.height);
         }
 
@@ -427,7 +505,14 @@ class ThumbnailCacheService {
           if (chunk != null &&
               chunk.length == entry.length &&
               _looksLikeValidImage(chunk)) {
-            putInMemory(container, filePath, chunk, quality, entry.width, entry.height);
+            putInMemory(
+              container,
+              filePath,
+              chunk,
+              quality,
+              entry.width,
+              entry.height,
+            );
             return (chunk, entry.width, entry.height);
           }
         }
@@ -442,7 +527,9 @@ class ThumbnailCacheService {
             0,
             _inContainerReadCap,
           );
-          if (stored != null && stored.isNotEmpty && _looksLikeValidImage(stored)) {
+          if (stored != null &&
+              stored.isNotEmpty &&
+              _looksLikeValidImage(stored)) {
             final dims = _extractImageDimensions(stored);
             final width = dims?.$1;
             final height = dims?.$2;
@@ -551,7 +638,8 @@ class ThumbnailCacheService {
         final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
         // Pack index keys are 16-byte digests; anything else can't be indexed.
         if (!_cacheKeyRe.hasMatch(keyHex)) return;
-        final resolvedDims = (width != null && height != null && width > 0 && height > 0)
+        final resolvedDims =
+            (width != null && height != null && width > 0 && height > 0)
             ? (width, height)
             : _extractImageDimensions(data) ?? (180, 180);
 
@@ -771,7 +859,9 @@ class ThumbnailCacheService {
   }
 
   static Uint8List _serializeIndex(_InContainerPackIndex index) {
-    final buffer = Uint8List(_indexHeaderSize + index.entries.length * _indexEntrySize);
+    final buffer = Uint8List(
+      _indexHeaderSize + index.entries.length * _indexEntrySize,
+    );
     final bd = ByteData.sublistView(buffer);
 
     buffer.setRange(0, 4, utf8.encode('TPK3'));
@@ -844,7 +934,9 @@ class ThumbnailCacheService {
 
   // ── Cache Invalidation & Management ────────────────────────────────────────
 
- static Duration inContainerDebounceDuration = const Duration(milliseconds: 2500);
+  static Duration inContainerDebounceDuration = const Duration(
+    milliseconds: 2500,
+  );
 
   /// Called on every container lock (F-16). Wipes the decrypted memory tier
   /// and releases this mount's in-container pack state, so the next unlock
@@ -872,7 +964,8 @@ class ThumbnailCacheService {
     }
     _memoryCache.removeWhere((key) => key.startsWith('${container.volId}:'));
     _latestKeyByFile.removeWhere(
-        (prefix, _) => prefix.startsWith('${container.volId}:'));
+      (prefix, _) => prefix.startsWith('${container.volId}:'),
+    );
     _sizeCache.removeWhere((key, _) => key.startsWith('${container.volId}:'));
   }
 
@@ -952,14 +1045,23 @@ class ThumbnailCacheService {
         '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
     _memoryCache.removeWhere((key) => key.startsWith(prefix));
     _sizeCache.removeWhere((key, _) => key.startsWith(prefix));
-    _latestKeyByFile.remove(prefix);
+    _latestKeyByFile.removeWhere((key, _) => key.startsWith(prefix));
 
     final inContainerKeys = <String>[];
+    final videoVariants = _variantForPath(filePath) == null
+        ? <String?>[null]
+        : _knownVideoThumbnailVariants.toList();
     for (final quality in qualities) {
-      try {
-        inContainerKeys.add(await _encodeKey(_qualifiedPath(filePath, quality)));
-      } catch (e) {
-        logSwallowed('invalidateFile', e, expected: true);
+      for (final variant in videoVariants) {
+        try {
+          inContainerKeys.add(
+            await _encodeKey(
+              _qualifiedPath(filePath, quality, videoVariant: variant),
+            ),
+          );
+        } catch (e) {
+          logSwallowed('invalidateFile', e, expected: true);
+        }
       }
     }
 
@@ -967,18 +1069,27 @@ class ThumbnailCacheService {
     try {
       final dir = await _thumbDir(container);
       for (final quality in qualities) {
-        try {
-          final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
-          final file = File('$dir/$cacheKey');
-          if (await file.exists()) await file.delete();
-          final metaFile = File('${file.path}.meta');
-          if (await metaFile.exists()) await metaFile.delete();
-          final baseKey = await _encodeKey(filePath);
-          final baseFile = File('$dir/$baseKey');
-          if (await baseFile.exists()) await baseFile.delete();
-        } catch (e) {
-          logSwallowed('invalidateFile', e, expected: true);
+        for (final variant in videoVariants) {
+          try {
+            final cacheKey = await _encodeKey(
+              _qualifiedPath(filePath, quality, videoVariant: variant),
+            );
+            final file = File('$dir/$cacheKey');
+            if (await file.exists()) await file.delete();
+            final metaFile = File('${file.path}.meta');
+            if (await metaFile.exists()) await metaFile.delete();
+          } catch (e) {
+            logSwallowed('invalidateFile', e, expected: true);
+          }
         }
+      }
+      // Remove legacy entries created before strategy-aware video keys.
+      if (_variantForPath(filePath) != null) {
+        final legacyKey = await _encodeKey(filePath);
+        final legacyFile = File('$dir/$legacyKey');
+        if (await legacyFile.exists()) await legacyFile.delete();
+        final legacyMetaFile = File('${legacyFile.path}.meta');
+        if (await legacyMetaFile.exists()) await legacyMetaFile.delete();
       }
     } catch (e) {
       logSwallowed('invalidateFile', e, expected: true);
@@ -1038,7 +1149,11 @@ class ThumbnailCacheService {
         }
       }
     } catch (e) {
-      VeLog.e('ThumbnailCacheService', 'App-cache disk budget eviction failed', e);
+      VeLog.e(
+        'ThumbnailCacheService',
+        'App-cache disk budget eviction failed',
+        e,
+      );
     }
   }
 
@@ -1055,7 +1170,11 @@ class ThumbnailCacheService {
         () => _evictInContainer(container, queue, maxBytes),
       );
     } catch (e) {
-      VeLog.e('ThumbnailCacheService', 'In-container disk budget eviction failed', e);
+      VeLog.e(
+        'ThumbnailCacheService',
+        'In-container disk budget eviction failed',
+        e,
+      );
     }
   }
 
@@ -1120,7 +1239,9 @@ class ThumbnailCacheService {
     if (index.dirty && await queue.persist(index)) index.dirty = false;
   }
 
-  static Future<void> pruneStaleAppCache(Set<String> activeContainerUris) async {
+  static Future<void> pruneStaleAppCache(
+    Set<String> activeContainerUris,
+  ) async {
     try {
       final rootPath = await _getAppCacheRoot();
       final root = Directory('$rootPath/thumbs');
@@ -1170,15 +1291,16 @@ class ThumbnailCacheService {
         return (width > 0 && height > 0) ? (width, height) : null;
       case 'VP8L':
         final bits =
-            bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24);
+            bytes[21] |
+            (bytes[22] << 8) |
+            (bytes[23] << 16) |
+            (bytes[24] << 24);
         final width = (bits & 0x3FFF) + 1;
         final height = ((bits >> 14) & 0x3FFF) + 1;
         return (width, height);
       case 'VP8X':
-        final width =
-            ((bytes[24] << 16) | (bytes[25] << 8) | bytes[26]) + 1;
-        final height =
-            ((bytes[27] << 16) | (bytes[28] << 8) | bytes[29]) + 1;
+        final width = ((bytes[24] << 16) | (bytes[25] << 8) | bytes[26]) + 1;
+        final height = ((bytes[27] << 16) | (bytes[28] << 8) | bytes[29]) + 1;
         return (width, height);
       default:
         return null;
@@ -1419,7 +1541,10 @@ class _InContainerPackQueue {
   Future<bool> persist(_InContainerPackIndex index) =>
       _writeIndex(index, ThumbnailCacheService._fileIo);
 
-  Future<bool> _writeIndex(_InContainerPackIndex index, VaultFileIoApi io) async {
+  Future<bool> _writeIndex(
+    _InContainerPackIndex index,
+    VaultFileIoApi io,
+  ) async {
     try {
       return await io.writeWholeFile(
         container,
@@ -1518,7 +1643,8 @@ class _InContainerPackQueue {
     VaultFileIoApi io,
   ) async {
     final index = await ensureIndex();
-    if (index == null) return false; // unknown on-disk state: never write over it
+    if (index == null)
+      return false; // unknown on-disk state: never write over it
     if (!await _ensureDir(io)) return false;
 
     final packId = index.nextPackId;

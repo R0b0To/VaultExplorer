@@ -9622,4 +9622,65 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mirrorSyncActivityLabel => 'Збереження змін сховища у сховище';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Чутливість жесту перемотування';
+
+  @override
+  String get volumeGestureSensitivityTitle => 'Чутливість жесту гучності';
+
+  @override
+  String get brightnessGestureSensitivityTitle => 'Чутливість жесту яскравості';
+
+  @override
+  String get thumbnailSettingsHeader => 'Створення мініатюр';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => 'Стратегія кадру мініатюри';
+
+  @override
+  String get thumbnailFirstFrameOption => 'Перший кадр';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Кадр у вибраній позиції';
+
+  @override
+  String get thumbnailHybridOption => 'Гібрид (пропускати порожній початок)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'Бажана позиція кадру';
+
+  @override
+  String get volumeBoostHeader => 'Підсилення гучності';
+
+  @override
+  String get volumeBoostTitle => 'Увімкнути підсилення гучності';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Підсилювати тихий звук відео понад звичайну гучність програвача.';
+
+  @override
+  String get volumeBoostGainTitle => 'Рівень підсилення';
+
+  @override
+  String get decoderSelectionHeader => 'Вибір декодера';
+
+  @override
+  String get videoDecoderTitle => 'Відеодекодер';
+
+  @override
+  String get audioDecoderTitle => 'Аудіодекодер';
+
+  @override
+  String get decoderAutoOption => 'Автоматично';
+
+  @override
+  String get decoderHardwareOption => 'Апаратний';
+
+  @override
+  String get decoderSoftwareOption => 'Програмний';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

@@ -466,6 +466,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (!mounted || token != _activateToken) return;
     _updateSwipePhysics();
     if (isVid || isAud) {
+      final playbackSettings = ref
+          .read(fileManagerToolbarSettingsProvider(null))
+          .config
+          .mediaViewerToolbarConfig;
       unawaited(
         _playbackManager.activate(
           fileName: file,
@@ -484,6 +488,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           autoPlay: false,
           playbackSpeed: _playbackSpeed,
           looping: _videoPlaybackMode == VideoPlaybackMode.loop,
+          videoDecoderMode: playbackSettings.videoDecoderMode,
+          audioDecoderMode: playbackSettings.audioDecoderMode,
+          volumeBoostEnabled: playbackSettings.volumeBoostEnabled,
+          volumeBoostGainMb: playbackSettings.volumeBoostGainMb,
         ),
       );
     } else {
@@ -2132,7 +2140,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const MediaViewerToolbarSettingsScreen(),
+                builder: (_) =>
+                    const MediaViewerToolbarSettingsScreen(initialTab: 1),
               ),
             );
           },
@@ -2361,6 +2370,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               swipeToSeekEnabled:
                   !_playlistController.isPlaylistMode ||
                   gestureConfig.swipeToSeekEnabled,
+              seekSensitivity: gestureConfig.seekSensitivity,
+              volumeGestureSensitivity: gestureConfig.volumeGestureSensitivity,
+              brightnessGestureSensitivity:
+                  gestureConfig.brightnessGestureSensitivity,
+              volumeBoostEnabled: gestureConfig.volumeBoostEnabled,
+              volumeBoostGainMb: gestureConfig.volumeBoostGainMb,
+              videoDecoderMode: gestureConfig.videoDecoderMode,
+              audioDecoderMode: gestureConfig.audioDecoderMode,
               progressNotifier: _videoProgressNotifier,
               onSubtitlesAvailableChanged: (val) {
                 _playbackManager.updateSubtitleStatus(fileName, val);
@@ -2790,7 +2807,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    const MediaViewerToolbarSettingsScreen(),
+                                    const MediaViewerToolbarSettingsScreen(
+                                  initialTab: 1,
+                                ),
                               ),
                             );
                           },

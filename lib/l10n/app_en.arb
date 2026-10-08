@@ -11963,5 +11963,25 @@
   "mirrorSyncActivityLabel": "Saving vault changes to storage",
   "@mirrorSyncActivityLabel": {
     "description": "Status shown while a mirror proxy is still writing vault changes to its storage provider."
-  }
+  },
+  "seekGestureSensitivityTitle": "Seek gesture sensitivity",
+  "volumeGestureSensitivityTitle": "Volume gesture sensitivity",
+  "brightnessGestureSensitivityTitle": "Brightness gesture sensitivity",
+  "thumbnailSettingsHeader": "Thumbnail Generation",
+  "thumbnailGenerationStrategyTitle": "Thumbnail frame strategy",
+  "thumbnailFirstFrameOption": "First frame",
+  "thumbnailPercentageFrameOption": "Frame at position",
+  "thumbnailHybridOption": "Hybrid (skip blank opening)",
+  "thumbnailFramePositionTitle": "Preferred frame position",
+  "volumeBoostHeader": "Volume Boost",
+  "volumeBoostTitle": "Enable volume boost",
+  "volumeBoostSubtitle": "Increase quiet video audio above the normal player volume.",
+  "volumeBoostGainTitle": "Boost amount",
+  "decoderSelectionHeader": "Decoder Selection",
+  "videoDecoderTitle": "Video decoder",
+  "audioDecoderTitle": "Audio decoder",
+  "decoderAutoOption": "Automatic",
+  "decoderHardwareOption": "Hardware",
+  "decoderSoftwareOption": "Software",
+  "decoderFfmpegOption": "FFmpeg"
 }

@@ -9038,4 +9038,64 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get mirrorSyncActivityLabel => '볼트 변경 사항을 저장소에 저장 중';
+
+  @override
+  String get seekGestureSensitivityTitle => '탐색 제스처 감도';
+
+  @override
+  String get volumeGestureSensitivityTitle => '볼륨 제스처 감도';
+
+  @override
+  String get brightnessGestureSensitivityTitle => '밝기 제스처 감도';
+
+  @override
+  String get thumbnailSettingsHeader => '썸네일 생성';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => '썸네일 프레임 선택 방식';
+
+  @override
+  String get thumbnailFirstFrameOption => '첫 프레임';
+
+  @override
+  String get thumbnailPercentageFrameOption => '지정 위치의 프레임';
+
+  @override
+  String get thumbnailHybridOption => '하이브리드 (빈 시작 부분 건너뛰기)';
+
+  @override
+  String get thumbnailFramePositionTitle => '선호 프레임 위치';
+
+  @override
+  String get volumeBoostHeader => '볼륨 부스트';
+
+  @override
+  String get volumeBoostTitle => '볼륨 부스트 사용';
+
+  @override
+  String get volumeBoostSubtitle => '작은 동영상 오디오를 플레이어의 일반 볼륨보다 높입니다.';
+
+  @override
+  String get volumeBoostGainTitle => '부스트 크기';
+
+  @override
+  String get decoderSelectionHeader => '디코더 선택';
+
+  @override
+  String get videoDecoderTitle => '비디오 디코더';
+
+  @override
+  String get audioDecoderTitle => '오디오 디코더';
+
+  @override
+  String get decoderAutoOption => '자동';
+
+  @override
+  String get decoderHardwareOption => '하드웨어';
+
+  @override
+  String get decoderSoftwareOption => '소프트웨어';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

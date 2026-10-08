@@ -9543,4 +9543,67 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get mirrorSyncActivityLabel =>
       'Tresoränderungen werden im Speicher gesichert';
+
+  @override
+  String get seekGestureSensitivityTitle => 'Empfindlichkeit der Suchgeste';
+
+  @override
+  String get volumeGestureSensitivityTitle =>
+      'Empfindlichkeit der Lautstärkegeste';
+
+  @override
+  String get brightnessGestureSensitivityTitle =>
+      'Empfindlichkeit der Helligkeitsgeste';
+
+  @override
+  String get thumbnailSettingsHeader => 'Vorschaubilderstellung';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => 'Strategie für Vorschaubilder';
+
+  @override
+  String get thumbnailFirstFrameOption => 'Erstes Bild';
+
+  @override
+  String get thumbnailPercentageFrameOption => 'Bild an Position';
+
+  @override
+  String get thumbnailHybridOption => 'Hybrid (leeren Anfang überspringen)';
+
+  @override
+  String get thumbnailFramePositionTitle => 'Bevorzugte Bildposition';
+
+  @override
+  String get volumeBoostHeader => 'Lautstärkeverstärkung';
+
+  @override
+  String get volumeBoostTitle => 'Lautstärkeverstärkung aktivieren';
+
+  @override
+  String get volumeBoostSubtitle =>
+      'Leise Videowiedergabe über die normale Player-Lautstärke hinaus verstärken.';
+
+  @override
+  String get volumeBoostGainTitle => 'Verstärkung';
+
+  @override
+  String get decoderSelectionHeader => 'Decoder-Auswahl';
+
+  @override
+  String get videoDecoderTitle => 'Videodecoder';
+
+  @override
+  String get audioDecoderTitle => 'Audioddecoder';
+
+  @override
+  String get decoderAutoOption => 'Automatisch';
+
+  @override
+  String get decoderHardwareOption => 'Hardware';
+
+  @override
+  String get decoderSoftwareOption => 'Software';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

@@ -8912,4 +8912,64 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mirrorSyncActivityLabel => '正在将保险库更改保存到存储空间';
+
+  @override
+  String get seekGestureSensitivityTitle => '搜索手势灵敏度';
+
+  @override
+  String get volumeGestureSensitivityTitle => '音量手势灵敏度';
+
+  @override
+  String get brightnessGestureSensitivityTitle => '亮度手势灵敏度';
+
+  @override
+  String get thumbnailSettingsHeader => '缩略图生成';
+
+  @override
+  String get thumbnailGenerationStrategyTitle => '缩略图帧策略';
+
+  @override
+  String get thumbnailFirstFrameOption => '第一帧';
+
+  @override
+  String get thumbnailPercentageFrameOption => '指定位置的帧';
+
+  @override
+  String get thumbnailHybridOption => '混合（跳过空白开头）';
+
+  @override
+  String get thumbnailFramePositionTitle => '首选帧位置';
+
+  @override
+  String get volumeBoostHeader => '音量增强';
+
+  @override
+  String get volumeBoostTitle => '启用音量增强';
+
+  @override
+  String get volumeBoostSubtitle => '将视频的微弱音频提高到播放器正常音量以上。';
+
+  @override
+  String get volumeBoostGainTitle => '增强幅度';
+
+  @override
+  String get decoderSelectionHeader => '解码器选择';
+
+  @override
+  String get videoDecoderTitle => '视频解码器';
+
+  @override
+  String get audioDecoderTitle => '音频解码器';
+
+  @override
+  String get decoderAutoOption => '自动';
+
+  @override
+  String get decoderHardwareOption => '硬件';
+
+  @override
+  String get decoderSoftwareOption => '软件';
+
+  @override
+  String get decoderFfmpegOption => 'FFmpeg';
 }

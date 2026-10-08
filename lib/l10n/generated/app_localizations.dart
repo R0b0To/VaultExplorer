@@ -15828,6 +15828,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving vault changes to storage'**
   String get mirrorSyncActivityLabel;
+
+  /// No description provided for @seekGestureSensitivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seek gesture sensitivity'**
+  String get seekGestureSensitivityTitle;
+
+  /// No description provided for @volumeGestureSensitivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume gesture sensitivity'**
+  String get volumeGestureSensitivityTitle;
+
+  /// No description provided for @brightnessGestureSensitivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness gesture sensitivity'**
+  String get brightnessGestureSensitivityTitle;
+
+  /// No description provided for @thumbnailSettingsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Generation'**
+  String get thumbnailSettingsHeader;
+
+  /// No description provided for @thumbnailGenerationStrategyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail frame strategy'**
+  String get thumbnailGenerationStrategyTitle;
+
+  /// No description provided for @thumbnailFirstFrameOption.
+  ///
+  /// In en, this message translates to:
+  /// **'First frame'**
+  String get thumbnailFirstFrameOption;
+
+  /// No description provided for @thumbnailPercentageFrameOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame at position'**
+  String get thumbnailPercentageFrameOption;
+
+  /// No description provided for @thumbnailHybridOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Hybrid (skip blank opening)'**
+  String get thumbnailHybridOption;
+
+  /// No description provided for @thumbnailFramePositionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred frame position'**
+  String get thumbnailFramePositionTitle;
+
+  /// No description provided for @volumeBoostHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Boost'**
+  String get volumeBoostHeader;
+
+  /// No description provided for @volumeBoostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable volume boost'**
+  String get volumeBoostTitle;
+
+  /// No description provided for @volumeBoostSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase quiet video audio above the normal player volume.'**
+  String get volumeBoostSubtitle;
+
+  /// No description provided for @volumeBoostGainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Boost amount'**
+  String get volumeBoostGainTitle;
+
+  /// No description provided for @decoderSelectionHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder Selection'**
+  String get decoderSelectionHeader;
+
+  /// No description provided for @videoDecoderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Video decoder'**
+  String get videoDecoderTitle;
+
+  /// No description provided for @audioDecoderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio decoder'**
+  String get audioDecoderTitle;
+
+  /// No description provided for @decoderAutoOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get decoderAutoOption;
+
+  /// No description provided for @decoderHardwareOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware'**
+  String get decoderHardwareOption;
+
+  /// No description provided for @decoderSoftwareOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Software'**
+  String get decoderSoftwareOption;
+
+  /// No description provided for @decoderFfmpegOption.
+  ///
+  /// In en, this message translates to:
+  /// **'FFmpeg'**
+  String get decoderFfmpegOption;
 }
 
 class _AppLocalizationsDelegate

@@ -152,8 +152,11 @@ class ScheduledSyncBackgroundRunner {
         ).updateLastSynced(vault, {rule.id: DateTime.now()});
       }
       return const {'success': true};
-    } catch (_) {
-      return const {'success': false, 'reason': 'The scheduled sync failed'};
+    } catch (error) {
+      return {
+        'success': false,
+        'reason': 'Scheduled sync failed (${error.runtimeType})',
+      };
     } finally {
       try {
         await ledger?.close();

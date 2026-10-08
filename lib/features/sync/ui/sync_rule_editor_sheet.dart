@@ -110,6 +110,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _deleteSourceAfterImport = false;
   bool _scheduledRun = false;
   bool _scheduleAvailable = false;
+  TimeOfDay _scheduledTime = const TimeOfDay(hour: 3, minute: 0);
 
   String _initialTargetUri = '';
   String _initialTargetSub = '';
@@ -120,6 +121,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _initialDeletes = false;
   bool _initialDeleteSourceAfterImport = false;
   bool _initialScheduledRun = false;
+  TimeOfDay _initialScheduledTime = const TimeOfDay(hour: 3, minute: 0);
   String _initialIgnore = '';
 
   bool get _readOnly => widget.vault.readOnly;
@@ -135,6 +137,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
           _deletes != _initialDeletes ||
           _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
           _scheduledRun != _initialScheduledRun ||
+          _scheduledTime != _initialScheduledTime ||
           _ignore.text.trim() != _initialIgnore.trim();
     }
     return _targetUri != _initialTargetUri ||
@@ -146,6 +149,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _deletes != _initialDeletes ||
         _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
         _scheduledRun != _initialScheduledRun ||
+        _scheduledTime != _initialScheduledTime ||
         _ignore.text.trim() != _initialIgnore.trim();
   }
 
@@ -239,6 +243,11 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
             existing.direction == SyncDirection.targetToVault &&
             existing.deleteSourceAfterImport;
         _scheduledRun = binding?.scheduledRun ?? false;
+        final timeMinutes = binding?.scheduledTimeMinutes ?? 180;
+        _scheduledTime = TimeOfDay(
+          hour: timeMinutes ~/ 60,
+          minute: timeMinutes % 60,
+        );
         _ignore.text = existing.ignorePatterns.join('\n');
       }
       _initialTargetUri = _targetUri;
@@ -250,6 +259,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       _initialDeletes = _deletes;
       _initialDeleteSourceAfterImport = _deleteSourceAfterImport;
       _initialScheduledRun = _scheduledRun;
+      _initialScheduledTime = _scheduledTime;
       _scheduleAvailable =
           automation.tier == AutomationTier.full &&
           automation.hasStoredPassword;
@@ -411,8 +421,51 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         ],
       ),
     );
-    if (confirmed == true && mounted) {
-      setState(() => _scheduledRun = true);
+    if (confirmed != true || !mounted) return;
+
+    final lifecycleApi = ref.read(vaultLifecycleApiProvider);
+    if (!await lifecycleApi.canScheduleExactAlarms()) {
+      if (!mounted) return;
+      final openSettings = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.autoSyncExactAlarmAccessTitle),
+          content: Text(l10n.autoSyncExactAlarmAccessMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.autoSyncExactAlarmAccessOpen),
+            ),
+          ],
+        ),
+      );
+      if (openSettings == true) {
+        final opened = await lifecycleApi.requestExactAlarmAccess();
+        if (!opened && mounted) {
+          showAppSnackBar(
+            context,
+            message: l10n.autoSyncExactAlarmAccessUnavailable,
+            tone: AppBannerTone.warning,
+          );
+        }
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _scheduledRun = true);
+  }
+
+  Future<void> _pickScheduledTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _scheduledTime,
+    );
+    if (time != null && mounted) {
+      setState(() => _scheduledTime = time);
     }
   }
 
@@ -519,6 +572,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                 displayName: _targetName,
                 subPath: _targetSub,
                 scheduledRun: _scheduledRun,
+                scheduledTimeMinutes:
+                    _scheduledTime.hour * 60 + _scheduledTime.minute,
               ),
             );
       } catch (_) {
@@ -536,6 +591,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
             targetUri: _targetUri,
             targetSubPath: _targetSub,
             targetDisplayName: _targetName,
+            scheduledHour: _scheduledTime.hour,
+            scheduledMinute: _scheduledTime.minute,
           );
       if (_scheduledRun && (!bindingSaved || !scheduleOk)) {
         scheduledFailed = true;
@@ -551,6 +608,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                   displayName: _targetName,
                   subPath: _targetSub,
                   scheduledRun: false,
+                  scheduledTimeMinutes:
+                      _scheduledTime.hour * 60 + _scheduledTime.minute,
                 ),
               );
         } catch (_) {}
@@ -637,6 +696,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                 : existing.targetEndpointUri,
             targetSubPath: _targetSub,
             targetDisplayName: _targetName,
+            scheduledHour: _scheduledTime.hour,
+            scheduledMinute: _scheduledTime.minute,
           );
       try {
         await ref
@@ -963,6 +1024,29 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                           value: _scheduledRun,
                           onChanged: _saving ? null : _setScheduledRun,
                         ),
+                        if (_scheduledRun)
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            leading: const Icon(Icons.schedule_rounded),
+                            title: Text(
+                              l10n.autoSyncScheduledTimeTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              l10n.autoSyncScheduledTimeSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: TextButton(
+                              onPressed: _saving ? null : _pickScheduledTime,
+                              child: Text(_scheduledTime.format(context)),
+                            ),
+                          ),
                         if (!_scheduleAvailable)
                           Align(
                             alignment: Alignment.centerLeft,

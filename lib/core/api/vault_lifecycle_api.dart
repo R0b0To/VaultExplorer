@@ -1233,8 +1233,9 @@ class VaultLifecycleApi {
     // cache cleanup fires after the unmount, when every write would fail.
     // Never throws and is bounded in time, so it can't hold a lock up.
     try {
-      await ThumbnailCacheService.flushInContainerCacheForUri(filePath)
-          .timeout(const Duration(seconds: 3));
+      await ThumbnailCacheService.flushInContainerCacheForUri(
+        filePath,
+      ).timeout(const Duration(seconds: 3));
     } catch (e) {
       logSwallowed('lockContainer/flushThumbnailCache', e, expected: true);
     }
@@ -1271,23 +1272,49 @@ class VaultLifecycleApi {
     required String targetUri,
     required String targetSubPath,
     required String targetDisplayName,
+    required int scheduledHour,
+    required int scheduledMinute,
   }) async {
     try {
-      final result = await _channel.invokeMethod<bool>(
-        ChannelMethods.scheduleVaultSync,
-        {
-          'enabled': enabled,
-          'vaultUri': vaultUri,
-          'vaultDisplayName': vaultDisplayName,
-          'ruleId': ruleId,
-          'targetUri': targetUri,
-          'targetSubPath': targetSubPath,
-          'targetDisplayName': targetDisplayName,
-        },
-      );
+      final result = await _channel
+          .invokeMethod<bool>(ChannelMethods.scheduleVaultSync, {
+            'enabled': enabled,
+            'vaultUri': vaultUri,
+            'vaultDisplayName': vaultDisplayName,
+            'ruleId': ruleId,
+            'targetUri': targetUri,
+            'targetSubPath': targetSubPath,
+            'targetDisplayName': targetDisplayName,
+            'scheduledHour': scheduledHour,
+            'scheduledMinute': scheduledMinute,
+          });
       return result ?? false;
     } catch (e) {
       logSwallowed('scheduleVaultSync', e);
+      return false;
+    }
+  }
+
+  Future<bool> canScheduleExactAlarms() async {
+    try {
+      return await _channel.invokeMethod<bool>(
+            ChannelMethods.canScheduleExactAlarms,
+          ) ??
+          true;
+    } catch (e) {
+      logSwallowed('canScheduleExactAlarms', e);
+      return false;
+    }
+  }
+
+  Future<bool> requestExactAlarmAccess() async {
+    try {
+      return await _channel.invokeMethod<bool>(
+            ChannelMethods.requestExactAlarmAccess,
+          ) ??
+          false;
+    } catch (e) {
+      logSwallowed('requestExactAlarmAccess', e);
       return false;
     }
   }

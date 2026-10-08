@@ -131,12 +131,14 @@ class SyncTargetBinding {
   final String displayName;
   final String subPath;
   final bool scheduledRun;
+  final int scheduledTimeMinutes;
 
   const SyncTargetBinding({
     required this.uri,
     this.displayName = '',
     this.subPath = '',
     this.scheduledRun = false,
+    this.scheduledTimeMinutes = 180,
   });
 
   Map<String, dynamic> toJson() => {
@@ -144,6 +146,7 @@ class SyncTargetBinding {
     'displayName': displayName,
     if (subPath.isNotEmpty) 'subPath': subPath,
     if (scheduledRun) 'scheduledRun': true,
+    'scheduledTimeMinutes': scheduledTimeMinutes,
   };
 
   static SyncTargetBinding? tryParse(String? source) {
@@ -160,6 +163,9 @@ class SyncTargetBinding {
         displayName: name is String ? name : '',
         subPath: sub is String ? sub : '',
         scheduledRun: json['scheduledRun'] == true,
+        scheduledTimeMinutes: json['scheduledTimeMinutes'] is int
+            ? (json['scheduledTimeMinutes'] as int).clamp(0, 1439)
+            : 180,
       );
     } catch (_) {
       return null;

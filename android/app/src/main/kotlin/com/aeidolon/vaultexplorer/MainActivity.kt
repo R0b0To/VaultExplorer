@@ -93,6 +93,8 @@ private object ChannelMethods {
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val SCHEDULE_VAULT_SYNC       = "scheduleVaultSync"
+    const val CAN_SCHEDULE_EXACT_ALARMS = "canScheduleExactAlarms"
+    const val REQUEST_EXACT_ALARM_ACCESS = "requestExactAlarmAccess"
     const val RESOLVE_RAW_STORAGE_PATH  = "resolveRawStoragePath"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
     const val GET_MIRROR_PUSH_ACTIVITY = "getMirrorPushActivity"
@@ -393,6 +395,9 @@ open class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
+        ioExecutor.execute {
+            ScheduledSyncHandlers.rescheduleAll(applicationContext)
+        }
         disguiseModeHandlers.updateActivityIdentity()
         if (this is VaultShareActivity) {
             shareIntentHandlers.handleIncomingIntent(intent)
@@ -1011,6 +1016,10 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
                 ChannelMethods.SCHEDULE_VAULT_SYNC -> scheduledSyncHandlers.handleSchedule(call, result)
+                ChannelMethods.CAN_SCHEDULE_EXACT_ALARMS ->
+                    scheduledSyncHandlers.handleCanScheduleExactAlarms(result)
+                ChannelMethods.REQUEST_EXACT_ALARM_ACCESS ->
+                    scheduledSyncHandlers.handleRequestExactAlarmAccess(result)
                 ChannelMethods.RESOLVE_RAW_STORAGE_PATH -> {
                     val rawUri = call.argument<String>("uri")
                     if (rawUri.isNullOrBlank()) {

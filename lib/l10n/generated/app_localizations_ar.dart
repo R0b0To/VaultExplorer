@@ -9772,4 +9772,67 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get hide => 'إخفاء';
+
+  @override
+  String get mediaViewerActionAdjustments => 'تعديلات';
+
+  @override
+  String get adjustmentsSheetTitle => 'تعديلات';
+
+  @override
+  String get adjustmentBrightness => 'السطوع';
+
+  @override
+  String get adjustmentContrast => 'التباين';
+
+  @override
+  String get adjustmentSaturation => 'التشبع';
+
+  @override
+  String get adjustmentHue => 'تدرج اللون';
+
+  @override
+  String get adjustmentGamma => 'جاما';
+
+  @override
+  String get adjustmentsApplyToAll => 'تطبيق على كل الملفات';
+
+  @override
+  String get adjustmentsCompareHold => 'اضغط مطولاً للمقارنة';
+
+  @override
+  String get adjustmentPresetVivid => 'حيوي';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'أبيض وأسود';
+
+  @override
+  String get adjustmentPresetWarm => 'دافئ';
+
+  @override
+  String get adjustmentPresetCool => 'بارد';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'فيديو وصوت';
+
+  @override
+  String get durationLabel => 'المدة';
+
+  @override
+  String get rotationLabel => 'التدوير';
+
+  @override
+  String get videoBitrateLabel => 'معدل بت الفيديو';
+
+  @override
+  String get audioBitrateLabel => 'معدل بت الصوت';
+
+  @override
+  String get sampleRateLabel => 'معدل العينة';
+
+  @override
+  String get audioChannelsLabel => 'قنوات الصوت';
+
+  @override
+  String get subtitleTracksLabel => 'مسارات الترجمة';
 }

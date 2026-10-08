@@ -9725,4 +9725,67 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get hide => 'Nascondi';
+
+  @override
+  String get mediaViewerActionAdjustments => 'Regolazioni';
+
+  @override
+  String get adjustmentsSheetTitle => 'Regolazioni';
+
+  @override
+  String get adjustmentBrightness => 'Luminosità';
+
+  @override
+  String get adjustmentContrast => 'Contrasto';
+
+  @override
+  String get adjustmentSaturation => 'Saturazione';
+
+  @override
+  String get adjustmentHue => 'Tonalità';
+
+  @override
+  String get adjustmentGamma => 'Gamma';
+
+  @override
+  String get adjustmentsApplyToAll => 'Applica a tutti i file';
+
+  @override
+  String get adjustmentsCompareHold => 'Tieni premuto per confrontare';
+
+  @override
+  String get adjustmentPresetVivid => 'Vivido';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'B/N';
+
+  @override
+  String get adjustmentPresetWarm => 'Caldo';
+
+  @override
+  String get adjustmentPresetCool => 'Freddo';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'VIDEO E AUDIO';
+
+  @override
+  String get durationLabel => 'Durata';
+
+  @override
+  String get rotationLabel => 'Rotazione';
+
+  @override
+  String get videoBitrateLabel => 'Bitrate video';
+
+  @override
+  String get audioBitrateLabel => 'Bitrate audio';
+
+  @override
+  String get sampleRateLabel => 'Frequenza di campionamento';
+
+  @override
+  String get audioChannelsLabel => 'Canali audio';
+
+  @override
+  String get subtitleTracksLabel => 'Tracce sottotitoli';
 }

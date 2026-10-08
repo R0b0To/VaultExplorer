@@ -16140,6 +16140,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide'**
   String get hide;
+
+  /// Media viewer toolbar action that opens the picture adjustment sheet (brightness, contrast, etc.)
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustments'**
+  String get mediaViewerActionAdjustments;
+
+  /// Title of the bottom sheet with picture adjustment sliders in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustments'**
+  String get adjustmentsSheetTitle;
+
+  /// Slider label: brightness of the displayed image/video (not the device screen brightness)
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get adjustmentBrightness;
+
+  /// Slider label: contrast of the displayed image/video
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get adjustmentContrast;
+
+  /// Slider label: color saturation of the displayed image/video
+  ///
+  /// In en, this message translates to:
+  /// **'Saturation'**
+  String get adjustmentSaturation;
+
+  /// Slider label: hue rotation of the displayed image/video
+  ///
+  /// In en, this message translates to:
+  /// **'Hue'**
+  String get adjustmentHue;
+
+  /// Slider label: gamma (midtone brightness curve) of the displayed image/video
+  ///
+  /// In en, this message translates to:
+  /// **'Gamma'**
+  String get adjustmentGamma;
+
+  /// Switch: use the current adjustments for every file in the playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to all files'**
+  String get adjustmentsApplyToAll;
+
+  /// Button: while held, shows the original image/video without adjustments
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to compare'**
+  String get adjustmentsCompareHold;
+
+  /// Picture adjustment preset: boosted contrast and saturation (not the file skin preset)
+  ///
+  /// In en, this message translates to:
+  /// **'Vivid'**
+  String get adjustmentPresetVivid;
+
+  /// Picture adjustment preset: black and white, short label for a chip
+  ///
+  /// In en, this message translates to:
+  /// **'B&W'**
+  String get adjustmentPresetBlackAndWhite;
+
+  /// Picture adjustment preset with warmer colors
+  ///
+  /// In en, this message translates to:
+  /// **'Warm'**
+  String get adjustmentPresetWarm;
+
+  /// Picture adjustment preset with cooler colors
+  ///
+  /// In en, this message translates to:
+  /// **'Cool'**
+  String get adjustmentPresetCool;
+
+  /// Section header for technical properties of a video file
+  ///
+  /// In en, this message translates to:
+  /// **'VIDEO & AUDIO'**
+  String get videoFilePropertiesSectionHeader;
+
+  /// Media file duration property label
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get durationLabel;
+
+  /// Video display rotation property label
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation'**
+  String get rotationLabel;
+
+  /// Video stream bitrate property label
+  ///
+  /// In en, this message translates to:
+  /// **'Video Bitrate'**
+  String get videoBitrateLabel;
+
+  /// Audio stream bitrate property label
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Bitrate'**
+  String get audioBitrateLabel;
+
+  /// Audio sample rate property label
+  ///
+  /// In en, this message translates to:
+  /// **'Sample Rate'**
+  String get sampleRateLabel;
+
+  /// Number of channels in the audio stream
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Channels'**
+  String get audioChannelsLabel;
+
+  /// Number of subtitle tracks in the media file
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle Tracks'**
+  String get subtitleTracksLabel;
 }
 
 class _AppLocalizationsDelegate

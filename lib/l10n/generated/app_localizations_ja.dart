@@ -9208,4 +9208,67 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get hide => '非表示';
+
+  @override
+  String get mediaViewerActionAdjustments => '調整';
+
+  @override
+  String get adjustmentsSheetTitle => '調整';
+
+  @override
+  String get adjustmentBrightness => '明るさ';
+
+  @override
+  String get adjustmentContrast => 'コントラスト';
+
+  @override
+  String get adjustmentSaturation => '彩度';
+
+  @override
+  String get adjustmentHue => '色相';
+
+  @override
+  String get adjustmentGamma => 'ガンマ';
+
+  @override
+  String get adjustmentsApplyToAll => 'すべてのファイルに適用';
+
+  @override
+  String get adjustmentsCompareHold => '長押しして比較';
+
+  @override
+  String get adjustmentPresetVivid => 'ビビッド';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => '白黒';
+
+  @override
+  String get adjustmentPresetWarm => '暖色';
+
+  @override
+  String get adjustmentPresetCool => '寒色';
+
+  @override
+  String get videoFilePropertiesSectionHeader => '動画と音声';
+
+  @override
+  String get durationLabel => '再生時間';
+
+  @override
+  String get rotationLabel => '回転';
+
+  @override
+  String get videoBitrateLabel => '動画ビットレート';
+
+  @override
+  String get audioBitrateLabel => '音声ビットレート';
+
+  @override
+  String get sampleRateLabel => 'サンプルレート';
+
+  @override
+  String get audioChannelsLabel => '音声チャンネル';
+
+  @override
+  String get subtitleTracksLabel => '字幕トラック';
 }

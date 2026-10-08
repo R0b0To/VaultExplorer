@@ -9726,4 +9726,67 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get hide => 'Ocultar';
+
+  @override
+  String get mediaViewerActionAdjustments => 'Ajustes';
+
+  @override
+  String get adjustmentsSheetTitle => 'Ajustes';
+
+  @override
+  String get adjustmentBrightness => 'Brilho';
+
+  @override
+  String get adjustmentContrast => 'Contraste';
+
+  @override
+  String get adjustmentSaturation => 'Saturação';
+
+  @override
+  String get adjustmentHue => 'Matiz';
+
+  @override
+  String get adjustmentGamma => 'Gama';
+
+  @override
+  String get adjustmentsApplyToAll => 'Aplicar a todos os arquivos';
+
+  @override
+  String get adjustmentsCompareHold => 'Mantenha pressionado para comparar';
+
+  @override
+  String get adjustmentPresetVivid => 'Vívido';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'P&B';
+
+  @override
+  String get adjustmentPresetWarm => 'Quente';
+
+  @override
+  String get adjustmentPresetCool => 'Frio';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'VÍDEO E ÁUDIO';
+
+  @override
+  String get durationLabel => 'Duração';
+
+  @override
+  String get rotationLabel => 'Rotação';
+
+  @override
+  String get videoBitrateLabel => 'Taxa de bits do vídeo';
+
+  @override
+  String get audioBitrateLabel => 'Taxa de bits do áudio';
+
+  @override
+  String get sampleRateLabel => 'Taxa de amostragem';
+
+  @override
+  String get audioChannelsLabel => 'Canais de áudio';
+
+  @override
+  String get subtitleTracksLabel => 'Faixas de legenda';
 }

@@ -9804,4 +9804,67 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get hide => 'Masquer';
+
+  @override
+  String get mediaViewerActionAdjustments => 'Ajustements';
+
+  @override
+  String get adjustmentsSheetTitle => 'Ajustements';
+
+  @override
+  String get adjustmentBrightness => 'Luminosité';
+
+  @override
+  String get adjustmentContrast => 'Contraste';
+
+  @override
+  String get adjustmentSaturation => 'Saturation';
+
+  @override
+  String get adjustmentHue => 'Teinte';
+
+  @override
+  String get adjustmentGamma => 'Gamma';
+
+  @override
+  String get adjustmentsApplyToAll => 'Appliquer à tous les fichiers';
+
+  @override
+  String get adjustmentsCompareHold => 'Maintenir pour comparer';
+
+  @override
+  String get adjustmentPresetVivid => 'Éclatant';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'N&B';
+
+  @override
+  String get adjustmentPresetWarm => 'Chaud';
+
+  @override
+  String get adjustmentPresetCool => 'Froid';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'VIDÉO ET AUDIO';
+
+  @override
+  String get durationLabel => 'Durée';
+
+  @override
+  String get rotationLabel => 'Rotation';
+
+  @override
+  String get videoBitrateLabel => 'Débit vidéo';
+
+  @override
+  String get audioBitrateLabel => 'Débit audio';
+
+  @override
+  String get sampleRateLabel => 'Fréquence d’échantillonnage';
+
+  @override
+  String get audioChannelsLabel => 'Canaux audio';
+
+  @override
+  String get subtitleTracksLabel => 'Pistes de sous-titres';
 }

@@ -9576,4 +9576,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hide => 'Hide';
+
+  @override
+  String get mediaViewerActionAdjustments => 'Adjustments';
+
+  @override
+  String get adjustmentsSheetTitle => 'Adjustments';
+
+  @override
+  String get adjustmentBrightness => 'Brightness';
+
+  @override
+  String get adjustmentContrast => 'Contrast';
+
+  @override
+  String get adjustmentSaturation => 'Saturation';
+
+  @override
+  String get adjustmentHue => 'Hue';
+
+  @override
+  String get adjustmentGamma => 'Gamma';
+
+  @override
+  String get adjustmentsApplyToAll => 'Apply to all files';
+
+  @override
+  String get adjustmentsCompareHold => 'Hold to compare';
+
+  @override
+  String get adjustmentPresetVivid => 'Vivid';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'B&W';
+
+  @override
+  String get adjustmentPresetWarm => 'Warm';
+
+  @override
+  String get adjustmentPresetCool => 'Cool';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'VIDEO & AUDIO';
+
+  @override
+  String get durationLabel => 'Duration';
+
+  @override
+  String get rotationLabel => 'Rotation';
+
+  @override
+  String get videoBitrateLabel => 'Video Bitrate';
+
+  @override
+  String get audioBitrateLabel => 'Audio Bitrate';
+
+  @override
+  String get sampleRateLabel => 'Sample Rate';
+
+  @override
+  String get audioChannelsLabel => 'Audio Channels';
+
+  @override
+  String get subtitleTracksLabel => 'Subtitle Tracks';
 }

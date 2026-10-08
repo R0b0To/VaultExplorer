@@ -12059,5 +12059,89 @@
   "hide": "Hide",
   "@hide": {
     "description": "Button label for hiding a storage location section from the sidebar"
+  },
+  "mediaViewerActionAdjustments": "Adjustments",
+  "@mediaViewerActionAdjustments": {
+    "description": "Media viewer toolbar action that opens the picture adjustment sheet (brightness, contrast, etc.)"
+  },
+  "adjustmentsSheetTitle": "Adjustments",
+  "@adjustmentsSheetTitle": {
+    "description": "Title of the bottom sheet with picture adjustment sliders in the media viewer"
+  },
+  "adjustmentBrightness": "Brightness",
+  "@adjustmentBrightness": {
+    "description": "Slider label: brightness of the displayed image/video (not the device screen brightness)"
+  },
+  "adjustmentContrast": "Contrast",
+  "@adjustmentContrast": {
+    "description": "Slider label: contrast of the displayed image/video"
+  },
+  "adjustmentSaturation": "Saturation",
+  "@adjustmentSaturation": {
+    "description": "Slider label: color saturation of the displayed image/video"
+  },
+  "adjustmentHue": "Hue",
+  "@adjustmentHue": {
+    "description": "Slider label: hue rotation of the displayed image/video"
+  },
+  "adjustmentGamma": "Gamma",
+  "@adjustmentGamma": {
+    "description": "Slider label: gamma (midtone brightness curve) of the displayed image/video"
+  },
+  "adjustmentsApplyToAll": "Apply to all files",
+  "@adjustmentsApplyToAll": {
+    "description": "Switch: use the current adjustments for every file in the playlist"
+  },
+  "adjustmentsCompareHold": "Hold to compare",
+  "@adjustmentsCompareHold": {
+    "description": "Button: while held, shows the original image/video without adjustments"
+  },
+  "adjustmentPresetVivid": "Vivid",
+  "@adjustmentPresetVivid": {
+    "description": "Picture adjustment preset: boosted contrast and saturation (not the file skin preset)"
+  },
+  "adjustmentPresetBlackAndWhite": "B&W",
+  "@adjustmentPresetBlackAndWhite": {
+    "description": "Picture adjustment preset: black and white, short label for a chip"
+  },
+  "adjustmentPresetWarm": "Warm",
+  "@adjustmentPresetWarm": {
+    "description": "Picture adjustment preset with warmer colors"
+  },
+  "adjustmentPresetCool": "Cool",
+  "@adjustmentPresetCool": {
+    "description": "Picture adjustment preset with cooler colors"
+  },
+  "videoFilePropertiesSectionHeader": "VIDEO & AUDIO",
+  "@videoFilePropertiesSectionHeader": {
+    "description": "Section header for technical properties of a video file"
+  },
+  "durationLabel": "Duration",
+  "@durationLabel": {
+    "description": "Media file duration property label"
+  },
+  "rotationLabel": "Rotation",
+  "@rotationLabel": {
+    "description": "Video display rotation property label"
+  },
+  "videoBitrateLabel": "Video Bitrate",
+  "@videoBitrateLabel": {
+    "description": "Video stream bitrate property label"
+  },
+  "audioBitrateLabel": "Audio Bitrate",
+  "@audioBitrateLabel": {
+    "description": "Audio stream bitrate property label"
+  },
+  "sampleRateLabel": "Sample Rate",
+  "@sampleRateLabel": {
+    "description": "Audio sample rate property label"
+  },
+  "audioChannelsLabel": "Audio Channels",
+  "@audioChannelsLabel": {
+    "description": "Number of channels in the audio stream"
+  },
+  "subtitleTracksLabel": "Subtitle Tracks",
+  "@subtitleTracksLabel": {
+    "description": "Number of subtitle tracks in the media file"
   }
 }

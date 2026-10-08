@@ -12,6 +12,8 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
 
 class ImagePageItem extends StatefulWidget {
@@ -20,6 +22,7 @@ class ImagePageItem extends StatefulWidget {
   final MountedContainer container;
   final BoxFit imageFit;
   final int rotationQuarterTurns;
+  final ViewerAdjustments adjustments;
   final bool showUI;
   final ValueChanged<bool> onToggleUI;
   final bool tapEdgesToNavigate;
@@ -44,6 +47,7 @@ class ImagePageItem extends StatefulWidget {
     required this.container,
     required this.imageFit,
     required this.rotationQuarterTurns,
+    this.adjustments = ViewerAdjustments.identity,
     required this.showUI,
     required this.onToggleUI,
     this.tapEdgesToNavigate = true,
@@ -642,22 +646,28 @@ bool _isClampingMatrix = false;
                   type: MaterialType.transparency,
                   child: RotatedBox(
                     quarterTurns: widget.rotationQuarterTurns,
-                  child: EncryptedImageWidget(
-                      container: widget.container,
-                      fileName: widget.fileName,
-                      prefetchedBytes: widget.prefetchedBytes,
-                      fit: BoxFit.contain,
-                      onError: widget.onError,
-                      thumbnailQuality: widget.thumbnailQuality,
-                      thumbnailCacheMode: widget.thumbnailCacheMode,
-                      onSizeKnown: (w, h) {
-                        if (_imageSize == null ||
-                            _imageSize!.width != w ||
-                            _imageSize!.height != h) {
-                          _imageSize = Size(w.toDouble(), h.toDouble());
-                          widget.onSizeKnown?.call(w, h);
-                        }
-                      },
+                    // Filter hugs the picture itself (inside the zoom
+                    // transform and the rotation) so the black letterbox is
+                    // never brightened and the filter area stays small.
+                    child: ColorAdjustFilter(
+                      adjustments: widget.adjustments,
+                      child: EncryptedImageWidget(
+                        container: widget.container,
+                        fileName: widget.fileName,
+                        prefetchedBytes: widget.prefetchedBytes,
+                        fit: BoxFit.contain,
+                        onError: widget.onError,
+                        thumbnailQuality: widget.thumbnailQuality,
+                        thumbnailCacheMode: widget.thumbnailCacheMode,
+                        onSizeKnown: (w, h) {
+                          if (_imageSize == null ||
+                              _imageSize!.width != w ||
+                              _imageSize!.height != h) {
+                            _imageSize = Size(w.toDouble(), h.toDouble());
+                            widget.onSizeKnown?.call(w, h);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ),

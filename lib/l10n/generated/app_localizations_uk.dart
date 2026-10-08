@@ -9800,4 +9800,67 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get hide => 'Приховати';
+
+  @override
+  String get mediaViewerActionAdjustments => 'Коригування';
+
+  @override
+  String get adjustmentsSheetTitle => 'Коригування';
+
+  @override
+  String get adjustmentBrightness => 'Яскравість';
+
+  @override
+  String get adjustmentContrast => 'Контрастність';
+
+  @override
+  String get adjustmentSaturation => 'Насиченість';
+
+  @override
+  String get adjustmentHue => 'Відтінок';
+
+  @override
+  String get adjustmentGamma => 'Гама';
+
+  @override
+  String get adjustmentsApplyToAll => 'Застосувати до всіх файлів';
+
+  @override
+  String get adjustmentsCompareHold => 'Утримуйте для порівняння';
+
+  @override
+  String get adjustmentPresetVivid => 'Яскравий';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => 'Ч/Б';
+
+  @override
+  String get adjustmentPresetWarm => 'Теплий';
+
+  @override
+  String get adjustmentPresetCool => 'Холодний';
+
+  @override
+  String get videoFilePropertiesSectionHeader => 'ВІДЕО ТА АУДІО';
+
+  @override
+  String get durationLabel => 'Тривалість';
+
+  @override
+  String get rotationLabel => 'Поворот';
+
+  @override
+  String get videoBitrateLabel => 'Бітрейт відео';
+
+  @override
+  String get audioBitrateLabel => 'Бітрейт аудіо';
+
+  @override
+  String get sampleRateLabel => 'Частота дискретизації';
+
+  @override
+  String get audioChannelsLabel => 'Аудіоканали';
+
+  @override
+  String get subtitleTracksLabel => 'Доріжки субтитрів';
 }

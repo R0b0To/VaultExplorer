@@ -14,6 +14,7 @@ enum MediaViewerAction {
   subtitles,
   audioTrack,
   imageFit,
+  adjustments,
   aspectRatio,
   slideshowDelay,
   bookmark,
@@ -41,6 +42,8 @@ enum MediaViewerAction {
         MediaViewerAction.subtitles => Icons.subtitles_rounded,
         MediaViewerAction.audioTrack => Icons.audiotrack_rounded,
         MediaViewerAction.imageFit => Icons.aspect_ratio_rounded,
+        // tune_rounded is already advancedSettings.
+        MediaViewerAction.adjustments => Icons.brightness_6_rounded,
         MediaViewerAction.aspectRatio => Icons.aspect_ratio_rounded,
         MediaViewerAction.slideshowDelay => Icons.timer_outlined,
         MediaViewerAction.bookmark => Icons.star_rounded,
@@ -69,6 +72,7 @@ enum MediaViewerAction {
         MediaViewerAction.subtitles => l10n.subtitlesLabel,
         MediaViewerAction.audioTrack => l10n.audioTrackTitle,
         MediaViewerAction.imageFit => l10n.imageFitModeLabel,
+        MediaViewerAction.adjustments => l10n.mediaViewerActionAdjustments,
         MediaViewerAction.aspectRatio => l10n.aspectRatioModeLabel,
         MediaViewerAction.slideshowDelay => l10n.slideshowDelayLabel,
         MediaViewerAction.bookmark => l10n.mediaViewerActionBookmark,
@@ -111,7 +115,8 @@ enum MediaViewerAction {
       return false;
     }
     if (isAudio &&
-        (this == MediaViewerAction.editVideo ||
+        (this == MediaViewerAction.adjustments ||
+            this == MediaViewerAction.editVideo ||
             this == MediaViewerAction.subtitles ||
             this == MediaViewerAction.rotate90 ||
             this == MediaViewerAction.screenOrientation ||

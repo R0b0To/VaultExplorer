@@ -69,6 +69,7 @@ class MediaViewerToolbarConfig {
     this.advancedSettingsActions = const [
       MediaViewerAction.rotate90,
       MediaViewerAction.imageFit,
+      MediaViewerAction.adjustments,
       MediaViewerAction.playbackSpeed,
       MediaViewerAction.aspectRatio,
       MediaViewerAction.decoder,
@@ -283,11 +284,24 @@ class MediaViewerToolbarConfig {
         ? advanced
         : [...advanced, MediaViewerAction.decoder];
 
+    // Same for `adjustments`: a config saved before it existed doesn't list
+    // it anywhere, so it joins the Advanced settings list.
+    final placed3 = {
+      ...top,
+      ...bottom,
+      ...moreWithNew,
+      ...advancedWithDecoder,
+      ...hidden,
+    };
+    final advancedWithNew = placed3.contains(MediaViewerAction.adjustments)
+        ? advancedWithDecoder
+        : [...advancedWithDecoder, MediaViewerAction.adjustments];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
       moreMenuActions: moreWithNew,
-      advancedSettingsActions: advancedWithDecoder,
+      advancedSettingsActions: advancedWithNew,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,
       showCenterTransport: j['showCenterTransport'] as bool? ?? true,

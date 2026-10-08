@@ -9207,4 +9207,67 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get hide => '숨기기';
+
+  @override
+  String get mediaViewerActionAdjustments => '조절';
+
+  @override
+  String get adjustmentsSheetTitle => '조절';
+
+  @override
+  String get adjustmentBrightness => '밝기';
+
+  @override
+  String get adjustmentContrast => '대비';
+
+  @override
+  String get adjustmentSaturation => '채도';
+
+  @override
+  String get adjustmentHue => '색조';
+
+  @override
+  String get adjustmentGamma => '감마';
+
+  @override
+  String get adjustmentsApplyToAll => '모든 파일에 적용';
+
+  @override
+  String get adjustmentsCompareHold => '길게 눌러 비교';
+
+  @override
+  String get adjustmentPresetVivid => '생생하게';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => '흑백';
+
+  @override
+  String get adjustmentPresetWarm => '따뜻함';
+
+  @override
+  String get adjustmentPresetCool => '차가움';
+
+  @override
+  String get videoFilePropertiesSectionHeader => '비디오 및 오디오';
+
+  @override
+  String get durationLabel => '재생 시간';
+
+  @override
+  String get rotationLabel => '회전';
+
+  @override
+  String get videoBitrateLabel => '비디오 비트레이트';
+
+  @override
+  String get audioBitrateLabel => '오디오 비트레이트';
+
+  @override
+  String get sampleRateLabel => '샘플 레이트';
+
+  @override
+  String get audioChannelsLabel => '오디오 채널';
+
+  @override
+  String get subtitleTracksLabel => '자막 트랙';
 }

@@ -4,6 +4,7 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 export 'package:vaultexplorer/data/models/video_playback_mode.dart'
     show VideoPlaybackMode;
 part 'media_viewer_session_controller.g.dart';
@@ -36,6 +37,10 @@ class MediaViewerSessionState {
     this.scrollMode = PlaylistScrollMode.horizontal,
     this.isMuted = false,
     this.rotations = const {},
+    this.adjustments = const {},
+    this.applyAdjustmentsToAll = false,
+    this.sharedAdjustments = ViewerAdjustments.identity,
+    this.compareOriginal = false,
     this.imageReloadEpoch = const {},
   });
 
@@ -61,6 +66,32 @@ class MediaViewerSessionState {
   /// This is the unit `RotatedBox.quarterTurns`, the `% 2` "is it sideways"
   /// checks and the playback settings sheet all work in -- not degrees.
   final Map<String, int> rotations;
+
+  /// Per-file picture adjustments, keyed by path. In memory only: nothing is
+  /// persisted, so file paths from inside an encrypted vault never reach
+  /// plaintext preferences. Files without an entry are unadjusted.
+  final Map<String, ViewerAdjustments> adjustments;
+
+  /// When true, [sharedAdjustments] is used for every file and the per-file
+  /// [adjustments] map is ignored (but kept, so switching back restores it).
+  final bool applyAdjustmentsToAll;
+  final ViewerAdjustments sharedAdjustments;
+
+  /// True while the user holds "compare": every picture is shown without its
+  /// adjustments. Transient, never edits the stored values.
+  final bool compareOriginal;
+
+  /// The adjustments stored for [path] (shared across files when
+  /// apply-to-all is on). What the sliders show and edit.
+  ViewerAdjustments adjustmentsFor(String path) => applyAdjustmentsToAll
+      ? sharedAdjustments
+      : (adjustments[path] ?? ViewerAdjustments.identity);
+
+  /// What is actually drawn for [path]: the stored adjustments, or none
+  /// while [compareOriginal] is held.
+  ViewerAdjustments effectiveAdjustmentsFor(String path) =>
+      compareOriginal ? ViewerAdjustments.identity : adjustmentsFor(path);
+
   final Map<String, int> imageReloadEpoch;
 
   MediaViewerSessionState copyWith({
@@ -82,6 +113,10 @@ class MediaViewerSessionState {
     PlaylistScrollMode? scrollMode,
     bool? isMuted,
     Map<String, int>? rotations,
+    Map<String, ViewerAdjustments>? adjustments,
+    bool? applyAdjustmentsToAll,
+    ViewerAdjustments? sharedAdjustments,
+    bool? compareOriginal,
     Map<String, int>? imageReloadEpoch,
   }) =>
       MediaViewerSessionState(
@@ -106,6 +141,11 @@ class MediaViewerSessionState {
         scrollMode: scrollMode ?? this.scrollMode,
         isMuted: isMuted ?? this.isMuted,
         rotations: rotations ?? this.rotations,
+        adjustments: adjustments ?? this.adjustments,
+        applyAdjustmentsToAll:
+            applyAdjustmentsToAll ?? this.applyAdjustmentsToAll,
+        sharedAdjustments: sharedAdjustments ?? this.sharedAdjustments,
+        compareOriginal: compareOriginal ?? this.compareOriginal,
         imageReloadEpoch: imageReloadEpoch ?? this.imageReloadEpoch,
       );
 }
@@ -231,13 +271,83 @@ class MediaViewerSession extends _$MediaViewerSession {
     setRotation(path, (state.rotations[path] ?? 0) + 1);
   }
 
+  /// Sets the adjustments for [path]. While apply-to-all is on this edits the
+  /// shared value instead, so the sheet behaves the same either way.
+  ///
+  /// Identity values are stored as "no entry" so the map never accumulates
+  /// neutral rows.
+  void setAdjustments(String path, ViewerAdjustments value) {
+    if (state.applyAdjustmentsToAll) {
+      if (state.sharedAdjustments == value) return;
+      state = state.copyWith(sharedAdjustments: value);
+      return;
+    }
+    final current = state.adjustments[path] ?? ViewerAdjustments.identity;
+    if (current == value) return;
+    final map = Map<String, ViewerAdjustments>.from(state.adjustments);
+    if (value.isIdentity) {
+      map.remove(path);
+    } else {
+      map[path] = value;
+    }
+    state = state.copyWith(adjustments: Map.unmodifiable(map));
+  }
+
+  /// Hold-to-compare: show (true) or stop showing (false) the originals.
+  void setCompareOriginal(bool compare) {
+    if (state.compareOriginal == compare) return;
+    state = state.copyWith(compareOriginal: compare);
+  }
+
+  /// Resets the adjustments that currently apply to [path].
+  void resetAdjustments(String path) =>
+      setAdjustments(path, ViewerAdjustments.identity);
+
+  /// Turns "use these adjustments for every file" on or off.
+  ///
+  /// Turning it on seeds the shared value from [path]'s current adjustments,
+  /// so nothing visibly jumps when the switch is flipped. Turning it off
+  /// hands the shared value back to [path] only; other files return to
+  /// whatever they had before.
+  void setApplyAdjustmentsToAll(String path, bool apply) {
+    if (state.applyAdjustmentsToAll == apply) return;
+    if (apply) {
+      state = state.copyWith(
+        applyAdjustmentsToAll: true,
+        sharedAdjustments: state.adjustmentsFor(path),
+      );
+    } else {
+      final shared = state.sharedAdjustments;
+      final map = Map<String, ViewerAdjustments>.from(state.adjustments);
+      if (shared.isIdentity) {
+        map.remove(path);
+      } else {
+        map[path] = shared;
+      }
+      state = state.copyWith(
+        applyAdjustmentsToAll: false,
+        adjustments: Map.unmodifiable(map),
+      );
+    }
+  }
+
+  /// Moves [oldPath]'s per-file adjustments to [newPath] after a rename.
+  void moveAdjustments(String oldPath, String newPath) {
+    final value = state.adjustments[oldPath];
+    if (value == null || oldPath == newPath) return;
+    final map = Map<String, ViewerAdjustments>.from(state.adjustments)
+      ..remove(oldPath)
+      ..[newPath] = value;
+    state = state.copyWith(adjustments: Map.unmodifiable(map));
+  }
+
   void bumpImageReloadEpoch(String path) {
     final map = Map<String, int>.from(state.imageReloadEpoch);
     map[path] = (map[path] ?? 0) + 1;
     state = state.copyWith(imageReloadEpoch: Map.unmodifiable(map));
   }
 
-  /// Drops the transient per-file state (rotation, reload counter) kept for
+  /// Drops the transient per-file state (rotation, adjustments, reload counter) kept for
   /// [path], e.g. once the file has been deleted.
   ///
   /// [MediaViewerSessionState.rotations] and
@@ -248,11 +358,18 @@ class MediaViewerSession extends _$MediaViewerSession {
   void forgetFile(String path) {
     final hasRotation = state.rotations.containsKey(path);
     final hasEpoch = state.imageReloadEpoch.containsKey(path);
-    if (!hasRotation && !hasEpoch) return;
+    final hasAdjustments = state.adjustments.containsKey(path);
+    if (!hasRotation && !hasEpoch && !hasAdjustments) return;
     state = state.copyWith(
       rotations: hasRotation
           ? Map.unmodifiable(
               Map<String, int>.from(state.rotations)..remove(path),
+            )
+          : null,
+      adjustments: hasAdjustments
+          ? Map.unmodifiable(
+              Map<String, ViewerAdjustments>.from(state.adjustments)
+                ..remove(path),
             )
           : null,
       imageReloadEpoch: hasEpoch

@@ -59,6 +59,9 @@ import 'package:vaultexplorer/features/video_editor/video_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/adjustments_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
@@ -342,6 +345,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   PlaylistScrollMode get _scrollMode => _session.scrollMode;
   bool get _isMuted => _session.isMuted;
   Map<String, int> get _rotations => _session.rotations;
+
+  /// Adjustments drawn for [path]: shared across files when apply-to-all is
+  /// on, and none while "hold to compare" is pressed.
+  ViewerAdjustments _adjustmentsFor(String path) =>
+      _session.effectiveAdjustmentsFor(path);
   Map<String, int> get _imageReloadEpoch => _session.imageReloadEpoch;
 
   static const _archivePreviewActions = {
@@ -349,6 +357,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     MediaViewerAction.playbackSpeed,
     MediaViewerAction.rotate90,
     MediaViewerAction.screenOrientation,
+    MediaViewerAction.adjustments,
     MediaViewerAction.mute,
     MediaViewerAction.playbackMode,
     MediaViewerAction.subtitles,
@@ -385,6 +394,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   @override
   void initState() {
     super.initState();
+    // Warm the adjustment shader so the first slider drag already uses the
+    // gamma-capable path instead of the matrix fallback.
+    unawaited(ViewerAdjustShader.ensureLoaded());
     _fileIoApi = ref.read(vaultFileIoApiProvider);
     _engineEvents = ref.read(vaultEngineEventsProvider);
     _prefetchController = MediaPrefetchController(
@@ -478,9 +490,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       final savedPosition = widget._isPreviewOnly
           ? null
           : (_lastSavedPlaybackPositions[file] ??
-              await _readResumePosition(file));
-      final canResume = savedPosition != null &&
-          savedPosition >= const Duration(seconds: 5);
+                await _readResumePosition(file));
+      final canResume =
+          savedPosition != null && savedPosition >= const Duration(seconds: 5);
       final shouldPreSeek = canResume && mode == ResumePlaybackMode.always;
 
       unawaited(
@@ -494,12 +506,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           // to the container root.
           filePath: widget.container.isLocalStorage
               ? (widget.container.isSafStorage
-                  ? (file.startsWith(widget.container.uri)
-                      ? file
-                      : '${widget.container.uri}/${file.replaceFirst(RegExp(r"^/+"), "")}')
-                  : (p.isAbsolute(file)
-                      ? file
-                      : p.join(widget.container.uri, file)))
+                    ? (file.startsWith(widget.container.uri)
+                          ? file
+                          : '${widget.container.uri}/${file.replaceFirst(RegExp(r"^/+"), "")}')
+                    : (p.isAbsolute(file)
+                          ? file
+                          : p.join(widget.container.uri, file)))
               : file,
           isLocalStorage: widget.container.isLocalStorage,
           // Wait until the position preference and any resume prompt have
@@ -797,7 +809,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final fileName = _playbackManager.currentFileName;
     if (fileName != null) {
       if (duration > Duration.zero) {
-        final lastSaved = _lastSavedPlaybackPositions[fileName] ?? Duration.zero;
+        final lastSaved =
+            _lastSavedPlaybackPositions[fileName] ?? Duration.zero;
         if (position.inSeconds - lastSaved.inSeconds >= 5) {
           unawaited(
             _savePlaybackPosition(fileName, position, duration: duration),
@@ -1642,6 +1655,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         if (rotation != null) {
           _sessionController.setRotation(newPath, rotation);
         }
+        final adjustments = _session.adjustments[oldPath];
+        if (adjustments != null) {
+          _sessionController.moveAdjustments(oldPath, newPath);
+        }
         _playbackManager.renameFile(oldPath, newPath);
         _playlistController.renameFile(oldPath, newPath);
         if (mounted) {
@@ -1769,8 +1786,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _showDecoderPicker(BuildContext context) {
     _menuOpened();
     final l10n = context.l10n;
-    final isAudio =
-        MediaViewerConstants.isAudio(_playlistController.currentFile);
+    final isAudio = MediaViewerConstants.isAudio(
+      _playlistController.currentFile,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -1816,9 +1834,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           Expanded(
                             child: Text(
                               l10n.decoderSelectionHeader,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
+                              style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -1826,7 +1842,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                       ),
                     ),
                     const Divider(height: 1),
-                  if (!isAudio) ...[
+                    if (!isAudio) ...[
                       const SizedBox(height: 12),
                       Center(
                         child: SegmentedButton<String>(
@@ -1853,8 +1869,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                       const SizedBox(height: 8),
                     ] else ...[
                       Padding(
-                        padding:
-                            const EdgeInsets.only(left: 8, top: 12, bottom: 4),
+                        padding: const EdgeInsets.only(
+                          left: 8,
+                          top: 12,
+                          bottom: 4,
+                        ),
                         child: Text(
                           l10n.audioDecoderTitle,
                           style: TextStyle(
@@ -1871,8 +1890,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         selected: currentMode == mode,
-                        selectedTileColor:
-                            cs.primaryContainer.withValues(alpha: 0.3),
+                        selectedTileColor: cs.primaryContainer.withValues(
+                          alpha: 0.3,
+                        ),
                         title: Text(
                           _decoderModeLabel(l10n, mode),
                           style: TextStyle(
@@ -2224,6 +2244,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       case MediaViewerAction.imageFit:
         _showAdvancedSettings(context, isImage, initialPage: 'imageFit');
         break;
+      case MediaViewerAction.adjustments:
+        _showAdjustmentsSheet(context);
+        break;
       case MediaViewerAction.aspectRatio:
         _showAdvancedSettings(context, isImage, initialPage: 'aspectRatio');
         break;
@@ -2412,6 +2435,84 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     ).whenComplete(_menuClosed);
   }
 
+  /// Shows compact adjustment controls over the live preview, using a side
+  /// panel in landscape and a short bottom sheet in portrait.
+  void _showAdjustmentsSheet(BuildContext context) {
+    _menuOpened();
+    final path = _playlistController.currentFile;
+    final size = MediaQuery.sizeOf(context);
+    final isLandscape = size.width > size.height;
+    final sheet = AdjustmentsSheet(
+      sessionKey: _sessionKey,
+      path: path,
+      showApplyToAll: _playlistController.isPlaylistMode,
+      onInteraction: _startHideTimer,
+      isSidebar: isLandscape,
+    );
+    void onClosed() {
+      // Never leave "hold to compare" stuck if the panel closes mid-press.
+      if (mounted) _sessionController.setCompareOriginal(false);
+      _menuClosed();
+    }
+
+    if (isLandscape) {
+      final panelWidth = (size.width * 0.42).clamp(280.0, 420.0).toDouble();
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(
+          context,
+        ).modalBarrierDismissLabel,
+        barrierColor: Colors.transparent,
+        transitionDuration: MediaViewerConstants.animationDuration,
+        pageBuilder: (context, animation, secondaryAnimation) => SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) => Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Material(
+                elevation: 16,
+                borderRadius: const BorderRadiusDirectional.horizontal(
+                  start: Radius.circular(24),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: panelWidth.clamp(0.0, constraints.maxWidth).toDouble(),
+                  height: constraints.maxHeight,
+                  child: sheet,
+                ),
+              ),
+            ),
+          ),
+        ),
+        transitionBuilder: (context, animation, secondaryAnimation, child) =>
+            SlideTransition(
+              position:
+                  Tween<Offset>(
+                    begin: Directionality.of(context) == TextDirection.rtl
+                        ? const Offset(-1, 0)
+                        : const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+              child: child,
+            ),
+      ).whenComplete(onClosed);
+    } else {
+      showModalBottomSheet<void>(
+        context: context,
+        barrierColor: Colors.transparent,
+        showDragHandle: true,
+        isScrollControlled: true,
+        constraints: BoxConstraints(maxHeight: size.height * 0.38),
+        builder: (context) => sheet,
+      ).whenComplete(onClosed);
+    }
+  }
+
   void _showDiagnostics(BuildContext context) {
     final controller = _playbackManager.activeController;
     if (controller == null) return;
@@ -2509,6 +2610,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               container: widget.container,
               imageFit: _scrollMode.isContinuous ? BoxFit.contain : _imageFit,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
+              adjustments: _adjustmentsFor(fileName),
               showUI: _showUI,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               enableZoom: !_scrollMode.isContinuous,
@@ -2555,6 +2657,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               },
               playbackSpeed: _playbackSpeed,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
+              adjustments: _adjustmentsFor(fileName),
               videoAspectRatioMode: _videoAspectRatioMode,
               isMuted: _isMuted,
               onMuteChanged: (muted) {
@@ -2960,6 +3063,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                       progress: _videoProgressNotifier,
                       rotationQuarterTurns:
                           _rotations[_playlistController.currentFile] ?? 0,
+                      adjustments: _adjustmentsFor(
+                        _playlistController.currentFile,
+                      ),
                     ),
                   ),
                 Positioned(

@@ -9081,4 +9081,67 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hide => '隐藏';
+
+  @override
+  String get mediaViewerActionAdjustments => '调整';
+
+  @override
+  String get adjustmentsSheetTitle => '调整';
+
+  @override
+  String get adjustmentBrightness => '亮度';
+
+  @override
+  String get adjustmentContrast => '对比度';
+
+  @override
+  String get adjustmentSaturation => '饱和度';
+
+  @override
+  String get adjustmentHue => '色调';
+
+  @override
+  String get adjustmentGamma => '伽马';
+
+  @override
+  String get adjustmentsApplyToAll => '应用到所有文件';
+
+  @override
+  String get adjustmentsCompareHold => '按住以对比';
+
+  @override
+  String get adjustmentPresetVivid => '鲜艳';
+
+  @override
+  String get adjustmentPresetBlackAndWhite => '黑白';
+
+  @override
+  String get adjustmentPresetWarm => '暖色';
+
+  @override
+  String get adjustmentPresetCool => '冷色';
+
+  @override
+  String get videoFilePropertiesSectionHeader => '视频与音频';
+
+  @override
+  String get durationLabel => '时长';
+
+  @override
+  String get rotationLabel => '旋转';
+
+  @override
+  String get videoBitrateLabel => '视频码率';
+
+  @override
+  String get audioBitrateLabel => '音频码率';
+
+  @override
+  String get sampleRateLabel => '采样率';
+
+  @override
+  String get audioChannelsLabel => '音频声道';
+
+  @override
+  String get subtitleTracksLabel => '字幕轨道';
 }

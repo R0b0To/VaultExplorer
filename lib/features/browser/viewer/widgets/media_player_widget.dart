@@ -18,6 +18,8 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_claim_recognizer.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -86,6 +88,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final ValueChanged<double>? onSubtitleVerticalPositionChanged;
   final double playbackSpeed;
   final int rotationQuarterTurns;
+  final ViewerAdjustments adjustments;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
   final void Function(int width, int height)? onSizeKnown;
@@ -133,6 +136,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.onSubtitleVerticalPositionChanged,
     required this.playbackSpeed,
     required this.rotationQuarterTurns,
+    this.adjustments = ViewerAdjustments.identity,
     required this.onSubtitlesAvailableChanged,
     required this.progressNotifier,
     required this.playbackManager,
@@ -862,7 +866,13 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
   Widget _buildVideoTexture(NativeVideoController controller) {
     final mode = widget.videoAspectRatioMode;
-    final textureView = NativeVideoPlayerView(controller: controller);
+    // The filter wraps only the texture, so the black letterbox bars stay
+    // black and the filtered area is exactly the video frame. It sits inside
+    // the AnimatedScale / AnimatedOpacity morph in the caller.
+    final textureView = ColorAdjustFilter(
+      adjustments: widget.adjustments,
+      child: NativeVideoPlayerView(controller: controller),
+    );
     final rawSize = controller.value.size;
     if (rawSize.width <= 0 || rawSize.height <= 0) {
       return RotatedBox(
@@ -944,7 +954,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             child: SizedBox(
               width: sizedWidth,
               height: sizedHeight,
-              child: _ScrubPreviewFrameImage(bytes: frameBytes),
+              child: ColorAdjustFilter(
+                adjustments: widget.adjustments,
+                child: _ScrubPreviewFrameImage(bytes: frameBytes),
+              ),
             ),
           ),
         ),
@@ -1019,6 +1032,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           return const SizedBox.expand();
         },
       );
+      // Filter the poster too, otherwise the picture flashes unfiltered when
+      // the poster hands over to live video. Audio cover art is not filtered.
+      if (!widget.isAudio) {
+        imageWidget = ColorAdjustFilter(
+          adjustments: widget.adjustments,
+          child: imageWidget,
+        );
+      }
 
       if (mode == VideoAspectRatioMode.centre) {
         final dpr = MediaQuery.of(context).devicePixelRatio;

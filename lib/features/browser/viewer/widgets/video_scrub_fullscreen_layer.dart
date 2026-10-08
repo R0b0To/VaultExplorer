@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart'
     show VideoPlaybackProgress;
 
@@ -29,6 +31,7 @@ class VideoScrubFullscreenLayer extends StatelessWidget {
     required this.previewHost,
     required this.progress,
     this.rotationQuarterTurns = 0,
+    this.adjustments = ViewerAdjustments.identity,
   });
 
   /// Holds the active drag's preview session, or null between drags.
@@ -41,6 +44,10 @@ class VideoScrubFullscreenLayer extends StatelessWidget {
   /// The viewer's manual "rotate" setting for the current video, in the same
   /// unit the video itself is given, so the frame turns with it.
   final int rotationQuarterTurns;
+
+  /// The current video's picture adjustments, so the scrub frame matches
+  /// the live picture instead of flashing unfiltered.
+  final ViewerAdjustments adjustments;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +73,7 @@ class VideoScrubFullscreenLayer extends StatelessWidget {
               position: p.position,
               duration: p.duration,
               rotationQuarterTurns: rotationQuarterTurns,
+              adjustments: adjustments,
             );
           } else {
             child = const SizedBox.shrink();
@@ -88,12 +96,14 @@ class _FullscreenFrame extends StatelessWidget {
     required this.position,
     required this.duration,
     required this.rotationQuarterTurns,
+    required this.adjustments,
   });
 
   final VideoScrubPreviewController preview;
   final Duration position;
   final Duration duration;
   final int rotationQuarterTurns;
+  final ViewerAdjustments adjustments;
 
   /// Distance from the bottom safe-area edge to the pill: clears the bottom
   /// controls (seekbar row + transport dock) that sit above this layer.
@@ -120,7 +130,10 @@ class _FullscreenFrame extends StatelessWidget {
                     children: [
                       RotatedBox(
                         quarterTurns: rotationQuarterTurns,
-                        child: _ScrubFrameImage(bytes: bytes),
+                        child: ColorAdjustFilter(
+                          adjustments: adjustments,
+                          child: _ScrubFrameImage(bytes: bytes),
+                        ),
                       ),
                       Positioned(
                         left: 0,

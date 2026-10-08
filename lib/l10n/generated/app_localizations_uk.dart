@@ -9761,4 +9761,26 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncSavedScheduled => 'Правило та щоденний розклад збережено.';
+
+  @override
+  String get autoSyncScheduledTimeTitle => 'Daily run time';
+
+  @override
+  String get autoSyncScheduledTimeSubtitle =>
+      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+
+  @override
+  String get autoSyncExactAlarmAccessTitle =>
+      'Дозволити точні будильники для щоденної синхронізації?';
+
+  @override
+  String get autoSyncExactAlarmAccessMessage =>
+      'Android вимагає доступу до «Будильників і нагадувань», щоб Vault Explorer запускав щоденну синхронізацію у вибраний час, коли застосунок закрито. Дозвольте доступ на наступному екрані, поверніться сюди й увімкніть заплановану синхронізацію знову.';
+
+  @override
+  String get autoSyncExactAlarmAccessOpen => 'Відкрити налаштування';
+
+  @override
+  String get autoSyncExactAlarmAccessUnavailable =>
+      'Не вдалося відкрити налаштування будильників Android. Увімкніть «Будильники й нагадування» для Vault Explorer у системних налаштуваннях і спробуйте ще раз.';
 }

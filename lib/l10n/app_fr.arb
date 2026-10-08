@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Activer la planification",
   "autoSyncScheduleNotificationRequired": "Autorisez les notifications pour qu’Android affiche « Synchronisation du coffre… » pendant la tâche en arrière-plan.",
   "autoSyncScheduleFailed": "Règle enregistrée, mais la synchronisation planifiée n’a pas pu être activée.",
-  "autoSyncSavedScheduled": "Règle et planification quotidienne enregistrées."
+  "autoSyncSavedScheduled": "Règle et planification quotidienne enregistrées.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "Autoriser les alarmes exactes pour la synchronisation quotidienne ?",
+  "autoSyncExactAlarmAccessMessage": "Android exige l’accès « Alarmes et rappels » pour que Vault Explorer lance la synchronisation quotidienne à l’heure choisie lorsque l’application est fermée. Autorisez-le sur l’écran suivant, revenez ici, puis réactivez la synchronisation programmée.",
+  "autoSyncExactAlarmAccessOpen": "Ouvrir les paramètres",
+  "autoSyncExactAlarmAccessUnavailable": "Impossible d’ouvrir les paramètres d’alarmes Android. Activez « Alarmes et rappels » pour Vault Explorer dans les paramètres système, puis réessayez."
 }

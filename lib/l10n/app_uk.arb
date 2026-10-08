@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Увімкнути розклад",
   "autoSyncScheduleNotificationRequired": "Дозвольте сповіщення, щоб Android показував «Синхронізація сховища...» під час роботи у фоновому режимі.",
   "autoSyncScheduleFailed": "Правило збережено, але не вдалося ввімкнути заплановану синхронізацію.",
-  "autoSyncSavedScheduled": "Правило та щоденний розклад збережено."
+  "autoSyncSavedScheduled": "Правило та щоденний розклад збережено.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "Дозволити точні будильники для щоденної синхронізації?",
+  "autoSyncExactAlarmAccessMessage": "Android вимагає доступу до «Будильників і нагадувань», щоб Vault Explorer запускав щоденну синхронізацію у вибраний час, коли застосунок закрито. Дозвольте доступ на наступному екрані, поверніться сюди й увімкніть заплановану синхронізацію знову.",
+  "autoSyncExactAlarmAccessOpen": "Відкрити налаштування",
+  "autoSyncExactAlarmAccessUnavailable": "Не вдалося відкрити налаштування будильників Android. Увімкніть «Будильники й нагадування» для Vault Explorer у системних налаштуваннях і спробуйте ще раз."
 }

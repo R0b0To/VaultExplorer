@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Ativar agendamento",
   "autoSyncScheduleNotificationRequired": "Permita notificações para que o Android mostre «A sincronizar cofre...» durante a sincronização em segundo plano.",
   "autoSyncScheduleFailed": "Regra guardada, mas não foi possível ativar a sincronização agendada.",
-  "autoSyncSavedScheduled": "Regra e agendamento diário guardados."
+  "autoSyncSavedScheduled": "Regra e agendamento diário guardados.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "Permitir alarmes exatos para a sincronização diária?",
+  "autoSyncExactAlarmAccessMessage": "O Android exige acesso a “Alarmes e lembretes” para que o Vault Explorer inicie a sincronização diária no horário escolhido enquanto o app estiver fechado. Permita na próxima tela, volte aqui e ative a sincronização agendada novamente.",
+  "autoSyncExactAlarmAccessOpen": "Abrir configurações",
+  "autoSyncExactAlarmAccessUnavailable": "Não foi possível abrir as configurações de alarmes do Android. Ative “Alarmes e lembretes” para o Vault Explorer nas configurações do sistema e tente novamente."
 }

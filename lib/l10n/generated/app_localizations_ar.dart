@@ -9734,4 +9734,26 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get autoSyncSavedScheduled => 'حُفظت القاعدة والجدولة اليومية.';
+
+  @override
+  String get autoSyncScheduledTimeTitle => 'Daily run time';
+
+  @override
+  String get autoSyncScheduledTimeSubtitle =>
+      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+
+  @override
+  String get autoSyncExactAlarmAccessTitle =>
+      'السماح بالتنبيهات الدقيقة للمزامنة اليومية؟';
+
+  @override
+  String get autoSyncExactAlarmAccessMessage =>
+      'يتطلب Android إذن «المنبّهات والتذكيرات» لكي يبدأ Vault Explorer المزامنة اليومية في الوقت الذي تختاره والتطبيق مغلق. اسمح بذلك في الشاشة التالية، ثم عُد إلى هنا وفعّل المزامنة المجدولة مرة أخرى.';
+
+  @override
+  String get autoSyncExactAlarmAccessOpen => 'فتح الإعدادات';
+
+  @override
+  String get autoSyncExactAlarmAccessUnavailable =>
+      'تعذّر فتح إعدادات التنبيهات في Android. فعّل «المنبّهات والتذكيرات» لـ Vault Explorer من إعدادات النظام ثم حاول مرة أخرى.';
 }

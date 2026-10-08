@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "تفعيل الجدولة",
   "autoSyncScheduleNotificationRequired": "اسمح بالإشعارات ليعرض Android «جارٍ مزامنة الخزنة...» أثناء المزامنة في الخلفية.",
   "autoSyncScheduleFailed": "حُفظت القاعدة، لكن تعذّر تفعيل المزامنة المجدولة.",
-  "autoSyncSavedScheduled": "حُفظت القاعدة والجدولة اليومية."
+  "autoSyncSavedScheduled": "حُفظت القاعدة والجدولة اليومية.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "السماح بالتنبيهات الدقيقة للمزامنة اليومية؟",
+  "autoSyncExactAlarmAccessMessage": "يتطلب Android إذن «المنبّهات والتذكيرات» لكي يبدأ Vault Explorer المزامنة اليومية في الوقت الذي تختاره والتطبيق مغلق. اسمح بذلك في الشاشة التالية، ثم عُد إلى هنا وفعّل المزامنة المجدولة مرة أخرى.",
+  "autoSyncExactAlarmAccessOpen": "فتح الإعدادات",
+  "autoSyncExactAlarmAccessUnavailable": "تعذّر فتح إعدادات التنبيهات في Android. فعّل «المنبّهات والتذكيرات» لـ Vault Explorer من إعدادات النظام ثم حاول مرة أخرى."
 }

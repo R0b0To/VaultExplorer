@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Zeitplan aktivieren",
   "autoSyncScheduleNotificationRequired": "Erlaube Benachrichtigungen, damit Android während der Hintergrundsynchronisierung „Tresor wird synchronisiert...“ anzeigen kann.",
   "autoSyncScheduleFailed": "Regel gespeichert, aber die geplante Synchronisierung konnte nicht aktiviert werden.",
-  "autoSyncSavedScheduled": "Regel und täglicher Zeitplan gespeichert."
+  "autoSyncSavedScheduled": "Regel und täglicher Zeitplan gespeichert.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "Exakte Alarme für die tägliche Synchronisierung erlauben?",
+  "autoSyncExactAlarmAccessMessage": "Android benötigt den Zugriff auf „Alarme und Erinnerungen“, damit Vault Explorer die tägliche Synchronisierung zur gewählten Zeit starten kann, wenn die App geschlossen ist. Erlaube den Zugriff auf dem nächsten Bildschirm, kehre hierher zurück und aktiviere die geplante Synchronisierung erneut.",
+  "autoSyncExactAlarmAccessOpen": "Einstellungen öffnen",
+  "autoSyncExactAlarmAccessUnavailable": "Die Android-Alarmeinstellungen konnten nicht geöffnet werden. Erlaube „Alarme und Erinnerungen“ für Vault Explorer in den Systemeinstellungen und versuche es erneut."
 }

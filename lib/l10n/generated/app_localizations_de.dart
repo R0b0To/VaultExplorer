@@ -9686,4 +9686,26 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get autoSyncSavedScheduled =>
       'Regel und täglicher Zeitplan gespeichert.';
+
+  @override
+  String get autoSyncScheduledTimeTitle => 'Daily run time';
+
+  @override
+  String get autoSyncScheduledTimeSubtitle =>
+      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+
+  @override
+  String get autoSyncExactAlarmAccessTitle =>
+      'Exakte Alarme für die tägliche Synchronisierung erlauben?';
+
+  @override
+  String get autoSyncExactAlarmAccessMessage =>
+      'Android benötigt den Zugriff auf „Alarme und Erinnerungen“, damit Vault Explorer die tägliche Synchronisierung zur gewählten Zeit starten kann, wenn die App geschlossen ist. Erlaube den Zugriff auf dem nächsten Bildschirm, kehre hierher zurück und aktiviere die geplante Synchronisierung erneut.';
+
+  @override
+  String get autoSyncExactAlarmAccessOpen => 'Einstellungen öffnen';
+
+  @override
+  String get autoSyncExactAlarmAccessUnavailable =>
+      'Die Android-Alarmeinstellungen konnten nicht geöffnet werden. Erlaube „Alarme und Erinnerungen“ für Vault Explorer in den Systemeinstellungen und versuche es erneut.';
 }

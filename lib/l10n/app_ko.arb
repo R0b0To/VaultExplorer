@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "예약 사용 설정",
   "autoSyncScheduleNotificationRequired": "백그라운드 동기화 중 Android가 “볼트 동기화 중...”을 표시하도록 알림을 허용하세요.",
   "autoSyncScheduleFailed": "규칙은 저장했지만 예약 동기화를 사용 설정하지 못했습니다.",
-  "autoSyncSavedScheduled": "규칙과 일일 일정을 저장했습니다."
+  "autoSyncSavedScheduled": "규칙과 일일 일정을 저장했습니다.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "매일 동기화에 정확한 알람을 허용할까요?",
+  "autoSyncExactAlarmAccessMessage": "앱이 닫혀 있어도 선택한 시간에 Vault Explorer가 매일 동기화를 시작하려면 Android의 ‘알람 및 리마인더’ 접근 권한이 필요합니다. 다음 화면에서 허용하고 여기로 돌아온 뒤 예약 동기화를 다시 켜세요.",
+  "autoSyncExactAlarmAccessOpen": "설정 열기",
+  "autoSyncExactAlarmAccessUnavailable": "Android 알람 설정을 열 수 없습니다. 시스템 설정에서 Vault Explorer의 ‘알람 및 리마인더’를 허용한 뒤 다시 시도하세요."
 }

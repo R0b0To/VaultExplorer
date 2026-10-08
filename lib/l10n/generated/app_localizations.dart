@@ -16074,6 +16074,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rule and daily schedule saved.'**
   String get autoSyncSavedScheduled;
+
+  /// Label for selecting the local time of a scheduled daily vault sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily run time'**
+  String get autoSyncScheduledTimeTitle;
+
+  /// Explains that the schedule uses local time and suggests how to test it soon.
+  ///
+  /// In en, this message translates to:
+  /// **'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.'**
+  String get autoSyncScheduledTimeSubtitle;
+
+  /// No description provided for @autoSyncExactAlarmAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow exact alarms for daily sync?'**
+  String get autoSyncExactAlarmAccessTitle;
+
+  /// No description provided for @autoSyncExactAlarmAccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Android requires Alarms & reminders access so Vault Explorer can start a daily sync at your chosen time while the app is closed. On the next screen, allow it, return here, then turn on Scheduled sync again.'**
+  String get autoSyncExactAlarmAccessMessage;
+
+  /// No description provided for @autoSyncExactAlarmAccessOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get autoSyncExactAlarmAccessOpen;
+
+  /// No description provided for @autoSyncExactAlarmAccessUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open Android alarm settings. Enable Alarms & reminders for Vault Explorer in system settings, then try again.'**
+  String get autoSyncExactAlarmAccessUnavailable;
 }
 
 class _AppLocalizationsDelegate

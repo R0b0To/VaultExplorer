@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Activar programación",
   "autoSyncScheduleNotificationRequired": "Permite las notificaciones para que Android muestre «Sincronizando bóveda...» durante la sincronización en segundo plano.",
   "autoSyncScheduleFailed": "Regla guardada, pero no se pudo activar la sincronización programada.",
-  "autoSyncSavedScheduled": "Regla y programación diaria guardadas."
+  "autoSyncSavedScheduled": "Regla y programación diaria guardadas.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "¿Permitir alarmas exactas para la sincronización diaria?",
+  "autoSyncExactAlarmAccessMessage": "Android requiere el acceso a «Alarmas y recordatorios» para que Vault Explorer inicie la sincronización diaria a la hora que elijas cuando la app esté cerrada. Permítelo en la siguiente pantalla, vuelve aquí y activa de nuevo la sincronización programada.",
+  "autoSyncExactAlarmAccessOpen": "Abrir ajustes",
+  "autoSyncExactAlarmAccessUnavailable": "No se pudieron abrir los ajustes de alarmas de Android. Activa «Alarmas y recordatorios» para Vault Explorer en los ajustes del sistema y vuelve a intentarlo."
 }

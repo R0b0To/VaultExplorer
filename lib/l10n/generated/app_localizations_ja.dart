@@ -9171,4 +9171,25 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get autoSyncSavedScheduled => 'ルールと毎日のスケジュールを保存しました。';
+
+  @override
+  String get autoSyncScheduledTimeTitle => 'Daily run time';
+
+  @override
+  String get autoSyncScheduledTimeSubtitle =>
+      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+
+  @override
+  String get autoSyncExactAlarmAccessTitle => '毎日の同期に正確なアラームを許可しますか？';
+
+  @override
+  String get autoSyncExactAlarmAccessMessage =>
+      'アプリを閉じている間に選択した時刻に毎日の同期を開始するには、Android の「アラームとリマインダー」へのアクセスが必要です。次の画面で許可し、ここに戻ってからスケジュール同期をもう一度有効にしてください。';
+
+  @override
+  String get autoSyncExactAlarmAccessOpen => '設定を開く';
+
+  @override
+  String get autoSyncExactAlarmAccessUnavailable =>
+      'Android のアラーム設定を開けませんでした。システム設定で Vault Explorer の「アラームとリマインダー」を有効にして、もう一度お試しください。';
 }

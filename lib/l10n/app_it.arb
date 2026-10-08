@@ -2652,5 +2652,11 @@
   "autoSyncScheduleEnable": "Attiva pianificazione",
   "autoSyncScheduleNotificationRequired": "Consenti le notifiche affinché Android mostri «Sincronizzazione vault...» durante l’attività in background.",
   "autoSyncScheduleFailed": "Regola salvata, ma non è stato possibile attivare la sincronizzazione pianificata.",
-  "autoSyncSavedScheduled": "Regola e pianificazione giornaliera salvate."
+  "autoSyncSavedScheduled": "Regola e pianificazione giornaliera salvate.",
+  "autoSyncScheduledTimeTitle": "Daily run time",
+  "autoSyncScheduledTimeSubtitle": "Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.",
+  "autoSyncExactAlarmAccessTitle": "Consentire allarmi esatti per la sincronizzazione giornaliera?",
+  "autoSyncExactAlarmAccessMessage": "Android richiede l’accesso “Sveglie e promemoria” affinché Vault Explorer possa avviare la sincronizzazione giornaliera all’ora scelta quando l’app è chiusa. Consentilo nella schermata successiva, torna qui e riattiva la sincronizzazione programmata.",
+  "autoSyncExactAlarmAccessOpen": "Apri impostazioni",
+  "autoSyncExactAlarmAccessUnavailable": "Impossibile aprire le impostazioni degli allarmi Android. Attiva “Sveglie e promemoria” per Vault Explorer nelle impostazioni di sistema e riprova."
 }

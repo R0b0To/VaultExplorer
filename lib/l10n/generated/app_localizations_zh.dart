@@ -9043,4 +9043,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoSyncSavedScheduled => '规则和每日计划已保存。';
+
+  @override
+  String get autoSyncScheduledTimeTitle => 'Daily run time';
+
+  @override
+  String get autoSyncScheduledTimeSubtitle =>
+      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+
+  @override
+  String get autoSyncExactAlarmAccessTitle => '允许每日同步使用精确闹钟？';
+
+  @override
+  String get autoSyncExactAlarmAccessMessage =>
+      'Android 需要“闹钟和提醒”访问权限，才能在应用关闭时于你选择的时间启动 Vault Explorer 的每日同步。请在下一屏允许访问，返回此处后再次开启计划同步。';
+
+  @override
+  String get autoSyncExactAlarmAccessOpen => '打开设置';
+
+  @override
+  String get autoSyncExactAlarmAccessUnavailable =>
+      '无法打开 Android 闹钟设置。请在系统设置中为 Vault Explorer 启用“闹钟和提醒”，然后重试。';
 }

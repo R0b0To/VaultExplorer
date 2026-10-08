@@ -4,13 +4,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
+import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/sync/services/scheduled_sync_background.dart';
 
 final _scheduledSyncControl = MethodChannel(
   'com.aeidolon.vaultexplorer/scheduled_sync',
 );
-final _scheduledSyncBackgroundRunner = ScheduledSyncBackgroundRunner();
+final _scheduledSyncBackgroundRunner = ScheduledSyncBackgroundRunner(
+  io: VaultFileIoApi(kVaultEngineChannel),
+  hash: VaultHashApi(kVaultEngineChannel),
+);
 
 @pragma('vm:entry-point')
 void scheduledSyncBackgroundEntrypoint() {

@@ -39,11 +39,11 @@ object LosslessVideoCutter {
         val hasAudio: Boolean,
         val videoMime: String?,
         val audioMime: String?,
-        val videoBitrate: Int?,
-        val audioBitrate: Int?,
-        val frameRate: Float?,
-        val audioSampleRate: Int?,
-        val audioChannels: Int?,
+        val videoBitrate: Int? = null,
+        val audioBitrate: Int? = null,
+        val frameRate: Float? = null,
+        val audioSampleRate: Int? = null,
+        val audioChannels: Int? = null,
         /** Sync-sample times of the video track, ascending, in microseconds. */
         val keyframesUs: LongArray,
         /** False when the scan hit its time/size budget before reaching the end. */

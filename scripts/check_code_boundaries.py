@@ -43,12 +43,16 @@ CONSTANT_ALLOWLIST = {
     "lib/data/services/logcat_service.dart",
     "lib/data/services/thumbnail_cache_service.dart",
     "lib/data/services/password_interchange/authenticator_backup_crypto.dart",
+    "lib/main.dart",  # headless scheduled-sync entry-point; no Riverpod container
 }
 
 # Files that use the engine channel and so must use ChannelMethods constants.
 # quick_capture_api.dart is excluded: its raw names go to its own
 # `.../quickcapture` channel.
-RAW_NAME_EXEMPT = {"lib/core/api/quick_capture_api.dart"}
+RAW_NAME_EXEMPT = {
+    "lib/core/api/quick_capture_api.dart",
+    "lib/main.dart",  # 'ready' is on the scheduled_sync control channel, not the engine channel
+}
 
 
 def is_generated(rel: str) -> bool:

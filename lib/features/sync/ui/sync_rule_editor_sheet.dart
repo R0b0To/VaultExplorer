@@ -612,7 +612,11 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                       _scheduledTime.hour * 60 + _scheduledTime.minute,
                 ),
               );
-        } catch (_) {}
+        } catch (_) {
+          // Best-effort: the binding is a local cache entry for the
+          // scheduled-sync worker; save and schedule failures are surfaced
+          // separately so losing this write is harmless.
+        }
       }
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
       final syncedPaths = rules

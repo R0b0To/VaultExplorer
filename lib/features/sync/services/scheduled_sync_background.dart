@@ -1,6 +1,5 @@
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
-import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
@@ -15,8 +14,14 @@ import 'package:vaultexplorer/features/sync/domain/sync_rule_runner.dart';
 
 /// Headless runner called by ScheduledVaultSyncWorker's FlutterEngine.
 class ScheduledSyncBackgroundRunner {
-  final VaultFileIoApi _io = VaultFileIoApi(kVaultEngineChannel);
-  final VaultHashApi _hash = VaultHashApi(kVaultEngineChannel);
+  ScheduledSyncBackgroundRunner({
+    required VaultFileIoApi io,
+    required VaultHashApi hash,
+  })  : _io = io,
+        _hash = hash;
+
+  final VaultFileIoApi _io;
+  final VaultHashApi _hash;
   SyncCancellationToken? _activeToken;
 
   void cancel() => _activeToken?.cancel();

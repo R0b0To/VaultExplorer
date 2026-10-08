@@ -12,6 +12,11 @@ class VideoProbe {
   final bool hasAudio;
   final String? videoMime;
   final String? audioMime;
+  final int? videoBitrate;
+  final int? audioBitrate;
+  final double? frameRate;
+  final int? audioSampleRate;
+  final int? audioChannels;
 
   /// Sync-sample times of the video track, ascending, in microseconds.
   final List<int> keyframesUs;
@@ -38,6 +43,11 @@ class VideoProbe {
     required this.hasAudio,
     required this.videoMime,
     required this.audioMime,
+    this.videoBitrate,
+    this.audioBitrate,
+    this.frameRate,
+    this.audioSampleRate,
+    this.audioChannels,
     required this.keyframesUs,
     required this.keyframesComplete,
     required this.outputExtension,
@@ -46,23 +56,28 @@ class VideoProbe {
   });
 
   factory VideoProbe.fromMap(Map<Object?, Object?> m) => VideoProbe(
-        durationUs: (m['durationUs'] as num?)?.toInt() ?? 0,
-        width: (m['width'] as num?)?.toInt() ?? 0,
-        height: (m['height'] as num?)?.toInt() ?? 0,
-        rotationDegrees: (m['rotationDegrees'] as num?)?.toInt() ?? 0,
-        hasVideo: m['hasVideo'] as bool? ?? false,
-        hasAudio: m['hasAudio'] as bool? ?? false,
-        videoMime: m['videoMime'] as String?,
-        audioMime: m['audioMime'] as String?,
-        keyframesUs: [
-          for (final k in (m['keyframesUs'] as List<Object?>? ?? const []))
-            (k as num).toInt(),
-        ],
-        keyframesComplete: m['keyframesComplete'] as bool? ?? false,
-        outputExtension: m['outputExtension'] as String? ?? 'mp4',
-        hasSubtitles: m['hasSubtitles'] as bool? ?? false,
-        subtitleTracks: (m['subtitleTracks'] as num?)?.toInt() ?? 0,
-      );
+    durationUs: (m['durationUs'] as num?)?.toInt() ?? 0,
+    width: (m['width'] as num?)?.toInt() ?? 0,
+    height: (m['height'] as num?)?.toInt() ?? 0,
+    rotationDegrees: (m['rotationDegrees'] as num?)?.toInt() ?? 0,
+    hasVideo: m['hasVideo'] as bool? ?? false,
+    hasAudio: m['hasAudio'] as bool? ?? false,
+    videoMime: m['videoMime'] as String?,
+    audioMime: m['audioMime'] as String?,
+    videoBitrate: (m['videoBitrate'] as num?)?.toInt(),
+    audioBitrate: (m['audioBitrate'] as num?)?.toInt(),
+    frameRate: (m['frameRate'] as num?)?.toDouble(),
+    audioSampleRate: (m['audioSampleRate'] as num?)?.toInt(),
+    audioChannels: (m['audioChannels'] as num?)?.toInt(),
+    keyframesUs: [
+      for (final k in (m['keyframesUs'] as List<Object?>? ?? const []))
+        (k as num).toInt(),
+    ],
+    keyframesComplete: m['keyframesComplete'] as bool? ?? false,
+    outputExtension: m['outputExtension'] as String? ?? 'mp4',
+    hasSubtitles: m['hasSubtitles'] as bool? ?? false,
+    subtitleTracks: (m['subtitleTracks'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class VideoExportResult {
@@ -100,22 +115,25 @@ class VaultVideoEditApi {
     required int volId,
     required String filePath,
     required bool isLocalStorage,
+    bool includeKeyframes = true,
   }) async {
     try {
-      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
-        ChannelMethods.videoEditProbe,
-        {
-          'volId': volId,
-          'filePath': filePath,
-          'isLocalStorage': isLocalStorage,
-        },
-      );
+      final raw = await _channel
+          .invokeMethod<Map<Object?, Object?>>(ChannelMethods.videoEditProbe, {
+            'volId': volId,
+            'filePath': filePath,
+            'isLocalStorage': isLocalStorage,
+            'includeKeyframes': includeKeyframes,
+          });
       if (raw == null) {
         throw const VideoEditException('PROBE_FAILED', 'No response');
       }
       return VideoProbe.fromMap(raw);
     } on PlatformException catch (e) {
-      throw VideoEditException(e.code, e.message ?? 'Could not read this video');
+      throw VideoEditException(
+        e.code,
+        e.message ?? 'Could not read this video',
+      );
     }
   }
 
@@ -148,7 +166,8 @@ class VaultVideoEditApi {
       );
       return VideoExportResult(
         outputPaths: [
-          for (final p in (raw?['outputPaths'] as List<Object?>? ?? outputPaths))
+          for (final p
+              in (raw?['outputPaths'] as List<Object?>? ?? outputPaths))
             p as String,
         ],
         droppedAudioTracks: (raw?['droppedAudioTracks'] as num?)?.toInt() ?? 0,

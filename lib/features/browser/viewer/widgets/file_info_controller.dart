@@ -10,12 +10,16 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_video_edit_api.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart'
     show ParsedMetadata, MetadataParser;
+import 'package:vaultexplorer/features/video_editor/video_edit_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 part 'file_info_controller.g.dart';
@@ -23,6 +27,7 @@ part 'file_info_controller.g.dart';
 class FileInfoState {
   final bool loading;
   final ParsedMetadata? metadata;
+  final VideoProbe? videoMetadata;
   final String? sha256;
   final bool calculatingSha256;
   final int? folderItemCount;
@@ -32,6 +37,7 @@ class FileInfoState {
   const FileInfoState({
     this.loading = true,
     this.metadata,
+    this.videoMetadata,
     this.sha256,
     this.calculatingSha256 = false,
     this.folderItemCount,
@@ -42,21 +48,22 @@ class FileInfoState {
   FileInfoState copyWith({
     bool? loading,
     ParsedMetadata? metadata,
+    VideoProbe? videoMetadata,
     String? sha256,
     bool? calculatingSha256,
     int? folderItemCount,
     int? folderTotalBytes,
     bool? loadingFolderStats,
-  }) =>
-      FileInfoState(
-        loading: loading ?? this.loading,
-        metadata: metadata ?? this.metadata,
-        sha256: sha256 ?? this.sha256,
-        calculatingSha256: calculatingSha256 ?? this.calculatingSha256,
-        folderItemCount: folderItemCount ?? this.folderItemCount,
-        folderTotalBytes: folderTotalBytes ?? this.folderTotalBytes,
-        loadingFolderStats: loadingFolderStats ?? this.loadingFolderStats,
-      );
+  }) => FileInfoState(
+    loading: loading ?? this.loading,
+    metadata: metadata ?? this.metadata,
+    videoMetadata: videoMetadata ?? this.videoMetadata,
+    sha256: sha256 ?? this.sha256,
+    calculatingSha256: calculatingSha256 ?? this.calculatingSha256,
+    folderItemCount: folderItemCount ?? this.folderItemCount,
+    folderTotalBytes: folderTotalBytes ?? this.folderTotalBytes,
+    loadingFolderStats: loadingFolderStats ?? this.loadingFolderStats,
+  );
 }
 
 @riverpod
@@ -75,15 +82,12 @@ class FileInfo extends _$FileInfo {
       final isVid = MediaViewerConstants.isVideo(entry.name);
 
       Uint8List? headerBytes;
-      if (!entry.isDir && (isImg || isVid)) {
+      if (!entry.isDir && isImg) {
         final readLen = min(entry.sizeBytes, 256 * 1024);
         if (readLen > 0) {
-          headerBytes = await ref.read(vaultFileIoApiProvider).readFileChunk(
-                container,
-                fullPath,
-                0,
-                readLen,
-              );
+          headerBytes = await ref
+              .read(vaultFileIoApiProvider)
+              .readFileChunk(container, fullPath, 0, readLen);
         }
       }
 
@@ -95,8 +99,32 @@ class FileInfo extends _$FileInfo {
         cachedAspectRatio: cachedRatio,
       );
 
+      VideoProbe? videoMetadata;
+      if (!entry.isDir && isVid) {
+        final nativePath = container.isLocalStorage
+            ? p.join(container.uri, fullPath)
+            : fullPath;
+        try {
+          videoMetadata = await ref
+              .read(vaultVideoEditApiProvider)
+              .probe(
+                volId: container.volId,
+                filePath: nativePath,
+                isLocalStorage: container.isLocalStorage,
+                includeKeyframes: false,
+              );
+        } catch (_) {
+          // Keep ordinary file properties available if this video cannot be
+          // inspected by the platform media extractor.
+        }
+      }
+
       if (!ref.mounted) return;
-      state = state.copyWith(metadata: parsed, loading: false);
+      state = state.copyWith(
+        metadata: parsed,
+        videoMetadata: videoMetadata,
+        loading: false,
+      );
 
       // Auto-trigger SHA-256 computation for files
       if (!entry.isDir) {
@@ -122,7 +150,12 @@ class FileInfo extends _$FileInfo {
       while (offset < size) {
         if (!ref.mounted) break;
         final len = min(size - offset, chunkSize);
-        final chunk = await fileIoApi.readFileChunk(container, fullPath, offset, len);
+        final chunk = await fileIoApi.readFileChunk(
+          container,
+          fullPath,
+          offset,
+          len,
+        );
         if (chunk == null) break;
         await hashApi.updateHashSession(opId, chunk);
         offset += len;

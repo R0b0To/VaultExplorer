@@ -70,6 +70,7 @@ class VideoEditHandlers(
         val volId = call.argument<Number>("volId")?.toInt()
         val filePath = call.argument<String>("filePath")
         val isLocal = call.argument<Boolean>("isLocalStorage") ?: false
+        val includeKeyframes = call.argument<Boolean>("includeKeyframes") ?: true
         if (volId == null || filePath.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "volId and filePath are required", null)
             return
@@ -77,7 +78,10 @@ class VideoEditHandlers(
 
         ioExecutor.execute {
             try {
-                val probe = LosslessVideoCutter.probe(extractorFactory(volId, filePath, isLocal))
+                val probe = LosslessVideoCutter.probe(
+                    extractorFactory(volId, filePath, isLocal),
+                    includeKeyframes = includeKeyframes,
+                )
                 val map = hashMapOf<String, Any?>(
                     "durationUs" to probe.durationUs,
                     "width" to probe.width,
@@ -87,6 +91,11 @@ class VideoEditHandlers(
                     "hasAudio" to probe.hasAudio,
                     "videoMime" to probe.videoMime,
                     "audioMime" to probe.audioMime,
+                    "videoBitrate" to probe.videoBitrate,
+                    "audioBitrate" to probe.audioBitrate,
+                    "frameRate" to probe.frameRate,
+                    "audioSampleRate" to probe.audioSampleRate,
+                    "audioChannels" to probe.audioChannels,
                     "keyframesUs" to probe.keyframesUs.toList(),
                     "keyframesComplete" to probe.keyframesComplete,
                     "outputExtension" to probe.outputExtension,

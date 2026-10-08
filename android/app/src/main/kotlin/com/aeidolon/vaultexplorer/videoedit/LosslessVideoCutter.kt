@@ -39,6 +39,11 @@ object LosslessVideoCutter {
         val hasAudio: Boolean,
         val videoMime: String?,
         val audioMime: String?,
+        val videoBitrate: Int?,
+        val audioBitrate: Int?,
+        val frameRate: Float?,
+        val audioSampleRate: Int?,
+        val audioChannels: Int?,
         /** Sync-sample times of the video track, ascending, in microseconds. */
         val keyframesUs: LongArray,
         /** False when the scan hit its time/size budget before reaching the end. */
@@ -94,6 +99,18 @@ object LosslessVideoCutter {
         return d
     }
 
+    private fun intFormatValue(format: MediaFormat?, key: String): Int? {
+        if (format == null || !format.containsKey(key)) return null
+        return runCatching { format.getInteger(key) }.getOrNull()
+            ?: runCatching { format.getLong(key).toInt() }.getOrNull()
+    }
+
+    private fun floatFormatValue(format: MediaFormat?, key: String): Float? {
+        if (format == null || !format.containsKey(key)) return null
+        return runCatching { format.getFloat(key) }.getOrNull()
+            ?: runCatching { format.getInteger(key).toFloat() }.getOrNull()
+    }
+
     private fun isWebmCompatible(mime: String): Boolean =
         mime == "video/x-vnd.on2.vp8" ||
             mime == "video/x-vnd.on2.vp9" ||
@@ -122,7 +139,7 @@ object LosslessVideoCutter {
 
     // ── Probe ────────────────────────────────────────────────────────────
 
-    fun probe(newExtractor: () -> MediaExtractor): Probe {
+    fun probe(newExtractor: () -> MediaExtractor, includeKeyframes: Boolean = true): Probe {
         val extractor = newExtractor()
         try {
             val plan = planTracks(extractor)
@@ -140,10 +157,10 @@ object LosslessVideoCutter {
             val rotation = videoFormat?.takeIf { it.containsKey(MediaFormat.KEY_ROTATION) }
                 ?.getInteger(MediaFormat.KEY_ROTATION) ?: 0
 
-            val (keyframes, complete) = if (plan.videoTrack >= 0) {
+            val (keyframes, complete) = if (includeKeyframes && plan.videoTrack >= 0) {
                 scanKeyframes(extractor, plan.videoTrack)
             } else {
-                LongArray(0) to true
+                LongArray(0) to false
             }
 
             var subtitleTracks = 0
@@ -164,6 +181,11 @@ object LosslessVideoCutter {
                 hasAudio = plan.audioTracks.isNotEmpty(),
                 videoMime = videoFormat?.getString(MediaFormat.KEY_MIME),
                 audioMime = audioFormat?.getString(MediaFormat.KEY_MIME),
+                videoBitrate = intFormatValue(videoFormat, MediaFormat.KEY_BIT_RATE),
+                audioBitrate = intFormatValue(audioFormat, MediaFormat.KEY_BIT_RATE),
+                frameRate = floatFormatValue(videoFormat, MediaFormat.KEY_FRAME_RATE),
+                audioSampleRate = intFormatValue(audioFormat, MediaFormat.KEY_SAMPLE_RATE),
+                audioChannels = intFormatValue(audioFormat, MediaFormat.KEY_CHANNEL_COUNT),
                 keyframesUs = keyframes,
                 keyframesComplete = complete,
                 outputExtension = chooseContainer(plan).second,

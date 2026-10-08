@@ -38,7 +38,9 @@ class FileInfoSheet extends ConsumerStatefulWidget {
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
       ),
       builder: (_) => FileInfoSheet(
         container: container,
@@ -63,8 +65,9 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final notifier = ref
-          .read(fileInfoProvider(widget.container.volId, _fullPath).notifier);
+      final notifier = ref.read(
+        fileInfoProvider(widget.container.volId, _fullPath).notifier,
+      );
       notifier.load(widget.container, widget.entry);
 
       // Trigger folder stats scan for directories
@@ -76,8 +79,11 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final controllerState = ref.watch(fileInfoProvider(widget.container.volId, _fullPath));
+    final controllerState = ref.watch(
+      fileInfoProvider(widget.container.volId, _fullPath),
+    );
     final metadata = controllerState.metadata;
+    final videoMetadata = controllerState.videoMetadata;
     final sha256 = controllerState.sha256;
     final calculatingSha256 = controllerState.calculatingSha256;
     final loading = controllerState.loading;
@@ -86,8 +92,11 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     final textTheme = Theme.of(context).textTheme;
     final mediaQuery = MediaQuery.of(context);
     final isLandscape = mediaQuery.orientation == Orientation.landscape;
-    final double sheetHeight = mediaQuery.size.height * (isLandscape ? 0.88 : 0.72);
-    final ext = widget.entry.name.contains('.') ? widget.entry.name.split('.').last : '';
+    final double sheetHeight =
+        mediaQuery.size.height * (isLandscape ? 0.88 : 0.72);
+    final ext = widget.entry.name.contains('.')
+        ? widget.entry.name.split('.').last
+        : '';
 
     return AppBottomSheet(
       child: SizedBox(
@@ -100,14 +109,21 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (widget.entry.isDir ? cs.secondary : colorForFile(widget.entry.name))
-                        .withValues(alpha: 0.15),
+                    color:
+                        (widget.entry.isDir
+                                ? cs.secondary
+                                : colorForFile(widget.entry.name))
+                            .withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    widget.entry.isDir ? Icons.folder_rounded : iconForFile(widget.entry.name),
+                    widget.entry.isDir
+                        ? Icons.folder_rounded
+                        : iconForFile(widget.entry.name),
                     size: 24,
-                    color: widget.entry.isDir ? cs.secondary : colorForFile(widget.entry.name),
+                    color: widget.entry.isDir
+                        ? cs.secondary
+                        : colorForFile(widget.entry.name),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -117,15 +133,21 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                     children: [
                       Text(
                         widget.entry.name,
-                        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         widget.entry.isDir
                             ? context.l10n.nounFolderCapitalized
-                            : ext.isNotEmpty ? ext.toUpperCase() : context.l10n.nounFileCapitalized,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            : ext.isNotEmpty
+                            ? ext.toUpperCase()
+                            : context.l10n.nounFileCapitalized,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -137,17 +159,27 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
             const SizedBox(height: 8),
             Expanded(
               child: loading
-                  ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+                  ? const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildSectionTitle(context, context.l10n.filePropertiesSectionHeader),
+                          _buildSectionTitle(
+                            context,
+                            context.l10n.filePropertiesSectionHeader,
+                          ),
                           AppCard.rows(
                             dividerIndent: 16,
                             children: [
-                              _buildInfoTile(context, context.l10n.fullPathLabel, _fullPath, copyable: true),
+                              _buildInfoTile(
+                                context,
+                                context.l10n.fullPathLabel,
+                                _fullPath,
+                                copyable: true,
+                              ),
                               if (!widget.entry.isDir)
                                 _buildInfoTile(
                                   context,
@@ -159,7 +191,9 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                   context,
                                   context.l10n.contentsLabel,
                                   controllerState.folderItemCount != null
-                                      ? context.l10n.folderItemCount(controllerState.folderItemCount!)
+                                      ? context.l10n.folderItemCount(
+                                          controllerState.folderItemCount!,
+                                        )
                                       : context.l10n.calculatingFolderStats,
                                 ),
                               if (widget.entry.isDir)
@@ -175,63 +209,224 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                   context,
                                   context.l10n.modifiedLabel,
                                   DateFormat('yyyy-MM-dd HH:mm:ss').format(
-                                    DateTime.fromMillisecondsSinceEpoch(widget.entry.modifiedSecs * 1000),
+                                    DateTime.fromMillisecondsSinceEpoch(
+                                      widget.entry.modifiedSecs * 1000,
+                                    ),
                                   ),
                                 ),
-                              _buildInfoTile(context, context.l10n.vaultLabel, widget.container.displayName),
+                              _buildInfoTile(
+                                context,
+                                context.l10n.vaultLabel,
+                                widget.container.displayName,
+                              ),
                             ],
                           ),
                           if (metadata?.hasMediaInfo == true) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, context.l10n.mediaDimensionsSectionHeader),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.mediaDimensionsSectionHeader,
+                            ),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
-                                if (metadata?.width != null && metadata?.height != null)
+                                if (metadata?.width != null &&
+                                    metadata?.height != null)
                                   _buildInfoTile(
                                     context,
                                     context.l10n.resolutionLabel,
                                     '${metadata!.width} × ${metadata.height}${metadata.megapixels != null ? ' (${metadata.megapixels} MP)' : ''}',
                                   ),
                                 if (metadata?.aspectRatioString != null)
-                                  _buildInfoTile(context, context.l10n.aspectRatioLabel, metadata!.aspectRatioString!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.aspectRatioLabel,
+                                    metadata!.aspectRatioString!,
+                                  ),
                                 if (metadata?.mimeType != null)
-                                  _buildInfoTile(context, context.l10n.formatLabel, metadata!.mimeType!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.formatLabel,
+                                    metadata!.mimeType!,
+                                  ),
+                              ],
+                            ),
+                          ],
+                          if (videoMetadata != null &&
+                              (videoMetadata.hasVideo ||
+                                  videoMetadata.hasAudio)) ...[
+                            const SizedBox(height: 16),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.videoFilePropertiesSectionHeader,
+                            ),
+                            AppCard.rows(
+                              dividerIndent: 16,
+                              children: [
+                                if (videoMetadata.durationUs > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.durationLabel,
+                                    formatClockDuration(
+                                      Duration(
+                                        microseconds: videoMetadata.durationUs,
+                                      ),
+                                    ),
+                                  ),
+                                if (videoMetadata.hasVideo &&
+                                    videoMetadata.width > 0 &&
+                                    videoMetadata.height > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.resolutionLabel,
+                                    '${videoMetadata.width} × ${videoMetadata.height}',
+                                  ),
+                                if (videoMetadata.hasVideo &&
+                                    videoMetadata.width > 0 &&
+                                    videoMetadata.height > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.aspectRatioLabel,
+                                    (videoMetadata.width / videoMetadata.height)
+                                        .toStringAsFixed(2),
+                                  ),
+                                if (videoMetadata.rotationDegrees != 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.rotationLabel,
+                                    context.l10n.rotationDegreesValue(
+                                      videoMetadata.rotationDegrees,
+                                    ),
+                                  ),
+                                if (videoMetadata.videoMime?.isNotEmpty == true)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.videoCodecLabel,
+                                    _prettyCodec(videoMetadata.videoMime!),
+                                  ),
+                                if ((videoMetadata.videoBitrate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.videoBitrateLabel,
+                                    _formatBitrate(videoMetadata.videoBitrate!),
+                                  ),
+                                if ((videoMetadata.frameRate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.framerateLabel,
+                                    '${videoMetadata.frameRate!.toStringAsFixed(2)} fps',
+                                  ),
+                                if (videoMetadata.audioMime?.isNotEmpty == true)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioCodecLabel,
+                                    _prettyCodec(videoMetadata.audioMime!),
+                                  ),
+                                if ((videoMetadata.audioBitrate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioBitrateLabel,
+                                    _formatBitrate(videoMetadata.audioBitrate!),
+                                  ),
+                                if ((videoMetadata.audioSampleRate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.sampleRateLabel,
+                                    '${videoMetadata.audioSampleRate} Hz',
+                                  ),
+                                if ((videoMetadata.audioChannels ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioChannelsLabel,
+                                    videoMetadata.audioChannels.toString(),
+                                  ),
+                                if (videoMetadata.subtitleTracks > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.subtitleTracksLabel,
+                                    videoMetadata.subtitleTracks.toString(),
+                                  ),
                               ],
                             ),
                           ],
                           if (metadata?.hasExifData == true) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, context.l10n.exifCameraDataSectionHeader),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.exifCameraDataSectionHeader,
+                            ),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
                                 if (metadata?.cameraModel != null)
-                                  _buildInfoTile(context, context.l10n.cameraLabel, metadata!.cameraModel!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.cameraLabel,
+                                    metadata!.cameraModel!,
+                                  ),
                                 if (metadata?.lensModel != null)
-                                  _buildInfoTile(context, context.l10n.lensLabel, metadata!.lensModel!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.lensLabel,
+                                    metadata!.lensModel!,
+                                  ),
                                 if (metadata?.dateTaken != null)
-                                  _buildInfoTile(context, context.l10n.dateTakenLabel, metadata!.dateTaken!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.dateTakenLabel,
+                                    metadata!.dateTaken!,
+                                  ),
                                 if (metadata?.exposureTime != null)
-                                  _buildInfoTile(context, context.l10n.shutterSpeedLabel, metadata!.exposureTime!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.shutterSpeedLabel,
+                                    metadata!.exposureTime!,
+                                  ),
                                 if (metadata?.fNumber != null)
-                                  _buildInfoTile(context, context.l10n.apertureLabel, 'f/${metadata!.fNumber}'),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.apertureLabel,
+                                    'f/${metadata!.fNumber}',
+                                  ),
                                 if (metadata?.iso != null)
-                                  _buildInfoTile(context, context.l10n.isoLabel, 'ISO ${metadata!.iso}'),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.isoLabel,
+                                    'ISO ${metadata!.iso}',
+                                  ),
                                 if (metadata?.focalLength != null)
-                                  _buildInfoTile(context, context.l10n.focalLengthLabel, metadata!.focalLength!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.focalLengthLabel,
+                                    metadata!.focalLength!,
+                                  ),
                                 if (metadata?.flash != null)
-                                  _buildInfoTile(context, context.l10n.flashLabel, metadata!.flash!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.flashLabel,
+                                    metadata!.flash!,
+                                  ),
                                 if (metadata?.software != null)
-                                  _buildInfoTile(context, context.l10n.softwareLabel, metadata!.software!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.softwareLabel,
+                                    metadata!.software!,
+                                  ),
                                 if (metadata?.gpsCoordinates != null)
-                                  _buildInfoTile(context, context.l10n.gpsLocationLabel, metadata!.gpsCoordinates!),
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.gpsLocationLabel,
+                                    metadata!.gpsCoordinates!,
+                                  ),
                               ],
                             ),
                           ],
                           if (!widget.entry.isDir) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, context.l10n.integrityChecksumSectionHeader),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.integrityChecksumSectionHeader,
+                            ),
                             AppCard(
                               padding: const EdgeInsets.all(16),
                               children: [
@@ -240,7 +435,9 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                   children: [
                                     Text(
                                       'SHA-256',
-                                      style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                                      style: textTheme.labelSmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     if (sha256 != null)
@@ -257,14 +454,18 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                           const SizedBox(
                                             width: 12,
                                             height: 12,
-                                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 1.5,
+                                            ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
                                             context.l10n.computingHashMessage,
-                                            style: textTheme.bodySmall?.copyWith(
-                                              color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                                            ),
+                                            style: textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: cs.onSurfaceVariant
+                                                      .withValues(alpha: 0.8),
+                                                ),
                                           ),
                                         ],
                                       )
@@ -296,15 +497,45 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-              letterSpacing: 1.1,
-            ),
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.1,
+        ),
       ),
     );
   }
 
-  Future<void> _copyValue(BuildContext context, String label, String value) async {
+  String _formatBitrate(int bitsPerSecond) {
+    if (bitsPerSecond >= 1000000) {
+      return '${(bitsPerSecond / 1000000).toStringAsFixed(1)} Mbps';
+    }
+    if (bitsPerSecond >= 1000) {
+      return '${(bitsPerSecond / 1000).round()} kbps';
+    }
+    return '$bitsPerSecond bps';
+  }
+
+  String _prettyCodec(String mime) => switch (mime.toLowerCase()) {
+    'video/avc' => 'H.264 / AVC',
+    'video/hevc' => 'H.265 / HEVC',
+    'video/av01' => 'AV1',
+    'video/x-vnd.on2.vp8' => 'VP8',
+    'video/x-vnd.on2.vp9' => 'VP9',
+    'video/mp4v-es' => 'MPEG-4 Part 2',
+    'audio/mp4a-latm' => 'AAC',
+    'audio/opus' => 'Opus',
+    'audio/vorbis' => 'Vorbis',
+    'audio/ac3' => 'Dolby Digital (AC-3)',
+    'audio/eac3' => 'Dolby Digital Plus (E-AC-3)',
+    'audio/mpeg' => 'MP3',
+    _ => mime,
+  };
+
+  Future<void> _copyValue(
+    BuildContext context,
+    String label,
+    String value,
+  ) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!context.mounted) return;
     showAppSnackBar(
@@ -339,7 +570,9 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
           Expanded(
             child: Text(
               value,
-              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           if (copyable) ...[
@@ -405,13 +638,15 @@ class ParsedMetadata {
       gpsCoordinates != null;
 
   String? get megapixels {
-    if (width == null || height == null || width! <= 0 || height! <= 0) return null;
+    if (width == null || height == null || width! <= 0 || height! <= 0)
+      return null;
     final mp = (width! * height!) / 1000000.0;
     return mp >= 1.0 ? mp.toStringAsFixed(1) : mp.toStringAsFixed(2);
   }
 
   String? get aspectRatioString {
-    if (width == null || height == null || width! <= 0 || height! <= 0) return null;
+    if (width == null || height == null || width! <= 0 || height! <= 0)
+      return null;
     int gcd(int a, int b) => b == 0 ? a : gcd(b, a % b);
     final divisor = gcd(width!, height!);
     final rw = width! ~/ divisor;
@@ -472,7 +707,9 @@ class MetadataParser {
         continue;
       }
       final marker = bytes[offset + 1];
-      if (marker == 0xD8 || marker == 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) {
+      if (marker == 0xD8 ||
+          marker == 0xD9 ||
+          (marker >= 0xD0 && marker <= 0xD7)) {
         offset += 2;
         continue;
       }
@@ -482,7 +719,8 @@ class MetadataParser {
       if (length < 2 || offset + 2 + length > bytes.length) break;
 
       // SOF markers for resolution (SOF0, SOF1, SOF2)
-      if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7)) {
+      if ((marker >= 0xC0 && marker <= 0xC3) ||
+          (marker >= 0xC5 && marker <= 0xC7)) {
         if (offset + 9 <= bytes.length) {
           height = (bytes[offset + 5] << 8) | bytes[offset + 6];
           width = (bytes[offset + 7] << 8) | bytes[offset + 8];
@@ -520,7 +758,9 @@ class MetadataParser {
 
     String? fullCamera;
     if (make != null && model != null) {
-      fullCamera = model.toLowerCase().contains(make.toLowerCase()) ? model : '$make $model';
+      fullCamera = model.toLowerCase().contains(make.toLowerCase())
+          ? model
+          : '$make $model';
     } else {
       fullCamera = model ?? make;
     }
@@ -549,13 +789,22 @@ class MetadataParser {
     final isLe = tiff[0] == 0x49 && tiff[1] == 0x49; // 'II' vs 'MM'
     int readU16(int o) {
       if (o < 0 || o + 2 > tiff.length) return 0;
-      return isLe ? (tiff[o] | (tiff[o + 1] << 8)) : ((tiff[o] << 8) | tiff[o + 1]);
+      return isLe
+          ? (tiff[o] | (tiff[o + 1] << 8))
+          : ((tiff[o] << 8) | tiff[o + 1]);
     }
+
     int readU32(int o) {
       if (o < 0 || o + 4 > tiff.length) return 0;
       return isLe
-          ? (tiff[o] | (tiff[o + 1] << 8) | (tiff[o + 2] << 16) | (tiff[o + 3] << 24))
-          : ((tiff[o] << 24) | (tiff[o + 1] << 16) | (tiff[o + 2] << 8) | tiff[o + 3]);
+          ? (tiff[o] |
+                (tiff[o + 1] << 8) |
+                (tiff[o + 2] << 16) |
+                (tiff[o + 3] << 24))
+          : ((tiff[o] << 24) |
+                (tiff[o + 1] << 16) |
+                (tiff[o + 2] << 8) |
+                tiff[o + 3]);
     }
 
     final ifd0Offset = readU32(4);
@@ -610,13 +859,16 @@ class MetadataParser {
               final num = readU32(valOffset);
               final den = readU32(valOffset + 4);
               if (den > 0) {
-                result['exposureTime'] = num < den ? '1/${(den / num).round()}s' : '${num / den}s';
+                result['exposureTime'] = num < den
+                    ? '1/${(den / num).round()}s'
+                    : '${num / den}s';
               }
             }
           }
           if (tag == 0x920A) {
             final fl = readRational(valOffset);
-            if (fl != null) result['focalLength'] = '${fl.toStringAsFixed(1)} mm';
+            if (fl != null)
+              result['focalLength'] = '${fl.toStringAsFixed(1)} mm';
           }
         }
 
@@ -630,16 +882,24 @@ class MetadataParser {
 
   static ParsedMetadata _parsePng(Uint8List bytes) {
     if (bytes.length >= 24 &&
-        bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
-      final w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-      final h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      final w =
+          (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+      final h =
+          (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
       return ParsedMetadata(width: w, height: h, mimeType: 'PNG Image');
     }
     return const ParsedMetadata();
   }
 
   static ParsedMetadata _parseGif(Uint8List bytes) {
-    if (bytes.length >= 10 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
+    if (bytes.length >= 10 &&
+        bytes[0] == 0x47 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46) {
       final w = bytes[6] | (bytes[7] << 8);
       final h = bytes[8] | (bytes[9] << 8);
       return ParsedMetadata(width: w, height: h, mimeType: 'GIF Image');
@@ -649,14 +909,26 @@ class MetadataParser {
 
   static ParsedMetadata _parseWebp(Uint8List bytes) {
     if (bytes.length >= 30 &&
-        bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
-        bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
-      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x20) {
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      if (bytes[12] == 0x56 &&
+          bytes[13] == 0x50 &&
+          bytes[14] == 0x38 &&
+          bytes[15] == 0x20) {
         final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
         final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
         return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
       }
-      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x58) {
+      if (bytes[12] == 0x56 &&
+          bytes[13] == 0x50 &&
+          bytes[14] == 0x38 &&
+          bytes[15] == 0x58) {
         final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
         final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
         return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');

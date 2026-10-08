@@ -15,6 +15,14 @@ enum FileGlyph {
   archive,
   apk,
   generic,
+  document,
+  spreadsheet,
+  presentation,
+  code,
+  ebook,
+  font,
+  database,
+  encrypted,
   // Vault-item types (see [vaultIconForExt]).
   key,
   card,
@@ -113,6 +121,54 @@ abstract final class SkinIcons {
       Icons.insert_drive_file_outlined,
       Icons.insert_drive_file_sharp,
     ),
+    FileGlyph.document: _IconSet(
+      Icons.description,
+      Icons.description_rounded,
+      Icons.description_outlined,
+      Icons.description_sharp,
+    ),
+    FileGlyph.spreadsheet: _IconSet(
+      Icons.table_chart,
+      Icons.table_chart_rounded,
+      Icons.table_chart_outlined,
+      Icons.table_chart_sharp,
+    ),
+    FileGlyph.presentation: _IconSet(
+      Icons.slideshow,
+      Icons.slideshow_rounded,
+      Icons.slideshow_outlined,
+      Icons.slideshow_sharp,
+    ),
+    FileGlyph.code: _IconSet(
+      Icons.code,
+      Icons.code_rounded,
+      Icons.code_outlined,
+      Icons.code_sharp,
+    ),
+    FileGlyph.ebook: _IconSet(
+      Icons.menu_book,
+      Icons.menu_book_rounded,
+      Icons.menu_book_outlined,
+      Icons.menu_book_sharp,
+    ),
+    FileGlyph.font: _IconSet(
+      Icons.font_download,
+      Icons.font_download_rounded,
+      Icons.font_download_outlined,
+      Icons.font_download_sharp,
+    ),
+    FileGlyph.database: _IconSet(
+      Icons.storage,
+      Icons.storage_rounded,
+      Icons.storage_outlined,
+      Icons.storage_sharp,
+    ),
+    FileGlyph.encrypted: _IconSet(
+      Icons.lock,
+      Icons.lock_rounded,
+      Icons.lock_outlined,
+      Icons.lock_sharp,
+    ),
     FileGlyph.key: _IconSet(
       Icons.key,
       Icons.key_rounded,
@@ -185,43 +241,29 @@ abstract final class SkinIcons {
     return _glyph(family, vaultGlyphForExt(ext) ?? glyphForFile(name));
   }
 
-  /// Mirrors [iconForFile]'s extension groups exactly, so switching icon
-  /// family changes only the *style* of a file's icon, never which kind of
-  /// icon it gets.
-  static FileGlyph glyphForFile(String name) {
-    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    if (videoFileExtensions.contains(ext)) return FileGlyph.video;
-    if (audioFileExtensions.contains(ext)) return FileGlyph.audio;
-    switch (ext) {
-      case 'pdf':
-        return FileGlyph.pdf;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'avif':
-      case 'heic':
-      case 'webp':
-        return FileGlyph.image;
-      case 'txt':
-      case 'md':
-      case 'csv':
-        return FileGlyph.text;
-      case 'html':
-      case 'htm':
-        return FileGlyph.web;
-      case 'zip':
-      case 'gz':
-      case 'tar':
-      case '7z':
-      case 'rar':
-        return FileGlyph.archive;
-      case 'apk':
-        return FileGlyph.apk;
-      default:
-        return FileGlyph.generic;
-    }
-  }
+  /// Mirrors [iconForFile]: both classify through [fileKindOf], so switching
+  /// icon family changes only the *style* of a file's icon, never which kind
+  /// of icon it gets.
+  static FileGlyph glyphForFile(String name) => switch (fileKindOf(name)) {
+        FileKind.pdf => FileGlyph.pdf,
+        FileKind.image => FileGlyph.image,
+        FileKind.video => FileGlyph.video,
+        FileKind.audio => FileGlyph.audio,
+        FileKind.document => FileGlyph.document,
+        FileKind.spreadsheet => FileGlyph.spreadsheet,
+        FileKind.presentation => FileGlyph.presentation,
+        FileKind.text => FileGlyph.text,
+        FileKind.code => FileGlyph.code,
+        FileKind.web => FileGlyph.web,
+        FileKind.archive => FileGlyph.archive,
+        FileKind.ebook => FileGlyph.ebook,
+        FileKind.font => FileGlyph.font,
+        FileKind.database => FileGlyph.database,
+        FileKind.keyFile => FileGlyph.key,
+        FileKind.encrypted => FileGlyph.encrypted,
+        FileKind.apk => FileGlyph.apk,
+        FileKind.generic => FileGlyph.generic,
+      };
 
   /// Mirrors [vaultIconForExt]; null when [ext] is not a vault-item type.
   static FileGlyph? vaultGlyphForExt(String ext) => switch (ext) {

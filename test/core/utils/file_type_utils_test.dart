@@ -63,8 +63,31 @@ void main() {
       expect(audioFileExtensions.intersection(videoFileExtensions), isEmpty);
     });
 
-    test('.ts stays generic: TypeScript must not get a video icon', () {
-      expect(iconForFile('index.ts'), Icons.insert_drive_file_outlined);
+    test('.ts is TypeScript source (code), not an MPEG transport stream', () {
+      expect(fileKindOf('index.ts'), FileKind.code);
+      expect(iconForFile('index.ts'), isNot(Icons.ondemand_video_outlined));
+    });
+
+    test('office documents, spreadsheets and presentations get their own '
+        'icons', () {
+      expect(iconForFile('a.docx'), Icons.description_outlined);
+      expect(iconForFile('a.odt'), Icons.description_outlined);
+      expect(iconForFile('a.xlsx'), Icons.table_chart_outlined);
+      expect(iconForFile('a.csv'), Icons.table_chart_outlined);
+      expect(iconForFile('a.pptx'), Icons.slideshow_outlined);
+    });
+
+    test('bz2/xz archives get the archive icon, not the generic one', () {
+      expect(iconForFile('a.bz2'), Icons.archive_outlined);
+      expect(iconForFile('a.xz'), Icons.archive_outlined);
+      expect(iconForFile('a.tar.zst'), Icons.archive_outlined);
+    });
+
+    test('app-encrypted files get the encrypted icon', () {
+      for (final name in ['a.vxenc', 'a.aes', 'A.VXENC']) {
+        expect(isAppEncryptedFileName(name), isTrue, reason: name);
+        expect(fileKindOf(name), FileKind.encrypted, reason: name);
+      }
     });
 
     test('falls back to a generic file icon for unknown extensions', () {
@@ -74,6 +97,62 @@ void main() {
     test('falls back to a generic file icon for names with no extension',
         () {
       expect(iconForFile('README'), Icons.insert_drive_file_outlined);
+    });
+  });
+
+  group('fileKindOf / fileKindExtensions', () {
+    test('every kind except generic has extensions, and generic has none',
+        () {
+      for (final kind in FileKind.values) {
+        if (kind == FileKind.generic) {
+          expect(fileKindExtensions.containsKey(kind), isFalse);
+        } else {
+          expect(fileKindExtensions[kind], isNotEmpty, reason: kind.name);
+        }
+      }
+    });
+
+    test('no extension is claimed by two kinds', () {
+      final all = fileKindExtensions.values.expand((e) => e).toList();
+      expect(all.length, all.toSet().length,
+          reason: 'duplicates: ${all.where((e) => all.where((x) => x == e).length > 1).toSet()}');
+    });
+
+    test('extensions are stored lower-case with no dot', () {
+      for (final entry in fileKindExtensions.entries) {
+        for (final ext in entry.value) {
+          expect(ext, ext.toLowerCase(), reason: ext);
+          expect(ext.contains('.'), isFalse, reason: ext);
+        }
+      }
+    });
+
+    test('every extension classifies back to the kind that lists it', () {
+      for (final entry in fileKindExtensions.entries) {
+        for (final ext in entry.value) {
+          expect(fileKindOf('f.$ext'), entry.key, reason: ext);
+          expect(fileKindOf('F.${ext.toUpperCase()}'), entry.key, reason: ext);
+        }
+      }
+    });
+
+    test('every kind has a distinct icon', () {
+      final icons = {
+        for (final kind in FileKind.values)
+          kind: iconForFile(
+            kind == FileKind.generic
+                ? 'f.xyz'
+                : 'f.${fileKindExtensions[kind]!.first}',
+          ),
+      };
+      expect(icons.values.toSet(), hasLength(FileKind.values.length));
+    });
+
+    test('unknown and extension-less names are generic', () {
+      expect(fileKindOf('data.xyz'), FileKind.generic);
+      expect(fileKindOf('README'), FileKind.generic);
+      expect(fileKindOf(''), FileKind.generic);
+      expect(fileKindOf('trailing.'), FileKind.generic);
     });
   });
 

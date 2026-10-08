@@ -5,21 +5,28 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/skin_icons.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 
-/// Every extension [iconForFile] gives a dedicated icon, plus a few it does
-/// not (so the fallback is exercised too).
+/// A spread of extensions across every [FileKind], plus a few that get no
+/// dedicated icon (so the fallback is exercised too). The exhaustive sweep
+/// over [fileKindExtensions] is a separate test below.
 const _extensions = [
   'pdf',
-  'jpg', 'jpeg', 'png', 'gif', 'avif', 'heic', 'webp',
-  'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mpeg', 'mpg',
-  'mp3', 'flac', 'wav', 'm4a',
-  'ogg', 'opus', 'wma', 'ac3', 'aiff', 'amr', // added audio
-  'wmv', 'flv', '3gp', // added video
-  'ts', // deliberately NOT video (TypeScript)
-  'txt', 'md', 'csv',
+  'jpg', 'jpeg', 'png', 'gif', 'avif', 'heic', 'webp', 'bmp', 'svg', 'tiff',
+  'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mpeg', 'mpg', 'wmv', 'flv', '3gp',
+  'mp3', 'flac', 'wav', 'm4a', 'ogg', 'opus', 'wma', 'ac3', 'aiff', 'amr',
+  'doc', 'docx', 'odt', 'rtf',
+  'xls', 'xlsx', 'ods', 'csv',
+  'ppt', 'pptx', 'odp',
+  'txt', 'md', 'log', 'srt',
+  'json', 'xml', 'yaml', 'py', 'dart', 'ts',
   'html', 'htm',
-  'zip', 'gz', 'tar', '7z', 'rar',
-  'apk',
-  'bz2', 'xz', 'xyz', // no dedicated icon today
+  'zip', 'gz', 'tar', '7z', 'rar', 'bz2', 'xz', 'zst',
+  'epub', 'mobi',
+  'ttf', 'otf', 'woff2',
+  'db', 'sqlite',
+  'pem', 'kdbx',
+  'vxenc', 'aes', 'gpg',
+  'apk', 'xapk',
+  'xyz', // no dedicated icon
 ];
 
 const _vaultExts = [
@@ -78,6 +85,20 @@ void main() {
           contains(iconForFile(name)),
           reason: name,
         );
+      }
+    });
+
+    test('glyphForFile agrees with iconForFile for every known extension',
+        () {
+      for (final entry in fileKindExtensions.entries) {
+        for (final ext in entry.value) {
+          final name = 'file.$ext';
+          expect(
+            SkinIcons.variantsOf(SkinIcons.glyphForFile(name)),
+            contains(iconForFile(name)),
+            reason: name,
+          );
+        }
       }
     });
 

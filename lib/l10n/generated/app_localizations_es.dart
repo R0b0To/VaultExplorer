@@ -9666,4 +9666,41 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'Lo entiendo';
+
+  @override
+  String get autoSyncScheduledTitle =>
+      'Ejecutar a diario con la bóveda bloqueada';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'Se ejecuta en segundo plano con la app cerrada. Android puede retrasarlo o detener ejecuciones largas. La bóveda se vuelve a bloquear al terminar la sincronización.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Requiere acceso de automatización completa y una contraseña de bóveda guardada.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Configurar acceso en segundo plano';
+
+  @override
+  String get autoSyncScheduleWarningTitle =>
+      '¿Activar la sincronización programada?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'La app desbloqueará esta bóveda en segundo plano una vez al día y la bloqueará después de sincronizar. Android puede retrasar la ejecución. Si está activado eliminar tras importar, el archivo de origen solo se elimina cuando la copia de la bóveda se ha guardado y coinciden su tamaño y su suma SHA-256.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Activar programación';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Permite las notificaciones para que Android muestre «Sincronizando bóveda...» durante la sincronización en segundo plano.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Regla guardada, pero no se pudo activar la sincronización programada.';
+
+  @override
+  String get autoSyncSavedScheduled => 'Regla y programación diaria guardadas.';
 }

@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "Dateien im Stammordner des lokalen Speichers löschen?",
   "autoSyncLocalRootDeleteWarningMessage": "Diese Synchronisierung in eine Richtung durchsucht den gesamten Stammordner des lokalen Speichers. Wenn „Quelldateien nach dem Import löschen“ aktiviert ist, können in den Tresor kopierte Dateien nach erfolgreicher SHA-256-Prüfung von deinem Gerät gelöscht werden. Fahre nur fort, wenn du diese Originale wirklich löschen möchtest.",
-  "autoSyncLocalRootDeleteWarningConfirm": "Ich verstehe"
+  "autoSyncLocalRootDeleteWarningConfirm": "Ich verstehe",
+  "autoSyncScheduledTitle": "Täglich bei gesperrtem Tresor ausführen",
+  "autoSyncScheduledSubtitle": "Läuft im Hintergrund, wenn die App geschlossen ist. Android kann den Start verzögern oder lange Läufe stoppen. Nach der Synchronisierung wird der Tresor wieder gesperrt.",
+  "autoSyncScheduledSetupRequired": "Erfordert den vollen Automatisierungszugriff und ein gespeichertes Tresorpasswort.",
+  "autoSyncScheduledConfigure": "Hintergrundzugriff einrichten",
+  "autoSyncScheduleWarningTitle": "Geplante Synchronisierung aktivieren?",
+  "autoSyncScheduleWarningMessage": "Die App entsperrt diesen Tresor einmal täglich im Hintergrund und sperrt ihn nach der Synchronisierung wieder. Android kann den Start verzögern. Ist „Quelle nach Import löschen“ aktiviert, wird eine Quelldatei erst gelöscht, wenn die Tresorkopie geschrieben wurde und Größe sowie SHA-256-Prüfsumme übereinstimmen.",
+  "autoSyncScheduleEnable": "Zeitplan aktivieren",
+  "autoSyncScheduleNotificationRequired": "Erlaube Benachrichtigungen, damit Android während der Hintergrundsynchronisierung „Tresor wird synchronisiert...“ anzeigen kann.",
+  "autoSyncScheduleFailed": "Regel gespeichert, aber die geplante Synchronisierung konnte nicht aktiviert werden.",
+  "autoSyncSavedScheduled": "Regel und täglicher Zeitplan gespeichert."
 }

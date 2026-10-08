@@ -9648,4 +9648,42 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'Ich verstehe';
+
+  @override
+  String get autoSyncScheduledTitle =>
+      'Täglich bei gesperrtem Tresor ausführen';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'Läuft im Hintergrund, wenn die App geschlossen ist. Android kann den Start verzögern oder lange Läufe stoppen. Nach der Synchronisierung wird der Tresor wieder gesperrt.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Erfordert den vollen Automatisierungszugriff und ein gespeichertes Tresorpasswort.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Hintergrundzugriff einrichten';
+
+  @override
+  String get autoSyncScheduleWarningTitle =>
+      'Geplante Synchronisierung aktivieren?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'Die App entsperrt diesen Tresor einmal täglich im Hintergrund und sperrt ihn nach der Synchronisierung wieder. Android kann den Start verzögern. Ist „Quelle nach Import löschen“ aktiviert, wird eine Quelldatei erst gelöscht, wenn die Tresorkopie geschrieben wurde und Größe sowie SHA-256-Prüfsumme übereinstimmen.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Zeitplan aktivieren';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Erlaube Benachrichtigungen, damit Android während der Hintergrundsynchronisierung „Tresor wird synchronisiert...“ anzeigen kann.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Regel gespeichert, aber die geplante Synchronisierung konnte nicht aktiviert werden.';
+
+  @override
+  String get autoSyncSavedScheduled =>
+      'Regel und täglicher Zeitplan gespeichert.';
 }

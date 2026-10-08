@@ -9503,4 +9503,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'I understand';
+
+  @override
+  String get autoSyncScheduledTitle => 'Run daily while the vault is locked';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'Runs in the background when the app is closed. Android may delay it or stop a long run. The vault is locked again when sync finishes.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Requires Full automation access and a saved vault password.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Set up background access';
+
+  @override
+  String get autoSyncScheduleWarningTitle => 'Enable scheduled sync?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'The app will unlock this vault in the background once a day and lock it after syncing. Android may delay a run. If delete after import is on, a source file is removed only after the vault copy is committed and its size and SHA-256 checksum match.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Enable schedule';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Allow notifications so Android can show “Syncing vault...” while the background sync runs.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Rule saved, but the scheduled sync could not be enabled.';
+
+  @override
+  String get autoSyncSavedScheduled => 'Rule and daily schedule saved.';
 }

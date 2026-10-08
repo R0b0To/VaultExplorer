@@ -9699,4 +9699,39 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'أفهم';
+
+  @override
+  String get autoSyncScheduledTitle => 'التشغيل يوميًا أثناء قفل الخزنة';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'يعمل في الخلفية عند إغلاق التطبيق. قد يؤخر Android التشغيل أو يوقف المهام الطويلة. تُقفل الخزنة مجددًا بعد انتهاء المزامنة.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'يتطلب تفعيل الأتمتة الكاملة وحفظ كلمة مرور الخزنة.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'إعداد الوصول في الخلفية';
+
+  @override
+  String get autoSyncScheduleWarningTitle => 'تفعيل المزامنة المجدولة؟';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'سيفتح التطبيق هذه الخزنة في الخلفية مرة يوميًا ويقفلها بعد المزامنة. قد يؤخر Android التشغيل. عند تفعيل الحذف بعد الاستيراد، لن يُحذف الملف المصدر إلا بعد حفظ نسخته في الخزنة والتحقق من تطابق الحجم وبصمة SHA-256.';
+
+  @override
+  String get autoSyncScheduleEnable => 'تفعيل الجدولة';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'اسمح بالإشعارات ليعرض Android «جارٍ مزامنة الخزنة...» أثناء المزامنة في الخلفية.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'حُفظت القاعدة، لكن تعذّر تفعيل المزامنة المجدولة.';
+
+  @override
+  String get autoSyncSavedScheduled => 'حُفظت القاعدة والجدولة اليومية.';
 }

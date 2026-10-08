@@ -9647,4 +9647,42 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'Ho capito';
+
+  @override
+  String get autoSyncScheduledTitle =>
+      'Esegui ogni giorno con il vault bloccato';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'Funziona in background con l’app chiusa. Android potrebbe posticipare o interrompere le attività lunghe. Al termine della sincronizzazione, il vault viene bloccato di nuovo.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Richiede l’accesso completo all’automazione e una password del vault salvata.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Configura l’accesso in background';
+
+  @override
+  String get autoSyncScheduleWarningTitle =>
+      'Attivare la sincronizzazione pianificata?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'L’app sbloccherà questo vault in background una volta al giorno e lo bloccherà al termine della sincronizzazione. Android potrebbe posticipare l’esecuzione. Se è attiva l’eliminazione dopo l’importazione, il file sorgente viene eliminato solo dopo aver salvato la copia nel vault e verificato che dimensione e checksum SHA-256 coincidano.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Attiva pianificazione';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Consenti le notifiche affinché Android mostri «Sincronizzazione vault...» durante l’attività in background.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Regola salvata, ma non è stato possibile attivare la sincronizzazione pianificata.';
+
+  @override
+  String get autoSyncSavedScheduled =>
+      'Regola e pianificazione giornaliera salvate.';
 }

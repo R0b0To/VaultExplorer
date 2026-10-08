@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "Excluir arquivos da raiz do armazenamento local?",
   "autoSyncLocalRootDeleteWarningMessage": "Esta sincronização unidirecional verificará toda a raiz do armazenamento local. Se a opção de excluir arquivos de origem após a importação estiver ativada, os arquivos copiados para o cofre poderão ser removidos do dispositivo após a verificação SHA-256. Continue apenas se quiser excluir esses originais.",
-  "autoSyncLocalRootDeleteWarningConfirm": "Entendi"
+  "autoSyncLocalRootDeleteWarningConfirm": "Entendi",
+  "autoSyncScheduledTitle": "Executar diariamente com o cofre bloqueado",
+  "autoSyncScheduledSubtitle": "Executa em segundo plano com a aplicação fechada. O Android pode adiar ou interromper tarefas longas. O cofre é bloqueado novamente quando a sincronização termina.",
+  "autoSyncScheduledSetupRequired": "Requer acesso de automação completa e uma palavra-passe do cofre guardada.",
+  "autoSyncScheduledConfigure": "Configurar acesso em segundo plano",
+  "autoSyncScheduleWarningTitle": "Ativar a sincronização agendada?",
+  "autoSyncScheduleWarningMessage": "A aplicação desbloqueia este cofre em segundo plano uma vez por dia e volta a bloqueá-lo após a sincronização. O Android pode adiar a execução. Se a eliminação após importação estiver ativa, o ficheiro de origem só é eliminado depois de a cópia no cofre ser gravada e o tamanho e a soma SHA-256 coincidirem.",
+  "autoSyncScheduleEnable": "Ativar agendamento",
+  "autoSyncScheduleNotificationRequired": "Permita notificações para que o Android mostre «A sincronizar cofre...» durante a sincronização em segundo plano.",
+  "autoSyncScheduleFailed": "Regra guardada, mas não foi possível ativar a sincronização agendada.",
+  "autoSyncSavedScheduled": "Regra e agendamento diário guardados."
 }

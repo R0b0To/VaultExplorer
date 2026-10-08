@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "Supprimer les fichiers à la racine du stockage local ?",
   "autoSyncLocalRootDeleteWarningMessage": "Cette synchronisation à sens unique parcourra toute la racine du stockage local. Si la suppression des fichiers source après importation est activée, les fichiers copiés dans le coffre pourront être supprimés de votre appareil après vérification du SHA-256. Continuez uniquement si vous souhaitez supprimer ces originaux.",
-  "autoSyncLocalRootDeleteWarningConfirm": "J’ai compris"
+  "autoSyncLocalRootDeleteWarningConfirm": "J’ai compris",
+  "autoSyncScheduledTitle": "Exécuter chaque jour lorsque le coffre est verrouillé",
+  "autoSyncScheduledSubtitle": "S’exécute en arrière-plan lorsque l’application est fermée. Android peut retarder ou interrompre une longue tâche. Le coffre est reverrouillé à la fin de la synchronisation.",
+  "autoSyncScheduledSetupRequired": "Nécessite l’accès d’automatisation complète et un mot de passe de coffre enregistré.",
+  "autoSyncScheduledConfigure": "Configurer l’accès en arrière-plan",
+  "autoSyncScheduleWarningTitle": "Activer la synchronisation planifiée ?",
+  "autoSyncScheduleWarningMessage": "L’application déverrouillera ce coffre en arrière-plan une fois par jour, puis le reverrouillera après la synchronisation. Android peut retarder l’exécution. Si la suppression après import est activée, le fichier source ne sera supprimé qu’après l’enregistrement de la copie dans le coffre et la vérification de sa taille et de son empreinte SHA-256.",
+  "autoSyncScheduleEnable": "Activer la planification",
+  "autoSyncScheduleNotificationRequired": "Autorisez les notifications pour qu’Android affiche « Synchronisation du coffre… » pendant la tâche en arrière-plan.",
+  "autoSyncScheduleFailed": "Règle enregistrée, mais la synchronisation planifiée n’a pas pu être activée.",
+  "autoSyncSavedScheduled": "Règle et planification quotidienne enregistrées."
 }

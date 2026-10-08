@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "حذف الملفات من جذر التخزين المحلي؟",
   "autoSyncLocalRootDeleteWarningMessage": "ستفحص هذه المزامنة أحادية الاتجاه جذر التخزين المحلي بالكامل. عند تفعيل حذف الملفات المصدرية بعد الاستيراد، يمكن حذف الملفات المنسوخة إلى الخزنة بعد التحقق من تطابق SHA-256. تابع فقط إذا كنت تقصد حذف هذه الملفات الأصلية من جهازك.",
-  "autoSyncLocalRootDeleteWarningConfirm": "أفهم"
+  "autoSyncLocalRootDeleteWarningConfirm": "أفهم",
+  "autoSyncScheduledTitle": "التشغيل يوميًا أثناء قفل الخزنة",
+  "autoSyncScheduledSubtitle": "يعمل في الخلفية عند إغلاق التطبيق. قد يؤخر Android التشغيل أو يوقف المهام الطويلة. تُقفل الخزنة مجددًا بعد انتهاء المزامنة.",
+  "autoSyncScheduledSetupRequired": "يتطلب تفعيل الأتمتة الكاملة وحفظ كلمة مرور الخزنة.",
+  "autoSyncScheduledConfigure": "إعداد الوصول في الخلفية",
+  "autoSyncScheduleWarningTitle": "تفعيل المزامنة المجدولة؟",
+  "autoSyncScheduleWarningMessage": "سيفتح التطبيق هذه الخزنة في الخلفية مرة يوميًا ويقفلها بعد المزامنة. قد يؤخر Android التشغيل. عند تفعيل الحذف بعد الاستيراد، لن يُحذف الملف المصدر إلا بعد حفظ نسخته في الخزنة والتحقق من تطابق الحجم وبصمة SHA-256.",
+  "autoSyncScheduleEnable": "تفعيل الجدولة",
+  "autoSyncScheduleNotificationRequired": "اسمح بالإشعارات ليعرض Android «جارٍ مزامنة الخزنة...» أثناء المزامنة في الخلفية.",
+  "autoSyncScheduleFailed": "حُفظت القاعدة، لكن تعذّر تفعيل المزامنة المجدولة.",
+  "autoSyncSavedScheduled": "حُفظت القاعدة والجدولة اليومية."
 }

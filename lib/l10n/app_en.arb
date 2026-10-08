@@ -12017,5 +12017,15 @@
   "autoSyncLocalRootDeleteWarningConfirm": "I understand",
   "@autoSyncLocalRootDeleteWarningConfirm": {
     "description": "Explicit confirmation button for the Local Storage root deletion warning"
-  }
+  },
+  "autoSyncScheduledTitle": "Run daily while the vault is locked",
+  "autoSyncScheduledSubtitle": "Runs in the background when the app is closed. Android may delay it or stop a long run. The vault is locked again when sync finishes.",
+  "autoSyncScheduledSetupRequired": "Requires Full automation access and a saved vault password.",
+  "autoSyncScheduledConfigure": "Set up background access",
+  "autoSyncScheduleWarningTitle": "Enable scheduled sync?",
+  "autoSyncScheduleWarningMessage": "The app will unlock this vault in the background once a day and lock it after syncing. Android may delay a run. If delete after import is on, a source file is removed only after the vault copy is committed and its size and SHA-256 checksum match.",
+  "autoSyncScheduleEnable": "Enable schedule",
+  "autoSyncScheduleNotificationRequired": "Allow notifications so Android can show “Syncing vault...” while the background sync runs.",
+  "autoSyncScheduleFailed": "Rule saved, but the scheduled sync could not be enabled.",
+  "autoSyncSavedScheduled": "Rule and daily schedule saved."
 }

@@ -9136,4 +9136,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => '이해했습니다';
-}
+
+  @override
+  String get autoSyncScheduledTitle => '볼트가 잠겨 있을 때 매일 실

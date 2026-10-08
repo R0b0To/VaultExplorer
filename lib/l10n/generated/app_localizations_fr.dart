@@ -9726,4 +9726,42 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => 'J’ai compris';
+
+  @override
+  String get autoSyncScheduledTitle =>
+      'Exécuter chaque jour lorsque le coffre est verrouillé';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'S’exécute en arrière-plan lorsque l’application est fermée. Android peut retarder ou interrompre une longue tâche. Le coffre est reverrouillé à la fin de la synchronisation.';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      'Nécessite l’accès d’automatisation complète et un mot de passe de coffre enregistré.';
+
+  @override
+  String get autoSyncScheduledConfigure => 'Configurer l’accès en arrière-plan';
+
+  @override
+  String get autoSyncScheduleWarningTitle =>
+      'Activer la synchronisation planifiée ?';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'L’application déverrouillera ce coffre en arrière-plan une fois par jour, puis le reverrouillera après la synchronisation. Android peut retarder l’exécution. Si la suppression après import est activée, le fichier source ne sera supprimé qu’après l’enregistrement de la copie dans le coffre et la vérification de sa taille et de son empreinte SHA-256.';
+
+  @override
+  String get autoSyncScheduleEnable => 'Activer la planification';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'Autorisez les notifications pour qu’Android affiche « Synchronisation du coffre… » pendant la tâche en arrière-plan.';
+
+  @override
+  String get autoSyncScheduleFailed =>
+      'Règle enregistrée, mais la synchronisation planifiée n’a pas pu être activée.';
+
+  @override
+  String get autoSyncSavedScheduled =>
+      'Règle et planification quotidienne enregistrées.';
 }

@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "Eliminare i file dalla radice della memoria locale?",
   "autoSyncLocalRootDeleteWarningMessage": "Questa sincronizzazione in una sola direzione esaminerà tutta la radice della memoria locale. Se è attiva l’eliminazione dei file sorgente dopo l’importazione, i file copiati nel vault potranno essere rimossi dal dispositivo dopo la verifica SHA-256. Continua solo se intendi eliminare questi originali.",
-  "autoSyncLocalRootDeleteWarningConfirm": "Ho capito"
+  "autoSyncLocalRootDeleteWarningConfirm": "Ho capito",
+  "autoSyncScheduledTitle": "Esegui ogni giorno con il vault bloccato",
+  "autoSyncScheduledSubtitle": "Funziona in background con l’app chiusa. Android potrebbe posticipare o interrompere le attività lunghe. Al termine della sincronizzazione, il vault viene bloccato di nuovo.",
+  "autoSyncScheduledSetupRequired": "Richiede l’accesso completo all’automazione e una password del vault salvata.",
+  "autoSyncScheduledConfigure": "Configura l’accesso in background",
+  "autoSyncScheduleWarningTitle": "Attivare la sincronizzazione pianificata?",
+  "autoSyncScheduleWarningMessage": "L’app sbloccherà questo vault in background una volta al giorno e lo bloccherà al termine della sincronizzazione. Android potrebbe posticipare l’esecuzione. Se è attiva l’eliminazione dopo l’importazione, il file sorgente viene eliminato solo dopo aver salvato la copia nel vault e verificato che dimensione e checksum SHA-256 coincidano.",
+  "autoSyncScheduleEnable": "Attiva pianificazione",
+  "autoSyncScheduleNotificationRequired": "Consenti le notifiche affinché Android mostri «Sincronizzazione vault...» durante l’attività in background.",
+  "autoSyncScheduleFailed": "Regola salvata, ma non è stato possibile attivare la sincronizzazione pianificata.",
+  "autoSyncSavedScheduled": "Regola e pianificazione giornaliera salvate."
 }

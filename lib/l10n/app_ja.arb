@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "ローカルストレージのルートからファイルを削除しますか？",
   "autoSyncLocalRootDeleteWarningMessage": "この一方向同期では、ローカルストレージのルート全体を確認します。「インポート後に元のファイルを削除」が有効な場合、VaultにコピーされたファイルはSHA-256の検証後に端末から削除されます。元のファイルを削除する意図がある場合のみ続行してください。",
-  "autoSyncLocalRootDeleteWarningConfirm": "理解しました"
+  "autoSyncLocalRootDeleteWarningConfirm": "理解しました",
+  "autoSyncScheduledTitle": "Vault のロック中に毎日実行",
+  "autoSyncScheduledSubtitle": "アプリを閉じていてもバックグラウンドで実行します。Android により遅延または長時間処理が停止される場合があります。同期後に Vault は再びロックされます。",
+  "autoSyncScheduledSetupRequired": "完全な自動化アクセスと、保存済みの Vault パスワードが必要です。",
+  "autoSyncScheduledConfigure": "バックグラウンドアクセスを設定",
+  "autoSyncScheduleWarningTitle": "スケジュール同期を有効にしますか？",
+  "autoSyncScheduleWarningMessage": "アプリは 1 日に 1 回バックグラウンドでこの Vault をロック解除し、同期後に再びロックします。Android により実行が遅れる場合があります。インポート後の削除が有効な場合、Vault のコピーを書き込み、サイズと SHA-256 ハッシュの一致を確認してから元ファイルを削除します。",
+  "autoSyncScheduleEnable": "スケジュールを有効化",
+  "autoSyncScheduleNotificationRequired": "バックグラウンド同期中に Android が「Vault を同期中...」と表示できるよう、通知を許可してください。",
+  "autoSyncScheduleFailed": "ルールは保存されましたが、スケジュール同期を有効にできませんでした。",
+  "autoSyncSavedScheduled": "ルールと毎日のスケジュールを保存しました。"
 }

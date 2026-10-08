@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "¿Eliminar archivos de la raíz del almacenamiento local?",
   "autoSyncLocalRootDeleteWarningMessage": "Esta sincronización en una sola dirección examinará toda la raíz del almacenamiento local. Si está activada la opción de eliminar los archivos de origen después de importarlos, los archivos copiados en la bóveda podrán eliminarse del dispositivo tras verificar el SHA-256. Continúa solo si quieres eliminar esos originales.",
-  "autoSyncLocalRootDeleteWarningConfirm": "Lo entiendo"
+  "autoSyncLocalRootDeleteWarningConfirm": "Lo entiendo",
+  "autoSyncScheduledTitle": "Ejecutar a diario con la bóveda bloqueada",
+  "autoSyncScheduledSubtitle": "Se ejecuta en segundo plano con la app cerrada. Android puede retrasarlo o detener ejecuciones largas. La bóveda se vuelve a bloquear al terminar la sincronización.",
+  "autoSyncScheduledSetupRequired": "Requiere acceso de automatización completa y una contraseña de bóveda guardada.",
+  "autoSyncScheduledConfigure": "Configurar acceso en segundo plano",
+  "autoSyncScheduleWarningTitle": "¿Activar la sincronización programada?",
+  "autoSyncScheduleWarningMessage": "La app desbloqueará esta bóveda en segundo plano una vez al día y la bloqueará después de sincronizar. Android puede retrasar la ejecución. Si está activado eliminar tras importar, el archivo de origen solo se elimina cuando la copia de la bóveda se ha guardado y coinciden su tamaño y su suma SHA-256.",
+  "autoSyncScheduleEnable": "Activar programación",
+  "autoSyncScheduleNotificationRequired": "Permite las notificaciones para que Android muestre «Sincronizando bóveda...» durante la sincronización en segundo plano.",
+  "autoSyncScheduleFailed": "Regla guardada, pero no se pudo activar la sincronización programada.",
+  "autoSyncSavedScheduled": "Regla y programación diaria guardadas."
 }

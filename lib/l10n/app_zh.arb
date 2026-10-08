@@ -2642,5 +2642,15 @@
   "decoderFfmpegOption": "FFmpeg",
   "autoSyncLocalRootDeleteWarningTitle": "要删除本地存储根目录中的文件吗？",
   "autoSyncLocalRootDeleteWarningMessage": "此单向同步会扫描整个本地存储根目录。启用“导入后删除源文件”后，复制到保险库的文件在通过 SHA-256 校验后可能会从设备中删除。只有在确实要删除这些原始文件时才继续。",
-  "autoSyncLocalRootDeleteWarningConfirm": "我已了解"
+  "autoSyncLocalRootDeleteWarningConfirm": "我已了解",
+  "autoSyncScheduledTitle": "保险库锁定时每天运行",
+  "autoSyncScheduledSubtitle": "应用关闭后也会在后台运行。Android 可能会延迟任务或停止长时间运行的任务。同步完成后会重新锁定保险库。",
+  "autoSyncScheduledSetupRequired": "需要启用完整自动化权限并保存保险库密码。",
+  "autoSyncScheduledConfigure": "设置后台访问权限",
+  "autoSyncScheduleWarningTitle": "启用计划同步？",
+  "autoSyncScheduleWarningMessage": "应用每天会在后台解锁此保险库一次，并在同步后重新锁定。Android 可能会延迟任务。如果启用了导入后删除，只有在保险库副本写入完成且文件大小与 SHA-256 校验和匹配后，才会删除源文件。",
+  "autoSyncScheduleEnable": "启用计划",
+  "autoSyncScheduleNotificationRequired": "请允许通知，以便 Android 在后台同步时显示“正在同步保险库...”。",
+  "autoSyncScheduleFailed": "规则已保存，但无法启用计划同步。",
+  "autoSyncSavedScheduled": "规则和每日计划已保存。"
 }

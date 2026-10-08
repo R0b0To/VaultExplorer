@@ -9137,4 +9137,38 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get autoSyncLocalRootDeleteWarningConfirm => '理解しました';
+
+  @override
+  String get autoSyncScheduledTitle => 'Vault のロック中に毎日実行';
+
+  @override
+  String get autoSyncScheduledSubtitle =>
+      'アプリを閉じていてもバックグラウンドで実行します。Android により遅延または長時間処理が停止される場合があります。同期後に Vault は再びロックされます。';
+
+  @override
+  String get autoSyncScheduledSetupRequired =>
+      '完全な自動化アクセスと、保存済みの Vault パスワードが必要です。';
+
+  @override
+  String get autoSyncScheduledConfigure => 'バックグラウンドアクセスを設定';
+
+  @override
+  String get autoSyncScheduleWarningTitle => 'スケジュール同期を有効にしますか？';
+
+  @override
+  String get autoSyncScheduleWarningMessage =>
+      'アプリは 1 日に 1 回バックグラウンドでこの Vault をロック解除し、同期後に再びロックします。Android により実行が遅れる場合があります。インポート後の削除が有効な場合、Vault のコピーを書き込み、サイズと SHA-256 ハッシュの一致を確認してから元ファイルを削除します。';
+
+  @override
+  String get autoSyncScheduleEnable => 'スケジュールを有効化';
+
+  @override
+  String get autoSyncScheduleNotificationRequired =>
+      'バックグラウンド同期中に Android が「Vault を同期中...」と表示できるよう、通知を許可してください。';
+
+  @override
+  String get autoSyncScheduleFailed => 'ルールは保存されましたが、スケジュール同期を有効にできませんでした。';
+
+  @override
+  String get autoSyncSavedScheduled => 'ルールと毎日のスケジュールを保存しました。';
 }

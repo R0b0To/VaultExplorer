@@ -140,8 +140,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
         val factory = DefaultExtractorsFactory()
+        factory.setConstantBitrateSeekingEnabled(true)
         if (lenient) {
-            factory.setConstantBitrateSeekingEnabled(true)
             factory.setMp4ExtractorFlags(
                 Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
                 Mp4Extractor.FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES
@@ -154,7 +154,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
             )
         } else {
-            factory.setConstantBitrateSeekingEnabled(false)
             factory.setMp4ExtractorFlags(
                 Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS
             )

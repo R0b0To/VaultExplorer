@@ -20,9 +20,35 @@ bool isApkFile(String name) {
   return ext == 'apk';
 }
 
+/// Lower-case extensions (no dot) shown with the music/audio icon.
+///
+/// Single source of truth for [iconForFile], [colorForFile] and
+/// `SkinIcons.glyphForFile`, so the three can never disagree about what
+/// counts as music. Deliberately independent of the in-app player's
+/// `MediaViewerConstants.audioExtensions`: that list decides what the viewer
+/// can *play*, this one decides what *looks* like music.
+const Set<String> audioFileExtensions = {
+  'mp3', 'mp2', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus',
+  'spx', 'wma', 'ac3', 'eac3', 'ape', 'aiff', 'aif', 'aifc', 'dts', 'amr',
+  'awb', 'mka', 'mid', 'midi', 'weba', 'wv', 'mpc', 'au', 'caf',
+};
+
+/// Lower-case extensions (no dot) shown with the video icon. See
+/// [audioFileExtensions].
+///
+/// `ts` is intentionally absent: MPEG transport streams share it with
+/// TypeScript source files, and a code file must not get a video icon.
+const Set<String> videoFileExtensions = {
+  'mp4', 'm4v', 'webm', 'mov', 'qt', 'avi', 'mkv', 'mpeg', 'mpg', 'mpe',
+  'flv', 'f4v', 'wmv', 'asf', '3gp', '3g2', 'vob', 'ogv', 'ogm', 'divx',
+  'm2ts', 'mts', 'm2v', 'rm', 'rmvb', 'mxf',
+};
+
 /// Returns the appropriate [IconData] for a file based on its extension.
 IconData iconForFile(String name) {
   final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  if (videoFileExtensions.contains(ext)) return Icons.ondemand_video_outlined;
+  if (audioFileExtensions.contains(ext)) return Icons.audio_file_outlined;
   switch (ext) {
     case 'pdf':
       return Icons.picture_as_pdf_outlined;
@@ -34,20 +60,6 @@ IconData iconForFile(String name) {
     case 'heic':
     case 'webp':
       return Icons.image_outlined;
-    case 'mp4':
-    case 'mov':
-    case 'avi':
-    case 'mkv':
-    case 'webm':
-    case 'm4v':
-    case 'mpeg':
-    case 'mpg':
-      return Icons.ondemand_video_outlined;
-    case 'mp3':
-    case 'flac':
-    case 'wav':
-    case 'm4a':
-      return Icons.audio_file_outlined;
     case 'txt':
     case 'md':
     case 'csv':
@@ -71,6 +83,8 @@ IconData iconForFile(String name) {
 /// Returns the accent [Color] for a file based on its extension.
 Color colorForFile(String name) {
   final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  if (videoFileExtensions.contains(ext)) return const Color(0xFF7E57C2);
+  if (audioFileExtensions.contains(ext)) return const Color(0xFF66BB6A);
   switch (ext) {
     case 'pdf':
       return const Color(0xFFEF5350);
@@ -81,20 +95,6 @@ Color colorForFile(String name) {
     case 'avif':
     case 'webp':
       return const Color(0xFF26C6DA);
-    case 'mp4':
-    case 'mov':
-    case 'avi':
-    case 'mkv':
-    case 'webm':
-    case 'm4v':
-    case 'mpeg':
-    case 'mpg':
-      return const Color(0xFF7E57C2);
-    case 'mp3':
-    case 'flac':
-    case 'wav':
-    case 'm4a':
-      return const Color(0xFF66BB6A);
     case 'txt':
     case 'md':
     case 'csv':

@@ -21,6 +21,30 @@ object GlobMatcher {
             val normalized = relativePath.trim().replace('\\', '/').trim('/')
             return regex.matches(normalized)
         }
+
+        /**
+         * Exclusion matching also treats a matching folder as a match for
+         * everything below it. A pattern without `/` matches any path
+         * segment; slash-separated patterns match a path from the selected
+         * folder root and any of its descendants.
+         */
+        fun matchesPathOrAncestor(relativePath: String): Boolean {
+            val normalized = relativePath.trim().replace('\\', '/').trim('/')
+            if (normalized.isEmpty()) return false
+
+            val pathPattern = rawPattern.replace('\\', '/').trim('/').contains('/')
+            if (!pathPattern) {
+                return normalized.split('/').any { regex.matches(it) }
+            }
+
+            if (regex.matches(normalized)) return true
+            var separator = normalized.lastIndexOf('/')
+            while (separator > 0) {
+                if (regex.matches(normalized.substring(0, separator))) return true
+                separator = normalized.lastIndexOf('/', separator - 1)
+            }
+            return false
+        }
     }
 
     /**

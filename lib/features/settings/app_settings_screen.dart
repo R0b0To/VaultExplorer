@@ -1715,7 +1715,7 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
                     label: context.l10n.deleteAfterImportLabel,
                     value: state.settings.deleteAfterImportMode,
                     subtitle: state.settings.deleteAfterImportMode
-                        .getLocalizedLabel(context.l10n),
+                        .getLocalizedSubtitle(context.l10n),
                     options: DeleteAfterImportMode.values.map((mode) {
                       return SelectOption(
                         value: mode,

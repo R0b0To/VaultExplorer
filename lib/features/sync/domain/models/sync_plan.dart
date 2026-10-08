@@ -17,6 +17,10 @@ enum SyncActionKind {
   deleteOnTarget,
   deleteOnVault,
 
+  /// After a target-to-vault import, remove the target copy only if its
+  /// SHA-256 matches the committed vault copy.
+  deleteSourceAfterImport,
+
   /// Creates a directory on target.
   createDirOnTarget,
 
@@ -117,6 +121,7 @@ class SyncAction {
   bool get isDelete =>
       kind == SyncActionKind.deleteOnTarget ||
       kind == SyncActionKind.deleteOnVault ||
+      kind == SyncActionKind.deleteSourceAfterImport ||
       kind == SyncActionKind.deleteDirOnTarget ||
       kind == SyncActionKind.deleteDirOnVault;
 

@@ -110,6 +110,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault; optional for TAKE_PHOTO/START_RECORDING
         const val EXTRA_DELETE_SOURCE = "delete_source"   // IMPORT_FILE/IMPORT_FOLDER: wipe/delete source after import
         const val EXTRA_PATTERN = "pattern"               // glob wildcard pattern for batch import/export (e.g. *.xlsx, HOSPITAL_*)
+        const val EXTRA_EXCLUDE_PATTERN = "exclude_pattern" // optional glob to skip matching files, folders, and folder contents
         const val EXTRA_RECURSIVE = "recursive"           // boolean, whether glob batch matches recursively (default true)
         const val EXTRA_STREAM_MODE = "stream_mode"       // EXPORT_FILE: stream decrypted bytes via pipe without disk writes
 
@@ -519,13 +520,16 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
 
         val patternStr = intent.getStringExtra(EXTRA_PATTERN)
+        val excludePatternStr = intent.getStringExtra(EXTRA_EXCLUDE_PATTERN)
         val isDirectorySource = !sourcePath.startsWith("content://") && File(sourcePath).isDirectory
-        if (!patternStr.isNullOrEmpty() || isDirectorySource) {
+        val excludePattern = excludePatternStr?.takeIf { it.isNotBlank() }
+            ?.let { GlobMatcher.compile(it) }
+        if (!patternStr.isNullOrEmpty() || isDirectorySource || excludePattern != null) {
             val glob = patternStr?.let { GlobMatcher.compile(it) }
             val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
             val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
             val summary = VaultAutomationFolderOps.importFolder(
-                context, volId, sourcePath, vaultPath, deleteSource, glob, recursive
+                context, volId, sourcePath, vaultPath, deleteSource, glob, recursive, excludePattern
             ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder")
             return summaryOutcome(summary, "Imported")
         }
@@ -585,11 +589,14 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
 
         val patternStr = intent.getStringExtra(EXTRA_PATTERN)
-        if (!patternStr.isNullOrEmpty()) {
+        val excludePatternStr = intent.getStringExtra(EXTRA_EXCLUDE_PATTERN)
+        val excludePattern = excludePatternStr?.takeIf { it.isNotBlank() }
+            ?.let { GlobMatcher.compile(it) }
+        if (!patternStr.isNullOrEmpty() || excludePattern != null) {
             val glob = GlobMatcher.compile(patternStr)
             val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
             val summary = VaultAutomationFolderOps.exportFolder(
-                context, volId, vaultPath, destPath, glob, recursive
+                context, volId, vaultPath, destPath, glob, recursive, excludePattern
             ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder")
             return summaryOutcome(summary, "Exported")
         }
@@ -618,9 +625,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
         val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
         val pattern = intent.getStringExtra(EXTRA_PATTERN)?.let { GlobMatcher.compile(it) }
+        val excludePattern = intent.getStringExtra(EXTRA_EXCLUDE_PATTERN)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { GlobMatcher.compile(it) }
         val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
         val summary = VaultAutomationFolderOps.importFolder(
-            context, volId, sourcePath, vaultDestDir, deleteSource, pattern, recursive
+            context, volId, sourcePath, vaultDestDir, deleteSource, pattern, recursive, excludePattern
         ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Imported")
     }
@@ -637,9 +647,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             return Outcome("INVALID_ARGS", "dest_path is required")
         }
         val pattern = intent.getStringExtra(EXTRA_PATTERN)?.let { GlobMatcher.compile(it) }
+        val excludePattern = intent.getStringExtra(EXTRA_EXCLUDE_PATTERN)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { GlobMatcher.compile(it) }
         val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
         val summary = VaultAutomationFolderOps.exportFolder(
-            context, volId, vaultSourceDir, destPath, pattern, recursive
+            context, volId, vaultSourceDir, destPath, pattern, recursive, excludePattern
         ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Exported")
     }

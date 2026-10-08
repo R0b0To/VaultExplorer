@@ -6,10 +6,14 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dart'
-    show kImmediateAutoLockDuration, kInheritAutoLockDuration, kScreenLockOnlyAutoLockDuration;
+    show
+        kImmediateAutoLockDuration,
+        kInheritAutoLockDuration,
+        kScreenLockOnlyAutoLockDuration;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -61,6 +65,8 @@ class ContainerConfigState {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
+  final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
+  final DeleteAfterImportMode globalDeleteAfterImportMode;
 
   /// The expiry currently stored for this container's cached key, loaded from
   /// the platform layer. Null means none.
@@ -97,6 +103,7 @@ class ContainerConfigState {
   final ThumbnailCacheMode? initialThumbnailCacheMode;
   final ThumbnailQuality? initialThumbnailQuality;
   final bool? initialCacheDerivedKey;
+  final VaultDeleteAfterImportMode initialVaultDeleteAfterImportMode;
   final String? initialPatternHash;
   final String? initialPinHash;
   final List<KeyfileRef> initialKeyfiles;
@@ -109,6 +116,8 @@ class ContainerConfigState {
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     required this.cacheDerivedKey,
+    this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
+    this.globalDeleteAfterImportMode = DeleteAfterImportMode.ask,
     this.derivedKeyExpiresAt,
     this.derivedKeyLifetimeDays,
     this.cipherId = 255,
@@ -135,12 +144,14 @@ class ContainerConfigState {
     this.initialThumbnailCacheMode,
     this.initialThumbnailQuality,
     this.initialCacheDerivedKey,
+    this.initialVaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.initialPatternHash,
     this.initialPinHash,
     this.initialKeyfiles = const [],
   });
 
-  bool get wasPasswordless => initialUnlockMethod == ContainerUnlockMethod.password;
+  bool get wasPasswordless =>
+      initialUnlockMethod == ContainerUnlockMethod.password;
 
   /// The expiry the cached key will have once this is saved: the stored one if
   /// the lifetime was not touched, none for [kNoDerivedKeyExpiry], otherwise
@@ -152,7 +163,8 @@ class ContainerConfigState {
     return (now ?? DateTime.now()).add(Duration(days: days));
   }
 
-  bool get unlockMethodNeedsPassword => unlockMethod != ContainerUnlockMethod.password;
+  bool get unlockMethodNeedsPassword =>
+      unlockMethod != ContainerUnlockMethod.password;
 
   bool get needsPatternSetup =>
       unlockMethod == ContainerUnlockMethod.pattern && patternHash == null;
@@ -160,15 +172,23 @@ class ContainerConfigState {
   bool get needsPinSetup =>
       unlockMethod == ContainerUnlockMethod.pin && pinHash == null;
 
-  bool isModified(String currentPasswordText, String currentLabelText, [String? currentPimText]) {
+  bool isModified(
+    String currentPasswordText,
+    String currentLabelText, [
+    String? currentPimText,
+  ]) {
     if (currentLabelText.trim() != initialLabel) return true;
-    if (currentPimText != null && currentPimText.trim() != (tempPim ?? '')) return true;
+    if (currentPimText != null && currentPimText.trim() != (tempPim ?? ''))
+      return true;
     if (unlockMethod != initialUnlockMethod) return true;
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
     if (thumbnailCacheMode != initialThumbnailCacheMode) return true;
     if (thumbnailQuality != initialThumbnailQuality) return true;
     if (cacheDerivedKey != initialCacheDerivedKey) return true;
+    if (vaultDeleteAfterImportMode != initialVaultDeleteAfterImportMode) {
+      return true;
+    }
     if (cacheDerivedKey && derivedKeyLifetimeDays != null) return true;
     if (cipherId != initialCipherId) return true;
     if (hashId != initialHashId) return true;
@@ -176,15 +196,16 @@ class ContainerConfigState {
     if (patternHash != initialPatternHash) return true;
     if (pinHash != initialPinHash) return true;
 
-    final initialKeyfilesCount = (initialUnlockMethod != ContainerUnlockMethod.password)
+    final initialKeyfilesCount =
+        (initialUnlockMethod != ContainerUnlockMethod.password)
         ? initialKeyfiles.length
         : 0;
-    final currentKeyfilesCount = (unlockMethod != ContainerUnlockMethod.password)
-        ? keyfiles.length
-        : 0;
+    final currentKeyfilesCount =
+        (unlockMethod != ContainerUnlockMethod.password) ? keyfiles.length : 0;
     if (currentKeyfilesCount != initialKeyfilesCount) return true;
 
-    if (unlockMethod != ContainerUnlockMethod.password && initialKeyfilesCount > 0) {
+    if (unlockMethod != ContainerUnlockMethod.password &&
+        initialKeyfilesCount > 0) {
       final initialUris = initialKeyfiles.map((k) => k.uri).toSet();
       final currentUris = keyfiles.map((k) => k.uri).toSet();
       if (initialUris.difference(currentUris).isNotEmpty ||
@@ -213,6 +234,8 @@ class ContainerConfigState {
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
     bool? cacheDerivedKey,
+    VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
+    DeleteAfterImportMode? globalDeleteAfterImportMode,
     DateTime? derivedKeyExpiresAt,
     int? derivedKeyLifetimeDays,
     bool clearDerivedKeyLifetimeDays = false,
@@ -236,6 +259,7 @@ class ContainerConfigState {
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
     bool? initialCacheDerivedKey,
+    VaultDeleteAfterImportMode? initialVaultDeleteAfterImportMode,
     String? initialPatternHash,
     String? initialPinHash,
   }) => ContainerConfigState(
@@ -246,6 +270,10 @@ class ContainerConfigState {
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
     cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
+    vaultDeleteAfterImportMode:
+        vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
+    globalDeleteAfterImportMode:
+        globalDeleteAfterImportMode ?? this.globalDeleteAfterImportMode,
     derivedKeyExpiresAt: derivedKeyExpiresAt ?? this.derivedKeyExpiresAt,
     derivedKeyLifetimeDays: clearDerivedKeyLifetimeDays
         ? null
@@ -271,9 +299,15 @@ class ContainerConfigState {
     initialDocumentProvider: initialDocumentProvider,
     initialCipherId: initialCipherId,
     initialHashId: initialHashId,
-    initialThumbnailCacheMode: initialThumbnailCacheMode ?? this.initialThumbnailCacheMode,
-    initialThumbnailQuality: initialThumbnailQuality ?? this.initialThumbnailQuality,
-    initialCacheDerivedKey: initialCacheDerivedKey ?? this.initialCacheDerivedKey,
+    initialThumbnailCacheMode:
+        initialThumbnailCacheMode ?? this.initialThumbnailCacheMode,
+    initialThumbnailQuality:
+        initialThumbnailQuality ?? this.initialThumbnailQuality,
+    initialCacheDerivedKey:
+        initialCacheDerivedKey ?? this.initialCacheDerivedKey,
+    initialVaultDeleteAfterImportMode:
+        initialVaultDeleteAfterImportMode ??
+        this.initialVaultDeleteAfterImportMode,
     initialPatternHash: initialPatternHash ?? this.initialPatternHash,
     initialPinHash: initialPinHash ?? this.initialPinHash,
     initialKeyfiles: initialKeyfiles,
@@ -308,14 +342,20 @@ class ContainerConfigController extends _$ContainerConfigController {
     required AppSettings? appSettings,
     required MountedContainer? mountedContainer,
   }) {
-    final initialKeyfiles = (rec != null &&
+    final initialKeyfiles =
+        (rec != null &&
             rec.unlockMethod != ContainerUnlockMethod.password &&
             rec.keyfiles.isNotEmpty)
-        ? rec.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)).toList()
+        ? rec.keyfiles
+              .map((k) => (uri: k['uri']!, displayName: k['name']!))
+              .toList()
         : <KeyfileRef>[];
 
-    final initialLabel = (rec?.label.isNotEmpty == true) ? rec!.label : state.initialLabel;
-    final initialUnlockMethod = rec?.unlockMethod ?? ContainerUnlockMethod.password;
+    final initialLabel = (rec?.label.isNotEmpty == true)
+        ? rec!.label
+        : state.initialLabel;
+    final initialUnlockMethod =
+        rec?.unlockMethod ?? ContainerUnlockMethod.password;
     final initialAutoCloseMins = _resolveInitialAutoCloseMins(rec);
     final initialDocumentProvider =
         rec?.documentProvider ?? appSettings?.defaultDocumentProvider ?? false;
@@ -323,8 +363,10 @@ class ContainerConfigController extends _$ContainerConfigController {
     final initialHashId = rec?.hashId ?? 255;
     final initialCacheDerivedKey = rec?.cacheDerivedKey;
 
-    final recentlyUnlocked = mountedContainer != null &&
-        DateTime.now().difference(mountedContainer.mountedAt) < const Duration(seconds: 30);
+    final recentlyUnlocked =
+        mountedContainer != null &&
+        DateTime.now().difference(mountedContainer.mountedAt) <
+            const Duration(seconds: 30);
     final settingsLocked = rec != null && !recentlyUnlocked;
 
     state = ContainerConfigState(
@@ -334,7 +376,14 @@ class ContainerConfigController extends _$ContainerConfigController {
       documentProvider: initialDocumentProvider,
       thumbnailCacheMode: rec?.thumbnailCacheMode,
       thumbnailQuality: rec?.thumbnailQuality,
-      cacheDerivedKey: rec?.cacheDerivedKey ?? appSettings?.defaultDerivedKeyCacheEnabled ?? false,
+      cacheDerivedKey:
+          rec?.cacheDerivedKey ??
+          appSettings?.defaultDerivedKeyCacheEnabled ??
+          false,
+      vaultDeleteAfterImportMode:
+          rec?.vaultDeleteAfterImportMode ?? VaultDeleteAfterImportMode.inherit,
+      globalDeleteAfterImportMode:
+          appSettings?.deleteAfterImportMode ?? DeleteAfterImportMode.ask,
       cipherId: initialCipherId,
       hashId: initialHashId,
       keyfiles: List.unmodifiable(initialKeyfiles),
@@ -350,6 +399,8 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialThumbnailCacheMode: rec?.thumbnailCacheMode,
       initialThumbnailQuality: rec?.thumbnailQuality,
       initialCacheDerivedKey: initialCacheDerivedKey,
+      initialVaultDeleteAfterImportMode:
+          rec?.vaultDeleteAfterImportMode ?? VaultDeleteAfterImportMode.inherit,
       initialKeyfiles: List.unmodifiable(initialKeyfiles),
     );
 
@@ -374,13 +425,22 @@ class ContainerConfigController extends _$ContainerConfigController {
     return kInheritAutoLockDuration;
   }
 
-  Future<void> _initAsync(ContainerRecord? rec, AppSettings? appSettings) async {
+  Future<void> _initAsync(
+    ContainerRecord? rec,
+    AppSettings? appSettings,
+  ) async {
     String? tempPw;
     String? tempPim;
     try {
-      tempPw = await ref.read(appSecureStorageProvider).read(key: 'temp_pw_${params.uri}');
-      tempPim = await ref.read(appSecureStorageProvider).read(key: 'temp_pim_${params.uri}');
-      tempPim ??= await ref.read(appSecureStorageProvider).read(key: 'pim_${params.uri}');
+      tempPw = await ref
+          .read(appSecureStorageProvider)
+          .read(key: 'temp_pw_${params.uri}');
+      tempPim = await ref
+          .read(appSecureStorageProvider)
+          .read(key: 'temp_pim_${params.uri}');
+      tempPim ??= await ref
+          .read(appSecureStorageProvider)
+          .read(key: 'pim_${params.uri}');
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Temp credentials read failed', e);
     }
@@ -389,15 +449,22 @@ class ContainerConfigController extends _$ContainerConfigController {
     bool biometricAvailable = false;
     try {
       final localAuth = LocalAuthentication();
-      biometricAvailable = await localAuth.canCheckBiometrics && await localAuth.isDeviceSupported();
+      biometricAvailable =
+          await localAuth.canCheckBiometrics &&
+          await localAuth.isDeviceSupported();
     } catch (e) {
-      VeLog.w('ContainerConfigController', 'Biometric availability check failed', e);
+      VeLog.w(
+        'ContainerConfigController',
+        'Biometric availability check failed',
+        e,
+      );
     }
     if (!ref.mounted) return;
 
     ThumbnailCacheMode? thumbMode = state.thumbnailCacheMode;
     ThumbnailQuality? thumbQuality = state.thumbnailQuality;
     bool derivedKey = state.cacheDerivedKey;
+    var globalDeleteAfterImportMode = state.globalDeleteAfterImportMode;
 
     DateTime? derivedKeyExpiresAt;
     try {
@@ -410,8 +477,9 @@ class ContainerConfigController extends _$ContainerConfigController {
     if (!ref.mounted) return;
 
     try {
-      final toolbarConfig =
-          await ref.read(fileManagerToolbarServiceProvider).load();
+      final toolbarConfig = await ref
+          .read(fileManagerToolbarServiceProvider)
+          .load();
       thumbMode ??= toolbarConfig.defaultThumbnailCacheMode;
       thumbQuality ??= toolbarConfig.defaultThumbnailQuality;
     } catch (_) {
@@ -420,8 +488,10 @@ class ContainerConfigController extends _$ContainerConfigController {
     if (!ref.mounted) return;
 
     try {
-      final settings = appSettings ??
+      final settings =
+          appSettings ??
           await ref.read(appSettingsServiceProvider).loadSettings();
+      globalDeleteAfterImportMode = settings.deleteAfterImportMode;
       if (appSettings == null && rec == null) {
         derivedKey = settings.defaultDerivedKeyCacheEnabled;
       }
@@ -433,11 +503,15 @@ class ContainerConfigController extends _$ContainerConfigController {
     String? patternHash;
     String? pinHash;
     if (state.unlockMethod == ContainerUnlockMethod.pattern) {
-      patternHash = await ref.read(containerRepositoryProvider).getPatternHash(params.uri);
+      patternHash = await ref
+          .read(containerRepositoryProvider)
+          .getPatternHash(params.uri);
     }
     if (!ref.mounted) return;
     if (state.unlockMethod == ContainerUnlockMethod.pin) {
-      pinHash = await ref.read(containerRepositoryProvider).getPinHash(params.uri);
+      pinHash = await ref
+          .read(containerRepositoryProvider)
+          .getPinHash(params.uri);
     }
 
     if (!ref.mounted) return;
@@ -452,6 +526,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialThumbnailCacheMode: thumbMode,
       initialThumbnailQuality: thumbQuality,
       initialCacheDerivedKey: state.initialCacheDerivedKey ?? derivedKey,
+      globalDeleteAfterImportMode: globalDeleteAfterImportMode,
       patternHash: patternHash,
       initialPatternHash: patternHash,
       pinHash: pinHash,
@@ -465,13 +540,16 @@ class ContainerConfigController extends _$ContainerConfigController {
   void setUnlockMethod(ContainerUnlockMethod method) {
     state = state._copy(
       unlockMethod: method,
-      keyfiles: method == ContainerUnlockMethod.password ? const [] : state.keyfiles,
+      keyfiles: method == ContainerUnlockMethod.password
+          ? const []
+          : state.keyfiles,
     );
   }
 
   void setAutoCloseMins(int mins) => state = state._copy(autoCloseMins: mins);
 
-  void setDocumentProvider(bool val) => state = state._copy(documentProvider: val);
+  void setDocumentProvider(bool val) =>
+      state = state._copy(documentProvider: val);
 
   void setThumbnailCacheMode(ThumbnailCacheMode mode) =>
       state = state._copy(thumbnailCacheMode: mode);
@@ -479,7 +557,11 @@ class ContainerConfigController extends _$ContainerConfigController {
   void setThumbnailQuality(ThumbnailQuality quality) =>
       state = state._copy(thumbnailQuality: quality);
 
-  void setCacheDerivedKey(bool val) => state = state._copy(cacheDerivedKey: val);
+  void setCacheDerivedKey(bool val) =>
+      state = state._copy(cacheDerivedKey: val);
+
+  void setVaultDeleteAfterImportMode(VaultDeleteAfterImportMode mode) =>
+      state = state._copy(vaultDeleteAfterImportMode: mode);
 
   /// Picks how long the cached derived key may live: [kNoDerivedKeyExpiry],
   /// a number of days from saving, or [kKeepDerivedKeyExpiry] to go back to
@@ -547,7 +629,8 @@ class ContainerConfigController extends _$ContainerConfigController {
     state = state._copy(keyfiles: List.unmodifiable(items));
   }
 
-  Future<({bool appCacheCleared, bool containerCacheCleared, bool isLocked})> clearThumbnailCache() async {
+  Future<({bool appCacheCleared, bool containerCacheCleared, bool isLocked})>
+  clearThumbnailCache() async {
     state = state._copy(clearingCache: true);
     bool appCacheCleared = false;
     bool containerCacheCleared = false;
@@ -609,19 +692,23 @@ class ContainerConfigController extends _$ContainerConfigController {
     required ContainerRecord? existingRecord,
   }) async {
     state = state._copy(saving: true);
-    final label = labelText.trim().isEmpty ? params.currentLabel : labelText.trim();
+    final label = labelText.trim().isEmpty
+        ? params.currentLabel
+        : labelText.trim();
     final needsPassword = state.unlockMethodNeedsPassword;
-    final shouldSavePassword = needsPassword && (state.wasPasswordless || state.changePassword);
+    final shouldSavePassword =
+        needsPassword && (state.wasPasswordless || state.changePassword);
 
     if (shouldSavePassword && pimText != null) {
       final trimmedPim = pimText.trim();
       if (trimmedPim.isNotEmpty && trimmedPim != '0') {
-        await ref.read(appSecureStorageProvider).write(
-          key: 'pim_${params.uri}',
-          value: trimmedPim,
-        );
+        await ref
+            .read(appSecureStorageProvider)
+            .write(key: 'pim_${params.uri}', value: trimmedPim);
       } else {
-        await ref.read(appSecureStorageProvider).delete(key: 'pim_${params.uri}');
+        await ref
+            .read(appSecureStorageProvider)
+            .delete(key: 'pim_${params.uri}');
       }
     } else if (!needsPassword) {
       await ref.read(appSecureStorageProvider).delete(key: 'pim_${params.uri}');
@@ -645,20 +732,29 @@ class ContainerConfigController extends _$ContainerConfigController {
       autoCloseMins: state.autoCloseMins > 0 ? state.autoCloseMins : 0,
       autoCloseNever: state.autoCloseMins == 0,
       autoCloseImmediately: state.autoCloseMins == kImmediateAutoLockDuration,
-      autoCloseScreenLockOnly: state.autoCloseMins == kScreenLockOnlyAutoLockDuration,
+      autoCloseScreenLockOnly:
+          state.autoCloseMins == kScreenLockOnlyAutoLockDuration,
       documentProvider: state.documentProvider,
-      documentProviderFolders: existingRecord?.documentProviderFolders ?? const [],
+      documentProviderFolders:
+          existingRecord?.documentProviderFolders ?? const [],
       thumbnailCacheMode: state.thumbnailCacheMode,
       thumbnailQuality: state.thumbnailQuality,
       cacheDerivedKey: state.cacheDerivedKey,
+      vaultDeleteAfterImportMode: state.vaultDeleteAfterImportMode,
       pendingPassword: shouldSavePassword ? passwordText : null,
-      pendingPatternHash: state.unlockMethod == ContainerUnlockMethod.pattern ? state.patternHash : null,
-      pendingPinHash: state.unlockMethod == ContainerUnlockMethod.pin ? state.pinHash : null,
+      pendingPatternHash: state.unlockMethod == ContainerUnlockMethod.pattern
+          ? state.patternHash
+          : null,
+      pendingPinHash: state.unlockMethod == ContainerUnlockMethod.pin
+          ? state.pinHash
+          : null,
       cipherId: state.cipherId,
       hashId: state.hashId,
       containerFormat: params.containerFormat,
       keyfiles: needsPassword
-          ? state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList()
+          ? state.keyfiles
+                .map((k) => {'uri': k.uri, 'name': k.displayName})
+                .toList()
           : const [],
       compositeCarriers: existingRecord?.compositeCarriers ?? const [],
       pinnedPaths: existingRecord?.pinnedPaths ?? const [],
@@ -672,7 +768,11 @@ class ContainerConfigController extends _$ContainerConfigController {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(params.uri);
       } catch (e) {
-        VeLog.e('ContainerConfigController', 'Post-save lock failed for uri=${VeLog.censorUri(params.uri)}', e);
+        VeLog.e(
+          'ContainerConfigController',
+          'Post-save lock failed for uri=${VeLog.censorUri(params.uri)}',
+          e,
+        );
       }
     }
     if (ref.mounted) state = state._copy(saving: false);

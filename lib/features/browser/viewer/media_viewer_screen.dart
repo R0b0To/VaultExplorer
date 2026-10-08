@@ -466,7 +466,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (isVid || isAud) {
       PlaybackThrottleController.setInitializing();
     }
-    await PlaybackThrottleController.setActive(isVid);
+    await PlaybackThrottleController.setActive(isVid || isAud);
     if (!mounted || token != _activateToken) return;
     _updateSwipePhysics();
     if (isVid || isAud) {
@@ -493,7 +493,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           // off disk, so it needs the full path rather than one relative
           // to the container root.
           filePath: widget.container.isLocalStorage
-              ? p.join(widget.container.uri, file)
+              ? (widget.container.isSafStorage
+                  ? (file.startsWith(widget.container.uri)
+                      ? file
+                      : '${widget.container.uri}/${file.replaceFirst(RegExp(r"^/+"), "")}')
+                  : (p.isAbsolute(file)
+                      ? file
+                      : p.join(widget.container.uri, file)))
               : file,
           isLocalStorage: widget.container.isLocalStorage,
           // Wait until the position preference and any resume prompt have
@@ -783,23 +789,27 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _updateWakelock(controller.value.isPlaying);
 
     final isInitialized = controller.value.isInitialized;
+    if (!isInitialized) return;
+
     final position = controller.value.position;
     final duration = controller.value.duration;
 
-    if (!isInitialized || duration <= Duration.zero) return;
-
     final fileName = _playbackManager.currentFileName;
     if (fileName != null) {
-      final lastSaved = _lastSavedPlaybackPositions[fileName] ?? Duration.zero;
-      if (position.inSeconds - lastSaved.inSeconds >= 5) {
-        unawaited(
-          _savePlaybackPosition(fileName, position, duration: duration),
-        );
+      if (duration > Duration.zero) {
+        final lastSaved = _lastSavedPlaybackPositions[fileName] ?? Duration.zero;
+        if (position.inSeconds - lastSaved.inSeconds >= 5) {
+          unawaited(
+            _savePlaybackPosition(fileName, position, duration: duration),
+          );
+        }
       }
       unawaited(
         _resolveInitialPlayback(controller, fileName, _resumeFlowToken),
       );
     }
+
+    if (duration <= Duration.zero) return;
 
     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
       if (controller.value.isPlaying && position >= duration) {
@@ -2340,6 +2350,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         return AdvancedSettingsSheet(
           initialPage: initialPage,
           actions: mediaConfig.advancedSettingsActions,
+          sessionKey: _sessionKey,
           isMuted: _isMuted,
           onExecuteAction: _executeMediaAction,
           onCustomizeControls: _openCustomizeControls,

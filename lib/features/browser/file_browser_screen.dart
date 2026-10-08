@@ -33,6 +33,7 @@ import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
@@ -1726,23 +1727,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     final pref = settings.extensionPreferences[ext];
-    // Audio/HTML are still native, session-based viewers with no
-    // local-storage counterpart (see LocalFileIoBackend's doc comment) --
-    // checked ahead of `pref` so a per-extension preference saved while
-    // browsing a real vault (e.g. "always use the built-in viewer for
-    // .html") can't route a local file into a viewer that can't render it.
-    // The device's own app already plays/renders a real, already-plaintext
-    // file fine, so hand it off there instead. Video is exempt: the native
-    // player reads local files directly off disk via its own local branch
-    // (see NativePlayerManager.kt's buildMediaSource), so it plays in-app
-    // exactly like vault content. PDF is exempt too: PdfViewerScreen has its
-    // own isLocalStorage branch (VaultLocalShareApi.getLocalFileUri ->
+    // HTML is still a native, session-based viewer with no local-storage
+    // counterpart (see LocalFileIoBackend's doc comment) -- checked ahead
+    // of `pref` so a per-extension preference saved while browsing a real
+    // vault (e.g. "always use the built-in viewer for .html") can't route
+    // a local file into a viewer that can't render it. The device's own
+    // browser already renders a real, already-plaintext HTML file fine, so
+    // hand it off there instead. Video and audio are both exempt: the
+    // native player reads local files directly off disk via its own local
+    // branch (see NativePlayerManager.kt's buildMediaSource --
+    // DefaultDataSource.Factory + Uri.fromFile), so they play in-app
+    // exactly like vault content. PDF is exempt too: PdfViewerScreen has
+    // its own isLocalStorage branch (VaultLocalShareApi.getLocalFileUri ->
     // PdfViewerRouter's localUri path), so it also renders in-app.
     final needsSystemAppForLocal =
-        widget.container.isLocalStorage &&
-        (MediaViewerConstants.isAudio(entry.name) ||
-            ext == 'html' ||
-            ext == 'htm');
+        widget.container.isLocalStorage && (ext == 'html' || ext == 'htm');
     // Which viewer/action applies is decided by decideFileOpenAction
     // (file_open_dispatch.dart) -- a pure function of ext/pref/these two
     // booleans, extracted so the branch priority (needsSystemAppForLocal
@@ -1964,13 +1963,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         }
         if (item.isDir) return false;
         if (!_matchesFilter(name) || !_isSupportedMedia(name)) return false;
-        // Local storage: images and video play in-app now (see
-        // _handleFileTap/NativePlayerManager.kt's local branch); audio
-        // still doesn't, so it stays out of the swipeable playlist.
-        if (widget.container.isLocalStorage &&
-            MediaViewerConstants.isAudio(name)) {
-          return false;
-        }
         return true;
       }).toList()..sort(_compareOverall);
 
@@ -2999,9 +2991,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     FileOperation op, {
     required bool isFolder,
   }) {
+    final fileIo = ref.read(vaultFileIoApiProvider);
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
+        unawaited(fileIo.clearImportSources(op.id));
         return;
       }
       final done =
@@ -3022,9 +3016,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         } else if (!keepVisible) {
           _opSvc.dismiss(op.id);
         }
-        if (op.status == FileOperationStatus.completed ||
-            op.status == FileOperationStatus.completedWithErrors) {
+        if (op.status == FileOperationStatus.completed) {
           _maybeDeleteImportSources(op, isFolder: isFolder);
+        } else {
+          unawaited(fileIo.clearImportSources(op.id));
         }
       }
     }
@@ -3036,54 +3031,98 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     FileOperation op, {
     required bool isFolder,
   }) async {
-    if (!mounted) return;
-    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
-    if (mounted) {
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    var deletionAttempted = false;
+    try {
+      if (!mounted) return;
+      final settings = await ref
+          .read(appSettingsServiceProvider)
+          .loadSettings();
+      if (!mounted) return;
       _appSettings = settings;
-    }
 
-    bool shouldDelete = false;
+      final records = await ref.read(containerRepositoryProvider).loadAll();
+      if (!mounted) return;
+      final record = records[widget.container.uri];
+      final vaultMode =
+          record?.vaultDeleteAfterImportMode ??
+          VaultDeleteAfterImportMode.inherit;
+      final behavior = vaultMode.resolve(settings.deleteAfterImportMode);
 
-    switch (settings.deleteAfterImportMode) {
-      case DeleteAfterImportMode.keep:
-        return;
-      case DeleteAfterImportMode.delete:
-        shouldDelete = true;
-        break;
-      case DeleteAfterImportMode.ask:
-        final choice = await DeleteOriginalsDialog.show(
-          context,
-          isFolder: isFolder,
-        );
-        if (choice == null || !mounted) return;
+      var shouldDelete = false;
+      switch (behavior) {
+        case DeleteAfterImportMode.keep:
+          break;
+        case DeleteAfterImportMode.delete:
+          shouldDelete = true;
+          break;
+        case DeleteAfterImportMode.ask:
+          final choice = await DeleteOriginalsDialog.show(
+            context,
+            isFolder: isFolder,
+          );
+          if (choice == null || !mounted) return;
 
-        if (choice.dontAskAgain) {
-          final newMode = choice.confirmed
-              ? DeleteAfterImportMode.delete
-              : DeleteAfterImportMode.keep;
-          final updated = settings.copyWith(deleteAfterImportMode: newMode);
-          await ref.read(appSettingsServiceProvider).saveSettings(updated);
-          if (mounted) {
-            _appSettings = updated;
+          if (choice.dontAskAgain) {
+            final selected = choice.confirmed
+                ? DeleteAfterImportMode.delete
+                : DeleteAfterImportMode.keep;
+            try {
+              if (record != null) {
+                await ref
+                    .read(containerRepositoryProvider)
+                    .save(
+                      record.copyWith(
+                        vaultDeleteAfterImportMode:
+                            selected == DeleteAfterImportMode.delete
+                            ? VaultDeleteAfterImportMode.delete
+                            : VaultDeleteAfterImportMode.keep,
+                      ),
+                    );
+              } else {
+                final updated = settings.copyWith(
+                  deleteAfterImportMode: selected,
+                );
+                await ref
+                    .read(appSettingsServiceProvider)
+                    .saveSettings(updated);
+                if (mounted) _appSettings = updated;
+              }
+            } catch (e) {
+              VeLog.w(
+                'FileBrowserScreen',
+                'Could not save the delete-after-import choice',
+                e,
+              );
+            }
           }
-        }
 
-        shouldDelete = choice.confirmed;
-        break;
+          shouldDelete = choice.confirmed;
+          break;
+      }
+
+      if (!shouldDelete || !mounted) return;
+      deletionAttempted = true;
+      final deleted = await fileIo.deleteImportSources(op.id);
+      if (!mounted) return;
+      _setStatus(
+        deleted > 0
+            ? context.l10n.deletedOriginalCount(deleted)
+            : context.l10n.couldNotDeleteOriginals,
+        error: deleted == 0,
+        autoClear: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      VeLog.e(
+        'FileBrowserScreen',
+        'Could not resolve delete-after-import behavior',
+        e,
+      );
+    } finally {
+      if (!deletionAttempted) {
+        await fileIo.clearImportSources(op.id);
+      }
     }
-
-    if (!shouldDelete || !mounted) return;
-    final deleted = await ref
-        .read(vaultFileIoApiProvider)
-        .deleteImportSources(op.id);
-    if (!mounted) return;
-    _setStatus(
-      deleted > 0
-          ? context.l10n.deletedOriginalCount(deleted)
-          : context.l10n.couldNotDeleteOriginals,
-      error: deleted == 0,
-      autoClear: const Duration(seconds: 3),
-    );
   }
 
   Future<void> _importFolderFromDevice() async {
@@ -3811,7 +3850,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
 
     final bool canPop = _atRoot && !isSelectionMode && !_searchActive;
-    final systemOverlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle ??
+    final systemOverlayStyle =
+        Theme.of(context).appBarTheme.systemOverlayStyle ??
         (Theme.of(context).brightness == Brightness.dark
             ? AppSystemUI.transparentDark
             : SystemUiOverlayStyle.dark);
@@ -3835,715 +3875,732 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             }
           },
           child: Scaffold(
-          key: _scaffoldKey,
-          resizeToAvoidBottomInset: false,
-          drawerEnableOpenDragGesture: false,
-          drawer: widget.drawer,
-          bottomNavigationBar:
-              (!isLandscape && (showActionBar || showBookmarkBar))
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (showBookmarkBar)
-                      BookmarkBar(
-                        bookmarkPaths: _bookmarkPaths,
-                        axis: Axis.horizontal,
-                        onTapItem: (path) {
-                          final isDir =
-                              !path.split('/').last.contains('.') ||
-                              path.endsWith('/');
-                          _navigateToPath(path, isDir: isDir);
-                        },
-                        onRemoveBookmark: (path) => _pinsBookmarksNotifier
-                            .removeBookmark(widget.container, path),
-                      ),
-                    if (!isLandscape && showActionBar)
-                      FileManagerActionBar(
-                        axis: Axis.horizontal,
-                        actions: _toolbarConfig.visible,
-                        builders: actionBuilders,
-                      ),
-                  ],
-                )
-              : null,
-          body: Stack(
-            children: [
-              SafeArea(
-                bottom: false,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _handleScrollNotification,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    dragStartBehavior: DragStartBehavior.start,
-                    onHorizontalDragStart: widget.drawer == null
-                        ? null
-                        : (details) {
-                            final edgeInset = math.max(
-                              72.0,
-                              MediaQuery.systemGestureInsetsOf(context).left,
-                            );
-                            if (_isMultiTouch ||
-                                _isTouchFromEdge ||
-                                details.globalPosition.dx <= edgeInset ||
-                                _backGestureProgress != null) {
-                              _isTouchFromEdge = true;
+            key: _scaffoldKey,
+            resizeToAvoidBottomInset: false,
+            drawerEnableOpenDragGesture: false,
+            drawer: widget.drawer,
+            bottomNavigationBar:
+                (!isLandscape && (showActionBar || showBookmarkBar))
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (showBookmarkBar)
+                        BookmarkBar(
+                          bookmarkPaths: _bookmarkPaths,
+                          axis: Axis.horizontal,
+                          onTapItem: (path) {
+                            final isDir =
+                                !path.split('/').last.contains('.') ||
+                                path.endsWith('/');
+                            _navigateToPath(path, isDir: isDir);
+                          },
+                          onRemoveBookmark: (path) => _pinsBookmarksNotifier
+                              .removeBookmark(widget.container, path),
+                        ),
+                      if (!isLandscape && showActionBar)
+                        FileManagerActionBar(
+                          axis: Axis.horizontal,
+                          actions: _toolbarConfig.visible,
+                          builders: actionBuilders,
+                        ),
+                    ],
+                  )
+                : null,
+            body: Stack(
+              children: [
+                SafeArea(
+                  bottom: false,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      dragStartBehavior: DragStartBehavior.start,
+                      onHorizontalDragStart: widget.drawer == null
+                          ? null
+                          : (details) {
+                              final edgeInset = math.max(
+                                72.0,
+                                MediaQuery.systemGestureInsetsOf(context).left,
+                              );
+                              if (_isMultiTouch ||
+                                  _isTouchFromEdge ||
+                                  details.globalPosition.dx <= edgeInset ||
+                                  _backGestureProgress != null) {
+                                _isTouchFromEdge = true;
+                                _drawerDragDistance = 0.0;
+                                return;
+                              }
                               _drawerDragDistance = 0.0;
-                              return;
-                            }
-                            _drawerDragDistance = 0.0;
-                          },
-                    onHorizontalDragUpdate: widget.drawer == null
-                        ? null
-                        : (details) {
-                            if (_isMultiTouch ||
-                                _isTouchFromEdge ||
-                                _backGestureProgress != null ||
-                                widget.drawer == null) {
+                            },
+                      onHorizontalDragUpdate: widget.drawer == null
+                          ? null
+                          : (details) {
+                              if (_isMultiTouch ||
+                                  _isTouchFromEdge ||
+                                  _backGestureProgress != null ||
+                                  widget.drawer == null) {
+                                _drawerDragDistance = 0.0;
+                                return;
+                              }
+                              _drawerDragDistance +=
+                                  details.primaryDelta ?? 0.0;
+                              if (_drawerDragDistance > 60.0) {
+                                _scaffoldKey.currentState?.openDrawer();
+                                _drawerDragDistance = 0.0;
+                                _isTouchFromEdge = true;
+                              }
+                            },
+                      onHorizontalDragEnd: widget.drawer == null
+                          ? null
+                          : (_) {
                               _drawerDragDistance = 0.0;
-                              return;
-                            }
-                            _drawerDragDistance += details.primaryDelta ?? 0.0;
-                            if (_drawerDragDistance > 60.0) {
-                              _scaffoldKey.currentState?.openDrawer();
+                            },
+                      onHorizontalDragCancel: widget.drawer == null
+                          ? null
+                          : () {
                               _drawerDragDistance = 0.0;
-                              _isTouchFromEdge = true;
-                            }
-                          },
-                    onHorizontalDragEnd: widget.drawer == null
-                        ? null
-                        : (_) {
-                            _drawerDragDistance = 0.0;
-                          },
-                    onHorizontalDragCancel: widget.drawer == null
-                        ? null
-                        : () {
-                            _drawerDragDistance = 0.0;
-                          },
-                    child: Stack(
-                      children: [
-                        Column(
-                          children: [
-                            ClipRect(
-                              key: const Key('browser_app_bar_clip_rect'),
-                              child: AnimatedBuilder(
-                                animation: _appBarAnimController,
-                                builder: (context, _) {
-                                  // Follow current status: if it was hidden, stay hidden
-                                  final factor =
-                                      (!_toolbarConfig.autoHideAppBar ||
-                                          _searchActive)
-                                      ? 1.0
-                                      : _appBarAnimController.value;
-                                  if (factor == 0.0) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Align(
-                                    key: const Key('browser_app_bar_align'),
-                                    alignment: Alignment.bottomCenter,
-                                    heightFactor: factor,
-                                    child: SizedBox(
-                                      height: kToolbarHeight,
-                                      child: MediaQuery.removePadding(
-                                        context: context,
-                                        removeTop: true,
-                                        child: buildAppBar(
-                                          selectionMode: false,
+                            },
+                      child: Stack(
+                        children: [
+                          Column(
+                            children: [
+                              ClipRect(
+                                key: const Key('browser_app_bar_clip_rect'),
+                                child: AnimatedBuilder(
+                                  animation: _appBarAnimController,
+                                  builder: (context, _) {
+                                    // Follow current status: if it was hidden, stay hidden
+                                    final factor =
+                                        (!_toolbarConfig.autoHideAppBar ||
+                                            _searchActive)
+                                        ? 1.0
+                                        : _appBarAnimController.value;
+                                    if (factor == 0.0) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Align(
+                                      key: const Key('browser_app_bar_align'),
+                                      alignment: Alignment.bottomCenter,
+                                      heightFactor: factor,
+                                      child: SizedBox(
+                                        height: kToolbarHeight,
+                                        child: MediaQuery.removePadding(
+                                          context: context,
+                                          removeTop: true,
+                                          child: buildAppBar(
+                                            selectionMode: false,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: Stack(
-                                children: [
-                                  Row(
-                                    children: [
-                                      if (isLandscape && showBookmarkBar)
-                                        BookmarkBar(
-                                          bookmarkPaths: _bookmarkPaths,
-                                          axis: Axis.vertical,
-                                          onTapItem: (path) {
-                                            final isDir =
-                                                !path
-                                                    .split('/')
-                                                    .last
-                                                    .contains('.') ||
-                                                path.endsWith('/');
-                                            _navigateToPath(path, isDir: isDir);
-                                          },
-                                          onRemoveBookmark: (path) =>
-                                              _pinsBookmarksNotifier
-                                                  .removeBookmark(
-                                                    widget.container,
-                                                    path,
-                                                  ),
-                                        ),
-                                      Expanded(
-                                        child: Column(
-                                          children: [
-                                            if (_toolbarConfig
-                                                .showBreadcrumbBar) ...[
-                                              BreadcrumbBar(
-                                                stack: _pathStack,
-                                                onTap: _jumpTo,
-                                              ),
-                                            ],
-                                            if (!widget
-                                                    .container
-                                                    .isLocalStorage &&
-                                                _archiveContext == null)
-                                              const SyncStatusBanner(),
-                                            if (_archiveContext?.isSolid ==
-                                                true)
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.fromLTRB(
-                                                      12,
-                                                      8,
-                                                      12,
-                                                      0,
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        if (isLandscape && showBookmarkBar)
+                                          BookmarkBar(
+                                            bookmarkPaths: _bookmarkPaths,
+                                            axis: Axis.vertical,
+                                            onTapItem: (path) {
+                                              final isDir =
+                                                  !path
+                                                      .split('/')
+                                                      .last
+                                                      .contains('.') ||
+                                                  path.endsWith('/');
+                                              _navigateToPath(
+                                                path,
+                                                isDir: isDir,
+                                              );
+                                            },
+                                            onRemoveBookmark: (path) =>
+                                                _pinsBookmarksNotifier
+                                                    .removeBookmark(
+                                                      widget.container,
+                                                      path,
                                                     ),
-                                                child: InlineBanner(
-                                                  context
-                                                      .l10n
-                                                      .archiveSolidWarning,
-                                                  tone: AppBannerTone.warning,
+                                          ),
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              if (_toolbarConfig
+                                                  .showBreadcrumbBar) ...[
+                                                BreadcrumbBar(
+                                                  stack: _pathStack,
+                                                  onTap: _jumpTo,
                                                 ),
-                                              ),
-                                            Expanded(
-                                              child: Stack(
-                                                children: [
-                                                  KeyedSubtree(
-                                                    key: ValueKey(
-                                                      _currentDirPath,
-                                                    ),
-                                                    child: buildBrowserBody(
-                                                      context,
-                                                      filteredItems,
-                                                      isLoading: _isLoading,
-                                                      currentItems:
-                                                          _currentItems,
-                                                      atRoot: _atRoot,
-                                                      onNavigateUp: _atRoot
-                                                          ? null
-                                                          : _navigateUp,
-                                                      searchQuery: _searchQuery,
-                                                      layoutMode: _layoutMode,
-                                                      container:
-                                                          widget.container,
-                                                      currentDirPath:
-                                                          _currentDirPath,
-                                                      thumbnailCacheMode:
-                                                          _resolvedThumbnailCacheMode,
-                                                      thumbnailQuality:
-                                                          _resolvedThumbnailQuality,
-                                                      toolbarConfig:
-                                                          _toolbarConfig,
-                                                      isSelectionMode:
-                                                          isSelectionMode,
-                                                      selectedItems:
-                                                          selectedItems,
-                                                      searchActive:
-                                                          _searchActive,
-                                                      mountedDocProviderFolders:
-                                                          _mountedDocProviderFolders,
-                                                      isFolderMounted:
-                                                          _isFolderMounted,
-                                                      isPinned: _isPinned,
-                                                      isBookmark: _isBookmark,
-                                                      isFolderSynced:
-                                                          _isFolderSynced,
-                                                      onDirTap: _handleDirTap,
-                                                      onFileTap: _handleFileTap,
-                                                      onItemLongPress:
-                                                          _handleItemLongPress,
-                                                      onIconTap: _handleIconTap,
-                                                      onItemMoreTap:
-                                                          _showItemActionsSheet,
-                                                      onSelectionChanged:
-                                                          setSelectedItems,
-                                                      onGridColumnCountChanged: (count) {
-                                                        _toolbarConfig =
-                                                            isLandscape
-                                                            ? _toolbarConfig
-                                                                  .copyWith(
-                                                                    gridColumnsLandscape:
-                                                                        count,
-                                                                  )
-                                                            : _toolbarConfig
-                                                                  .copyWith(
-                                                                    gridColumnsPortrait:
-                                                                        count,
-                                                                  );
-                                                        _toolbarSvc.save(
-                                                          _toolbarConfig,
-                                                        );
-                                                        final effectiveToolbarUri =
-                                                            widget
-                                                                .container
-                                                                .isLocalStorage
-                                                            ? null
-                                                            : widget
-                                                                  .container
-                                                                  .uri;
-                                                        ref
-                                                            .read(
-                                                              fileManagerToolbarSettingsProvider(
-                                                                effectiveToolbarUri,
-                                                              ).notifier,
-                                                            )
-                                                            .applyImportedConfig(
-                                                              _toolbarConfig,
-                                                            );
-                                                      },
-                                                      onMasonryColumnCountChanged: (count) {
-                                                        _toolbarConfig =
-                                                            isLandscape
-                                                            ? _toolbarConfig
-                                                                  .copyWith(
-                                                                    masonryColumnsLandscape:
-                                                                        count,
-                                                                  )
-                                                            : _toolbarConfig
-                                                                  .copyWith(
-                                                                    masonryColumnsPortrait:
-                                                                        count,
-                                                                  );
-                                                        _toolbarSvc.save(
-                                                          _toolbarConfig,
-                                                        );
-                                                        final effectiveToolbarUri =
-                                                            widget
-                                                                .container
-                                                                .isLocalStorage
-                                                            ? null
-                                                            : widget
-                                                                  .container
-                                                                  .uri;
-                                                        ref
-                                                            .read(
-                                                              fileManagerToolbarSettingsProvider(
-                                                                effectiveToolbarUri,
-                                                              ).notifier,
-                                                            )
-                                                            .applyImportedConfig(
-                                                              _toolbarConfig,
-                                                            );
-                                                      },
-                                                      onListZoomLevelChanged: (newZoom) {
-                                                        setState(() {
-                                                          _toolbarConfig =
-                                                              _toolbarConfig
-                                                                  .copyWith(
-                                                                    listZoomLevel:
-                                                                        newZoom,
-                                                                  );
-                                                        });
-                                                        _toolbarSvc.save(
-                                                          _toolbarConfig,
-                                                        );
-                                                        final effectiveToolbarUri =
-                                                            widget
-                                                                .container
-                                                                .isLocalStorage
-                                                            ? null
-                                                            : widget
-                                                                  .container
-                                                                  .uri;
-                                                        ref
-                                                            .read(
-                                                              fileManagerToolbarSettingsProvider(
-                                                                effectiveToolbarUri,
-                                                              ).notifier,
-                                                            )
-                                                            .applyImportedConfig(
-                                                              _toolbarConfig,
-                                                            );
-                                                      },
-                                                      onRefresh: () {
-                                                        FolderThumbnailPreview.clearSessionCache();
-                                                        return _loadDirectoryContents(
-                                                          _currentDirPath,
-                                                          refresh: true,
-                                                        );
-                                                      },
-                                                      isListingTruncated:
-                                                          _isListingTruncated,
-                                                      scrollController:
-                                                          _browserScrollController,
-                                                      archiveContext:
-                                                          _archiveContext,
-                                                      archiveRootPath:
-                                                          _archiveRootPathForSearch,
-                                                      sortBy: sortBy,
-                                                    ),
+                                              ],
+                                              if (!widget
+                                                      .container
+                                                      .isLocalStorage &&
+                                                  _archiveContext == null)
+                                                const SyncStatusBanner(),
+                                              if (_archiveContext?.isSolid ==
+                                                  true)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.fromLTRB(
+                                                        12,
+                                                        8,
+                                                        12,
+                                                        0,
+                                                      ),
+                                                  child: InlineBanner(
+                                                    context
+                                                        .l10n
+                                                        .archiveSolidWarning,
+                                                    tone: AppBannerTone.warning,
                                                   ),
-                                                  if (_backGestureProgress !=
-                                                      null)
-                                                    Positioned.fill(
-                                                      child: IgnorePointer(
-                                                        child: Stack(
-                                                          fit: StackFit.expand,
-                                                          children: [
-                                                            if (_backGestureProgress! >=
-                                                                    0.18 &&
-                                                                sortedPreviewItems !=
-                                                                    null) ...[
-                                                              ColoredBox(
-                                                                color: Theme.of(
-                                                                  context,
-                                                                ).scaffoldBackgroundColor,
-                                                              ),
-                                                              buildBrowserBody(
-                                                                context,
-                                                                sortedPreviewItems,
-                                                                isLoading:
-                                                                    false,
-                                                                currentItems:
-                                                                    sortedPreviewItems,
-                                                                atRoot:
-                                                                    _backGesturePreviewAtRoot,
-                                                                onNavigateUp:
-                                                                    null,
-                                                                searchQuery: '',
-                                                                layoutMode:
-                                                                    _backGesturePreviewLayoutMode ??
-                                                                    _layoutMode,
-                                                                container: widget
-                                                                    .container,
-                                                                currentDirPath:
-                                                                    previewDirPath,
-                                                                thumbnailCacheMode:
-                                                                    _resolvedThumbnailCacheMode,
-                                                                thumbnailQuality:
-                                                                    _resolvedThumbnailQuality,
-                                                                toolbarConfig:
-                                                                    _toolbarConfig,
-                                                                isSelectionMode:
-                                                                    false,
-                                                                selectedItems:
-                                                                    const {},
-                                                                searchActive:
-                                                                    false,
-                                                                mountedDocProviderFolders:
-                                                                    _mountedDocProviderFolders,
-                                                                isFolderMounted:
-                                                                    (
-                                                                      e,
-                                                                    ) => isFolderMounted(
-                                                                      e,
-                                                                      previewDirPath,
-                                                                      _mountedDocProviderFolders,
-                                                                    ),
-                                                                isPinned: (e) =>
-                                                                    isPinned(
-                                                                      e,
-                                                                      previewDirPath,
-                                                                      _pinnedPaths,
-                                                                    ),
-                                                                isBookmark: (e) =>
-                                                                    isBookmark(
-                                                                      e,
-                                                                      previewDirPath,
-                                                                      _bookmarkPaths,
-                                                                    ),
-                                                                isFolderSynced:
-                                                                    _isFolderSynced,
-                                                                onDirTap:
-                                                                    (_) {},
-                                                                onFileTap:
-                                                                    (_) {},
-                                                                onItemLongPress:
-                                                                    (_) {},
-                                                                onIconTap:
-                                                                    (_) {},
-                                                                onItemMoreTap:
-                                                                    (_) {},
-                                                                onGridColumnCountChanged:
-                                                                    (_) {},
-                                                                onMasonryColumnCountChanged:
-                                                                    (_) {},
-                                                                onListZoomLevelChanged:
-                                                                    (_) {},
-                                                                onRefresh:
-                                                                    () async {},
-                                                                isListingTruncated:
-                                                                    false,
-                                                                scrollController:
-                                                                    _backGesturePreviewScrollController,
-                                                                archiveContext:
-                                                                    previewArchiveContext,
-                                                                archiveRootPath:
-                                                                    previewArchiveRootPath,
-                                                                sortBy: sortBy,
-                                                              ),
-                                                            ],
-                                                            Opacity(
-                                                              opacity:
-                                                                  _fadeScrimOpacity(
-                                                                    _backGestureProgress!,
-                                                                  ),
-                                                              child: ColoredBox(
-                                                                color: Theme.of(
-                                                                  context,
-                                                                ).scaffoldBackgroundColor,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
+                                                ),
+                                              Expanded(
+                                                child: Stack(
+                                                  children: [
+                                                    KeyedSubtree(
+                                                      key: ValueKey(
+                                                        _currentDirPath,
+                                                      ),
+                                                      child: buildBrowserBody(
+                                                        context,
+                                                        filteredItems,
+                                                        isLoading: _isLoading,
+                                                        currentItems:
+                                                            _currentItems,
+                                                        atRoot: _atRoot,
+                                                        onNavigateUp: _atRoot
+                                                            ? null
+                                                            : _navigateUp,
+                                                        searchQuery:
+                                                            _searchQuery,
+                                                        layoutMode: _layoutMode,
+                                                        container:
+                                                            widget.container,
+                                                        currentDirPath:
+                                                            _currentDirPath,
+                                                        thumbnailCacheMode:
+                                                            _resolvedThumbnailCacheMode,
+                                                        thumbnailQuality:
+                                                            _resolvedThumbnailQuality,
+                                                        toolbarConfig:
+                                                            _toolbarConfig,
+                                                        isSelectionMode:
+                                                            isSelectionMode,
+                                                        selectedItems:
+                                                            selectedItems,
+                                                        searchActive:
+                                                            _searchActive,
+                                                        mountedDocProviderFolders:
+                                                            _mountedDocProviderFolders,
+                                                        isFolderMounted:
+                                                            _isFolderMounted,
+                                                        isPinned: _isPinned,
+                                                        isBookmark: _isBookmark,
+                                                        isFolderSynced:
+                                                            _isFolderSynced,
+                                                        onDirTap: _handleDirTap,
+                                                        onFileTap:
+                                                            _handleFileTap,
+                                                        onItemLongPress:
+                                                            _handleItemLongPress,
+                                                        onIconTap:
+                                                            _handleIconTap,
+                                                        onItemMoreTap:
+                                                            _showItemActionsSheet,
+                                                        onSelectionChanged:
+                                                            setSelectedItems,
+                                                        onGridColumnCountChanged: (count) {
+                                                          _toolbarConfig =
+                                                              isLandscape
+                                                              ? _toolbarConfig
+                                                                    .copyWith(
+                                                                      gridColumnsLandscape:
+                                                                          count,
+                                                                    )
+                                                              : _toolbarConfig
+                                                                    .copyWith(
+                                                                      gridColumnsPortrait:
+                                                                          count,
+                                                                    );
+                                                          _toolbarSvc.save(
+                                                            _toolbarConfig,
+                                                          );
+                                                          final effectiveToolbarUri =
+                                                              widget
+                                                                  .container
+                                                                  .isLocalStorage
+                                                              ? null
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
+                                                          ref
+                                                              .read(
+                                                                fileManagerToolbarSettingsProvider(
+                                                                  effectiveToolbarUri,
+                                                                ).notifier,
+                                                              )
+                                                              .applyImportedConfig(
+                                                                _toolbarConfig,
+                                                              );
+                                                        },
+                                                        onMasonryColumnCountChanged: (count) {
+                                                          _toolbarConfig =
+                                                              isLandscape
+                                                              ? _toolbarConfig
+                                                                    .copyWith(
+                                                                      masonryColumnsLandscape:
+                                                                          count,
+                                                                    )
+                                                              : _toolbarConfig
+                                                                    .copyWith(
+                                                                      masonryColumnsPortrait:
+                                                                          count,
+                                                                    );
+                                                          _toolbarSvc.save(
+                                                            _toolbarConfig,
+                                                          );
+                                                          final effectiveToolbarUri =
+                                                              widget
+                                                                  .container
+                                                                  .isLocalStorage
+                                                              ? null
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
+                                                          ref
+                                                              .read(
+                                                                fileManagerToolbarSettingsProvider(
+                                                                  effectiveToolbarUri,
+                                                                ).notifier,
+                                                              )
+                                                              .applyImportedConfig(
+                                                                _toolbarConfig,
+                                                              );
+                                                        },
+                                                        onListZoomLevelChanged: (newZoom) {
+                                                          setState(() {
+                                                            _toolbarConfig =
+                                                                _toolbarConfig
+                                                                    .copyWith(
+                                                                      listZoomLevel:
+                                                                          newZoom,
+                                                                    );
+                                                          });
+                                                          _toolbarSvc.save(
+                                                            _toolbarConfig,
+                                                          );
+                                                          final effectiveToolbarUri =
+                                                              widget
+                                                                  .container
+                                                                  .isLocalStorage
+                                                              ? null
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
+                                                          ref
+                                                              .read(
+                                                                fileManagerToolbarSettingsProvider(
+                                                                  effectiveToolbarUri,
+                                                                ).notifier,
+                                                              )
+                                                              .applyImportedConfig(
+                                                                _toolbarConfig,
+                                                              );
+                                                        },
+                                                        onRefresh: () {
+                                                          FolderThumbnailPreview.clearSessionCache();
+                                                          return _loadDirectoryContents(
+                                                            _currentDirPath,
+                                                            refresh: true,
+                                                          );
+                                                        },
+                                                        isListingTruncated:
+                                                            _isListingTruncated,
+                                                        scrollController:
+                                                            _browserScrollController,
+                                                        archiveContext:
+                                                            _archiveContext,
+                                                        archiveRootPath:
+                                                            _archiveRootPathForSearch,
+                                                        sortBy: sortBy,
                                                       ),
                                                     ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  AnimatedPositioned(
-                                    duration: AppMotion.short2,
-                                    curve: Curves.easeOutCubic,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: bannerBottomOffset,
-                                    child: Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 600,
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (_statusMessage != null)
-                                              Padding(
-                                                padding: EdgeInsets.only(
-                                                  bottom: _searchActive
-                                                      ? 16
-                                                      : 8,
-                                                  left: 16,
-                                                  right: 16,
+                                                    if (_backGestureProgress !=
+                                                        null)
+                                                      Positioned.fill(
+                                                        child: IgnorePointer(
+                                                          child: Stack(
+                                                            fit:
+                                                                StackFit.expand,
+                                                            children: [
+                                                              if (_backGestureProgress! >=
+                                                                      0.18 &&
+                                                                  sortedPreviewItems !=
+                                                                      null) ...[
+                                                                ColoredBox(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).scaffoldBackgroundColor,
+                                                                ),
+                                                                buildBrowserBody(
+                                                                  context,
+                                                                  sortedPreviewItems,
+                                                                  isLoading:
+                                                                      false,
+                                                                  currentItems:
+                                                                      sortedPreviewItems,
+                                                                  atRoot:
+                                                                      _backGesturePreviewAtRoot,
+                                                                  onNavigateUp:
+                                                                      null,
+                                                                  searchQuery:
+                                                                      '',
+                                                                  layoutMode:
+                                                                      _backGesturePreviewLayoutMode ??
+                                                                      _layoutMode,
+                                                                  container: widget
+                                                                      .container,
+                                                                  currentDirPath:
+                                                                      previewDirPath,
+                                                                  thumbnailCacheMode:
+                                                                      _resolvedThumbnailCacheMode,
+                                                                  thumbnailQuality:
+                                                                      _resolvedThumbnailQuality,
+                                                                  toolbarConfig:
+                                                                      _toolbarConfig,
+                                                                  isSelectionMode:
+                                                                      false,
+                                                                  selectedItems:
+                                                                      const {},
+                                                                  searchActive:
+                                                                      false,
+                                                                  mountedDocProviderFolders:
+                                                                      _mountedDocProviderFolders,
+                                                                  isFolderMounted:
+                                                                      (
+                                                                        e,
+                                                                      ) => isFolderMounted(
+                                                                        e,
+                                                                        previewDirPath,
+                                                                        _mountedDocProviderFolders,
+                                                                      ),
+                                                                  isPinned: (e) =>
+                                                                      isPinned(
+                                                                        e,
+                                                                        previewDirPath,
+                                                                        _pinnedPaths,
+                                                                      ),
+                                                                  isBookmark: (e) =>
+                                                                      isBookmark(
+                                                                        e,
+                                                                        previewDirPath,
+                                                                        _bookmarkPaths,
+                                                                      ),
+                                                                  isFolderSynced:
+                                                                      _isFolderSynced,
+                                                                  onDirTap:
+                                                                      (_) {},
+                                                                  onFileTap:
+                                                                      (_) {},
+                                                                  onItemLongPress:
+                                                                      (_) {},
+                                                                  onIconTap:
+                                                                      (_) {},
+                                                                  onItemMoreTap:
+                                                                      (_) {},
+                                                                  onGridColumnCountChanged:
+                                                                      (_) {},
+                                                                  onMasonryColumnCountChanged:
+                                                                      (_) {},
+                                                                  onListZoomLevelChanged:
+                                                                      (_) {},
+                                                                  onRefresh:
+                                                                      () async {},
+                                                                  isListingTruncated:
+                                                                      false,
+                                                                  scrollController:
+                                                                      _backGesturePreviewScrollController,
+                                                                  archiveContext:
+                                                                      previewArchiveContext,
+                                                                  archiveRootPath:
+                                                                      previewArchiveRootPath,
+                                                                  sortBy:
+                                                                      sortBy,
+                                                                ),
+                                                              ],
+                                                              Opacity(
+                                                                opacity:
+                                                                    _fadeScrimOpacity(
+                                                                      _backGestureProgress!,
+                                                                    ),
+                                                                child: ColoredBox(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).scaffoldBackgroundColor,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
-                                                child: AnimatedSwitcher(
-                                                  duration: AppMotion.short2,
-                                                  child: InlineBanner(
-                                                    _statusMessage!,
-                                                    key: ValueKey(
-                                                      _statusBannerKey,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    AnimatedPositioned(
+                                      duration: AppMotion.short2,
+                                      curve: Curves.easeOutCubic,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: bannerBottomOffset,
+                                      child: Align(
+                                        alignment: Alignment.bottomCenter,
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 600,
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (_statusMessage != null)
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    bottom: _searchActive
+                                                        ? 16
+                                                        : 8,
+                                                    left: 16,
+                                                    right: 16,
+                                                  ),
+                                                  child: AnimatedSwitcher(
+                                                    duration: AppMotion.short2,
+                                                    child: InlineBanner(
+                                                      _statusMessage!,
+                                                      key: ValueKey(
+                                                        _statusBannerKey,
+                                                      ),
+                                                      tone: _statusIsError
+                                                          ? AppBannerTone.error
+                                                          : AppBannerTone.info,
+                                                      trailing:
+                                                          _mediaScanInProgress
+                                                          ? TextButton(
+                                                              style: TextButton.styleFrom(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                    ),
+                                                                minimumSize:
+                                                                    Size.zero,
+                                                                tapTargetSize:
+                                                                    MaterialTapTargetSize
+                                                                        .shrinkWrap,
+                                                              ),
+                                                              onPressed:
+                                                                  _cancelMediaScan,
+                                                              child: Text(
+                                                                context
+                                                                    .l10n
+                                                                    .cancel,
+                                                              ),
+                                                            )
+                                                          : null,
                                                     ),
-                                                    tone: _statusIsError
-                                                        ? AppBannerTone.error
-                                                        : AppBannerTone.info,
-                                                    trailing:
-                                                        _mediaScanInProgress
-                                                        ? TextButton(
-                                                            style: TextButton.styleFrom(
-                                                              padding:
-                                                                  const EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        8,
-                                                                  ),
-                                                              minimumSize:
-                                                                  Size.zero,
-                                                              tapTargetSize:
-                                                                  MaterialTapTargetSize
-                                                                      .shrinkWrap,
-                                                            ),
-                                                            onPressed:
-                                                                _cancelMediaScan,
-                                                            child: Text(
-                                                              context
-                                                                  .l10n
-                                                                  .cancel,
-                                                            ),
-                                                          )
-                                                        : null,
                                                   ),
                                                 ),
-                                              ),
-                                            if (_searchActive)
-                                              BottomSearchBar(
-                                                initialQuery: _searchQuery,
-                                                onChanged:
-                                                    _onSearchQueryChanged,
-                                                isDeepSearch: _isDeepSearch,
-                                                onDeepSearchToggle:
-                                                    _onDeepSearchToggled,
-                                                isSearchingSubfolders:
-                                                    _isSearchingSubfolders,
-                                                onClose: () => setState(
-                                                  () => _clearSearch(),
+                                              if (_searchActive)
+                                                BottomSearchBar(
+                                                  initialQuery: _searchQuery,
+                                                  onChanged:
+                                                      _onSearchQueryChanged,
+                                                  isDeepSearch: _isDeepSearch,
+                                                  onDeepSearchToggle:
+                                                      _onDeepSearchToggled,
+                                                  isSearchingSubfolders:
+                                                      _isSearchingSubfolders,
+                                                  onClose: () => setState(
+                                                    () => _clearSearch(),
+                                                  ),
                                                 ),
-                                              ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          // ── FAB Toolbar: Add FAB + "More" cascade (search/sort/filter/view/play) ──
+                          if (hasFabToolbar)
+                            ..._buildFabToolbar(
+                              bottomOffset:
+                                  baseBottomOffset +
+                                  ((isSelectionMode &&
+                                          _toolbarConfig.bottomSelectionBar)
+                                      ? kToolbarHeight
+                                      : 0.0),
+                            ),
+
+                          // ── Clipboard Paste FAB ────────────────────────────────────────────────
+                          if (!isSelectionMode && !_searchActive)
+                            Positioned(
+                              right: 16.0 + MediaQuery.paddingOf(context).right,
+                              bottom: useFab
+                                  ? (baseBottomOffset + 68.0)
+                                  : baseBottomOffset,
+                              child: ClipboardFab(
+                                onPaste: _isReadOnly ? null : _paste,
+                                heroTag:
+                                    'browser_clipboard_fab_${widget.container.volId}',
                               ),
                             ),
-                          ],
-                        ),
-                        // ── FAB Toolbar: Add FAB + "More" cascade (search/sort/filter/view/play) ──
-                        if (hasFabToolbar)
-                          ..._buildFabToolbar(
-                            bottomOffset:
-                                baseBottomOffset +
-                                ((isSelectionMode &&
-                                        _toolbarConfig.bottomSelectionBar)
-                                    ? kToolbarHeight
-                                    : 0.0),
-                          ),
-
-                        // ── Clipboard Paste FAB ────────────────────────────────────────────────
-                        if (!isSelectionMode && !_searchActive)
-                          Positioned(
-                            right: 16.0 + MediaQuery.paddingOf(context).right,
-                            bottom: useFab
-                                ? (baseBottomOffset + 68.0)
-                                : baseBottomOffset,
-                            child: ClipboardFab(
-                              onPaste: _isReadOnly ? null : _paste,
-                              heroTag:
-                                  'browser_clipboard_fab_${widget.container.volId}',
-                            ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // ── Top Selection Bar Overlay (when bottomSelectionBar is DISABLED) ──
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: AnimatedSwitcher(
-                  duration: AppMotion.short2,
-                  layoutBuilder: (currentChild, previousChildren) => Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      ...previousChildren,
-                      if (currentChild != null) currentChild,
-                    ],
-                  ),
-                  transitionBuilder: (child, animation) {
-                    return SlideTransition(
-                      position:
-                          Tween<Offset>(
-                            begin: const Offset(0.0, -1.0),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutCubic,
-                              reverseCurve: Curves.easeInCubic,
-                            ),
-                          ),
-                      child: FadeTransition(opacity: animation, child: child),
-                    );
-                  },
-                  child: (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
-                      ? Material(
-                          key: const ValueKey(
-                            'browser_selection_app_bar_overlay',
-                          ),
-                          color: Theme.of(context).colorScheme.surfaceContainer,
-                          elevation: 0.0,
-                          child: SafeArea(
-                            bottom: false,
-                            child: SizedBox(
-                              height: kToolbarHeight,
-                              child: MediaQuery.removePadding(
-                                context: context,
-                                removeTop: true,
-                                child: buildAppBar(selectionMode: true),
+                // ── Top Selection Bar Overlay (when bottomSelectionBar is DISABLED) ──
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: AnimatedSwitcher(
+                    duration: AppMotion.short2,
+                    layoutBuilder: (currentChild, previousChildren) => Stack(
+                      alignment: Alignment.topCenter,
+                      children: [
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
+                    ),
+                    transitionBuilder: (child, animation) {
+                      return SlideTransition(
+                        position:
+                            Tween<Offset>(
+                              begin: const Offset(0.0, -1.0),
+                              end: Offset.zero,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                                reverseCurve: Curves.easeInCubic,
                               ),
                             ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child:
+                        (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
+                        ? Material(
+                            key: const ValueKey(
+                              'browser_selection_app_bar_overlay',
+                            ),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainer,
+                            elevation: 0.0,
+                            child: SafeArea(
+                              bottom: false,
+                              child: SizedBox(
+                                height: kToolbarHeight,
+                                child: MediaQuery.removePadding(
+                                  context: context,
+                                  removeTop: true,
+                                  child: buildAppBar(selectionMode: true),
+                                ),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(
+                            key: ValueKey('no_selection_top_bar'),
                           ),
-                        )
-                      : const SizedBox.shrink(
-                          key: ValueKey('no_selection_top_bar'),
-                        ),
+                  ),
                 ),
-              ),
 
-              // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
-              // bottom is offset by the keyboard inset (same fix BottomSearchBar
-              // already applies to itself) -- the Scaffold above uses
-              // resizeToAvoidBottomInset: false, so nothing else shifts this bar
-              // out from under the on-screen keyboard. Without it, entering
-              // selection mode while the keyboard is up (e.g. selecting a result
-              // while search is active) pins the bar to the physical bottom of the
-              // screen, underneath the keyboard, where it's invisible and untappable.
-              Positioned(
-                key: const Key(
-                  'browser_selection_bottom_bar_overlay_container',
-                ),
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 0,
-                right: 0,
-                child: AnimatedSwitcher(
-                  duration: AppMotion.short2,
-                  layoutBuilder: (currentChild, previousChildren) => Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      ...previousChildren,
-                      if (currentChild != null) currentChild,
-                    ],
+                // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
+                // bottom is offset by the keyboard inset (same fix BottomSearchBar
+                // already applies to itself) -- the Scaffold above uses
+                // resizeToAvoidBottomInset: false, so nothing else shifts this bar
+                // out from under the on-screen keyboard. Without it, entering
+                // selection mode while the keyboard is up (e.g. selecting a result
+                // while search is active) pins the bar to the physical bottom of the
+                // screen, underneath the keyboard, where it's invisible and untappable.
+                Positioned(
+                  key: const Key(
+                    'browser_selection_bottom_bar_overlay_container',
                   ),
-                  transitionBuilder: (child, animation) {
-                    return SlideTransition(
-                      position:
-                          Tween<Offset>(
-                            begin: const Offset(0.0, 1.0),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutCubic,
-                              reverseCurve: Curves.easeInCubic,
-                            ),
-                          ),
-                      child: FadeTransition(opacity: animation, child: child),
-                    );
-                  },
-                  child: (isSelectionMode && _toolbarConfig.bottomSelectionBar)
-                      ? Material(
-                          key: const ValueKey(
-                            'browser_selection_bottom_bar_overlay',
-                          ),
-                          color: Theme.of(context).colorScheme.surfaceContainer,
-                          elevation: 4.0,
-                          child: SafeArea(
-                            top: false,
-                            bottom:
-                                !(!isLandscape &&
-                                    (showActionBar || showBookmarkBar)),
-                            child: SizedBox(
-                              height: kToolbarHeight,
-                              child: MediaQuery.removePadding(
-                                context: context,
-                                removeTop: true,
-                                removeBottom: true,
-                                child: buildAppBar(selectionMode: true),
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                  left: 0,
+                  right: 0,
+                  child: AnimatedSwitcher(
+                    duration: AppMotion.short2,
+                    layoutBuilder: (currentChild, previousChildren) => Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
+                    ),
+                    transitionBuilder: (child, animation) {
+                      return SlideTransition(
+                        position:
+                            Tween<Offset>(
+                              begin: const Offset(0.0, 1.0),
+                              end: Offset.zero,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                                reverseCurve: Curves.easeInCubic,
                               ),
                             ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child:
+                        (isSelectionMode && _toolbarConfig.bottomSelectionBar)
+                        ? Material(
+                            key: const ValueKey(
+                              'browser_selection_bottom_bar_overlay',
+                            ),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainer,
+                            elevation: 4.0,
+                            child: SafeArea(
+                              top: false,
+                              bottom:
+                                  !(!isLandscape &&
+                                      (showActionBar || showBookmarkBar)),
+                              child: SizedBox(
+                                height: kToolbarHeight,
+                                child: MediaQuery.removePadding(
+                                  context: context,
+                                  removeTop: true,
+                                  removeBottom: true,
+                                  child: buildAppBar(selectionMode: true),
+                                ),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(
+                            key: ValueKey('no_selection_bottom_bar'),
                           ),
-                        )
-                      : const SizedBox.shrink(
-                          key: ValueKey('no_selection_bottom_bar'),
-                        ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }

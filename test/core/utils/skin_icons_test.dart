@@ -12,6 +12,9 @@ const _extensions = [
   'jpg', 'jpeg', 'png', 'gif', 'avif', 'heic', 'webp',
   'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mpeg', 'mpg',
   'mp3', 'flac', 'wav', 'm4a',
+  'ogg', 'opus', 'wma', 'ac3', 'aiff', 'amr', // added audio
+  'wmv', 'flv', '3gp', // added video
+  'ts', // deliberately NOT video (TypeScript)
   'txt', 'md', 'csv',
   'html', 'htm',
   'zip', 'gz', 'tar', '7z', 'rar',

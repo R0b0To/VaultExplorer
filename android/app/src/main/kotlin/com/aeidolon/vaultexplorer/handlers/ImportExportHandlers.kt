@@ -11,6 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
@@ -48,6 +49,15 @@ class ImportExportHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    private data class ImportVerification(val path: String, val expectedSha256: ByteArray)
+
+    private data class ImportedItemReport(
+        val sourceName: String,
+        val resolvedName: String,
+        val isDir: Boolean,
+        val success: Boolean,
+    )
+
     companion object {
         /**
          * Fraction of a destination's reported free space held back as a
@@ -563,6 +573,7 @@ class ImportExportHandlers(
         abstract val isDirectory: Boolean
         abstract val lastModifiedSeconds: Long
         abstract fun children(): List<ImportSource>
+        abstract fun openInputStream(): InputStream
         abstract fun writeLeaf(
             volId: Int, targetFatPath: String, opId: Int, total: Int,
             doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
@@ -580,6 +591,10 @@ class ImportExportHandlers(
             // node's own logging/progress calls in writeLeaf below.
             override fun children(): List<ImportSource> =
                 doc.listFiles().mapNotNull { child -> if (child.name == null) null else Saf(activity, child) }
+
+            override fun openInputStream(): InputStream =
+                activity.contentResolver.openInputStream(doc.uri)
+                    ?: throw java.io.IOException("Failed to open source for integrity check")
 
             override fun writeLeaf(
                 volId: Int, targetFatPath: String, opId: Int, total: Int,
@@ -660,6 +675,7 @@ class ImportExportHandlers(
             override val isDirectory: Boolean get() = file.isDirectory
             override val lastModifiedSeconds: Long get() = file.lastModified() / 1000L
             override fun children(): List<ImportSource> = (file.listFiles() ?: emptyArray()).map { Raw(it) }
+            override fun openInputStream(): InputStream = FileInputStream(file)
 
             override fun writeLeaf(
                 volId: Int, targetFatPath: String, opId: Int, total: Int,
@@ -709,10 +725,72 @@ class ImportExportHandlers(
         }
     }
 
+    /** Hashes the bytes that are about to be copied into the vault. */
+    private fun sha256Source(source: ImportSource): ByteArray {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(256 * 1024)
+        try {
+            source.openInputStream().use { input ->
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    if (count > 0) digest.update(buffer, 0, count)
+                }
+            }
+            return digest.digest()
+        } finally {
+            buffer.fill(0)
+        }
+    }
+
+    /** Reads the committed vault file back and hashes its plaintext bytes. */
+    private fun sha256VaultFile(volId: Int, path: String): ByteArray {
+        val parentPath = path.substringBeforeLast('/', "")
+        val fileName = path.substringAfterLast('/')
+        val existsAsFile = ContainerFileSystem.listDirectory(volId, parentPath)
+            ?.asSequence()
+            ?.filterNot { it.startsWith("System:") }
+            ?.mapNotNull { DirEntryWire.parse(it) }
+            ?.any { it.name == fileName && !it.isDir } == true
+        if (!existsAsFile) {
+            throw java.io.IOException("Imported file could not be verified")
+        }
+
+        val size = ContainerFileSystem.getFileSize(volId, path)
+        if (size < 0L) throw java.io.IOException("Imported file could not be verified")
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        var offset = 0L
+        while (offset < size) {
+            val request = minOf(256 * 1024L, size - offset).toInt()
+            val chunk = ContainerFileSystem.readFileChunk(volId, path, offset, request)
+                ?: throw java.io.IOException("Imported file could not be verified")
+            if (chunk.isEmpty()) {
+                throw java.io.IOException("Imported file could not be verified")
+            }
+            digest.update(chunk)
+            offset += chunk.size
+            chunk.fill(0)
+        }
+        if (offset != size) throw java.io.IOException("Imported file could not be verified")
+        return digest.digest()
+    }
+
+    private fun verifyCommittedImports(volId: Int, verifications: List<ImportVerification>) {
+        for (verification in verifications) {
+            val actual = sha256VaultFile(volId, verification.path)
+            val matches = MessageDigest.isEqual(verification.expectedSha256, actual)
+            actual.fill(0)
+            verification.expectedSha256.fill(0)
+            if (!matches) throw java.io.IOException("Imported file integrity verification failed")
+        }
+    }
+
     private fun importEntryRecursive(
         src: ImportSource, targetFatPath: String, volId: Int,
         opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong? = null,
+        verifications: MutableList<ImportVerification>,
     ): Int {
         if (ImportCancellation.isCancelled(opId)) {
             throw ImportCancelledException("Import cancelled")
@@ -738,19 +816,23 @@ class ImportExportHandlers(
                 count += importEntryRecursive(
                     child, "$targetFatPath/$childName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
+                    verifications,
                 )
             }
             return count
         }
 
+        val expectedSha256 = sha256Source(src)
         val ok = src.writeLeaf(volId, targetFatPath, opId, total, doneCounter, totalBytes, transferredCounter)
         if (!ok) {
+            expectedSha256.fill(0)
             throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
         }
         val lastModified = src.lastModifiedSeconds
         if (lastModified > 0) {
             ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
         }
+        verifications.add(ImportVerification(targetFatPath, expectedSha256))
         return 1
     }
 
@@ -1059,7 +1141,7 @@ class ImportExportHandlers(
             result.error("INVALID_ARGS", "opId required", null)
             return
         }
-        val recorded = ImportSourceRegistry.take(opId)
+        val recorded = ImportSourceRegistry.takeForDeletion(opId)
         if (recorded == null) {
             result.success(0)
             return
@@ -1086,6 +1168,17 @@ class ImportExportHandlers(
             }
             activity.runOnUiThread { result.success(deleted) }
         }
+    }
+
+    /** Releases source URI references when the caller decides to keep them. */
+    fun handleClearImportSources(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId required", null)
+            return
+        }
+        ImportSourceRegistry.take(opId)
+        result.success(true)
     }
 
     /**
@@ -1196,8 +1289,12 @@ class ImportExportHandlers(
 
         ioExecutor.execute {
             val opStart = System.currentTimeMillis()
+            val verifications = mutableListOf<ImportVerification>()
             try {
-                val total = picked.entries.sumOf { e -> e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc) }
+                val expectedCounts = picked.entries.map { e ->
+                    e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc)
+                }
+                val total = expectedCounts.sum()
                 val totalBytes = picked.entries.sumOf { e -> e.raw?.let { countBytesRaw(it) } ?: countBytesRecursive(e.doc) }
                 VeLog.i("VaultExplorer_Import") {
                     "IMPORT_FILES start opId=$opId volId=${picked.volId} " +
@@ -1210,31 +1307,24 @@ class ImportExportHandlers(
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                 var successCount = 0
+                val itemReports = mutableListOf<ImportedItemReport>()
                 val fsKind = FilesystemNameValidator.kindFor(picked.volId)
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 try {
-                    for (entry in picked.entries) {
+                    for ((entryIndex, entry) in picked.entries.withIndex()) {
                         val isDir = entry.raw?.isDirectory ?: entry.doc.isDirectory
                         val issues = FilesystemNameValidator.validate(entry.name, fsKind)
                         if (issues.isNotEmpty()) {
                             ImportProgressBridge.reportSkippedInvalidName(opId, entry.name, issues)
-                            ImportProgressBridge.reportItemFinished(
-                                opId = opId,
-                                sourceName = entry.name,
-                                resolvedName = entry.name,
-                                isDir = isDir,
-                                success = false,
+                            itemReports.add(
+                                ImportedItemReport(entry.name, entry.name, isDir, false)
                             )
                             continue
                         }
                         val name = resolveImportName(picked.volId, picked.targetDir, entry.name, conflictPlan)
                         if (name == null) {
-                            ImportProgressBridge.reportItemFinished(
-                                opId = opId,
-                                sourceName = entry.name,
-                                resolvedName = entry.name,
-                                isDir = isDir,
-                                success = false,
+                            itemReports.add(
+                                ImportedItemReport(entry.name, entry.name, isDir, false)
                             )
                             continue
                         }
@@ -1247,14 +1337,17 @@ class ImportExportHandlers(
                         val count = importEntryRecursive(
                             src, targetFatPath, picked.volId,
                             opId, total, doneCounter, totalBytes, transferredCounter,
+                            verifications,
                         )
                         successCount += count
-                        ImportProgressBridge.reportItemFinished(
-                            opId = opId,
-                            sourceName = entry.name,
-                            resolvedName = name,
-                            isDir = isDir,
-                            success = count > 0,
+                        itemReports.add(
+                            ImportedItemReport(
+                                entry.name,
+                                name,
+                                isDir,
+                                count == expectedCounts[entryIndex] &&
+                                    (count > 0 || !isDir),
+                            )
                         )
                     }
                 } finally {
@@ -1264,6 +1357,19 @@ class ImportExportHandlers(
                         "IMPORT_FILES endBatchWrite opId=$opId tookMs=${System.currentTimeMillis() - commitStart}"
                     }
                 }
+                verifyCommittedImports(picked.volId, verifications)
+                itemReports.forEach { report ->
+                    ImportProgressBridge.reportItemFinished(
+                        opId = opId,
+                        sourceName = report.sourceName,
+                        resolvedName = report.resolvedName,
+                        isDir = report.isDir,
+                        success = report.success,
+                    )
+                }
+                if (itemReports.isNotEmpty() && itemReports.all { it.success }) {
+                    ImportSourceRegistry.markVerifiedForDeletion(opId)
+                }
                 VeLog.i("VaultExplorer_Import") {
                     "IMPORT_FILES done opId=$opId successCount=$successCount totalMs=${System.currentTimeMillis() - opStart}"
                 }
@@ -1271,6 +1377,7 @@ class ImportExportHandlers(
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {
+                verifications.forEach { it.expectedSha256.fill(0) }
                 ImportCancellation.clear(opId)
                 ImportProgressBridge.clear(opId)
             }
@@ -1362,6 +1469,7 @@ class ImportExportHandlers(
 
         ioExecutor.execute {
             val opStart = System.currentTimeMillis()
+            val verifications = mutableListOf<ImportVerification>()
             try {
                 val fsKind = FilesystemNameValidator.kindFor(picked.volId)
                 val issues = FilesystemNameValidator.validate(picked.folderName, fsKind)
@@ -1398,6 +1506,7 @@ class ImportExportHandlers(
                     importEntryRecursive(
                         src, targetFatPath, picked.volId,
                         opId, total, doneCounter, totalBytes, transferredCounter,
+                        verifications,
                     )
                 } finally {
                     val commitStart = System.currentTimeMillis()
@@ -1406,20 +1515,26 @@ class ImportExportHandlers(
                         "IMPORT_FOLDER endBatchWrite opId=$opId tookMs=${System.currentTimeMillis() - commitStart}"
                     }
                 }
+                verifyCommittedImports(picked.volId, verifications)
                 VeLog.i("VaultExplorer_Import") {
                     "IMPORT_FOLDER done opId=$opId count=$count totalMs=${System.currentTimeMillis() - opStart}"
                 }
+                val importFullyVerified = count == total && total > 0
                 ImportProgressBridge.reportItemFinished(
                     opId = opId,
                     sourceName = picked.folderName,
                     resolvedName = folderName,
                     isDir = true,
-                    success = count > 0,
+                    success = importFullyVerified,
                 )
+                if (importFullyVerified) {
+                    ImportSourceRegistry.markVerifiedForDeletion(opId)
+                }
                 activity.runOnUiThread { result.success(count) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {
+                verifications.forEach { it.expectedSha256.fill(0) }
                 ImportCancellation.clear(opId)
                 ImportProgressBridge.clear(opId)
             }

@@ -1026,6 +1026,18 @@ class VaultFileIoApi {
     }
   }
 
+  /// Releases the source documents retained for an import that was kept,
+  /// cancelled, or otherwise did not qualify for deletion.
+  Future<void> clearImportSources(int opId) async {
+    try {
+      await _channel.invokeMethod<bool>(ChannelMethods.clearImportSources, {
+        'opId': opId,
+      });
+    } catch (e) {
+      logSwallowed('clearImportSources', e, expected: true);
+    }
+  }
+
   // ── Android Share Sheet integration ─────────────────────────────────────
   // See ShareIntentHandlers.kt/IncomingShareBridge.kt and
   // lib/features/share_import/ for the Flutter-side flow these back. The

@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
 import 'package:vaultexplorer/features/sync/domain/folder_vault_detector.dart';
 import 'package:vaultexplorer/features/sync/domain/models/sync_plan.dart';
@@ -63,7 +65,8 @@ class SyncRuleEditorSheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<SyncRuleEditorSheet> createState() => _SyncRuleEditorSheetState();
+  ConsumerState<SyncRuleEditorSheet> createState() =>
+      _SyncRuleEditorSheetState();
 }
 
 class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
@@ -94,12 +97,15 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   String _targetName = '';
   IconData _targetIcon = Icons.folder_open_rounded;
   bool _targetNotSetHere = false;
+  bool _targetIsPrimaryLocalStorageRoot = false;
+  bool _localRootDeleteWarningAcknowledged = false;
 
   SyncDirection _direction = SyncDirection.twoWay;
   ConflictStrategy _conflict = ConflictStrategy.renameConflict;
   bool _onUnlock = true;
   bool _live = false;
   bool _deletes = false;
+  bool _deleteSourceAfterImport = false;
 
   String _initialTargetUri = '';
   String _initialTargetSub = '';
@@ -108,6 +114,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   bool _initialOnUnlock = true;
   bool _initialLive = false;
   bool _initialDeletes = false;
+  bool _initialDeleteSourceAfterImport = false;
   String _initialIgnore = '';
 
   bool get _readOnly => widget.vault.readOnly;
@@ -121,6 +128,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
           _onUnlock != _initialOnUnlock ||
           _live != _initialLive ||
           _deletes != _initialDeletes ||
+          _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
           _ignore.text.trim() != _initialIgnore.trim();
     }
     return _targetUri != _initialTargetUri ||
@@ -130,6 +138,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         _onUnlock != _initialOnUnlock ||
         _live != _initialLive ||
         _deletes != _initialDeletes ||
+        _deleteSourceAfterImport != _initialDeleteSourceAfterImport ||
         _ignore.text.trim() != _initialIgnore.trim();
   }
 
@@ -154,7 +163,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   Future<void> _load() async {
     SyncConfig config;
     try {
-      config = await ref.read(syncConfigStoreProvider).loadOrCreate(widget.vault);
+      config = await ref
+          .read(syncConfigStoreProvider)
+          .loadOrCreate(widget.vault);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -165,7 +176,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     }
 
     final folder = normalizeSyncPath(widget.folderPath);
-    final existing = config.rules.where((r) => r.vaultRelativePath == folder).firstOrNull;
+    final existing = config.rules
+        .where((r) => r.vaultRelativePath == folder)
+        .firstOrNull;
     SyncTargetBinding? binding;
     if (existing != null) {
       binding = await ref
@@ -174,13 +187,24 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     }
     final report = existing == null
         ? null
-        : ref.read(syncCoordinatorServiceProvider).lastReportFor(widget.vault, existing.id);
+        : ref
+              .read(syncCoordinatorServiceProvider)
+              .lastReportFor(widget.vault, existing.id);
+    String? primaryLocalStorageRoot;
+    try {
+      primaryLocalStorageRoot =
+          (await const DecoyLocalRepository().primaryRoot()).path;
+    } catch (_) {
+      // A failed lookup only affects the extra warning. The sync picker still
+      // identifies the root directly when the user chooses it here.
+    }
     if (!mounted) return;
 
     setState(() {
       _config = config;
       _existing = existing;
       _report = report;
+      _targetIsPrimaryLocalStorageRoot = false;
       if (existing != null) {
         _targetUri = binding?.uri ?? existing.targetEndpointUri;
         _targetSub = binding != null
@@ -190,12 +214,20 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
             ? binding!.displayName
             : existing.targetDisplayName;
         _targetNotSetHere =
-            binding == null && existing.targetEndpointUri.startsWith('content://');
+            binding == null &&
+            existing.targetEndpointUri.startsWith('content://');
+        _targetIsPrimaryLocalStorageRoot =
+            _targetSub.isEmpty &&
+            primaryLocalStorageRoot != null &&
+            _targetUri == primaryLocalStorageRoot;
         _direction = existing.direction;
         _conflict = existing.conflictStrategy;
         _onUnlock = existing.autoSyncOnUnlock;
         _live = existing.liveWatch;
         _deletes = existing.deleteOrphans;
+        _deleteSourceAfterImport =
+            existing.direction == SyncDirection.targetToVault &&
+            existing.deleteSourceAfterImport;
         _ignore.text = existing.ignorePatterns.join('\n');
       }
       _initialTargetUri = _targetUri;
@@ -205,6 +237,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       _initialOnUnlock = _onUnlock;
       _initialLive = _live;
       _initialDeletes = _deletes;
+      _initialDeleteSourceAfterImport = _deleteSourceAfterImport;
       _initialIgnore = _ignore.text;
       _loading = false;
     });
@@ -232,6 +265,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     if (side == null || !mounted) return;
 
     final sub = normalizeSyncPath(side.relativePath);
+    final targetIsPrimaryLocalStorageRoot =
+        side.container.isPrimaryLocalStorage && sub.isEmpty;
 
     // A vault's own storage folder, reached as plain device storage, is
     // ciphertext: syncing with it would fill this vault with encrypted
@@ -255,14 +290,70 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       }
     }
 
+    final needsLocalRootDeleteWarning =
+        targetIsPrimaryLocalStorageRoot &&
+        _direction == SyncDirection.targetToVault &&
+        _deleteSourceAfterImport;
+    if (needsLocalRootDeleteWarning &&
+        !await _confirmLocalRootDeleteWarning()) {
+      return;
+    }
+
     setState(() {
       _targetUri = side.container.uri;
       _targetSub = sub;
-      _targetName = sub.isEmpty ? side.container.displayName : sub.split('/').last;
+      _targetName = sub.isEmpty
+          ? side.container.displayName
+          : sub.split('/').last;
       _targetIcon = side.kind.icon;
       _targetNotSetHere = false;
+      _targetIsPrimaryLocalStorageRoot = targetIsPrimaryLocalStorageRoot;
+      _localRootDeleteWarningAcknowledged = needsLocalRootDeleteWarning;
       _problem = null;
     });
+  }
+
+  bool get _requiresLocalRootDeleteWarning =>
+      _direction == SyncDirection.targetToVault &&
+      _targetIsPrimaryLocalStorageRoot &&
+      _targetSub.isEmpty &&
+      _deleteSourceAfterImport;
+
+  Future<bool> _confirmLocalRootDeleteWarning() async {
+    if (!mounted) return false;
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.autoSyncLocalRootDeleteWarningTitle),
+        content: Text(l10n.autoSyncLocalRootDeleteWarningMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.autoSyncLocalRootDeleteWarningConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return false;
+    _localRootDeleteWarningAcknowledged = true;
+    return true;
+  }
+
+  Future<void> _setDeleteSourceAfterImport(bool value) async {
+    if (value &&
+        _direction == SyncDirection.targetToVault &&
+        _targetIsPrimaryLocalStorageRoot) {
+      if (!await _confirmLocalRootDeleteWarning()) return;
+    } else if (!value) {
+      _localRootDeleteWarningAcknowledged = false;
+    }
+    if (!mounted) return;
+    setState(() => _deleteSourceAfterImport = value);
   }
 
   List<String> get _patterns => _ignore.text
@@ -274,6 +365,12 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
   Future<void> _save({required bool syncAfter}) async {
     final config = _config;
     if (config == null || !_canSave) return;
+    if (_requiresLocalRootDeleteWarning &&
+        !_localRootDeleteWarningAcknowledged &&
+        !await _confirmLocalRootDeleteWarning()) {
+      return;
+    }
+    if (!mounted) return;
     final l10n = context.l10n;
     final existing = _existing;
     final id = existing?.id ?? generateSyncId();
@@ -290,6 +387,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
       autoSyncOnUnlock: _onUnlock,
       liveWatch: _live,
       deleteOrphans: _deletes,
+      deleteSourceAfterImport: _deleteSourceAfterImport,
       ignorePatterns: _patterns,
       lastSyncedAt: existing?.lastSyncedAt,
     );
@@ -366,7 +464,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     var message = l10n.autoSyncSaved;
     var tone = AppBannerTone.success;
     if (syncAfter) {
-      final started = ref.read(syncCoordinatorServiceProvider).syncNow(widget.vault, id);
+      final started = ref
+          .read(syncCoordinatorServiceProvider)
+          .syncNow(widget.vault, id);
       message = started ? l10n.autoSyncStarted : l10n.autoSyncUnavailable;
       if (!started) tone = AppBannerTone.warning;
     }
@@ -402,17 +502,22 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     setState(() => _saving = true);
     final remainingRules = [
       for (final r in config.rules)
-        if (r.id != existing.id) r
+        if (r.id != existing.id) r,
     ];
-    final ok = await ref.read(syncConfigStoreProvider).save(
-      widget.vault,
-      config.copyWith(rules: remainingRules),
-    );
+    final ok = await ref
+        .read(syncConfigStoreProvider)
+        .save(widget.vault, config.copyWith(rules: remainingRules));
     if (ok) {
       try {
-        await ref.read(syncTargetBindingStoreProvider).delete(config.vaultSyncId, existing.id);
+        await ref
+            .read(syncTargetBindingStoreProvider)
+            .delete(config.vaultSyncId, existing.id);
       } catch (e) {
-        VeLog.w('SyncRuleEditorSheet', 'Target binding cleanup failed for rule ${existing.id}', e);
+        VeLog.w(
+          'SyncRuleEditorSheet',
+          'Target binding cleanup failed for rule ${existing.id}',
+          e,
+        );
       }
       await ref.read(syncCoordinatorServiceProvider).reloadConfig(widget.vault);
       final syncedPaths = remainingRules
@@ -443,7 +548,8 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     return switch (problem) {
       SyncRuleProblem.noTarget => l10n.autoSyncProblemNoTarget,
       SyncRuleProblem.overlapsTarget => l10n.autoSyncProblemOverlapsTarget,
-      SyncRuleProblem.overlapsOtherRule => l10n.autoSyncProblemOverlapsOtherRule,
+      SyncRuleProblem.overlapsOtherRule =>
+        l10n.autoSyncProblemOverlapsOtherRule,
     };
   }
 
@@ -488,7 +594,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         ),
         body: Padding(
           padding: const EdgeInsets.all(16),
-          child: InlineBanner(l10n.autoSyncConfigUnreadable, tone: AppBannerTone.error),
+          child: InlineBanner(
+            l10n.autoSyncConfigUnreadable,
+            tone: AppBannerTone.error,
+          ),
         ),
       );
     }
@@ -514,7 +623,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
             if (widget.folderName.isNotEmpty)
               Text(
                 widget.folderName,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -551,11 +662,16 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                   children: [
                     Text(
                       l10n.autoSyncSheetIntro,
-                      style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     if (_readOnly) ...[
                       const SizedBox(height: 12),
-                      InlineBanner(l10n.autoSyncReadOnlyNotice, tone: AppBannerTone.warning),
+                      InlineBanner(
+                        l10n.autoSyncReadOnlyNotice,
+                        tone: AppBannerTone.warning,
+                      ),
                     ],
                     const SizedBox(height: 12),
 
@@ -564,18 +680,29 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                     SectionCard(
                       children: [
                         ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: cs.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(_targetIcon, color: cs.primary, size: 22),
+                            child: Icon(
+                              _targetIcon,
+                              color: cs.primary,
+                              size: 22,
+                            ),
                           ),
                           title: Text(
-                            _targetUri.isEmpty ? l10n.autoSyncChooseFolder : _targetLabel,
-                            style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                            _targetUri.isEmpty
+                                ? l10n.autoSyncChooseFolder
+                                : _targetLabel,
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -585,7 +712,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                                   _targetSub,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
                                 ),
                           trailing: Icon(
                             Icons.chevron_right_rounded,
@@ -598,7 +727,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                             child: Text(
                               l10n.autoSyncTargetNotSetHere,
-                              style: textTheme.bodySmall?.copyWith(color: cs.error),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.error,
+                              ),
                             ),
                           ),
                       ],
@@ -620,7 +751,13 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                               subtitle: d.hint(l10n),
                             );
                           }).toList(),
-                          onChanged: (v) => setState(() => _direction = v),
+                          onChanged: (v) => setState(() {
+                            _direction = v;
+                            if (v != SyncDirection.targetToVault) {
+                              _deleteSourceAfterImport = false;
+                              _localRootDeleteWarningAcknowledged = false;
+                            }
+                          }),
                         ),
                         OptionPickerTile<ConflictStrategy>(
                           label: l10n.autoSyncConflictSection,
@@ -644,40 +781,76 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                     SectionCard(
                       children: [
                         SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           title: Text(
                             l10n.autoSyncOnUnlockTitle,
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           value: _onUnlock,
                           onChanged: (v) => setState(() => _onUnlock = v),
                         ),
                         SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           title: Text(
                             l10n.autoSyncLiveTitle,
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Text(
                             l10n.autoSyncLiveSubtitle,
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                           value: _live,
                           onChanged: (v) => setState(() => _live = v),
                         ),
                         SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           title: Text(
                             l10n.autoSyncDeleteTitle,
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Text(
                             l10n.autoSyncDeleteSubtitle,
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                           value: _deletes,
                           onChanged: (v) => setState(() => _deletes = v),
                         ),
+                        if (_direction == SyncDirection.targetToVault)
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
+                              l10n.autoSyncDeleteSourceAfterImportTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              l10n.autoSyncDeleteSourceAfterImportSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            value: _deleteSourceAfterImport,
+                            onChanged: _setDeleteSourceAfterImport,
+                          ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           child: TextField(
@@ -715,7 +888,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
 
                     if (_problem != null) ...[
                       const SizedBox(height: 12),
-                      InlineBanner(_problemText(_problem!), tone: AppBannerTone.error),
+                      InlineBanner(
+                        _problemText(_problem!),
+                        tone: AppBannerTone.error,
+                      ),
                     ],
 
                     if (_existing != null) ...[
@@ -723,7 +899,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                       Align(
                         alignment: Alignment.center,
                         child: TextButton.icon(
-                          style: TextButton.styleFrom(foregroundColor: cs.error),
+                          style: TextButton.styleFrom(
+                            foregroundColor: cs.error,
+                          ),
                           onPressed: (_readOnly || _saving) ? null : _remove,
                           icon: const Icon(Icons.sync_disabled_rounded),
                           label: Text(l10n.autoSyncRemove),
@@ -760,9 +938,11 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                         ),
                         onPressed: _canSave
                             ? () {
-                                final isInitialSync = _existing == null ||
+                                final isInitialSync =
+                                    _existing == null ||
                                     _existing?.lastSyncedAt == null ||
-                                    _existing?.targetEndpointUri.isEmpty == true ||
+                                    _existing?.targetEndpointUri.isEmpty ==
+                                        true ||
                                     _targetUri != _initialTargetUri ||
                                     _targetSub != _initialTargetSub;
                                 _save(syncAfter: isInitialSync);
@@ -780,7 +960,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                             : const Icon(Icons.save_rounded),
                         label: Text(
                           l10n.save,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -807,7 +990,9 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
         Text(
           at == null
               ? l10n.autoSyncNeverSynced
-              : l10n.autoSyncLastSynced(formatEntryDate(at.millisecondsSinceEpoch ~/ 1000)),
+              : l10n.autoSyncLastSynced(
+                  formatEntryDate(at.millisecondsSinceEpoch ~/ 1000),
+                ),
           style: muted,
         ),
         if (report != null) ...[

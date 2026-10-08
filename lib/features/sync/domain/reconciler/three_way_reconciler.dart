@@ -94,6 +94,7 @@ class ThreeWayReconciler {
       await run.decide(path);
     }
     run.reconcileDirectories();
+    run.addSourceCleanupActions();
     return run.finish();
   }
 
@@ -595,6 +596,28 @@ class _Run {
           }
         }
       }
+    }
+  }
+
+  /// Adds cleanup candidates for visible source files. The executor removes
+  /// each source only after the vault copy is committed and both SHA-256
+  /// digests match.
+  void addSourceCleanupActions() {
+    if (rule.direction != SyncDirection.targetToVault ||
+        !rule.deleteSourceAfterImport) {
+      return;
+    }
+
+    final paths = target.files.keys.toList()..sort();
+    for (final path in paths) {
+      actions.add(
+        SyncAction(
+          kind: SyncActionKind.deleteSourceAfterImport,
+          relPath: path,
+          vaultState: vault.files[path],
+          targetState: target.files[path],
+        ),
+      );
     }
   }
 

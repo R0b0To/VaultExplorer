@@ -129,9 +129,8 @@ class FileOperationService extends ChangeNotifier {
   /// Mirrors are the storage-commit phase of a transfer, so they extend an
   /// active transfer instead of incrementing the app-bar operation count.
   /// A mirror activity without a tracked transfer still represents one item.
-  int get combinedActivityCount => activeCount > 0
-      ? activeCount
-      : (_mirrorPushActiveCount > 0 ? 1 : 0);
+  int get combinedActivityCount =>
+      activeCount > 0 ? activeCount : (_mirrorPushActiveCount > 0 ? 1 : 0);
 
   List<RawEntry> getActivePlaceholders(int volId, String dirPath) {
     final placeholders = <RawEntry>[];
@@ -964,13 +963,24 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
     try {
       final count = await performImport(op.id);
-      if (count > 0) {
+      final hasSuccessfulItem = op._itemStatuses.any(
+        (item) => item.result == FileItemResult.success,
+      );
+      if (count > 0 || hasSuccessfulItem) {
         if (op._itemStatuses.length == 1 &&
             op._itemStatuses[0].result == FileItemResult.pending) {
           op._recordItemResult(0, FileItemResult.success);
         }
         op._setDoneCount(count);
-        op._setStatus(FileOperationStatus.completed);
+        op._setStatus(
+          op._itemStatuses.any((item) => item.result != FileItemResult.success)
+              ? FileOperationStatus.completedWithErrors
+              : FileOperationStatus.completed,
+        );
+      } else if (op._itemStatuses.any(
+        (item) => item.result == FileItemResult.failed,
+      )) {
+        op._setStatus(FileOperationStatus.completedWithErrors);
       } else {
         op._setStatus(FileOperationStatus.cancelled);
       }

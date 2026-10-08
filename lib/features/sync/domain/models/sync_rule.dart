@@ -69,6 +69,7 @@ class SyncRule {
   final bool autoSyncOnUnlock;
   final bool liveWatch;
   final bool deleteOrphans;
+  final bool deleteSourceAfterImport;
   final List<String> ignorePatterns;
   final DateTime? lastSyncedAt;
 
@@ -83,6 +84,7 @@ class SyncRule {
     this.autoSyncOnUnlock = true,
     this.liveWatch = false,
     this.deleteOrphans = false,
+    this.deleteSourceAfterImport = false,
     this.ignorePatterns = defaultIgnorePatterns,
     this.lastSyncedAt,
   });
@@ -102,6 +104,7 @@ class SyncRule {
     bool? autoSyncOnUnlock,
     bool? liveWatch,
     bool? deleteOrphans,
+    bool? deleteSourceAfterImport,
     List<String>? ignorePatterns,
     DateTime? lastSyncedAt,
   }) {
@@ -116,6 +119,8 @@ class SyncRule {
       autoSyncOnUnlock: autoSyncOnUnlock ?? this.autoSyncOnUnlock,
       liveWatch: liveWatch ?? this.liveWatch,
       deleteOrphans: deleteOrphans ?? this.deleteOrphans,
+      deleteSourceAfterImport:
+          deleteSourceAfterImport ?? this.deleteSourceAfterImport,
       ignorePatterns: ignorePatterns ?? this.ignorePatterns,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
@@ -132,6 +137,7 @@ class SyncRule {
     'autoSyncOnUnlock': autoSyncOnUnlock,
     'liveWatch': liveWatch,
     'deleteOrphans': deleteOrphans,
+    'deleteSourceAfterImport': deleteSourceAfterImport,
     'ignorePatterns': ignorePatterns,
     if (lastSyncedAt != null)
       'lastSyncedAt': lastSyncedAt!.millisecondsSinceEpoch,
@@ -162,6 +168,8 @@ class SyncRule {
       autoSyncOnUnlock: json['autoSyncOnUnlock'] as bool? ?? true,
       liveWatch: json['liveWatch'] as bool? ?? false,
       deleteOrphans: json['deleteOrphans'] as bool? ?? false,
+      deleteSourceAfterImport:
+          json['deleteSourceAfterImport'] as bool? ?? false,
       ignorePatterns: patterns is List
           ? patterns.whereType<String>().toList()
           : defaultIgnorePatterns,

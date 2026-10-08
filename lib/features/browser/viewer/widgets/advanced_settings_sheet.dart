@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -38,6 +39,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
   final ValueChanged<double> onSubtitleVerticalPositionChanged;
   final NativeVideoController? videoController;
   final bool isMuted;
+  final String? sessionKey;
 
   const AdvancedSettingsSheet({
     super.key,
@@ -48,6 +50,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
     required this.isPlaylistMode,
     required this.isImage,
     this.isMuted = false,
+    this.sessionKey,
     required this.currentFileName,
     required this.initialRotation,
     required this.initialImageFit,
@@ -75,9 +78,12 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
 }
 
 class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
+  late bool _localIsMuted;
+
   @override
   void initState() {
     super.initState();
+    _localIsMuted = widget.isMuted;
     if (widget.initialPage != null && widget.initialPage != 'main') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref
@@ -85,6 +91,21 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             .setSheetPage(widget.initialPage!);
       });
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdvancedSettingsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isMuted != widget.isMuted) {
+      _localIsMuted = widget.isMuted;
+    }
+  }
+
+  bool get _isMuted {
+    if (widget.sessionKey != null) {
+      return ref.watch(mediaViewerSessionProvider(widget.sessionKey!)).isMuted;
+    }
+    return _localIsMuted;
   }
 
   AdvancedSettingsParams _buildParams() => AdvancedSettingsParams(
@@ -463,24 +484,31 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
           },
         );
       case MediaViewerAction.mute:
+        final muted = _isMuted;
         return ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
-            widget.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-            color: widget.isMuted ? cs.error : null,
+            muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            color: muted ? cs.error : null,
           ),
           title: Text(
             action.getLocalizedLabel(context.l10n),
-            style: widget.isMuted ? TextStyle(color: cs.error) : null,
+            style: muted ? TextStyle(color: cs.error) : null,
           ),
           trailing: Switch(
-            value: !widget.isMuted,
+            value: !muted,
             activeColor: cs.primary,
             onChanged: (_) {
+              if (widget.sessionKey == null) {
+                setState(() => _localIsMuted = !_localIsMuted);
+              }
               widget.onExecuteAction(MediaViewerAction.mute);
             },
           ),
           onTap: () {
+            if (widget.sessionKey == null) {
+              setState(() => _localIsMuted = !_localIsMuted);
+            }
             widget.onExecuteAction(MediaViewerAction.mute);
           },
         );

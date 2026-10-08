@@ -110,6 +110,7 @@ private object ChannelMethods {
     const val CANCEL_IMPORT             = "cancelImport"
     const val CANCEL_EXPORT             = "cancelExport"
     const val DELETE_IMPORT_SOURCES     = "deleteImportSources"
+    const val CLEAR_IMPORT_SOURCES      = "clearImportSources"
     const val GET_FILE_SIZE             = "getFileSize"
     const val READ_FILE_CHUNK           = "readFileChunk"
     const val GET_MEDIA_FILE_SIZE       = "getMediaFileSize"
@@ -955,6 +956,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CANCEL_UNLOCK -> vaultUnlockHandlers.handleCancelUnlock(call, result)
                 ChannelMethods.CANCEL_IMPORT -> importExportHandlers.handleCancelImport(call, result)
                 ChannelMethods.DELETE_IMPORT_SOURCES -> importExportHandlers.handleDeleteImportSources(call, result)
+                ChannelMethods.CLEAR_IMPORT_SOURCES -> importExportHandlers.handleClearImportSources(call, result)
                 ChannelMethods.CHANGE_CONTAINER_PASSWORD -> vaultUnlockHandlers.handleChangeContainerPassword(call, result)
                 ChannelMethods.CHANGE_LUKS_CONTAINER_PASSWORD -> vaultUnlockHandlers.handleChangeLuksContainerPassword(call, result)
                 ChannelMethods.DERIVE_DERIVED_KEY -> derivedKeyHandlers.handleDeriveDerivedKey(call, result)

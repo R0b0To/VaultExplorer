@@ -641,10 +641,10 @@ than through it.
 |---|---|---|
 | `ACTION_UNLOCK_VAULT` | LIFECYCLE | Unlock a vault opted in to automation; dispatches to the block-device or directory-vault path per `AutomationSettings.getFormat`. Starts `VaultKeepAliveService`. No hidden-volume or keyfile support. |
 | `ACTION_LOCK_VAULT` | LIFECYCLE | Lock a vault; stops `VaultKeepAliveService` if no session remains active anywhere. |
-| `ACTION_IMPORT_FILE` | FULL | Import a real filesystem path into the vault, with an option to securely wipe the source afterward. |
-| `ACTION_EXPORT_FILE` | FULL | Export a path from inside the vault to a real filesystem path. |
-| `ACTION_IMPORT_FOLDER` | FULL | Import every matching file under a real folder into the vault (`VaultAutomationFolderOps.importFolder`), optionally recursive and filtered by an `EXTRA_PATTERN` glob (`GlobMatcher`). Replies with per-file matched/succeeded/failed/skipped counts, not just one outcome. |
-| `ACTION_EXPORT_FOLDER` | FULL | Export a vault folder to a real destination folder, same glob/recursive/count-summary shape as `IMPORT_FOLDER`. |
+| `ACTION_IMPORT_FILE` | FULL | Import a real filesystem path into the vault, with an option to securely wipe the source afterward; batch mode supports include/exclude globs. |
+| `ACTION_EXPORT_FILE` | FULL | Export a path from inside the vault to a real filesystem path; batch mode supports include/exclude globs. |
+| `ACTION_IMPORT_FOLDER` | FULL | Import every included file under a real folder into the vault (`VaultAutomationFolderOps.importFolder`), optionally recursive with `EXTRA_PATTERN` and `EXTRA_EXCLUDE_PATTERN` globs (`GlobMatcher`). Replies with per-file matched/succeeded/failed/skipped counts, not just one outcome. |
+| `ACTION_EXPORT_FOLDER` | FULL | Export a vault folder to a real destination folder, with the same include/exclude glob, recursive, and count-summary shape as `IMPORT_FOLDER`. |
 | `ACTION_TAKE_PHOTO` | FULL, **and** the vault's separate camera-capture opt-in (`AutomationSettings.canCapture`/`setAutomationCaptureEnabled`) | Headless photo capture straight into the vault via `VaultAutomationCaptureBridge`. |
 | `ACTION_START_RECORDING` / `ACTION_STOP_RECORDING` | FULL + capture opt-in, same as `TAKE_PHOTO` | Headless video capture. Owned end-to-end by `VaultAutomationRecordingService` — a foreground service (type `camera\|microphone`) that *is* the recording, unlike the UI-driven `VaultCameraRecordingService` (§4.4), because a broadcast-triggered capture has no Activity/Flutter engine to own a camera session. Auto-stops after a 3-hour safety cap (finalizing what was captured) if `STOP_RECORDING` never arrives. |
 | `ACTION_WIPE_FILE` | *(not vault-gated)* | Securely deletes an arbitrary plaintext path outside any vault — e.g. an `EXPORT_FILE` destination once a script has finished processing it. Still requires a valid API token. |

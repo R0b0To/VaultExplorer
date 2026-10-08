@@ -36,6 +36,37 @@ void main() {
       expect(iconForFile('bundle.zip'), Icons.archive_outlined);
     });
 
+    test('every audio extension gets the music icon, case-insensitively', () {
+      for (final ext in audioFileExtensions) {
+        expect(iconForFile('a.$ext'), Icons.audio_file_outlined, reason: ext);
+        expect(iconForFile('a.${ext.toUpperCase()}'),
+            Icons.audio_file_outlined,
+            reason: ext);
+      }
+      for (final ext in ['ac3', 'ogg', 'aiff', 'amr', 'opus', 'wma']) {
+        expect(audioFileExtensions, contains(ext));
+      }
+    });
+
+    test('every video extension gets the video icon, case-insensitively', () {
+      for (final ext in videoFileExtensions) {
+        expect(iconForFile('v.$ext'), Icons.ondemand_video_outlined,
+            reason: ext);
+        expect(iconForFile('v.${ext.toUpperCase()}'),
+            Icons.ondemand_video_outlined,
+            reason: ext);
+      }
+      expect(videoFileExtensions, contains('wmv'));
+    });
+
+    test('audio and video extension sets do not overlap', () {
+      expect(audioFileExtensions.intersection(videoFileExtensions), isEmpty);
+    });
+
+    test('.ts stays generic: TypeScript must not get a video icon', () {
+      expect(iconForFile('index.ts'), Icons.insert_drive_file_outlined);
+    });
+
     test('falls back to a generic file icon for unknown extensions', () {
       expect(iconForFile('data.xyz'), Icons.insert_drive_file_outlined);
     });
@@ -57,6 +88,15 @@ void main() {
 
     test('is case-insensitive on the extension', () {
       expect(colorForFile('report.PDF'), colorForFile('report.pdf'));
+    });
+
+    test('every audio/video extension shares its category color', () {
+      for (final ext in audioFileExtensions) {
+        expect(colorForFile('a.$ext'), colorForFile('song.mp3'), reason: ext);
+      }
+      for (final ext in videoFileExtensions) {
+        expect(colorForFile('v.$ext'), colorForFile('clip.mp4'), reason: ext);
+      }
     });
 
     test('unknown extensions and no-extension names share the same '

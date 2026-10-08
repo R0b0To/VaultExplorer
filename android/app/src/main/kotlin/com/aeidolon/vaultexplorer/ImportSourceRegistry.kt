@@ -19,7 +19,11 @@ import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
  * is ever reused.
  */
 object ImportSourceRegistry {
-    private data class Entry(val uris: List<Uri>, val isTree: Boolean)
+    private data class Entry(
+        val uris: List<Uri>,
+        val isTree: Boolean,
+        val verifiedForDeletion: Boolean = false,
+    )
     private val sources = ConcurrentHashMap<Int, Entry>()
 
     fun recordFiles(opId: Int, uris: List<Uri>) {
@@ -30,7 +34,21 @@ object ImportSourceRegistry {
         sources[opId] = Entry(listOf(treeUri), isTree = true)
     }
 
-    /** Removes and returns the entry for [opId], or null if none/already consumed. */
+    /** Allows source deletion only after import commit and readback checks succeed. */
+    fun markVerifiedForDeletion(opId: Int) {
+        sources.computeIfPresent(opId) { _, entry ->
+            entry.copy(verifiedForDeletion = true)
+        }
+    }
+
+    /** Removes a verified entry; unverified or unknown operations cannot delete sources. */
+    fun takeForDeletion(opId: Int): Pair<List<Uri>, Boolean>? {
+        val entry = sources[opId] ?: return null
+        if (!entry.verifiedForDeletion) return null
+        return take(opId)
+    }
+
+    /** Removes and returns any entry for [opId], or null if none/already consumed. */
     fun take(opId: Int): Pair<List<Uri>, Boolean>? {
         val entry = sources.remove(opId) ?: return null
         return entry.uris to entry.isTree

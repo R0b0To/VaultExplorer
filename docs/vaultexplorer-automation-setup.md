@@ -85,6 +85,7 @@ Imports a file (or batch of files matching a glob pattern) from the host filesys
   - `source_path` *(String, required)*: Either an absolute file/folder path on the device (e.g. `/storage/emulated/0/DCIM/Camera/IMG_001.jpg`), or a `content://` SAF URI.
   - `vault_path` *(String, required)*: Relative destination path or directory in the vault. Any missing parent folders inside the vault are created automatically.
   - `pattern` *(String, optional)*: Glob wildcard pattern (e.g. `*.xlsx`, `HOSPITAL_RECEIPT_*`, `**/*.pdf`). When specified, `source_path` is treated as a directory and all matching files are imported in a single batch.
+  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip in batch mode. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
   - `delete_source` *(Boolean, optional)*: If `true`, wipes matched source files upon successful import. For a raw filesystem path this is a secure overwrite-then-delete; for a `content://` source it's a normal provider delete.
 
@@ -99,7 +100,8 @@ Exports a decrypted file from the vault to the host filesystem, OR streams it di
   - `vault_uri` *(String, required)*
   - `vault_path` *(String, required)*: Relative path inside the vault to read.
   - `dest_path` *(String, optional)*: Either an absolute destination *file* path on the host filesystem, or a `content://` SAF *tree* (folder) URI. (Required unless `stream_mode=true`).
-  - `pattern` *(String, optional)*: Glob pattern to export matching files in batch.
+  - `pattern` *(String, optional)*: Glob pattern to export matching files in batch. Supplying `exclude_pattern` also selects batch mode when you want to export everything except the excluded paths.
+  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip in batch mode. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
   - `stream_mode` *(Boolean, optional)*: **Zero-Disk Decrypted Data Streaming**. If `true`, VaultExplorer creates a memory-backed seekable proxy file descriptor and returns a `stream_uri` in `AUTOMATION_RESULT`. The stream supports **random-access seeking (`lseek`)** and multi-pass reading (for 2-pass image decoders, video players, and PDF viewers) during its 5-minute validity window without writing plaintext to flash storage.
 
@@ -115,6 +117,7 @@ Recursively imports an entire folder (and everything inside it) into the vault w
   - `source_path` *(String, required)*: Absolute folder path on the device, or a `content://` SAF *tree* URI.
   - `vault_path` *(String, optional)*: Destination folder inside the vault. Omit, or leave empty, to import into the vault root.
   - `pattern` *(String, optional)*: Glob pattern (e.g. `*.pdf`, `{jpg,png}`) to import only matching files.
+  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth. Excluded source files are not imported or deleted by `delete_source`.
   - `recursive` *(Boolean, optional)*: Whether traversal enters subdirectories. Default: `true`.
   - `delete_source` *(Boolean, optional)*: Same semantics as `IMPORT_FILE`'s `delete_source`, applied per file.
 
@@ -132,6 +135,7 @@ Recursively exports a vault folder (and everything inside it) out to the host fi
   - `vault_path` *(String, optional)*: Source folder inside the vault. Omit, or leave empty, to export the whole vault.
   - `dest_path` *(String, required)*: Absolute destination folder path on the device, or a `content://` SAF tree URI. Created automatically if it doesn't exist yet.
   - `pattern` *(String, optional)*: Glob wildcard filter (e.g. `*.docx`).
+  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Default `true`.
 
 Same best-effort, per-file semantics as `IMPORT_FOLDER`.
@@ -263,6 +267,8 @@ Swap `IMPORT_FILE` for `IMPORT_FOLDER` and add a `pattern` to batch-import only 
 IMPORT_FOLDER source_path = /storage/emulated/0/DCIM/Camera vault_path = Photos
 pattern = *.{jpg,jpeg,png,heic} delete_source = true
 
+Add `exclude_pattern = Screenshots` to skip every folder named `Screenshots` and its contents, or `exclude_pattern = Trips/Private` to skip that path under the selected source folder.
+
 
 ### Variant: Direct capture (no separate camera app involved)
 Skips the OS camera / gallery step entirely -- VaultExplorer takes the photo or video itself, straight into the vault. Requires the **Allow camera capture** switch from Section 1.
@@ -360,7 +366,7 @@ simultaneously.
 
 Glob Pattern Syntax Reference
 
-The pattern extra uses an offline glob engine with the following syntax:
+The `pattern` and `exclude_pattern` extras use the same offline glob syntax:
 
 | Pattern         | Matches                                                    |
 | :-------------- | :--------------------------------------------------------- |
@@ -377,6 +383,15 @@ Pattern matching is case-insensitive by default. Examples:
   - **/*.pdf — all PDFs in the folder and all subdirectories
   - REPORT_202[4-9]_*.xlsx — spreadsheets from 2024–2029
   - {IMG,VID}_*.{jpg,mp4} — camera files with standard naming
+
+`pattern` is an inclusion filter: only matching files are transferred.
+`exclude_pattern` is a separate exclusion filter: matching files are skipped,
+and a matching folder also excludes everything beneath it. A pattern without
+`/` matches a file or folder name at any depth; a slash-separated path is
+relative to the selected folder. For example, `node_modules` excludes every
+folder with that name and its contents, while `Projects/private` excludes that
+path from the selected folder root and all of its contents. Exclusions are
+counted in `skipped_count`.
 
 ## 7. OEM Background Service Survival
 

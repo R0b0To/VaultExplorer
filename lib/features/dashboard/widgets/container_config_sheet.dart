@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -47,7 +48,8 @@ class ContainerConfigScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<ContainerConfigScreen> createState() => _ContainerConfigScreenState();
+  ConsumerState<ContainerConfigScreen> createState() =>
+      _ContainerConfigScreenState();
 }
 
 class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
@@ -70,16 +72,17 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
 
-  bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
+  bool get _isCryptomator =>
+      ContainerFormat.isCryptomatorWire(_containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
 
   ContainerConfigParams get _params => ContainerConfigParams(
-        uri: widget.uri,
-        currentLabel: widget.currentLabel,
-        containerFormat: _containerFormat,
-      );
+    uri: widget.uri,
+    currentLabel: widget.currentLabel,
+    containerFormat: _containerFormat,
+  );
 
   MountedContainer? get _effectiveMounted {
     if (widget.mountedContainer != null) return widget.mountedContainer;
@@ -104,7 +107,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     _pimCtrl.addListener(() => setState(() {}));
 
     Future.microtask(() {
-      ref.read(containerConfigControllerProvider(_params).notifier).initializeFromRecord(
+      ref
+          .read(containerConfigControllerProvider(_params).notifier)
+          .initializeFromRecord(
             rec: widget.existingRecord,
             appSettings: widget.appSettings,
             mountedContainer: widget.mountedContainer,
@@ -202,7 +207,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       builder: (_) => const PatternSetupSheet(),
     );
     if (hash != null && mounted) {
-      ref.read(containerConfigControllerProvider(_params).notifier).setPatternHash(hash);
+      ref
+          .read(containerConfigControllerProvider(_params).notifier)
+          .setPatternHash(hash);
     }
   }
 
@@ -213,7 +220,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       builder: (_) => const PinSetupSheet(),
     );
     if (hash != null && mounted) {
-      ref.read(containerConfigControllerProvider(_params).notifier).setPinHash(hash);
+      ref
+          .read(containerConfigControllerProvider(_params).notifier)
+          .setPinHash(hash);
     }
   }
 
@@ -229,11 +238,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           persistAcrossBackgrounding: true,
         );
         if (ok && mounted) {
-          final savedPassword =
-              await ref.read(containerRepositoryProvider).getPassword(widget.uri);
-          final savedPim =
-              await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
-          ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
+          final savedPassword = await ref
+              .read(containerRepositoryProvider)
+              .getPassword(widget.uri);
+          final savedPim = await ref
+              .read(appSecureStorageProvider)
+              .read(key: 'pim_${widget.uri}');
+          ref
+              .read(containerConfigControllerProvider(_params).notifier)
+              .unlockSettings();
           if (savedPassword != null && mounted) {
             _prefillPassword = savedPassword;
             _prefillCleared = false;
@@ -242,24 +255,35 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           if (savedPim != null && mounted) _pimCtrl.text = savedPim;
         }
       } catch (e) {
-        VeLog.w('ContainerConfigSheet', 'Biometric authentication to modify settings failed', e);
+        VeLog.w(
+          'ContainerConfigSheet',
+          'Biometric authentication to modify settings failed',
+          e,
+        );
       }
     } else if (record.unlockMethod == ContainerUnlockMethod.pattern) {
       if (state.patternHash == null) {
-        ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
+        ref
+            .read(containerConfigControllerProvider(_params).notifier)
+            .unlockSettings();
         return;
       }
       final hash = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
-        builder: (context) => _PatternVerifySheet(storedHash: state.patternHash!),
+        builder: (context) =>
+            _PatternVerifySheet(storedHash: state.patternHash!),
       );
       if (hash != null && mounted) {
-        final savedPassword =
-            await ref.read(containerRepositoryProvider).getPassword(widget.uri);
-        final savedPim =
-            await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
-        ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
+        final savedPassword = await ref
+            .read(containerRepositoryProvider)
+            .getPassword(widget.uri);
+        final savedPim = await ref
+            .read(appSecureStorageProvider)
+            .read(key: 'pim_${widget.uri}');
+        ref
+            .read(containerConfigControllerProvider(_params).notifier)
+            .unlockSettings();
         if (savedPassword != null && mounted) {
           _prefillPassword = savedPassword;
           _prefillCleared = false;
@@ -269,7 +293,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       }
     } else if (record.unlockMethod == ContainerUnlockMethod.pin) {
       if (state.pinHash == null) {
-        ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
+        ref
+            .read(containerConfigControllerProvider(_params).notifier)
+            .unlockSettings();
         return;
       }
       final hash = await showModalBottomSheet<String>(
@@ -278,11 +304,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         builder: (context) => _PinVerifySheet(storedHash: state.pinHash!),
       );
       if (hash != null && mounted) {
-        final savedPassword =
-            await ref.read(containerRepositoryProvider).getPassword(widget.uri);
-        final savedPim =
-            await ref.read(appSecureStorageProvider).read(key: 'pim_${widget.uri}');
-        ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
+        final savedPassword = await ref
+            .read(containerRepositoryProvider)
+            .getPassword(widget.uri);
+        final savedPim = await ref
+            .read(appSecureStorageProvider)
+            .read(key: 'pim_${widget.uri}');
+        ref
+            .read(containerConfigControllerProvider(_params).notifier)
+            .unlockSettings();
         if (savedPassword != null && mounted) {
           _prefillPassword = savedPassword;
           _prefillCleared = false;
@@ -291,27 +321,37 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         if (savedPim != null && mounted) _pimCtrl.text = savedPim;
       }
     } else {
-      final savedPassword =
-          await ref.read(containerRepositoryProvider).getPassword(widget.uri);
+      final savedPassword = await ref
+          .read(containerRepositoryProvider)
+          .getPassword(widget.uri);
       if (!mounted) return;
-      final verified = await showDialog<
-          ({String password, List<KeyfileRef> keyfiles, int cipherId, int hashId})>(
-        context: context,
-        builder: (context) => _RealPasswordGateDialog(
-          uri: widget.uri,
-          cipherId: record.cipherId,
-          hashId: record.hashId,
-          documentProvider: state.documentProvider,
-          cacheDerivedKey: state.cacheDerivedKey,
-          containerFormat: record.containerFormat,
-          initialKeyfiles: record.keyfiles,
-          initialPassword: savedPassword,
-          isMounted: widget.mountedContainer != null,
-          compositeCarriers: record.compositeCarriers,
-        ),
-      );
+      final verified =
+          await showDialog<
+            ({
+              String password,
+              List<KeyfileRef> keyfiles,
+              int cipherId,
+              int hashId,
+            })
+          >(
+            context: context,
+            builder: (context) => _RealPasswordGateDialog(
+              uri: widget.uri,
+              cipherId: record.cipherId,
+              hashId: record.hashId,
+              documentProvider: state.documentProvider,
+              cacheDerivedKey: state.cacheDerivedKey,
+              containerFormat: record.containerFormat,
+              initialKeyfiles: record.keyfiles,
+              initialPassword: savedPassword,
+              isMounted: widget.mountedContainer != null,
+              compositeCarriers: record.compositeCarriers,
+            ),
+          );
       if (verified != null && mounted) {
-        ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings(
+        ref
+            .read(containerConfigControllerProvider(_params).notifier)
+            .unlockSettings(
               verifiedPassword: verified.password,
               verifiedKeyfiles: verified.keyfiles,
               verifiedCipherId: verified.cipherId,
@@ -327,13 +367,14 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
   Future<void> _editDisplayName() async {
     final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _DisplayNameDialog(
-        initialText: _labelCtrl.text,
-      ),
+      builder: (dialogContext) =>
+          _DisplayNameDialog(initialText: _labelCtrl.text),
     );
     if (result != null && result.trim().isNotEmpty) {
       _labelCtrl.text = result.trim();
-      ref.read(containerConfigControllerProvider(_params).notifier).setLabel(result.trim());
+      ref
+          .read(containerConfigControllerProvider(_params).notifier)
+          .setLabel(result.trim());
     }
   }
 
@@ -358,13 +399,31 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       _pimCtrl.text = state.tempPim!;
     }
 
-    final isModified = state.isModified(_passwordCtrl.text, _labelCtrl.text, _pimCtrl.text);
+    final isModified = state.isModified(
+      _passwordCtrl.text,
+      _labelCtrl.text,
+      _pimCtrl.text,
+    );
     final canSave = state.canSave(_passwordCtrl.text);
 
-    final generalSection = _buildGeneralSection(context);
-    final securitySection = _buildSecuritySection(context, state, cs, textTheme);
-    final systemSection = _buildSystemIntegrationSection(context, state, textTheme);
-    final thumbnailSection = _buildThumbnailSection(context, state, textTheme, cs);
+    final generalSection = _buildGeneralSection(context, state);
+    final securitySection = _buildSecuritySection(
+      context,
+      state,
+      cs,
+      textTheme,
+    );
+    final systemSection = _buildSystemIntegrationSection(
+      context,
+      state,
+      textTheme,
+    );
+    final thumbnailSection = _buildThumbnailSection(
+      context,
+      state,
+      textTheme,
+      cs,
+    );
     final toolsSection = _buildToolsSection(context, cs, textTheme);
 
     return Scaffold(
@@ -377,11 +436,17 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     widget.uri.startsWith('usb:')
                         ? context.l10n.usbVaultSettingsTitle
                         : context.l10n.vaultSettingsTitle,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: cs.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
@@ -404,7 +469,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     widget.uri.startsWith('usb:')
                         ? context.l10n.usbVaultSettingsTitle
                         : context.l10n.vaultSettingsTitle,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                   Text(
                     _containerFormat.toUpperCase(),
@@ -446,10 +514,14 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                           child: InlineBanner(
                             state.needsPatternSetup
-                                ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                                ? context
+                                      .l10n
+                                      .patternSetupRequiredAboveBeforeSaving
                                 : state.needsPinSetup
-                                    ? context.l10n.pinSetupRequiredAboveBeforeSaving
-                                    : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                                ? context.l10n.pinSetupRequiredAboveBeforeSaving
+                                : context
+                                      .l10n
+                                      .passwordOrCacheDerivedKeyRequiredMessage,
                             tone: AppBannerTone.error,
                             icon: Icons.info_outline_rounded,
                           ),
@@ -457,7 +529,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                       ],
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -467,7 +542,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.only(right: 12),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       generalSection,
                                       const SizedBox(height: 14),
@@ -480,7 +556,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                               VerticalDivider(
                                 width: 1,
                                 thickness: 1,
-                                color: cs.outlineVariant.withValues(alpha: 0.25),
+                                color: cs.outlineVariant.withValues(
+                                  alpha: 0.25,
+                                ),
                               ),
                               // Right Column: System, Storage & Tools (independent scroll)
                               Expanded(
@@ -488,7 +566,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.only(left: 12),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       systemSection,
                                       const SizedBox(height: 14),
@@ -507,7 +586,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     ],
                   )
                 : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -531,7 +613,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     );
   }
 
-  Widget _buildGeneralSection(BuildContext context) {
+  Widget _buildGeneralSection(
+    BuildContext context,
+    ContainerConfigState state,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -539,7 +624,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         SectionCard(
           children: [
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
               title: Text(_labelCtrl.text.trim()),
               trailing: IconButton(
                 icon: const Icon(Icons.edit_outlined),
@@ -547,6 +635,27 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 onPressed: _editDisplayName,
               ),
               onTap: _editDisplayName,
+            ),
+            OptionPickerTile<VaultDeleteAfterImportMode>(
+              label: context.l10n.deleteAfterImportVaultSettingLabel,
+              value: state.vaultDeleteAfterImportMode,
+              subtitle: state.vaultDeleteAfterImportMode.getLocalizedSubtitle(
+                context.l10n,
+                state.globalDeleteAfterImportMode,
+              ),
+              options: VaultDeleteAfterImportMode.values.map((mode) {
+                return SelectOption(
+                  value: mode,
+                  label: mode.getLocalizedLabel(context.l10n),
+                  subtitle: mode.getLocalizedSubtitle(
+                    context.l10n,
+                    state.globalDeleteAfterImportMode,
+                  ),
+                );
+              }).toList(),
+              onChanged: (mode) => ref
+                  .read(containerConfigControllerProvider(_params).notifier)
+                  .setVaultDeleteAfterImportMode(mode),
             ),
           ],
         ),
@@ -579,12 +688,16 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     children: [
                       Text(
                         context.l10n.securityOptionsLockedTitle,
-                        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         context.l10n.authenticateOriginalCredentialsMessage,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
@@ -593,7 +706,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         icon: const Icon(Icons.lock_open_rounded, size: 18),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 44),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         label: Text(context.l10n.unlockSettingsButton),
                       ),
@@ -607,51 +722,68 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 value: state.unlockMethod,
                 subtitle: state.unlockMethod.getLocalizedSubtitle(context.l10n),
                 options: ContainerUnlockMethod.values
-                    .where((m) =>
-                        m != ContainerUnlockMethod.biometrics ||
-                        state.biometricAvailable ||
-                        state.unlockMethod == m)
+                    .where(
+                      (m) =>
+                          m != ContainerUnlockMethod.biometrics ||
+                          state.biometricAvailable ||
+                          state.unlockMethod == m,
+                    )
                     .map((m) {
-                  final isUnavailableBio =
-                      m == ContainerUnlockMethod.biometrics && !state.biometricAvailable;
-                  return SelectOption(
-                    value: m,
-                    label: isUnavailableBio
-                        ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
-                        : m.getLocalizedLabel(context.l10n),
-                    subtitle: m.getLocalizedSubtitle(context.l10n),
-                  );
-                }).toList(),
+                      final isUnavailableBio =
+                          m == ContainerUnlockMethod.biometrics &&
+                          !state.biometricAvailable;
+                      return SelectOption(
+                        value: m,
+                        label: isUnavailableBio
+                            ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
+                            : m.getLocalizedLabel(context.l10n),
+                        subtitle: m.getLocalizedSubtitle(context.l10n),
+                      );
+                    })
+                    .toList(),
                 onChanged: (v) {
-                  ref.read(containerConfigControllerProvider(_params).notifier).setUnlockMethod(v);
+                  ref
+                      .read(containerConfigControllerProvider(_params).notifier)
+                      .setUnlockMethod(v);
                   if (v == ContainerUnlockMethod.password) {
                     _passwordCtrl.clear();
                   } else if (v == ContainerUnlockMethod.pattern) {
-                    if (ref.read(containerConfigControllerProvider(_params)).patternHash == null) {
+                    if (ref
+                            .read(containerConfigControllerProvider(_params))
+                            .patternHash ==
+                        null) {
                       _setupPattern();
                     }
                   } else if (v == ContainerUnlockMethod.pin) {
-                    if (ref.read(containerConfigControllerProvider(_params)).pinHash == null) {
+                    if (ref
+                            .read(containerConfigControllerProvider(_params))
+                            .pinHash ==
+                        null) {
                       _setupPin();
                     }
                   }
                 },
               ),
               if (widget.existingRecord != null &&
-                  widget.existingRecord!.unlockMethod != ContainerUnlockMethod.password &&
+                  widget.existingRecord!.unlockMethod !=
+                      ContainerUnlockMethod.password &&
                   state.unlockMethod != ContainerUnlockMethod.password &&
                   !state.changePassword) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: FilledButton.tonalIcon(
                     onPressed: () => ref
-                        .read(containerConfigControllerProvider(_params).notifier)
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
                         .setChangePassword(true),
                     icon: const Icon(Icons.key_rounded, size: 18),
                     label: Text(context.l10n.updateSavedCredentialsButton),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(double.infinity, 44),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       backgroundColor: cs.surfaceContainerHighest,
                       foregroundColor: cs.primary,
                     ),
@@ -660,7 +792,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               ],
               if (state.unlockMethod != ContainerUnlockMethod.password &&
                   (widget.existingRecord == null ||
-                      widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password ||
+                      widget.existingRecord!.unlockMethod ==
+                          ContainerUnlockMethod.password ||
                       state.changePassword)) ...[
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -679,8 +812,12 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: cs.surfaceContainerHighest,
-                          labelText: context.l10n.containerPasswordOptionalLabel,
-                          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                          labelText:
+                              context.l10n.containerPasswordOptionalLabel,
+                          prefixIcon: const Icon(
+                            Icons.lock_outline_rounded,
+                            size: 20,
+                          ),
                           suffixIcon: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -688,24 +825,40 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                 Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: Tooltip(
-                                    message: context.l10n.usingSavedPasswordTooltip,
-                                    child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
+                                    message:
+                                        context.l10n.usingSavedPasswordTooltip,
+                                    child: Icon(
+                                      Icons.bookmark_rounded,
+                                      size: 20,
+                                      color: cs.primary,
+                                    ),
                                   ),
                                 ),
                               PasswordVisibilityToggle(
                                 obscured: _revealLocked ? true : !_showPassword,
                                 enabled: !_revealLocked,
-                                onToggle: () => setState(() => _showPassword = !_showPassword),
+                                onToggle: () => setState(
+                                  () => _showPassword = !_showPassword,
+                                ),
                               ),
                               if (widget.existingRecord != null &&
                                   widget.existingRecord!.unlockMethod !=
                                       ContainerUnlockMethod.password)
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 20),
-                                  tooltip: context.l10n.cancelUpdatingPasswordTooltip,
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 20,
+                                  ),
+                                  tooltip: context
+                                      .l10n
+                                      .cancelUpdatingPasswordTooltip,
                                   onPressed: () {
                                     ref
-                                        .read(containerConfigControllerProvider(_params).notifier)
+                                        .read(
+                                          containerConfigControllerProvider(
+                                            _params,
+                                          ).notifier,
+                                        )
                                         .setChangePassword(false);
                                     _passwordCtrl.clear();
                                     _prefillCleared = true;
@@ -723,18 +876,23 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     ],
                   ),
                 ),
-                if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
-                  PimInputField(
-                    controller: _pimCtrl,
-                    enabled: !state.saving,
-                  ),
+                if (!_isCryptomator &&
+                    !_isGocryptfs &&
+                    !_isCryfs &&
+                    !_isBitlocker) ...[
+                  PimInputField(controller: _pimCtrl, enabled: !state.saving),
                   KeyfilesPicker(
                     keyfiles: state.keyfiles,
                     picking: state.pickingKeyfiles,
-                    onPick: () =>
-                        ref.read(containerConfigControllerProvider(_params).notifier).pickKeyfiles(),
+                    onPick: () => ref
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
+                        .pickKeyfiles(),
                     onRemove: (k) => ref
-                        .read(containerConfigControllerProvider(_params).notifier)
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
                         .removeKeyfile(k),
                   ),
                 ],
@@ -746,11 +904,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     onPressed: _setupPattern,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 44),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: Text(state.patternHash != null
-                        ? context.l10n.changePatternButton
-                        : context.l10n.setPatternButton),
+                    child: Text(
+                      state.patternHash != null
+                          ? context.l10n.changePatternButton
+                          : context.l10n.setPatternButton,
+                    ),
                   ),
                 ),
               ],
@@ -761,11 +923,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     onPressed: _setupPin,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 44),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: Text(state.pinHash != null
-                        ? context.l10n.changePinButton
-                        : context.l10n.setPinButton),
+                    child: Text(
+                      state.pinHash != null
+                          ? context.l10n.changePinButton
+                          : context.l10n.setPinButton,
+                    ),
                   ),
                 ),
               ],
@@ -774,20 +940,25 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   title: Text(
                     context.l10n.cacheDerivedKeyLabel,
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   subtitle: Text(
                     _isCryfs
                         ? context.l10n.cryfsSkipScryptKdfSubtitle
                         : context.l10n.reuseKeyMaterialKeystoreSubtitle,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                   value: state.cacheDerivedKey,
                   onChanged: (v) => ref
                       .read(containerConfigControllerProvider(_params).notifier)
                       .setCacheDerivedKey(v),
                 ),
-                if (state.cacheDerivedKey) _buildDerivedKeyLifetimeTile(context, state),
+                if (state.cacheDerivedKey)
+                  _buildDerivedKeyLifetimeTile(context, state),
                 if (!_isCryfs)
                   AdvancedParamsPanel(
                     collapsible: false,
@@ -795,29 +966,43 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     hashId: state.hashId,
                     subtitle: context.l10n.pinAlgorithmSkipAutoDetectSubtitle,
                     onCipherChanged: (val) => ref
-                        .read(containerConfigControllerProvider(_params).notifier)
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
                         .setCipherId(val),
                     onHashChanged: (val) => ref
-                        .read(containerConfigControllerProvider(_params).notifier)
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
                         .setHashId(val),
                   ),
               ],
             ],
             if (widget.existingRecord != null) ...[
               ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 leading: Icon(Icons.key_rounded, color: cs.primary),
                 title: Text(
                   context.l10n.changeContainerPasswordTitle,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                trailing: Icon(
+                  Icons.chevron_right_rounded,
+                  color: cs.onSurfaceVariant,
+                ),
                 onTap: () async {
                   final rec = widget.existingRecord;
                   if (rec?.isCompositeSource == true) {
                     showAppSnackBar(
                       context,
-                      message: context.l10n.compositePasswordChangeNotSupportedMessage,
+                      message: context
+                          .l10n
+                          .compositePasswordChangeNotSupportedMessage,
                       tone: AppBannerTone.warning,
                     );
                     return;
@@ -826,7 +1011,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   if (fmt == 'bitlocker') {
                     showAppSnackBar(
                       context,
-                      message: context.l10n.bitlockerCredentialsChangeNotSupportedMessage,
+                      message: context
+                          .l10n
+                          .bitlockerCredentialsChangeNotSupportedMessage,
                       tone: AppBannerTone.warning,
                     );
                   } else {
@@ -843,7 +1030,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     );
                     if (result is List<KeyfileRef> && mounted) {
                       ref
-                          .read(containerConfigControllerProvider(_params).notifier)
+                          .read(
+                            containerConfigControllerProvider(_params).notifier,
+                          )
                           .setKeyfiles(result);
                     }
                   }
@@ -875,7 +1064,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     return OptionPickerTile<int>(
       label: l10n.cacheDerivedKeyLifetimeTitle,
       prefixIcon: Icons.timer_outlined,
-      value: pendingDays ??
+      value:
+          pendingDays ??
           (stored != null ? kKeepDerivedKeyExpiry : kNoDerivedKeyExpiry),
       options: [
         if (stored != null)
@@ -939,11 +1129,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     context,
                     currentMinutes: state.autoCloseMins,
                     onPicked: (mins) => ref
-                        .read(containerConfigControllerProvider(_params).notifier)
+                        .read(
+                          containerConfigControllerProvider(_params).notifier,
+                        )
                         .setAutoCloseMins(mins),
                   );
                 } else {
-                  ref.read(containerConfigControllerProvider(_params).notifier).setAutoCloseMins(v);
+                  ref
+                      .read(containerConfigControllerProvider(_params).notifier)
+                      .setAutoCloseMins(v);
                 }
               },
             ),
@@ -951,11 +1145,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(
                 context.l10n.androidFileProviderTitle,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               subtitle: Text(
                 context.l10n.exposeContentToFilePickerSubtitle,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
               value: state.documentProvider,
               onChanged: (v) => ref
@@ -963,16 +1161,26 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   .setDocumentProvider(v),
             ),
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
               title: Text(
                 context.l10n.autoSyncMenuAction,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               subtitle: Text(
                 context.l10n.autoSyncSheetIntro,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
-              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+              ),
               onTap: () {
                 final mountedVault = _effectiveMounted;
                 if (mountedVault != null) {
@@ -1024,7 +1232,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               OptionPickerTile<ThumbnailCacheMode>(
                 label: context.l10n.cacheModeLabel,
                 value: state.thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                subtitle: state.thumbnailCacheMode?.getLocalizedLabel(context.l10n) ??
+                subtitle:
+                    state.thumbnailCacheMode?.getLocalizedLabel(context.l10n) ??
                     context.l10n.useGlobalDefaultSubtitle,
                 options: ThumbnailCacheMode.values.map((mode) {
                   return SelectOption(
@@ -1039,20 +1248,28 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               ),
               ThumbnailQualityTile(
                 label: context.l10n.thumbnailQualityLabel,
-                value: state.thumbnailQuality ?? ThumbnailQuality.defaultQuality,
+                value:
+                    state.thumbnailQuality ?? ThumbnailQuality.defaultQuality,
                 onChanged: (v) => ref
                     .read(containerConfigControllerProvider(_params).notifier)
                     .setThumbnailQuality(v),
               ),
               ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 title: Text(
                   context.l10n.clearThumbnailCacheTitle,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 subtitle: Text(
                   context.l10n.removeCachedThumbnailsSubtitle,
-                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
                 trailing: state.clearingCache
                     ? const SizedBox(
@@ -1060,7 +1277,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                    : Icon(
+                        Icons.chevron_right_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
                 onTap: state.clearingCache ? null : _clearThumbnailCache,
               ),
             ],
@@ -1082,17 +1302,27 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         SectionCard(
           children: [
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
               leading: Icon(Icons.info_outline_rounded, color: cs.primary),
               title: Text(
                 context.l10n.vaultInformationTileTitle,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               subtitle: Text(
                 context.l10n.vaultInformationTileSubtitle,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
-              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+              ),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1104,17 +1334,27 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               ),
             ),
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
               leading: Icon(Icons.bolt_rounded, color: cs.primary),
               title: Text(
                 context.l10n.automationTileTitle,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               subtitle: Text(
                 context.l10n.automationTileSubtitle,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
-              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+              ),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1147,11 +1387,16 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
                 border: Border(
-                  top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                  top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.3),
+                  ),
                 ),
               ),
               child: SafeArea(
-                minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                minimum: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Center(
                   heightFactor: 1.0,
                   child: ConstrainedBox(
@@ -1163,15 +1408,25 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.info_outline_rounded, size: 18, color: cs.error),
+                              Icon(
+                                Icons.info_outline_rounded,
+                                size: 18,
+                                color: cs.error,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   state.needsPatternSetup
-                                      ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                                      ? context
+                                            .l10n
+                                            .patternSetupRequiredAboveBeforeSaving
                                       : state.needsPinSetup
-                                          ? context.l10n.pinSetupRequiredAboveBeforeSaving
-                                          : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                                      ? context
+                                            .l10n
+                                            .pinSetupRequiredAboveBeforeSaving
+                                      : context
+                                            .l10n
+                                            .passwordOrCacheDerivedKeyRequiredMessage,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.error,
                                     fontWeight: FontWeight.bold,
@@ -1183,7 +1438,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                           const SizedBox(height: 10),
                         ],
                         FilledButton(
-                          onPressed: (state.saving || !canSave) ? null : () => _save(state),
+                          onPressed: (state.saving || !canSave)
+                              ? null
+                              : () => _save(state),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(48),
                             shape: const StadiumBorder(),
@@ -1199,7 +1456,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                 )
                               : Text(
                                   context.l10n.saveConfigurationButton,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
                                 ),
                         ),
                       ],

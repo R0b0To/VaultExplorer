@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -103,7 +104,7 @@ enum ContainerUnlockMethod {
     _ => ContainerUnlockMethod.password,
   };
 }
- 
+
 @Riverpod(keepAlive: true)
 ContainerRepository containerRepository(Ref ref) =>
     ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
@@ -118,7 +119,7 @@ String derivedKeyPathForUri(String uri) =>
 
 class ContainerRepository {
   ContainerRepository._(this._clearDerivedKey, [AppSecureStorage? secure])
-      : _secure = secure ?? AppSecureStorage.instance;
+    : _secure = secure ?? AppSecureStorage.instance;
   ContainerRepository.withCryptoApi(
     VaultCryptoApi cryptoApi, [
     AppSecureStorage? secure,
@@ -512,7 +513,8 @@ class ContainerRepository {
     String Function(String) legacyKeyExtractor, [
     Iterable<String>? otherUris,
   ]) {
-    final others = otherUris ??
+    final others =
+        otherUris ??
         (_cache?.keys.where((u) => u != uri) ?? const Iterable<String>.empty());
     return others.any((u) => legacyKeyExtractor(u) == legacyKey);
   }
@@ -586,7 +588,12 @@ class ContainerRepository {
   ) async {
     try {
       await _secure.write(key: key, value: value);
-      if (_shouldDeleteLegacyKey(uri, legacyKey, legacyKeyExtractor, otherUris)) {
+      if (_shouldDeleteLegacyKey(
+        uri,
+        legacyKey,
+        legacyKeyExtractor,
+        otherUris,
+      )) {
         await _secure.delete(key: legacyKey);
       }
     } catch (e) {
@@ -606,8 +613,9 @@ class ContainerRepository {
 
   static String _legacyScopedKey(String prefix, String uri, int legacyLimit) {
     final encoded = base64Url.encode(utf8.encode(uri));
-    final trimmed =
-        encoded.length > legacyLimit ? encoded.substring(0, legacyLimit) : encoded;
+    final trimmed = encoded.length > legacyLimit
+        ? encoded.substring(0, legacyLimit)
+        : encoded;
     return '$prefix$trimmed';
   }
 
@@ -764,14 +772,16 @@ class ContainerRepository {
           if (key != legacyKey) {
             final legacyVal = secureData[legacyKey];
             if (legacyVal != null) {
-              migrations.add(_migrateLegacySecureKey(
-                rawRecord.uri,
-                key,
-                legacyKey,
-                legacyExtractor,
-                legacyVal,
-                otherUris,
-              ));
+              migrations.add(
+                _migrateLegacySecureKey(
+                  rawRecord.uri,
+                  key,
+                  legacyKey,
+                  legacyExtractor,
+                  legacyVal,
+                  otherUris,
+                ),
+              );
               return legacyVal;
             }
           }
@@ -930,6 +940,7 @@ class ContainerRecord {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
+  final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
   final bool readOnly;
   final String? pendingPassword;
   final String? pendingPatternHash;
@@ -963,6 +974,7 @@ class ContainerRecord {
     this.thumbnailQuality,
     this.readOnly = false,
     this.cacheDerivedKey = false,
+    this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.pendingPassword,
     this.pendingPatternHash,
     this.pendingPinHash,
@@ -989,7 +1001,10 @@ class ContainerRecord {
   /// && !autoCloseScreenLockOnly), which is also the default for every
   /// container that's never had this setting touched.
   bool get isExemptFromGlobalLock =>
-      autoCloseNever || autoCloseImmediately || autoCloseScreenLockOnly || autoCloseMins > 0;
+      autoCloseNever ||
+      autoCloseImmediately ||
+      autoCloseScreenLockOnly ||
+      autoCloseMins > 0;
 
   ContainerRecord copyWith({
     String? label,
@@ -1004,6 +1019,7 @@ class ContainerRecord {
     Object? thumbnailCacheMode = _keep,
     Object? thumbnailQuality = _keep,
     bool? cacheDerivedKey,
+    VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
     bool? readOnly,
     String? pendingPassword,
     String? pendingPatternHash,
@@ -1024,7 +1040,8 @@ class ContainerRecord {
       autoCloseMins: autoCloseMins ?? this.autoCloseMins,
       autoCloseNever: autoCloseNever ?? this.autoCloseNever,
       autoCloseImmediately: autoCloseImmediately ?? this.autoCloseImmediately,
-      autoCloseScreenLockOnly: autoCloseScreenLockOnly ?? this.autoCloseScreenLockOnly,
+      autoCloseScreenLockOnly:
+          autoCloseScreenLockOnly ?? this.autoCloseScreenLockOnly,
       documentProvider: documentProvider ?? this.documentProvider,
       documentProviderFolders:
           documentProviderFolders ?? this.documentProviderFolders,
@@ -1035,6 +1052,8 @@ class ContainerRecord {
           ? this.thumbnailQuality
           : thumbnailQuality as ThumbnailQuality?,
       cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
+      vaultDeleteAfterImportMode:
+          vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
       readOnly: readOnly ?? this.readOnly,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
@@ -1064,6 +1083,7 @@ class ContainerRecord {
     if (thumbnailQuality != null)
       'thumbnailQuality': thumbnailQuality!.toJson(),
     'cacheDerivedKey': cacheDerivedKey,
+    'vaultDeleteAfterImportMode': vaultDeleteAfterImportMode.toJson(),
     'readOnly': readOnly,
     'cipherId': cipherId,
     'hashId': hashId,
@@ -1100,6 +1120,9 @@ class ContainerRecord {
           ? ThumbnailQuality.fromJson(j['thumbnailQuality'])
           : null,
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
+      vaultDeleteAfterImportMode: VaultDeleteAfterImportMode.fromJson(
+        j['vaultDeleteAfterImportMode'] as String?,
+      ),
       readOnly: j['readOnly'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,

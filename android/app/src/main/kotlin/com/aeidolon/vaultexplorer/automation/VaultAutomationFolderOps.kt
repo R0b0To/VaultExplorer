@@ -137,6 +137,7 @@ object VaultAutomationFolderOps {
         deleteSource: Boolean,
         pattern: GlobMatcher.GlobPattern? = null,
         recursive: Boolean = true,
+        excludePattern: GlobMatcher.GlobPattern? = null,
     ): OpSummary? {
         val root = resolveSourceFolder(context, sourceSpec) ?: return null
         var ok = 0
@@ -145,7 +146,9 @@ object VaultAutomationFolderOps {
         val destBase = VaultPathUtils.normalize(vaultDestDir)
 
         fun importLeaf(vaultPath: String, relativePath: String, rawFile: File?, docUri: Uri?) {
-            if (pattern != null && !GlobMatcher.matches(pattern, relativePath)) {
+            if ((excludePattern?.matchesPathOrAncestor(relativePath) == true) ||
+                (pattern != null && !GlobMatcher.matches(pattern, relativePath))
+            ) {
                 skipped++
                 return
             }
@@ -224,6 +227,7 @@ object VaultAutomationFolderOps {
         destSpec: String,
         pattern: GlobMatcher.GlobPattern? = null,
         recursive: Boolean = true,
+        excludePattern: GlobMatcher.GlobPattern? = null,
     ): OpSummary? {
         val dest = resolveDestFolder(context, destSpec) ?: return null
         var ok = 0
@@ -234,7 +238,9 @@ object VaultAutomationFolderOps {
         val saf = if (dest is ResolvedFolder.Tree) SafDocumentOps(context) else null
 
         fun exportLeaf(vaultPath: String, relativePath: String) {
-            if (pattern != null && !GlobMatcher.matches(pattern, relativePath)) {
+            if ((excludePattern?.matchesPathOrAncestor(relativePath) == true) ||
+                (pattern != null && !GlobMatcher.matches(pattern, relativePath))
+            ) {
                 skipped++
                 return
             }

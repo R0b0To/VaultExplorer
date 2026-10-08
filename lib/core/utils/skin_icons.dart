@@ -190,6 +190,8 @@ abstract final class SkinIcons {
   /// icon it gets.
   static FileGlyph glyphForFile(String name) {
     final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    if (videoFileExtensions.contains(ext)) return FileGlyph.video;
+    if (audioFileExtensions.contains(ext)) return FileGlyph.audio;
     switch (ext) {
       case 'pdf':
         return FileGlyph.pdf;
@@ -201,20 +203,6 @@ abstract final class SkinIcons {
       case 'heic':
       case 'webp':
         return FileGlyph.image;
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-      case 'mkv':
-      case 'webm':
-      case 'm4v':
-      case 'mpeg':
-      case 'mpg':
-        return FileGlyph.video;
-      case 'mp3':
-      case 'flac':
-      case 'wav':
-      case 'm4a':
-        return FileGlyph.audio;
       case 'txt':
       case 'md':
       case 'csv':

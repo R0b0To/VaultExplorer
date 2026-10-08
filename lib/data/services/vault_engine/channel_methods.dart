@@ -58,6 +58,7 @@ abstract final class ChannelMethods {
   static const cancelImport = 'cancelImport';
   static const cancelExport = 'cancelExport';
   static const deleteImportSources = 'deleteImportSources';
+  static const clearImportSources = 'clearImportSources';
   static const getFileSize = 'getFileSize';
   static const getFolderSize = 'getFolderSize';
   static const readFileChunk = 'readFileChunk';

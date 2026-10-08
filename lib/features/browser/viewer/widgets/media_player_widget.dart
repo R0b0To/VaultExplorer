@@ -1070,8 +1070,6 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         children: [
           if (posterContent != null)
             posterContent
-          else if (widget.isAudio)
-            Center(child: _buildAudioCenterVisual(cs, isPlaying: false))
           else
             const SizedBox.expand(),
         ],
@@ -1220,8 +1218,15 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               },
             ),
           ),
-        if (widget.isAudio && controller != null && isVideoReady)
-          _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
+        if (widget.isAudio)
+          controller != null
+              ? ValueListenableBuilder<NativeVideoValue>(
+                  valueListenable: controller,
+                  builder: (context, val, _) {
+                    return _buildAudioCenterVisual(cs, isPlaying: val.isPlaying);
+                  },
+                )
+              : _buildAudioCenterVisual(cs, isPlaying: false)
         else if (!widget.isAudio && widget.subtitlesEnabled)
           Positioned.fill(
             child: LayoutBuilder(
@@ -1315,7 +1320,11 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             ),
           ),
         if (controller != null && _isActive)
-          _MediaLoadingFeedbackOverlay(controller: controller, colorScheme: cs),
+          _MediaLoadingFeedbackOverlay(
+            controller: controller,
+            colorScheme: cs,
+            isAudio: widget.isAudio,
+          ),
         Positioned.fill(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -2350,10 +2359,12 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
 class _MediaLoadingFeedbackOverlay extends StatefulWidget {
   final NativeVideoController controller;
   final ColorScheme colorScheme;
+  final bool isAudio;
 
   const _MediaLoadingFeedbackOverlay({
     required this.controller,
     required this.colorScheme,
+    this.isAudio = false,
   });
 
   @override
@@ -2376,7 +2387,8 @@ class _MediaLoadingFeedbackOverlayState
   @override
   void didUpdateWidget(covariant _MediaLoadingFeedbackOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.isAudio != widget.isAudio) {
       oldWidget.controller.removeListener(_evaluateState);
       widget.controller.addListener(_evaluateState);
       _showFeedback = false;
@@ -2395,10 +2407,11 @@ class _MediaLoadingFeedbackOverlayState
 
   void _evaluateState() {
     final val = widget.controller.value;
-    // Feedback is needed if the video hasn't rendered its first frame yet,
-    // or if it is rebuffering during playback.
-    final videoStarted = val.isInitialized && val.hasRenderedFirstFrame;
-    final needsFeedback = !videoStarted || val.isBuffering;
+    // Feedback is needed if the video hasn't rendered its first frame yet
+    // (or audio hasn't initialized), or if it is rebuffering during playback.
+    final mediaStarted =
+        val.isInitialized && (widget.isAudio || val.hasRenderedFirstFrame);
+    final needsFeedback = !mediaStarted || val.isBuffering;
 
     if (!needsFeedback) {
       _delayTimer?.cancel();
@@ -2420,7 +2433,8 @@ class _MediaLoadingFeedbackOverlayState
       if (!mounted) return;
       final currentVal = widget.controller.value;
       final stillNeedsFeedback =
-          (!currentVal.isInitialized || !currentVal.hasRenderedFirstFrame) ||
+          (!currentVal.isInitialized ||
+              (!widget.isAudio && !currentVal.hasRenderedFirstFrame)) ||
           currentVal.isBuffering;
       if (stillNeedsFeedback) {
         setState(() => _showFeedback = true);

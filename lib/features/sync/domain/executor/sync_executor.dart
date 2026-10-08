@@ -131,6 +131,7 @@ class SyncExecutor {
     final dirCreates = <SyncAction>[];
     final cheap = <SyncAction>[];
     final transfers = <SyncAction>[];
+    final sourceCleanups = <SyncAction>[];
     final fileDeletions = <SyncAction>[];
     final dirDeletions = <SyncAction>[];
     for (final a in plan.actions) {
@@ -145,6 +146,8 @@ class SyncExecutor {
         case SyncActionKind.copyToVault:
         case SyncActionKind.keepBoth:
           transfers.add(a);
+        case SyncActionKind.deleteSourceAfterImport:
+          sourceCleanups.add(a);
         case SyncActionKind.deleteOnTarget:
         case SyncActionKind.deleteOnVault:
           fileDeletions.add(a);
@@ -162,6 +165,7 @@ class SyncExecutor {
       ...dirCreates,
       ...cheap,
       ...transfers,
+      ...sourceCleanups,
       ...fileDeletions,
       ...dirDeletions,
     ];
@@ -268,6 +272,15 @@ class SyncExecutor {
               await _delete(vault, action.relPath);
               ledger.remove(key, action.relPath);
               deleted++;
+            case SyncActionKind.deleteSourceAfterImport:
+              if (await _verifyAndDeleteImportedSource(
+                source: target,
+                destination: vault,
+                rel: action.relPath,
+                token: token,
+              )) {
+                deleted++;
+              }
             case SyncActionKind.deleteDirOnTarget:
               await _delete(target, action.relPath);
               ledger.remove(key, action.relPath);
@@ -284,6 +297,12 @@ class SyncExecutor {
           cancelled = true;
           break;
         } catch (e) {
+          if (action.kind == SyncActionKind.deleteSourceAfterImport &&
+              e is _StepFailed &&
+              e.reason == 'source-verification') {
+            ledger.remove(key, action.relPath);
+            pending.removeWhere((p) => p.path == action.relPath);
+          }
           // One bad file must not stop the rest. No path in the log:
           // file names are private.
           failed++;
@@ -372,6 +391,37 @@ class SyncExecutor {
     // "Couldn't delete" is fine if it is simply gone already.
     final still = await endpoint.stat([rel]);
     if (still.containsKey(rel)) throw const _StepFailed('delete');
+  }
+
+  /// Runs after the atomic destination swap. A missing digest or mismatch
+  /// fails closed and leaves the source untouched.
+  Future<bool> _verifyAndDeleteImportedSource({
+    required SyncEndpoint source,
+    required SyncEndpoint destination,
+    required String rel,
+    required SyncCancellationToken token,
+  }) async {
+    final sourceBefore = (await source.stat([rel]))[rel];
+    if (sourceBefore == null) {
+      return false; // Already gone; no cleanup is needed.
+    }
+
+    final destinationHash = await destination.hash(rel, token);
+    if (token.isCancelled) throw const SyncCancelledException();
+    final sourceHash = await source.hash(rel, token);
+    if (token.isCancelled) throw const SyncCancelledException();
+    final sourceAfter = (await source.stat([rel]))[rel];
+    if (sourceAfter == null) return false;
+    if (sourceHash == null ||
+        destinationHash == null ||
+        sourceHash != destinationHash ||
+        sourceBefore.size != sourceAfter.size ||
+        sourceBefore.mtimeSecs != sourceAfter.mtimeSecs) {
+      throw const _StepFailed('source-verification');
+    }
+    if (token.isCancelled) throw const SyncCancelledException();
+    await _delete(source, rel);
+    return true;
   }
 
   /// Copies [rel] from [source] to [dest] via a temp file and a swap. See

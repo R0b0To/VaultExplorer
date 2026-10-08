@@ -1,0 +1,33 @@
+## What's Changed
+
+### Vault Sync & Background Automation
+* **Daily Scheduled Sync**: Added automatic daily background synchronization while the app is closed (requires full automation access, saved unlock password, and notifications enabled).
+  * Runs via an Android background worker showing "Syncing vault...".
+  * Automatically skips already-open vaults and safely locks opened sessions when finished.
+* **Automation Exclusions**: Added `exclude_pattern` support for automation rules.
+* **Safety Protections**: Built-in rules permanently exclude system paths and vault ciphertext paths from synchronization, even if user ignore lists are reset.
+
+### Import & Source File Deletion
+* **Safe Source Deletion**: Added a per-vault option to delete source files following successful import or folder-to-vault auto-sync.
+* **SHA-256 Integrity Verification**: Source deletion only executes after a complete import, committed write, and verified SHA-256 match between the source and vault readback.
+* **Saved Preferences**: "Don't ask again" selections for source file deletion are now remembered per vault.
+
+### Media Viewer & Video Player
+* **Picture Adjustments**: Real-time controls for brightness, contrast, saturation, hue, and gamma, plus built-in presets (Vivid, B&W, Warm, Cool).
+* **Expanded Video Metadata**: View duration, resolution, codecs, frame rate, bitrate, audio properties, and subtitle track counts in file details.
+* **Decoder Selection & Fallbacks**: Configurable video/audio decoders (Automatic, Hardware, Software, or FFmpeg) with improved fallback handling.
+* **Audio & Playback Controls**: Added audio volume boost up to +20 dB, initial playback position support, and refined transport controls.
+* **Gesture Sensitivity**: Independent sensitivity tuning for seek, volume, and brightness gestures.
+* **Smart Thumbnails**: Thumbnail generation using first frame, custom position, or hybrid fallbacks with strategy-aware caching.
+
+### File Management & UI / UX
+* **Copyable File Paths**: File and folder paths in the Info sheet can now be tapped and copied.
+* **Markdown Viewer**: Added a fast scrollbar for long documents.
+* **File Types**: Updated icons, categorizations, and enhanced file type handling across the browser.
+* **Container Repair**: Improved visual presentation and flow during container repairs.
+
+### Bug Fixes & Reliability
+* **USB Storage**: Fixed an issue preventing certain USB OTG storage drives from being read correctly when unlocking vaults.
+* **Storage & Navigation**: Improved local storage access, navigation flow, and permission request handling.
+* **Camera & Sync**: Enhanced camera capture reliability and synchronization error handling.
+* **Stability**: General stability improvements and optimizations throughout the app.

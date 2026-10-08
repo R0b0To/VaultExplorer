@@ -1,0 +1,7 @@
+• Daily background vault sync with lock protection
+• Safe source deletion after import/sync (SHA-256 verified)
+• Media adjustments (contrast, presets) & detailed video stats
+• Video player upgrades: decoders, +20 dB boost, gesture tuning
+• Fixed USB drive unlock detection
+• Copyable file paths & Markdown fast scrollbar
+• General stability, camera, and sync fixes

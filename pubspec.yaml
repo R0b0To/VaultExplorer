@@ -1,7 +1,7 @@
 name: vaultexplorer
 description: "Encrypted container explorer: VeraCrypt, LUKS, BitLocker, and more."
 publish_to: 'none'
-version: 1.30.5+46
+version: 1.31.0+47
 environment:
   sdk: ^3.12.0
 dependencies:
@@ -44,6 +44,8 @@ flutter:
   assets:
     - assets/images/app_icon.png
     - assets/data/eff_large_wordlist.txt
+  shaders:
+    - shaders/viewer_adjust.frag
   fonts:
     - family: JetBrains Mono
       fonts:

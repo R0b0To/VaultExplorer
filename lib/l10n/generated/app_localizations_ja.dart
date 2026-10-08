@@ -5933,6 +5933,26 @@ class AppLocalizationsJa extends AppLocalizations {
       'インポート後、デバイスから元のファイルを自動的に削除します';
 
   @override
+  String get deleteAfterImportVaultSettingLabel => 'この保管庫でのインポート後のファイル削除';
+
+  @override
+  String get deleteAfterImportInheritGlobal => '全体設定を継承';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return '全体設定を使用: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => '毎回確認';
+
+  @override
+  String get deleteAfterImportVaultKeep => '常に元のファイルを保持';
+
+  @override
+  String get deleteAfterImportVaultDelete => '常に元のファイルを削除';
+
+  @override
   String get wizardBackButton => '戻る';
 
   @override
@@ -7802,10 +7822,18 @@ class AppLocalizationsJa extends AppLocalizations {
       '片側で削除したファイルはもう一方でも削除されます。フォルダが予期せず空に見える場合、削除は一時停止されます。';
 
   @override
-  String get autoSyncIgnoreLabel => '次に一致するファイルを除外';
+  String get autoSyncDeleteSourceAfterImportTitle => 'インポート後に元のファイルを削除';
 
   @override
-  String get autoSyncIgnoreHelper => '1行に1パターン(例: *.tmp)';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'フォルダーから保管庫への同期でのみ有効です。保管庫への書き込み完了後、SHA-256チェックサムの一致を確認してから元ファイルを削除します。';
+
+  @override
+  String get autoSyncIgnoreLabel => '一致するファイルとフォルダーを除外';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      '1行に1パターン：*.tmp は場所を問わず名前に一致します。node_modules はそのフォルダーと中身をすべて除外します。Projects/old は同期ルートからのそのパスと中身を除外します。';
 
   @override
   String get autoSyncNeverSynced => 'まだ同期されていません';
@@ -9098,4 +9126,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'ローカルストレージのルートからファイルを削除しますか？';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'この一方向同期では、ローカルストレージのルート全体を確認します。「インポート後に元のファイルを削除」が有効な場合、VaultにコピーされたファイルはSHA-256の検証後に端末から削除されます。元のファイルを削除する意図がある場合のみ続行してください。';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => '理解しました';
 }

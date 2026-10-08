@@ -6328,6 +6328,27 @@ class AppLocalizationsAr extends AppLocalizations {
       'حذف الملفات الأصلية من الجهاز تلقائيًا بعد الاستيراد';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'تنظيف الملفات بعد الاستيراد للخزنة';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'استخدام الإعداد العام';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'يتبع الإعداد العام: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'السؤال في كل مرة';
+
+  @override
+  String get deleteAfterImportVaultKeep => 'الاحتفاظ دائمًا بالملفات المصدر';
+
+  @override
+  String get deleteAfterImportVaultDelete => 'حذف الملفات المصدر دائمًا';
+
+  @override
   String get wizardBackButton => 'رجوع';
 
   @override
@@ -8315,10 +8336,19 @@ class AppLocalizationsAr extends AppLocalizations {
       'يُحذف الملف المحذوف في جانب من الجانب الآخر أيضًا. تُوقَف عمليات الحذف مؤقتًا إذا بدا مجلد فارغًا على نحو غير متوقع.';
 
   @override
-  String get autoSyncIgnoreLabel => 'تخطي الملفات المطابقة لـ';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'حذف الملفات المصدرية بعد الاستيراد';
 
   @override
-  String get autoSyncIgnoreHelper => 'نمط واحد في كل سطر، مثل *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'لمزامنة المجلد إلى الخزنة فقط. يُحذف الملف المصدر بعد حفظ نسخته في الخزنة والتحقق من تطابق بصمة SHA-256.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'تخطي الملفات والمجلدات المطابقة لـ';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'نمط واحد في كل سطر: يطابق *.tmp الأسماء في أي مكان؛ ويتخطى node_modules المجلد ومحتوياته أينما وُجد؛ ويتخطى Projects/old هذا المسار من جذر المزامنة وكل ما بداخله.';
 
   @override
   String get autoSyncNeverSynced => 'لم تتم المزامنة بعد';
@@ -9658,4 +9688,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'حذف الملفات من جذر التخزين المحلي؟';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'ستفحص هذه المزامنة أحادية الاتجاه جذر التخزين المحلي بالكامل. عند تفعيل حذف الملفات المصدرية بعد الاستيراد، يمكن حذف الملفات المنسوخة إلى الخزنة بعد التحقق من تطابق SHA-256. تابع فقط إذا كنت تقصد حذف هذه الملفات الأصلية من جهازك.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'أفهم';
 }

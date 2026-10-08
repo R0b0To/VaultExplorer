@@ -7883,6 +7883,20 @@
   "@deleteAfterImportModeDeleteSubtitle": {
     "description": "Subtitle for the 'Delete originals automatically' delete after import mode"
   },
+  "deleteAfterImportVaultSettingLabel": "Delete files after import for this vault",
+  "deleteAfterImportInheritGlobal": "Inherit global default",
+  "deleteAfterImportInheritGlobalSubtitle": "Using global default: {mode}",
+  "deleteAfterImportVaultAsk": "Ask every time",
+  "deleteAfterImportVaultKeep": "Always keep source files",
+  "deleteAfterImportVaultDelete": "Always delete source files",
+  "@deleteAfterImportInheritGlobalSubtitle": {
+    "description": "Shows which global delete-after-import mode a vault inherits",
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
   "wizardBackButton": "Back",
   "@wizardBackButton": {
     "description": "Bottom navigation bar button in a creation wizard: step back to the previous step"
@@ -10352,13 +10366,21 @@
   "@autoSyncDeleteSubtitle": {
     "description": "Explanation of the copy-deletions switch, including the safety pause"
   },
-  "autoSyncIgnoreLabel": "Skip files matching",
-  "@autoSyncIgnoreLabel": {
-    "description": "Label of the text field listing file patterns that auto-sync skips"
+  "autoSyncDeleteSourceAfterImportTitle": "Delete source files after import",
+  "@autoSyncDeleteSourceAfterImportTitle": {
+    "description": "Switch: delete imported source files after a verified folder-to-vault sync"
   },
-  "autoSyncIgnoreHelper": "One pattern per line, for example *.tmp",
+  "autoSyncDeleteSourceAfterImportSubtitle": "For folder-to-vault sync only. A source file is deleted after the vault copy is committed and its SHA-256 checksum matches.",
+  "@autoSyncDeleteSourceAfterImportSubtitle": {
+    "description": "Explains that source cleanup is available only for imports and happens after a committed checksum-verified copy"
+  },
+  "autoSyncIgnoreLabel": "Skip files and folders matching",
+  "@autoSyncIgnoreLabel": {
+    "description": "Label of the text field listing file, folder, and path patterns that auto-sync skips"
+  },
+  "autoSyncIgnoreHelper": "One pattern per line: *.tmp matches names anywhere; node_modules skips that folder and its contents anywhere; Projects/old skips that path from the sync root and everything inside it.",
   "@autoSyncIgnoreHelper": {
-    "description": "Helper text under the skip-patterns field"
+    "description": "Explains that name patterns match folders and contents anywhere, while slash-separated patterns are relative to the sync root"
   },
   "autoSyncNeverSynced": "Not synced yet",
   "@autoSyncNeverSynced": {
@@ -11983,5 +12005,17 @@
   "decoderAutoOption": "Automatic",
   "decoderHardwareOption": "Hardware",
   "decoderSoftwareOption": "Software",
-  "decoderFfmpegOption": "FFmpeg"
+  "decoderFfmpegOption": "FFmpeg",
+  "autoSyncLocalRootDeleteWarningTitle": "Delete files from the Local Storage root?",
+  "@autoSyncLocalRootDeleteWarningTitle": {
+    "description": "Warning title shown when deleting imported files from the entire Local Storage root"
+  },
+  "autoSyncLocalRootDeleteWarningMessage": "This one-way sync will scan the entire Local Storage root. With Delete source files after import enabled, files copied into the vault and verified by SHA-256 can then be removed from your device. Continue only if you intend to delete those originals.",
+  "@autoSyncLocalRootDeleteWarningMessage": {
+    "description": "Explains the consequences of deleting imported files when syncing the entire Local Storage root into a vault"
+  },
+  "autoSyncLocalRootDeleteWarningConfirm": "I understand",
+  "@autoSyncLocalRootDeleteWarningConfirm": {
+    "description": "Explicit confirmation button for the Local Storage root deletion warning"
+  }
 }

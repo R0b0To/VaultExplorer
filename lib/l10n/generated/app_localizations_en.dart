@@ -6155,6 +6155,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Automatically delete original files from device after import';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Delete files after import for this vault';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Inherit global default';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Using global default: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Ask every time';
+
+  @override
+  String get deleteAfterImportVaultKeep => 'Always keep source files';
+
+  @override
+  String get deleteAfterImportVaultDelete => 'Always delete source files';
+
+  @override
   String get wizardBackButton => 'Back';
 
   @override
@@ -8122,10 +8143,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'A file deleted on one side is deleted on the other. Deletions are paused if a folder looks unexpectedly empty.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Skip files matching';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Delete source files after import';
 
   @override
-  String get autoSyncIgnoreHelper => 'One pattern per line, for example *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'For folder-to-vault sync only. A source file is deleted after the vault copy is committed and its SHA-256 checksum matches.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Skip files and folders matching';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'One pattern per line: *.tmp matches names anywhere; node_modules skips that folder and its contents anywhere; Projects/old skips that path from the sync root and everything inside it.';
 
   @override
   String get autoSyncNeverSynced => 'Not synced yet';
@@ -9462,4 +9492,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Delete files from the Local Storage root?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'This one-way sync will scan the entire Local Storage root. With Delete source files after import enabled, files copied into the vault and verified by SHA-256 can then be removed from your device. Continue only if you intend to delete those originals.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'I understand';
 }

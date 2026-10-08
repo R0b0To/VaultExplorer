@@ -6260,6 +6260,29 @@ class AppLocalizationsPt extends AppLocalizations {
       'Excluir automaticamente os arquivos originais do dispositivo após a importação';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Excluir arquivos após a importação neste cofre';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Herdar padrão global';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Usando o padrão global: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Perguntar sempre';
+
+  @override
+  String get deleteAfterImportVaultKeep =>
+      'Sempre manter os arquivos de origem';
+
+  @override
+  String get deleteAfterImportVaultDelete =>
+      'Sempre excluir os arquivos de origem';
+
+  @override
   String get wizardBackButton => 'Voltar';
 
   @override
@@ -8260,10 +8283,20 @@ class AppLocalizationsPt extends AppLocalizations {
       'Um arquivo excluído de um lado é excluído do outro. As exclusões são pausadas se uma pasta parecer inesperadamente vazia.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Ignorar arquivos que correspondam a';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Excluir arquivos de origem após importar';
 
   @override
-  String get autoSyncIgnoreHelper => 'Um padrão por linha, por exemplo *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Apenas na sincronização da pasta para o cofre. O arquivo de origem é excluído após a gravação da cópia no cofre e a confirmação de que o checksum SHA-256 corresponde.';
+
+  @override
+  String get autoSyncIgnoreLabel =>
+      'Ignorar arquivos e pastas que correspondam a';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Um padrão por linha: *.tmp corresponde a nomes em qualquer local; node_modules ignora essa pasta e seu conteúdo; Projects/old ignora esse caminho a partir da raiz da sincronização e tudo dentro dele.';
 
   @override
   String get autoSyncNeverSynced => 'Ainda não sincronizado';
@@ -9607,4 +9640,15 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Excluir arquivos da raiz do armazenamento local?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Esta sincronização unidirecional verificará toda a raiz do armazenamento local. Se a opção de excluir arquivos de origem após a importação estiver ativada, os arquivos copiados para o cofre poderão ser removidos do dispositivo após a verificação SHA-256. Continue apenas se quiser excluir esses originais.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Entendi';
 }

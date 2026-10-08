@@ -6250,6 +6250,27 @@ class AppLocalizationsDe extends AppLocalizations {
       'Originaldateien nach dem Import automatisch vom Gerät löschen';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Dateien nach dem Import für diesen Tresor';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Globale Vorgabe übernehmen';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Verwendet die globale Vorgabe: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Jedes Mal fragen';
+
+  @override
+  String get deleteAfterImportVaultKeep => 'Quelldateien immer behalten';
+
+  @override
+  String get deleteAfterImportVaultDelete => 'Quelldateien immer löschen';
+
+  @override
   String get wizardBackButton => 'Zurück';
 
   @override
@@ -8254,10 +8275,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eine auf einer Seite gelöschte Datei wird auch auf der anderen gelöscht. Löschungen werden pausiert, wenn ein Ordner unerwartet leer aussieht.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Dateien überspringen, die passen zu';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Quelldateien nach dem Import löschen';
 
   @override
-  String get autoSyncIgnoreHelper => 'Ein Muster pro Zeile, z. B. *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Nur bei der Synchronisierung vom Ordner in den Tresor. Die Quelldatei wird gelöscht, nachdem die Tresorkopie gespeichert und ihre SHA-256-Prüfsumme abgeglichen wurde.';
+
+  @override
+  String get autoSyncIgnoreLabel =>
+      'Dateien und Ordner überspringen, die passen zu';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Ein Muster pro Zeile: *.tmp passt auf Namen überall; node_modules überspringt diesen Ordner samt Inhalt überall; Projects/old überspringt diesen Pfad ab dem Sync-Stamm und alles darin.';
 
   @override
   String get autoSyncNeverSynced => 'Noch nicht synchronisiert';
@@ -9606,4 +9637,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Dateien im Stammordner des lokalen Speichers löschen?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Diese Synchronisierung in eine Richtung durchsucht den gesamten Stammordner des lokalen Speichers. Wenn „Quelldateien nach dem Import löschen“ aktiviert ist, können in den Tresor kopierte Dateien nach erfolgreicher SHA-256-Prüfung von deinem Gerät gelöscht werden. Fahre nur fort, wenn du diese Originale wirklich löschen möchtest.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Ich verstehe';
 }

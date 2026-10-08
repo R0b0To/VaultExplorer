@@ -10233,6 +10233,42 @@ abstract class AppLocalizations {
   /// **'Automatically delete original files from device after import'**
   String get deleteAfterImportModeDeleteSubtitle;
 
+  /// No description provided for @deleteAfterImportVaultSettingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete files after import for this vault'**
+  String get deleteAfterImportVaultSettingLabel;
+
+  /// No description provided for @deleteAfterImportInheritGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherit global default'**
+  String get deleteAfterImportInheritGlobal;
+
+  /// Shows which global delete-after-import mode a vault inherits
+  ///
+  /// In en, this message translates to:
+  /// **'Using global default: {mode}'**
+  String deleteAfterImportInheritGlobalSubtitle(String mode);
+
+  /// No description provided for @deleteAfterImportVaultAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask every time'**
+  String get deleteAfterImportVaultAsk;
+
+  /// No description provided for @deleteAfterImportVaultKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Always keep source files'**
+  String get deleteAfterImportVaultKeep;
+
+  /// No description provided for @deleteAfterImportVaultDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Always delete source files'**
+  String get deleteAfterImportVaultDelete;
+
   /// Bottom navigation bar button in a creation wizard: step back to the previous step
   ///
   /// In en, this message translates to:
@@ -13681,16 +13717,28 @@ abstract class AppLocalizations {
   /// **'A file deleted on one side is deleted on the other. Deletions are paused if a folder looks unexpectedly empty.'**
   String get autoSyncDeleteSubtitle;
 
-  /// Label of the text field listing file patterns that auto-sync skips
+  /// Switch: delete imported source files after a verified folder-to-vault sync
   ///
   /// In en, this message translates to:
-  /// **'Skip files matching'**
+  /// **'Delete source files after import'**
+  String get autoSyncDeleteSourceAfterImportTitle;
+
+  /// Explains that source cleanup is available only for imports and happens after a committed checksum-verified copy
+  ///
+  /// In en, this message translates to:
+  /// **'For folder-to-vault sync only. A source file is deleted after the vault copy is committed and its SHA-256 checksum matches.'**
+  String get autoSyncDeleteSourceAfterImportSubtitle;
+
+  /// Label of the text field listing file, folder, and path patterns that auto-sync skips
+  ///
+  /// In en, this message translates to:
+  /// **'Skip files and folders matching'**
   String get autoSyncIgnoreLabel;
 
-  /// Helper text under the skip-patterns field
+  /// Explains that name patterns match folders and contents anywhere, while slash-separated patterns are relative to the sync root
   ///
   /// In en, this message translates to:
-  /// **'One pattern per line, for example *.tmp'**
+  /// **'One pattern per line: *.tmp matches names anywhere; node_modules skips that folder and its contents anywhere; Projects/old skips that path from the sync root and everything inside it.'**
   String get autoSyncIgnoreHelper;
 
   /// Status text when a sync rule has not completed a sync yet
@@ -15948,6 +15996,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'FFmpeg'**
   String get decoderFfmpegOption;
+
+  /// Warning title shown when deleting imported files from the entire Local Storage root
+  ///
+  /// In en, this message translates to:
+  /// **'Delete files from the Local Storage root?'**
+  String get autoSyncLocalRootDeleteWarningTitle;
+
+  /// Explains the consequences of deleting imported files when syncing the entire Local Storage root into a vault
+  ///
+  /// In en, this message translates to:
+  /// **'This one-way sync will scan the entire Local Storage root. With Delete source files after import enabled, files copied into the vault and verified by SHA-256 can then be removed from your device. Continue only if you intend to delete those originals.'**
+  String get autoSyncLocalRootDeleteWarningMessage;
+
+  /// Explicit confirmation button for the Local Storage root deletion warning
+  ///
+  /// In en, this message translates to:
+  /// **'I understand'**
+  String get autoSyncLocalRootDeleteWarningConfirm;
 }
 
 class _AppLocalizationsDelegate

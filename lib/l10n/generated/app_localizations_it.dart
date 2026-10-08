@@ -6248,6 +6248,27 @@ class AppLocalizationsIt extends AppLocalizations {
       'Elimina automaticamente i file originali dal dispositivo dopo l\'importazione';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Eliminazione dei file dopo l’importazione per questo vault';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Eredita impostazione globale';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Impostazione globale in uso: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Chiedi ogni volta';
+
+  @override
+  String get deleteAfterImportVaultKeep => 'Mantieni sempre i file di origine';
+
+  @override
+  String get deleteAfterImportVaultDelete => 'Elimina sempre i file di origine';
+
+  @override
   String get wizardBackButton => 'Indietro';
 
   @override
@@ -8251,10 +8272,20 @@ class AppLocalizationsIt extends AppLocalizations {
       'Un file eliminato su un lato viene eliminato anche sull\'altro. Le eliminazioni vengono sospese se una cartella sembra inaspettatamente vuota.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Ignora i file che corrispondono a';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Elimina i file sorgente dopo l’importazione';
 
   @override
-  String get autoSyncIgnoreHelper => 'Un modello per riga, ad esempio *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Solo per la sincronizzazione dalla cartella al vault. Il file sorgente viene eliminato dopo aver salvato la copia nel vault e verificato che l’hash SHA-256 coincida.';
+
+  @override
+  String get autoSyncIgnoreLabel =>
+      'Ignora file e cartelle che corrispondono a';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Un modello per riga: *.tmp corrisponde ai nomi ovunque; node_modules esclude quella cartella e il suo contenuto ovunque; Projects/old esclude quel percorso dalla radice di sincronizzazione e tutto ciò che contiene.';
 
   @override
   String get autoSyncNeverSynced => 'Non ancora sincronizzato';
@@ -9605,4 +9636,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Eliminare i file dalla radice della memoria locale?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Questa sincronizzazione in una sola direzione esaminerà tutta la radice della memoria locale. Se è attiva l’eliminazione dei file sorgente dopo l’importazione, i file copiati nel vault potranno essere rimossi dal dispositivo dopo la verifica SHA-256. Continua solo se intendi eliminare questi originali.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Ho capito';
 }

@@ -5931,6 +5931,26 @@ class AppLocalizationsKo extends AppLocalizations {
       '가져오기 후 기기에서 원본 파일을 자동으로 삭제합니다';
 
   @override
+  String get deleteAfterImportVaultSettingLabel => '이 보관함의 가져오기 후 파일 삭제';
+
+  @override
+  String get deleteAfterImportInheritGlobal => '전역 기본값 상속';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return '전역 기본값 사용 중: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => '매번 묻기';
+
+  @override
+  String get deleteAfterImportVaultKeep => '원본 파일 항상 유지';
+
+  @override
+  String get deleteAfterImportVaultDelete => '원본 파일 항상 삭제';
+
+  @override
   String get wizardBackButton => '뒤로';
 
   @override
@@ -7803,10 +7823,18 @@ class AppLocalizationsKo extends AppLocalizations {
       '한쪽에서 삭제한 파일은 다른 쪽에서도 삭제됩니다. 폴더가 예상치 않게 비어 있는 것처럼 보이면 삭제가 일시 중지됩니다.';
 
   @override
-  String get autoSyncIgnoreLabel => '다음과 일치하는 파일 건너뛰기';
+  String get autoSyncDeleteSourceAfterImportTitle => '가져온 후 원본 파일 삭제';
 
   @override
-  String get autoSyncIgnoreHelper => '한 줄에 하나의 패턴 (예: *.tmp)';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      '폴더에서 볼트로 동기화할 때만 적용됩니다. 볼트에 저장한 후 SHA-256 체크섬이 일치하는지 확인하고 원본 파일을 삭제합니다.';
+
+  @override
+  String get autoSyncIgnoreLabel => '다음과 일치하는 파일 및 폴더 건너뛰기';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      '한 줄에 하나의 패턴을 입력하세요. *.tmp는 모든 위치의 이름에 일치하고, node_modules는 해당 폴더와 내용을 모두 건너뛰며, Projects/old는 동기화 루트 기준 해당 경로와 그 안의 모든 항목을 건너뜁니다.';
 
   @override
   String get autoSyncNeverSynced => '아직 동기화되지 않음';
@@ -9098,4 +9126,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle => '로컬 저장소 루트의 파일을 삭제할까요?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      '이 단방향 동기화는 로컬 저장소 루트 전체를 검사합니다. 가져온 후 원본 파일 삭제가 켜져 있으면 Vault에 복사된 파일은 SHA-256 확인 후 기기에서 삭제될 수 있습니다. 원본 파일을 삭제하려는 경우에만 계속하세요.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => '이해했습니다';
 }

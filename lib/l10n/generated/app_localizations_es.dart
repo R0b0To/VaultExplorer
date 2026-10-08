@@ -6265,6 +6265,29 @@ class AppLocalizationsEs extends AppLocalizations {
       'Eliminar automáticamente los archivos originales del dispositivo después de importar';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Eliminar archivos después de importarlos en esta bóveda';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Heredar el valor global';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Se usa el valor global: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Preguntar siempre';
+
+  @override
+  String get deleteAfterImportVaultKeep =>
+      'Conservar siempre los archivos de origen';
+
+  @override
+  String get deleteAfterImportVaultDelete =>
+      'Eliminar siempre los archivos de origen';
+
+  @override
   String get wizardBackButton => 'Atrás';
 
   @override
@@ -8269,10 +8292,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'Un archivo eliminado en un lado se elimina en el otro. Las eliminaciones se pausan si una carpeta parece vacía de forma inesperada.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Omitir archivos que coincidan con';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Eliminar archivos de origen después de importar';
 
   @override
-  String get autoSyncIgnoreHelper => 'Un patrón por línea, por ejemplo *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Solo para sincronización de carpeta a bóveda. El archivo de origen se elimina cuando la copia de la bóveda se ha guardado y coincide su suma SHA-256.';
+
+  @override
+  String get autoSyncIgnoreLabel =>
+      'Omitir archivos y carpetas que coincidan con';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Un patrón por línea: *.tmp coincide con nombres en cualquier lugar; node_modules omite esa carpeta y su contenido; Projects/old omite esa ruta desde la raíz de sincronización y todo lo que contiene.';
 
   @override
   String get autoSyncNeverSynced => 'Aún no sincronizado';
@@ -9622,4 +9655,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      '¿Eliminar archivos de la raíz del almacenamiento local?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Esta sincronización en una sola dirección examinará toda la raíz del almacenamiento local. Si está activada la opción de eliminar los archivos de origen después de importarlos, los archivos copiados en la bóveda podrán eliminarse del dispositivo tras verificar el SHA-256. Continúa solo si quieres eliminar esos originales.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Lo entiendo';
 }

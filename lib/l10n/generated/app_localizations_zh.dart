@@ -5858,6 +5858,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteAfterImportModeDeleteSubtitle => '导入后自动从设备中删除原始文件';
 
   @override
+  String get deleteAfterImportVaultSettingLabel => '此保险库的导入后文件删除设置';
+
+  @override
+  String get deleteAfterImportInheritGlobal => '继承全局默认设置';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return '当前使用全局默认设置：$mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => '每次询问';
+
+  @override
+  String get deleteAfterImportVaultKeep => '始终保留源文件';
+
+  @override
+  String get deleteAfterImportVaultDelete => '始终删除源文件';
+
+  @override
   String get wizardBackButton => '返回';
 
   @override
@@ -7699,10 +7719,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncDeleteSubtitle => '在一侧删除的文件也会在另一侧删除。如果某个文件夹意外显示为空，则会暂停删除。';
 
   @override
-  String get autoSyncIgnoreLabel => '跳过符合以下规则的文件';
+  String get autoSyncDeleteSourceAfterImportTitle => '导入后删除源文件';
 
   @override
-  String get autoSyncIgnoreHelper => '每行一个规则，例如 *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      '仅适用于从文件夹同步到保险库。保险库副本写入完成且 SHA-256 校验和匹配后，才会删除源文件。';
+
+  @override
+  String get autoSyncIgnoreLabel => '跳过匹配的文件和文件夹';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      '每行一个规则：*.tmp 匹配任意位置的名称；node_modules 跳过该文件夹及其内容；Projects/old 跳过同步根目录下的该路径及其中所有内容。';
 
   @override
   String get autoSyncNeverSynced => '尚未同步';
@@ -8972,4 +9000,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle => '要删除本地存储根目录中的文件吗？';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      '此单向同步会扫描整个本地存储根目录。启用“导入后删除源文件”后，复制到保险库的文件在通过 SHA-256 校验后可能会从设备中删除。只有在确实要删除这些原始文件时才继续。';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => '我已了解';
 }

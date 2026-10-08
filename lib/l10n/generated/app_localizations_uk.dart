@@ -6299,6 +6299,27 @@ class AppLocalizationsUk extends AppLocalizations {
       'Автоматично видаляти оригінали з пристрою після імпорту';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Видалення файлів після імпорту для цього сховища';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Успадкувати глобальне значення';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Використовується глобальне значення: $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Запитувати щоразу';
+
+  @override
+  String get deleteAfterImportVaultKeep => 'Завжди зберігати вихідні файли';
+
+  @override
+  String get deleteAfterImportVaultDelete => 'Завжди видаляти вихідні файли';
+
+  @override
   String get wizardBackButton => 'Назад';
 
   @override
@@ -8317,10 +8338,19 @@ class AppLocalizationsUk extends AppLocalizations {
       'Файл, видалений в одному місці, видаляється і в іншому. Для захисту від втрати даних видалення призупиняється, якщо папка раптово виявилася порожньою.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Пропускати файли за шаблоном';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Видаляти вихідні файли після імпорту';
 
   @override
-  String get autoSyncIgnoreHelper => 'Один шаблон на рядок, наприклад *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Лише для синхронізації з папки до сховища. Вихідний файл видаляється після запису копії у сховище та перевірки збігу контрольної суми SHA-256.';
+
+  @override
+  String get autoSyncIgnoreLabel => 'Пропускати файли й папки за шаблоном';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Один шаблон на рядок: *.tmp відповідає назвам у будь-якому місці; node_modules пропускає цю папку та її вміст; Projects/old пропускає цей шлях від кореня синхронізації та все всередині.';
 
   @override
   String get autoSyncNeverSynced => 'Ще не синхронізовано';
@@ -9683,4 +9713,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Видалити файли з кореня локального сховища?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Ця одностороння синхронізація перевірить увесь корінь локального сховища. Якщо ввімкнено видалення вихідних файлів після імпорту, файли, скопійовані до сховища, можуть бути видалені з пристрою після перевірки SHA-256. Продовжуйте, лише якщо справді хочете видалити ці оригінали.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'Зрозуміло';
 }

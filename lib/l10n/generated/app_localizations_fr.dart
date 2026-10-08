@@ -6307,6 +6307,29 @@ class AppLocalizationsFr extends AppLocalizations {
       'Supprimer automatiquement les fichiers originaux de l\'appareil après l\'importation';
 
   @override
+  String get deleteAfterImportVaultSettingLabel =>
+      'Supprimer les fichiers après importation pour ce coffre';
+
+  @override
+  String get deleteAfterImportInheritGlobal => 'Utiliser le réglage global';
+
+  @override
+  String deleteAfterImportInheritGlobalSubtitle(String mode) {
+    return 'Réglage global utilisé : $mode';
+  }
+
+  @override
+  String get deleteAfterImportVaultAsk => 'Demander à chaque fois';
+
+  @override
+  String get deleteAfterImportVaultKeep =>
+      'Toujours conserver les fichiers source';
+
+  @override
+  String get deleteAfterImportVaultDelete =>
+      'Toujours supprimer les fichiers source';
+
+  @override
   String get wizardBackButton => 'Retour';
 
   @override
@@ -8323,10 +8346,20 @@ class AppLocalizationsFr extends AppLocalizations {
       'Un fichier supprimé d\'un côté est supprimé de l\'autre. Les suppressions sont suspendues si un dossier semble vide de façon inattendue.';
 
   @override
-  String get autoSyncIgnoreLabel => 'Ignorer les fichiers correspondant à';
+  String get autoSyncDeleteSourceAfterImportTitle =>
+      'Supprimer les fichiers source après l’importation';
 
   @override
-  String get autoSyncIgnoreHelper => 'Un motif par ligne, par exemple *.tmp';
+  String get autoSyncDeleteSourceAfterImportSubtitle =>
+      'Uniquement pour la synchronisation du dossier vers le coffre. Le fichier source est supprimé une fois la copie enregistrée dans le coffre et son empreinte SHA-256 vérifiée.';
+
+  @override
+  String get autoSyncIgnoreLabel =>
+      'Ignorer les fichiers et dossiers correspondant à';
+
+  @override
+  String get autoSyncIgnoreHelper =>
+      'Un motif par ligne : *.tmp correspond aux noms partout ; node_modules ignore ce dossier et son contenu partout ; Projects/old ignore ce chemin depuis la racine de synchronisation et tout ce qu’il contient.';
 
   @override
   String get autoSyncNeverSynced => 'Pas encore synchronisé';
@@ -9682,4 +9715,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get decoderFfmpegOption => 'FFmpeg';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningTitle =>
+      'Supprimer les fichiers à la racine du stockage local ?';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningMessage =>
+      'Cette synchronisation à sens unique parcourra toute la racine du stockage local. Si la suppression des fichiers source après importation est activée, les fichiers copiés dans le coffre pourront être supprimés de votre appareil après vérification du SHA-256. Continuez uniquement si vous souhaitez supprimer ces originaux.';
+
+  @override
+  String get autoSyncLocalRootDeleteWarningConfirm => 'J’ai compris';
 }

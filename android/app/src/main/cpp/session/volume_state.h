@@ -22,7 +22,11 @@
 
 extern "C" {
 #include "volume.h"
+#if __has_include(<ext2fs/ext2fs.h>)
 #include <ext2fs/ext2fs.h>
+#else
+typedef struct struct_ext2_filsys *ext2_filsys;
+#endif
 }
 
 struct NtfsStream;

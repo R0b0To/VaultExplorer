@@ -60,6 +60,7 @@ class VideoPlaybackManager {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    Duration? initialPosition,
   }) async {
     final token = ++_activationToken;
     final previousFuture = _currentActivationFuture;
@@ -87,6 +88,9 @@ class VideoPlaybackManager {
           await ctrl.setVolumeBoost(volumeBoostEnabled, volumeBoostGainMb);
           await ctrl.setPlaybackSpeed(playbackSpeed);
           await ctrl.setLooping(looping);
+          if (initialPosition != null && initialPosition > Duration.zero) {
+            await ctrl.seekTo(initialPosition);
+          }
           if (autoPlay) await ctrl.play();
           return;
         }
@@ -100,6 +104,7 @@ class VideoPlaybackManager {
 
       if (token != _activationToken) return;
 
+      final initialPositionMs = initialPosition?.inMilliseconds ?? 0;
       NativeVideoController controller;
       NativeVideoController createController() {
         if (volId != null && filePath != null) {
@@ -113,6 +118,7 @@ class VideoPlaybackManager {
             audioDecoderMode: audioDecoderMode,
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
+            initialPositionMs: initialPositionMs,
           );
         } else if (contentUriString != null) {
           return NativeVideoController.fromUri(
@@ -123,6 +129,7 @@ class VideoPlaybackManager {
             audioDecoderMode: audioDecoderMode,
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
+            initialPositionMs: initialPositionMs,
           );
         } else {
           throw ArgumentError(
@@ -152,6 +159,9 @@ class VideoPlaybackManager {
             volumeBoostGainMb,
           );
           await controller.setLooping(looping);
+          if (initialPosition != null && initialPosition > Duration.zero) {
+            await controller.seekTo(initialPosition);
+          }
           if (autoPlay) await controller.play();
         }
       } else {

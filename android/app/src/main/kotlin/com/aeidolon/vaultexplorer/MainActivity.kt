@@ -624,6 +624,7 @@ open class MainActivity : FlutterFragmentActivity() {
                     val audioDecoderMode = call.argument<String>("audioDecoderMode") ?: "AUTO"
                     val volumeBoostEnabled = call.argument<Boolean>("volumeBoostEnabled") ?: false
                     val volumeBoostGainMb = call.argument<Int>("volumeBoostGainMb") ?: 2000
+                    val initialPositionMs = (call.argument<Number>("initialPositionMs") ?: 0).toLong()
                     val textureId = nativePlayerManager.initialize(
                         volId,
                         filePath,
@@ -632,6 +633,7 @@ open class MainActivity : FlutterFragmentActivity() {
                         audioDecoderMode,
                         volumeBoostEnabled,
                         volumeBoostGainMb,
+                        initialPositionMs,
                     )
                     result.success(mapOf("textureId" to textureId))
                 }

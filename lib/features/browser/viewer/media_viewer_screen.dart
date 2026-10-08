@@ -303,10 +303,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       return;
     }
     if (shouldResume && savedPosition != null) {
-      try {
-        await controller.seekTo(savedPosition);
-      } catch (e) {
-        VeLog.w('MediaViewer', 'Could not resume playback position', e);
+      if ((controller.value.position - savedPosition).abs() >
+          const Duration(seconds: 2)) {
+        try {
+          await controller.seekTo(savedPosition);
+        } catch (e) {
+          VeLog.w('MediaViewer', 'Could not resume playback position', e);
+        }
       }
     }
     await controller.play();
@@ -471,6 +474,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           .read(fileManagerToolbarSettingsProvider(null))
           .config
           .mediaViewerToolbarConfig;
+      final mode = playbackSettings.resumePlaybackMode;
+      final savedPosition = widget._isPreviewOnly
+          ? null
+          : (_lastSavedPlaybackPositions[file] ??
+              await _readResumePosition(file));
+      final canResume = savedPosition != null &&
+          savedPosition >= const Duration(seconds: 5);
+      final shouldPreSeek = canResume && mode == ResumePlaybackMode.always;
+
       unawaited(
         _playbackManager.activate(
           fileName: file,
@@ -493,6 +505,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           audioDecoderMode: playbackSettings.audioDecoderMode,
           volumeBoostEnabled: playbackSettings.volumeBoostEnabled,
           volumeBoostGainMb: playbackSettings.volumeBoostGainMb,
+          initialPosition: shouldPreSeek ? savedPosition : null,
         ),
       );
     } else {
@@ -2515,6 +2528,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               posterBytes: prefetchedBytes,
               thumbnailQuality: widget.thumbnailQuality,
               thumbnailCacheMode: widget.thumbnailCacheMode,
+              thumbnailGenerationStrategy:
+                  gestureConfig.thumbnailGenerationStrategy,
               showUI: _showUI,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               enableZoom: !_scrollMode.isContinuous,

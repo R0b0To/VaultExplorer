@@ -88,6 +88,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    int initialPositionMs = 0,
   }) : _media3 = NativeMedia3Controller(
          volId: volId,
          filePath: filePath,
@@ -98,6 +99,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
          audioDecoderMode: audioDecoderMode,
          volumeBoostEnabled: volumeBoostEnabled,
          volumeBoostGainMb: volumeBoostGainMb,
+         initialPositionMs: initialPositionMs,
        ),
        super(const NativeVideoValue()) {
     _media3.addListener(_onMedia3StateChanged);
@@ -113,6 +115,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    int initialPositionMs = 0,
   }) {
     final parsed = _parseContentUri(contentUriString);
     return NativeVideoController(
@@ -124,6 +127,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
       audioDecoderMode: audioDecoderMode,
       volumeBoostEnabled: volumeBoostEnabled,
       volumeBoostGainMb: volumeBoostGainMb,
+      initialPositionMs: initialPositionMs,
     );
   }
 
@@ -141,6 +145,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     }
   }
 
+  int get initialPositionMs => _media3.initialPositionMs;
   NativeMedia3Controller get media3Controller => _media3;
   ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier =>
       _media3.audioTracksNotifier;

@@ -178,6 +178,8 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   List<SubtitleTrackInfo> get subtitleTracks => subtitleTracksNotifier.value;
   MediaDiagnosticsInfo get diagnostics => diagnosticsNotifier.value;
 
+  final int initialPositionMs;
+
   NativeMedia3Controller({
     required this.volId,
     required this.filePath,
@@ -188,6 +190,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    this.initialPositionMs = 0,
   }) : _currentSpeed = initialSpeed,
        _videoDecoderMode = videoDecoderMode,
        _audioDecoderMode = audioDecoderMode,
@@ -228,6 +231,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
             'audioDecoderMode': _audioDecoderMode.name,
             'volumeBoostEnabled': _volumeBoostEnabled,
             'volumeBoostGainMb': _volumeBoostGainMb,
+            if (initialPositionMs > 0) 'initialPositionMs': initialPositionMs,
           });
           if (result is Map && result.containsKey('textureId')) {
             textureId = (result['textureId'] as num?)?.toInt();

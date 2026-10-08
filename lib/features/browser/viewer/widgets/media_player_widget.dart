@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
@@ -113,6 +114,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final int volumeBoostGainMb;
   final MediaDecoderMode videoDecoderMode;
   final MediaDecoderMode audioDecoderMode;
+  final ThumbnailGenerationStrategy thumbnailGenerationStrategy;
   final ValueChanged<bool>? onEdgeTap;
 
   const MediaPlayerWidget({
@@ -137,6 +139,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.posterBytes,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.thumbnailGenerationStrategy = ThumbnailGenerationStrategy.hybrid,
     this.onSizeKnown,
     this.onError,
     this.isMuted = false,
@@ -949,6 +952,29 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     );
   }
 
+  Duration _getMorphDuration(
+    NativeVideoController controller,
+    NativeVideoValue val,
+  ) {
+    final isFirstFrameThumbnail =
+        widget.thumbnailGenerationStrategy ==
+        ThumbnailGenerationStrategy.firstFrame;
+    final isFirstFramePlayback =
+        controller.initialPositionMs <= 1000 &&
+        val.position <= const Duration(seconds: 1);
+
+    if (isFirstFrameThumbnail && isFirstFramePlayback) {
+      return const Duration(milliseconds: 200);
+    }
+    return const Duration(milliseconds: 1500);
+  }
+
+  Curve _getMorphCurve(Duration duration) {
+    return duration.inMilliseconds > 500
+        ? Curves.easeInOutCubic
+        : Curves.easeOutCubic;
+  }
+
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster =
         _localPosterBytes ??
@@ -1155,10 +1181,19 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                     val.hasRenderedFirstFrame &&
                     !controller.isDisposed;
 
-                return AnimatedOpacity(
-                  opacity: showVideo ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: _buildVideoTexture(controller),
+                final duration = _getMorphDuration(controller, val);
+                final curve = _getMorphCurve(duration);
+
+                return AnimatedScale(
+                  scale: showVideo ? 1.0 : 0.985,
+                  duration: duration,
+                  curve: curve,
+                  child: AnimatedOpacity(
+                    opacity: showVideo ? 1.0 : 0.0,
+                    duration: duration,
+                    curve: curve,
+                    child: _buildVideoTexture(controller),
+                  ),
                 );
               },
             ),

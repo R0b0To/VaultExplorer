@@ -358,6 +358,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         audioDecoderModeName: String = "AUTO",
         volumeBoostEnabled: Boolean = false,
         volumeBoostGainMb: Int = 2000,
+        initialPositionMs: Long = 0L,
     ): Long {
         // A scrub-preview session from the outgoing video (if the user
         // swiped to the next item mid-drag) is pinned to that video's
@@ -443,6 +444,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         val mediaSource = buildMediaSource(volId, filePath, isLocalStorage, extractorsFactory)
 
         exoPlayer.setMediaSource(mediaSource)
+        if (initialPositionMs > 0L) {
+            exoPlayer.seekTo(initialPositionMs)
+        }
         exoPlayer.prepare()
 
         VeLog.d(TAG) { "Player initialized for volId=$volId, pathLen=${filePath.length}, isLocalStorage=$isLocalStorage, fresh textureId=$textureId" }

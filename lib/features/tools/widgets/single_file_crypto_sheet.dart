@@ -177,14 +177,12 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection));
-    final cs = context.colors;
     final isEncrypt = state.direction == CryptoDirection.encrypt;
     final directionLocked = widget.initialDirection != null;
     final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         elevation: 0,
         title: Text(
           maxLines: 2,

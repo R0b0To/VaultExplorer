@@ -101,7 +101,9 @@ class VaultKeepAliveService : Service() {
             maxProgress = max
             isIndeterminate = indeterminate
             val s = instance
-            if (s != null && isRunning && ContainerSessionRegistry.hasAnyActiveSessions()) {
+            if (s != null && isRunning &&
+                (ContainerSessionRegistry.hasAnyActiveSessions() || hasActiveOperations)
+            ) {
                 val nm = context.getSystemService(NotificationManager::class.java)
                 nm.notify(NOTIFICATION_ID, s.buildNotification())
             }
@@ -109,7 +111,7 @@ class VaultKeepAliveService : Service() {
 
         fun refreshNotification() {
             val service = instance ?: return
-            if (!isRunning || !ContainerSessionRegistry.hasAnyActiveSessions()) return
+            if (!isRunning || (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations)) return
             service.getSystemService(NotificationManager::class.java)
                 .notify(NOTIFICATION_ID, service.buildNotification())
         }
@@ -140,7 +142,7 @@ class VaultKeepAliveService : Service() {
         if (intent?.action == ACTION_LOCK_ALL) {
             VeLog.i(TAG) { "onStartCommand: ACTION_LOCK_ALL -> locking every active session" }
             lockAllAndMaybeStop()
-        } else if (!ContainerSessionRegistry.hasAnyActiveSessions()) {
+        } else if (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations) {
             VeLog.d(TAG) { "onStartCommand: no active sessions -> stopping service" }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

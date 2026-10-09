@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -39,20 +41,23 @@ const List<Color> kSkinPalette = [
 ];
 
 /// `RRGGBB` for [color], without alpha or a leading `#`.
-String skinColorToHex(Color color) =>
-    (color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+String skinColorToHex(Color color) => (color.toARGB32() & 0xFFFFFF)
+    .toRadixString(16)
+    .padLeft(6, '0')
+    .toUpperCase();
 
-/// Parses exactly six hex digits into an opaque color; null for anything else.
+/// Parses six hex digits (RGB) or eight (ARGB); null for other values.
 Color? skinColorFromHex(String hex) {
-  if (hex.length != 6) return null;
-  final value = int.tryParse(hex, radix: 16);
-  if (value == null) return null;
-  return Color(0xFF000000 | value);
+  final value = hex.replaceFirst('#', '').trim();
+  if (value.length != 6 && value.length != 8) return null;
+  final parsed = int.tryParse(value, radix: 16);
+  if (parsed == null) return null;
+  return value.length == 6 ? Color(0xFF000000 | parsed) : Color(parsed);
 }
 
 /// Opens the picker. Completes with null if dismissed.
 ///
-/// [allowDefault] adds a "Default" button that completes with
+/// [allowDefault] adds a context.l10n.fileSkinColorDefault button that completes with
 /// `SkinColorPick(null)`, for options where "follow the theme" is a valid
 /// choice (names, details) as opposed to ones that always need a color.
 Future<SkinColorPick?> showSkinColorPicker(
@@ -89,16 +94,19 @@ class _SkinColorPickerSheet extends StatefulWidget {
 
 class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
   late final TextEditingController _hexController;
-  Color? _hexColor;
+  late HSVColor _selected;
+  Color? _typedColor;
+  bool _showExactEntry = false;
+
+  Color get _color => _selected.toColor();
 
   @override
   void initState() {
     super.initState();
-    final initial = widget.initial;
-    _hexController = TextEditingController(
-      text: initial == null ? '' : skinColorToHex(initial),
-    );
-    _hexColor = initial;
+    final initial = widget.initial ?? const Color(0xFF6487D9);
+    _selected = HSVColor.fromColor(initial);
+    _typedColor = initial;
+    _hexController = TextEditingController(text: _hexText(initial));
   }
 
   @override
@@ -107,7 +115,30 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
     super.dispose();
   }
 
+  String _hexText(Color color) {
+    final argb = color.toARGB32();
+    return ((argb >> 24) & 0xFF) == 0xFF
+        ? skinColorToHex(color)
+        : argb.toRadixString(16).padLeft(8, '0').toUpperCase();
+  }
+
   void _pick(Color? color) => Navigator.of(context).pop(SkinColorPick(color));
+
+  void _updateColor(Color color, {bool updateEntry = true}) {
+    setState(() {
+      _selected = HSVColor.fromColor(color);
+      _typedColor = color;
+      if (updateEntry) _hexController.text = _hexText(color);
+    });
+  }
+
+  void _updateHsv(HSVColor color) {
+    setState(() {
+      _selected = color;
+      _typedColor = color.toColor();
+      _hexController.text = _hexText(_typedColor!);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,87 +146,414 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
     final textTheme = Theme.of(context).textTheme;
 
     return AppBottomSheet(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.title,
-              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final color in kSkinPalette)
-                  _Swatch(
-                    color: color,
-                    selected: widget.initial == color,
-                    onTap: () => _pick(color),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _hexController,
-                    maxLength: 6,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp('[0-9a-fA-F]')),
+      child: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width - 40;
+            final wheelSize = (availableWidth - 24)
+                .clamp(220.0, 310.0)
+                .toDouble();
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            style: textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        _ColorSample(color: _color),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.l10n.skinDragAroundTheRingTo868d62,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: SizedBox.square(
+                        dimension: wheelSize,
+                        child: _HsvWheel(
+                          value: _selected,
+                          onChanged: _updateHsv,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.opacity_rounded, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Slider(
+                            value: _selected.alpha,
+                            label: '${(_selected.alpha * 100).round()}%',
+                            onChanged: (value) =>
+                                _updateHsv(_selected.withAlpha(value)),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 44,
+                          child: Text(
+                            '${(_selected.alpha * 100).round()}%',
+                            textAlign: TextAlign.end,
+                            style: textTheme.labelMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.l10n.skinQuickColors,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 11,
+                      runSpacing: 11,
+                      children: [
+                        for (final color in kSkinPalette)
+                          _Swatch(
+                            color: color,
+                            selected: _color.toARGB32() == color.toARGB32(),
+                            onTap: () => _updateColor(color),
+                          ),
+                      ],
+                    ),
+                    Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: EdgeInsets.zero,
+                        initiallyExpanded: _showExactEntry,
+                        onExpansionChanged: (expanded) =>
+                            setState(() => _showExactEntry = expanded),
+                        leading: const Icon(Icons.tag_rounded),
+                        title: Text(context.l10n.skinEnterAnExactColor),
+                        subtitle: Text(context.l10n.skinOptionalRGBOrARGBValue),
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _hexController,
+                                  maxLength: 8,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                      RegExp('[0-9a-fA-F]'),
+                                    ),
+                                  ],
+                                  decoration: InputDecoration(
+                                    labelText: context.l10n.skinRGBARGB,
+                                    prefixText: '#',
+                                    counterText: '',
+                                  ),
+                                  onChanged: (value) => setState(() {
+                                    _typedColor = skinColorFromHex(value);
+                                  }),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: _ColorSample(
+                                  color: _typedColor ?? Colors.transparent,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: IconButton.filledTonal(
+                                  tooltip: context.l10n.skinUseThisValue,
+                                  onPressed: _typedColor == null
+                                      ? null
+                                      : () => _updateColor(
+                                          _typedColor!,
+                                          updateEntry: false,
+                                        ),
+                                  icon: const Icon(Icons.check_rounded),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.allowDefault) ...[
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => _pick(null),
+                          icon: const Icon(Icons.restart_alt_rounded),
+                          label: Text(context.l10n.fileSkinColorDefault),
+                        ),
+                      ),
                     ],
-                    decoration: InputDecoration(
-                      labelText: context.l10n.fileSkinColorHexLabel,
-                      prefixText: '#',
-                      counterText: '',
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: () => _pick(_color),
+                      child: Text(context.l10n.done),
                     ),
-                    onChanged: (value) =>
-                        setState(() => _hexColor = skinColorFromHex(value)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _hexColor ?? Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    onPressed: _hexColor == null ? null : () => _pick(_hexColor),
-                    child: Text(context.l10n.done),
-                  ),
-                ),
-              ],
-            ),
-            if (widget.allowDefault) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _pick(null),
-                  icon: const Icon(Icons.restart_alt_rounded),
-                  label: Text(context.l10n.fileSkinColorDefault),
+                  ],
                 ),
               ),
-            ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HsvWheel extends StatefulWidget {
+  final HSVColor value;
+  final ValueChanged<HSVColor> onChanged;
+
+  const _HsvWheel({required this.value, required this.onChanged});
+
+  @override
+  State<_HsvWheel> createState() => _HsvWheelState();
+}
+
+class _HsvWheelState extends State<_HsvWheel> {
+  _WheelDragMode? _dragMode;
+
+  void _start(Offset position, Size size) {
+    final geometry = _WheelGeometry.fromSize(size);
+    final distance = (position - geometry.center).distance;
+    if (geometry.square.contains(position)) {
+      _dragMode = _WheelDragMode.shade;
+      _update(position, size);
+    } else if (distance >= geometry.innerRadius - 9 &&
+        distance <= geometry.radius + 9) {
+      _dragMode = _WheelDragMode.hue;
+      _update(position, size);
+    }
+  }
+
+  void _update(Offset position, Size size) {
+    final geometry = _WheelGeometry.fromSize(size);
+    switch (_dragMode) {
+      case _WheelDragMode.hue:
+        final delta = position - geometry.center;
+        final degrees =
+            (math.atan2(delta.dy, delta.dx) * 180 / math.pi + 90) % 360;
+        widget.onChanged(widget.value.withHue((degrees + 360) % 360));
+        return;
+      case _WheelDragMode.shade:
+        final saturation =
+            ((position.dx - geometry.square.left) / geometry.square.width)
+                .clamp(0.0, 1.0);
+        final value =
+            (1 - (position.dy - geometry.square.top) / geometry.square.height)
+                .clamp(0.0, 1.0);
+        widget.onChanged(
+          widget.value.withSaturation(saturation).withValue(value),
+        );
+        return;
+      case null:
+        return;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanDown: (event) => _start(event.localPosition, constraints.biggest),
+      onPanUpdate: (event) => _update(event.localPosition, constraints.biggest),
+      onPanEnd: (_) => _dragMode = null,
+      onPanCancel: () => _dragMode = null,
+      child: CustomPaint(
+        painter: _HsvWheelPainter(widget.value),
+        child: const SizedBox.expand(),
+      ),
+    ),
+  );
+}
+
+enum _WheelDragMode { hue, shade }
+
+class _WheelGeometry {
+  final Offset center;
+  final double radius;
+  final double innerRadius;
+  final Rect square;
+
+  const _WheelGeometry({
+    required this.center,
+    required this.radius,
+    required this.innerRadius,
+    required this.square,
+  });
+
+  factory _WheelGeometry.fromSize(Size size) {
+    final diameter = math.min(size.width, size.height).toDouble();
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = diameter * 0.48;
+    final innerRadius = radius * 0.73;
+    final squareSide = innerRadius * 1.36;
+    return _WheelGeometry(
+      center: center,
+      radius: radius,
+      innerRadius: innerRadius,
+      square: Rect.fromCenter(
+        center: center,
+        width: squareSide,
+        height: squareSide,
+      ),
+    );
+  }
+}
+
+class _HsvWheelPainter extends CustomPainter {
+  final HSVColor value;
+
+  const _HsvWheelPainter(this.value);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final geometry = _WheelGeometry.fromSize(size);
+    final outerRect = Rect.fromCircle(
+      center: geometry.center,
+      radius: geometry.radius,
+    );
+    final innerRect = Rect.fromCircle(
+      center: geometry.center,
+      radius: geometry.innerRadius,
+    );
+    const segmentCount = 360;
+    final segmentSweep = 2 * math.pi / segmentCount;
+    for (var degree = 0; degree < segmentCount; degree++) {
+      final start = -math.pi / 2 + degree * segmentSweep;
+      final end = start + segmentSweep;
+      final innerEnd = Offset(
+        geometry.center.dx + math.cos(end) * geometry.innerRadius,
+        geometry.center.dy + math.sin(end) * geometry.innerRadius,
+      );
+      final slice = Path()
+        ..moveTo(
+          geometry.center.dx + math.cos(start) * geometry.radius,
+          geometry.center.dy + math.sin(start) * geometry.radius,
+        )
+        ..arcTo(outerRect, start, segmentSweep, false)
+        ..lineTo(innerEnd.dx, innerEnd.dy)
+        ..arcTo(innerRect, end, -segmentSweep, false)
+        ..close();
+      canvas.drawPath(
+        slice,
+        Paint()
+          ..color = HSVColor.fromAHSV(1, degree.toDouble(), 1, 1).toColor(),
+      );
+    }
+
+    final hueColor = HSVColor.fromAHSV(1, value.hue, 1, 1).toColor();
+    final square = geometry.square;
+    canvas.save();
+    canvas.clipRRect(RRect.fromRectAndRadius(square, const Radius.circular(5)));
+    canvas.drawRect(
+      square,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [Colors.white, hueColor],
+        ).createShader(square),
+    );
+    canvas.drawRect(
+      square,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Colors.black],
+        ).createShader(square),
+    );
+    canvas.restore();
+
+    final hueAngle = (value.hue - 90) * math.pi / 180;
+    final hueMarker = Offset(
+      geometry.center.dx +
+          math.cos(hueAngle) * (geometry.radius + geometry.innerRadius) / 2,
+      geometry.center.dy +
+          math.sin(hueAngle) * (geometry.radius + geometry.innerRadius) / 2,
+    );
+    _drawMarker(canvas, hueMarker, 8);
+
+    final shadeMarker = Offset(
+      square.left + value.saturation * square.width,
+      square.top + (1 - value.value) * square.height,
+    );
+    _drawMarker(canvas, shadeMarker, 7);
+  }
+
+  void _drawMarker(Canvas canvas, Offset point, double radius) {
+    canvas.drawCircle(
+      point,
+      radius + 1,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.65)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+    canvas.drawCircle(
+      point,
+      radius,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HsvWheelPainter oldDelegate) =>
+      oldDelegate.value != value;
+}
+
+class _ColorSample extends StatelessWidget {
+  final Color color;
+
+  const _ColorSample({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final outline = Theme.of(context).colorScheme.outlineVariant;
+    return Tooltip(
+      message: '#${skinColorToHex(color)}',
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: outline, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
       ),
@@ -219,10 +577,10 @@ class _Swatch extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return InkResponse(
       onTap: onTap,
-      radius: 26,
+      radius: 25,
       child: Container(
-        width: 44,
-        height: 44,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
@@ -234,7 +592,7 @@ class _Swatch extends StatelessWidget {
         child: selected
             ? Icon(
                 Icons.check_rounded,
-                size: 22,
+                size: 19,
                 color: color.computeLuminance() > 0.5
                     ? Colors.black
                     : Colors.white,

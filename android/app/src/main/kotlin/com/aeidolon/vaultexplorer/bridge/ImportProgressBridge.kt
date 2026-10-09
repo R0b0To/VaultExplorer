@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
 import com.aeidolon.vaultexplorer.FilesystemNameValidator
+import com.aeidolon.vaultexplorer.automation.VaultAutomationProgress
 
 object ImportProgressBridge {
     @Volatile
@@ -45,6 +46,7 @@ object ImportProgressBridge {
         totalBytes: Long = 0L,
     ) {
         lastContext[opId] = LastContext(done, total, currentName, totalBytes)
+        VaultAutomationProgress.reportAbsoluteBytes(opId, transferredBytes)
 
         val ch = channel ?: return
         val now = System.currentTimeMillis()

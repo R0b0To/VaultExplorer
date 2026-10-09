@@ -1,5 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/data/models/app_skin_preset.dart';
+import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 
 abstract final class AppRadius {
   static const sm = 8.0;
@@ -71,12 +75,14 @@ class _PredictiveBackForwarder extends StatefulWidget {
   final Widget child;
 
   @override
-  State<_PredictiveBackForwarder> createState() => _PredictiveBackForwarderState();
+  State<_PredictiveBackForwarder> createState() =>
+      _PredictiveBackForwarderState();
 }
 
 class _PredictiveBackForwarderState extends State<_PredictiveBackForwarder>
     with WidgetsBindingObserver {
-  bool get _canHandle => widget.route.isCurrent && widget.route.popGestureEnabled;
+  bool get _canHandle =>
+      widget.route.isCurrent && widget.route.popGestureEnabled;
 
   @override
   void initState() {
@@ -99,7 +105,9 @@ class _PredictiveBackForwarderState extends State<_PredictiveBackForwarder>
 
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
-    widget.route.handleUpdateBackGestureProgress(progress: 1 - backEvent.progress);
+    widget.route.handleUpdateBackGestureProgress(
+      progress: 1 - backEvent.progress,
+    );
   }
 
   @override
@@ -248,12 +256,28 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       success: Color.lerp(success, other.success, t)!,
       onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
-      successContainer: Color.lerp(successContainer, other.successContainer, t)!,
-      onSuccessContainer: Color.lerp(onSuccessContainer, other.onSuccessContainer, t)!,
+      successContainer: Color.lerp(
+        successContainer,
+        other.successContainer,
+        t,
+      )!,
+      onSuccessContainer: Color.lerp(
+        onSuccessContainer,
+        other.onSuccessContainer,
+        t,
+      )!,
       warning: Color.lerp(warning, other.warning, t)!,
       onWarning: Color.lerp(onWarning, other.onWarning, t)!,
-      warningContainer: Color.lerp(warningContainer, other.warningContainer, t)!,
-      onWarningContainer: Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
+      warningContainer: Color.lerp(
+        warningContainer,
+        other.warningContainer,
+        t,
+      )!,
+      onWarningContainer: Color.lerp(
+        onWarningContainer,
+        other.onWarningContainer,
+        t,
+      )!,
       bookmark: Color.lerp(bookmark, other.bookmark, t)!,
     );
   }
@@ -269,40 +293,40 @@ extension AppThemeX on BuildContext {
 const Color _seedColor = Color(0xFF0B57D0);
 
 ColorScheme _darkColorScheme() => const ColorScheme(
-      brightness: Brightness.dark,
-      primary: Color(0xFFA8C7FA),
-      onPrimary: Color(0xFF062E6F),
-      primaryContainer: Color(0xFF0842A0),
-      onPrimaryContainer: Color(0xFFD3E3FD),
-      secondary: Color(0xFFBEC6DC),
-      onSecondary: Color(0xFF283141),
-      secondaryContainer: Color(0xFF3C4858),
-      onSecondaryContainer: Color(0xFFDAE2F9),
-      tertiary: Color(0xFFCFBCFF),
-      onTertiary: Color(0xFF34275B),
-      tertiaryContainer: Color(0xFF4B3D74),
-      onTertiaryContainer: Color(0xFFEADDFF),
-      error: Color(0xFFFFB4AB),
-      onError: Color(0xFF690005),
-      errorContainer: Color(0xFF93000A),
-      onErrorContainer: Color(0xFFFFDAD6),
-      surface: Color(0xFF111318),
-      onSurface: Color(0xFFE2E2E9),
-      onSurfaceVariant: Color(0xFFC2C7CF),
-      surfaceContainerLowest: Color(0xFF0C0E13),
-      surfaceContainerLow: Color(0xFF191C20),
-      surfaceContainer: Color(0xFF1D2024),
-      surfaceContainerHigh: Color(0xFF272A2F),
-      surfaceContainerHighest: Color(0xFF32353A),
-      outline: Color(0xFF8C9199),
-      outlineVariant: Color(0xFF42474E),
-      inverseSurface: Color(0xFFE2E2E9),
-      onInverseSurface: Color(0xFF2E3135),
-      inversePrimary: Color(0xFF3A5D92),
-      shadow: Color(0xFF000000),
-      scrim: Color(0xFF000000),
-      surfaceTint: Color(0xFFA8C7FA),
-    );
+  brightness: Brightness.dark,
+  primary: Color(0xFFA8C7FA),
+  onPrimary: Color(0xFF062E6F),
+  primaryContainer: Color(0xFF0842A0),
+  onPrimaryContainer: Color(0xFFD3E3FD),
+  secondary: Color(0xFFBEC6DC),
+  onSecondary: Color(0xFF283141),
+  secondaryContainer: Color(0xFF3C4858),
+  onSecondaryContainer: Color(0xFFDAE2F9),
+  tertiary: Color(0xFFCFBCFF),
+  onTertiary: Color(0xFF34275B),
+  tertiaryContainer: Color(0xFF4B3D74),
+  onTertiaryContainer: Color(0xFFEADDFF),
+  error: Color(0xFFFFB4AB),
+  onError: Color(0xFF690005),
+  errorContainer: Color(0xFF93000A),
+  onErrorContainer: Color(0xFFFFDAD6),
+  surface: Color(0xFF111318),
+  onSurface: Color(0xFFE2E2E9),
+  onSurfaceVariant: Color(0xFFC2C7CF),
+  surfaceContainerLowest: Color(0xFF0C0E13),
+  surfaceContainerLow: Color(0xFF191C20),
+  surfaceContainer: Color(0xFF1D2024),
+  surfaceContainerHigh: Color(0xFF272A2F),
+  surfaceContainerHighest: Color(0xFF32353A),
+  outline: Color(0xFF8C9199),
+  outlineVariant: Color(0xFF42474E),
+  inverseSurface: Color(0xFFE2E2E9),
+  onInverseSurface: Color(0xFF2E3135),
+  inversePrimary: Color(0xFF3A5D92),
+  shadow: Color(0xFF000000),
+  scrim: Color(0xFF000000),
+  surfaceTint: Color(0xFFA8C7FA),
+);
 
 /// Overrides the neutral surface ramp of [cs] with true blacks for an
 /// OLED/AMOLED "pure black" look. Accent roles (primary, secondary,
@@ -310,34 +334,97 @@ ColorScheme _darkColorScheme() => const ColorScheme(
 /// Material You dynamic colors still come through on top of the black
 /// background.
 ColorScheme _applyPureBlack(ColorScheme cs) => cs.copyWith(
-      surface: Colors.black,
-      surfaceContainerLowest: Colors.black,
-      surfaceContainerLow: const Color(0xFF0A0A0A),
-      surfaceContainer: const Color(0xFF121212),
-      surfaceContainerHigh: const Color(0xFF1C1C1C),
-      surfaceContainerHighest: const Color(0xFF242424),
-    );
+  surface: Colors.black,
+  surfaceContainerLowest: Colors.black,
+  surfaceContainerLow: const Color(0xFF0A0A0A),
+  surfaceContainer: const Color(0xFF121212),
+  surfaceContainerHigh: const Color(0xFF1C1C1C),
+  surfaceContainerHighest: const Color(0xFF242424),
+);
 
 /// [dynamicScheme] is the device's Material You palette (from
 /// `DynamicColorBuilder`'s `darkDynamic`), used in place of the hardcoded
 /// scheme when the user has enabled the "Use Material You" setting.
 ///
-/// [pureBlack] swaps the dark scheme's surfaces for true blacks (the "OLED
-/// theme" setting), which saves battery and reduces glare on OLED panels.
-ThemeData buildDarkTheme({ColorScheme? dynamicScheme, bool pureBlack = false}) {
-  final cs = dynamicScheme ?? _darkColorScheme();
-  return _buildTheme(pureBlack ? _applyPureBlack(cs) : cs, Brightness.dark);
+/// The OLED preset swaps the dark scheme's surfaces for true blacks, which
+/// saves battery and reduces glare on OLED panels.
+/// Material You colors blend with Default and OLED skins. Custom skins keep
+/// their authored accents so enabling dynamic color cannot wash out the
+/// selected palette.
+ThemeData buildDarkTheme({
+  ColorScheme? dynamicScheme,
+  AppSkinPreset appSkin = AppSkinPreset.defaultSkin,
+  CustomAppSkin customAppSkin = const CustomAppSkin(),
+  FileManagerSkin manualFileManagerSkin = FileManagerSkin.classic,
+  bool fileManagerFollowsAppSkin = true,
+  bool editorFollowsAppSkin = true,
+}) {
+  final useDynamicForSkin =
+      appSkin == AppSkinPreset.defaultSkin ||
+      appSkin == AppSkinPreset.oledPureBlack;
+  var cs = useDynamicForSkin && dynamicScheme != null
+      ? dynamicScheme
+      : appSkin == AppSkinPreset.custom
+      ? applyColorSchemeOverrides(
+          _skinColorScheme(AppSkinPreset.defaultSkin, Brightness.dark),
+          customAppSkin.darkColors,
+        )
+      : _skinColorScheme(appSkin, Brightness.dark);
+  if (appSkin == AppSkinPreset.oledPureBlack) {
+    cs = _applyPureBlack(cs);
+  }
+  return _buildTheme(
+    cs,
+    Brightness.dark,
+    appSkin: appSkin,
+    customAppSkin: customAppSkin,
+    manualFileManagerSkin: manualFileManagerSkin,
+    fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
+    editorFollowsAppSkin: editorFollowsAppSkin,
+  );
 }
 
 /// [dynamicScheme] is the device's Material You palette (from
 /// `DynamicColorBuilder`'s `lightDynamic`), used in place of the hardcoded
 /// seed-generated scheme when the user has enabled the "Use Material You"
 /// setting.
-ThemeData buildLightTheme({ColorScheme? dynamicScheme}) => _buildTheme(
-      dynamicScheme ??
-          ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
-      Brightness.light,
-    );
+ThemeData buildLightTheme({
+  ColorScheme? dynamicScheme,
+  AppSkinPreset appSkin = AppSkinPreset.defaultSkin,
+  CustomAppSkin customAppSkin = const CustomAppSkin(),
+  FileManagerSkin manualFileManagerSkin = FileManagerSkin.classic,
+  bool fileManagerFollowsAppSkin = true,
+  bool editorFollowsAppSkin = true,
+}) {
+  final useDynamicForSkin = appSkin == AppSkinPreset.defaultSkin;
+  final cs = useDynamicForSkin && dynamicScheme != null
+      ? dynamicScheme
+      : appSkin == AppSkinPreset.custom
+      ? applyColorSchemeOverrides(
+          _skinColorScheme(AppSkinPreset.defaultSkin, Brightness.light),
+          customAppSkin.lightColors,
+        )
+      : _skinColorScheme(appSkin, Brightness.light);
+  return _buildTheme(
+    cs,
+    Brightness.light,
+    appSkin: appSkin,
+    customAppSkin: customAppSkin,
+    manualFileManagerSkin: manualFileManagerSkin,
+    fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
+    editorFollowsAppSkin: editorFollowsAppSkin,
+  );
+}
+
+ColorScheme _skinColorScheme(AppSkinPreset skin, Brightness brightness) {
+  if (skin == AppSkinPreset.defaultSkin ||
+      skin == AppSkinPreset.oledPureBlack) {
+    return brightness == Brightness.dark
+        ? _darkColorScheme()
+        : ColorScheme.fromSeed(seedColor: _seedColor, brightness: brightness);
+  }
+  return ColorScheme.fromSeed(seedColor: _seedColor, brightness: brightness);
+}
 
 @Deprecated('Use buildDarkTheme() (or buildLightTheme()) instead.')
 ThemeData buildTheme() => buildDarkTheme();
@@ -350,11 +437,57 @@ ThemeData buildTheme() => buildDarkTheme();
 /// is user-selectable -- so every widget inside them (app bar, menus, input
 /// fields, list tiles, ...) picks up the same colors instead of only the
 /// ones a screen remembered to recolor by hand.
-ThemeData buildThemeFromColorScheme(ColorScheme scheme) =>
-    _buildTheme(scheme, scheme.brightness);
+ThemeData buildThemeFromColorScheme(
+  ColorScheme scheme, {
+  AppSkinTokens? appSkinTokens,
+}) => _buildTheme(scheme, scheme.brightness, skinTokens: appSkinTokens);
 
-ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
+AppSemanticColors _semanticColors(
+  bool isDark,
+  AppSkinPreset preset,
+  CustomAppSkin customAppSkin,
+) {
+  final base = isDark ? AppSemanticColors.dark : AppSemanticColors.light;
+  if (preset != AppSkinPreset.custom) return base;
+  final values = isDark
+      ? customAppSkin.darkSemanticColors
+      : customAppSkin.lightSemanticColors;
+  Color? color(String key) => values[key] == null ? null : Color(values[key]!);
+  return base.copyWith(
+    success: color('success'),
+    onSuccess: color('onSuccess'),
+    successContainer: color('successContainer'),
+    onSuccessContainer: color('onSuccessContainer'),
+    warning: color('warning'),
+    onWarning: color('onWarning'),
+    warningContainer: color('warningContainer'),
+    onWarningContainer: color('onWarningContainer'),
+    bookmark: color('bookmark'),
+  );
+}
+
+ThemeData _buildTheme(
+  ColorScheme cs,
+  Brightness brightness, {
+  AppSkinPreset appSkin = AppSkinPreset.defaultSkin,
+  CustomAppSkin customAppSkin = const CustomAppSkin(),
+  FileManagerSkin manualFileManagerSkin = FileManagerSkin.classic,
+  bool fileManagerFollowsAppSkin = true,
+  bool editorFollowsAppSkin = true,
+  AppSkinTokens? skinTokens,
+}) {
   final isDark = brightness == Brightness.dark;
+  final resolvedSkinTokens =
+      skinTokens ??
+      buildAppSkinTokens(
+        preset: appSkin,
+        customAppSkin: customAppSkin,
+        isDark: isDark,
+        colorScheme: cs,
+        manualFileManagerSkin: manualFileManagerSkin,
+        fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
+        editorFollowsAppSkin: editorFollowsAppSkin,
+      );
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
@@ -363,14 +496,15 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
     visualDensity: VisualDensity.adaptivePlatformDensity,
     splashFactory: InkSparkle.splashFactory,
     pageTransitionsTheme: const PageTransitionsTheme(
-      builders: {
-        TargetPlatform.android: CrossfadePageTransitionsBuilder(),
-      },
+      builders: {TargetPlatform.android: CrossfadePageTransitionsBuilder()},
     ),
-    extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],
-       appBarTheme: AppBarTheme(
-      backgroundColor: cs.surface,
-      foregroundColor: cs.onSurface,
+    extensions: [
+      _semanticColors(isDark, appSkin, customAppSkin),
+      resolvedSkinTokens,
+    ],
+    appBarTheme: AppBarTheme(
+      backgroundColor: resolvedSkinTokens.appBarBackground,
+      foregroundColor: resolvedSkinTokens.appBarForeground,
       elevation: 0,
       scrolledUnderElevation: 3,
       surfaceTintColor: cs.surfaceTint,
@@ -378,10 +512,15 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w400,
-        color: cs.onSurface,
+        color: resolvedSkinTokens.appBarForeground,
       ),
-      iconTheme: IconThemeData(color: cs.onSurface, size: AppIconSize.action),
-      actionsIconTheme: IconThemeData(color: cs.onSurfaceVariant),
+      iconTheme: IconThemeData(
+        color: resolvedSkinTokens.appBarForeground,
+        size: AppIconSize.action,
+      ),
+      actionsIconTheme: IconThemeData(
+        color: resolvedSkinTokens.appBarForeground,
+      ),
       // Default for standard pages: matches cs.surface
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -389,7 +528,9 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: cs.surfaceContainer,
         systemNavigationBarDividerColor: Colors.transparent,
-        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarIconBrightness: isDark
+            ? Brightness.light
+            : Brightness.dark,
         systemNavigationBarContrastEnforced: false,
         systemStatusBarContrastEnforced: false,
       ),
@@ -532,13 +673,16 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       style: IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: cs.primaryContainer,
-      foregroundColor: cs.onPrimaryContainer,
+      backgroundColor: resolvedSkinTokens.fabBackground,
+      foregroundColor: resolvedSkinTokens.fabForeground,
       elevation: 1,
       focusElevation: 1,
       hoverElevation: 2,
       highlightElevation: 3,
-      extendedTextStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      extendedTextStyle: const TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
@@ -548,9 +692,14 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       selectedColor: cs.secondaryContainer,
       disabledColor: cs.onSurface.withValues(alpha: 0.12),
       labelStyle: TextStyle(color: cs.onSurface, fontSize: 13),
-      secondaryLabelStyle: TextStyle(color: cs.onSecondaryContainer, fontSize: 13),
+      secondaryLabelStyle: TextStyle(
+        color: cs.onSecondaryContainer,
+        fontSize: 13,
+      ),
       side: BorderSide(color: cs.outlineVariant),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 8),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
@@ -614,7 +763,9 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       modalBackgroundColor: cs.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
       ),
       showDragHandle: true,
       dragHandleColor: cs.onSurfaceVariant.withValues(alpha: 0.4),
@@ -626,7 +777,9 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       elevation: 0,
       contentTextStyle: TextStyle(color: cs.onInverseSurface, fontSize: 14),
       actionTextColor: cs.inversePrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
       behavior: SnackBarBehavior.floating,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),

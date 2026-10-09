@@ -13,12 +13,18 @@ import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
 import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
 import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
 import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
 import com.aeidolon.vaultexplorer.camera.listCameraLenses
+import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
@@ -29,12 +35,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.panic.PanicSettings
 import com.aeidolon.vaultexplorer.panic.PanicTier
+import com.aeidolon.vaultexplorer.util.NotificationLocale
 
 /**
  * Headless entry point for any automation app to unlock, lock, import into,
@@ -282,19 +290,70 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             return
         }
         val appContext = context.applicationContext
+        val token = intent.getStringExtra(EXTRA_API_TOKEN)
+        val validToken = AutomationSettings.isTokenValid(appContext, token)
+        val progressTitle = if (validToken) {
+            progressTitleForAction(appContext, action)
+        } else null
+        if (progressTitle != null && !VaultKeepAliveService.isRunning) {
+            enqueueBackgroundAction(appContext, action, intent)
+            return
+        }
+        val progressId = progressTitle?.let { VaultAutomationProgress.begin(appContext, it) } ?: 0
         val pending = goAsync()
         automationExecutor.execute {
             try {
-                handleAction(appContext, action, intent)
+                handleAction(appContext, action, intent, progressId)
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "Unhandled automation error for $action" }
             } finally {
+                if (progressId > 0) VaultAutomationProgress.finish(progressId)
                 pending.finish()
             }
         }
     }
 
-    private fun handleAction(context: Context, action: String, intent: Intent) {
+    internal fun progressTitleForAction(context: Context, action: String): String? {
+        val resources = NotificationLocale.wrap(context)
+        val titleId = when (action) {
+            ACTION_UNLOCK_VAULT -> R.string.automation_unlocking_notification_title
+            ACTION_IMPORT_FILE, ACTION_IMPORT_FOLDER -> R.string.automation_importing_notification_title
+            ACTION_EXPORT_FILE, ACTION_EXPORT_FOLDER -> R.string.automation_exporting_notification_title
+            else -> return null
+        }
+        return resources.getString(titleId)
+    }
+
+    private fun enqueueBackgroundAction(context: Context, action: String, intent: Intent) {
+        val payloadId = VaultAutomationActionPayload.persist(context, intent)
+        if (payloadId == null) {
+            sendResult(context, action, Outcome("ERROR", "Could not securely queue this automation action"))
+            return
+        }
+        try {
+            val request = OneTimeWorkRequestBuilder<VaultAutomationWorker>()
+                .setInputData(
+                    Data.Builder()
+                        .putString(VaultAutomationWorker.KEY_PAYLOAD_ID, payloadId)
+                        .putString(VaultAutomationWorker.KEY_ACTION, action)
+                        .build(),
+                )
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .addTag(VaultAutomationWorker.TAG)
+                .build()
+            WorkManager.getInstance(context).beginUniqueWork(
+                VaultAutomationWorker.UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                request,
+            ).enqueue()
+        } catch (e: Exception) {
+            VaultAutomationActionPayload.clear(context, payloadId)
+            VeLog.e(TAG, e) { "Could not queue foreground automation action $action" }
+            sendResult(context, action, Outcome("ERROR", "Could not queue this automation action"))
+        }
+    }
+
+    internal fun handleAction(context: Context, action: String, intent: Intent, progressId: Int) {
         val token = intent.getStringExtra(EXTRA_API_TOKEN)
         if (!AutomationSettings.isTokenValid(context, token)) {
             VeLog.w(TAG) { "Rejected $action: invalid or missing token" }
@@ -322,10 +381,10 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             }
             ACTION_UNLOCK_VAULT -> handleUnlock(context, vaultUri!!, intent)
             ACTION_LOCK_VAULT -> handleLock(context, vaultUri!!)
-            ACTION_IMPORT_FILE -> handleImport(context, vaultUri!!, intent)
-            ACTION_EXPORT_FILE -> handleExport(context, vaultUri!!, intent)
-            ACTION_IMPORT_FOLDER -> handleImportFolder(context, vaultUri!!, intent)
-            ACTION_EXPORT_FOLDER -> handleExportFolder(context, vaultUri!!, intent)
+            ACTION_IMPORT_FILE -> handleImport(context, vaultUri!!, intent, progressId)
+            ACTION_EXPORT_FILE -> handleExport(context, vaultUri!!, intent, progressId)
+            ACTION_IMPORT_FOLDER -> handleImportFolder(context, vaultUri!!, intent, progressId)
+            ACTION_EXPORT_FOLDER -> handleExportFolder(context, vaultUri!!, intent, progressId)
             ACTION_TAKE_PHOTO -> handleTakePhoto(context, vaultUri!!, intent)
             ACTION_START_RECORDING -> handleStartRecording(context, vaultUri!!, intent)
             ACTION_STOP_RECORDING -> handleStopRecording(context, vaultUri!!)
@@ -335,7 +394,15 @@ class VaultAutomationReceiver : BroadcastReceiver() {
     }
 
     private fun startKeepAlive(context: Context) {
-        ContextCompat.startForegroundService(context, Intent(context, VaultKeepAliveService::class.java))
+        if (VaultKeepAliveService.isRunning) return
+        try {
+            ContextCompat.startForegroundService(context, Intent(context, VaultKeepAliveService::class.java))
+        } catch (e: Exception) {
+            // A background automation broadcast is not an Android FGS-start
+            // exemption. Keep the action successful; its WorkManager
+            // foreground worker already protects the current operation.
+            VeLog.w(TAG, e) { "Keep-alive service was not allowed to start after automation unlock" }
+        }
     }
 
     /**
@@ -404,7 +471,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             if (!startKeepAliveService) {
                 return Outcome("BUSY", "Vault became unlocked before scheduled sync started")
             }
-            if (startKeepAliveService) startKeepAlive(context)
+            startKeepAlive(context)
             reportAutomationUnlock(context, existingVolId)
             return Outcome("OK", "Already unlocked")
         }
@@ -531,7 +598,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun handleImport(context: Context, vaultUri: String, intent: Intent): Outcome {
+    private fun handleImport(context: Context, vaultUri: String, intent: Intent, progressId: Int): Outcome {
         if (!AutomationSettings.canImportExport(context, vaultUri)) {
             return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
         }
@@ -553,7 +620,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
             val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
             val summary = VaultAutomationFolderOps.importFolder(
-                context, volId, sourcePath, vaultPath, deleteSource, glob, recursive, excludePattern
+                context, volId, sourcePath, vaultPath, deleteSource, glob, recursive, excludePattern, progressId
             ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder")
             return summaryOutcome(summary, "Imported")
         }
@@ -561,7 +628,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         // VaultAutomationFolderOps.importOneFile accepts source_path as either
         // a raw filesystem path or a content:// Uri -- see its own and this
         // class's doc comments for the SAF-permission caveat on the latter.
-        if (!VaultAutomationFolderOps.importOneFile(context, volId, sourcePath, vaultPath)) {
+        if (!VaultAutomationFolderOps.importOneFile(context, volId, sourcePath, vaultPath, progressId)) {
             return Outcome("ERROR", "Import failed", failedCount = 1, matchedCount = 1)
         }
         if (intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)) {
@@ -583,7 +650,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         return Outcome("OK", "Imported", succeededCount = 1, matchedCount = 1, failedCount = 0, skippedCount = 0)
     }
 
-    private fun handleExport(context: Context, vaultUri: String, intent: Intent): Outcome {
+    private fun handleExport(context: Context, vaultUri: String, intent: Intent, progressId: Int): Outcome {
         if (!AutomationSettings.canImportExport(context, vaultUri)) {
             return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
         }
@@ -620,7 +687,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             val glob = GlobMatcher.compile(patternStr)
             val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
             val summary = VaultAutomationFolderOps.exportFolder(
-                context, volId, vaultPath, destPath, glob, recursive, excludePattern
+                context, volId, vaultPath, destPath, glob, recursive, excludePattern, progressId
             ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder")
             return summaryOutcome(summary, "Exported")
         }
@@ -629,14 +696,14 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         // content://) a SAF *tree* Uri to create the file inside -- see
         // VaultAutomationFolderOps.exportOneFile's doc comment for why the
         // two conventions differ here.
-        return if (VaultAutomationFolderOps.exportOneFile(context, volId, vaultPath, destPath)) {
+        return if (VaultAutomationFolderOps.exportOneFile(context, volId, vaultPath, destPath, progressId)) {
             Outcome("OK", "Exported", succeededCount = 1, matchedCount = 1, failedCount = 0, skippedCount = 0)
         } else {
             Outcome("ERROR", "Export failed", failedCount = 1, matchedCount = 1)
         }
     }
 
-    private fun handleImportFolder(context: Context, vaultUri: String, intent: Intent): Outcome {
+    private fun handleImportFolder(context: Context, vaultUri: String, intent: Intent, progressId: Int): Outcome {
         if (!AutomationSettings.canImportExport(context, vaultUri)) {
             return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
         }
@@ -654,12 +721,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ?.let { GlobMatcher.compile(it) }
         val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
         val summary = VaultAutomationFolderOps.importFolder(
-            context, volId, sourcePath, vaultDestDir, deleteSource, pattern, recursive, excludePattern
+            context, volId, sourcePath, vaultDestDir, deleteSource, pattern, recursive, excludePattern, progressId
         ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Imported")
     }
 
-    private fun handleExportFolder(context: Context, vaultUri: String, intent: Intent): Outcome {
+    private fun handleExportFolder(context: Context, vaultUri: String, intent: Intent, progressId: Int): Outcome {
         if (!AutomationSettings.canImportExport(context, vaultUri)) {
             return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
         }
@@ -676,7 +743,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ?.let { GlobMatcher.compile(it) }
         val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
         val summary = VaultAutomationFolderOps.exportFolder(
-            context, volId, vaultSourceDir, destPath, pattern, recursive, excludePattern
+            context, volId, vaultSourceDir, destPath, pattern, recursive, excludePattern, progressId
         ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Exported")
     }

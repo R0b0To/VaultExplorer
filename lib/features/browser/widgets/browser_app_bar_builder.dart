@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -533,7 +534,12 @@ PreferredSizeWidget buildBrowserAppBar(
         // Folder-up navigation is handled by system back gesture, breadcrumbs, and title menu.
         if (scaffold?.hasDrawer == true) {
           return IconButton(
-            icon: const Icon(Icons.menu_rounded),
+            icon: Icon(
+              Icons.menu_rounded,
+              color: Theme.of(ctx)
+                  .extension<AppSkinTokens>()
+                  ?.appBarForeground,
+            ),
             tooltip: context.l10n.storageLocationsTitle,
             onPressed: () => scaffold!.openDrawer(),
           );
@@ -541,7 +547,12 @@ PreferredSizeWidget buildBrowserAppBar(
 
         if (showBackButton) {
           return IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: Icon(
+              Icons.arrow_back,
+              color: Theme.of(ctx)
+                  .extension<AppSkinTokens>()
+                  ?.appBarForeground,
+            ),
             tooltip: context.l10n.backToDashboardTooltip,
             onPressed: () {
               if (pathStack.length > 1 && onNavigateUp != null) {
@@ -555,7 +566,12 @@ PreferredSizeWidget buildBrowserAppBar(
 
         if (onOpenStorageSwitcher != null) {
           return IconButton(
-            icon: const Icon(Icons.menu_rounded),
+            icon: Icon(
+              Icons.menu_rounded,
+              color: Theme.of(ctx)
+                  .extension<AppSkinTokens>()
+                  ?.appBarForeground,
+            ),
             tooltip: context.l10n.storageLocationsTitle,
             onPressed: onOpenStorageSwitcher,
           );

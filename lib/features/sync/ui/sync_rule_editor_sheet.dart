@@ -759,7 +759,6 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -776,7 +775,6 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     if (_configBroken) {
       return Scaffold(
         appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -801,7 +799,6 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,

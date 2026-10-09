@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -21,6 +22,7 @@ import 'package:vaultexplorer/features/browser/viewer/text_editor_chrome.dart';
 import 'package:vaultexplorer/features/browser/viewer/editor_text_encoding.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_formatters.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_language.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_accessory_key_bar.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_appearance_sheet.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart'
@@ -134,20 +136,47 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   /// app scheme actually change (see [EditorChrome.matches]).
   EditorChrome? _chrome;
 
-  EditorChrome _resolveChrome(EditorSyntaxStyle style, ColorScheme appScheme) {
+  EditorChrome _resolveChrome(
+    EditorSyntaxStyle style,
+    ColorScheme appScheme,
+    AppSkinTokens? appSkinTokens,
+  ) {
     final cached = _chrome;
     if (cached != null &&
-        cached.matches(style.backgroundColor, style.textColor, appScheme)) {
+        cached.matches(
+          style.backgroundColor,
+          style.textColor,
+          appScheme,
+          appSkinTokens: appSkinTokens,
+        )) {
       return cached;
     }
     return _chrome = EditorChrome.resolve(
       background: style.backgroundColor,
       foreground: style.textColor,
       appScheme: appScheme,
+      appSkinTokens: appSkinTokens,
     );
   }
 
   EditorTab get _activeTab => _tabs[_activeTabIndex];
+
+  TextEditorAppearancePrefs _effectiveAppearance(
+    TextEditorAppearancePrefs prefs,
+  ) {
+    final tokens = Theme.of(context).extension<AppSkinTokens>();
+    if (tokens == null || !tokens.editorFollowsAppSkin) return prefs;
+    return prefs.copyWith(
+      background: EditorBackgroundOption.values.firstWhere(
+        (option) => option.name == tokens.editorBackgroundOption,
+        orElse: () => EditorBackgroundOption.matchSyntaxTheme,
+      ),
+      syntaxTheme: EditorSyntaxThemeOption.values.firstWhere(
+        (option) => option.name == tokens.editorSyntaxThemeOption,
+        orElse: () => EditorSyntaxThemeOption.auto,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -211,13 +240,18 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             final cs = appTheme.colorScheme;
 
             // Resolve current editor background to check for color collisions
-            final appearance = ref.read(textEditorAppearanceProvider);
-            final editorStyle = resolveEditorSyntaxStyle(
-              _activeTab.filePath,
-              appTheme.brightness,
-              cs,
-              background: appearance.background,
-              syntaxTheme: appearance.syntaxTheme,
+            final appearance = _effectiveAppearance(
+              ref.read(textEditorAppearanceProvider),
+            );
+            final editorStyle = applyAppSkinEditorTokens(
+              resolveEditorSyntaxStyle(
+                _activeTab.filePath,
+                appTheme.brightness,
+                cs,
+                background: appearance.background,
+                syntaxTheme: appearance.syntaxTheme,
+              ),
+              appTheme.extension<AppSkinTokens>(),
             );
             final editorBg = editorStyle.backgroundColor;
 
@@ -362,7 +396,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      final appearance = ref.read(textEditorAppearanceProvider);
+      final appearance = _effectiveAppearance(
+        ref.read(textEditorAppearanceProvider),
+      );
       if (appearance.autoSave) {
         for (final tab in _tabs.where(
           (t) => t.isDirty && !t.isSaving && !t.isAutosaving,
@@ -396,7 +432,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   bool _handleTabBarScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
-    final appearance = ref.read(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.read(textEditorAppearanceProvider),
+    );
     if (!appearance.showTabBar || !appearance.autoHideTabBar) return false;
 
     final canScroll = notification.metrics.maxScrollExtent > 0;
@@ -496,11 +534,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     tab.autosaveTimer?.cancel();
-    final appearance = ref.read(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.read(textEditorAppearanceProvider),
+    );
 
     if (appearance.autoSave && !tab.isLoading && !tab.hasError) {
       tab.autosaveTimer = Timer(const Duration(milliseconds: 2500), () {
-        final currentAppearance = ref.read(textEditorAppearanceProvider);
+        final currentAppearance = _effectiveAppearance(
+          ref.read(textEditorAppearanceProvider),
+        );
         if (mounted &&
             currentAppearance.autoSave &&
             tab.isDirty &&
@@ -636,7 +678,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final anyDirty = _tabs.any((t) => t.isDirty);
     if (!anyDirty) return true;
 
-    final appearance = ref.read(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.read(textEditorAppearanceProvider),
+    );
     if (appearance.autoSave) {
       for (final tab in _tabs.where((t) => t.isDirty)) {
         await _saveFile(tab, isAutosave: true);
@@ -1715,22 +1759,32 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     final appTheme = Theme.of(context);
+    final appSkinTokens = appTheme.extension<AppSkinTokens>();
     final activeTab = _activeTab;
-    final appearance = ref.watch(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.watch(textEditorAppearanceProvider),
+    );
 
     // The editor's own background/syntax theme drives the colors of the whole
     // screen (app bar, tabs, status bar, accessory bar, find panel, drawer,
     // menus, system navigation bar), not just the text area. `cs` from here
     // on is the editor-derived scheme; `appTheme` is only used to resolve the
     // editor style itself, whose "auto" syntax theme follows the app.
-    final syntaxStyle = resolveEditorSyntaxStyle(
-      activeTab.filePath,
-      appTheme.brightness,
-      appTheme.colorScheme,
-      background: appearance.background,
-      syntaxTheme: appearance.syntaxTheme,
+    final syntaxStyle = applyAppSkinEditorTokens(
+      resolveEditorSyntaxStyle(
+        activeTab.filePath,
+        appTheme.brightness,
+        appTheme.colorScheme,
+        background: appearance.background,
+        syntaxTheme: appearance.syntaxTheme,
+      ),
+      appSkinTokens,
     );
-    final chrome = _resolveChrome(syntaxStyle, appTheme.colorScheme);
+    final chrome = _resolveChrome(
+      syntaxStyle,
+      appTheme.colorScheme,
+      appSkinTokens,
+    );
     final cs = chrome.colorScheme;
 
     ref.listen<TextEditorAppearancePrefs>(textEditorAppearanceProvider, (
@@ -2177,7 +2231,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                     ),
                   ],
                 ],
-                bottom: (appearance.showTabBar ||
+                bottom:
+                    (appearance.showTabBar ||
                         _tabBarAnimationController.value > 0)
                     ? PreferredSize(
                         preferredSize: Size.fromHeight(
@@ -2764,16 +2819,26 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       );
     }
 
-    final appearance = ref.watch(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.watch(textEditorAppearanceProvider),
+    );
     final softKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     // Calculate a high-contrast accent color for the cursor, selection, and teardrop handles
     final bgLuminance = syntaxStyle.backgroundColor.computeLuminance();
     final primaryLuminance = cs.primary.computeLuminance();
     final contrast = (primaryLuminance - bgLuminance).abs();
+    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
+    final followsAppSkin = skinTokens?.editorFollowsAppSkin == true;
     final safeAccentColor = contrast > 0.25
-        ? cs.primary
+        ? (followsAppSkin ? skinTokens!.editorCursor : cs.primary)
         : (bgLuminance < 0.5 ? Colors.white : Colors.black);
+    final selectionColor = followsAppSkin
+        ? skinTokens!.editorSelection
+        : safeAccentColor.withValues(alpha: 0.28);
+    final gutterColor = followsAppSkin
+        ? skinTokens!.editorGutter
+        : syntaxStyle.textColor.withValues(alpha: 0.45);
 
     return Column(
       children: [
@@ -3004,7 +3069,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                   axis: Axis.horizontal,
                   child: TextSelectionTheme(
                     data: TextSelectionThemeData(
-                      selectionColor: safeAccentColor.withValues(alpha: 0.28),
+                      selectionColor: selectionColor,
                       selectionHandleColor: safeAccentColor,
                     ),
                     child: CodeEditor(
@@ -3037,7 +3102,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                           alpha: 0.15,
                         ),
                         chunkIndicatorColor: safeAccentColor,
-                        selectionColor: safeAccentColor.withValues(alpha: 0.28),
+                        selectionColor: selectionColor,
                         codeTheme: syntaxStyle.codeTheme,
                       ),
                       commentFormatter: _getCommentFormatter(
@@ -3057,9 +3122,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                                     controller: editingController,
                                     notifier: notifier,
                                     textStyle: TextStyle(
-                                      color: syntaxStyle.textColor.withValues(
-                                        alpha: 0.45,
-                                      ),
+                                      color: gutterColor,
                                       fontFamily: 'JetBrains Mono',
                                       fontFamilyFallback: const ['monospace'],
                                       fontSize: appearance.fontSize,
@@ -3090,9 +3153,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                                     controller: chunkController,
                                     notifier: notifier,
                                     painter: DefaultCodeChunkIndicatorPainter(
-                                      color: syntaxStyle.textColor.withValues(
-                                        alpha: 0.45,
-                                      ),
+                                      color: gutterColor,
                                     ),
                                   ),
                                 ],
@@ -3148,7 +3209,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   Widget _buildBottomBar(ColorScheme cs) {
     final activeTab = _activeTab;
-    final appearance = ref.watch(textEditorAppearanceProvider);
+    final appearance = _effectiveAppearance(
+      ref.watch(textEditorAppearanceProvider),
+    );
     final timeStr = activeTab.lastSavedAt != null
         ? '${activeTab.lastSavedAt!.hour.toString().padLeft(2, '0')}:${activeTab.lastSavedAt!.minute.toString().padLeft(2, '0')}'
         : null;

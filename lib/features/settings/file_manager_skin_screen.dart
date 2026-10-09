@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -30,14 +32,17 @@ class FileManagerSkinScreen extends ConsumerWidget {
     final notifier = ref.read(
       fileManagerToolbarSettingsProvider(containerUri).notifier,
     );
-    final skin = state.config.skin;
+    final appSkinSettings = ref.watch(appSkinSettingsProvider);
+    final activeSkinTokens = Theme.of(context).extension<AppSkinTokens>();
+    final skin = appSkinSettings.fileManagerFollowsAppSkin
+        ? activeSkinTokens?.fileManagerSkin ?? state.config.skin
+        : state.config.skin;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           l10n.fileSkinScreenTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -46,7 +51,9 @@ class FileManagerSkinScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: l10n.resetToDefaultsTooltip,
-            onPressed: skin == FileManagerSkin.classic
+            onPressed:
+                appSkinSettings.fileManagerFollowsAppSkin ||
+                    skin == FileManagerSkin.classic
                 ? null
                 : () => notifier.setSkin(FileManagerSkin.classic),
           ),
@@ -66,6 +73,38 @@ class FileManagerSkinScreen extends ConsumerWidget {
                       vertical: 12,
                     ),
                     children: [
+                      const SectionHeader('Component styling'),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: appSkinSettings.fileManagerFollowsAppSkin,
+                            onChanged: (value) => ref
+                                .read(appSkinSettingsProvider.notifier)
+                                .setFileManagerFollowsAppSkin(value),
+                            title: Text(
+                              'Follow app skin',
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              appSkinSettings.fileManagerFollowsAppSkin
+                                  ? 'File and folder styling follows the selected app skin.'
+                                  : 'Use the file manager icon and color choices below.',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.folder_special_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                       SectionHeader(l10n.fileSkinPreviewHeader),
                       _SkinPreview(skin: skin),
                       SectionHeader(l10n.fileSkinPresetsHeader),
@@ -106,20 +145,24 @@ class FileManagerSkinScreen extends ConsumerWidget {
                             ),
                           ),
                           SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: skin.monospaceNames,
-                            onChanged: (v) =>
-                                notifier.setSkin(skin.copyWith(monospaceNames: v)),
+                            onChanged: (v) => notifier.setSkin(
+                              skin.copyWith(monospaceNames: v),
+                            ),
                             title: Text(
                               l10n.fileSkinMonospaceLabel,
-                              style: textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               l10n.fileSkinMonospaceDesc,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                             secondary: Icon(
                               Icons.text_fields_rounded,
@@ -299,8 +342,9 @@ class _SkinPreview extends StatelessWidget {
 
     Widget gridCard({required bool isFolder, required String name}) {
       final icon = isFolder ? skin.folderIcon : skin.fileIcon(name);
-      final color =
-          isFolder ? skin.folderIconColor(cs) : skin.fileIconColor(cs, name);
+      final color = isFolder
+          ? skin.folderIconColor(cs)
+          : skin.fileIconColor(cs, name);
       return GridCardShell(
         isFolder: isFolder,
         preview: Center(child: Icon(icon, size: 40, color: color)),

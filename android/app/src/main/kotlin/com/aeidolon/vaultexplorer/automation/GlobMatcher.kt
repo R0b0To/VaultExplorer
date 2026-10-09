@@ -16,9 +16,13 @@ object GlobMatcher {
         val rawPattern: String,
         val regex: Regex,
         val isRecursive: Boolean,
+        val alternatives: List<GlobPattern> = emptyList(),
     ) {
         fun matches(relativePath: String): Boolean {
             val normalized = relativePath.trim().replace('\\', '/').trim('/')
+            if (alternatives.isNotEmpty()) {
+                return alternatives.any { it.matches(normalized) }
+            }
             return regex.matches(normalized)
         }
 
@@ -31,6 +35,9 @@ object GlobMatcher {
         fun matchesPathOrAncestor(relativePath: String): Boolean {
             val normalized = relativePath.trim().replace('\\', '/').trim('/')
             if (normalized.isEmpty()) return false
+            if (alternatives.isNotEmpty()) {
+                return alternatives.any { it.matchesPathOrAncestor(normalized) }
+            }
 
             val pathPattern = rawPattern.replace('\\', '/').trim('/').contains('/')
             if (!pathPattern) {
@@ -61,6 +68,24 @@ object GlobMatcher {
         if (clean.isEmpty()) {
             val matchAllRegex = Regex(".*")
             return GlobPattern(rawPattern = "", regex = matchAllRegex, isRecursive = true)
+        }
+
+        // A comma-separated list is convenient for automation extras such as
+        // `Android,Download`. Keep commas inside brace alternatives
+        // (`{jpg,png}`) and character classes (`[a,b]`) as glob syntax.
+        val patterns = splitTopLevelAlternatives(clean)
+        if (patterns.size > 1) {
+            val compiled = patterns.map { compile(it, caseSensitive) }
+            val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
+            val unionBody = compiled.joinToString("|") { pattern ->
+                pattern.regex.pattern.removePrefix("^").removeSuffix("$")
+            }
+            return GlobPattern(
+                rawPattern = globPattern,
+                regex = Regex("^(?:$unionBody)$", options),
+                isRecursive = compiled.any { it.isRecursive },
+                alternatives = compiled,
+            )
         }
 
         val isRecursive = clean.contains("**")
@@ -127,6 +152,34 @@ object GlobMatcher {
         val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
         val regex = Regex(sb.toString(), options)
         return GlobPattern(rawPattern = globPattern, regex = regex, isRecursive = isRecursive)
+    }
+
+    /** Splits comma-separated patterns without splitting inside glob groups. */
+    private fun splitTopLevelAlternatives(pattern: String): List<String> {
+        val result = mutableListOf<String>()
+        var braces = 0
+        var brackets = 0
+        var start = 0
+        pattern.forEachIndexed { index, char ->
+            when (char) {
+                '{' -> braces++
+                '}' -> if (braces > 0) braces--
+                '[' -> brackets++
+                ']' -> if (brackets > 0) brackets--
+                ',' -> if (braces == 0 && brackets == 0) {
+                    pattern.substring(start, index)
+                        .trim()
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { result.add(it) }
+                    start = index + 1
+                }
+            }
+        }
+        pattern.substring(start)
+            .trim()
+            .takeIf { it.isNotEmpty() }
+            ?.let { result.add(it) }
+        return result
     }
 
     /**

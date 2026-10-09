@@ -28,10 +28,7 @@ void configurePlatformIntegrations(ProviderContainer container) {
   final fileIoApi = container.read(vaultFileIoApiProvider);
   ResumePaintSignal.register(fileIoApi);
   PlaybackThrottleController.configure(fileIoApi);
-  ArchiveService.configure(
-    fileIoApi,
-    container.read(vaultArchiveApiProvider),
-  );
+  ArchiveService.configure(fileIoApi, container.read(vaultArchiveApiProvider));
   ThumbnailCacheService.configure(
     fileIoApi: fileIoApi,
     cryptoApi: container.read(vaultCryptoApiProvider),
@@ -70,7 +67,6 @@ Future<void> runDeferredStartupWork(ProviderContainer container) async {
 
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
-    appUsePureBlackNotifier.value = settings.useOledBlackTheme;
     if (settings.languageCode != null) {
       appLocaleNotifier.value = Locale(settings.languageCode!);
     }

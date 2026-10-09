@@ -65,7 +65,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.fileManagerSettingsTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

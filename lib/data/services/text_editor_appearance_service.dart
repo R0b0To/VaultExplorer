@@ -3,17 +3,15 @@
 // item 2). One shared set of choices across every file opened in the text
 // editor, not per-file.
 //
-// Stored the same way AppSettingsService stores its own non-secret
-// preferences: a plain JSON file in the app's documents directory. Not
-// shared_preferences (this project doesn't depend on it, and everything
-// else non-secret already goes through this same file-based pattern
-// instead) and not AppSecureStorage (there's nothing secret about a color
-// scheme or a line-number style).
+// Stored in the AppSettingsService settings blob so editor templates travel
+// with settings export/import. The old standalone JSON file is read once and
+// migrated automatically for existing installs.
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 
 class TextEditorAppearancePrefs {
   final EditorBackgroundOption background;
@@ -33,19 +31,63 @@ class TextEditorAppearancePrefs {
   final List<String> accessoryActions;
 
   static const List<String> defaultSymbols = [
-    'Tab', '{', '}', '[', ']', '(', ')', '=', '"', "'",
-    ':', ';', '/', '\\', '<', '>', '_', '-', '&', '|', '!',
+    'Tab',
+    '{',
+    '}',
+    '[',
+    ']',
+    '(',
+    ')',
+    '=',
+    '"',
+    "'",
+    ':',
+    ';',
+    '/',
+    '\\',
+    '<',
+    '>',
+    '_',
+    '-',
+    '&',
+    '|',
+    '!',
   ];
 
   static const List<String> defaultActions = [
-    'undo', 'redo', 'cursorLeft', 'cursorRight', 'selectWord', 'selectAll',
-    'copy', 'cut', 'paste', 'find', 'wordWrap', 'goToLine',
+    'undo',
+    'redo',
+    'cursorLeft',
+    'cursorRight',
+    'selectWord',
+    'selectAll',
+    'copy',
+    'cut',
+    'paste',
+    'find',
+    'wordWrap',
+    'goToLine',
   ];
 
   static const List<String> allAvailableActions = [
-    'undo', 'redo', 'cursorLeft', 'cursorRight', 'selectWord', 'selectAll',
-    'copy', 'cut', 'paste', 'find', 'wordWrap', 'goToLine',
-    'goToStart', 'goToEnd', 'indent', 'outdent', 'format', 'readOnly',
+    'undo',
+    'redo',
+    'cursorLeft',
+    'cursorRight',
+    'selectWord',
+    'selectAll',
+    'copy',
+    'cut',
+    'paste',
+    'find',
+    'wordWrap',
+    'goToLine',
+    'goToStart',
+    'goToEnd',
+    'indent',
+    'outdent',
+    'format',
+    'readOnly',
   ];
 
   const TextEditorAppearancePrefs({
@@ -139,11 +181,13 @@ class TextEditorAppearancePrefs {
       showAccessoryActions: json['showAccessoryActions'] ?? true,
       showAccessoryScrubber: json['showAccessoryScrubber'] ?? false,
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 14.0,
-      accessorySymbols: (json['accessorySymbols'] as List<dynamic>?)
+      accessorySymbols:
+          (json['accessorySymbols'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           defaultSymbols,
-      accessoryActions: (json['accessoryActions'] as List<dynamic>?)
+      accessoryActions:
+          (json['accessoryActions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           defaultActions,
@@ -161,10 +205,31 @@ class TextEditorAppearanceService {
 
   Future<TextEditorAppearancePrefs> load() async {
     try {
+      final settingsService = const AppSettingsService();
+      final settings = await settingsService.loadSettings();
+      if (settings.editorAppearancePrefs.isNotEmpty) {
+        return TextEditorAppearancePrefs.fromJson(
+          settings.editorAppearancePrefs,
+        );
+      }
+
+      // One-time migration from the editor's previous standalone JSON file.
+      // The app settings blob is now the source of truth and is included in
+      // settings export/import.
       final file = await _prefsFile;
       if (await file.exists()) {
-        final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-        return TextEditorAppearancePrefs.fromJson(raw);
+        final raw =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final prefs = TextEditorAppearancePrefs.fromJson(raw);
+        await settingsService.updateSettings(
+          (current) => current.copyWith(editorAppearancePrefs: prefs.toJson()),
+        );
+        try {
+          await file.delete();
+        } catch (_) {
+          // The migrated app settings are already authoritative.
+        }
+        return prefs;
       }
     } catch (_) {
       // Fall through to defaults -- same reasoning as AppSettingsService:
@@ -176,8 +241,10 @@ class TextEditorAppearanceService {
 
   Future<void> save(TextEditorAppearancePrefs prefs) async {
     try {
-      final file = await _prefsFile;
-      await file.writeAsString(jsonEncode(prefs.toJson()));
+      final settingsService = const AppSettingsService();
+      await settingsService.updateSettings(
+        (settings) => settings.copyWith(editorAppearancePrefs: prefs.toJson()),
+      );
     } catch (_) {
       // The provider's in-memory state already reflects the change for
       // this session; a failed write only risks it not surviving a

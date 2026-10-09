@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -3647,8 +3648,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // Every file/folder tile, and the bookmark bar, below this point reads the
     // user's chosen skin from here. Kept as a thin wrapper so the (very
     // large) screen body itself is untouched.
+    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     return FileManagerSkinScope(
-      skin: _toolbarConfig.skin,
+      skin: skinTokens == null
+          ? _toolbarConfig.skin
+          : skinTokens.fileManagerFollowsAppSkin
+          ? skinTokens.fileManagerSkin
+          : skinTokens.manualFileManagerSkin,
       child: _buildBrowser(context),
     );
   }

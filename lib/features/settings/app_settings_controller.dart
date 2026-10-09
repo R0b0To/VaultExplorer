@@ -202,7 +202,10 @@ class AppSettingsController extends _$AppSettingsController {
           .setNotificationLocale(updated.languageCode);
     }
     try {
-      await ref.read(appSettingsServiceProvider).saveSettings(updated);
+      final persisted = await ref
+          .read(appSettingsServiceProvider)
+          .updateSettings(updater);
+      if (ref.mounted) state = state._copy(settings: persisted);
     } catch (e) {
       VeLog.e('AppSettingsController', 'Failed to persist settings', e);
     }

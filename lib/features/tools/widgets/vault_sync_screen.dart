@@ -164,7 +164,6 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: context.colors.surfaceContainerHigh,
         elevation: 0,
         title: Text(
           context.l10n.toolVaultSyncTitle,

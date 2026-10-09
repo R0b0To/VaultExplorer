@@ -181,7 +181,6 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
       },
       child: Scaffold(
        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             tooltip: MaterialLocalizations.of(context).closeButtonTooltip,

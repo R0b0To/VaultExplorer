@@ -68,7 +68,6 @@ class _QuickCaptureSettingsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.quickCaptureSettingsTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

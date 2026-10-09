@@ -46,6 +46,7 @@ import 'package:re_highlight/languages/xml.dart';
 import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 
 /// The [CodeHighlightThemeMode] for a single recognized language, along
 /// with a short id used both as its [CodeHighlightTheme.languages] key and
@@ -136,7 +137,8 @@ _LanguageMatch? _matchFor(String filePath) {
   if (byName != null) return byName;
 
   final dot = fileName.lastIndexOf('.');
-  if (dot <= 0 || dot == fileName.length - 1) return null; // no/leading-only dot
+  if (dot <= 0 || dot == fileName.length - 1)
+    return null; // no/leading-only dot
   final ext = fileName.substring(dot + 1).toLowerCase();
   return _extensionLanguages[ext];
 }
@@ -146,7 +148,11 @@ _LanguageMatch? _matchFor(String filePath) {
 /// `.txt`/`.log` files and anything else unmapped render as plain
 /// monospace text with no highlighting pass, which is both correct (there's
 /// no syntax to highlight) and cheaper for large files.
-CodeHighlightTheme? _resolveCodeHighlightTheme(String filePath, Brightness brightness, EditorSyntaxThemeOption syntaxTheme) {
+CodeHighlightTheme? _resolveCodeHighlightTheme(
+  String filePath,
+  Brightness brightness,
+  EditorSyntaxThemeOption syntaxTheme,
+) {
   final match = _matchFor(filePath);
   if (match == null) return null;
   return CodeHighlightTheme(
@@ -172,6 +178,21 @@ class EditorSyntaxStyle {
   });
 }
 
+/// Applies the active app-skin canvas colors while retaining its selected
+/// syntax palette. Independent editor overrides continue to use their saved
+/// background and syntax template.
+EditorSyntaxStyle applyAppSkinEditorTokens(
+  EditorSyntaxStyle style,
+  AppSkinTokens? tokens,
+) {
+  if (tokens == null || !tokens.editorFollowsAppSkin) return style;
+  return EditorSyntaxStyle(
+    codeTheme: style.codeTheme,
+    backgroundColor: tokens.editorBackground,
+    textColor: tokens.editorForeground,
+  );
+}
+
 /// Resolves [filePath] to the style [TextEditorScreen] should render it
 /// with. [fallback] supplies colors for files with no recognized syntax
 /// (and no bundled theme to draw them from) -- normally the current
@@ -185,12 +206,17 @@ EditorSyntaxStyle resolveEditorSyntaxStyle(
   required EditorBackgroundOption background,
   required EditorSyntaxThemeOption syntaxTheme,
 }) {
-  final codeTheme = _resolveCodeHighlightTheme(filePath, brightness, syntaxTheme);
+  final codeTheme = _resolveCodeHighlightTheme(
+    filePath,
+    brightness,
+    syntaxTheme,
+  );
   final root = codeTheme?.theme['root'];
-  
+
   return EditorSyntaxStyle(
     codeTheme: codeTheme,
-    backgroundColor: background.overrideColor ?? root?.backgroundColor ?? fallback.surface,
+    backgroundColor:
+        background.overrideColor ?? root?.backgroundColor ?? fallback.surface,
     textColor: (background == EditorBackgroundOption.matchSyntaxTheme)
         ? (root?.color ?? fallback.onSurface)
         : background.fallbackTextColor,

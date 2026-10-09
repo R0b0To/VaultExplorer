@@ -86,12 +86,10 @@ class PasswordInterchangeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(passwordInterchangeProvider);
-    final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),

@@ -286,7 +286,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
           elevation: 0,
           leading: inVaultSubAction
               ? IconButton(

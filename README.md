@@ -56,7 +56,7 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 - **Create & format** new volumes on device storage or a USB drive
 - **Composite containers** — spread a VeraCrypt-format volume across several ordinary photo/video/audio/document files instead of one container file. Each carrier's data is appended past its real content as high-entropy "growth" (adjustable from 3% to 30%, default 10% — your choice of stealth vs. capacity), indistinguishable from normal file noise, and every carrier has to be present to unlock. Create or unlock one from the dashboard like any other container, or from the Tools tab
 - **Up to 8 volumes** mounted at once
-- **Themes & settings** — available in 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), Material You dynamic colors and a pure-black theme, a categorized settings hub, and settings export/import (preferences and file manager layout only; never passwords, keys, or your container list)
+- **Themes & settings** — available in 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), coordinated Default, OLED app skins, Material You dynamic colors, independent file-manager/editor overrides, a categorized settings hub, and settings export/import (preferences and file manager layout only; never passwords, keys, or your container list)
 
 ### Tools tab
 
@@ -103,11 +103,20 @@ cd VaultExplorer
 
 Flutter itself is vendored as a pinned git submodule (`.flutter/`) rather than something you install separately — if you already cloned without `--recurse-submodules`, run `git submodule update --init` first. You'll also need the Android SDK (26+), Java 21, and CMake 3.18+; the NDK (pinned to r28c) is installed automatically via Gradle. CMake fetches and compiles all native C++ dependencies automatically — see [NOTICE.md](NOTICE.md) for exact versions and licenses.
 
+---
+
+## Donate
+
+If you find VaultExplorer useful, consider supporting the project:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K2ND3Y8)
+
+- **Bitcoin (BTC):** `bc1qszzfa2sm7hzyvd7wktgtfzgpmyv7e7um0wrtl2`
+- **Lightning:** `aeidolon@cake.cash`
+- **Monero (XMR):** `88qPr4aY9B62c1LXoiX9YV58gKB2jFYRx9YijBgPK3h32HnF93aytJCPKu58fbpa8XNKbJWpFGnnGM81rBCdpUje1WvfHaY`
 
 ---
 
 ## License
 
 GPLv3 — see [LICENSE](LICENSE).
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K2ND3Y8)

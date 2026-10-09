@@ -85,7 +85,7 @@ Imports a file (or batch of files matching a glob pattern) from the host filesys
   - `source_path` *(String, required)*: Either an absolute file/folder path on the device (e.g. `/storage/emulated/0/DCIM/Camera/IMG_001.jpg`), or a `content://` SAF URI.
   - `vault_path` *(String, required)*: Relative destination path or directory in the vault. Any missing parent folders inside the vault are created automatically.
   - `pattern` *(String, optional)*: Glob wildcard pattern (e.g. `*.xlsx`, `HOSPITAL_RECEIPT_*`, `**/*.pdf`). When specified, `source_path` is treated as a directory and all matching files are imported in a single batch.
-  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip in batch mode. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
+  - `exclude_pattern` *(String, optional)*: Glob pattern, or comma-separated glob patterns, for files or folders to skip in batch mode (e.g. `Android,Download`). A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
   - `delete_source` *(Boolean, optional)*: If `true`, wipes matched source files upon successful import. For a raw filesystem path this is a secure overwrite-then-delete; for a `content://` source it's a normal provider delete.
 
@@ -101,7 +101,7 @@ Exports a decrypted file from the vault to the host filesystem, OR streams it di
   - `vault_path` *(String, required)*: Relative path inside the vault to read.
   - `dest_path` *(String, optional)*: Either an absolute destination *file* path on the host filesystem, or a `content://` SAF *tree* (folder) URI. (Required unless `stream_mode=true`).
   - `pattern` *(String, optional)*: Glob pattern to export matching files in batch. Supplying `exclude_pattern` also selects batch mode when you want to export everything except the excluded paths.
-  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip in batch mode. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
+  - `exclude_pattern` *(String, optional)*: Glob pattern, or comma-separated glob patterns, for files or folders to skip in batch mode (e.g. `Android,Download`). A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
   - `stream_mode` *(Boolean, optional)*: **Zero-Disk Decrypted Data Streaming**. If `true`, VaultExplorer creates a memory-backed seekable proxy file descriptor and returns a `stream_uri` in `AUTOMATION_RESULT`. The stream supports **random-access seeking (`lseek`)** and multi-pass reading (for 2-pass image decoders, video players, and PDF viewers) during its 5-minute validity window without writing plaintext to flash storage.
 
@@ -117,7 +117,7 @@ Recursively imports an entire folder (and everything inside it) into the vault w
   - `source_path` *(String, required)*: Absolute folder path on the device, or a `content://` SAF *tree* URI.
   - `vault_path` *(String, optional)*: Destination folder inside the vault. Omit, or leave empty, to import into the vault root.
   - `pattern` *(String, optional)*: Glob pattern (e.g. `*.pdf`, `{jpg,png}`) to import only matching files.
-  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth. Excluded source files are not imported or deleted by `delete_source`.
+  - `exclude_pattern` *(String, optional)*: Glob pattern, or comma-separated glob patterns, for files or folders to skip (e.g. `Android,Download`). A matching folder excludes all its contents; a pattern without `/` matches that name at any depth. Excluded source files are not imported or deleted by `delete_source`.
   - `recursive` *(Boolean, optional)*: Whether traversal enters subdirectories. Default: `true`.
   - `delete_source` *(Boolean, optional)*: Same semantics as `IMPORT_FILE`'s `delete_source`, applied per file.
 
@@ -135,7 +135,7 @@ Recursively exports a vault folder (and everything inside it) out to the host fi
   - `vault_path` *(String, optional)*: Source folder inside the vault. Omit, or leave empty, to export the whole vault.
   - `dest_path` *(String, required)*: Absolute destination folder path on the device, or a `content://` SAF tree URI. Created automatically if it doesn't exist yet.
   - `pattern` *(String, optional)*: Glob wildcard filter (e.g. `*.docx`).
-  - `exclude_pattern` *(String, optional)*: Glob pattern for files or folders to skip. A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
+  - `exclude_pattern` *(String, optional)*: Glob pattern, or comma-separated glob patterns, for files or folders to skip (e.g. `Android,Download`). A matching folder excludes all its contents; a pattern without `/` matches that name at any depth.
   - `recursive` *(Boolean, optional)*: Default `true`.
 
 Same best-effort, per-file semantics as `IMPORT_FOLDER`.
@@ -377,6 +377,11 @@ The `pattern` and `exclude_pattern` extras use the same offline glob syntax:
 | `[!a-z]`        | Any character **not** in a range                           |
 | `{jpg,png,gif}` | Any of the comma-separated alternatives                    |
 
+You can also pass multiple independent patterns separated by commas, for
+example `exclude_pattern = Android,Download` skips both folder names and all
+their contents at any depth. Commas inside `{...}` brace alternatives remain
+part of that single glob pattern.
+
 Pattern matching is case-insensitive by default. Examples:
 
   - *.pdf — all PDFs in the immediate folder
@@ -430,4 +435,3 @@ alive on Samsung, Xiaomi, OnePlus, and Pixel devices, see the OEM Setup Guide.
     invalidates existing tasks until updated.
   - USB Storage: Automation is currently not supported on hardware USB
     OTG-mounted drives.
-

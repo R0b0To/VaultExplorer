@@ -265,7 +265,6 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       },
       child: Scaffold(
        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             tooltip: MaterialLocalizations.of(context).closeButtonTooltip,

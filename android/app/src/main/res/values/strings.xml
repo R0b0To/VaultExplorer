@@ -10,6 +10,12 @@
     <string name="scheduled_sync_channel_name">Scheduled vault sync</string>
     <string name="scheduled_sync_channel_description">Status while a scheduled vault sync is running</string>
     <string name="syncing_vault_notification">Syncing vault...</string>
+    <string name="automation_unlocking_notification_title">Unlocking vault...</string>
+    <string name="automation_importing_notification_title">Importing to vault...</string>
+    <string name="automation_exporting_notification_title">Exporting from vault...</string>
+    <string name="automation_progress_channel_name">Vault automation</string>
+    <string name="automation_progress_channel_description">Progress of vault automation actions</string>
+    <string name="automation_progress_starting">Starting automation...</string>
     <plurals name="vault_keep_alive_notification_text">
         <item quantity="one">%d vault open</item>
         <item quantity="other">%d vaults open</item>

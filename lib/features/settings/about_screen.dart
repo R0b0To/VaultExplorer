@@ -385,7 +385,6 @@ class AboutScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title:
             Text(context.l10n.aboutScreenTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),

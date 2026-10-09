@@ -3,6 +3,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -22,14 +23,14 @@ final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(
   ThemeMode.system,
 );
 final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
-final ValueNotifier<bool> appUsePureBlackNotifier = ValueNotifier(false);
 final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
-class VaultExplorerApp extends StatelessWidget {
+class VaultExplorerApp extends ConsumerWidget {
   const VaultExplorerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appSkin = ref.watch(appSkinSettingsProvider);
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
         return ValueListenableBuilder<ThemeMode>(
@@ -45,60 +46,65 @@ class VaultExplorerApp extends StatelessWidget {
                         useDynamicColor &&
                         lightDynamic != null &&
                         darkDynamic != null;
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: appUsePureBlackNotifier,
-                      builder: (context, usePureBlack, child) {
-                        return MaterialApp(
-                          debugShowCheckedModeBanner: false,
-                          theme: buildLightTheme(
-                            dynamicScheme: useDynamic ? lightDynamic : null,
-                          ),
-                          darkTheme: buildDarkTheme(
-                            dynamicScheme: useDynamic ? darkDynamic : null,
-                            pureBlack: usePureBlack,
-                          ),
-                          themeMode: themeMode,
-                          locale: locale,
+                    return MaterialApp(
+                      debugShowCheckedModeBanner: false,
+                      theme: buildLightTheme(
+                        dynamicScheme: useDynamic ? lightDynamic : null,
+                        appSkin: appSkin.preset,
+                        customAppSkin: appSkin.customAppSkin,
+                        manualFileManagerSkin: appSkin.fileManagerSkin,
+                        fileManagerFollowsAppSkin:
+                            appSkin.fileManagerFollowsAppSkin,
+                        editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
+                      ),
+                      darkTheme: buildDarkTheme(
+                        dynamicScheme: useDynamic ? darkDynamic : null,
+                        appSkin: appSkin.preset,
+                        customAppSkin: appSkin.customAppSkin,
+                        manualFileManagerSkin: appSkin.fileManagerSkin,
+                        fileManagerFollowsAppSkin:
+                            appSkin.fileManagerFollowsAppSkin,
+                        editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
+                      ),
+                      themeMode: themeMode,
+                      locale: locale,
 
-                          localizationsDelegates: [
-                            AppLocalizations.delegate,
-                            ...GlobalMaterialLocalizations.delegates,
-                          ],
-                          supportedLocales: AppLocalizations.supportedLocales,
-                          localeResolutionCallback:
-                              (deviceLocale, supportedLocales) {
-                                for (final supported in supportedLocales) {
-                                  if (supported.languageCode ==
-                                      deviceLocale?.languageCode) {
-                                    return supported;
-                                  }
-                                }
-                                return const Locale('en');
+                      localizationsDelegates: [
+                        AppLocalizations.delegate,
+                        ...GlobalMaterialLocalizations.delegates,
+                      ],
+                      supportedLocales: AppLocalizations.supportedLocales,
+                      localeResolutionCallback:
+                          (deviceLocale, supportedLocales) {
+                            for (final supported in supportedLocales) {
+                              if (supported.languageCode ==
+                                  deviceLocale?.languageCode) {
+                                return supported;
+                              }
+                            }
+                            return const Locale('en');
+                          },
+                      builder: (context, child) {
+                        return Consumer(
+                          builder: (context, ref, _) {
+                            return Listener(
+                              behavior: HitTestBehavior.translucent,
+                              onPointerDown: (_) {
+                                ref
+                                    .read(sessionLockControllerProvider)
+                                    .scheduleAutoLock();
+                                ref
+                                    .read(
+                                      vaultDashboardControllerProvider.notifier,
+                                    )
+                                    .resetAllAutoCloseTimers();
                               },
-                          builder: (context, child) {
-                            return Consumer(
-                              builder: (context, ref, _) {
-                                return Listener(
-                                  behavior: HitTestBehavior.translucent,
-                                  onPointerDown: (_) {
-                                    ref
-                                        .read(sessionLockControllerProvider)
-                                        .scheduleAutoLock();
-                                    ref
-                                        .read(
-                                          vaultDashboardControllerProvider
-                                              .notifier,
-                                        )
-                                        .resetAllAutoCloseTimers();
-                                  },
-                                  child: child ?? const SizedBox.shrink(),
-                                );
-                              },
+                              child: child ?? const SizedBox.shrink(),
                             );
                           },
-                          home: const _DisguiseModeGate(),
                         );
                       },
+                      home: const _DisguiseModeGate(),
                     );
                   },
                 );
@@ -160,7 +166,10 @@ class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
         : null;
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
-    appUsePureBlackNotifier.value = settings.useOledBlackTheme;
+
+    await ref
+        .read(appSkinSettingsProvider.notifier)
+        .applyImportedSettings(settings);
 
     final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
     VeLog.enabled = settings.debugLoggingEnabled;

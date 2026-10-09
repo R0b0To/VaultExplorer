@@ -113,7 +113,6 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     );
 
     final state = ref.watch(containerRepairProvider);
-    final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
     final hasTarget = state.target != null;
 
@@ -126,8 +125,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
+      appBar: AppBar(
           elevation: 0,
           leading: hasTarget
               ? IconButton(

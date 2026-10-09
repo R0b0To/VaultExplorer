@@ -5,7 +5,11 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 import com.aeidolon.vaultexplorer.camera.VaultChunkWriter
+import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
+import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
+import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.ScopedStorageUtils
 import com.aeidolon.vaultexplorer.saf.VaultPathUtils
@@ -72,17 +76,29 @@ object VaultAutomationFolderOps {
      * and harmless for backends that don't need it, required for the ones
      * that do.
      */
-    fun importOneFile(context: Context, volId: Int, sourceSpec: String, vaultPath: String): Boolean {
+    fun importOneFile(context: Context, volId: Int, sourceSpec: String, vaultPath: String, progressId: Int = 0): Boolean {
         ensureParentDirs(volId, vaultPath)
-        if (!ScopedStorageUtils.isSafUri(sourceSpec)) {
-            val src = File(sourceSpec)
-            if (!src.canRead()) return false
-            val ok = ContainerFileSystem.writeBackFile(volId, vaultPath, sourceSpec)
-            if (ok) ContainerFileSystem.finishWrite(volId, vaultPath)
-            return ok
+        val name = VaultPathUtils.nameOf(VaultPathUtils.normalize(vaultPath))
+        val size = if (ScopedStorageUtils.isSafUri(sourceSpec)) {
+            runCatching { DocumentFile.fromSingleUri(context, Uri.parse(sourceSpec))?.length() ?: 0L }.getOrDefault(0L)
+        } else {
+            File(sourceSpec).length()
         }
-        val input = openInputStreamSafely(context, Uri.parse(sourceSpec)) ?: return false
-        return streamIntoVault(volId, vaultPath, input)
+        beginImportFileProgress(progressId, name, size)
+        return try {
+            if (!ScopedStorageUtils.isSafUri(sourceSpec)) {
+                val src = File(sourceSpec)
+                if (!src.canRead()) return false
+                val ok = ContainerFileSystem.writeBackFile(volId, vaultPath, sourceSpec, progressId, singlePass = true)
+                if (ok) ContainerFileSystem.finishWrite(volId, vaultPath)
+                ok
+            } else {
+                val input = openInputStreamSafely(context, Uri.parse(sourceSpec)) ?: return false
+                streamIntoVault(volId, vaultPath, input, progressId)
+            }
+        } finally {
+            finishImportFileProgress(progressId)
+        }
     }
 
     /**
@@ -94,22 +110,30 @@ object VaultAutomationFolderOps {
      * Uri -- and the file is created inside it named after [vaultPath]'s
      * own basename.
      */
-    fun exportOneFile(context: Context, volId: Int, vaultPath: String, destSpec: String): Boolean {
-        if (!ScopedStorageUtils.isSafUri(destSpec)) {
-            File(destSpec).parentFile?.let { if (!it.exists()) it.mkdirs() }
-            return ContainerFileSystem.extractToFile(volId, vaultPath, destSpec)
-        }
-        val treeDoc = try {
-            DocumentFile.fromTreeUri(context, Uri.parse(destSpec))
-        } catch (e: Exception) {
-            null
-        } ?: return false
-        if (!treeDoc.isDirectory || !treeDoc.canWrite()) return false
+    fun exportOneFile(context: Context, volId: Int, vaultPath: String, destSpec: String, progressId: Int = 0): Boolean {
         val name = VaultPathUtils.nameOf(VaultPathUtils.normalize(vaultPath))
-        treeDoc.findFile(name)?.delete()
-        val doc = treeDoc.createFile("application/octet-stream", name) ?: return false
-        val out = openOutputStreamSafely(context, doc.uri) ?: return false
-        return streamOutOfVault(volId, vaultPath, out)
+        val size = runCatching { ContainerFileSystem.getFileSize(volId, vaultPath) }.getOrDefault(0L)
+        val hasChunkProgress = ScopedStorageUtils.isSafUri(destSpec) || VaultBackendRegistry.get(volId) != null
+        beginExportFileProgress(progressId, name, size, hasChunkProgress)
+        return try {
+            if (!ScopedStorageUtils.isSafUri(destSpec)) {
+                File(destSpec).parentFile?.let { if (!it.exists()) it.mkdirs() }
+                ContainerFileSystem.extractToFile(volId, vaultPath, destSpec, progressId, singlePass = true)
+            } else {
+                val treeDoc = try {
+                    DocumentFile.fromTreeUri(context, Uri.parse(destSpec))
+                } catch (e: Exception) {
+                    null
+                } ?: return false
+                if (!treeDoc.isDirectory || !treeDoc.canWrite()) return false
+                treeDoc.findFile(name)?.delete()
+                val doc = treeDoc.createFile("application/octet-stream", name) ?: return false
+                val out = openOutputStreamSafely(context, doc.uri) ?: return false
+                streamOutOfVault(volId, vaultPath, out, progressId)
+            }
+        } finally {
+            finishExportFileProgress(progressId)
+        }
     }
 
     // ── Recursive folder copy ─────────────────────────────────────────────
@@ -138,6 +162,7 @@ object VaultAutomationFolderOps {
         pattern: GlobMatcher.GlobPattern? = null,
         recursive: Boolean = true,
         excludePattern: GlobMatcher.GlobPattern? = null,
+        progressId: Int = 0,
     ): OpSummary? {
         val root = resolveSourceFolder(context, sourceSpec) ?: return null
         var ok = 0
@@ -152,31 +177,39 @@ object VaultAutomationFolderOps {
                 skipped++
                 return
             }
-            ensureParentDirs(volId, vaultPath)
-            val success = if (rawFile != null) {
-                ContainerFileSystem.writeBackFile(volId, vaultPath, rawFile.absolutePath).also {
-                    if (it) ContainerFileSystem.finishWrite(volId, vaultPath)
-                }
-            } else {
-                val input = docUri?.let { openInputStreamSafely(context, it) }
-                if (input == null) false else streamIntoVault(volId, vaultPath, input)
-            }
-            if (success) {
-                ok++
-                if (deleteSource) {
-                    if (rawFile != null) {
-                        SecureFileWipe.secureDeleteFile(rawFile)
-                    } else if (docUri != null) {
-                        // No local bytes to zero for most SAF providers (cloud
-                        // documents in particular) -- this is a normal provider
-                        // delete, not a secure wipe. Documented on the
-                        // EXTRA_DELETE_SOURCE constant in VaultAutomationReceiver.
-                        try { DocumentFile.fromSingleUri(context, docUri)?.delete() } catch (_: Exception) {}
+            val size = rawFile?.length() ?: runCatching {
+                docUri?.let { DocumentFile.fromSingleUri(context, it)?.length() } ?: 0L
+            }.getOrDefault(0L)
+            beginImportFileProgress(progressId, relativePath, size)
+            try {
+                ensureParentDirs(volId, vaultPath)
+                val success = if (rawFile != null) {
+                    ContainerFileSystem.writeBackFile(volId, vaultPath, rawFile.absolutePath, progressId, singlePass = true).also {
+                        if (it) ContainerFileSystem.finishWrite(volId, vaultPath)
                     }
+                } else {
+                    val input = docUri?.let { openInputStreamSafely(context, it) }
+                    if (input == null) false else streamIntoVault(volId, vaultPath, input, progressId)
                 }
-            } else {
-                failed++
-                VeLog.w(TAG) { "importFolder: failed to import into $vaultPath" }
+                if (success) {
+                    ok++
+                    if (deleteSource) {
+                        if (rawFile != null) {
+                            SecureFileWipe.secureDeleteFile(rawFile)
+                        } else if (docUri != null) {
+                            // No local bytes to zero for most SAF providers (cloud
+                            // documents in particular) -- this is a normal provider
+                            // delete, not a secure wipe. Documented on the
+                            // EXTRA_DELETE_SOURCE constant in VaultAutomationReceiver.
+                            try { DocumentFile.fromSingleUri(context, docUri)?.delete() } catch (_: Exception) {}
+                        }
+                    }
+                } else {
+                    failed++
+                    VeLog.w(TAG) { "importFolder: failed to import into $vaultPath" }
+                }
+            } finally {
+                finishImportFileProgress(progressId)
             }
         }
 
@@ -228,6 +261,7 @@ object VaultAutomationFolderOps {
         pattern: GlobMatcher.GlobPattern? = null,
         recursive: Boolean = true,
         excludePattern: GlobMatcher.GlobPattern? = null,
+        progressId: Int = 0,
     ): OpSummary? {
         val dest = resolveDestFolder(context, destSpec) ?: return null
         var ok = 0
@@ -244,28 +278,35 @@ object VaultAutomationFolderOps {
                 skipped++
                 return
             }
-            val success = when (dest) {
-                is ResolvedFolder.Raw -> {
-                    val outFile = File(dest.file, relativePath)
-                    outFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
-                    ContainerFileSystem.extractToFile(volId, vaultPath, outFile.absolutePath)
-                }
-                is ResolvedFolder.Tree -> {
-                    val parentDoc = ensureSafDirs(saf!!, dest.doc, VaultPathUtils.parentOf(relativePath))
-                    val name = VaultPathUtils.nameOf(relativePath)
-                    if (parentDoc == null) {
-                        false
-                    } else {
-                        parentDoc.findFile(name)?.delete()
-                        val doc = saf.createFileSafe(parentDoc, "application/octet-stream", name)
-                        val out = doc?.let { openOutputStreamSafely(context, it.uri) }
-                        if (out == null) false else streamOutOfVault(volId, vaultPath, out)
+            val size = runCatching { ContainerFileSystem.getFileSize(volId, vaultPath) }.getOrDefault(0L)
+            val hasChunkProgress = dest is ResolvedFolder.Tree || VaultBackendRegistry.get(volId) != null
+            beginExportFileProgress(progressId, relativePath, size, hasChunkProgress)
+            try {
+                val success = when (dest) {
+                    is ResolvedFolder.Raw -> {
+                        val outFile = File(dest.file, relativePath)
+                        outFile.parentFile?.let { if (!it.exists()) it.mkdirs() }
+                        ContainerFileSystem.extractToFile(volId, vaultPath, outFile.absolutePath, progressId, singlePass = true)
+                    }
+                    is ResolvedFolder.Tree -> {
+                        val parentDoc = ensureSafDirs(saf!!, dest.doc, VaultPathUtils.parentOf(relativePath))
+                        val name = VaultPathUtils.nameOf(relativePath)
+                        if (parentDoc == null) {
+                            false
+                        } else {
+                            parentDoc.findFile(name)?.delete()
+                            val doc = saf.createFileSafe(parentDoc, "application/octet-stream", name)
+                            val out = doc?.let { openOutputStreamSafely(context, it.uri) }
+                            if (out == null) false else streamOutOfVault(volId, vaultPath, out, progressId)
+                        }
                     }
                 }
-            }
-            if (success) ok++ else {
-                failed++
-                VeLog.w(TAG) { "exportFolder: failed to export $vaultPath" }
+                if (success) ok++ else {
+                    failed++
+                    VeLog.w(TAG) { "exportFolder: failed to export $vaultPath" }
+                }
+            } finally {
+                finishExportFileProgress(progressId)
             }
         }
 
@@ -368,7 +409,7 @@ object VaultAutomationFolderOps {
             null
         }
 
-    private fun streamIntoVault(volId: Int, vaultPath: String, input: InputStream): Boolean {
+    private fun streamIntoVault(volId: Int, vaultPath: String, input: InputStream, progressId: Int = 0): Boolean {
         val writer = VaultChunkWriter(volId, vaultPath)
         return try {
             input.use { stream ->
@@ -378,6 +419,7 @@ object VaultAutomationFolderOps {
                     if (read > 0) {
                         val chunk = if (read == buffer.size) buffer else buffer.copyOf(read)
                         if (!writer.write(chunk)) return false
+                        if (progressId > 0) VaultAutomationProgress.reportBytes(progressId, read.toLong())
                     }
                 }
             }
@@ -389,7 +431,7 @@ object VaultAutomationFolderOps {
         }
     }
 
-    private fun streamOutOfVault(volId: Int, vaultPath: String, out: OutputStream): Boolean {
+    private fun streamOutOfVault(volId: Int, vaultPath: String, out: OutputStream, progressId: Int = 0): Boolean {
         return try {
             out.use { stream ->
                 val size = ContainerFileSystem.getFileSize(volId, vaultPath).coerceAtLeast(0L)
@@ -400,6 +442,7 @@ object VaultAutomationFolderOps {
                     if (chunk.isEmpty()) break
                     stream.write(chunk)
                     offset += chunk.size
+                    if (progressId > 0) VaultAutomationProgress.reportBytes(progressId, chunk.size.toLong())
                 }
             }
             true
@@ -407,5 +450,38 @@ object VaultAutomationFolderOps {
             VeLog.e(TAG, e) { "streamOutOfVault failed for $vaultPath" }
             false
         }
+    }
+
+    private fun beginImportFileProgress(progressId: Int, name: String, size: Long) {
+        if (progressId <= 0) return
+        VaultAutomationProgress.beginFile(progressId, name, size)
+        ImportProgressBridge.begin(progressId)
+        ImportProgressBridge.reportProgress(progressId, 0, 1, name, 0L, size)
+        ImportProgressBridge.beginFileChunks(progressId, 0L)
+    }
+
+    private fun finishImportFileProgress(progressId: Int) {
+        if (progressId <= 0) return
+        CopyProgressBridge.flushPending(progressId)
+        CopyProgressBridge.clear(progressId)
+        ImportProgressBridge.clear(progressId)
+        VaultAutomationProgress.finishFile(progressId)
+    }
+
+    private fun beginExportFileProgress(progressId: Int, name: String, size: Long, hasChunkProgress: Boolean = true) {
+        if (progressId <= 0) return
+        // The native block-device export primitive currently has no chunk
+        // callback. Keep its notification indeterminate instead of showing
+        // a misleading 0% bar for the whole file.
+        VaultAutomationProgress.beginFile(progressId, name, if (hasChunkProgress) size else 0L)
+        ExportProgressBridge.begin(progressId)
+        ExportProgressBridge.reportProgress(progressId, 0, 1, name, 0L, size)
+        ExportProgressBridge.beginFileChunks(progressId, 0L)
+    }
+
+    private fun finishExportFileProgress(progressId: Int) {
+        if (progressId <= 0) return
+        ExportProgressBridge.clear(progressId)
+        VaultAutomationProgress.finishFile(progressId)
     }
 }

@@ -556,7 +556,6 @@ class _MediaViewerToolbarSettingsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         leading: _isSearching
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -1493,7 +1492,6 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           l10n.playbackSettingsTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2194,7 +2192,6 @@ class _MediaViewerToolbarLayoutScreenState
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           l10n.toolbarLayoutSectionHeader,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2412,7 +2409,6 @@ class MediaViewerAdvancedSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           l10n.advancedOptionsTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

@@ -113,7 +113,6 @@ class WizardScaffold extends StatelessWidget {
         child: Scaffold(
           appBar: AppBar(
             toolbarHeight: isLandscape ? 44 : kToolbarHeight,
-            backgroundColor: cs.surfaceContainerHigh,
             leading: IconButton(
               icon: Icon(Icons.arrow_back_rounded, size: isLandscape ? 20 : 24),
               onPressed: () => _handleBackOrExit(context),

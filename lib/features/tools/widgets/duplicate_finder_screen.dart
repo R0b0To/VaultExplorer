@@ -200,12 +200,10 @@ class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(duplicateFinderProvider);
-    final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         elevation: 0,
         title: Text(
           context.l10n.toolDuplicateFinderTitle,

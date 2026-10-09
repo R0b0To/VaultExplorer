@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
 
 part 'settings_backup_service.g.dart';
 
@@ -111,6 +112,7 @@ class SettingsBackupService {
   final VaultLifecycleApi _lifecycleApi;
 
   Future<String> _buildBundleJson() async {
+    final editorAppearance = await const TextEditorAppearanceService().load();
     final settings = await _appSettingsService.loadSettings();
     final toolbarConfig = await _toolbarService.load();
     final panicSettings = await _panicApi.getPanicSettings();
@@ -129,11 +131,16 @@ class SettingsBackupService {
       folderGridAspectRatios: const {},
       folderSortModes: const {},
     );
+    final exportableSettings = settings.copyWith(
+      fileManagerSkin: toolbarConfig.skin,
+      editorAppearancePrefs: editorAppearance.toJson(),
+      appSkinSchemaVersion: 1,
+    );
 
     final bundle = {
       'schemaVersion': _schemaVersion,
       'exportedAt': DateTime.now().toIso8601String(),
-      'appSettings': settings.toJson(),
+      'appSettings': exportableSettings.toJson(),
       'fileManagerToolbar': exportableToolbarConfig.toJson(),
       'panicTier': panicSettings.configuredTier.level,
       'quickTileEnabled': panicSettings.quickTileEnabled,
@@ -201,7 +208,25 @@ class SettingsBackupService {
   /// Persists a bundle already returned by [pickAndParseFile], overwriting
   /// the current [AppSettings], toolbar config, panic settings, and share target.
   Future<void> applyImportedBundle(ImportedSettingsBundle bundle) async {
-    await _appSettingsService.saveSettings(bundle.appSettings);
+    // Older exports predate app-skin settings and editor appearance backup.
+    // Keep this device's editor choices when importing one, and migrate the
+    // file-manager skin from the bundled toolbar config without losing it.
+    await const TextEditorAppearanceService().load();
+    final currentSettings = await _appSettingsService.loadSettings();
+    final importedSettings = bundle.appSettings.copyWith(
+      fileManagerSkin: bundle.toolbarConfig.skin,
+      editorAppearancePrefs: bundle.appSettings.editorAppearancePrefs.isNotEmpty
+          ? bundle.appSettings.editorAppearancePrefs
+          : currentSettings.editorAppearancePrefs,
+      fileManagerFollowsAppSkin: bundle.appSettings.appSkinSchemaVersion < 1
+          ? false
+          : bundle.appSettings.fileManagerFollowsAppSkin,
+      editorFollowsAppSkin: bundle.appSettings.appSkinSchemaVersion < 1
+          ? false
+          : bundle.appSettings.editorFollowsAppSkin,
+      appSkinSchemaVersion: 1,
+    );
+    await _appSettingsService.replaceSettings(importedSettings);
     await _toolbarService.save(bundle.toolbarConfig);
     if (bundle.panicTier != null) {
       await _panicApi.setPanicTier(bundle.panicTier!);

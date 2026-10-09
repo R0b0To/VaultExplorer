@@ -134,7 +134,6 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         elevation: 0,
         title: Text(
           context.l10n.toolContainerSplitterTitle,

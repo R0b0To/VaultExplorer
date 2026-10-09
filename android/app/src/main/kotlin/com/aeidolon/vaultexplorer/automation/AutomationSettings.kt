@@ -46,6 +46,7 @@ object AutomationSettings {
     private const val PREF_PIM_PREFIX = "pim:"          // + container URI -> encrypted PIM integer
     private const val PREF_FORMAT_PREFIX = "fmt:"       // + container URI -> DirectoryVaultFormat.name; absent = standard container
     private const val PREF_CAPTURE_PREFIX = "cap:"      // + container URI -> "true" if TAKE_PHOTO/START_RECORDING are opted in
+    private const val PREF_PENDING_ACTION_PREFIX = "pending_action:" // + random ID -> encrypted automation action payload
 
     enum class AutomationTier {
         /** Automation cannot touch this vault at all. This is the default for every vault. */
@@ -280,6 +281,24 @@ object AutomationSettings {
             editor.putString(PREF_PIM_PREFIX + containerUri, encrypted)
         }
         editor.commit()
+    }
+
+    /** Store a queued automation payload encrypted, since it may contain the API token or password. */
+    fun storePendingActionPayload(context: Context, id: String, payload: String): Boolean {
+        val encrypted = encrypt(payload) ?: return false
+        return prefs(context).edit().putString(PREF_PENDING_ACTION_PREFIX + id, encrypted).commit()
+    }
+
+    /** Consume an encrypted queued payload once the background worker starts. */
+    fun consumePendingActionPayload(context: Context, id: String): String? {
+        val key = PREF_PENDING_ACTION_PREFIX + id
+        val encrypted = prefs(context).getString(key, null) ?: return null
+        prefs(context).edit().remove(key).commit()
+        return decrypt(encrypted)
+    }
+
+    fun clearPendingActionPayload(context: Context, id: String) {
+        prefs(context).edit().remove(PREF_PENDING_ACTION_PREFIX + id).apply()
     }
 
     /** Call when a vault is removed from the app so stray automation config doesn't linger. */

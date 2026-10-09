@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/app_skin_preset.dart';
+import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -40,10 +44,11 @@ enum AuthenticatorSearchPlacement {
   top;
 
   String toJson() => name;
-  static AuthenticatorSearchPlacement fromJson(String? value) => switch (value) {
-    'top' => AuthenticatorSearchPlacement.top,
-    _ => AuthenticatorSearchPlacement.bottom,
-  };
+  static AuthenticatorSearchPlacement fromJson(String? value) =>
+      switch (value) {
+        'top' => AuthenticatorSearchPlacement.top,
+        _ => AuthenticatorSearchPlacement.bottom,
+      };
 }
 
 enum QuickActionLockMode {
@@ -52,14 +57,17 @@ enum QuickActionLockMode {
   leaveOpen;
 
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
-    QuickActionLockMode.leaveAsFound => l10n.quickActionLockModeLeaveAsFoundLabel,
+    QuickActionLockMode.leaveAsFound =>
+      l10n.quickActionLockModeLeaveAsFoundLabel,
     QuickActionLockMode.alwaysLock => l10n.quickActionLockModeAlwaysLockLabel,
     QuickActionLockMode.leaveOpen => l10n.quickActionLockModeLeaveOpenLabel,
   };
 
   String getLocalizedSubtitle(AppLocalizations l10n) => switch (this) {
-    QuickActionLockMode.leaveAsFound => l10n.quickActionLockModeLeaveAsFoundSubtitle,
-    QuickActionLockMode.alwaysLock => l10n.quickActionLockModeAlwaysLockSubtitle,
+    QuickActionLockMode.leaveAsFound =>
+      l10n.quickActionLockModeLeaveAsFoundSubtitle,
+    QuickActionLockMode.alwaysLock =>
+      l10n.quickActionLockModeAlwaysLockSubtitle,
     QuickActionLockMode.leaveOpen => l10n.quickActionLockModeLeaveOpenSubtitle,
   };
 
@@ -160,6 +168,14 @@ class AppSettings {
   bool enableAuthenticator;
   bool authenticatorShowNumbers;
   AuthenticatorSearchPlacement authenticatorSearchPlacement;
+  AppSkinPreset appSkinPreset;
+  CustomAppSkin customAppSkin;
+  List<CustomAppSkin> customAppSkins;
+  FileManagerSkin fileManagerSkin;
+  bool fileManagerFollowsAppSkin;
+  bool editorFollowsAppSkin;
+  Map<String, dynamic> editorAppearancePrefs;
+  int appSkinSchemaVersion;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
   String? _masterPatternHash;
@@ -171,7 +187,7 @@ class AppSettings {
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
-     this.keepVaultsRunningInBackground = false,
+    this.keepVaultsRunningInBackground = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
@@ -200,12 +216,21 @@ class AppSettings {
     this.enableAuthenticator = true,
     this.authenticatorShowNumbers = true,
     this.authenticatorSearchPlacement = AuthenticatorSearchPlacement.bottom,
+    this.appSkinPreset = AppSkinPreset.defaultSkin,
+    this.customAppSkin = const CustomAppSkin(),
+    this.customAppSkins = const [],
+    this.fileManagerSkin = FileManagerSkin.classic,
+    this.fileManagerFollowsAppSkin = true,
+    this.editorFollowsAppSkin = true,
+    Map<String, dynamic>? editorAppearancePrefs,
+    this.appSkinSchemaVersion = 1,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
     this._masterPatternHash,
     this._masterPinHash,
-  })  : extensionPreferences = extensionPreferences ?? {};
+  }) : extensionPreferences = extensionPreferences ?? {},
+       editorAppearancePrefs = editorAppearancePrefs ?? {};
 
   Axis get playlistScrollDirection => playlistScrollMode.axis;
   set playlistScrollDirection(Axis axis) {
@@ -281,21 +306,35 @@ class AppSettings {
     bool? enableAuthenticator,
     bool? authenticatorShowNumbers,
     AuthenticatorSearchPlacement? authenticatorSearchPlacement,
+    AppSkinPreset? appSkinPreset,
+    CustomAppSkin? customAppSkin,
+    List<CustomAppSkin>? customAppSkins,
+    FileManagerSkin? fileManagerSkin,
+    bool? fileManagerFollowsAppSkin,
+    bool? editorFollowsAppSkin,
+    Map<String, dynamic>? editorAppearancePrefs,
+    int? appSkinSchemaVersion,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
       masterUnlockMethod: masterUnlockMethod ?? this.masterUnlockMethod,
-      defaultDocumentProvider: defaultDocumentProvider ?? this.defaultDocumentProvider,
+      defaultDocumentProvider:
+          defaultDocumentProvider ?? this.defaultDocumentProvider,
       videoAutoPlay: videoAutoPlay ?? this.videoAutoPlay,
       blockScreenshots: blockScreenshots ?? this.blockScreenshots,
-      keepVaultsRunningInBackground: keepVaultsRunningInBackground ?? this.keepVaultsRunningInBackground,
-      defaultDerivedKeyCacheEnabled: defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
-      lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
+      keepVaultsRunningInBackground:
+          keepVaultsRunningInBackground ?? this.keepVaultsRunningInBackground,
+      defaultDerivedKeyCacheEnabled:
+          defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
+      lockContainersOnScreenLock:
+          lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
       autoLockMins: autoLockMins ?? this.autoLockMins,
-      autoLockScreenLockOnly: autoLockScreenLockOnly ?? this.autoLockScreenLockOnly,
-    lockAppOnScreenLock: lockAppOnScreenLock ?? this.lockAppOnScreenLock,
+      autoLockScreenLockOnly:
+          autoLockScreenLockOnly ?? this.autoLockScreenLockOnly,
+      lockAppOnScreenLock: lockAppOnScreenLock ?? this.lockAppOnScreenLock,
       appLockAfterMins: appLockAfterMins ?? this.appLockAfterMins,
-      appLockScreenLockOnly: appLockScreenLockOnly ?? this.appLockScreenLockOnly,
+      appLockScreenLockOnly:
+          appLockScreenLockOnly ?? this.appLockScreenLockOnly,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       themeMode: themeMode ?? this.themeMode,
@@ -308,27 +347,47 @@ class AppSettings {
       masterPatternHash: masterPatternHash ?? _masterPatternHash,
       masterPinHash: masterPinHash ?? _masterPinHash,
       defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
-      defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
+      defaultFileSortAscending:
+          defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
-      playlistScrollMode: playlistScrollMode ??
+      playlistScrollMode:
+          playlistScrollMode ??
           (playlistScrollDirection != null
               ? (playlistScrollDirection == Axis.vertical
-                  ? PlaylistScrollMode.verticalPage
-                  : PlaylistScrollMode.horizontal)
+                    ? PlaylistScrollMode.verticalPage
+                    : PlaylistScrollMode.horizontal)
               : this.playlistScrollMode),
       languageCode: clearLanguageCode
           ? null
           : (languageCode ?? this.languageCode),
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
-      deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
+      deleteAfterImportMode:
+          deleteAfterImportMode ?? this.deleteAfterImportMode,
       videoMuted: videoMuted ?? this.videoMuted,
       videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
-       showStorageLocationsInDrawer: showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
-      autoLockOnShareImport: autoLockOnShareImport ?? (quickActionLockMode != null ? quickActionLockMode != QuickActionLockMode.leaveOpen : this.autoLockOnShareImport),
+      showStorageLocationsInDrawer:
+          showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
+      autoLockOnShareImport:
+          autoLockOnShareImport ??
+          (quickActionLockMode != null
+              ? quickActionLockMode != QuickActionLockMode.leaveOpen
+              : this.autoLockOnShareImport),
       quickActionLockMode: quickActionLockMode ?? this.quickActionLockMode,
       enableAuthenticator: enableAuthenticator ?? this.enableAuthenticator,
-      authenticatorShowNumbers: authenticatorShowNumbers ?? this.authenticatorShowNumbers,
-      authenticatorSearchPlacement: authenticatorSearchPlacement ?? this.authenticatorSearchPlacement,
+      authenticatorShowNumbers:
+          authenticatorShowNumbers ?? this.authenticatorShowNumbers,
+      authenticatorSearchPlacement:
+          authenticatorSearchPlacement ?? this.authenticatorSearchPlacement,
+      appSkinPreset: appSkinPreset ?? this.appSkinPreset,
+      customAppSkin: customAppSkin ?? this.customAppSkin,
+      customAppSkins: customAppSkins ?? this.customAppSkins,
+      fileManagerSkin: fileManagerSkin ?? this.fileManagerSkin,
+      fileManagerFollowsAppSkin:
+          fileManagerFollowsAppSkin ?? this.fileManagerFollowsAppSkin,
+      editorFollowsAppSkin: editorFollowsAppSkin ?? this.editorFollowsAppSkin,
+      editorAppearancePrefs:
+          editorAppearancePrefs ?? this.editorAppearancePrefs,
+      appSkinSchemaVersion: appSkinSchemaVersion ?? this.appSkinSchemaVersion,
     );
   }
 
@@ -343,7 +402,7 @@ class AppSettings {
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
     'autoLockScreenLockOnly': autoLockScreenLockOnly,
-   'lockAppOnScreenLock': lockAppOnScreenLock,
+    'lockAppOnScreenLock': lockAppOnScreenLock,
     'appLockAfterMins': appLockAfterMins,
     'appLockScreenLockOnly': appLockScreenLockOnly,
     'defaultLayoutMode': defaultLayoutMode.toJson(),
@@ -357,22 +416,31 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'playlistScrollMode': playlistScrollMode.toJson(),
-    'playlistScrollDirection': playlistScrollMode == PlaylistScrollMode.verticalPage
+    'playlistScrollDirection':
+        playlistScrollMode == PlaylistScrollMode.verticalPage
         ? 'vertical'
         : (playlistScrollMode == PlaylistScrollMode.verticalContinuous
-            ? 'verticalContinuous'
-            : 'horizontal'),
+              ? 'verticalContinuous'
+              : 'horizontal'),
     'languageCode': languageCode,
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
     'videoMuted': videoMuted,
     'videoPlaybackMode': videoPlaybackMode.name,
-     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
+    'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'autoLockOnShareImport': autoLockOnShareImport,
     'quickActionLockMode': quickActionLockMode.toJson(),
     'enableAuthenticator': enableAuthenticator,
     'authenticatorShowNumbers': authenticatorShowNumbers,
     'authenticatorSearchPlacement': authenticatorSearchPlacement.toJson(),
+    'appSkinPreset': appSkinPreset.id,
+    'customAppSkin': customAppSkin.toJson(),
+    'customAppSkins': customAppSkins.map((skin) => skin.toJson()).toList(),
+    'fileManagerSkin': fileManagerSkin.toJson(),
+    'fileManagerFollowsAppSkin': fileManagerFollowsAppSkin,
+    'editorFollowsAppSkin': editorFollowsAppSkin,
+    'editorAppearancePrefs': editorAppearancePrefs,
+    'appSkinSchemaVersion': appSkinSchemaVersion,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -383,18 +451,25 @@ class AppSettings {
     masterUnlockMethod: j['masterUnlockMethod'] != null
         ? MasterUnlockMethod.fromJson(j['masterUnlockMethod'] as String?)
         : (j['masterPasswordIsFingerprint'] as bool? ?? false)
-            ? MasterUnlockMethod.biometrics
-            : MasterUnlockMethod.password,
+        ? MasterUnlockMethod.biometrics
+        : MasterUnlockMethod.password,
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
-    keepVaultsRunningInBackground: j['keepVaultsRunningInBackground'] as bool? ?? false,
-    defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
-    containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),
-    themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
+    keepVaultsRunningInBackground:
+        j['keepVaultsRunningInBackground'] as bool? ?? false,
+    defaultDerivedKeyCacheEnabled:
+        j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
+    containerSortMode: ContainerSortMode.fromJson(
+      j['containerSortMode'] as String?,
+    ),
+    themeMode: j['themeMode'] != null
+        ? ThemeMode.values[j['themeMode'] as int]
+        : ThemeMode.system,
     useDynamicColor: j['useDynamicColor'] as bool? ?? false,
     useOledBlackTheme: j['useOledBlackTheme'] as bool? ?? false,
-    lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
+    lockContainersOnScreenLock:
+        j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
     autoLockScreenLockOnly: j['autoLockScreenLockOnly'] as bool? ?? false,
     // Migrates installs from before App Lock and Vault Auto-Lock had
@@ -405,19 +480,19 @@ class AppSettings {
     // when a master password was actually in use -- otherwise there's
     // nothing to preserve), the same way masterUnlockMethod below backfills
     // from the legacy masterPasswordIsFingerprint boolean it replaced.
-    lockAppOnScreenLock: j['lockAppOnScreenLock'] as bool? ??
+    lockAppOnScreenLock:
+        j['lockAppOnScreenLock'] as bool? ??
         ((j['useMasterPassword'] as bool? ?? false)
             ? (j['lockContainersOnScreenLock'] as bool? ?? true)
             : true),
-    appLockAfterMins: j['appLockAfterMins'] as int? ??
+    appLockAfterMins:
+        j['appLockAfterMins'] as int? ??
         ((j['useMasterPassword'] as bool? ?? false)
             ? (j['autoLockMins'] as int? ?? 0)
             : 0),
     appLockScreenLockOnly: j['appLockScreenLockOnly'] as bool? ?? false,
     defaultLayoutMode:
-        BrowserLayoutMode.fromJson(
-          j['defaultLayoutMode'] as String?,
-        ) ??
+        BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
         BrowserLayoutMode.list,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
@@ -429,7 +504,8 @@ class AppSettings {
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
     playlistScrollMode: PlaylistScrollMode.fromJson(
-      j['playlistScrollMode'] as String? ?? j['playlistScrollDirection'] as String?,
+      j['playlistScrollMode'] as String? ??
+          j['playlistScrollDirection'] as String?,
     ),
     languageCode: j['languageCode'] as String?,
     debugLoggingEnabled: j['debugLoggingEnabled'] as bool? ?? false,
@@ -440,18 +516,38 @@ class AppSettings {
     videoPlaybackMode: VideoPlaybackMode.fromJson(
       j['videoPlaybackMode'] as String?,
     ),
-     showStorageLocationsInDrawer: j['showStorageLocationsInDrawer'] as bool? ?? true,
+    showStorageLocationsInDrawer:
+        j['showStorageLocationsInDrawer'] as bool? ?? true,
     autoLockOnShareImport: j['autoLockOnShareImport'] as bool? ?? true,
     quickActionLockMode: j['quickActionLockMode'] != null
         ? QuickActionLockMode.fromJson(j['quickActionLockMode'] as String?)
         : (j['autoLockOnShareImport'] as bool? ?? true)
-            ? QuickActionLockMode.leaveAsFound
-            : QuickActionLockMode.leaveOpen,
+        ? QuickActionLockMode.leaveAsFound
+        : QuickActionLockMode.leaveOpen,
     enableAuthenticator: j['enableAuthenticator'] as bool? ?? true,
     authenticatorShowNumbers: j['authenticatorShowNumbers'] as bool? ?? true,
     authenticatorSearchPlacement: AuthenticatorSearchPlacement.fromJson(
       j['authenticatorSearchPlacement'] as String?,
     ),
+    appSkinPreset: AppSkinPreset.fromJson(j['appSkinPreset']),
+    customAppSkin: CustomAppSkin.fromJson(j['customAppSkin']),
+    customAppSkins: j['customAppSkins'] is List
+        ? (j['customAppSkins'] as List)
+              .whereType<Map>()
+              .map(CustomAppSkin.fromJson)
+              .toList()
+        : const [],
+    fileManagerSkin: FileManagerSkin.fromJson(j['fileManagerSkin']),
+    fileManagerFollowsAppSkin:
+        j['fileManagerFollowsAppSkin'] as bool? ??
+        ((j['appSkinSchemaVersion'] as int? ?? 0) >= 1),
+    editorFollowsAppSkin:
+        j['editorFollowsAppSkin'] as bool? ??
+        ((j['appSkinSchemaVersion'] as int? ?? 0) >= 1),
+    editorAppearancePrefs: j['editorAppearancePrefs'] is Map
+        ? Map<String, dynamic>.from(j['editorAppearancePrefs'] as Map)
+        : {},
+    appSkinSchemaVersion: j['appSkinSchemaVersion'] as int? ?? 0,
   );
 }
 
@@ -460,6 +556,22 @@ AppSettingsService appSettingsService(Ref ref) => const AppSettingsService();
 
 class AppSettingsService {
   const AppSettingsService();
+
+  static Future<void> _writeQueue = Future<void>.value();
+
+  Future<T> _withWriteLock<T>(Future<T> Function() action) {
+    final previous = _writeQueue;
+    final done = Completer<void>();
+    _writeQueue = done.future;
+    return () async {
+      await previous;
+      try {
+        return await action();
+      } finally {
+        done.complete();
+      }
+    }();
+  }
 
   /// Storage key for the whole [AppSettings] blob (everything [toJson]
   /// covers -- never the master-password hash/salt or pattern/PIN hashes,
@@ -548,8 +660,9 @@ class AppSettingsService {
     try {
       final blob = await _readSettingsBlob();
       if (blob != null) {
-        settings =
-            AppSettings.fromJson(jsonDecode(blob) as Map<String, dynamic>);
+        settings = AppSettings.fromJson(
+          jsonDecode(blob) as Map<String, dynamic>,
+        );
       } else {
         settings = await _migrateLegacySettings() ?? AppSettings();
       }
@@ -580,7 +693,44 @@ class AppSettingsService {
     return settings;
   }
 
-  Future<void> saveSettings(AppSettings settings) async {
+  /// Saves general settings while retaining skin preferences written by the
+  /// dedicated read/modify/write methods below. Several legacy callers build
+  /// an AppSettings copy from a screen snapshot, so this protects newer skin
+  /// and editor choices from being replaced by that older snapshot.
+  Future<void> saveSettings(AppSettings settings) => _withWriteLock(() async {
+    final current = await loadSettings();
+    await _saveSettings(
+      settings.copyWith(
+        appSkinPreset: current.appSkinPreset,
+        customAppSkin: current.customAppSkin,
+        customAppSkins: current.customAppSkins,
+        fileManagerSkin: current.fileManagerSkin,
+        fileManagerFollowsAppSkin: current.fileManagerFollowsAppSkin,
+        editorFollowsAppSkin: current.editorFollowsAppSkin,
+        editorAppearancePrefs: current.editorAppearancePrefs,
+        appSkinSchemaVersion: current.appSkinSchemaVersion,
+      ),
+    );
+  });
+
+  /// Replaces the complete settings snapshot, used for an explicit import or
+  /// a one-time migration where the caller has already resolved all fields.
+  Future<void> replaceSettings(AppSettings settings) =>
+      _withWriteLock(() => _saveSettings(settings));
+
+  /// Updates one or more settings against the latest persisted snapshot.
+  /// Serializing the read/modify/write avoids independent skin and editor
+  /// preference changes overwriting each other when they happen together.
+  Future<AppSettings> updateSettings(
+    AppSettings Function(AppSettings current) updater,
+  ) => _withWriteLock(() async {
+    final current = await loadSettings();
+    final updated = updater(current);
+    await _saveSettings(updated);
+    return updated;
+  });
+
+  Future<void> _saveSettings(AppSettings settings) async {
     // Invalidate on both sides of the write: before, so nothing reads the old
     // blob from cache while the write is in flight; after, so a read that
     // began before the write finished can't have repopulated the cache with

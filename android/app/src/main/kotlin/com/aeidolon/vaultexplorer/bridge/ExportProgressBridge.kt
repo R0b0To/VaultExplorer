@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.bridge
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
+import com.aeidolon.vaultexplorer.automation.VaultAutomationProgress
 
 /**
  * Export-side counterpart to [ImportProgressBridge]. Reports progress for
@@ -76,6 +77,7 @@ object ExportProgressBridge {
         totalBytes: Long = 0L,
     ) {
         lastContext[opId] = LastContext(done, total, currentName, totalBytes)
+        VaultAutomationProgress.reportAbsoluteBytes(opId, transferredBytes)
 
         val ch = channel ?: return
         val now = System.currentTimeMillis()

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -64,7 +65,7 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
     this.asFab = false,
   });
 
-   @override
+  @override
   ConsumerState<AddItemMenuButton> createState() => _AddItemMenuButtonState();
 }
 
@@ -87,6 +88,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
     Color? backgroundColor,
     Color? foregroundColor,
   }) {
+    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     if (!widget.asFab) {
       return IconButton(
         icon: Icon(icon, size: 28, color: foregroundColor),
@@ -97,8 +99,10 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
     return FloatingActionButton(
       heroTag: 'file_manager_add_fab_${widget.container.volId}',
       tooltip: tooltip,
-      backgroundColor: backgroundColor ?? cs.primaryContainer,
-      foregroundColor: foregroundColor ?? cs.onPrimaryContainer,
+      backgroundColor:
+          backgroundColor ?? skinTokens?.fabBackground ?? cs.primaryContainer,
+      foregroundColor:
+          foregroundColor ?? skinTokens?.fabForeground ?? cs.onPrimaryContainer,
       onPressed: onPressed,
       child: Icon(icon, size: 26),
     );
@@ -113,14 +117,16 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
         icon: Icons.lock_outline_rounded,
         tooltip: context.l10n.readOnlyCantAddItemsTooltip,
         backgroundColor: widget.asFab ? cs.surfaceContainerHighest : null,
-        foregroundColor: cs.onSurfaceVariant.withValues(alpha: widget.asFab ? 1.0 : 0.5),
+        foregroundColor: cs.onSurfaceVariant.withValues(
+          alpha: widget.asFab ? 1.0 : 0.5,
+        ),
         onPressed: () => widget.onSetStatus(
           context.l10n.readOnlyContainerWarning,
           error: true,
         ),
       );
     }
-     if (widget.hasArchiveContext) {
+    if (widget.hasArchiveContext) {
       return _anchorButton(
         cs,
         icon: Icons.unarchive_rounded,
@@ -148,7 +154,10 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
       onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: [
         MenuItemButton(
-          leadingIcon: Icon(Icons.create_new_folder_outlined, color: cs.primary),
+          leadingIcon: Icon(
+            Icons.create_new_folder_outlined,
+            color: cs.primary,
+          ),
           child: Text(context.l10n.newFolderTitle),
           onPressed: () {
             BrowserDialogs.showCreateFolder(
@@ -156,13 +165,17 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
               container: widget.container,
               currentDirPath: widget.currentDirPath,
               existingEntries: widget.currentItems,
-              onSuccess: () => widget.onLoadDirectoryContents(widget.currentDirPath),
+              onSuccess: () =>
+                  widget.onLoadDirectoryContents(widget.currentDirPath),
               readOnly: widget.isReadOnly,
             );
           },
         ),
         MenuItemButton(
-          leadingIcon: Icon(Icons.insert_drive_file_outlined, color: cs.primary),
+          leadingIcon: Icon(
+            Icons.insert_drive_file_outlined,
+            color: cs.primary,
+          ),
           child: Text(context.l10n.newTextFileTitle),
           onPressed: () {
             BrowserDialogs.showCreateFile(
@@ -170,7 +183,8 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
               container: widget.container,
               currentDirPath: widget.currentDirPath,
               existingEntries: widget.currentItems,
-              onSuccess: () => widget.onLoadDirectoryContents(widget.currentDirPath),
+              onSuccess: () =>
+                  widget.onLoadDirectoryContents(widget.currentDirPath),
               readOnly: widget.isReadOnly,
             );
           },
@@ -192,7 +206,10 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             child: Text(context.l10n.importFiles),
           ),
           MenuItemButton(
-            leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
+            leadingIcon: Icon(
+              Icons.drive_folder_upload_outlined,
+              color: cs.secondary,
+            ),
             onPressed: () => ref
                 .read(sessionLockControllerProvider)
                 .withLockSuppression(widget.onImportFolderFromDevice),

@@ -107,7 +107,6 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
     });
 
     final state = ref.watch(headerBackupProvider);
-    final cs = context.colors;
     final l10n = context.l10n;
     final isLandscape = context.screen.useWideLayout;
     final hasTarget = state.target != null;
@@ -121,8 +120,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
+      appBar: AppBar(
           elevation: 0,
           leading: hasTarget
               ? IconButton(

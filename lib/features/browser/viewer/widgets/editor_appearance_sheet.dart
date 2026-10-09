@@ -1,5 +1,6 @@
 // Settings screen for choosing TextEditorScreen's appearance, themes,
 // typography, keyboard shortcuts, and auto-save behavior.
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:re_editor/re_editor.dart';
@@ -9,12 +10,12 @@ import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart'
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_language.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 
 Future<void> showEditorAppearanceSheet(BuildContext context) {
   return Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => const EditorAppearanceScreen(),
-    ),
+    MaterialPageRoute(builder: (context) => const EditorAppearanceScreen()),
   );
 }
 
@@ -22,18 +23,21 @@ class EditorAppearanceScreen extends ConsumerStatefulWidget {
   const EditorAppearanceScreen({super.key});
 
   @override
-  ConsumerState<EditorAppearanceScreen> createState() => _EditorAppearanceScreenState();
+  ConsumerState<EditorAppearanceScreen> createState() =>
+      _EditorAppearanceScreenState();
 }
 
-class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen> {
-  late final CodeLineEditingController _previewCodeController = CodeLineEditingController.fromText(
-    '// Live theme & font preview\n'
-    'void main() {\n'
-    '  const vault = "VaultExplorer";\n'
-    '  final count = 42;\n'
-    '  print("Ready: \$vault (\$count)");\n'
-    '}',
-  );
+class _EditorAppearanceScreenState
+    extends ConsumerState<EditorAppearanceScreen> {
+  late final CodeLineEditingController _previewCodeController =
+      CodeLineEditingController.fromText(
+        '// Live theme & font preview\n'
+        'void main() {\n'
+        '  const vault = "VaultExplorer";\n'
+        '  final count = 42;\n'
+        '  print("Ready: \$vault (\$count)");\n'
+        '}',
+      );
 
   @override
   void dispose() {
@@ -41,20 +45,34 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
     super.dispose();
   }
 
-  String _backgroundLabel(BuildContext context, EditorBackgroundOption option) => switch (option) {
-    EditorBackgroundOption.matchSyntaxTheme => context.l10n.textEditorBackgroundMatchTheme,
-    EditorBackgroundOption.amoledBlack => context.l10n.textEditorBackgroundAmoledBlack,
-    EditorBackgroundOption.darkSlate => context.l10n.textEditorBackgroundDarkSlate,
-    EditorBackgroundOption.classicLight => context.l10n.textEditorBackgroundClassicLight,
+  String _backgroundLabel(
+    BuildContext context,
+    EditorBackgroundOption option,
+  ) => switch (option) {
+    EditorBackgroundOption.matchSyntaxTheme =>
+      context.l10n.textEditorBackgroundMatchTheme,
+    EditorBackgroundOption.amoledBlack =>
+      context.l10n.textEditorBackgroundAmoledBlack,
+    EditorBackgroundOption.darkSlate =>
+      context.l10n.textEditorBackgroundDarkSlate,
+    EditorBackgroundOption.classicLight =>
+      context.l10n.textEditorBackgroundClassicLight,
     EditorBackgroundOption.sepia => context.l10n.textEditorBackgroundSepia,
   };
 
-  String _syntaxThemeLabel(BuildContext context, EditorSyntaxThemeOption option) => switch (option) {
+  String _syntaxThemeLabel(
+    BuildContext context,
+    EditorSyntaxThemeOption option,
+  ) => switch (option) {
     EditorSyntaxThemeOption.auto => context.l10n.textEditorSyntaxThemeAuto,
-    EditorSyntaxThemeOption.oneDark => context.l10n.textEditorSyntaxThemeOneDark,
-    EditorSyntaxThemeOption.dracula => context.l10n.textEditorSyntaxThemeDracula,
-    EditorSyntaxThemeOption.githubLight => context.l10n.textEditorSyntaxThemeGithubLight,
-    EditorSyntaxThemeOption.monokai => context.l10n.textEditorSyntaxThemeMonokai,
+    EditorSyntaxThemeOption.oneDark =>
+      context.l10n.textEditorSyntaxThemeOneDark,
+    EditorSyntaxThemeOption.dracula =>
+      context.l10n.textEditorSyntaxThemeDracula,
+    EditorSyntaxThemeOption.githubLight =>
+      context.l10n.textEditorSyntaxThemeGithubLight,
+    EditorSyntaxThemeOption.monokai =>
+      context.l10n.textEditorSyntaxThemeMonokai,
     EditorSyntaxThemeOption.nord => context.l10n.textEditorSyntaxThemeNord,
   };
 
@@ -64,12 +82,15 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
     ColorScheme cs,
     Brightness appBrightness,
   ) {
-    final syntaxStyle = resolveEditorSyntaxStyle(
-      'preview.dart',
-      appBrightness,
-      cs,
-      background: prefs.background,
-      syntaxTheme: prefs.syntaxTheme,
+    final syntaxStyle = applyAppSkinEditorTokens(
+      resolveEditorSyntaxStyle(
+        'preview.dart',
+        appBrightness,
+        cs,
+        background: prefs.background,
+        syntaxTheme: prefs.syntaxTheme,
+      ),
+      Theme.of(context).extension<AppSkinTokens>(),
     );
 
     return Container(
@@ -102,7 +123,7 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
           textColor: syntaxStyle.textColor,
           codeTheme: syntaxStyle.codeTheme,
         ),
-         indicatorBuilder: prefs.showLineNumbers
+        indicatorBuilder: prefs.showLineNumbers
             ? (context, editingController, chunkController, notifier) {
                 return DefaultCodeLineNumber(
                   controller: editingController,
@@ -140,6 +161,21 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(textEditorAppearanceProvider);
+    final appSkinSettings = ref.watch(appSkinSettingsProvider);
+    final appSkinTokens = Theme.of(context).extension<AppSkinTokens>();
+    final shownPrefs =
+        appSkinSettings.editorFollowsAppSkin && appSkinTokens != null
+        ? prefs.copyWith(
+            background: EditorBackgroundOption.values.firstWhere(
+              (option) => option.name == appSkinTokens.editorBackgroundOption,
+              orElse: () => EditorBackgroundOption.matchSyntaxTheme,
+            ),
+            syntaxTheme: EditorSyntaxThemeOption.values.firstWhere(
+              (option) => option.name == appSkinTokens.editorSyntaxThemeOption,
+              orElse: () => EditorSyntaxThemeOption.auto,
+            ),
+          )
+        : prefs;
     final notifier = ref.read(textEditorAppearanceProvider.notifier);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -147,13 +183,12 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.textEditorThemeSheetTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-           IconButton(
+          IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: context.l10n.textEditorResetToDefault,
             onPressed: () {
@@ -169,8 +204,12 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
               notifier.setShowAccessorySymbols(true);
               notifier.setShowAccessoryActions(true);
               notifier.setShowAccessoryScrubber(false);
-              notifier.setAccessorySymbols(TextEditorAppearancePrefs.defaultSymbols);
-              notifier.setAccessoryActions(TextEditorAppearancePrefs.defaultActions);
+              notifier.setAccessorySymbols(
+                TextEditorAppearancePrefs.defaultSymbols,
+              );
+              notifier.setAccessoryActions(
+                TextEditorAppearancePrefs.defaultActions,
+              );
               notifier.setAutoSave(false);
             },
           ),
@@ -185,11 +224,41 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
+                const SectionHeader('Editor styling'),
+                SectionCard(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      value: appSkinSettings.editorFollowsAppSkin,
+                      onChanged: (value) => ref
+                          .read(appSkinSettingsProvider.notifier)
+                          .setEditorFollowsAppSkin(value),
+                      title: Text(
+                        'Follow app skin',
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        appSkinSettings.editorFollowsAppSkin
+                            ? 'The editor uses the selected skin’s color template.'
+                            : 'Choose an independent editor background and syntax theme below.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      secondary: Icon(Icons.code_rounded, color: cs.primary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 // ==========================================
                 // 1. LIVE PREVIEW (Original style)
                 // ==========================================
                 SectionHeader(context.l10n.textEditorLivePreviewTitle),
-                _buildPreviewCard(context, prefs, cs, appBrightness),
+                _buildPreviewCard(context, shownPrefs, cs, appBrightness),
                 const SizedBox(height: 16),
 
                 // ==========================================
@@ -217,16 +286,32 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final option in EditorBackgroundOption.values)
+                              for (final option
+                                  in EditorBackgroundOption.values)
                                 _BackgroundChip(
                                   label: _backgroundLabel(context, option),
-                                  color: option.overrideColor ?? cs.surfaceContainerHighest,
+                                  color:
+                                      option.overrideColor ??
+                                      cs.surfaceContainerHighest,
                                   textColor: option.overrideColor != null
                                       ? option.fallbackTextColor
                                       : cs.onSurface,
-                                  selected: prefs.background == option,
-                                  isAuto: option == EditorBackgroundOption.matchSyntaxTheme,
-                                  onTap: () => notifier.setBackground(option),
+                                  selected: shownPrefs.background == option,
+                                  isAuto:
+                                      option ==
+                                      EditorBackgroundOption.matchSyntaxTheme,
+                                  onTap: () {
+                                    if (appSkinSettings.editorFollowsAppSkin) {
+                                      unawaited(
+                                        ref
+                                            .read(
+                                              appSkinSettingsProvider.notifier,
+                                            )
+                                            .setEditorFollowsAppSkin(false),
+                                      );
+                                    }
+                                    notifier.setBackground(option);
+                                  },
                                 ),
                             ],
                           ),
@@ -245,15 +330,35 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final option in EditorSyntaxThemeOption.values)
+                              for (final option
+                                  in EditorSyntaxThemeOption.values)
                                 _BackgroundChip(
                                   label: _syntaxThemeLabel(context, option),
-                                  color: option.themeMap(appBrightness)['root']?.backgroundColor ??
+                                  color:
+                                      option
+                                          .themeMap(appBrightness)['root']
+                                          ?.backgroundColor ??
                                       cs.surfaceContainerHighest,
-                                  textColor: option.themeMap(appBrightness)['root']?.color ?? cs.onSurface,
-                                  selected: prefs.syntaxTheme == option,
-                                  isAuto: option == EditorSyntaxThemeOption.auto,
-                                  onTap: () => notifier.setSyntaxTheme(option),
+                                  textColor:
+                                      option
+                                          .themeMap(appBrightness)['root']
+                                          ?.color ??
+                                      cs.onSurface,
+                                  selected: shownPrefs.syntaxTheme == option,
+                                  isAuto:
+                                      option == EditorSyntaxThemeOption.auto,
+                                  onTap: () {
+                                    if (appSkinSettings.editorFollowsAppSkin) {
+                                      unawaited(
+                                        ref
+                                            .read(
+                                              appSkinSettingsProvider.notifier,
+                                            )
+                                            .setEditorFollowsAppSkin(false),
+                                      );
+                                    }
+                                    notifier.setSyntaxTheme(option);
+                                  },
                                 ),
                             ],
                           ),
@@ -278,16 +383,26 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.format_size_rounded, color: cs.primary),
+                              Icon(
+                                Icons.format_size_rounded,
+                                color: cs.primary,
+                              ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Text(
-                                  context.l10n.textEditorFontSizeLabel(prefs.fontSize.round()),
-                                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                  context.l10n.textEditorFontSizeLabel(
+                                    prefs.fontSize.round(),
+                                  ),
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
                                   color: cs.primaryContainer,
                                   borderRadius: BorderRadius.circular(10),
@@ -317,47 +432,68 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                     ),
 
                     SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       value: prefs.showTabBar,
                       onChanged: notifier.setShowTabBar,
                       title: Text(
                         context.l10n.textEditorShowTabBarLabel,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         context.l10n.textEditorShowTabBarDescription,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                       secondary: Icon(Icons.tab_rounded, color: cs.primary),
                     ),
                     if (prefs.showTabBar)
                       SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                         value: prefs.autoHideTabBar,
                         onChanged: notifier.setAutoHideTabBar,
                         title: Text(
                           context.l10n.textEditorAutoHideTabBarLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         subtitle: Text(
                           context.l10n.textEditorAutoHideTabBarDescription,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                        secondary: Icon(Icons.unfold_less_rounded, color: cs.primary),
+                        secondary: Icon(
+                          Icons.unfold_less_rounded,
+                          color: cs.primary,
+                        ),
                       ),
 
                     // Show Line Numbers Switch
                     SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       value: prefs.showLineNumbers,
                       onChanged: notifier.setShowLineNumbers,
                       title: Text(
                         context.l10n.textEditorShowLineNumbersLabel,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         context.l10n.textEditorShowLineNumbersDescription,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                       secondary: Icon(
                         Icons.format_list_numbered_rounded,
@@ -365,19 +501,25 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                       ),
                     ),
 
-                   // Relative Line Numbers
+                    // Relative Line Numbers
                     if (prefs.showLineNumbers)
                       SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                         value: prefs.relativeLineNumbers,
                         onChanged: notifier.setRelativeLineNumbers,
                         title: Text(
                           context.l10n.textEditorRelativeLineNumbersLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         subtitle: Text(
                           context.l10n.textEditorRelativeLineNumbersDescription,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                         secondary: Icon(
                           Icons.swap_vert_rounded,
@@ -387,35 +529,44 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
 
                     // Show Status Bar Switch
                     SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       value: prefs.showStatusBar,
                       onChanged: notifier.setShowStatusBar,
                       title: Text(
                         context.l10n.textEditorShowStatusBarLabel,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         context.l10n.textEditorShowStatusBarDescription,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
-                      secondary: Icon(
-                        Icons.dock_rounded,
-                        color: cs.primary,
-                      ),
+                      secondary: Icon(Icons.dock_rounded, color: cs.primary),
                     ),
 
                     // Accessory Bar Master Switch
                     SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                       value: prefs.showAccessoryBar,
                       onChanged: notifier.setShowAccessoryBar,
                       title: Text(
                         context.l10n.textEditorShowAccessoryBarLabel,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         context.l10n.textEditorShowAccessoryBarDescription,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                       secondary: Icon(
                         Icons.keyboard_outlined,
@@ -426,35 +577,47 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                     if (prefs.showAccessoryBar) ...[
                       // Show Symbols Row Switch
                       SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                         value: prefs.showAccessorySymbols,
                         onChanged: notifier.setShowAccessorySymbols,
                         title: Text(
                           context.l10n.textEditorShowSymbolsBarLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         subtitle: Text(
                           context.l10n.textEditorShowSymbolsBarDescription,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                        secondary: Icon(
-                          Icons.tag_rounded,
-                          color: cs.primary,
-                        ),
+                        secondary: Icon(Icons.tag_rounded, color: cs.primary),
                       ),
 
                       // Customize Symbols Tile
                       if (prefs.showAccessorySymbols)
                         ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                          leading: Icon(Icons.edit_note_rounded, color: cs.primary),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                          leading: Icon(
+                            Icons.edit_note_rounded,
+                            color: cs.primary,
+                          ),
                           title: Text(
                             context.l10n.textEditorCustomizeKeyBarLabel,
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Text(
                             context.l10n.textEditorCustomizeKeyBarDescription,
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => _showCustomizeKeyBarDialog(context),
@@ -462,16 +625,22 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
 
                       // Show Actions Row Switch
                       SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                         value: prefs.showAccessoryActions,
                         onChanged: notifier.setShowAccessoryActions,
                         title: Text(
                           context.l10n.textEditorShowActionsBarLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         subtitle: Text(
                           context.l10n.textEditorShowActionsBarDescription,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                         secondary: Icon(
                           Icons.smart_button_rounded,
@@ -482,15 +651,21 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                       // Customize & Reorder Actions Tile
                       if (prefs.showAccessoryActions)
                         ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           leading: Icon(Icons.tune_rounded, color: cs.primary),
                           title: Text(
                             context.l10n.textEditorCustomizeActionsLabel,
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Text(
                             context.l10n.textEditorCustomizeActionsDescription,
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => _showCustomizeActionsDialog(context),
@@ -498,16 +673,22 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
 
                       // Show Scrubber Switch
                       SwitchListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                         value: prefs.showAccessoryScrubber,
                         onChanged: notifier.setShowAccessoryScrubber,
                         title: Text(
                           context.l10n.textEditorShowCaretScrubberLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         subtitle: Text(
                           context.l10n.textEditorShowCaretScrubberDescription,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                         secondary: Icon(
                           Icons.linear_scale_rounded,
@@ -526,16 +707,23 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
                 SectionCard(
                   children: [
                     SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
                       value: prefs.autoSave,
                       onChanged: notifier.setAutoSave,
                       title: Text(
                         context.l10n.textEditorAutoSaveLabel,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       subtitle: Text(
                         context.l10n.textEditorAutoSaveDescription,
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                       secondary: Icon(
                         Icons.save_as_outlined,
@@ -569,7 +757,9 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
   void _showCustomizeKeyBarDialog(BuildContext context) {
     final prefs = ref.read(textEditorAppearanceProvider);
     final notifier = ref.read(textEditorAppearanceProvider.notifier);
-    final controller = TextEditingController(text: prefs.accessorySymbols.join(' '));
+    final controller = TextEditingController(
+      text: prefs.accessorySymbols.join(' '),
+    );
 
     showDialog(
       context: context,
@@ -589,7 +779,9 @@ class _EditorAppearanceScreenState extends ConsumerState<EditorAppearanceScreen>
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: () {
-                controller.text = TextEditorAppearancePrefs.defaultSymbols.join(' ');
+                controller.text = TextEditorAppearancePrefs.defaultSymbols.join(
+                  ' ',
+                );
               },
               icon: const Icon(Icons.refresh_rounded),
               label: Text(ctx.l10n.textEditorResetToDefault),
@@ -631,7 +823,8 @@ class _CustomizeActionsDialog extends StatefulWidget {
   });
 
   @override
-  State<_CustomizeActionsDialog> createState() => _CustomizeActionsDialogState();
+  State<_CustomizeActionsDialog> createState() =>
+      _CustomizeActionsDialogState();
 }
 
 class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
@@ -642,8 +835,9 @@ class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
   void initState() {
     super.initState();
     _enabled = Set<String>.from(widget.currentActions);
-    final rest = TextEditorAppearancePrefs.allAvailableActions
-        .where((a) => !_enabled.contains(a));
+    final rest = TextEditorAppearancePrefs.allAvailableActions.where(
+      (a) => !_enabled.contains(a),
+    );
     _order = [...widget.currentActions, ...rest];
   }
 
@@ -651,20 +845,44 @@ class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
     return switch (key) {
       'undo' => (Icons.undo_rounded, context.l10n.actionUndo),
       'redo' => (Icons.redo_rounded, context.l10n.actionRedo),
-      'cursorLeft' => (Icons.keyboard_arrow_left_rounded, context.l10n.actionCursorLeft),
-      'cursorRight' => (Icons.keyboard_arrow_right_rounded, context.l10n.actionCursorRight),
-      'selectWord' => (Icons.highlight_alt_rounded, context.l10n.actionSelectWord),
+      'cursorLeft' => (
+        Icons.keyboard_arrow_left_rounded,
+        context.l10n.actionCursorLeft,
+      ),
+      'cursorRight' => (
+        Icons.keyboard_arrow_right_rounded,
+        context.l10n.actionCursorRight,
+      ),
+      'selectWord' => (
+        Icons.highlight_alt_rounded,
+        context.l10n.actionSelectWord,
+      ),
       'selectAll' => (Icons.select_all_rounded, context.l10n.actionSelectAll),
       'copy' => (Icons.content_copy_rounded, context.l10n.actionCopy),
       'cut' => (Icons.content_cut_rounded, context.l10n.actionCut),
       'paste' => (Icons.content_paste_rounded, context.l10n.actionPaste),
       'find' => (Icons.search_rounded, context.l10n.actionFind),
       'wordWrap' => (Icons.wrap_text_rounded, context.l10n.actionWordWrap),
-      'goToLine' => (Icons.format_list_numbered_rounded, context.l10n.actionGoToLine),
-      'goToStart' => (Icons.vertical_align_top_rounded, context.l10n.actionGoToStart),
-      'goToEnd' => (Icons.vertical_align_bottom_rounded, context.l10n.actionGoToEnd),
-      'indent' => (Icons.format_indent_increase_rounded, context.l10n.actionIndent),
-      'outdent' => (Icons.format_indent_decrease_rounded, context.l10n.actionOutdent),
+      'goToLine' => (
+        Icons.format_list_numbered_rounded,
+        context.l10n.actionGoToLine,
+      ),
+      'goToStart' => (
+        Icons.vertical_align_top_rounded,
+        context.l10n.actionGoToStart,
+      ),
+      'goToEnd' => (
+        Icons.vertical_align_bottom_rounded,
+        context.l10n.actionGoToEnd,
+      ),
+      'indent' => (
+        Icons.format_indent_increase_rounded,
+        context.l10n.actionIndent,
+      ),
+      'outdent' => (
+        Icons.format_indent_decrease_rounded,
+        context.l10n.actionOutdent,
+      ),
       'format' => (Icons.auto_fix_high_rounded, context.l10n.actionFormat),
       'readOnly' => (Icons.lock_outline_rounded, context.l10n.actionReadOnly),
       _ => (Icons.code_rounded, key),
@@ -736,9 +954,12 @@ class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
         TextButton(
           onPressed: () {
             setState(() {
-              _enabled = Set<String>.from(TextEditorAppearancePrefs.defaultActions);
-              final rest = TextEditorAppearancePrefs.allAvailableActions
-                  .where((a) => !_enabled.contains(a));
+              _enabled = Set<String>.from(
+                TextEditorAppearancePrefs.defaultActions,
+              );
+              final rest = TextEditorAppearancePrefs.allAvailableActions.where(
+                (a) => !_enabled.contains(a),
+              );
               _order = [...TextEditorAppearancePrefs.defaultActions, ...rest];
             });
           },
@@ -750,7 +971,9 @@ class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
         ),
         FilledButton(
           onPressed: () {
-            final finalActions = _order.where((a) => _enabled.contains(a)).toList();
+            final finalActions = _order
+                .where((a) => _enabled.contains(a))
+                .toList();
             widget.onSave(finalActions);
             Navigator.of(context).pop();
           },
@@ -789,10 +1012,7 @@ class _BackgroundChip extends StatelessWidget {
       color: color,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: borderColor,
-          width: selected ? 2 : 1,
-        ),
+        side: BorderSide(color: borderColor, width: selected ? 2 : 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

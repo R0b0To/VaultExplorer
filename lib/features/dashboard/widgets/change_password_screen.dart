@@ -263,7 +263,6 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.changePasswordTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

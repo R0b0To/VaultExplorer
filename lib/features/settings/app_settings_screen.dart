@@ -6,11 +6,13 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
@@ -23,6 +25,7 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
+import 'package:vaultexplorer/features/settings/app_skin_settings_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
@@ -30,6 +33,7 @@ import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.da
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
 
 class AppSettingsScreen extends ConsumerStatefulWidget {
@@ -258,7 +262,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -1387,7 +1390,6 @@ class _SecuritySettingsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.sectionSecurityPrivacy,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1642,7 +1644,6 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.sectionKeyStorageIntegration,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1886,7 +1887,6 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.sectionVaultFileHandling,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2007,29 +2007,35 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                             );
                       },
                     ),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ListTile(
+                    leading: Icon(Icons.palette_outlined, color: cs.primary),
                     title: Text(
-                      context.l10n.pureBlackThemeTitle,
+                      context.l10n.skinAppSkin,
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     subtitle: Text(
-                      context.l10n.pureBlackThemeSubtitle,
+                      ref.watch(appSkinSettingsProvider).preset ==
+                              AppSkinPreset.custom
+                          ? ref
+                                .watch(appSkinSettingsProvider)
+                                .customAppSkin
+                                .name
+                          : appSkinPresetLabel(
+                              context,
+                              ref.watch(appSkinSettingsProvider).preset,
+                            ),
                       style: textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     ),
-                    value: state.settings.useOledBlackTheme,
-                    onChanged: (v) {
-                      appUsePureBlackNotifier.value = v;
-                      ref
-                          .read(appSettingsControllerProvider.notifier)
-                          .updateSettings(
-                            (s) => s.copyWith(useOledBlackTheme: v),
-                          );
-                    },
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AppSkinSettingsScreen(),
+                      ),
+                    ),
                   ),
                   // Language Selection (Bug Fixed)
                   OptionPickerTile<String>(
@@ -2130,7 +2136,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.sectionAppearanceInterface,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2242,10 +2247,14 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       await ref
           .read(appSettingsControllerProvider.notifier)
           .applyImportedSettings(bundle.appSettings);
+      await ref
+          .read(appSkinSettingsProvider.notifier)
+          .applyImportedSettings(bundle.appSettings);
       ref
           .read(fileManagerToolbarSettingsProvider(null).notifier)
           .applyImportedConfig(bundle.toolbarConfig);
       ref.invalidate(fileManagerToolbarSettingsProvider);
+      ref.invalidate(textEditorAppearanceProvider);
 
       if (bundle.shareTargetEnabled != null) {
         await ref
@@ -2255,7 +2264,6 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
       appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
-      appUsePureBlackNotifier.value = bundle.appSettings.useOledBlackTheme;
       appLocaleNotifier.value = bundle.appSettings.languageCode != null
           ? Locale(bundle.appSettings.languageCode!)
           : null;
@@ -2414,7 +2422,6 @@ class AdvancedSettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
           style: const TextStyle(fontWeight: FontWeight.bold),

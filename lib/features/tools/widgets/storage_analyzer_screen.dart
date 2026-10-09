@@ -66,7 +66,6 @@ class _StorageAnalyzerScreenState
     final selected = analyzerState.selected;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: context.colors.surfaceContainerHigh,
         title: Text(
           context.l10n.toolStorageAnalyzerTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

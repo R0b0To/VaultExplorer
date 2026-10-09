@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
@@ -907,10 +908,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         drawerEnableOpenDragGesture: false,
         drawer: _buildDrawer(),
         appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
           leading: Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu_rounded),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: Theme.of(ctx)
+                    .extension<AppSkinTokens>()
+                    ?.appBarForeground,
+              ),
               tooltip: context.l10n.storageLocationsTitle,
               onPressed: () => Scaffold.of(ctx).openDrawer(),
             ),

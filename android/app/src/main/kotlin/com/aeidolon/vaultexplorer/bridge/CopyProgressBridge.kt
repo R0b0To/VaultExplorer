@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.bridge
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
+import com.aeidolon.vaultexplorer.automation.VaultAutomationProgress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -43,6 +44,7 @@ object CopyProgressBridge {
     @JvmStatic
     fun reportProgress(opId: Int, bytesDelta: Long) {
         if (opId <= 0 || bytesDelta <= 0) return
+        VaultAutomationProgress.reportBytes(opId, bytesDelta)
         pendingBytes.getOrPut(opId) { AtomicLong(0) }.addAndGet(bytesDelta)
         maybeFlush(opId)
     }

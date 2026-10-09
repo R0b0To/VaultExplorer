@@ -12,12 +12,14 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:meta/meta.dart' show immutable;
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 
 @immutable
 class EditorChrome {
   final Color background;
   final Color foreground;
   final ColorScheme appScheme;
+  final AppSkinTokens? appSkinTokens;
   final ColorScheme colorScheme;
   final ThemeData theme;
   final SystemUiOverlayStyle overlayStyle;
@@ -26,6 +28,7 @@ class EditorChrome {
     required this.background,
     required this.foreground,
     required this.appScheme,
+    required this.appSkinTokens,
     required this.colorScheme,
     required this.theme,
     required this.overlayStyle,
@@ -34,15 +37,22 @@ class EditorChrome {
   /// Building a [ThemeData] is not free and the editor screen rebuilds on
   /// every cursor move, so the screen keeps the last result and only calls
   /// [EditorChrome.resolve] again when one of these inputs changed.
-  bool matches(Color background, Color foreground, ColorScheme appScheme) =>
+  bool matches(
+    Color background,
+    Color foreground,
+    ColorScheme appScheme, {
+    AppSkinTokens? appSkinTokens,
+  }) =>
       this.background == background &&
       this.foreground == foreground &&
-      this.appScheme == appScheme;
+      this.appScheme == appScheme &&
+      this.appSkinTokens == appSkinTokens;
 
   factory EditorChrome.resolve({
     required Color background,
     required Color foreground,
     required ColorScheme appScheme,
+    AppSkinTokens? appSkinTokens,
   }) {
     final brightness = ThemeData.estimateBrightnessForColor(background);
     final isDark = brightness == Brightness.dark;
@@ -91,8 +101,9 @@ class EditorChrome {
       statusBarBrightness: brightness,
       systemNavigationBarColor: scheme.surfaceContainerLow,
       systemNavigationBarDividerColor: Colors.transparent,
-      systemNavigationBarIconBrightness:
-          isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: isDark
+          ? Brightness.light
+          : Brightness.dark,
       systemNavigationBarContrastEnforced: false,
       systemStatusBarContrastEnforced: false,
     );
@@ -102,8 +113,9 @@ class EditorChrome {
       foreground: foreground,
       appScheme: appScheme,
       colorScheme: scheme,
-      theme: buildThemeFromColorScheme(scheme),
+      theme: buildThemeFromColorScheme(scheme, appSkinTokens: appSkinTokens),
       overlayStyle: overlay,
+      appSkinTokens: appSkinTokens,
     );
   }
 }

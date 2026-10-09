@@ -79,8 +79,7 @@ class VaultBrowserScaffold extends ConsumerWidget {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
+      appBar: AppBar(
           title: wrapAppBarTitle?.call(titleText) ?? titleText,
           actions: actions?.call(context),
           leading: state.pathStack.length > 1

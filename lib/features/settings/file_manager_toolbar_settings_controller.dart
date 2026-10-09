@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
@@ -153,11 +154,17 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setLongFileNameDisplayMode(LongFileNameDisplayMode mode) =>
       _updateConfig(state.config.copyWith(longFileNameDisplayMode: mode));
 
-  /// Applies [skin] to the file manager. Persisted with the rest of the
-  /// toolbar config, and pushed to any open browser via the synchronized
-  /// family instances in [_updateConfig].
-  Future<void> setSkin(FileManagerSkin skin) =>
-      _updateConfig(state.config.copyWith(skin: skin));
+  /// Applies [skin] as the independent file-manager override. It is retained
+  /// in the toolbar config for compatibility and mirrored through
+  /// AppSettingsService for app-skin persistence/export; open browsers receive
+  /// the effective skin through the app ThemeExtension.
+  Future<void> setSkin(FileManagerSkin skin) async {
+    await ref
+        .read(appSkinSettingsProvider.notifier)
+        .setFileManagerFollowsAppSkin(false);
+    await ref.read(appSkinSettingsProvider.notifier).setFileManagerSkin(skin);
+    await _updateConfig(state.config.copyWith(skin: skin));
+  }
 
   Future<void> setAutoStartPlaylistMode(bool val) =>
       _updateConfig(state.config.copyWith(autoStartPlaylistMode: val));

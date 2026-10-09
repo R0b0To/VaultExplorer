@@ -9144,4 +9144,1019 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get subtitleTracksLabel => '字幕轨道';
+
+  @override
+  String get skinActionAccent => '操作强调色';
+
+  @override
+  String get skinEmphasisForActionIconsActiveControlsProgressAndLinks =>
+      '用于操作图标、活动控件、进度和链接的强调。';
+
+  @override
+  String get skinTextAndIconsOnAccentButtons => '强调按钮上的文本和图标';
+
+  @override
+  String get skinForegroundForButtonsFilledWithTheActionAccentColor =>
+      '使用操作强调色填充的按钮的前景色。';
+
+  @override
+  String get skinSelectionAndIconTileBackground => '选定项和图标平铺背景';
+
+  @override
+  String get skinSelectedFilesAndVaultFormat076e52 =>
+      '选定文件和保管库格式图标平铺使用此颜色。悬浮按钮填充有其独立设置。';
+
+  @override
+  String get skinTextAndIconsOnSelectionColors => '选择颜色上的文本和图标';
+
+  @override
+  String get skinForegroundForIconTilesAndOtherPrimaryContainerSurfaces =>
+      '图标平铺及其他主要容器表面的前景色。';
+
+  @override
+  String get skinSteadyMainAccent => '固定主强调色';
+
+  @override
+  String get skinAPrimaryAccentThatStaysTheSameInLightAndDarkSurfaces =>
+      '在浅色和深色表面上保持一致的主要强调色。';
+
+  @override
+  String get skinMutedSteadyMainAccent => '柔和固定主强调色';
+
+  @override
+  String get skinASofterVersionOfTheSteadyPrimaryAccent => '固定主要强调色的更柔和版本。';
+
+  @override
+  String get skinTextOnSteadyMainAccent => '固定主强调色上的文本';
+
+  @override
+  String get skinForegroundForPrimaryFixedColors => '主要固定颜色的前景色。';
+
+  @override
+  String get skinMutedTextOnSteadyMainAccent => '固定主强调色上的柔和文本';
+
+  @override
+  String get skinSecondaryForegroundForPrimaryFixedColors => '主要固定颜色的辅助前景色。';
+
+  @override
+  String get skinSecondaryAccent => '辅助强调色';
+
+  @override
+  String get skinSupportingActionsAndLessProminentHighlights => '次要操作和较不显著的高亮。';
+
+  @override
+  String get skinTextOnSecondaryAccent => '辅助强调色上的文本';
+
+  @override
+  String get skinLabelsAndIconsOnSecondaryColoredAreas => '辅助颜色区域上的标签和图标。';
+
+  @override
+  String get skinSecondaryBackground => '次要背景';
+
+  @override
+  String get skinSoftFillForSupportingContent => '辅助内容的柔和填充。';
+
+  @override
+  String get skinTextOnSecondaryBackgrounds => '次要背景上的文本';
+
+  @override
+  String get skinForegroundForSecondaryContainers => '次要容器的前景色。';
+
+  @override
+  String get skinSteadySecondaryAccent => '固定辅助强调色';
+
+  @override
+  String get skinASecondaryAccentThatStaysTheSameAcrossSurfaces =>
+      '在不同表面间保持一致的辅助强调色。';
+
+  @override
+  String get skinMutedSteadySecondaryAccent => '柔和固定辅助强调色';
+
+  @override
+  String get skinASofterVersionOfTheSteadySecondaryAccent => '固定辅助强调色的更柔和版本。';
+
+  @override
+  String get skinTextOnSteadySecondaryAccent => '固定辅助强调色上的文本';
+
+  @override
+  String get skinForegroundForSecondaryFixedColors => '辅助固定颜色的前景色。';
+
+  @override
+  String get skinMutedTextOnSteadySecondaryAccent => '固定辅助强调色上的柔和文本';
+
+  @override
+  String get skinSecondaryForegroundForSecondaryFixedColors => '辅助固定颜色的辅助前景色。';
+
+  @override
+  String get skinExtraAccentColor => '附加强调色';
+
+  @override
+  String get skinDecorativeHighlightsAndContrastingAccents => '装饰性高亮与对比强调。';
+
+  @override
+  String get skinTextOnExtraAccent => '附加强调色上的文本';
+
+  @override
+  String get skinLabelsAndIconsOnTertiaryColoredAreas => '第三级颜色区域上的标签和图标。';
+
+  @override
+  String get skinExtraAccentBackground => '附加强调背景';
+
+  @override
+  String get skinSoftFillForTertiaryContent => '第三级内容的柔和填充。';
+
+  @override
+  String get skinTextOnExtraAccentBackgrounds => '附加强调背景上的文本';
+
+  @override
+  String get skinForegroundForTertiaryContainers => '第三级容器的前景色。';
+
+  @override
+  String get skinSteadyExtraAccent => '固定附加强调色';
+
+  @override
+  String get skinATertiaryAccentThatStaysTheSameAcrossSurfaces =>
+      '在不同表面间保持一致的第三级强调色。';
+
+  @override
+  String get skinMutedSteadyExtraAccent => '柔和固定附加强调色';
+
+  @override
+  String get skinASofterVersionOfTheSteadyTertiaryAccent => '固定第三级强调色的更柔和版本。';
+
+  @override
+  String get skinTextOnSteadyExtraAccent => '固定附加强调色上的文本';
+
+  @override
+  String get skinForegroundForTertiaryFixedColors => '第三级固定颜色的前景色。';
+
+  @override
+  String get skinMutedTextOnSteadyExtraAccent => '固定附加强调色上的柔和文本';
+
+  @override
+  String get skinSecondaryForegroundForTertiaryFixedColors => '第三级固定颜色的辅助前景色。';
+
+  @override
+  String get skinErrorColor => '错误颜色';
+
+  @override
+  String get skinErrorsDestructiveActionsAndInvalidInput => '错误、破坏性操作和无效输入。';
+
+  @override
+  String get skinTextOnErrorColor => '错误颜色上的文本';
+
+  @override
+  String get skinLabelsAndIconsOnErrorColoredAreas => '错误颜色区域上的标签和图标。';
+
+  @override
+  String get skinErrorBackground => '错误背景';
+
+  @override
+  String get skinSoftFillBehindErrorMessages => '错误消息背后的柔和填充。';
+
+  @override
+  String get skinTextOnErrorBackgrounds => '错误背景上的文本';
+
+  @override
+  String get skinForegroundForErrorContainers => '错误容器的前景色。';
+
+  @override
+  String get skinPageBackground => '页面背景';
+
+  @override
+  String get skinTheMainBackgroundBehindAppContent => '应用内容背后的主要背景。';
+
+  @override
+  String get skinMainTextAndIcons => '主文本和图标';
+
+  @override
+  String get skinPrimaryContentDrawnOnPageAndCardBackgrounds =>
+      '在页面和卡片背景上绘制的主要内容。';
+
+  @override
+  String get skinDimmedBackground => '暗淡背景';
+
+  @override
+  String get skinTheDarkestNeutralSurfaceLayer => '最暗的中性表面层。';
+
+  @override
+  String get skinBrightBackground => '明亮背景';
+
+  @override
+  String get skinTheLightestNeutralSurfaceLayer => '最亮的中性表面层。';
+
+  @override
+  String get skinDeepestCardLayer => '最深卡片层';
+
+  @override
+  String get skinTheLowestAndQuietestSurfaceContainer => '层级最低、最隐蔽的表面容器。';
+
+  @override
+  String get skinLowCardLayer => '低层卡片层';
+
+  @override
+  String get skinSubtleCardsAndRecessedAreas => '微妙的卡片和凹陷区域。';
+
+  @override
+  String get skinStandardCardLayer => '标准卡片层';
+
+  @override
+  String get skinCommonCardsAndGroupedContent => '常规卡片和分组内容。';
+
+  @override
+  String get skinRaisedCardLayer => '凸起卡片层';
+
+  @override
+  String get skinRaisedCardsMenusAndAppBars => '凸起卡片、菜单和应用栏。';
+
+  @override
+  String get skinTopCardLayer => '顶层卡片层';
+
+  @override
+  String get skinProminentPanelsAndSelectedSurfaces => '醒目面板和选定表面。';
+
+  @override
+  String get skinSecondaryTextAndIcons => '次要文本和图标';
+
+  @override
+  String get skinDetailsHintsAndSupportingLabels => '详细信息、提示和辅助标签。';
+
+  @override
+  String get skinStrongBorder => '粗边框';
+
+  @override
+  String get skinVisibleBordersAndSeparators => '可见边框和分隔线。';
+
+  @override
+  String get skinSubtleBorder => '精细边框';
+
+  @override
+  String get skinQuietOutlinesAndLowEmphasisSeparators => '柔和轮廓与低强调分隔线。';
+
+  @override
+  String get skinShadowTint => '阴影色调';
+
+  @override
+  String get skinTintUsedByElevatedSurfaces => '凸起表面使用的色调。';
+
+  @override
+  String get skinModalBackdrop => '模态背景遮罩';
+
+  @override
+  String get skinTintBehindDialogsAndModalSheets => '对话框和模态面板背后的底色。';
+
+  @override
+  String get skinInvertedSurface => '反转表面';
+
+  @override
+  String get skinAContrastingSurfaceForInverseElements => '用于反转元素的高对比度表面。';
+
+  @override
+  String get skinTextOnInvertedSurfaces => '反转表面上的文本';
+
+  @override
+  String get skinForegroundUsedOverInverseSurfaces => '在反转表面上使用的前景色。';
+
+  @override
+  String get skinInvertedMainAccent => '反转主强调色';
+
+  @override
+  String get skinPrimaryAccentUsedOnInverseSurfaces => '在反转表面上使用的主要强调色。';
+
+  @override
+  String get skinElevationTint => '仰角高度色调';
+
+  @override
+  String get skinTintAppliedToElevatedSurfaces => '应用于凸起表面的色调。';
+
+  @override
+  String get skinSuccessColor => '成功颜色';
+
+  @override
+  String get skinCompletedActionsAndPositiveStatus => '已完成的操作和良好状态。';
+
+  @override
+  String get skinTextOnSuccessColor => '成功颜色上的文本';
+
+  @override
+  String get skinForegroundForSuccessColoredContent => '成功颜色内容的前景色。';
+
+  @override
+  String get skinSuccessBackground => '成功背景';
+
+  @override
+  String get skinSoftFillBehindPositiveStatusMessages => '正面状态消息背后的柔和填充。';
+
+  @override
+  String get skinTextOnSuccessBackgrounds => '成功背景上的文本';
+
+  @override
+  String get skinForegroundForSuccessContainers => '成功容器的前景色。';
+
+  @override
+  String get skinWarningColor => '警告颜色';
+
+  @override
+  String get skinCautionAttentionAndPendingStatus => '注意、警示和待处理状态。';
+
+  @override
+  String get skinTextOnWarningColor => '警告颜色上的文本';
+
+  @override
+  String get skinForegroundForWarningColoredContent => '警告颜色内容的前景色。';
+
+  @override
+  String get skinWarningBackground => '警告背景';
+
+  @override
+  String get skinSoftFillBehindWarningMessages => '警告消息背后的柔和填充。';
+
+  @override
+  String get skinTextOnWarningBackgrounds => '警告背景上的文本';
+
+  @override
+  String get skinForegroundForWarningContainers => '警告容器的前景色。';
+
+  @override
+  String get skinBookmarkColor => '书签颜色';
+
+  @override
+  String get skinSavedAndBookmarkedItems => '已保存和添加书签的项目。';
+
+  @override
+  String get skinMainActions => '主要操作';
+
+  @override
+  String get skinPrimaryButtonsSelectionsAndFixedPrimaryAccents =>
+      '主要按钮、选择和固定主强调色。';
+
+  @override
+  String get skinSupportingAccents => '辅助强调色';
+
+  @override
+  String get skinSecondaryAndTertiaryHighlightsAndTheirTextColors =>
+      '辅助和第三级高亮及其文本颜色。';
+
+  @override
+  String get skinErrorMessagesAndDestructiveOrInvalidStates =>
+      '错误消息以及破坏性或无效状态。';
+
+  @override
+  String get skinPagesCardsAndText => '页面、卡片和文本';
+
+  @override
+  String get skinAppBackgroundsCardsMenusAndForegroundText =>
+      '应用背景、卡片、菜单和前景文本。';
+
+  @override
+  String get skinBordersAndOverlays => '边框和覆层';
+
+  @override
+  String get skinOutlinesShadowsAndModalBackdrops => '轮廓、阴影和模态遮罩。';
+
+  @override
+  String get skinTapAnyPreviewElement => '点按任意预览元素';
+
+  @override
+  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
+      '选择应用、文件或编辑器颜色以查看其控制的内容。';
+
+  @override
+  String get skinCustomizeSkin => '自定义皮肤';
+
+  @override
+  String get skinLight => '浅色';
+
+  @override
+  String get skinDark => '深色';
+
+  @override
+  String get skinApp => '应用';
+
+  @override
+  String get skinEditor => '编辑器';
+
+  @override
+  String get skinSkinDetails => '皮肤详情';
+
+  @override
+  String get skinNameYourSkinAndChooseWhichPaletteToEdit => '命名您的皮肤并选择要编辑的调色板。';
+
+  @override
+  String get skinSkinName => '皮肤名称';
+
+  @override
+  String get skinMyCustomSkin => '我的自定义皮肤';
+
+  @override
+  String get skinLightColors => '浅色调';
+
+  @override
+  String get skinDarkColors => '深色调';
+
+  @override
+  String get skinPageAndActions => '页面与操作';
+
+  @override
+  String get skinTheMainBackgroundTextAndActionColors => '主要背景、文本和操作颜色。';
+
+  @override
+  String get skinAppBar => '应用栏';
+
+  @override
+  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
+      '顶部导航栏独立于卡片和页面。';
+
+  @override
+  String get skinTopBarFillColor => '顶栏填充颜色。';
+
+  @override
+  String get skinTitleAndIcons => '标题和图标';
+
+  @override
+  String get skinTopBarTextAndIconColor => '顶栏文本和图标颜色。';
+
+  @override
+  String get skinFloatingActionButton => '悬浮操作按钮';
+
+  @override
+  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
+      '其填充和图标颜色独立于选择颜色。';
+
+  @override
+  String get skinButtonFill => '按钮填充';
+
+  @override
+  String get skinBackgroundOfTheRoundButton => '圆形“+”按钮的背景。';
+
+  @override
+  String get skinButtonIcon => '按钮图标';
+
+  @override
+  String get skinIconColorOnTheRoundButton => '圆形“+”按钮上的图标颜色。';
+
+  @override
+  String get skinDashboardVaultCards => '仪表盘保管库卡片';
+
+  @override
+  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
+      '设置锁定和挂载的保管库卡片的背景。';
+
+  @override
+  String get skinLockedVaultCard => '已锁定保管库卡片';
+
+  @override
+  String get skinNeutralVaultCardFill => '中性保管库卡片填充。';
+
+  @override
+  String get skinMountedVaultCard => '已挂载保管库卡片';
+
+  @override
+  String get skinSeparateFillForAnUnlockedMountedVault => '已解锁并挂载的保管库的独立填充。';
+
+  @override
+  String get skinFineTuneAppColors => '微调应用颜色';
+
+  @override
+  String get skinAdvancedMaterialColorsForLessCommonElements =>
+      '用于不常用元素的高级 Material 颜色。';
+
+  @override
+  String get skinStatusAndBookmarkColors => '状态和书签颜色';
+
+  @override
+  String get skinColorsForSuccessWarningsErrorsAndBookmarks =>
+      '用于成功、警告、错误和书签的颜色。';
+
+  @override
+  String get skinTheCustomSkinIsActive971ce3 =>
+      '自定义皮肤立即生效，同时文件管理器和编辑器已设置为沿用应用皮肤。';
+
+  @override
+  String get skinCustomColorTapToChangeOrReset => '自定义颜色 · 点按以更改或重置';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor => '点按色圈以选择颜色。';
+
+  @override
+  String get skinAppBarBackground => '应用栏背景';
+
+  @override
+  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
+      '仪表盘及其他应用栏使用此独立颜色。';
+
+  @override
+  String get skinDashboardMenuIcon => '仪表盘菜单图标';
+
+  @override
+  String get skinTheHamburgerButtonUsesTheAppBarIconColor => '汉堡菜单按钮使用应用栏图标颜色。';
+
+  @override
+  String get skinDashboardTitle => '仪表盘标题';
+
+  @override
+  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
+      '仪表盘标题使用应用栏前景色。';
+
+  @override
+  String get skinActionLabelAndIcon => '操作标签和图标';
+
+  @override
+  String get skinTheActionAccentColorsLabelsb08a63 => '操作强调色用于“添加保管库”等标签及其图标。';
+
+  @override
+  String get skinDashboardAddButton => '仪表盘添加按钮';
+
+  @override
+  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
+      '按钮填充和加号图标具有单独的皮肤颜色。';
+
+  @override
+  String get skinVaultCardAndIconBackground => '保管库卡片和图标背景';
+
+  @override
+  String get skinTheIconTileUsesPrimary5c2f93 =>
+      '图标平铺使用 Primary container。挂载的保管库卡片将该颜色与凸起表面混合。';
+
+  @override
+  String get skinVaultFormatIconColor => '保管库格式图标颜色';
+
+  @override
+  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
+      '保管库格式首字母使用 On primary container。';
+
+  @override
+  String get skinVaultStorageDetails => '保管库存储详情';
+
+  @override
+  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
+      '可用空间和总容量使用辅助文本颜色。';
+
+  @override
+  String get skin17GBFree5GB => '剩余 1.7 GB / 5 GB';
+
+  @override
+  String get skinVaultStorageProgress => '保管库存储进度';
+
+  @override
+  String get skinTheProgressBarUsesTheba7c98 =>
+      '进度条使用应用强调色，并在存储空间变满时切换为第三级颜色和错误颜色。';
+
+  @override
+  String get skinLockActionBackground => '锁定操作背景';
+
+  @override
+  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
+      '挂载保管库的锁定按钮使用 Primary container。';
+
+  @override
+  String get skinVaultActionsIconColor => '保管库操作图标颜色';
+
+  @override
+  String get skinTheOverflowMenuUsesTheSupportingIconColor => '溢出菜单使用辅助图标颜色。';
+
+  @override
+  String get skinMountedVaultCardBackground => '已挂载保管库卡片背景';
+
+  @override
+  String get skinThisIsTheBackgroundOfa8d0d3 => '这是挂载保管库卡片的背景。其图标平铺仍使用主操作颜色。';
+
+  @override
+  String get skinLockedVaultCardBackground => '已锁定保管库卡片背景';
+
+  @override
+  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
+      '此颜色独立于应用栏和挂载的保管库卡片。';
+
+  @override
+  String get skinLockedVaultFormatIcon => '锁定保管库格式图标';
+
+  @override
+  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
+      '锁定保管库图标使用辅助文本和图标颜色。';
+
+  @override
+  String get skinSharedArchive => '共享存档';
+
+  @override
+  String get skinLockedVaultStatusText => '锁定保管库状态文本';
+
+  @override
+  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
+      '锁定状态标签使用辅助文本颜色。';
+
+  @override
+  String get skinLockedVaultActionsIcon => '锁定保管库操作图标';
+
+  @override
+  String get skinVaultActionsMenuBackground => '保管库操作菜单背景';
+
+  @override
+  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
+      '“编辑”和“移除”弹出窗口使用菜单表面颜色。';
+
+  @override
+  String get skinEditMenuItem => '“编辑”菜单项';
+
+  @override
+  String get skinTheEditActionUsesTheRegularForegroundColor => '“编辑”操作使用常规前景色。';
+
+  @override
+  String get skinRemoveMenuItem => '“移除”菜单项';
+
+  @override
+  String get skinDestructiveActionsUseTheErrorColor => '破坏性操作使用错误颜色。';
+
+  @override
+  String get skinFileManagerAppBar => '文件管理器应用栏';
+
+  @override
+  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
+      '文件浏览器工具栏使用相同的应用栏背景。';
+
+  @override
+  String get skinFileManagerBackButton => '文件管理器返回按钮';
+
+  @override
+  String get skinToolbarNavigationIconsUseThisColor => '工具栏导航图标使用此颜色。';
+
+  @override
+  String get skinFileManagerTitle => '文件管理器标题';
+
+  @override
+  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
+      '当前文件夹名称使用应用栏前景色。';
+
+  @override
+  String get skinFileManagerAppBarActions => '文件管理器应用栏操作';
+
+  @override
+  String get skinToolbarActionsUseThisIconColor => '工具栏操作使用此图标颜色。';
+
+  @override
+  String get skinProjects => '项目';
+
+  @override
+  String get skinFolder12Items => '文件夹 · 12 项';
+
+  @override
+  String get skinTextFile4KB => '文本文件 · 4 KB';
+
+  @override
+  String get skinCompressedFile28MB => '压缩文件 · 28 MB';
+
+  @override
+  String get skin3Items => '3 项';
+
+  @override
+  String get skinFileManagerAddButton => '文件管理器添加按钮';
+
+  @override
+  String get skinAddButtonIconColor => '添加按钮图标颜色';
+
+  @override
+  String get skinThePlusIconUsesTheButtonForegroundColor => '加号图标使用按钮前景色。';
+
+  @override
+  String get skinEditorFileName => '编辑器文件名';
+
+  @override
+  String get skinTheEditorToolbarUsesTheAppForegroundColor => '编辑器工具栏使用应用前景色。';
+
+  @override
+  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · 第 3 行，第 12 列';
+
+  @override
+  String get skinTheMainBackgroundBehindThisScreen => '此屏幕背后的主要背景。';
+
+  @override
+  String get skinFolderIconColor => '文件夹图标颜色';
+
+  @override
+  String get skinFileIconColor => '文件图标颜色';
+
+  @override
+  String get skinText => ' : ';
+
+  @override
+  String get skinFolderNameColor => '文件夹名称颜色';
+
+  @override
+  String get skinFileNameColor => '文件名称颜色';
+
+  @override
+  String get skinFileDetailsColor => '文件详细信息颜色';
+
+  @override
+  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
+      '较小的日期、大小和类型标签使用此颜色。';
+
+  @override
+  String get skinFileOverflowButton => '文件更多选项按钮';
+
+  @override
+  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
+      '每行的三点按钮使用辅助图标颜色。';
+
+  @override
+  String get skinSelectedFileRow => '选定文件行';
+
+  @override
+  String get skinSelectedRowsUseATranslucente0ff21 =>
+      '选定行使用半透明的主容器高亮；文件列表本身保持在页面背景上。';
+
+  @override
+  String get skinFileActionsMenuBackground => '文件操作菜单背景';
+
+  @override
+  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
+      '文件操作弹出窗口使用菜单表面颜色。';
+
+  @override
+  String get skinOpenFileMenuItem => '“打开文件”菜单项';
+
+  @override
+  String get skinRegularFileActionsUseTheMainTextColor => '常规文件操作使用主文本颜色。';
+
+  @override
+  String get skinOpen => '打开';
+
+  @override
+  String get skinDeleteFileMenuItem => '“删除文件”菜单项';
+
+  @override
+  String get skinEditorBackground => '编辑器背景';
+
+  @override
+  String get skinTheCanvasColorBehindTheCode => '代码背后的画布颜色。';
+
+  @override
+  String get skinEditorLineNumbers => '编辑器行号';
+
+  @override
+  String get skinTheGutterAndLineNumbersBesideTheCode => '代码旁边的边槽和行号。';
+
+  @override
+  String get skinEditorTextColor => '编辑器文本颜色';
+
+  @override
+  String get skinTheDefaultCodeAndEditorTextColor => '默认代码和编辑器文本颜色。';
+
+  @override
+  String get skinEditorCursor => '编辑器光标';
+
+  @override
+  String get skinTheInsertionCaretColor => '插入光标颜色。';
+
+  @override
+  String get skinEditorSelectionHighlight => '编辑器选中高亮';
+
+  @override
+  String get skinTheBackgroundUsedToHighlightSelectedCode => '用于高亮所选代码的背景。';
+
+  @override
+  String get skinFileManager => '文件管理器';
+
+  @override
+  String get skinFolderAndFileGlyphsTilesAndLabelColors => '文件夹和文件的字形、平铺及标签颜色。';
+
+  @override
+  String get skinDetailsTextColor => '详细信息文本颜色';
+
+  @override
+  String get skinUseTheAppSSupportingTextColor => '使用应用的辅助文本颜色';
+
+  @override
+  String get skinCustomColor => '自定义颜色';
+
+  @override
+  String get skinMonospaceFileNames => '等宽字体文件名';
+
+  @override
+  String get skinBackgroundBehindTheIcon => '图标背后的背景';
+
+  @override
+  String get skinIconColorSource => '图标颜色来源';
+
+  @override
+  String get skinUseTheAppSMainTextColor => '使用应用的主文本颜色';
+
+  @override
+  String get skinTextEditor => '文本编辑器';
+
+  @override
+  String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
+      '画布、边槽、光标、选中项、背景和语法模板。';
+
+  @override
+  String get skinGutterAndLineNumbers => '边槽与行号';
+
+  @override
+  String get skinCursor => '光标';
+
+  @override
+  String get skinSelection => '选中项';
+
+  @override
+  String get skinEditorBackgroundTemplate => '编辑器背景模板';
+
+  @override
+  String get skinSyntaxTemplate => '语法模板';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor246981 => '点按色圈以选择颜色';
+
+  @override
+  String get skinDefaultVaultExplorerIcons => '默认 Vault Explorer 图标';
+
+  @override
+  String get skinSolidIcons => '实心图标';
+
+  @override
+  String get skinRoundedIcons => '圆角图标';
+
+  @override
+  String get skinOutlineIcons => '轮廓图标';
+
+  @override
+  String get skinSquareCornerIcons => '直角图标';
+
+  @override
+  String get skinTintedTileBehindTheIcon => '图标背后的着色平铺';
+
+  @override
+  String get skinOutlinedTileBehindTheIcon => '图标背后的轮廓平铺';
+
+  @override
+  String get skinNoTile => '无平铺';
+
+  @override
+  String get skinAutomaticFileTypeOrFolderColor => '自动 (文件类型或文件夹颜色)';
+
+  @override
+  String get skinUseTheMainAppAccent => '使用应用主强调色';
+
+  @override
+  String get skinUseAMutedNeutralColor => '使用柔和中性色';
+
+  @override
+  String get skinChooseAColorBelow => '在下方选择颜色';
+
+  @override
+  String get skinUseTheSyntaxThemeBackground => '使用语法主题背景';
+
+  @override
+  String get skinPureBlack => '纯黑';
+
+  @override
+  String get skinDarkSlate => '深灰石';
+
+  @override
+  String get skinCleanWhite => '纯净白';
+
+  @override
+  String get skinWarmSepia => '暖乌贼墨褐';
+
+  @override
+  String get skinAutomaticMatchLightOrDarkMode => '自动 (匹配浅色或深色模式)';
+
+  @override
+  String get skinSkinExported => '皮肤已导出。';
+
+  @override
+  String get skinSkinsExported => '皮肤已导出。';
+
+  @override
+  String get skinRemoveSkin => '移除皮肤？';
+
+  @override
+  String get skinAppSkin => '应用皮肤';
+
+  @override
+  String get skinImportSkins => '导入皮肤';
+
+  @override
+  String get skinExportSkins => '导出皮肤';
+
+  @override
+  String get skinChooseACoordinatedLookForTheAppFileManagerAndEditor =>
+      '为应用、文件管理器和编辑器选择协调统一的外观。 ';
+
+  @override
+  String get skinLightAndDarkSystemThemesUseMatchingPaletteVariants =>
+      '浅色和深色系统主题使用相匹配的调色板变体。';
+
+  @override
+  String get skinEditCurrentSkin => '编辑当前皮肤';
+
+  @override
+  String get skinCreateASkinFromThisLook => '根据此外观创建皮肤';
+
+  @override
+  String get skinYourSkins => '您的皮肤';
+
+  @override
+  String get skinCustomAppFileManagerAndEditorColors => '自定义应用、文件管理器和编辑器颜色';
+
+  @override
+  String get skinMaterialColorsWithLightAndDarkVariants =>
+      '具有浅色和深色变体的 Material 颜色';
+
+  @override
+  String get skinTrueBlackEditorAndDarkf97e8f => '纯黑编辑器和深色应用表面，搭配 OLED 强调色调色板';
+
+  @override
+  String get skinYourEditableAppFileManagerAndEditorColors =>
+      '可编辑的应用、文件管理器和编辑器颜色';
+
+  @override
+  String get skinSkinActions => '皮肤操作';
+
+  @override
+  String get skinEditSkin => '编辑皮肤';
+
+  @override
+  String get skinExportSkin => '导出皮肤';
+
+  @override
+  String get skinRemoveSkinf09101 => '移除皮肤';
+
+  @override
+  String get skinDragAroundTheRingTo868d62 => '在色环上拖动以选择色相，然后在内部移动以调整明暗。';
+
+  @override
+  String get skinQuickColors => '快捷颜色';
+
+  @override
+  String get skinEnterAnExactColor => '输入准确颜色';
+
+  @override
+  String get skinOptionalRGBOrARGBValue => '可选的 RGB 或 ARGB 值';
+
+  @override
+  String get skinRGBARGB => 'RGB / ARGB';
+
+  @override
+  String get skinUseThisValue => '使用此值';
+
+  @override
+  String get skinDefaultLightDark => '默认 浅色 / 深色';
+
+  @override
+  String get skinOLEDPureBlack => 'OLED 纯黑';
+
+  @override
+  String get skinCustomSkin => '自定义皮肤';
+
+  @override
+  String skinImportSucceeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已导入 # 个皮肤。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String skinImportFailed(String error) {
+    return '无法导入皮肤：$error';
+  }
+
+  @override
+  String skinExportFailed(String error) {
+    return '无法导出皮肤：$error';
+  }
+
+  @override
+  String skinRemoveConfirmation(String skin) {
+    return '“$skin”将从您保存的皮肤中移除。';
+  }
+
+  @override
+  String skinSelectPreviewElement(String title) {
+    return '选择 $title';
+  }
+
+  @override
+  String skinIconColorForItem(String item) {
+    return '$item 图标颜色';
+  }
+
+  @override
+  String skinNameColorForItem(String item) {
+    return '$item 名称颜色';
+  }
+
+  @override
+  String get skinFileIconColorSettingDescription => '此颜色由文件管理器部分中的图标颜色设置控制。';
+
+  @override
+  String get skinFileNameColorSettingDescription => '此颜色由文件管理器部分中的名称颜色设置控制。';
+
+  @override
+  String get skinExportedSingle => '皮肤已导出。';
+
+  @override
+  String get skinExportedMultiple => '皮肤已导出。';
 }

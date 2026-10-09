@@ -9863,4 +9863,1128 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get subtitleTracksLabel => 'Доріжки субтитрів';
+
+  @override
+  String get skinActionAccent => 'Акцент дій';
+
+  @override
+  String get skinEmphasisForActionIconsActiveControlsProgressAndLinks =>
+      'Виділення для піктограм дій, активних елементів керування, перебігу та посилань.';
+
+  @override
+  String get skinTextAndIconsOnAccentButtons =>
+      'Текст і піктограми на акцентних кнопках';
+
+  @override
+  String get skinForegroundForButtonsFilledWithTheActionAccentColor =>
+      'Колір переднього плану для кнопок, заповнених акцентним кольором дій.';
+
+  @override
+  String get skinSelectionAndIconTileBackground =>
+      'Тло виділення та плиток піктограм';
+
+  @override
+  String get skinSelectedFilesAndVaultFormat076e52 =>
+      'Вибрані файли та плитки формату сховища використовують цей колір. Заповнення плаваючої кнопки має окреме налаштування.';
+
+  @override
+  String get skinTextAndIconsOnSelectionColors =>
+      'Текст і піктограми на кольорах виділення';
+
+  @override
+  String get skinForegroundForIconTilesAndOtherPrimaryContainerSurfaces =>
+      'Передній план для плиток піктограм та інших поверхонь основного контейнера.';
+
+  @override
+  String get skinSteadyMainAccent => 'Постійний головний акцент';
+
+  @override
+  String get skinAPrimaryAccentThatStaysTheSameInLightAndDarkSurfaces =>
+      'Основний акцент, який залишається незмінним на світлих і темних поверхнях.';
+
+  @override
+  String get skinMutedSteadyMainAccent =>
+      'Приглушений постійний головний акцент';
+
+  @override
+  String get skinASofterVersionOfTheSteadyPrimaryAccent =>
+      'М\'якша версія постійного основного акценту.';
+
+  @override
+  String get skinTextOnSteadyMainAccent =>
+      'Текст на постійному головному акценті';
+
+  @override
+  String get skinForegroundForPrimaryFixedColors =>
+      'Передній план для фіксованих основних кольорів.';
+
+  @override
+  String get skinMutedTextOnSteadyMainAccent =>
+      'Приглушений текст на постійному головному акценті';
+
+  @override
+  String get skinSecondaryForegroundForPrimaryFixedColors =>
+      'Вторинний передній план для фіксованих основних кольорів.';
+
+  @override
+  String get skinSecondaryAccent => 'Вторинний акцент';
+
+  @override
+  String get skinSupportingActionsAndLessProminentHighlights =>
+      'Допоміжні дії та менш помітні виділення.';
+
+  @override
+  String get skinTextOnSecondaryAccent => 'Текст на вторинному акценті';
+
+  @override
+  String get skinLabelsAndIconsOnSecondaryColoredAreas =>
+      'Мітки та піктограми на вторинних кольорових областях.';
+
+  @override
+  String get skinSecondaryBackground => 'Вторинне тло';
+
+  @override
+  String get skinSoftFillForSupportingContent =>
+      'М\'яке заповнення для допоміжного вмісту.';
+
+  @override
+  String get skinTextOnSecondaryBackgrounds => 'Текст на вторинному тлі';
+
+  @override
+  String get skinForegroundForSecondaryContainers =>
+      'Передній план для вторинних контейнерів.';
+
+  @override
+  String get skinSteadySecondaryAccent => 'Постійний вторинний акцент';
+
+  @override
+  String get skinASecondaryAccentThatStaysTheSameAcrossSurfaces =>
+      'Вторинний акцент, який залишається незмінним на різних поверхнях.';
+
+  @override
+  String get skinMutedSteadySecondaryAccent =>
+      'Приглушений постійний вторинний акцент';
+
+  @override
+  String get skinASofterVersionOfTheSteadySecondaryAccent =>
+      'М\'якша версія постійного вторинного акценту.';
+
+  @override
+  String get skinTextOnSteadySecondaryAccent =>
+      'Текст на постійному вторинному акценті';
+
+  @override
+  String get skinForegroundForSecondaryFixedColors =>
+      'Передній план для фіксованих вторинних кольорів.';
+
+  @override
+  String get skinMutedTextOnSteadySecondaryAccent =>
+      'Приглушений текст на постійному вторинному акценті';
+
+  @override
+  String get skinSecondaryForegroundForSecondaryFixedColors =>
+      'Вторинний передній план для фіксованих вторинних кольорів.';
+
+  @override
+  String get skinExtraAccentColor => 'Додатковий акцентний колір';
+
+  @override
+  String get skinDecorativeHighlightsAndContrastingAccents =>
+      'Декоративні виділення та контрастні акценти.';
+
+  @override
+  String get skinTextOnExtraAccent => 'Текст на додатковому акценті';
+
+  @override
+  String get skinLabelsAndIconsOnTertiaryColoredAreas =>
+      'Мітки та піктограми на третинних кольорових областях.';
+
+  @override
+  String get skinExtraAccentBackground => 'Тло додаткового акценту';
+
+  @override
+  String get skinSoftFillForTertiaryContent =>
+      'М\'яке заповнення для третинного вмісту.';
+
+  @override
+  String get skinTextOnExtraAccentBackgrounds =>
+      'Текст на тлі додаткового акценту';
+
+  @override
+  String get skinForegroundForTertiaryContainers =>
+      'Передній план для третинних контейнерів.';
+
+  @override
+  String get skinSteadyExtraAccent => 'Постійний додатковий акцент';
+
+  @override
+  String get skinATertiaryAccentThatStaysTheSameAcrossSurfaces =>
+      'Третинний акцент, який залишається незмінним на різних поверхнях.';
+
+  @override
+  String get skinMutedSteadyExtraAccent =>
+      'Приглушений постійний додатковий акцент';
+
+  @override
+  String get skinASofterVersionOfTheSteadyTertiaryAccent =>
+      'М\'якша версія постійного третинного акценту.';
+
+  @override
+  String get skinTextOnSteadyExtraAccent =>
+      'Текст на постійному додатковому акценті';
+
+  @override
+  String get skinForegroundForTertiaryFixedColors =>
+      'Передній план для фіксованих третинних кольорів.';
+
+  @override
+  String get skinMutedTextOnSteadyExtraAccent =>
+      'Приглушений текст на постійному додатковому акценті';
+
+  @override
+  String get skinSecondaryForegroundForTertiaryFixedColors =>
+      'Вторинний передній план для фіксованих третинних кольорів.';
+
+  @override
+  String get skinErrorColor => 'Колір помилки';
+
+  @override
+  String get skinErrorsDestructiveActionsAndInvalidInput =>
+      'Помилки, деструктивні дії та недійсні дані.';
+
+  @override
+  String get skinTextOnErrorColor => 'Текст на кольорі помилки';
+
+  @override
+  String get skinLabelsAndIconsOnErrorColoredAreas =>
+      'Мітки та піктограми на областях кольору помилки.';
+
+  @override
+  String get skinErrorBackground => 'Тло помилки';
+
+  @override
+  String get skinSoftFillBehindErrorMessages =>
+      'М\'яке заповнення під повідомленнями про помилки.';
+
+  @override
+  String get skinTextOnErrorBackgrounds => 'Текст на тлі помилки';
+
+  @override
+  String get skinForegroundForErrorContainers =>
+      'Передній план для контейнерів помилки.';
+
+  @override
+  String get skinPageBackground => 'Тло сторінки';
+
+  @override
+  String get skinTheMainBackgroundBehindAppContent =>
+      'Основне тло позаду вмісту програми.';
+
+  @override
+  String get skinMainTextAndIcons => 'Основний текст і піктограми';
+
+  @override
+  String get skinPrimaryContentDrawnOnPageAndCardBackgrounds =>
+      'Основний вміст на тлі сторінок і карток.';
+
+  @override
+  String get skinDimmedBackground => 'Затемнене тло';
+
+  @override
+  String get skinTheDarkestNeutralSurfaceLayer =>
+      'Найтемніший нейтральний шар поверхні.';
+
+  @override
+  String get skinBrightBackground => 'Яскраве тло';
+
+  @override
+  String get skinTheLightestNeutralSurfaceLayer =>
+      'Найсвітліший нейтральний шар поверхні.';
+
+  @override
+  String get skinDeepestCardLayer => 'Найглибший шар карток';
+
+  @override
+  String get skinTheLowestAndQuietestSurfaceContainer =>
+      'Найнижчий і найспокійніший контейнер поверхні.';
+
+  @override
+  String get skinLowCardLayer => 'Низький шар карток';
+
+  @override
+  String get skinSubtleCardsAndRecessedAreas =>
+      'Непомітні картки та заглиблені області.';
+
+  @override
+  String get skinStandardCardLayer => 'Стандартний шар карток';
+
+  @override
+  String get skinCommonCardsAndGroupedContent =>
+      'Звичайні картки та згрупований вміст.';
+
+  @override
+  String get skinRaisedCardLayer => 'Піднятий шар карток';
+
+  @override
+  String get skinRaisedCardsMenusAndAppBars =>
+      'Підняті картки, меню та панелі програми.';
+
+  @override
+  String get skinTopCardLayer => 'Верхній шар карток';
+
+  @override
+  String get skinProminentPanelsAndSelectedSurfaces =>
+      'Виразні панелі та вибрані поверхні.';
+
+  @override
+  String get skinSecondaryTextAndIcons => 'Вторинний текст і піктограми';
+
+  @override
+  String get skinDetailsHintsAndSupportingLabels =>
+      'Деталі, підказки та допоміжні мітки.';
+
+  @override
+  String get skinStrongBorder => 'Виразна межа';
+
+  @override
+  String get skinVisibleBordersAndSeparators => 'Помітні межі та роздільники.';
+
+  @override
+  String get skinSubtleBorder => 'Тонка межа';
+
+  @override
+  String get skinQuietOutlinesAndLowEmphasisSeparators =>
+      'Непомітні контури та роздільники з низьким акцентом.';
+
+  @override
+  String get skinShadowTint => 'Відтінок тіні';
+
+  @override
+  String get skinTintUsedByElevatedSurfaces =>
+      'Відтінок для піднятих поверхонь.';
+
+  @override
+  String get skinModalBackdrop => 'Модальне тло';
+
+  @override
+  String get skinTintBehindDialogsAndModalSheets =>
+      'Відтінок позаду діалогових вікон і модальних панелей.';
+
+  @override
+  String get skinInvertedSurface => 'Інвертована поверхня';
+
+  @override
+  String get skinAContrastingSurfaceForInverseElements =>
+      'Контрастна поверхня для інвертованих елементів.';
+
+  @override
+  String get skinTextOnInvertedSurfaces => 'Текст на інвертованих поверхнях';
+
+  @override
+  String get skinForegroundUsedOverInverseSurfaces =>
+      'Передній план для інвертованих поверхонь.';
+
+  @override
+  String get skinInvertedMainAccent => 'Інвертований головний акцент';
+
+  @override
+  String get skinPrimaryAccentUsedOnInverseSurfaces =>
+      'Основний акцент для інвертованих поверхонь.';
+
+  @override
+  String get skinElevationTint => 'Відтінок підвищення';
+
+  @override
+  String get skinTintAppliedToElevatedSurfaces =>
+      'Відтінок, застосований до піднятих поверхонь.';
+
+  @override
+  String get skinSuccessColor => 'Колір успіху';
+
+  @override
+  String get skinCompletedActionsAndPositiveStatus =>
+      'Завершені дії та позитивний статус.';
+
+  @override
+  String get skinTextOnSuccessColor => 'Текст на кольорі успіху';
+
+  @override
+  String get skinForegroundForSuccessColoredContent =>
+      'Передній план для вмісту з кольором успіху.';
+
+  @override
+  String get skinSuccessBackground => 'Тло успіху';
+
+  @override
+  String get skinSoftFillBehindPositiveStatusMessages =>
+      'М\'яке заповнення під повідомленнями позитивного статусу.';
+
+  @override
+  String get skinTextOnSuccessBackgrounds => 'Текст на тлі успіху';
+
+  @override
+  String get skinForegroundForSuccessContainers =>
+      'Передній план для контейнерів успіху.';
+
+  @override
+  String get skinWarningColor => 'Колір попередження';
+
+  @override
+  String get skinCautionAttentionAndPendingStatus =>
+      'Обережно, увага та статус очікування.';
+
+  @override
+  String get skinTextOnWarningColor => 'Текст на кольорі попередження';
+
+  @override
+  String get skinForegroundForWarningColoredContent =>
+      'Передній план для вмісту з кольором попередження.';
+
+  @override
+  String get skinWarningBackground => 'Тло попередження';
+
+  @override
+  String get skinSoftFillBehindWarningMessages =>
+      'М\'яке заповнення під повідомленнями з попередженням.';
+
+  @override
+  String get skinTextOnWarningBackgrounds => 'Текст на тлі попередження';
+
+  @override
+  String get skinForegroundForWarningContainers =>
+      'Передній план для контейнерів попередження.';
+
+  @override
+  String get skinBookmarkColor => 'Колір закладки';
+
+  @override
+  String get skinSavedAndBookmarkedItems => 'Збережені елементи та закладки.';
+
+  @override
+  String get skinMainActions => 'Основні дії';
+
+  @override
+  String get skinPrimaryButtonsSelectionsAndFixedPrimaryAccents =>
+      'Основні кнопки, виділення та фіксовані основні акценти.';
+
+  @override
+  String get skinSupportingAccents => 'Допоміжні акценти';
+
+  @override
+  String get skinSecondaryAndTertiaryHighlightsAndTheirTextColors =>
+      'Вторинні й третинні виділення та їхні кольори тексту.';
+
+  @override
+  String get skinErrorMessagesAndDestructiveOrInvalidStates =>
+      'Повідомлення про помилки та деструктивні чи недійсні стани.';
+
+  @override
+  String get skinPagesCardsAndText => 'Сторінки, картки та текст';
+
+  @override
+  String get skinAppBackgroundsCardsMenusAndForegroundText =>
+      'Тло програми, картки, меню та текст переднього плану.';
+
+  @override
+  String get skinBordersAndOverlays => 'Межі та накладання';
+
+  @override
+  String get skinOutlinesShadowsAndModalBackdrops =>
+      'Контури, тіні та модальні підкладки.';
+
+  @override
+  String get skinTapAnyPreviewElement =>
+      'Торкніться будь-якого елемента попереднього перегляду';
+
+  @override
+  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
+      'Виберіть колір програми, файлу чи редактора, щоб побачити, чим він керує.';
+
+  @override
+  String get skinCustomizeSkin => 'Налаштувати скін';
+
+  @override
+  String get skinLight => 'Світла';
+
+  @override
+  String get skinDark => 'Темна';
+
+  @override
+  String get skinApp => 'Програма';
+
+  @override
+  String get skinEditor => 'Редактор';
+
+  @override
+  String get skinSkinDetails => 'Деталі скіна';
+
+  @override
+  String get skinNameYourSkinAndChooseWhichPaletteToEdit =>
+      'Вкажіть назву скіна та виберіть палітру для редагування.';
+
+  @override
+  String get skinSkinName => 'Назва скіна';
+
+  @override
+  String get skinMyCustomSkin => 'Мій власний скін';
+
+  @override
+  String get skinLightColors => 'Світлі кольори';
+
+  @override
+  String get skinDarkColors => 'Темні кольори';
+
+  @override
+  String get skinPageAndActions => 'Сторінка та дії';
+
+  @override
+  String get skinTheMainBackgroundTextAndActionColors =>
+      'Основні кольори тла, тексту та дій.';
+
+  @override
+  String get skinAppBar => 'Панель програми';
+
+  @override
+  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
+      'Верхня панель навігації незалежна від карток і сторінок.';
+
+  @override
+  String get skinTopBarFillColor => 'Колір заповнення верхньої панелі.';
+
+  @override
+  String get skinTitleAndIcons => 'Заголовок і піктограми';
+
+  @override
+  String get skinTopBarTextAndIconColor =>
+      'Колір тексту та піктограм верхньої панелі.';
+
+  @override
+  String get skinFloatingActionButton => 'Плаваюча кнопка дії';
+
+  @override
+  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
+      'Його заповнення та колір піктограми відокремлені від кольорів виділення.';
+
+  @override
+  String get skinButtonFill => 'Заповнення кнопки';
+
+  @override
+  String get skinBackgroundOfTheRoundButton => 'Тло круглої кнопки «+».';
+
+  @override
+  String get skinButtonIcon => 'Піктограма кнопки';
+
+  @override
+  String get skinIconColorOnTheRoundButton =>
+      'Колір піктограми на круглій кнопці «+».';
+
+  @override
+  String get skinDashboardVaultCards => 'Картки сховищ на панелі';
+
+  @override
+  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
+      'Встановіть тло для карток заблокованих і підключених сховищ.';
+
+  @override
+  String get skinLockedVaultCard => 'Картка заблокованого сховища';
+
+  @override
+  String get skinNeutralVaultCardFill =>
+      'Нейтральне заповнення картки сховища.';
+
+  @override
+  String get skinMountedVaultCard => 'Картка підключеного сховища';
+
+  @override
+  String get skinSeparateFillForAnUnlockedMountedVault =>
+      'Окреме заповнення для розблокованого, підключеного сховища.';
+
+  @override
+  String get skinFineTuneAppColors => 'Тонке налаштування кольорів програми';
+
+  @override
+  String get skinAdvancedMaterialColorsForLessCommonElements =>
+      'Розширені кольори Material для менш поширених елементів.';
+
+  @override
+  String get skinStatusAndBookmarkColors => 'Кольори статусу та закладок';
+
+  @override
+  String get skinColorsForSuccessWarningsErrorsAndBookmarks =>
+      'Кольори для успіху, попереджень, помилок і закладок.';
+
+  @override
+  String get skinTheCustomSkinIsActive971ce3 =>
+      'Власний скін застосовується негайно, доки Менеджер файлів і Редактор налаштовані наслідувати скін програми.';
+
+  @override
+  String get skinCustomColorTapToChangeOrReset =>
+      'Власний колір · торкніться для зміни або скидання';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor =>
+      'Торкніться колірного кола, щоб вибрати колір.';
+
+  @override
+  String get skinAppBarBackground => 'Тло панелі програми';
+
+  @override
+  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
+      'Панель керування та інші панелі програми використовують цей окремий колір.';
+
+  @override
+  String get skinDashboardMenuIcon => 'Піктограма меню панелі';
+
+  @override
+  String get skinTheHamburgerButtonUsesTheAppBarIconColor =>
+      'Кнопка-гамбургер використовує колір піктограм панелі програми.';
+
+  @override
+  String get skinDashboardTitle => 'Заголовок панелі';
+
+  @override
+  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
+      'Заголовок панелі використовує колір переднього плану панелі програми.';
+
+  @override
+  String get skinActionLabelAndIcon => 'Мітка та піктограма дії';
+
+  @override
+  String get skinTheActionAccentColorsLabelsb08a63 =>
+      'Акцент дій забарвлює такі мітки, як «Додати сховище», та їхні піктограми.';
+
+  @override
+  String get skinDashboardAddButton => 'Кнопка додавання на панелі';
+
+  @override
+  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
+      'Заповнення кнопки та піктограма плюса мають окремі кольори скіна.';
+
+  @override
+  String get skinVaultCardAndIconBackground =>
+      'Тло картки та піктограми сховища';
+
+  @override
+  String get skinTheIconTileUsesPrimary5c2f93 =>
+      'Плитка піктограми використовує Primary container. Картка підключеного сховища змішує цей колір із піднятою поверхнею.';
+
+  @override
+  String get skinVaultFormatIconColor => 'Колір піктограми формату сховища';
+
+  @override
+  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
+      'Ініціали формату сховища використовують On primary container.';
+
+  @override
+  String get skinVaultStorageDetails => 'Деталі сховища даних';
+
+  @override
+  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
+      'Вільне місце та місткість використовують колір допоміжного тексту.';
+
+  @override
+  String get skin17GBFree5GB => '1,7 ГБ вільно / 5 ГБ';
+
+  @override
+  String get skinVaultStorageProgress => 'Перебіг сховища даних';
+
+  @override
+  String get skinTheProgressBarUsesTheba7c98 =>
+      'Індикатор перебігу використовує акцент програми, а зі заповненням сховища перемикається на третинний колір і колір помилки.';
+
+  @override
+  String get skinLockActionBackground => 'Тло дії блокування';
+
+  @override
+  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
+      'Кнопка блокування підключеного сховища використовує Primary container.';
+
+  @override
+  String get skinVaultActionsIconColor => 'Колір піктограми дій сховища';
+
+  @override
+  String get skinTheOverflowMenuUsesTheSupportingIconColor =>
+      'Меню додаткових дій використовує колір допоміжних піктограм.';
+
+  @override
+  String get skinMountedVaultCardBackground =>
+      'Тло картки підключеного сховища';
+
+  @override
+  String get skinThisIsTheBackgroundOfa8d0d3 =>
+      'Це тло картки підключеного сховища. Її плитка піктограми все одно використовує колір основної дії.';
+
+  @override
+  String get skinLockedVaultCardBackground =>
+      'Тло картки заблокованого сховища';
+
+  @override
+  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
+      'Цей колір незалежний від панелі програми та картки підключеного сховища.';
+
+  @override
+  String get skinLockedVaultFormatIcon =>
+      'Піктограма формату заблокованого сховища';
+
+  @override
+  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
+      'Піктограми заблокованого сховища використовують колір допоміжного тексту та піктограм.';
+
+  @override
+  String get skinSharedArchive => 'Спільний архів';
+
+  @override
+  String get skinLockedVaultStatusText => 'Текст статусу заблокованого сховища';
+
+  @override
+  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
+      'Мітка заблокованого статусу використовує колір допоміжного тексту.';
+
+  @override
+  String get skinLockedVaultActionsIcon =>
+      'Піктограма дій заблокованого сховища';
+
+  @override
+  String get skinVaultActionsMenuBackground => 'Тло меню дій сховища';
+
+  @override
+  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
+      'Спливне вікно «Редагувати» та «Видалити» використовує колір поверхні меню.';
+
+  @override
+  String get skinEditMenuItem => 'Пункт меню «Редагувати»';
+
+  @override
+  String get skinTheEditActionUsesTheRegularForegroundColor =>
+      'Дія «Редагувати» використовує звичайний колір переднього плану.';
+
+  @override
+  String get skinRemoveMenuItem => 'Пункт меню «Видалити»';
+
+  @override
+  String get skinDestructiveActionsUseTheErrorColor =>
+      'Деструктивні дії використовують колір помилки.';
+
+  @override
+  String get skinFileManagerAppBar => 'Панель менеджера файлів';
+
+  @override
+  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
+      'Панелі інструментів переглядача файлів використовують те саме тло панелі програми.';
+
+  @override
+  String get skinFileManagerBackButton => 'Кнопка «Назад» менеджера файлів';
+
+  @override
+  String get skinToolbarNavigationIconsUseThisColor =>
+      'Піктограми навігації на панелі інструментів використовують цей колір.';
+
+  @override
+  String get skinFileManagerTitle => 'Заголовок менеджера файлів';
+
+  @override
+  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
+      'Назва поточної папки використовує передній план панелі програми.';
+
+  @override
+  String get skinFileManagerAppBarActions => 'Дії на панелі менеджера файлів';
+
+  @override
+  String get skinToolbarActionsUseThisIconColor =>
+      'Дії на панелі інструментів використовують цей колір піктограм.';
+
+  @override
+  String get skinProjects => 'Проєкти';
+
+  @override
+  String get skinFolder12Items => 'Папка · 12 елементів';
+
+  @override
+  String get skinTextFile4KB => 'Текстовий файл · 4 КБ';
+
+  @override
+  String get skinCompressedFile28MB => 'Стиснутий файл · 28 МБ';
+
+  @override
+  String get skin3Items => '3 елементи';
+
+  @override
+  String get skinFileManagerAddButton => 'Кнопка додавання у менеджері файлів';
+
+  @override
+  String get skinAddButtonIconColor => 'Колір піктограми кнопки додавання';
+
+  @override
+  String get skinThePlusIconUsesTheButtonForegroundColor =>
+      'Піктограма плюса використовує колір переднього плану кнопки.';
+
+  @override
+  String get skinEditorFileName => 'Назва файлу в редакторі';
+
+  @override
+  String get skinTheEditorToolbarUsesTheAppForegroundColor =>
+      'Панель інструментів редактора використовує колір переднього плану програми.';
+
+  @override
+  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Ряд 3, Стовп 12';
+
+  @override
+  String get skinTheMainBackgroundBehindThisScreen =>
+      'Основне тло позаду цього екрана.';
+
+  @override
+  String get skinFolderIconColor => 'Колір піктограми папки';
+
+  @override
+  String get skinFileIconColor => 'Колір піктограми файлу';
+
+  @override
+  String get skinText => ' : ';
+
+  @override
+  String get skinFolderNameColor => 'Колір назви папки';
+
+  @override
+  String get skinFileNameColor => 'Колір назви файлу';
+
+  @override
+  String get skinFileDetailsColor => 'Колір деталей файлу';
+
+  @override
+  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
+      'Менші мітки дати, розміру та типу використовують цей колір.';
+
+  @override
+  String get skinFileOverflowButton => 'Кнопка додаткових дій файлу';
+
+  @override
+  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
+      'Кнопка з трьома крапками кожного рядка використовує колір допоміжної піктограми.';
+
+  @override
+  String get skinSelectedFileRow => 'Рядок вибраного файлу';
+
+  @override
+  String get skinSelectedRowsUseATranslucente0ff21 =>
+      'Вибрані рядки мають напівпрозоре підсвічування основного контейнера; сам список файлів залишається на тлі сторінки.';
+
+  @override
+  String get skinFileActionsMenuBackground => 'Тло меню дій з файлом';
+
+  @override
+  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
+      'Спливне вікно дій над файлом використовує колір поверхні меню.';
+
+  @override
+  String get skinOpenFileMenuItem => 'Пункт меню «Відкрити файл»';
+
+  @override
+  String get skinRegularFileActionsUseTheMainTextColor =>
+      'Звичайні дії над файлами використовують основний колір тексту.';
+
+  @override
+  String get skinOpen => 'Відкрити';
+
+  @override
+  String get skinDeleteFileMenuItem => 'Пункт меню «Видалити файл»';
+
+  @override
+  String get skinEditorBackground => 'Тло редактора';
+
+  @override
+  String get skinTheCanvasColorBehindTheCode => 'Колір полотна позаду коду.';
+
+  @override
+  String get skinEditorLineNumbers => 'Номери рядків редактора';
+
+  @override
+  String get skinTheGutterAndLineNumbersBesideTheCode =>
+      'Бічна смуга та номери рядків поруч із кодом.';
+
+  @override
+  String get skinEditorTextColor => 'Колір тексту редактора';
+
+  @override
+  String get skinTheDefaultCodeAndEditorTextColor =>
+      'Стандартний колір коду та тексту в редакторі.';
+
+  @override
+  String get skinEditorCursor => 'Курсор редактора';
+
+  @override
+  String get skinTheInsertionCaretColor => 'Колір курсора вставки.';
+
+  @override
+  String get skinEditorSelectionHighlight => 'Виділення вибраного в редакторі';
+
+  @override
+  String get skinTheBackgroundUsedToHighlightSelectedCode =>
+      'Тло для виділення вибраного коду.';
+
+  @override
+  String get skinFileManager => 'Менеджер файлів';
+
+  @override
+  String get skinFolderAndFileGlyphsTilesAndLabelColors =>
+      'Значки, плитки та кольори міток папок і файлів.';
+
+  @override
+  String get skinDetailsTextColor => 'Колір тексту деталей';
+
+  @override
+  String get skinUseTheAppSSupportingTextColor =>
+      'Використовувати колір допоміжного тексту програми';
+
+  @override
+  String get skinCustomColor => 'Власний колір';
+
+  @override
+  String get skinMonospaceFileNames => 'Моноширинні назви файлів';
+
+  @override
+  String get skinBackgroundBehindTheIcon => 'Тло позаду піктограми';
+
+  @override
+  String get skinIconColorSource => 'Джерело кольору піктограми';
+
+  @override
+  String get skinUseTheAppSMainTextColor =>
+      'Використовувати основний колір тексту програми';
+
+  @override
+  String get skinTextEditor => 'Текстовий редактор';
+
+  @override
+  String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
+      'Полотно, бічна смуга, курсор, виділення, тло та шаблон синтаксису.';
+
+  @override
+  String get skinGutterAndLineNumbers => 'Бічна смуга та номери рядків';
+
+  @override
+  String get skinCursor => 'Курсор';
+
+  @override
+  String get skinSelection => 'Виділення';
+
+  @override
+  String get skinEditorBackgroundTemplate => 'Шаблон тла редактора';
+
+  @override
+  String get skinSyntaxTemplate => 'Шаблон синтаксису';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor246981 =>
+      'Торкніться колірного кола, щоб вибрати колір';
+
+  @override
+  String get skinDefaultVaultExplorerIcons =>
+      'Стандартні піктограми Vault Explorer';
+
+  @override
+  String get skinSolidIcons => 'Суцільні піктограми';
+
+  @override
+  String get skinRoundedIcons => 'Закруглені піктограми';
+
+  @override
+  String get skinOutlineIcons => 'Контурні піктограми';
+
+  @override
+  String get skinSquareCornerIcons => 'Прямокутні піктограми';
+
+  @override
+  String get skinTintedTileBehindTheIcon => 'Тонована плитка позаду піктограми';
+
+  @override
+  String get skinOutlinedTileBehindTheIcon =>
+      'Контурна плитка позаду піктограми';
+
+  @override
+  String get skinNoTile => 'Без плитки';
+
+  @override
+  String get skinAutomaticFileTypeOrFolderColor =>
+      'Автоматично (колір типу файлу чи папки)';
+
+  @override
+  String get skinUseTheMainAppAccent =>
+      'Використовувати основний акцент програми';
+
+  @override
+  String get skinUseAMutedNeutralColor =>
+      'Використовувати приглушений нейтральний колір';
+
+  @override
+  String get skinChooseAColorBelow => 'Виберіть колір нижче';
+
+  @override
+  String get skinUseTheSyntaxThemeBackground =>
+      'Використовувати тло теми синтаксису';
+
+  @override
+  String get skinPureBlack => 'Чистий чорний';
+
+  @override
+  String get skinDarkSlate => 'Темний сланцевий';
+
+  @override
+  String get skinCleanWhite => 'Чистий білий';
+
+  @override
+  String get skinWarmSepia => 'Тепла сепія';
+
+  @override
+  String get skinAutomaticMatchLightOrDarkMode =>
+      'Автоматично (відповідно до світлого чи темного режиму)';
+
+  @override
+  String get skinSkinExported => 'Скін експортовано.';
+
+  @override
+  String get skinSkinsExported => 'Скіни експортовано.';
+
+  @override
+  String get skinRemoveSkin => 'Видалити скін?';
+
+  @override
+  String get skinAppSkin => 'Скін програми';
+
+  @override
+  String get skinImportSkins => 'Імпортувати скіни';
+
+  @override
+  String get skinExportSkins => 'Експортувати скіни';
+
+  @override
+  String get skinChooseACoordinatedLookForTheAppFileManagerAndEditor =>
+      'Виберіть узгоджений вигляд для програми, менеджера файлів і редактора. ';
+
+  @override
+  String get skinLightAndDarkSystemThemesUseMatchingPaletteVariants =>
+      'Світла й темна системні теми використовують відповідні варіанти палітри.';
+
+  @override
+  String get skinEditCurrentSkin => 'Редагувати поточний скін';
+
+  @override
+  String get skinCreateASkinFromThisLook =>
+      'Створити скін на основі цього вигляду';
+
+  @override
+  String get skinYourSkins => 'Ваші скіни';
+
+  @override
+  String get skinCustomAppFileManagerAndEditorColors =>
+      'Власні кольори програми, менеджера файлів і редактора';
+
+  @override
+  String get skinMaterialColorsWithLightAndDarkVariants =>
+      'Кольори Material зі світлими та темними варіантами';
+
+  @override
+  String get skinTrueBlackEditorAndDarkf97e8f =>
+      'Справжній чорний редактор і темні поверхні програми з палітрою акцентів OLED';
+
+  @override
+  String get skinYourEditableAppFileManagerAndEditorColors =>
+      'Ваші кольори для редагування в програмі, менеджері файлів і редакторі';
+
+  @override
+  String get skinSkinActions => 'Дії зі скіном';
+
+  @override
+  String get skinEditSkin => 'Редагувати скін';
+
+  @override
+  String get skinExportSkin => 'Експортувати скін';
+
+  @override
+  String get skinRemoveSkinf09101 => 'Видалити скін';
+
+  @override
+  String get skinDragAroundTheRingTo868d62 =>
+      'Перетягуйте по колу, щоб вибрати відтінок, потім перемістіться всередину для налаштування тону.';
+
+  @override
+  String get skinQuickColors => 'Швидкі кольори';
+
+  @override
+  String get skinEnterAnExactColor => 'Введіть точний колір';
+
+  @override
+  String get skinOptionalRGBOrARGBValue =>
+      'Необов\'язкове значення RGB або ARGB';
+
+  @override
+  String get skinRGBARGB => 'RGB / ARGB';
+
+  @override
+  String get skinUseThisValue => 'Використати це значення';
+
+  @override
+  String get skinDefaultLightDark => 'За замовчуванням Світлий / Темний';
+
+  @override
+  String get skinOLEDPureBlack => 'OLED Чистий чорний';
+
+  @override
+  String get skinCustomSkin => 'Власний скін';
+
+  @override
+  String skinImportSucceeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Імпортовано # скінів.',
+      many: 'Імпортовано # скінів.',
+      few: 'Імпортовано # скіни.',
+      one: 'Імпортовано 1 скін.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String skinImportFailed(String error) {
+    return 'Не вдалося імпортувати скін: $error';
+  }
+
+  @override
+  String skinExportFailed(String error) {
+    return 'Не вдалося експортувати скін: $error';
+  }
+
+  @override
+  String skinRemoveConfirmation(String skin) {
+    return '«$skin» буде видалено зі збережених скінів.';
+  }
+
+  @override
+  String skinSelectPreviewElement(String title) {
+    return 'Вибрати $title';
+  }
+
+  @override
+  String skinIconColorForItem(String item) {
+    return 'Колір піктограми $item';
+  }
+
+  @override
+  String skinNameColorForItem(String item) {
+    return 'Колір назви $item';
+  }
+
+  @override
+  String get skinFileIconColorSettingDescription =>
+      'Цей колір контролюється налаштуванням кольору піктограми в розділі менеджера файлів.';
+
+  @override
+  String get skinFileNameColorSettingDescription =>
+      'Цей колір контролюється налаштуванням кольору назви в розділі менеджера файлів.';
+
+  @override
+  String get skinExportedSingle => 'Скін експортовано.';
+
+  @override
+  String get skinExportedMultiple => 'Скіни експортовано.';
 }

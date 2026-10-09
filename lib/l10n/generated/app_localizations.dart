@@ -16266,6 +16266,1914 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subtitle Tracks'**
   String get subtitleTracksLabel;
+
+  /// No description provided for @skinActionAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Action accent'**
+  String get skinActionAccent;
+
+  /// No description provided for @skinEmphasisForActionIconsActiveControlsProgressAndLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Emphasis for action icons, active controls, progress, and links.'**
+  String get skinEmphasisForActionIconsActiveControlsProgressAndLinks;
+
+  /// No description provided for @skinTextAndIconsOnAccentButtons.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons on accent buttons'**
+  String get skinTextAndIconsOnAccentButtons;
+
+  /// No description provided for @skinForegroundForButtonsFilledWithTheActionAccentColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for buttons filled with the Action accent color.'**
+  String get skinForegroundForButtonsFilledWithTheActionAccentColor;
+
+  /// No description provided for @skinSelectionAndIconTileBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection and icon tile background'**
+  String get skinSelectionAndIconTileBackground;
+
+  /// No description provided for @skinSelectedFilesAndVaultFormat076e52.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected files and vault format icon tiles use this color. Floating button fill has its own setting.'**
+  String get skinSelectedFilesAndVaultFormat076e52;
+
+  /// No description provided for @skinTextAndIconsOnSelectionColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons on selection colors'**
+  String get skinTextAndIconsOnSelectionColors;
+
+  /// No description provided for @skinForegroundForIconTilesAndOtherPrimaryContainerSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for icon tiles and other primary-container surfaces.'**
+  String get skinForegroundForIconTilesAndOtherPrimaryContainerSurfaces;
+
+  /// No description provided for @skinSteadyMainAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Steady main accent'**
+  String get skinSteadyMainAccent;
+
+  /// No description provided for @skinAPrimaryAccentThatStaysTheSameInLightAndDarkSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'A primary accent that stays the same in light and dark surfaces.'**
+  String get skinAPrimaryAccentThatStaysTheSameInLightAndDarkSurfaces;
+
+  /// No description provided for @skinMutedSteadyMainAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted steady main accent'**
+  String get skinMutedSteadyMainAccent;
+
+  /// No description provided for @skinASofterVersionOfTheSteadyPrimaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'A softer version of the steady primary accent.'**
+  String get skinASofterVersionOfTheSteadyPrimaryAccent;
+
+  /// No description provided for @skinTextOnSteadyMainAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on steady main accent'**
+  String get skinTextOnSteadyMainAccent;
+
+  /// No description provided for @skinForegroundForPrimaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for primary fixed colors.'**
+  String get skinForegroundForPrimaryFixedColors;
+
+  /// No description provided for @skinMutedTextOnSteadyMainAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted text on steady main accent'**
+  String get skinMutedTextOnSteadyMainAccent;
+
+  /// No description provided for @skinSecondaryForegroundForPrimaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary foreground for primary fixed colors.'**
+  String get skinSecondaryForegroundForPrimaryFixedColors;
+
+  /// No description provided for @skinSecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary accent'**
+  String get skinSecondaryAccent;
+
+  /// No description provided for @skinSupportingActionsAndLessProminentHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting actions and less prominent highlights.'**
+  String get skinSupportingActionsAndLessProminentHighlights;
+
+  /// No description provided for @skinTextOnSecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on secondary accent'**
+  String get skinTextOnSecondaryAccent;
+
+  /// No description provided for @skinLabelsAndIconsOnSecondaryColoredAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels and icons on secondary colored areas.'**
+  String get skinLabelsAndIconsOnSecondaryColoredAreas;
+
+  /// No description provided for @skinSecondaryBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary background'**
+  String get skinSecondaryBackground;
+
+  /// No description provided for @skinSoftFillForSupportingContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft fill for supporting content.'**
+  String get skinSoftFillForSupportingContent;
+
+  /// No description provided for @skinTextOnSecondaryBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on secondary backgrounds'**
+  String get skinTextOnSecondaryBackgrounds;
+
+  /// No description provided for @skinForegroundForSecondaryContainers.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for secondary containers.'**
+  String get skinForegroundForSecondaryContainers;
+
+  /// No description provided for @skinSteadySecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Steady secondary accent'**
+  String get skinSteadySecondaryAccent;
+
+  /// No description provided for @skinASecondaryAccentThatStaysTheSameAcrossSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'A secondary accent that stays the same across surfaces.'**
+  String get skinASecondaryAccentThatStaysTheSameAcrossSurfaces;
+
+  /// No description provided for @skinMutedSteadySecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted steady secondary accent'**
+  String get skinMutedSteadySecondaryAccent;
+
+  /// No description provided for @skinASofterVersionOfTheSteadySecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'A softer version of the steady secondary accent.'**
+  String get skinASofterVersionOfTheSteadySecondaryAccent;
+
+  /// No description provided for @skinTextOnSteadySecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on steady secondary accent'**
+  String get skinTextOnSteadySecondaryAccent;
+
+  /// No description provided for @skinForegroundForSecondaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for secondary fixed colors.'**
+  String get skinForegroundForSecondaryFixedColors;
+
+  /// No description provided for @skinMutedTextOnSteadySecondaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted text on steady secondary accent'**
+  String get skinMutedTextOnSteadySecondaryAccent;
+
+  /// No description provided for @skinSecondaryForegroundForSecondaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary foreground for secondary fixed colors.'**
+  String get skinSecondaryForegroundForSecondaryFixedColors;
+
+  /// No description provided for @skinExtraAccentColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra accent color'**
+  String get skinExtraAccentColor;
+
+  /// No description provided for @skinDecorativeHighlightsAndContrastingAccents.
+  ///
+  /// In en, this message translates to:
+  /// **'Decorative highlights and contrasting accents.'**
+  String get skinDecorativeHighlightsAndContrastingAccents;
+
+  /// No description provided for @skinTextOnExtraAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on extra accent'**
+  String get skinTextOnExtraAccent;
+
+  /// No description provided for @skinLabelsAndIconsOnTertiaryColoredAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels and icons on tertiary colored areas.'**
+  String get skinLabelsAndIconsOnTertiaryColoredAreas;
+
+  /// No description provided for @skinExtraAccentBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra accent background'**
+  String get skinExtraAccentBackground;
+
+  /// No description provided for @skinSoftFillForTertiaryContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft fill for tertiary content.'**
+  String get skinSoftFillForTertiaryContent;
+
+  /// No description provided for @skinTextOnExtraAccentBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on extra accent backgrounds'**
+  String get skinTextOnExtraAccentBackgrounds;
+
+  /// No description provided for @skinForegroundForTertiaryContainers.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for tertiary containers.'**
+  String get skinForegroundForTertiaryContainers;
+
+  /// No description provided for @skinSteadyExtraAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Steady extra accent'**
+  String get skinSteadyExtraAccent;
+
+  /// No description provided for @skinATertiaryAccentThatStaysTheSameAcrossSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'A tertiary accent that stays the same across surfaces.'**
+  String get skinATertiaryAccentThatStaysTheSameAcrossSurfaces;
+
+  /// No description provided for @skinMutedSteadyExtraAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted steady extra accent'**
+  String get skinMutedSteadyExtraAccent;
+
+  /// No description provided for @skinASofterVersionOfTheSteadyTertiaryAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'A softer version of the steady tertiary accent.'**
+  String get skinASofterVersionOfTheSteadyTertiaryAccent;
+
+  /// No description provided for @skinTextOnSteadyExtraAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on steady extra accent'**
+  String get skinTextOnSteadyExtraAccent;
+
+  /// No description provided for @skinForegroundForTertiaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for tertiary fixed colors.'**
+  String get skinForegroundForTertiaryFixedColors;
+
+  /// No description provided for @skinMutedTextOnSteadyExtraAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted text on steady extra accent'**
+  String get skinMutedTextOnSteadyExtraAccent;
+
+  /// No description provided for @skinSecondaryForegroundForTertiaryFixedColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary foreground for tertiary fixed colors.'**
+  String get skinSecondaryForegroundForTertiaryFixedColors;
+
+  /// No description provided for @skinErrorColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Error color'**
+  String get skinErrorColor;
+
+  /// No description provided for @skinErrorsDestructiveActionsAndInvalidInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors, destructive actions, and invalid input.'**
+  String get skinErrorsDestructiveActionsAndInvalidInput;
+
+  /// No description provided for @skinTextOnErrorColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on error color'**
+  String get skinTextOnErrorColor;
+
+  /// No description provided for @skinLabelsAndIconsOnErrorColoredAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels and icons on error-colored areas.'**
+  String get skinLabelsAndIconsOnErrorColoredAreas;
+
+  /// No description provided for @skinErrorBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Error background'**
+  String get skinErrorBackground;
+
+  /// No description provided for @skinSoftFillBehindErrorMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft fill behind error messages.'**
+  String get skinSoftFillBehindErrorMessages;
+
+  /// No description provided for @skinTextOnErrorBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on error backgrounds'**
+  String get skinTextOnErrorBackgrounds;
+
+  /// No description provided for @skinForegroundForErrorContainers.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for error containers.'**
+  String get skinForegroundForErrorContainers;
+
+  /// No description provided for @skinPageBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Page background'**
+  String get skinPageBackground;
+
+  /// No description provided for @skinTheMainBackgroundBehindAppContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The main background behind app content.'**
+  String get skinTheMainBackgroundBehindAppContent;
+
+  /// No description provided for @skinMainTextAndIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Main text and icons'**
+  String get skinMainTextAndIcons;
+
+  /// No description provided for @skinPrimaryContentDrawnOnPageAndCardBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary content drawn on page and card backgrounds.'**
+  String get skinPrimaryContentDrawnOnPageAndCardBackgrounds;
+
+  /// No description provided for @skinDimmedBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimmed background'**
+  String get skinDimmedBackground;
+
+  /// No description provided for @skinTheDarkestNeutralSurfaceLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'The darkest neutral surface layer.'**
+  String get skinTheDarkestNeutralSurfaceLayer;
+
+  /// No description provided for @skinBrightBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Bright background'**
+  String get skinBrightBackground;
+
+  /// No description provided for @skinTheLightestNeutralSurfaceLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'The lightest neutral surface layer.'**
+  String get skinTheLightestNeutralSurfaceLayer;
+
+  /// No description provided for @skinDeepestCardLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Deepest card layer'**
+  String get skinDeepestCardLayer;
+
+  /// No description provided for @skinTheLowestAndQuietestSurfaceContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The lowest and quietest surface container.'**
+  String get skinTheLowestAndQuietestSurfaceContainer;
+
+  /// No description provided for @skinLowCardLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Low card layer'**
+  String get skinLowCardLayer;
+
+  /// No description provided for @skinSubtleCardsAndRecessedAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtle cards and recessed areas.'**
+  String get skinSubtleCardsAndRecessedAreas;
+
+  /// No description provided for @skinStandardCardLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard card layer'**
+  String get skinStandardCardLayer;
+
+  /// No description provided for @skinCommonCardsAndGroupedContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Common cards and grouped content.'**
+  String get skinCommonCardsAndGroupedContent;
+
+  /// No description provided for @skinRaisedCardLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Raised card layer'**
+  String get skinRaisedCardLayer;
+
+  /// No description provided for @skinRaisedCardsMenusAndAppBars.
+  ///
+  /// In en, this message translates to:
+  /// **'Raised cards, menus, and app bars.'**
+  String get skinRaisedCardsMenusAndAppBars;
+
+  /// No description provided for @skinTopCardLayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Top card layer'**
+  String get skinTopCardLayer;
+
+  /// No description provided for @skinProminentPanelsAndSelectedSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Prominent panels and selected surfaces.'**
+  String get skinProminentPanelsAndSelectedSurfaces;
+
+  /// No description provided for @skinSecondaryTextAndIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary text and icons'**
+  String get skinSecondaryTextAndIcons;
+
+  /// No description provided for @skinDetailsHintsAndSupportingLabels.
+  ///
+  /// In en, this message translates to:
+  /// **'Details, hints, and supporting labels.'**
+  String get skinDetailsHintsAndSupportingLabels;
+
+  /// No description provided for @skinStrongBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong border'**
+  String get skinStrongBorder;
+
+  /// No description provided for @skinVisibleBordersAndSeparators.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible borders and separators.'**
+  String get skinVisibleBordersAndSeparators;
+
+  /// No description provided for @skinSubtleBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtle border'**
+  String get skinSubtleBorder;
+
+  /// No description provided for @skinQuietOutlinesAndLowEmphasisSeparators.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet outlines and low emphasis separators.'**
+  String get skinQuietOutlinesAndLowEmphasisSeparators;
+
+  /// No description provided for @skinShadowTint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadow tint'**
+  String get skinShadowTint;
+
+  /// No description provided for @skinTintUsedByElevatedSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Tint used by elevated surfaces.'**
+  String get skinTintUsedByElevatedSurfaces;
+
+  /// No description provided for @skinModalBackdrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Modal backdrop'**
+  String get skinModalBackdrop;
+
+  /// No description provided for @skinTintBehindDialogsAndModalSheets.
+  ///
+  /// In en, this message translates to:
+  /// **'Tint behind dialogs and modal sheets.'**
+  String get skinTintBehindDialogsAndModalSheets;
+
+  /// No description provided for @skinInvertedSurface.
+  ///
+  /// In en, this message translates to:
+  /// **'Inverted surface'**
+  String get skinInvertedSurface;
+
+  /// No description provided for @skinAContrastingSurfaceForInverseElements.
+  ///
+  /// In en, this message translates to:
+  /// **'A contrasting surface for inverse elements.'**
+  String get skinAContrastingSurfaceForInverseElements;
+
+  /// No description provided for @skinTextOnInvertedSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on inverted surfaces'**
+  String get skinTextOnInvertedSurfaces;
+
+  /// No description provided for @skinForegroundUsedOverInverseSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground used over inverse surfaces.'**
+  String get skinForegroundUsedOverInverseSurfaces;
+
+  /// No description provided for @skinInvertedMainAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Inverted main accent'**
+  String get skinInvertedMainAccent;
+
+  /// No description provided for @skinPrimaryAccentUsedOnInverseSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary accent used on inverse surfaces.'**
+  String get skinPrimaryAccentUsedOnInverseSurfaces;
+
+  /// No description provided for @skinElevationTint.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevation tint'**
+  String get skinElevationTint;
+
+  /// No description provided for @skinTintAppliedToElevatedSurfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Tint applied to elevated surfaces.'**
+  String get skinTintAppliedToElevatedSurfaces;
+
+  /// No description provided for @skinSuccessColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Success color'**
+  String get skinSuccessColor;
+
+  /// No description provided for @skinCompletedActionsAndPositiveStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed actions and positive status.'**
+  String get skinCompletedActionsAndPositiveStatus;
+
+  /// No description provided for @skinTextOnSuccessColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on success color'**
+  String get skinTextOnSuccessColor;
+
+  /// No description provided for @skinForegroundForSuccessColoredContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for success-colored content.'**
+  String get skinForegroundForSuccessColoredContent;
+
+  /// No description provided for @skinSuccessBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Success background'**
+  String get skinSuccessBackground;
+
+  /// No description provided for @skinSoftFillBehindPositiveStatusMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft fill behind positive status messages.'**
+  String get skinSoftFillBehindPositiveStatusMessages;
+
+  /// No description provided for @skinTextOnSuccessBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on success backgrounds'**
+  String get skinTextOnSuccessBackgrounds;
+
+  /// No description provided for @skinForegroundForSuccessContainers.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for success containers.'**
+  String get skinForegroundForSuccessContainers;
+
+  /// No description provided for @skinWarningColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning color'**
+  String get skinWarningColor;
+
+  /// No description provided for @skinCautionAttentionAndPendingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Caution, attention, and pending status.'**
+  String get skinCautionAttentionAndPendingStatus;
+
+  /// No description provided for @skinTextOnWarningColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on warning color'**
+  String get skinTextOnWarningColor;
+
+  /// No description provided for @skinForegroundForWarningColoredContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for warning-colored content.'**
+  String get skinForegroundForWarningColoredContent;
+
+  /// No description provided for @skinWarningBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning background'**
+  String get skinWarningBackground;
+
+  /// No description provided for @skinSoftFillBehindWarningMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft fill behind warning messages.'**
+  String get skinSoftFillBehindWarningMessages;
+
+  /// No description provided for @skinTextOnWarningBackgrounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on warning backgrounds'**
+  String get skinTextOnWarningBackgrounds;
+
+  /// No description provided for @skinForegroundForWarningContainers.
+  ///
+  /// In en, this message translates to:
+  /// **'Foreground for warning containers.'**
+  String get skinForegroundForWarningContainers;
+
+  /// No description provided for @skinBookmarkColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark color'**
+  String get skinBookmarkColor;
+
+  /// No description provided for @skinSavedAndBookmarkedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved and bookmarked items.'**
+  String get skinSavedAndBookmarkedItems;
+
+  /// No description provided for @skinMainActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Main actions'**
+  String get skinMainActions;
+
+  /// No description provided for @skinPrimaryButtonsSelectionsAndFixedPrimaryAccents.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary buttons, selections, and fixed primary accents.'**
+  String get skinPrimaryButtonsSelectionsAndFixedPrimaryAccents;
+
+  /// No description provided for @skinSupportingAccents.
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting accents'**
+  String get skinSupportingAccents;
+
+  /// No description provided for @skinSecondaryAndTertiaryHighlightsAndTheirTextColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary and tertiary highlights and their text colors.'**
+  String get skinSecondaryAndTertiaryHighlightsAndTheirTextColors;
+
+  /// No description provided for @skinErrorMessagesAndDestructiveOrInvalidStates.
+  ///
+  /// In en, this message translates to:
+  /// **'Error messages and destructive or invalid states.'**
+  String get skinErrorMessagesAndDestructiveOrInvalidStates;
+
+  /// No description provided for @skinPagesCardsAndText.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages, cards, and text'**
+  String get skinPagesCardsAndText;
+
+  /// No description provided for @skinAppBackgroundsCardsMenusAndForegroundText.
+  ///
+  /// In en, this message translates to:
+  /// **'App backgrounds, cards, menus, and foreground text.'**
+  String get skinAppBackgroundsCardsMenusAndForegroundText;
+
+  /// No description provided for @skinBordersAndOverlays.
+  ///
+  /// In en, this message translates to:
+  /// **'Borders and overlays'**
+  String get skinBordersAndOverlays;
+
+  /// No description provided for @skinOutlinesShadowsAndModalBackdrops.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlines, shadows, and modal backdrops.'**
+  String get skinOutlinesShadowsAndModalBackdrops;
+
+  /// No description provided for @skinTapAnyPreviewElement.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap any preview element'**
+  String get skinTapAnyPreviewElement;
+
+  /// No description provided for @skinChooseAnAppFileOrEditorColorToSeeWhatItControls.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an app, file, or editor color to see what it controls.'**
+  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls;
+
+  /// No description provided for @skinCustomizeSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize skin'**
+  String get skinCustomizeSkin;
+
+  /// No description provided for @skinLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get skinLight;
+
+  /// No description provided for @skinDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get skinDark;
+
+  /// No description provided for @skinApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get skinApp;
+
+  /// No description provided for @skinEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get skinEditor;
+
+  /// No description provided for @skinSkinDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin details'**
+  String get skinSkinDetails;
+
+  /// No description provided for @skinNameYourSkinAndChooseWhichPaletteToEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Name your skin and choose which palette to edit.'**
+  String get skinNameYourSkinAndChooseWhichPaletteToEdit;
+
+  /// No description provided for @skinSkinName.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin name'**
+  String get skinSkinName;
+
+  /// No description provided for @skinMyCustomSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'My Custom Skin'**
+  String get skinMyCustomSkin;
+
+  /// No description provided for @skinLightColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Light colors'**
+  String get skinLightColors;
+
+  /// No description provided for @skinDarkColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark colors'**
+  String get skinDarkColors;
+
+  /// No description provided for @skinPageAndActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Page and actions'**
+  String get skinPageAndActions;
+
+  /// No description provided for @skinTheMainBackgroundTextAndActionColors.
+  ///
+  /// In en, this message translates to:
+  /// **'The main background, text, and action colors.'**
+  String get skinTheMainBackgroundTextAndActionColors;
+
+  /// No description provided for @skinAppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'App bar'**
+  String get skinAppBar;
+
+  /// No description provided for @skinTheTopNavigationBarIsIndependentFromCardsAndPages.
+  ///
+  /// In en, this message translates to:
+  /// **'The top navigation bar is independent from cards and pages.'**
+  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages;
+
+  /// No description provided for @skinTopBarFillColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar fill color.'**
+  String get skinTopBarFillColor;
+
+  /// No description provided for @skinTitleAndIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Title and icons'**
+  String get skinTitleAndIcons;
+
+  /// No description provided for @skinTopBarTextAndIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar text and icon color.'**
+  String get skinTopBarTextAndIconColor;
+
+  /// No description provided for @skinFloatingActionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating action button'**
+  String get skinFloatingActionButton;
+
+  /// No description provided for @skinItsFillAndIconColorAreSeparateFromSelectionColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Its fill and icon color are separate from selection colors.'**
+  String get skinItsFillAndIconColorAreSeparateFromSelectionColors;
+
+  /// No description provided for @skinButtonFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Button fill'**
+  String get skinButtonFill;
+
+  /// No description provided for @skinBackgroundOfTheRoundButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Background of the round + button.'**
+  String get skinBackgroundOfTheRoundButton;
+
+  /// No description provided for @skinButtonIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Button icon'**
+  String get skinButtonIcon;
+
+  /// No description provided for @skinIconColorOnTheRoundButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon color on the round + button.'**
+  String get skinIconColorOnTheRoundButton;
+
+  /// No description provided for @skinDashboardVaultCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard vault cards'**
+  String get skinDashboardVaultCards;
+
+  /// No description provided for @skinSetTheBackgroundForLockedAndMountedVaultCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the background for locked and mounted vault cards.'**
+  String get skinSetTheBackgroundForLockedAndMountedVaultCards;
+
+  /// No description provided for @skinLockedVaultCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault card'**
+  String get skinLockedVaultCard;
+
+  /// No description provided for @skinNeutralVaultCardFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Neutral vault card fill.'**
+  String get skinNeutralVaultCardFill;
+
+  /// No description provided for @skinMountedVaultCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted vault card'**
+  String get skinMountedVaultCard;
+
+  /// No description provided for @skinSeparateFillForAnUnlockedMountedVault.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate fill for an unlocked, mounted vault.'**
+  String get skinSeparateFillForAnUnlockedMountedVault;
+
+  /// No description provided for @skinFineTuneAppColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Fine tune app colors'**
+  String get skinFineTuneAppColors;
+
+  /// No description provided for @skinAdvancedMaterialColorsForLessCommonElements.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Material colors for less common elements.'**
+  String get skinAdvancedMaterialColorsForLessCommonElements;
+
+  /// No description provided for @skinStatusAndBookmarkColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Status and bookmark colors'**
+  String get skinStatusAndBookmarkColors;
+
+  /// No description provided for @skinColorsForSuccessWarningsErrorsAndBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors for success, warnings, errors, and bookmarks.'**
+  String get skinColorsForSuccessWarningsErrorsAndBookmarks;
+
+  /// No description provided for @skinTheCustomSkinIsActive971ce3.
+  ///
+  /// In en, this message translates to:
+  /// **'The custom skin is active immediately while File Manager and Editor are set to follow the app skin.'**
+  String get skinTheCustomSkinIsActive971ce3;
+
+  /// No description provided for @skinCustomColorTapToChangeOrReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom color · tap to change or reset'**
+  String get skinCustomColorTapToChangeOrReset;
+
+  /// No description provided for @skinTapTheColorCircleToChooseAColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the color circle to choose a color.'**
+  String get skinTapTheColorCircleToChooseAColor;
+
+  /// No description provided for @skinAppBarBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'App bar background'**
+  String get skinAppBarBackground;
+
+  /// No description provided for @skinTheDashboardAndOtherAppBarsUseThisIndependentColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The dashboard and other app bars use this independent color.'**
+  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor;
+
+  /// No description provided for @skinDashboardMenuIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard menu icon'**
+  String get skinDashboardMenuIcon;
+
+  /// No description provided for @skinTheHamburgerButtonUsesTheAppBarIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The hamburger button uses the app bar icon color.'**
+  String get skinTheHamburgerButtonUsesTheAppBarIconColor;
+
+  /// No description provided for @skinDashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard title'**
+  String get skinDashboardTitle;
+
+  /// No description provided for @skinTheDashboardTitleUsesTheAppBarForegroundColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The dashboard title uses the app bar foreground color.'**
+  String get skinTheDashboardTitleUsesTheAppBarForegroundColor;
+
+  /// No description provided for @skinActionLabelAndIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Action label and icon'**
+  String get skinActionLabelAndIcon;
+
+  /// No description provided for @skinTheActionAccentColorsLabelsb08a63.
+  ///
+  /// In en, this message translates to:
+  /// **'The action accent colors labels such as Add a vault and their icons.'**
+  String get skinTheActionAccentColorsLabelsb08a63;
+
+  /// No description provided for @skinDashboardAddButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard add button'**
+  String get skinDashboardAddButton;
+
+  /// No description provided for @skinTheButtonFillAndPlusIconHaveSeparateSkinColors.
+  ///
+  /// In en, this message translates to:
+  /// **'The button fill and plus icon have separate skin colors.'**
+  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors;
+
+  /// No description provided for @skinVaultCardAndIconBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault card and icon background'**
+  String get skinVaultCardAndIconBackground;
+
+  /// No description provided for @skinTheIconTileUsesPrimary5c2f93.
+  ///
+  /// In en, this message translates to:
+  /// **'The icon tile uses Primary container. The mounted vault card blends that color with the raised surface.'**
+  String get skinTheIconTileUsesPrimary5c2f93;
+
+  /// No description provided for @skinVaultFormatIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault format icon color'**
+  String get skinVaultFormatIconColor;
+
+  /// No description provided for @skinVaultFormatInitialsUseOnPrimaryContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault format initials use On primary container.'**
+  String get skinVaultFormatInitialsUseOnPrimaryContainer;
+
+  /// No description provided for @skinVaultStorageDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault storage details'**
+  String get skinVaultStorageDetails;
+
+  /// No description provided for @skinFreeSpaceAndCapacityUseTheSupportingTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Free space and capacity use the supporting text color.'**
+  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor;
+
+  /// No description provided for @skin17GBFree5GB.
+  ///
+  /// In en, this message translates to:
+  /// **'1.7 GB free / 5 GB'**
+  String get skin17GBFree5GB;
+
+  /// No description provided for @skinVaultStorageProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault storage progress'**
+  String get skinVaultStorageProgress;
+
+  /// No description provided for @skinTheProgressBarUsesTheba7c98.
+  ///
+  /// In en, this message translates to:
+  /// **'The progress bar uses the app accent, then switches to tertiary and error colors as storage fills.'**
+  String get skinTheProgressBarUsesTheba7c98;
+
+  /// No description provided for @skinLockActionBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock action background'**
+  String get skinLockActionBackground;
+
+  /// No description provided for @skinTheMountedVaultLockButtonUsesPrimaryContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The mounted-vault lock button uses Primary container.'**
+  String get skinTheMountedVaultLockButtonUsesPrimaryContainer;
+
+  /// No description provided for @skinVaultActionsIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault actions icon color'**
+  String get skinVaultActionsIconColor;
+
+  /// No description provided for @skinTheOverflowMenuUsesTheSupportingIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The overflow menu uses the supporting icon color.'**
+  String get skinTheOverflowMenuUsesTheSupportingIconColor;
+
+  /// No description provided for @skinMountedVaultCardBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted vault card background'**
+  String get skinMountedVaultCardBackground;
+
+  /// No description provided for @skinThisIsTheBackgroundOfa8d0d3.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the background of the mounted vault card. Its icon tile still uses the main action color.'**
+  String get skinThisIsTheBackgroundOfa8d0d3;
+
+  /// No description provided for @skinLockedVaultCardBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault card background'**
+  String get skinLockedVaultCardBackground;
+
+  /// No description provided for @skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard.
+  ///
+  /// In en, this message translates to:
+  /// **'This color is independent from the app bar and mounted vault card.'**
+  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard;
+
+  /// No description provided for @skinLockedVaultFormatIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault format icon'**
+  String get skinLockedVaultFormatIcon;
+
+  /// No description provided for @skinLockedVaultIconsUseTheSupportingTextAndIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault icons use the supporting text and icon color.'**
+  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor;
+
+  /// No description provided for @skinSharedArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared archive'**
+  String get skinSharedArchive;
+
+  /// No description provided for @skinLockedVaultStatusText.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault status text'**
+  String get skinLockedVaultStatusText;
+
+  /// No description provided for @skinTheLockedStatusLabelUsesTheSupportingTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The locked status label uses the supporting text color.'**
+  String get skinTheLockedStatusLabelUsesTheSupportingTextColor;
+
+  /// No description provided for @skinLockedVaultActionsIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked vault actions icon'**
+  String get skinLockedVaultActionsIcon;
+
+  /// No description provided for @skinVaultActionsMenuBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault actions menu background'**
+  String get skinVaultActionsMenuBackground;
+
+  /// No description provided for @skinTheEditAndRemovePopupUsesTheMenuSurfaceColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The Edit and Remove popup uses the menu surface color.'**
+  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor;
+
+  /// No description provided for @skinEditMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit menu item'**
+  String get skinEditMenuItem;
+
+  /// No description provided for @skinTheEditActionUsesTheRegularForegroundColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The Edit action uses the regular foreground color.'**
+  String get skinTheEditActionUsesTheRegularForegroundColor;
+
+  /// No description provided for @skinRemoveMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove menu item'**
+  String get skinRemoveMenuItem;
+
+  /// No description provided for @skinDestructiveActionsUseTheErrorColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Destructive actions use the error color.'**
+  String get skinDestructiveActionsUseTheErrorColor;
+
+  /// No description provided for @skinFileManagerAppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager app bar'**
+  String get skinFileManagerAppBar;
+
+  /// No description provided for @skinFileBrowserToolbarsUseTheSameAppBarBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'File browser toolbars use the same app bar background.'**
+  String get skinFileBrowserToolbarsUseTheSameAppBarBackground;
+
+  /// No description provided for @skinFileManagerBackButton.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager back button'**
+  String get skinFileManagerBackButton;
+
+  /// No description provided for @skinToolbarNavigationIconsUseThisColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Toolbar navigation icons use this color.'**
+  String get skinToolbarNavigationIconsUseThisColor;
+
+  /// No description provided for @skinFileManagerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager title'**
+  String get skinFileManagerTitle;
+
+  /// No description provided for @skinTheCurrentFolderNameUsesTheAppBarForeground.
+  ///
+  /// In en, this message translates to:
+  /// **'The current folder name uses the app bar foreground.'**
+  String get skinTheCurrentFolderNameUsesTheAppBarForeground;
+
+  /// No description provided for @skinFileManagerAppBarActions.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager app bar actions'**
+  String get skinFileManagerAppBarActions;
+
+  /// No description provided for @skinToolbarActionsUseThisIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Toolbar actions use this icon color.'**
+  String get skinToolbarActionsUseThisIconColor;
+
+  /// No description provided for @skinProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get skinProjects;
+
+  /// No description provided for @skinFolder12Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder · 12 items'**
+  String get skinFolder12Items;
+
+  /// No description provided for @skinTextFile4KB.
+  ///
+  /// In en, this message translates to:
+  /// **'Text file · 4 KB'**
+  String get skinTextFile4KB;
+
+  /// No description provided for @skinCompressedFile28MB.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed file · 28 MB'**
+  String get skinCompressedFile28MB;
+
+  /// No description provided for @skin3Items.
+  ///
+  /// In en, this message translates to:
+  /// **'3 items'**
+  String get skin3Items;
+
+  /// No description provided for @skinFileManagerAddButton.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager add button'**
+  String get skinFileManagerAddButton;
+
+  /// No description provided for @skinAddButtonIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Add button icon color'**
+  String get skinAddButtonIconColor;
+
+  /// No description provided for @skinThePlusIconUsesTheButtonForegroundColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The plus icon uses the button foreground color.'**
+  String get skinThePlusIconUsesTheButtonForegroundColor;
+
+  /// No description provided for @skinEditorFileName.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor file name'**
+  String get skinEditorFileName;
+
+  /// No description provided for @skinTheEditorToolbarUsesTheAppForegroundColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The editor toolbar uses the app foreground color.'**
+  String get skinTheEditorToolbarUsesTheAppForegroundColor;
+
+  /// No description provided for @skinDartUTF8Ln3Col12.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart · UTF-8 · Ln 3, Col 12'**
+  String get skinDartUTF8Ln3Col12;
+
+  /// No description provided for @skinTheMainBackgroundBehindThisScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'The main background behind this screen.'**
+  String get skinTheMainBackgroundBehindThisScreen;
+
+  /// No description provided for @skinFolderIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder icon color'**
+  String get skinFolderIconColor;
+
+  /// No description provided for @skinFileIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'File icon color'**
+  String get skinFileIconColor;
+
+  /// No description provided for @skinText.
+  ///
+  /// In en, this message translates to:
+  /// **' : '**
+  String get skinText;
+
+  /// No description provided for @skinFolderNameColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder name color'**
+  String get skinFolderNameColor;
+
+  /// No description provided for @skinFileNameColor.
+  ///
+  /// In en, this message translates to:
+  /// **'File name color'**
+  String get skinFileNameColor;
+
+  /// No description provided for @skinFileDetailsColor.
+  ///
+  /// In en, this message translates to:
+  /// **'File details color'**
+  String get skinFileDetailsColor;
+
+  /// No description provided for @skinTheSmallerDateSizeAndTypeLabelsUseThisColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The smaller date, size, and type labels use this color.'**
+  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor;
+
+  /// No description provided for @skinFileOverflowButton.
+  ///
+  /// In en, this message translates to:
+  /// **'File overflow button'**
+  String get skinFileOverflowButton;
+
+  /// No description provided for @skinEachRowSThreeDotButtonUsesTheSupportingIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Each row’s three-dot button uses the supporting icon color.'**
+  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor;
+
+  /// No description provided for @skinSelectedFileRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected file row'**
+  String get skinSelectedFileRow;
+
+  /// No description provided for @skinSelectedRowsUseATranslucente0ff21.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected rows use a translucent primary-container highlight; the file list itself stays on the page background.'**
+  String get skinSelectedRowsUseATranslucente0ff21;
+
+  /// No description provided for @skinFileActionsMenuBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'File actions menu background'**
+  String get skinFileActionsMenuBackground;
+
+  /// No description provided for @skinTheFileActionsPopupUsesTheMenuSurfaceColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The file actions popup uses the menu surface color.'**
+  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor;
+
+  /// No description provided for @skinOpenFileMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Open file menu item'**
+  String get skinOpenFileMenuItem;
+
+  /// No description provided for @skinRegularFileActionsUseTheMainTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular file actions use the main text color.'**
+  String get skinRegularFileActionsUseTheMainTextColor;
+
+  /// No description provided for @skinOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get skinOpen;
+
+  /// No description provided for @skinDeleteFileMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete file menu item'**
+  String get skinDeleteFileMenuItem;
+
+  /// No description provided for @skinEditorBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor background'**
+  String get skinEditorBackground;
+
+  /// No description provided for @skinTheCanvasColorBehindTheCode.
+  ///
+  /// In en, this message translates to:
+  /// **'The canvas color behind the code.'**
+  String get skinTheCanvasColorBehindTheCode;
+
+  /// No description provided for @skinEditorLineNumbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor line numbers'**
+  String get skinEditorLineNumbers;
+
+  /// No description provided for @skinTheGutterAndLineNumbersBesideTheCode.
+  ///
+  /// In en, this message translates to:
+  /// **'The gutter and line numbers beside the code.'**
+  String get skinTheGutterAndLineNumbersBesideTheCode;
+
+  /// No description provided for @skinEditorTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor text color'**
+  String get skinEditorTextColor;
+
+  /// No description provided for @skinTheDefaultCodeAndEditorTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The default code and editor text color.'**
+  String get skinTheDefaultCodeAndEditorTextColor;
+
+  /// No description provided for @skinEditorCursor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor cursor'**
+  String get skinEditorCursor;
+
+  /// No description provided for @skinTheInsertionCaretColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The insertion caret color.'**
+  String get skinTheInsertionCaretColor;
+
+  /// No description provided for @skinEditorSelectionHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor selection highlight'**
+  String get skinEditorSelectionHighlight;
+
+  /// No description provided for @skinTheBackgroundUsedToHighlightSelectedCode.
+  ///
+  /// In en, this message translates to:
+  /// **'The background used to highlight selected code.'**
+  String get skinTheBackgroundUsedToHighlightSelectedCode;
+
+  /// No description provided for @skinFileManager.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager'**
+  String get skinFileManager;
+
+  /// No description provided for @skinFolderAndFileGlyphsTilesAndLabelColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder and file glyphs, tiles, and label colors.'**
+  String get skinFolderAndFileGlyphsTilesAndLabelColors;
+
+  /// No description provided for @skinDetailsTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Details text color'**
+  String get skinDetailsTextColor;
+
+  /// No description provided for @skinUseTheAppSSupportingTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the app’s supporting text color'**
+  String get skinUseTheAppSSupportingTextColor;
+
+  /// No description provided for @skinCustomColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom color'**
+  String get skinCustomColor;
+
+  /// No description provided for @skinMonospaceFileNames.
+  ///
+  /// In en, this message translates to:
+  /// **'Monospace file names'**
+  String get skinMonospaceFileNames;
+
+  /// No description provided for @skinBackgroundBehindTheIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Background behind the icon'**
+  String get skinBackgroundBehindTheIcon;
+
+  /// No description provided for @skinIconColorSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon color source'**
+  String get skinIconColorSource;
+
+  /// No description provided for @skinUseTheAppSMainTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the app’s main text color'**
+  String get skinUseTheAppSMainTextColor;
+
+  /// No description provided for @skinTextEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Text editor'**
+  String get skinTextEditor;
+
+  /// No description provided for @skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas, gutter, cursor, selection, background, and syntax template.'**
+  String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate;
+
+  /// No description provided for @skinGutterAndLineNumbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Gutter and line numbers'**
+  String get skinGutterAndLineNumbers;
+
+  /// No description provided for @skinCursor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor'**
+  String get skinCursor;
+
+  /// No description provided for @skinSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection'**
+  String get skinSelection;
+
+  /// No description provided for @skinEditorBackgroundTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor background template'**
+  String get skinEditorBackgroundTemplate;
+
+  /// No description provided for @skinSyntaxTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Syntax template'**
+  String get skinSyntaxTemplate;
+
+  /// No description provided for @skinTapTheColorCircleToChooseAColor246981.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the color circle to choose a color'**
+  String get skinTapTheColorCircleToChooseAColor246981;
+
+  /// No description provided for @skinDefaultVaultExplorerIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Vault Explorer icons'**
+  String get skinDefaultVaultExplorerIcons;
+
+  /// No description provided for @skinSolidIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Solid icons'**
+  String get skinSolidIcons;
+
+  /// No description provided for @skinRoundedIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Rounded icons'**
+  String get skinRoundedIcons;
+
+  /// No description provided for @skinOutlineIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline icons'**
+  String get skinOutlineIcons;
+
+  /// No description provided for @skinSquareCornerIcons.
+  ///
+  /// In en, this message translates to:
+  /// **'Square-corner icons'**
+  String get skinSquareCornerIcons;
+
+  /// No description provided for @skinTintedTileBehindTheIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Tinted tile behind the icon'**
+  String get skinTintedTileBehindTheIcon;
+
+  /// No description provided for @skinOutlinedTileBehindTheIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlined tile behind the icon'**
+  String get skinOutlinedTileBehindTheIcon;
+
+  /// No description provided for @skinNoTile.
+  ///
+  /// In en, this message translates to:
+  /// **'No tile'**
+  String get skinNoTile;
+
+  /// No description provided for @skinAutomaticFileTypeOrFolderColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic (file type or folder color)'**
+  String get skinAutomaticFileTypeOrFolderColor;
+
+  /// No description provided for @skinUseTheMainAppAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the main app accent'**
+  String get skinUseTheMainAppAccent;
+
+  /// No description provided for @skinUseAMutedNeutralColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a muted neutral color'**
+  String get skinUseAMutedNeutralColor;
+
+  /// No description provided for @skinChooseAColorBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a color below'**
+  String get skinChooseAColorBelow;
+
+  /// No description provided for @skinUseTheSyntaxThemeBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the syntax theme background'**
+  String get skinUseTheSyntaxThemeBackground;
+
+  /// No description provided for @skinPureBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure black'**
+  String get skinPureBlack;
+
+  /// No description provided for @skinDarkSlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark slate'**
+  String get skinDarkSlate;
+
+  /// No description provided for @skinCleanWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean white'**
+  String get skinCleanWhite;
+
+  /// No description provided for @skinWarmSepia.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm sepia'**
+  String get skinWarmSepia;
+
+  /// No description provided for @skinAutomaticMatchLightOrDarkMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic (match light or dark mode)'**
+  String get skinAutomaticMatchLightOrDarkMode;
+
+  /// No description provided for @skinSkinExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin exported.'**
+  String get skinSkinExported;
+
+  /// No description provided for @skinSkinsExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins exported.'**
+  String get skinSkinsExported;
+
+  /// No description provided for @skinRemoveSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove skin?'**
+  String get skinRemoveSkin;
+
+  /// No description provided for @skinAppSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'App skin'**
+  String get skinAppSkin;
+
+  /// No description provided for @skinImportSkins.
+  ///
+  /// In en, this message translates to:
+  /// **'Import skins'**
+  String get skinImportSkins;
+
+  /// No description provided for @skinExportSkins.
+  ///
+  /// In en, this message translates to:
+  /// **'Export skins'**
+  String get skinExportSkins;
+
+  /// No description provided for @skinChooseACoordinatedLookForTheAppFileManagerAndEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a coordinated look for the app, file manager, and editor. '**
+  String get skinChooseACoordinatedLookForTheAppFileManagerAndEditor;
+
+  /// No description provided for @skinLightAndDarkSystemThemesUseMatchingPaletteVariants.
+  ///
+  /// In en, this message translates to:
+  /// **'Light and dark system themes use matching palette variants.'**
+  String get skinLightAndDarkSystemThemesUseMatchingPaletteVariants;
+
+  /// No description provided for @skinEditCurrentSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit current skin'**
+  String get skinEditCurrentSkin;
+
+  /// No description provided for @skinCreateASkinFromThisLook.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a skin from this look'**
+  String get skinCreateASkinFromThisLook;
+
+  /// No description provided for @skinYourSkins.
+  ///
+  /// In en, this message translates to:
+  /// **'Your skins'**
+  String get skinYourSkins;
+
+  /// No description provided for @skinCustomAppFileManagerAndEditorColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom app, file manager, and editor colors'**
+  String get skinCustomAppFileManagerAndEditorColors;
+
+  /// No description provided for @skinMaterialColorsWithLightAndDarkVariants.
+  ///
+  /// In en, this message translates to:
+  /// **'Material colors with light and dark variants'**
+  String get skinMaterialColorsWithLightAndDarkVariants;
+
+  /// No description provided for @skinTrueBlackEditorAndDarkf97e8f.
+  ///
+  /// In en, this message translates to:
+  /// **'True black editor and dark app surfaces with the OLED accent palette'**
+  String get skinTrueBlackEditorAndDarkf97e8f;
+
+  /// No description provided for @skinYourEditableAppFileManagerAndEditorColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Your editable app, file manager, and editor colors'**
+  String get skinYourEditableAppFileManagerAndEditorColors;
+
+  /// No description provided for @skinSkinActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin actions'**
+  String get skinSkinActions;
+
+  /// No description provided for @skinEditSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit skin'**
+  String get skinEditSkin;
+
+  /// No description provided for @skinExportSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Export skin'**
+  String get skinExportSkin;
+
+  /// No description provided for @skinRemoveSkinf09101.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove skin'**
+  String get skinRemoveSkinf09101;
+
+  /// No description provided for @skinDragAroundTheRingTo868d62.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag around the ring to choose a hue, then move inside to adjust the shade.'**
+  String get skinDragAroundTheRingTo868d62;
+
+  /// No description provided for @skinQuickColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick colors'**
+  String get skinQuickColors;
+
+  /// No description provided for @skinEnterAnExactColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an exact color'**
+  String get skinEnterAnExactColor;
+
+  /// No description provided for @skinOptionalRGBOrARGBValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional RGB or ARGB value'**
+  String get skinOptionalRGBOrARGBValue;
+
+  /// No description provided for @skinRGBARGB.
+  ///
+  /// In en, this message translates to:
+  /// **'RGB / ARGB'**
+  String get skinRGBARGB;
+
+  /// No description provided for @skinUseThisValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this value'**
+  String get skinUseThisValue;
+
+  /// No description provided for @skinDefaultLightDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Light / Dark'**
+  String get skinDefaultLightDark;
+
+  /// No description provided for @skinOLEDPureBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'OLED Pure Black'**
+  String get skinOLEDPureBlack;
+
+  /// No description provided for @skinCustomSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom skin'**
+  String get skinCustomSkin;
+
+  /// Confirmation shown after importing one or more app skins.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Imported one skin.} other{Imported # skins.}}'**
+  String skinImportSucceeded(int count);
+
+  /// Error shown when importing an app skin fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import skin: {error}'**
+  String skinImportFailed(String error);
+
+  /// Error shown when exporting app skins fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export skin: {error}'**
+  String skinExportFailed(String error);
+
+  /// Confirmation text shown before deleting a saved app skin.
+  ///
+  /// In en, this message translates to:
+  /// **'“{skin}” will be removed from your saved skins.'**
+  String skinRemoveConfirmation(String skin);
+
+  /// Tooltip inviting the user to select a preview element.
+  ///
+  /// In en, this message translates to:
+  /// **'Select {title}'**
+  String skinSelectPreviewElement(String title);
+
+  /// Color picker title for a file manager item icon.
+  ///
+  /// In en, this message translates to:
+  /// **'{item} icon color'**
+  String skinIconColorForItem(String item);
+
+  /// Color picker title for a file manager item name.
+  ///
+  /// In en, this message translates to:
+  /// **'{item} name color'**
+  String skinNameColorForItem(String item);
+
+  /// No description provided for @skinFileIconColorSettingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'This color is controlled by the icon color setting in the file manager section.'**
+  String get skinFileIconColorSettingDescription;
+
+  /// No description provided for @skinFileNameColorSettingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'This color is controlled by the name color setting in the file manager section.'**
+  String get skinFileNameColorSettingDescription;
+
+  /// No description provided for @skinExportedSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin exported.'**
+  String get skinExportedSingle;
+
+  /// No description provided for @skinExportedMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins exported.'**
+  String get skinExportedMultiple;
 }
 
 class _AppLocalizationsDelegate

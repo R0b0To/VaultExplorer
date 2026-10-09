@@ -9867,4 +9867,1139 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get subtitleTracksLabel => 'Pistes de sous-titres';
+
+  @override
+  String get skinActionAccent => 'Accent d\'action';
+
+  @override
+  String get skinEmphasisForActionIconsActiveControlsProgressAndLinks =>
+      'Accentuation pour les icônes d\'action, commandes actives, progression et liens.';
+
+  @override
+  String get skinTextAndIconsOnAccentButtons =>
+      'Texte et icônes sur les boutons d\'accent';
+
+  @override
+  String get skinForegroundForButtonsFilledWithTheActionAccentColor =>
+      'Premier plan pour les boutons remplis avec la couleur d\'accent d\'action.';
+
+  @override
+  String get skinSelectionAndIconTileBackground =>
+      'Arrière-plan de sélection et tuiles d\'icônes';
+
+  @override
+  String get skinSelectedFilesAndVaultFormat076e52 =>
+      'Les fichiers sélectionnés et les tuiles de format de coffre utilisent cette couleur. Le bouton flottant a son propre paramètre.';
+
+  @override
+  String get skinTextAndIconsOnSelectionColors =>
+      'Texte et icônes sur les couleurs de sélection';
+
+  @override
+  String get skinForegroundForIconTilesAndOtherPrimaryContainerSurfaces =>
+      'Premier plan pour les tuiles d\'icônes et autres surfaces de conteneur principal.';
+
+  @override
+  String get skinSteadyMainAccent => 'Accent principal fixe';
+
+  @override
+  String get skinAPrimaryAccentThatStaysTheSameInLightAndDarkSurfaces =>
+      'Un accent principal qui reste identique sur les surfaces claires et sombres.';
+
+  @override
+  String get skinMutedSteadyMainAccent => 'Accent principal fixe atténué';
+
+  @override
+  String get skinASofterVersionOfTheSteadyPrimaryAccent =>
+      'Une version plus douce de l\'accent principal fixe.';
+
+  @override
+  String get skinTextOnSteadyMainAccent => 'Texte sur accent principal fixe';
+
+  @override
+  String get skinForegroundForPrimaryFixedColors =>
+      'Premier plan pour les couleurs principales fixes.';
+
+  @override
+  String get skinMutedTextOnSteadyMainAccent =>
+      'Texte atténué sur accent principal fixe';
+
+  @override
+  String get skinSecondaryForegroundForPrimaryFixedColors =>
+      'Premier plan secondaire pour les couleurs principales fixes.';
+
+  @override
+  String get skinSecondaryAccent => 'Accent secondaire';
+
+  @override
+  String get skinSupportingActionsAndLessProminentHighlights =>
+      'Actions secondaires et mises en évidence moins proéminentes.';
+
+  @override
+  String get skinTextOnSecondaryAccent => 'Texte sur accent secondaire';
+
+  @override
+  String get skinLabelsAndIconsOnSecondaryColoredAreas =>
+      'Étiquettes et icônes sur les zones de couleur secondaire.';
+
+  @override
+  String get skinSecondaryBackground => 'Arrière-plan secondaire';
+
+  @override
+  String get skinSoftFillForSupportingContent =>
+      'Remplissage doux pour le contenu secondaire.';
+
+  @override
+  String get skinTextOnSecondaryBackgrounds =>
+      'Texte sur arrière-plans secondaires';
+
+  @override
+  String get skinForegroundForSecondaryContainers =>
+      'Premier plan pour les conteneurs secondaires.';
+
+  @override
+  String get skinSteadySecondaryAccent => 'Accent secondaire fixe';
+
+  @override
+  String get skinASecondaryAccentThatStaysTheSameAcrossSurfaces =>
+      'Un accent secondaire qui reste identique sur toutes les surfaces.';
+
+  @override
+  String get skinMutedSteadySecondaryAccent => 'Accent secondaire fixe atténué';
+
+  @override
+  String get skinASofterVersionOfTheSteadySecondaryAccent =>
+      'Une version plus douce de l\'accent secondaire fixe.';
+
+  @override
+  String get skinTextOnSteadySecondaryAccent =>
+      'Texte sur accent secondaire fixe';
+
+  @override
+  String get skinForegroundForSecondaryFixedColors =>
+      'Premier plan pour les couleurs secondaires fixes.';
+
+  @override
+  String get skinMutedTextOnSteadySecondaryAccent =>
+      'Texte atténué sur accent secondaire fixe';
+
+  @override
+  String get skinSecondaryForegroundForSecondaryFixedColors =>
+      'Premier plan secondaire pour les couleurs secondaires fixes.';
+
+  @override
+  String get skinExtraAccentColor => 'Couleur d\'accent supplémentaire';
+
+  @override
+  String get skinDecorativeHighlightsAndContrastingAccents =>
+      'Mises en valeur décoratives et accents contrastés.';
+
+  @override
+  String get skinTextOnExtraAccent => 'Texte sur accent supplémentaire';
+
+  @override
+  String get skinLabelsAndIconsOnTertiaryColoredAreas =>
+      'Étiquettes et icônes sur les zones de couleur tertiaire.';
+
+  @override
+  String get skinExtraAccentBackground =>
+      'Arrière-plan d\'accent supplémentaire';
+
+  @override
+  String get skinSoftFillForTertiaryContent =>
+      'Remplissage doux pour le contenu tertiaire.';
+
+  @override
+  String get skinTextOnExtraAccentBackgrounds =>
+      'Texte sur arrière-plans d\'accent supplémentaire';
+
+  @override
+  String get skinForegroundForTertiaryContainers =>
+      'Premier plan pour les conteneurs tertiaires.';
+
+  @override
+  String get skinSteadyExtraAccent => 'Accent supplémentaire fixe';
+
+  @override
+  String get skinATertiaryAccentThatStaysTheSameAcrossSurfaces =>
+      'Un accent tertiaire qui reste identique sur toutes les surfaces.';
+
+  @override
+  String get skinMutedSteadyExtraAccent => 'Accent supplémentaire fixe atténué';
+
+  @override
+  String get skinASofterVersionOfTheSteadyTertiaryAccent =>
+      'Une version plus douce de l\'accent tertiaire fixe.';
+
+  @override
+  String get skinTextOnSteadyExtraAccent =>
+      'Texte sur accent supplémentaire fixe';
+
+  @override
+  String get skinForegroundForTertiaryFixedColors =>
+      'Premier plan pour les couleurs tertiaires fixes.';
+
+  @override
+  String get skinMutedTextOnSteadyExtraAccent =>
+      'Texte atténué sur accent supplémentaire fixe';
+
+  @override
+  String get skinSecondaryForegroundForTertiaryFixedColors =>
+      'Premier plan secondaire pour les couleurs tertiaires fixes.';
+
+  @override
+  String get skinErrorColor => 'Couleur d\'erreur';
+
+  @override
+  String get skinErrorsDestructiveActionsAndInvalidInput =>
+      'Erreurs, actions destructives et entrées non valides.';
+
+  @override
+  String get skinTextOnErrorColor => 'Texte sur couleur d\'erreur';
+
+  @override
+  String get skinLabelsAndIconsOnErrorColoredAreas =>
+      'Étiquettes et icônes sur les zones de couleur d\'erreur.';
+
+  @override
+  String get skinErrorBackground => 'Arrière-plan d\'erreur';
+
+  @override
+  String get skinSoftFillBehindErrorMessages =>
+      'Remplissage doux derrière les messages d\'erreur.';
+
+  @override
+  String get skinTextOnErrorBackgrounds => 'Texte sur arrière-plans d\'erreur';
+
+  @override
+  String get skinForegroundForErrorContainers =>
+      'Premier plan pour les conteneurs d\'erreur.';
+
+  @override
+  String get skinPageBackground => 'Arrière-plan de page';
+
+  @override
+  String get skinTheMainBackgroundBehindAppContent =>
+      'L\'arrière-plan principal derrière le contenu de l\'application.';
+
+  @override
+  String get skinMainTextAndIcons => 'Texte et icônes principaux';
+
+  @override
+  String get skinPrimaryContentDrawnOnPageAndCardBackgrounds =>
+      'Contenu principal affiché sur les arrière-plans de page et de carte.';
+
+  @override
+  String get skinDimmedBackground => 'Arrière-plan assombri';
+
+  @override
+  String get skinTheDarkestNeutralSurfaceLayer =>
+      'La couche de surface neutre la plus sombre.';
+
+  @override
+  String get skinBrightBackground => 'Arrière-plan clair';
+
+  @override
+  String get skinTheLightestNeutralSurfaceLayer =>
+      'La couche de surface neutre la plus claire.';
+
+  @override
+  String get skinDeepestCardLayer => 'Couche de carte la plus basse';
+
+  @override
+  String get skinTheLowestAndQuietestSurfaceContainer =>
+      'Le conteneur de surface le plus bas et le plus discret.';
+
+  @override
+  String get skinLowCardLayer => 'Couche de carte basse';
+
+  @override
+  String get skinSubtleCardsAndRecessedAreas =>
+      'Cartes subtiles et zones en retrait.';
+
+  @override
+  String get skinStandardCardLayer => 'Couche de carte standard';
+
+  @override
+  String get skinCommonCardsAndGroupedContent =>
+      'Cartes courantes et contenu groupé.';
+
+  @override
+  String get skinRaisedCardLayer => 'Couche de carte surélevée';
+
+  @override
+  String get skinRaisedCardsMenusAndAppBars =>
+      'Cartes surélevées, menus et barres d\'application.';
+
+  @override
+  String get skinTopCardLayer => 'Couche de carte supérieure';
+
+  @override
+  String get skinProminentPanelsAndSelectedSurfaces =>
+      'Panneaux proéminents et surfaces sélectionnées.';
+
+  @override
+  String get skinSecondaryTextAndIcons => 'Texte et icônes secondaires';
+
+  @override
+  String get skinDetailsHintsAndSupportingLabels =>
+      'Détails, indices et étiquettes secondaires.';
+
+  @override
+  String get skinStrongBorder => 'Bordure prononcée';
+
+  @override
+  String get skinVisibleBordersAndSeparators =>
+      'Bordures et séparateurs visibles.';
+
+  @override
+  String get skinSubtleBorder => 'Bordure subtile';
+
+  @override
+  String get skinQuietOutlinesAndLowEmphasisSeparators =>
+      'Contours discrets et séparateurs peu accentués.';
+
+  @override
+  String get skinShadowTint => 'Teinte d\'ombre';
+
+  @override
+  String get skinTintUsedByElevatedSurfaces =>
+      'Teinte utilisée par les surfaces surélevées.';
+
+  @override
+  String get skinModalBackdrop => 'Arrière-plan modal';
+
+  @override
+  String get skinTintBehindDialogsAndModalSheets =>
+      'Teinte derrière les boîtes de dialogue et feuilles modales.';
+
+  @override
+  String get skinInvertedSurface => 'Surface inversée';
+
+  @override
+  String get skinAContrastingSurfaceForInverseElements =>
+      'Une surface contrastée pour les éléments inversés.';
+
+  @override
+  String get skinTextOnInvertedSurfaces => 'Texte sur surfaces inversées';
+
+  @override
+  String get skinForegroundUsedOverInverseSurfaces =>
+      'Premier plan utilisé sur les surfaces inversées.';
+
+  @override
+  String get skinInvertedMainAccent => 'Accent principal inversé';
+
+  @override
+  String get skinPrimaryAccentUsedOnInverseSurfaces =>
+      'Accent principal utilisé sur les surfaces inversées.';
+
+  @override
+  String get skinElevationTint => 'Teinte d\'élévation';
+
+  @override
+  String get skinTintAppliedToElevatedSurfaces =>
+      'Teinte appliquée aux surfaces surélevées.';
+
+  @override
+  String get skinSuccessColor => 'Couleur de succès';
+
+  @override
+  String get skinCompletedActionsAndPositiveStatus =>
+      'Actions terminées et état positif.';
+
+  @override
+  String get skinTextOnSuccessColor => 'Texte sur couleur de succès';
+
+  @override
+  String get skinForegroundForSuccessColoredContent =>
+      'Premier plan pour le contenu de couleur succès.';
+
+  @override
+  String get skinSuccessBackground => 'Arrière-plan de succès';
+
+  @override
+  String get skinSoftFillBehindPositiveStatusMessages =>
+      'Remplissage doux derrière les messages d\'état positif.';
+
+  @override
+  String get skinTextOnSuccessBackgrounds =>
+      'Texte sur arrière-plans de succès';
+
+  @override
+  String get skinForegroundForSuccessContainers =>
+      'Premier plan pour les conteneurs de succès.';
+
+  @override
+  String get skinWarningColor => 'Couleur d\'avertissement';
+
+  @override
+  String get skinCautionAttentionAndPendingStatus =>
+      'Prudence, attention et état en attente.';
+
+  @override
+  String get skinTextOnWarningColor => 'Texte sur couleur d\'avertissement';
+
+  @override
+  String get skinForegroundForWarningColoredContent =>
+      'Premier plan pour le contenu de couleur avertissement.';
+
+  @override
+  String get skinWarningBackground => 'Arrière-plan d\'avertissement';
+
+  @override
+  String get skinSoftFillBehindWarningMessages =>
+      'Remplissage doux derrière les messages d\'avertissement.';
+
+  @override
+  String get skinTextOnWarningBackgrounds =>
+      'Texte sur arrière-plans d\'avertissement';
+
+  @override
+  String get skinForegroundForWarningContainers =>
+      'Premier plan pour les conteneurs d\'avertissement.';
+
+  @override
+  String get skinBookmarkColor => 'Couleur de signet';
+
+  @override
+  String get skinSavedAndBookmarkedItems => 'Éléments enregistrés et marqués.';
+
+  @override
+  String get skinMainActions => 'Actions principales';
+
+  @override
+  String get skinPrimaryButtonsSelectionsAndFixedPrimaryAccents =>
+      'Boutons principaux, sélections et accents primaires fixes.';
+
+  @override
+  String get skinSupportingAccents => 'Accents secondaires';
+
+  @override
+  String get skinSecondaryAndTertiaryHighlightsAndTheirTextColors =>
+      'Mises en évidence secondaires et tertiaires et leurs couleurs de texte.';
+
+  @override
+  String get skinErrorMessagesAndDestructiveOrInvalidStates =>
+      'Messages d\'erreur et états destructeurs ou non valides.';
+
+  @override
+  String get skinPagesCardsAndText => 'Pages, cartes et texte';
+
+  @override
+  String get skinAppBackgroundsCardsMenusAndForegroundText =>
+      'Arrière-plans d\'application, cartes, menus et texte de premier plan.';
+
+  @override
+  String get skinBordersAndOverlays => 'Bordures et superpositions';
+
+  @override
+  String get skinOutlinesShadowsAndModalBackdrops =>
+      'Contours, ombres et arrière-plans modaux.';
+
+  @override
+  String get skinTapAnyPreviewElement => 'Appuyez sur un élément d\'aperçu';
+
+  @override
+  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
+      'Choisissez une couleur d\'appli, de fichier ou d\'éditeur pour voir ce qu\'elle contrôle.';
+
+  @override
+  String get skinCustomizeSkin => 'Personnaliser le thème';
+
+  @override
+  String get skinLight => 'Clair';
+
+  @override
+  String get skinDark => 'Sombre';
+
+  @override
+  String get skinApp => 'Appli';
+
+  @override
+  String get skinEditor => 'Éditeur';
+
+  @override
+  String get skinSkinDetails => 'Détails du thème';
+
+  @override
+  String get skinNameYourSkinAndChooseWhichPaletteToEdit =>
+      'Nommez votre thème et choisissez la palette à modifier.';
+
+  @override
+  String get skinSkinName => 'Nom du thème';
+
+  @override
+  String get skinMyCustomSkin => 'Mon thème personnalisé';
+
+  @override
+  String get skinLightColors => 'Couleurs claires';
+
+  @override
+  String get skinDarkColors => 'Couleurs sombres';
+
+  @override
+  String get skinPageAndActions => 'Page et actions';
+
+  @override
+  String get skinTheMainBackgroundTextAndActionColors =>
+      'L\'arrière-plan principal, le texte et les couleurs d\'action.';
+
+  @override
+  String get skinAppBar => 'Barre d\'application';
+
+  @override
+  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
+      'La barre de navigation supérieure est indépendante des cartes et des pages.';
+
+  @override
+  String get skinTopBarFillColor =>
+      'Couleur de remplissage de la barre supérieure.';
+
+  @override
+  String get skinTitleAndIcons => 'Titre et icônes';
+
+  @override
+  String get skinTopBarTextAndIconColor =>
+      'Couleur du texte et des icônes de la barre supérieure.';
+
+  @override
+  String get skinFloatingActionButton => 'Bouton d\'action flottant';
+
+  @override
+  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
+      'Son remplissage et sa couleur d\'icône sont séparés des couleurs de sélection.';
+
+  @override
+  String get skinButtonFill => 'Remplissage du bouton';
+
+  @override
+  String get skinBackgroundOfTheRoundButton => 'Arrière-plan du bouton rond +.';
+
+  @override
+  String get skinButtonIcon => 'Icône du bouton';
+
+  @override
+  String get skinIconColorOnTheRoundButton =>
+      'Couleur de l\'icône sur le bouton rond +.';
+
+  @override
+  String get skinDashboardVaultCards => 'Cartes de coffre du tableau de bord';
+
+  @override
+  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
+      'Définir l\'arrière-plan des cartes de coffres verrouillés et montés.';
+
+  @override
+  String get skinLockedVaultCard => 'Carte de coffre verrouillé';
+
+  @override
+  String get skinNeutralVaultCardFill =>
+      'Remplissage neutre de carte de coffre.';
+
+  @override
+  String get skinMountedVaultCard => 'Carte de coffre monté';
+
+  @override
+  String get skinSeparateFillForAnUnlockedMountedVault =>
+      'Remplissage distinct pour un coffre déverrouillé et monté.';
+
+  @override
+  String get skinFineTuneAppColors => 'Ajuster les couleurs de l\'application';
+
+  @override
+  String get skinAdvancedMaterialColorsForLessCommonElements =>
+      'Couleurs Material avancées pour les éléments moins courants.';
+
+  @override
+  String get skinStatusAndBookmarkColors => 'Couleurs de statut et de signet';
+
+  @override
+  String get skinColorsForSuccessWarningsErrorsAndBookmarks =>
+      'Couleurs pour le succès, avertissements, erreurs et signets.';
+
+  @override
+  String get skinTheCustomSkinIsActive971ce3 =>
+      'Le thème personnalisé est actif immédiatement tandis que le Gestionnaire de fichiers et l\'Éditeur sont configurés pour suivre le thème de l\'application.';
+
+  @override
+  String get skinCustomColorTapToChangeOrReset =>
+      'Couleur personnalisée · toucher pour modifier ou réinitialiser';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor =>
+      'Appuyez sur le cercle de couleur pour choisir une couleur.';
+
+  @override
+  String get skinAppBarBackground => 'Arrière-plan de la barre d\'application';
+
+  @override
+  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
+      'Le tableau de bord et les autres barres d\'application utilisent cette couleur indépendante.';
+
+  @override
+  String get skinDashboardMenuIcon => 'Icône de menu du tableau de bord';
+
+  @override
+  String get skinTheHamburgerButtonUsesTheAppBarIconColor =>
+      'Le bouton hamburger utilise la couleur d\'icône de la barre d\'application.';
+
+  @override
+  String get skinDashboardTitle => 'Titre du tableau de bord';
+
+  @override
+  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
+      'Le titre du tableau de bord utilise la couleur de premier plan de la barre d\'application.';
+
+  @override
+  String get skinActionLabelAndIcon => 'Étiquette et icône d\'action';
+
+  @override
+  String get skinTheActionAccentColorsLabelsb08a63 =>
+      'L\'accent d\'action colore les étiquettes comme Ajouter un coffre et leurs icônes.';
+
+  @override
+  String get skinDashboardAddButton => 'Bouton d\'ajout du tableau de bord';
+
+  @override
+  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
+      'Le remplissage du bouton et l\'icône plus ont des couleurs de thème distinctes.';
+
+  @override
+  String get skinVaultCardAndIconBackground =>
+      'Arrière-plan de la carte et de l\'icône de coffre';
+
+  @override
+  String get skinTheIconTileUsesPrimary5c2f93 =>
+      'La tuile d\'icône utilise Primary container. La carte de coffre monté mélange cette couleur avec la surface surélevée.';
+
+  @override
+  String get skinVaultFormatIconColor =>
+      'Couleur de l\'icône de format de coffre';
+
+  @override
+  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
+      'Les initiales du format de coffre utilisent On primary container.';
+
+  @override
+  String get skinVaultStorageDetails => 'Détails de stockage du coffre';
+
+  @override
+  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
+      'L\'espace libre et la capacité utilisent la couleur de texte secondaire.';
+
+  @override
+  String get skin17GBFree5GB => '1,7 Go libres / 5 Go';
+
+  @override
+  String get skinVaultStorageProgress => 'Progression du stockage du coffre';
+
+  @override
+  String get skinTheProgressBarUsesTheba7c98 =>
+      'La barre de progression utilise l\'accent de l\'application, puis passe aux couleurs tertiaires et d\'erreur lorsque le stockage se remplit.';
+
+  @override
+  String get skinLockActionBackground =>
+      'Arrière-plan de l\'action de verrouillage';
+
+  @override
+  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
+      'Le bouton de verrouillage du coffre monté utilise Primary container.';
+
+  @override
+  String get skinVaultActionsIconColor =>
+      'Couleur de l\'icône d\'actions du coffre';
+
+  @override
+  String get skinTheOverflowMenuUsesTheSupportingIconColor =>
+      'Le menu de débordement utilise la couleur d\'icône secondaire.';
+
+  @override
+  String get skinMountedVaultCardBackground =>
+      'Arrière-plan de la carte de coffre monté';
+
+  @override
+  String get skinThisIsTheBackgroundOfa8d0d3 =>
+      'C\'est l\'arrière-plan de la carte de coffre monté. Sa tuile d\'icône utilise toujours la couleur d\'action principale.';
+
+  @override
+  String get skinLockedVaultCardBackground =>
+      'Arrière-plan de la carte de coffre verrouillé';
+
+  @override
+  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
+      'Cette couleur est indépendante de la barre d\'application et de la carte de coffre monté.';
+
+  @override
+  String get skinLockedVaultFormatIcon =>
+      'Icône de format de coffre verrouillé';
+
+  @override
+  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
+      'Les icônes de coffres verrouillés utilisent la couleur de texte et d\'icône secondaire.';
+
+  @override
+  String get skinSharedArchive => 'Archive partagée';
+
+  @override
+  String get skinLockedVaultStatusText => 'Texte d\'état du coffre verrouillé';
+
+  @override
+  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
+      'L\'étiquette d\'état verrouillé utilise la couleur de texte secondaire.';
+
+  @override
+  String get skinLockedVaultActionsIcon =>
+      'Icône d\'actions du coffre verrouillé';
+
+  @override
+  String get skinVaultActionsMenuBackground =>
+      'Arrière-plan du menu d\'actions du coffre';
+
+  @override
+  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
+      'Le menu contextuel Modifier et Supprimer utilise la couleur de surface du menu.';
+
+  @override
+  String get skinEditMenuItem => 'Élément de menu Modifier';
+
+  @override
+  String get skinTheEditActionUsesTheRegularForegroundColor =>
+      'L\'action Modifier utilise la couleur de premier plan normale.';
+
+  @override
+  String get skinRemoveMenuItem => 'Élément de menu Supprimer';
+
+  @override
+  String get skinDestructiveActionsUseTheErrorColor =>
+      'Les actions destructives utilisent la couleur d\'erreur.';
+
+  @override
+  String get skinFileManagerAppBar =>
+      'Barre d\'application du gestionnaire de fichiers';
+
+  @override
+  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
+      'Les barres d\'outils du navigateur de fichiers utilisent le même arrière-plan de barre d\'application.';
+
+  @override
+  String get skinFileManagerBackButton =>
+      'Bouton retour du gestionnaire de fichiers';
+
+  @override
+  String get skinToolbarNavigationIconsUseThisColor =>
+      'Les icônes de navigation de la barre d\'outils utilisent cette couleur.';
+
+  @override
+  String get skinFileManagerTitle => 'Titre du gestionnaire de fichiers';
+
+  @override
+  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
+      'Le nom du dossier actuel utilise le premier plan de la barre d\'application.';
+
+  @override
+  String get skinFileManagerAppBarActions =>
+      'Actions de la barre d\'application du gestionnaire de fichiers';
+
+  @override
+  String get skinToolbarActionsUseThisIconColor =>
+      'Les actions de la barre d\'outils utilisent cette couleur d\'icône.';
+
+  @override
+  String get skinProjects => 'Projets';
+
+  @override
+  String get skinFolder12Items => 'Dossier · 12 éléments';
+
+  @override
+  String get skinTextFile4KB => 'Fichier texte · 4 Ko';
+
+  @override
+  String get skinCompressedFile28MB => 'Fichier compressé · 28 Mo';
+
+  @override
+  String get skin3Items => '3 éléments';
+
+  @override
+  String get skinFileManagerAddButton =>
+      'Bouton d\'ajout du gestionnaire de fichiers';
+
+  @override
+  String get skinAddButtonIconColor => 'Couleur de l\'icône du bouton d\'ajout';
+
+  @override
+  String get skinThePlusIconUsesTheButtonForegroundColor =>
+      'L\'icône plus utilise la couleur de premier plan du bouton.';
+
+  @override
+  String get skinEditorFileName => 'Nom de fichier dans l\'éditeur';
+
+  @override
+  String get skinTheEditorToolbarUsesTheAppForegroundColor =>
+      'La barre d\'outils de l\'éditeur utilise la couleur de premier plan de l\'application.';
+
+  @override
+  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Lg 3, Col 12';
+
+  @override
+  String get skinTheMainBackgroundBehindThisScreen =>
+      'L\'arrière-plan principal derrière cet écran.';
+
+  @override
+  String get skinFolderIconColor => 'Couleur de l\'icône de dossier';
+
+  @override
+  String get skinFileIconColor => 'Couleur de l\'icône de fichier';
+
+  @override
+  String get skinText => ' : ';
+
+  @override
+  String get skinFolderNameColor => 'Couleur du nom de dossier';
+
+  @override
+  String get skinFileNameColor => 'Couleur du nom de fichier';
+
+  @override
+  String get skinFileDetailsColor => 'Couleur des détails de fichier';
+
+  @override
+  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
+      'Les petites étiquettes de date, taille et type utilisent cette couleur.';
+
+  @override
+  String get skinFileOverflowButton => 'Bouton d\'options de fichier';
+
+  @override
+  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
+      'Le bouton à trois points de chaque ligne utilise la couleur d\'icône secondaire.';
+
+  @override
+  String get skinSelectedFileRow => 'Ligne de fichier sélectionnée';
+
+  @override
+  String get skinSelectedRowsUseATranslucente0ff21 =>
+      'Les lignes sélectionnées utilisent une mise en surbrillance translucide de conteneur principal ; la liste de fichiers reste sur l\'arrière-plan de la page.';
+
+  @override
+  String get skinFileActionsMenuBackground =>
+      'Arrière-plan du menu d\'actions de fichier';
+
+  @override
+  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
+      'Le menu contextuel des actions de fichier utilise la couleur de surface du menu.';
+
+  @override
+  String get skinOpenFileMenuItem => 'Élément de menu Ouvrir le fichier';
+
+  @override
+  String get skinRegularFileActionsUseTheMainTextColor =>
+      'Les actions de fichier standard utilisent la couleur de texte principale.';
+
+  @override
+  String get skinOpen => 'Ouvrir';
+
+  @override
+  String get skinDeleteFileMenuItem => 'Élément de menu Supprimer le fichier';
+
+  @override
+  String get skinEditorBackground => 'Arrière-plan de l\'éditeur';
+
+  @override
+  String get skinTheCanvasColorBehindTheCode =>
+      'La couleur de la zone de travail derrière le code.';
+
+  @override
+  String get skinEditorLineNumbers => 'Numéros de ligne de l\'éditeur';
+
+  @override
+  String get skinTheGutterAndLineNumbersBesideTheCode =>
+      'La marge et les numéros de ligne à côté du code.';
+
+  @override
+  String get skinEditorTextColor => 'Couleur du texte de l\'éditeur';
+
+  @override
+  String get skinTheDefaultCodeAndEditorTextColor =>
+      'La couleur de texte par défaut du code et de l\'éditeur.';
+
+  @override
+  String get skinEditorCursor => 'Curseur de l\'éditeur';
+
+  @override
+  String get skinTheInsertionCaretColor =>
+      'La couleur du curseur d\'insertion.';
+
+  @override
+  String get skinEditorSelectionHighlight =>
+      'Surlignage de sélection de l\'éditeur';
+
+  @override
+  String get skinTheBackgroundUsedToHighlightSelectedCode =>
+      'L\'arrière-plan utilisé pour surligner le code sélectionné.';
+
+  @override
+  String get skinFileManager => 'Gestionnaire de fichiers';
+
+  @override
+  String get skinFolderAndFileGlyphsTilesAndLabelColors =>
+      'Glyphes, tuiles et couleurs d\'étiquettes des dossiers et fichiers.';
+
+  @override
+  String get skinDetailsTextColor => 'Couleur du texte des détails';
+
+  @override
+  String get skinUseTheAppSSupportingTextColor =>
+      'Utiliser la couleur de texte secondaire de l\'application';
+
+  @override
+  String get skinCustomColor => 'Couleur personnalisée';
+
+  @override
+  String get skinMonospaceFileNames => 'Noms de fichiers à espacement fixe';
+
+  @override
+  String get skinBackgroundBehindTheIcon => 'Arrière-plan derrière l\'icône';
+
+  @override
+  String get skinIconColorSource => 'Source de couleur de l\'icône';
+
+  @override
+  String get skinUseTheAppSMainTextColor =>
+      'Utiliser la couleur de texte principale de l\'application';
+
+  @override
+  String get skinTextEditor => 'Éditeur de texte';
+
+  @override
+  String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
+      'Zone de travail, marge, curseur, sélection, arrière-plan et modèle de syntaxe.';
+
+  @override
+  String get skinGutterAndLineNumbers => 'Marge et numéros de ligne';
+
+  @override
+  String get skinCursor => 'Curseur';
+
+  @override
+  String get skinSelection => 'Sélection';
+
+  @override
+  String get skinEditorBackgroundTemplate =>
+      'Modèle d\'arrière-plan de l\'éditeur';
+
+  @override
+  String get skinSyntaxTemplate => 'Modèle de syntaxe';
+
+  @override
+  String get skinTapTheColorCircleToChooseAColor246981 =>
+      'Appuyez sur le cercle de couleur pour choisir une couleur';
+
+  @override
+  String get skinDefaultVaultExplorerIcons =>
+      'Icônes Vault Explorer par défaut';
+
+  @override
+  String get skinSolidIcons => 'Icônes pleines';
+
+  @override
+  String get skinRoundedIcons => 'Icônes arrondies';
+
+  @override
+  String get skinOutlineIcons => 'Icônes de contour';
+
+  @override
+  String get skinSquareCornerIcons => 'Icônes à angles droits';
+
+  @override
+  String get skinTintedTileBehindTheIcon => 'Tuile teintée derrière l\'icône';
+
+  @override
+  String get skinOutlinedTileBehindTheIcon =>
+      'Tuile avec contour derrière l\'icône';
+
+  @override
+  String get skinNoTile => 'Pas de tuile';
+
+  @override
+  String get skinAutomaticFileTypeOrFolderColor =>
+      'Automatique (type de fichier ou couleur de dossier)';
+
+  @override
+  String get skinUseTheMainAppAccent =>
+      'Utiliser l\'accent principal de l\'application';
+
+  @override
+  String get skinUseAMutedNeutralColor =>
+      'Utiliser une couleur neutre discrète';
+
+  @override
+  String get skinChooseAColorBelow => 'Choisissez une couleur ci-dessous';
+
+  @override
+  String get skinUseTheSyntaxThemeBackground =>
+      'Utiliser l\'arrière-plan du thème de syntaxe';
+
+  @override
+  String get skinPureBlack => 'Noir pur';
+
+  @override
+  String get skinDarkSlate => 'Ardoise sombre';
+
+  @override
+  String get skinCleanWhite => 'Blanc pur';
+
+  @override
+  String get skinWarmSepia => 'Sépia chaud';
+
+  @override
+  String get skinAutomaticMatchLightOrDarkMode =>
+      'Automatique (s\'adapte au mode clair ou sombre)';
+
+  @override
+  String get skinSkinExported => 'Thème exporté.';
+
+  @override
+  String get skinSkinsExported => 'Thèmes exportés.';
+
+  @override
+  String get skinRemoveSkin => 'Supprimer le thème ?';
+
+  @override
+  String get skinAppSkin => 'Thème de l\'application';
+
+  @override
+  String get skinImportSkins => 'Importer des thèmes';
+
+  @override
+  String get skinExportSkins => 'Exporter des thèmes';
+
+  @override
+  String get skinChooseACoordinatedLookForTheAppFileManagerAndEditor =>
+      'Choisissez une apparence coordonnée pour l\'application, le gestionnaire de fichiers et l\'éditeur. ';
+
+  @override
+  String get skinLightAndDarkSystemThemesUseMatchingPaletteVariants =>
+      'Les thèmes système clair et sombre utilisent des variantes de palette assorties.';
+
+  @override
+  String get skinEditCurrentSkin => 'Modifier le thème actuel';
+
+  @override
+  String get skinCreateASkinFromThisLook =>
+      'Créer un thème à partir de cette apparence';
+
+  @override
+  String get skinYourSkins => 'Vos thèmes';
+
+  @override
+  String get skinCustomAppFileManagerAndEditorColors =>
+      'Couleurs personnalisées de l\'application, du gestionnaire de fichiers et de l\'éditeur';
+
+  @override
+  String get skinMaterialColorsWithLightAndDarkVariants =>
+      'Couleurs Material avec variantes claire et sombre';
+
+  @override
+  String get skinTrueBlackEditorAndDarkf97e8f =>
+      'Éditeur noir pur et surfaces d\'application sombres avec la palette d\'accents OLED';
+
+  @override
+  String get skinYourEditableAppFileManagerAndEditorColors =>
+      'Vos couleurs modifiables de l\'application, du gestionnaire de fichiers et de l\'éditeur';
+
+  @override
+  String get skinSkinActions => 'Actions du thème';
+
+  @override
+  String get skinEditSkin => 'Modifier le thème';
+
+  @override
+  String get skinExportSkin => 'Exporter le thème';
+
+  @override
+  String get skinRemoveSkinf09101 => 'Supprimer le thème';
+
+  @override
+  String get skinDragAroundTheRingTo868d62 =>
+      'Faites glisser autour de l\'anneau pour choisir une teinte, puis déplacez-vous à l\'intérieur pour ajuster la nuance.';
+
+  @override
+  String get skinQuickColors => 'Couleurs rapides';
+
+  @override
+  String get skinEnterAnExactColor => 'Saisir une couleur exacte';
+
+  @override
+  String get skinOptionalRGBOrARGBValue => 'Valeur RVB ou ARVB facultative';
+
+  @override
+  String get skinRGBARGB => 'RGB / ARGB';
+
+  @override
+  String get skinUseThisValue => 'Utiliser cette valeur';
+
+  @override
+  String get skinDefaultLightDark => 'Par défaut Clair / Sombre';
+
+  @override
+  String get skinOLEDPureBlack => 'OLED Noir pur';
+
+  @override
+  String get skinCustomSkin => 'Thème personnalisé';
+
+  @override
+  String skinImportSucceeded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# thèmes importés.',
+      one: '1 thème importé.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String skinImportFailed(String error) {
+    return 'Impossible d\'importer le thème : $error';
+  }
+
+  @override
+  String skinExportFailed(String error) {
+    return 'Impossible d\'exporter le thème : $error';
+  }
+
+  @override
+  String skinRemoveConfirmation(String skin) {
+    return '« $skin » sera supprimé de vos thèmes enregistrés.';
+  }
+
+  @override
+  String skinSelectPreviewElement(String title) {
+    return 'Sélectionner $title';
+  }
+
+  @override
+  String skinIconColorForItem(String item) {
+    return 'Couleur de l\'icône de $item';
+  }
+
+  @override
+  String skinNameColorForItem(String item) {
+    return 'Couleur du nom de $item';
+  }
+
+  @override
+  String get skinFileIconColorSettingDescription =>
+      'Cette couleur est contrôlée par le paramètre de couleur d\'icône dans la section gestionnaire de fichiers.';
+
+  @override
+  String get skinFileNameColorSettingDescription =>
+      'Cette couleur est contrôlée par le paramètre de couleur de nom dans la section gestionnaire de fichiers.';
+
+  @override
+  String get skinExportedSingle => 'Thème exporté.';
+
+  @override
+  String get skinExportedMultiple => 'Thèmes exportés.';
 }

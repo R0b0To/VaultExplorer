@@ -27,7 +27,19 @@ class _PortraitLayout extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: body),
-        if (!hasError) ...[shelf, toolSelectorRow],
+        if (!hasError)
+          // The app is edge-to-edge and the screen's own SafeArea opts out of
+          // the bottom inset, so the controls must keep clear of the system
+          // navigation bar themselves. Without this, the 3-button navigation
+          // bar draws over the tool row and swallows taps in portrait. The
+          // image body above stays full-bleed.
+          SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [shelf, toolSelectorRow],
+            ),
+          ),
       ],
     );
   }

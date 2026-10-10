@@ -12551,5 +12551,21 @@
   "skinFileRowDetailsColor": "File row details color",
   "skinFileActionOverflowIconColor": "File row action icon color",
   "skinMatchingElementsHighlightTogether": "Other preview elements with the same color are highlighted too.",
-  "skinStatusBannerTextColor": "The banner text uses this color."
+  "skinStatusBannerTextColor": "The banner text uses this color.",
+  "apkOpenPackageInstaller": "Package installer",
+  "@apkOpenPackageInstaller": {
+    "description": "Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer"
+  },
+  "apkOpenPackageInstallerSubtitle": "Install this app on your device",
+  "@apkOpenPackageInstallerSubtitle": {
+    "description": "Subtitle under the \"Package installer\" choice in the APK open dialog"
+  },
+  "apkOpenAsZip": "Open as ZIP",
+  "@apkOpenAsZip": {
+    "description": "Choice label in the APK open dialog (and the file-associations list in settings): browse the .apk as a ZIP archive"
+  },
+  "apkOpenAsZipSubtitle": "Browse the files inside and extract them",
+  "@apkOpenAsZipSubtitle": {
+    "description": "Subtitle under the \"Open as ZIP\" choice in the APK open dialog"
+  }
 }

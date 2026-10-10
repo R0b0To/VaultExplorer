@@ -8,8 +8,151 @@ typedef OpenWithChoice = ({
   String? mimeType, // only meaningful when action == 'open_as'
 });
 
+/// Result of [OpenWithDialog.showApkChooser]. [action] is `'installer'`,
+/// `'archive'`, or null when the dialog was dismissed.
+typedef ApkOpenChoice = ({String? action, bool remember});
+
 class OpenWithDialog {
   const OpenWithDialog._();
+
+  /// Asks what to do with an `.apk`: hand it to the system package installer
+  /// or open it as a ZIP archive. An APK is both, so this is shown instead of
+  /// guessing. [ext] is only used for the "remember" checkbox label.
+  static Future<ApkOpenChoice> showApkChooser(
+    BuildContext context, {
+    required String fileName,
+    required String ext,
+  }) async {
+    bool remember = false;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final cs = Theme.of(context).colorScheme;
+            final textTheme = Theme.of(context).textTheme;
+            final isLandscape =
+                MediaQuery.orientationOf(context) == Orientation.landscape;
+
+            final rememberCheckbox = InkWell(
+              onTap: () => setDialogState(() => remember = !remember),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: remember,
+                    onChanged: (val) {
+                      setDialogState(() => remember = val ?? false);
+                    },
+                  ),
+                  Expanded(
+                    child: Text(
+                      context.l10n.alwaysRememberChoiceExt(ext),
+                      style: textTheme.bodySmall ?? textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            );
+
+            final tiles = [
+              _ActionTile(
+                icon: Icons.android_rounded,
+                iconColor: cs.primary,
+                title: context.l10n.apkOpenPackageInstaller,
+                subtitle: context.l10n.apkOpenPackageInstallerSubtitle,
+                dense: isLandscape,
+                onTap: () => Navigator.of(context).pop('installer'),
+              ),
+              _ActionTile(
+                icon: Icons.folder_zip_outlined,
+                iconColor: cs.secondary,
+                title: context.l10n.apkOpenAsZip,
+                subtitle: context.l10n.apkOpenAsZipSubtitle,
+                dense: isLandscape,
+                onTap: () => Navigator.of(context).pop('archive'),
+              ),
+            ];
+
+            return AlertDialog(
+              scrollable: true,
+              constraints: BoxConstraints(maxWidth: isLandscape ? 640 : 420),
+              title: isLandscape ? null : Text(context.l10n.openFileDialogTitle),
+              content: isLandscape
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                context.l10n.openFileDialogTitle,
+                                style: textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                context.l10n.chooseHowToOpen(fileName),
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              rememberCheckbox,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              tiles[0],
+                              const SizedBox(height: 8),
+                              tiles[1],
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          context.l10n.chooseHowToOpen(fileName),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        tiles[0],
+                        const SizedBox(height: 12),
+                        tiles[1],
+                        const SizedBox(height: 16),
+                        rememberCheckbox,
+                      ],
+                    ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(context.l10n.cancel),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return (action: result, remember: remember);
+  }
 
   static Future<OpenWithChoice> show(
     BuildContext context, {

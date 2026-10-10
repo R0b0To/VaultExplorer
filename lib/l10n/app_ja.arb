@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "ファイル行の詳細の色",
   "skinFileActionOverflowIconColor": "ファイル行のアクションアイコンの色",
   "skinMatchingElementsHighlightTogether": "同じ色の他のプレビュー要素も強調表示されます。",
-  "skinStatusBannerTextColor": "バナーテキストにはこの色が使用されます。"
+  "skinStatusBannerTextColor": "バナーテキストにはこの色が使用されます。",
+  "apkOpenPackageInstaller": "パッケージインストーラー",
+  "apkOpenPackageInstallerSubtitle": "このアプリを端末にインストールします",
+  "apkOpenAsZip": "ZIPとして開く",
+  "apkOpenAsZipSubtitle": "中のファイルを参照して展開します"
 }

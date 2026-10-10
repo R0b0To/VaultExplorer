@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "Cor dos detalhes da linha de arquivo",
   "skinFileActionOverflowIconColor": "Cor do ícone de ação da linha de arquivo",
   "skinMatchingElementsHighlightTogether": "Outros elementos de pré-visualização com a mesma cor também são destacados.",
-  "skinStatusBannerTextColor": "O texto do banner usa esta cor."
+  "skinStatusBannerTextColor": "O texto do banner usa esta cor.",
+  "apkOpenPackageInstaller": "Instalador de pacotes",
+  "apkOpenPackageInstallerSubtitle": "Instalar este app no seu dispositivo",
+  "apkOpenAsZip": "Abrir como ZIP",
+  "apkOpenAsZipSubtitle": "Explorar os arquivos internos e extraí-los"
 }

@@ -1667,6 +1667,8 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
   String _labelForAssociation(BuildContext context, String value) {
     if (value == 'editor') return context.l10n.fileAssocInAppTextEditor;
     if (value == 'media') return context.l10n.fileAssocInAppMediaViewer;
+    if (value == 'installer') return context.l10n.apkOpenPackageInstaller;
+    if (value == 'archive') return context.l10n.apkOpenAsZip;
     if (value.startsWith('package:')) {
       return context.l10n.fileAssocAppPrefix(value.substring(8));
     }

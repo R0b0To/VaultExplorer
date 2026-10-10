@@ -11082,4 +11082,18 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get skinStatusBannerTextColor =>
       'Le texte de la bannière utilise cette couleur.';
+
+  @override
+  String get apkOpenPackageInstaller => 'Installateur de paquets';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle =>
+      'Installer cette application sur votre appareil';
+
+  @override
+  String get apkOpenAsZip => 'Ouvrir comme ZIP';
+
+  @override
+  String get apkOpenAsZipSubtitle =>
+      'Parcourir les fichiers qu’il contient et les extraire';
 }

@@ -11,25 +11,91 @@ import 'dart:io';
 ///     'description': 'Description for translators',
 ///   },
 const Map<String, dynamic> enMetadataAndValues = {
-  // 'exampleKey': 'Example value',
-  // '@exampleKey': {
-  //   'description': 'Context or description for this key',
-  // },
+  'apkOpenPackageInstaller': 'Package installer',
+  '@apkOpenPackageInstaller': {
+    'description':
+        'Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer',
+  },
+  'apkOpenPackageInstallerSubtitle': 'Install this app on your device',
+  '@apkOpenPackageInstallerSubtitle': {
+    'description':
+        'Subtitle under the "Package installer" choice in the APK open dialog',
+  },
+  'apkOpenAsZip': 'Open as ZIP',
+  '@apkOpenAsZip': {
+    'description':
+        'Choice label in the APK open dialog (and the file-associations list in settings): browse the .apk as a ZIP archive',
+  },
+  'apkOpenAsZipSubtitle': 'Browse the files inside and extract them',
+  '@apkOpenAsZipSubtitle': {
+    'description':
+        'Subtitle under the "Open as ZIP" choice in the APK open dialog',
+  },
 };
 
 /// Add translations for each supported language here.
 /// If a translation for a key is omitted, it falls back to the English value.
 const Map<String, Map<String, String>> localizedValues = {
-  'ar': {},
-  'de': {},
-  'es': {},
-  'fr': {},
-  'it': {},
-  'ja': {},
-  'ko': {},
-  'pt': {},
-  'uk': {},
-  'zh': {},
+  'ar': {
+    'apkOpenPackageInstaller': 'مُثبّت الحزم',
+    'apkOpenPackageInstallerSubtitle': 'ثبّت هذا التطبيق على جهازك',
+    'apkOpenAsZip': 'فتح كملف ZIP',
+    'apkOpenAsZipSubtitle': 'تصفّح الملفات بداخله واستخراجها',
+  },
+  'de': {
+    'apkOpenPackageInstaller': 'Paketinstaller',
+    'apkOpenPackageInstallerSubtitle': 'Diese App auf dem Gerät installieren',
+    'apkOpenAsZip': 'Als ZIP öffnen',
+    'apkOpenAsZipSubtitle': 'Enthaltene Dateien durchsuchen und extrahieren',
+  },
+  'es': {
+    'apkOpenPackageInstaller': 'Instalador de paquetes',
+    'apkOpenPackageInstallerSubtitle': 'Instalar esta app en tu dispositivo',
+    'apkOpenAsZip': 'Abrir como ZIP',
+    'apkOpenAsZipSubtitle': 'Explorar los archivos que contiene y extraerlos',
+  },
+  'fr': {
+    'apkOpenPackageInstaller': 'Installateur de paquets',
+    'apkOpenPackageInstallerSubtitle': 'Installer cette application sur votre appareil',
+    'apkOpenAsZip': 'Ouvrir comme ZIP',
+    'apkOpenAsZipSubtitle': 'Parcourir les fichiers qu’il contient et les extraire',
+  },
+  'it': {
+    'apkOpenPackageInstaller': 'Programma di installazione pacchetti',
+    'apkOpenPackageInstallerSubtitle': 'Installa questa app sul dispositivo',
+    'apkOpenAsZip': 'Apri come ZIP',
+    'apkOpenAsZipSubtitle': 'Sfoglia i file contenuti ed estraili',
+  },
+  'ja': {
+    'apkOpenPackageInstaller': 'パッケージインストーラー',
+    'apkOpenPackageInstallerSubtitle': 'このアプリを端末にインストールします',
+    'apkOpenAsZip': 'ZIPとして開く',
+    'apkOpenAsZipSubtitle': '中のファイルを参照して展開します',
+  },
+  'ko': {
+    'apkOpenPackageInstaller': '패키지 설치 프로그램',
+    'apkOpenPackageInstallerSubtitle': '이 앱을 기기에 설치합니다',
+    'apkOpenAsZip': 'ZIP으로 열기',
+    'apkOpenAsZipSubtitle': '내부 파일을 둘러보고 압축을 풉니다',
+  },
+  'pt': {
+    'apkOpenPackageInstaller': 'Instalador de pacotes',
+    'apkOpenPackageInstallerSubtitle': 'Instalar este app no seu dispositivo',
+    'apkOpenAsZip': 'Abrir como ZIP',
+    'apkOpenAsZipSubtitle': 'Explorar os arquivos internos e extraí-los',
+  },
+  'uk': {
+    'apkOpenPackageInstaller': 'Інсталятор пакетів',
+    'apkOpenPackageInstallerSubtitle': 'Встановити цю програму на пристрій',
+    'apkOpenAsZip': 'Відкрити як ZIP',
+    'apkOpenAsZipSubtitle': 'Переглянути вміст і видобути файли',
+  },
+  'zh': {
+    'apkOpenPackageInstaller': '软件包安装程序',
+    'apkOpenPackageInstallerSubtitle': '将此应用安装到你的设备',
+    'apkOpenAsZip': '作为 ZIP 打开',
+    'apkOpenAsZipSubtitle': '浏览其中的文件并解压',
+  },
 };
 
 void main() async {

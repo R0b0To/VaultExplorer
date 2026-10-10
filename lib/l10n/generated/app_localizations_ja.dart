@@ -10388,4 +10388,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skinStatusBannerTextColor => 'バナーテキストにはこの色が使用されます。';
+
+  @override
+  String get apkOpenPackageInstaller => 'パッケージインストーラー';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle => 'このアプリを端末にインストールします';
+
+  @override
+  String get apkOpenAsZip => 'ZIPとして開く';
+
+  @override
+  String get apkOpenAsZipSubtitle => '中のファイルを参照して展開します';
 }

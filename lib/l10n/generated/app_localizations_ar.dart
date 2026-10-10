@@ -11009,4 +11009,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get skinStatusBannerTextColor => 'يستخدم نص اللافتة هذا اللون.';
+
+  @override
+  String get apkOpenPackageInstaller => 'مُثبّت الحزم';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle => 'ثبّت هذا التطبيق على جهازك';
+
+  @override
+  String get apkOpenAsZip => 'فتح كملف ZIP';
+
+  @override
+  String get apkOpenAsZipSubtitle => 'تصفّح الملفات بداخله واستخراجها';
 }

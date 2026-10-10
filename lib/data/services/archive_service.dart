@@ -66,6 +66,28 @@ class ArchiveService {
   static bool isArchive(String ext) =>
       allArchiveExtensions.contains(ext.toLowerCase());
 
+  /// Extensions that are really ZIP containers under a different name.
+  ///
+  /// The native engine sniffs the format from the bytes (libarchive's
+  /// `archive_read_support_format_all`), so these already scan, list and
+  /// extract correctly -- they just must not be *auto-routed* to the archive
+  /// browser on tap the way [isArchive] extensions are, because tapping one
+  /// means something else first (an `.apk` is installed).
+  ///
+  /// Deliberately kept out of [allArchiveExtensions]: [isArchive] is also
+  /// what `isUnsupportedArchiveCarrierName` uses to reject a file as a
+  /// composite-container carrier, and an APK is a perfectly valid carrier.
+  static const zipLikePackageExtensions = {'apk'};
+
+  static bool isZipLikePackage(String ext) =>
+      zipLikePackageExtensions.contains(ext.toLowerCase());
+
+  /// True when the file can be opened in the archive browser and extracted,
+  /// whether or not a tap does that by default: every [isArchive] extension
+  /// plus the [zipLikePackageExtensions].
+  static bool isOpenableAsArchive(String ext) =>
+      isArchive(ext) || isZipLikePackage(ext);
+
   static Future<ArchiveContext> open({
     required MountedContainer container,
     required String archivePathInContainer,

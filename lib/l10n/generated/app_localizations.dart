@@ -18306,6 +18306,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The banner text uses this color.'**
   String get skinStatusBannerTextColor;
+
+  /// Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer
+  ///
+  /// In en, this message translates to:
+  /// **'Package installer'**
+  String get apkOpenPackageInstaller;
+
+  /// Subtitle under the "Package installer" choice in the APK open dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Install this app on your device'**
+  String get apkOpenPackageInstallerSubtitle;
+
+  /// Choice label in the APK open dialog (and the file-associations list in settings): browse the .apk as a ZIP archive
+  ///
+  /// In en, this message translates to:
+  /// **'Open as ZIP'**
+  String get apkOpenAsZip;
+
+  /// Subtitle under the "Open as ZIP" choice in the APK open dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the files inside and extract them'**
+  String get apkOpenAsZipSubtitle;
 }
 
 class _AppLocalizationsDelegate

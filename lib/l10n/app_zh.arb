@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "文件行详细信息颜色",
   "skinFileActionOverflowIconColor": "文件行操作图标颜色",
   "skinMatchingElementsHighlightTogether": "具有相同颜色的其他预览元素也会同时高亮显示。",
-  "skinStatusBannerTextColor": "横幅文本使用此颜色。"
+  "skinStatusBannerTextColor": "横幅文本使用此颜色。",
+  "apkOpenPackageInstaller": "软件包安装程序",
+  "apkOpenPackageInstallerSubtitle": "将此应用安装到你的设备",
+  "apkOpenAsZip": "作为 ZIP 打开",
+  "apkOpenAsZipSubtitle": "浏览其中的文件并解压"
 }

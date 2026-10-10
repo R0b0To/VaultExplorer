@@ -11062,4 +11062,17 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinStatusBannerTextColor =>
       'Текст банера використовує цей колір.';
+
+  @override
+  String get apkOpenPackageInstaller => 'Інсталятор пакетів';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle =>
+      'Встановити цю програму на пристрій';
+
+  @override
+  String get apkOpenAsZip => 'Відкрити як ZIP';
+
+  @override
+  String get apkOpenAsZipSubtitle => 'Переглянути вміст і видобути файли';
 }

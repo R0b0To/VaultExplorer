@@ -43,13 +43,32 @@ class OpenWithSystemApp extends FileOpenAction {
 
 /// Hand the file to the system package installer.
 ///
-/// Sits below every saved preference, so a user who has explicitly
-/// pointed `.apk` at some other app (an APK analyser, an archive viewer
-/// -- an APK is a ZIP) still gets that app. With no preference set,
-/// though, tapping an APK means one thing to almost everyone, and
-/// offering a chooser instead just adds a step to it.
+/// Reached for an `.apk` only through an explicit choice: the saved
+/// `'installer'` preference, or picking "Package installer" in
+/// [ShowApkOpenChooser]. Like every other action it sits below the saved
+/// preferences, so a user who has explicitly pointed `.apk` at some other
+/// app (an APK analyser, a third-party archive viewer) still gets that app.
 class InstallApk extends FileOpenAction {
   const InstallApk();
+}
+
+/// Browse the file in the app's own archive browser (the same one `.zip`
+/// opens in), from where its contents can be viewed and extracted.
+///
+/// Used for `.apk` -- a ZIP under a different name -- via the saved
+/// `'archive'` preference or the [ShowApkOpenChooser] choice. Real archive
+/// extensions never come through here: `_handleFileTap` routes those
+/// straight to the archive browser before this dispatch runs.
+class OpenAsArchive extends FileOpenAction {
+  const OpenAsArchive();
+}
+
+/// An `.apk` with no saved preference: ask whether to hand it to the system
+/// package installer or open it as a ZIP, with a "remember" option. It is
+/// both an installable app and a ZIP archive, so neither default is right
+/// for everyone.
+class ShowApkOpenChooser extends FileOpenAction {
+  const ShowApkOpenChooser();
 }
 
 /// No preference, and the extension doesn't match anything built in --
@@ -61,7 +80,8 @@ class ShowOpenWithDialog extends FileOpenAction {
 /// [ext] is the already-lowercased, dot-and-whitespace-stripped extension
 /// (see `_handleFileTap`'s own normalization). [extensionPreference] is
 /// the saved choice for that extension, if any (`'editor'`, `'media'`,
-/// `'pdf'`, `'html'`, `'markdown'`, `'external'`, or `'package:<name>'`).
+/// `'pdf'`, `'html'`, `'markdown'`, `'installer'`, `'archive'`,
+/// `'external'`, or `'package:<name>'`).
 /// [needsSystemAppForLocal] and [isSupportedMedia] are pre-computed by the
 /// caller (the former depends on `widget.container.isLocalStorage`, the
 /// latter on `MediaViewerConstants`) since neither belongs in a function
@@ -84,6 +104,12 @@ FileOpenAction decideFileOpenAction({
   if (pref == 'media') return const OpenInMediaViewer();
   if (pref == 'pdf') return const OpenInPdfViewer();
   if (pref == 'html') return const OpenInHtmlViewer();
+  // Only meaningful for .apk (the chooser is the only thing that saves them);
+  // anything else with one of these values -- a hand-edited settings file --
+  // falls through to the normal extension fallback instead of being
+  // installed or scanned as an archive.
+  if (ext == 'apk' && pref == 'installer') return const InstallApk();
+  if (ext == 'apk' && pref == 'archive') return const OpenAsArchive();
   if (pref != null && pref.startsWith('package:')) {
     return OpenWithSystemApp(packageName: pref.substring(8));
   }
@@ -92,6 +118,6 @@ FileOpenAction decideFileOpenAction({
   if (ext == 'pdf') return const OpenInPdfViewer();
   if (ext == 'html' || ext == 'htm') return const OpenInHtmlViewer();
   if (ext == 'md' || ext == 'markdown') return const OpenInEditor();
-  if (ext == 'apk') return const InstallApk();
+  if (ext == 'apk') return const ShowApkOpenChooser();
   return const ShowOpenWithDialog();
 }

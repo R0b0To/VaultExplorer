@@ -10228,4 +10228,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinStatusBannerTextColor => '横幅文本使用此颜色。';
+
+  @override
+  String get apkOpenPackageInstaller => '软件包安装程序';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle => '将此应用安装到你的设备';
+
+  @override
+  String get apkOpenAsZip => '作为 ZIP 打开';
+
+  @override
+  String get apkOpenAsZipSubtitle => '浏览其中的文件并解压';
 }

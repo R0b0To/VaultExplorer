@@ -10817,4 +10817,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinStatusBannerTextColor => 'The banner text uses this color.';
+
+  @override
+  String get apkOpenPackageInstaller => 'Package installer';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle =>
+      'Install this app on your device';
+
+  @override
+  String get apkOpenAsZip => 'Open as ZIP';
+
+  @override
+  String get apkOpenAsZipSubtitle => 'Browse the files inside and extract them';
 }

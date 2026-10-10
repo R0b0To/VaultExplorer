@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "Колір деталей рядка файлу",
   "skinFileActionOverflowIconColor": "Колір значка дії рядка файлу",
   "skinMatchingElementsHighlightTogether": "Інші елементи попереднього перегляду з таким самим кольором також виділяються.",
-  "skinStatusBannerTextColor": "Текст банера використовує цей колір."
+  "skinStatusBannerTextColor": "Текст банера використовує цей колір.",
+  "apkOpenPackageInstaller": "Інсталятор пакетів",
+  "apkOpenPackageInstallerSubtitle": "Встановити цю програму на пристрій",
+  "apkOpenAsZip": "Відкрити як ZIP",
+  "apkOpenAsZipSubtitle": "Переглянути вміст і видобути файли"
 }

@@ -144,14 +144,48 @@ void main() {
       }
     });
 
-    test('.apk goes straight to the package installer', () {
+    test('.apk with no preference asks installer vs. ZIP', () {
       final action = decideFileOpenAction(
         ext: 'apk',
         extensionPreference: null,
         needsSystemAppForLocal: false,
         isSupportedMedia: false,
       );
+      expect(action, isA<ShowApkOpenChooser>());
+    });
+
+    test("a remembered 'installer' choice installs the .apk", () {
+      final action = decideFileOpenAction(
+        ext: 'apk',
+        extensionPreference: 'installer',
+        needsSystemAppForLocal: false,
+        isSupportedMedia: false,
+      );
       expect(action, isA<InstallApk>());
+    });
+
+    test("a remembered 'archive' choice opens the .apk as a ZIP", () {
+      final action = decideFileOpenAction(
+        ext: 'apk',
+        extensionPreference: 'archive',
+        needsSystemAppForLocal: false,
+        isSupportedMedia: false,
+      );
+      expect(action, isA<OpenAsArchive>());
+    });
+
+    test("'installer' / 'archive' are ignored for any other extension", () {
+      // Only the APK chooser ever saves these; a stray value (hand-edited
+      // settings) must not install or archive-scan an unrelated file.
+      for (final pref in ['installer', 'archive']) {
+        final action = decideFileOpenAction(
+          ext: 'xyz',
+          extensionPreference: pref,
+          needsSystemAppForLocal: false,
+          isSupportedMedia: false,
+        );
+        expect(action, isA<ShowOpenWithDialog>(), reason: 'pref=$pref');
+      }
     });
 
     test('a saved preference still beats the installer for .apk', () {

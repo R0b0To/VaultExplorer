@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "لون تفاصيل صف الملف",
   "skinFileActionOverflowIconColor": "لون رمز إجراء صف الملف",
   "skinMatchingElementsHighlightTogether": "يتم أيضًا تمييز عناصر المعاينة الأخرى التي لها نفس اللون.",
-  "skinStatusBannerTextColor": "يستخدم نص اللافتة هذا اللون."
+  "skinStatusBannerTextColor": "يستخدم نص اللافتة هذا اللون.",
+  "apkOpenPackageInstaller": "مُثبّت الحزم",
+  "apkOpenPackageInstallerSubtitle": "ثبّت هذا التطبيق على جهازك",
+  "apkOpenAsZip": "فتح كملف ZIP",
+  "apkOpenAsZipSubtitle": "تصفّح الملفات بداخله واستخراجها"
 }

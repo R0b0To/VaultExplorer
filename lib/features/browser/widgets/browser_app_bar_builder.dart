@@ -99,7 +99,7 @@ PreferredSizeWidget buildBrowserAppBar(
     // no-op implementation.
     final hideVaultOnlyActions = container.isLocalStorage;
     final singleArchiveSelected = singleFile &&
-        ArchiveService.isArchive(
+        ArchiveService.isOpenableAsArchive(
           selectedItems.first.name.contains('.')
               ? selectedItems.first.name.split('.').last.toLowerCase()
               : '',

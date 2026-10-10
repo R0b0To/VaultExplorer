@@ -10388,4 +10388,16 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skinStatusBannerTextColor => '배너 텍스트는 이 색상을 사용합니다.';
+
+  @override
+  String get apkOpenPackageInstaller => '패키지 설치 프로그램';
+
+  @override
+  String get apkOpenPackageInstallerSubtitle => '이 앱을 기기에 설치합니다';
+
+  @override
+  String get apkOpenAsZip => 'ZIP으로 열기';
+
+  @override
+  String get apkOpenAsZipSubtitle => '내부 파일을 둘러보고 압축을 풉니다';
 }

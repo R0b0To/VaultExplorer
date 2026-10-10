@@ -883,7 +883,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         : '';
     final canExtract =
         _archiveContext != null ||
-        (!entry.isDir && ArchiveService.isArchive(extension));
+        (!entry.isDir && ArchiveService.isOpenableAsArchive(extension));
     FileItemActionsSheet.show(
       context,
       entry: entry,
@@ -1879,6 +1879,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _openFileWithApp(entry.name, fullPath, packageName: packageName);
       case InstallApk():
         await _installApk(entry.name, fullPath);
+      case OpenAsArchive():
+        // An APK is a ZIP; the archive browser sniffs the format from the
+        // bytes, so the same path a .zip takes works unchanged.
+        await _openArchive(fullPath, entry.name);
+      case ShowApkOpenChooser():
+        if (!mounted) return;
+        await _showApkOpenChooser(entry.name, fullPath, ext);
       case ShowOpenWithDialog():
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
@@ -2158,12 +2165,49 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
+  /// Asks whether an `.apk` should go to the package installer or open as a
+  /// ZIP, and (optionally) remembers the answer for `.apk` -- stored as the
+  /// `'installer'` / `'archive'` extension preferences, which
+  /// [decideFileOpenAction] reads on the next tap and the file-associations
+  /// settings list can clear.
+  Future<void> _showApkOpenChooser(
+    String fileName,
+    String fullPath,
+    String ext,
+  ) async {
+    final cleanExt = ext.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
+    final choice = await OpenWithDialog.showApkChooser(
+      context,
+      fileName: fileName,
+      ext: cleanExt,
+    );
+    final action = choice.action;
+    if (action == null) return;
+    if (choice.remember && cleanExt.isNotEmpty) {
+      await _saveExtensionPreference(cleanExt, action);
+    }
+    if (!mounted) return;
+    if (action == 'installer') {
+      await _installApk(fileName, fullPath);
+    } else if (action == 'archive') {
+      await _openArchive(fullPath, fileName);
+    }
+  }
+
   Future<void> _showOpenWithDialog(
     String fileName,
     String fullPath,
     String ext,
     AppSettings settings,
   ) async {
+    // Every explicit "Open with" -- the item's 3-dots sheet and the selection
+    // menu both end up here -- asks installer vs. ZIP for an APK, even when a
+    // choice was remembered for plain taps. It's the way back to the other
+    // option once "remember" has been ticked.
+    if (ext.toLowerCase() == 'apk') {
+      await _showApkOpenChooser(fileName, fullPath, ext);
+      return;
+    }
     final choice = await OpenWithDialog.show(
       context,
       fileName: fileName,
@@ -2911,7 +2955,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final ext = entry.name.contains('.')
         ? entry.name.split('.').last.toLowerCase()
         : '';
-    if (entry.isDir || !ArchiveService.isArchive(ext)) return;
+    if (entry.isDir || !ArchiveService.isOpenableAsArchive(ext)) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;

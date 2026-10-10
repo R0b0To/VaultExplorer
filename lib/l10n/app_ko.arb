@@ -3024,5 +3024,9 @@
   "skinFileRowDetailsColor": "파일 행 세부정보 색상",
   "skinFileActionOverflowIconColor": "파일 행 작업 아이콘 색상",
   "skinMatchingElementsHighlightTogether": "같은 색상의 다른 미리보기 요소도 함께 강조 표시됩니다.",
-  "skinStatusBannerTextColor": "배너 텍스트는 이 색상을 사용합니다."
+  "skinStatusBannerTextColor": "배너 텍스트는 이 색상을 사용합니다.",
+  "apkOpenPackageInstaller": "패키지 설치 프로그램",
+  "apkOpenPackageInstallerSubtitle": "이 앱을 기기에 설치합니다",
+  "apkOpenAsZip": "ZIP으로 열기",
+  "apkOpenAsZipSubtitle": "내부 파일을 둘러보고 압축을 풉니다"
 }

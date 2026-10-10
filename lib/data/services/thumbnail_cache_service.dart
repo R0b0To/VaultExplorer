@@ -213,6 +213,10 @@ class ThumbnailCacheService {
           'divx',
           'f4v',
           'm2ts',
+          'qt',
+          '3g2',
+          'mts',
+          'mpe',
         }.contains(extension)
         ? 'video:$_videoThumbnailVariant'
         : null;

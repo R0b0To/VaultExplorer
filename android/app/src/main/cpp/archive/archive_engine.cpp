@@ -236,6 +236,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
     }
 
     const int formatFamily = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
+    result.isSevenZip = formatFamily == ARCHIVE_FORMAT_7ZIP;
     const bool formatCanBeSolid =
         formatFamily == ARCHIVE_FORMAT_RAR ||
         formatFamily == ARCHIVE_FORMAT_RAR_V5 ||

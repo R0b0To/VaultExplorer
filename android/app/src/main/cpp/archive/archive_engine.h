@@ -29,6 +29,7 @@ struct ArchiveIndexResult {
     ArchiveOpenStatus status = ArchiveOpenStatus::IoError;
     std::vector<ArchiveEntryInfo> entries;
     bool isSolid = false;
+    bool isSevenZip = false;
     std::string errorMessage;
 };
 

@@ -34,6 +34,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.mp4.FragmentedMp4Extractor
 import androidx.media3.extractor.mp4.Mp4Extractor
@@ -138,7 +139,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     // closed, or a decode throws.
     private val previewCursor = SoftwareDecodeCursor()
 
-    private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
+    private fun createExtractorsFactory(lenient: Boolean): ExtractorsFactory {
         val factory = DefaultExtractorsFactory()
         factory.setConstantBitrateSeekingEnabled(true)
         if (lenient) {
@@ -162,7 +163,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
             )
         }
-        return factory
+        // Media3 has no AIFF extractor; AiffExtractor sniffs first and is a no-op for other formats.
+        return AiffAwareExtractorsFactory(factory)
     }
 
     /**
@@ -182,7 +184,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         volId: Int,
         filePath: String,
         isLocalStorage: Boolean,
-        extractorsFactory: DefaultExtractorsFactory,
+        extractorsFactory: ExtractorsFactory,
     ): ProgressiveMediaSource {
         val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
             DefaultDataSource.Factory(context)

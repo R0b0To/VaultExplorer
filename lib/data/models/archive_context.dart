@@ -135,6 +135,10 @@ class ArchiveContext {
   /// Whether this archive is a solid archive (e.g. RAR or 7z with multi-file shared blocks).
   bool get isSolid => indexResult.isSolid;
 
+  /// Whether this archive uses the 7-Zip format. 7z archives may be solid,
+  /// but individual image entries can still be extracted for thumbnails.
+  bool get isSevenZip => indexResult.isSevenZip;
+
   /// Open status of the archive.
   ArchiveOpenStatus get status => indexResult.status;
 

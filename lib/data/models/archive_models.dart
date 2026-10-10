@@ -162,12 +162,14 @@ class ArchiveIndexResult {
   final ArchiveOpenStatus status;
   final List<ArchiveEntryInfo> entries;
   final bool isSolid;
+  final bool isSevenZip;
   final String errorMessage;
 
   const ArchiveIndexResult({
     required this.status,
     required this.entries,
     required this.isSolid,
+    this.isSevenZip = false,
     required this.errorMessage,
   });
 
@@ -183,6 +185,7 @@ class ArchiveIndexResult {
       status: ArchiveOpenStatus.fromInt(rawStatus.toInt()),
       entries: entries,
       isSolid: map['isSolid'] as bool? ?? false,
+      isSevenZip: map['isSevenZip'] as bool? ?? false,
       errorMessage: map['errorMessage'] as String? ?? '',
     );
   }

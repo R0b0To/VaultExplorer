@@ -145,6 +145,7 @@ static jobject buildIndexResultMap(JNIEnv* env, const ArchiveIndexResult& result
 
     putInt("status", static_cast<int>(result.status));
     putBool("isSolid", result.isSolid);
+    putBool("isSevenZip", result.isSevenZip);
     putString("errorMessage", result.errorMessage);
 
     jstring kEntries = env->NewStringUTF("entries");

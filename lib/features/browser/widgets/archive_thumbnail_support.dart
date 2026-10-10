@@ -40,23 +40,16 @@ String archiveRelativeSubPath(String fullPath, String archiveRootPath) {
 /// downsamples at decode time, so this doesn't need a separate native
 /// resize step the way a real container thumbnail does).
 ///
-/// This is only attempted for archives that support cheap direct access to
-/// an individual entry ([ArchiveContext.isSolid] == false). Solid archives
-/// (RAR/7z with shared compression blocks) require decompressing every
-/// entry before the target one to extract it at all -- the existing
-/// "opening files may be slower, especially near the end" warning already
-/// sets that expectation for opening a single file, but doing the same
-/// decompression-from-the-start work for every visible grid tile at once
-/// would make browsing a large solid archive unusably slow. For those, this
-/// throws immediately so the tile falls back to its plain file-type icon
-/// instead of hanging or churning the CPU -- the "disable it" half of the
-/// fix, as opposed to the "make it work" half for direct-access archives.
+/// RAR solid archives are skipped because extracting each visible tile can
+/// require replaying all preceding entries. 7z entries are allowed through:
+/// the browser's 7z support is expected to provide image previews, and the
+/// native extractor handles the same on-demand entry path used to open files.
 Future<Uint8List> fetchArchiveEntryForThumbnail({
   required ArchiveContext archiveContext,
   required String archiveRootPath,
   required String fullPath,
 }) async {
-  if (archiveContext.isSolid) {
+  if (archiveContext.isSolid && !archiveContext.isSevenZip) {
     throw const ArchiveThumbnailUnavailable();
   }
   final subPath = archiveRelativeSubPath(fullPath, archiveRootPath);

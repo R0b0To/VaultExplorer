@@ -76,11 +76,13 @@ class MediaViewerConstants {
 static const List<String> videoExtensions = [
   'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv', 'mpeg', 'mpg',
   'flv', 'ts', 'wmv', '3gp', 'vob', 'ogv', 'divx', 'f4v', 'm2ts',
+  'qt', '3g2', 'mts', 'mpe',
 ];
 
 static const List<String> audioExtensions = [
   'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac',
   'opus', 'wma', 'ac3', 'eac3', 'm4b', 'ape', 'aiff', 'dts',
+  'aif', 'aifc', 'amr', 'awb', 'mka', 'weba', 'oga',
 ];
 
   static bool isImage(String fileName) {

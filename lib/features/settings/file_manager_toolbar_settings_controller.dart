@@ -89,29 +89,59 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     );
   }
 
-  Future<void> _updateConfig(FileManagerToolbarConfig newConfig) async {
-    final currentServiceConfig = await ref
-        .read(fileManagerToolbarServiceProvider)
-        .load();
-    final preservedConfig = newConfig.copyWith(
-      listZoomLevel: currentServiceConfig.listZoomLevel,
-      gridColumnsPortrait: currentServiceConfig.gridColumnsPortrait,
-      gridColumnsLandscape: currentServiceConfig.gridColumnsLandscape,
-      masonryColumnsPortrait: currentServiceConfig.masonryColumnsPortrait,
-      masonryColumnsLandscape: currentServiceConfig.masonryColumnsLandscape,
-      folderLayoutModes: currentServiceConfig.folderLayoutModes,
-      folderGridAspectRatios: currentServiceConfig.folderGridAspectRatios,
-      folderSortModes: currentServiceConfig.folderSortModes,
-    );
-    await ref.read(fileManagerToolbarServiceProvider).save(preservedConfig);
+  /// Id of the most recent [_updateConfig] call, shared across every family
+  /// instance (they all write to the same underlying service).
+  static int _latestUpdateId = 0;
 
-    // Synchronize all active family instances so any screen listening
-    // to toolbar settings updates immediately in real-time.
+  /// Serializes disk writes so rapid successive updates are persisted in the
+  /// order they were made.
+  static Future<void> _persistQueue = Future.value();
+
+  /// Publishes [config] to every live family instance so any screen listening
+  /// to toolbar settings updates in real-time.
+  static void _publishConfig(FileManagerToolbarConfig config) {
     for (final instance in _activeInstances) {
       if (instance.ref.mounted) {
-        instance.state = instance.state._copy(config: preservedConfig);
+        instance.state = instance.state._copy(config: config);
       }
     }
+  }
+
+  /// Applies [newConfig] to in-memory state immediately (optimistically), then
+  /// persists it in the background.
+  ///
+  /// The state must NOT wait for the encrypted-storage write: UIs such as the
+  /// reorderable toolbar list rebuild as soon as a drag is dropped, and if the
+  /// provider still holds the old order at that moment the list visibly snaps
+  /// back before jumping to the new order once the write finishes.
+  Future<void> _updateConfig(FileManagerToolbarConfig newConfig) {
+    final updateId = ++_latestUpdateId;
+    final service = ref.read(fileManagerToolbarServiceProvider);
+
+    _publishConfig(newConfig);
+
+    final persisted = _persistQueue.then((_) async {
+      final currentServiceConfig = await service.load();
+      final preservedConfig = newConfig.copyWith(
+        listZoomLevel: currentServiceConfig.listZoomLevel,
+        gridColumnsPortrait: currentServiceConfig.gridColumnsPortrait,
+        gridColumnsLandscape: currentServiceConfig.gridColumnsLandscape,
+        masonryColumnsPortrait: currentServiceConfig.masonryColumnsPortrait,
+        masonryColumnsLandscape: currentServiceConfig.masonryColumnsLandscape,
+        folderLayoutModes: currentServiceConfig.folderLayoutModes,
+        folderGridAspectRatios: currentServiceConfig.folderGridAspectRatios,
+        folderSortModes: currentServiceConfig.folderSortModes,
+      );
+      await service.save(preservedConfig);
+
+      // Only the newest update re-syncs state (to pick up the preserved
+      // fields); an older one doing so would briefly revert a newer change.
+      if (updateId == _latestUpdateId) {
+        _publishConfig(preservedConfig);
+      }
+    });
+    _persistQueue = persisted.catchError((_) {});
+    return persisted;
   }
 
   Future<void> setBottomSelectionBar(bool val) =>

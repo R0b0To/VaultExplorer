@@ -783,27 +783,30 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     required Widget child,
     VoidCallback? onTap,
     BorderRadius borderRadius = const BorderRadius.all(Radius.circular(12)),
-  }) => Tooltip(
-    message: context.l10n.skinSelectPreviewElement(title),
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap ?? () => _selectPreview(id, title, explanation),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: BoxDecoration(
-          borderRadius: borderRadius,
-          border: Border.all(
-            color: _previewSelection?.id == id
-                ? _storedColor(_schemeColors(), 'primary')
-                : Colors.transparent,
-            width: 2,
+  }) {
+    final isSelected = _previewSelection?.id == id;
+    return Tooltip(
+      message: context.l10n.skinSelectPreviewElement(title),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap ?? () => _selectPreview(id, title, explanation),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            border: Border.all(
+              color: isSelected
+                  ? _storedColor(_schemeColors(), 'primary')
+                  : Colors.transparent,
+              width: 2,
+            ),
           ),
+          padding: const EdgeInsets.all(2),
+          child: child,
         ),
-        padding: const EdgeInsets.all(2),
-        child: child,
       ),
-    ),
-  );
+    );
+  }
 
   Widget _previewInspector() {
     final selection = _previewSelection;
@@ -835,10 +838,9 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                     ),
                   ),
                   Text(
-                    selection?.explanation ??
-                        context
-                            .l10n
-                            .skinChooseAnAppFileOrEditorColorToSeeWhatItControls,
+                    selection == null
+                        ? '${context.l10n.skinChooseAnAppFileOrEditorColorToSeeWhatItControls} ${context.l10n.skinMatchingElementsHighlightTogether}'
+                        : '${selection.explanation} ${context.l10n.skinMatchingElementsHighlightTogether}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(
@@ -1227,206 +1229,445 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   );
 
   Widget _livePreview(CustomAppSkin skin) {
-    final cs = Theme.of(context).colorScheme;
-    final colors = _schemeColors();
-    Color color(String role, Color fallback) =>
-        Color(colors[role] ?? fallback.toARGB32());
-    final previewScheme = cs.copyWith(
-      brightness: _darkColors ? Brightness.dark : Brightness.light,
-      primary: color('primary', cs.primary),
-      onPrimary: color('onPrimary', cs.onPrimary),
-      primaryContainer: color('primaryContainer', cs.primaryContainer),
-      onPrimaryContainer: color('onPrimaryContainer', cs.onPrimaryContainer),
-      secondary: color('secondary', cs.secondary),
-      secondaryContainer: color('secondaryContainer', cs.secondaryContainer),
-      tertiary: color('tertiary', cs.tertiary),
-      error: color('error', cs.error),
-      onSurface: color('onSurface', cs.onSurface),
-      onSurfaceVariant: color('onSurfaceVariant', cs.onSurfaceVariant),
-      surface: color('surface', cs.surface),
-      surfaceContainer: color('surfaceContainer', cs.surfaceContainer),
-      surfaceContainerHigh: color(
-        'surfaceContainerHigh',
-        cs.surfaceContainerHigh,
-      ),
-      surfaceContainerHighest: color(
-        'surfaceContainerHighest',
-        cs.surfaceContainerHighest,
-      ),
-      outlineVariant: color('outlineVariant', cs.outlineVariant),
-    );
-    final child = switch (_previewPane) {
-      _PreviewPane.app => _appShellPreview(color, cs),
-      _PreviewPane.fileManager => _fileManagerPreview(
-        skin,
-        color,
-        previewScheme,
-      ),
-      _PreviewPane.editor => _editorScreenPreview(color, previewScheme),
-    };
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: child,
-    );
-  }
-
-  Widget _appShellPreview(Color Function(String, Color) color, ColorScheme cs) {
-    final page = color('surface', cs.surface);
-    final foreground = color('onSurface', cs.onSurface);
-    final previewColorScheme = cs.copyWith(
-      brightness: _darkColors ? Brightness.dark : Brightness.light,
-      primary: color('primary', cs.primary),
-      onPrimary: color('onPrimary', cs.onPrimary),
-      primaryContainer: color('primaryContainer', cs.primaryContainer),
-      onPrimaryContainer: color('onPrimaryContainer', cs.onPrimaryContainer),
-      secondary: color('secondary', cs.secondary),
-      onSurface: foreground,
-      onSurfaceVariant: color('onSurfaceVariant', cs.onSurfaceVariant),
-      surface: page,
-      surfaceContainer: color('surfaceContainer', cs.surfaceContainer),
-      surfaceContainerHigh: color(
-        'surfaceContainerHigh',
-        cs.surfaceContainerHigh,
-      ),
-      surfaceContainerHighest: color(
-        'surfaceContainerHighest',
-        cs.surfaceContainerHighest,
-      ),
-      outlineVariant: color('outlineVariant', cs.outlineVariant),
-      error: color('error', cs.error),
-      tertiary: color('tertiary', cs.tertiary),
-    );
     final baseTheme = Theme.of(context);
+    final previewColorScheme = _editorColorScheme();
+    final baseSemantic =
+        baseTheme.extension<AppSemanticColors>() ??
+        (_darkColors ? AppSemanticColors.dark : AppSemanticColors.light);
+    Color semantic(String role, Color fallback) =>
+        Color(_semanticColors()[role] ?? fallback.toARGB32());
+    final previewSemantic = baseSemantic.copyWith(
+      success: semantic('success', baseSemantic.success),
+      onSuccess: semantic('onSuccess', baseSemantic.onSuccess),
+      successContainer: semantic(
+        'successContainer',
+        baseSemantic.successContainer,
+      ),
+      onSuccessContainer: semantic(
+        'onSuccessContainer',
+        baseSemantic.onSuccessContainer,
+      ),
+      warning: semantic('warning', baseSemantic.warning),
+      onWarning: semantic('onWarning', baseSemantic.onWarning),
+      warningContainer: semantic(
+        'warningContainer',
+        baseSemantic.warningContainer,
+      ),
+      onWarningContainer: semantic(
+        'onWarningContainer',
+        baseSemantic.onWarningContainer,
+      ),
+      bookmark: semantic('bookmark', baseSemantic.bookmark),
+    );
     final previewTheme = baseTheme.copyWith(
       colorScheme: previewColorScheme,
       textTheme: baseTheme.textTheme.apply(
-        bodyColor: foreground,
-        displayColor: foreground,
+        bodyColor: previewColorScheme.onSurface,
+        displayColor: previewColorScheme.onSurface,
       ),
+      extensions: [
+        for (final extension in baseTheme.extensions.values)
+          if (extension is! AppSemanticColors) extension,
+        previewSemantic,
+      ],
     );
-
+    final child = switch (_previewPane) {
+      _PreviewPane.app => _appShellPreview(previewColorScheme),
+      _PreviewPane.fileManager => _fileManagerPreview(
+        skin,
+        (role, fallback) => Color(_schemeColors()[role] ?? fallback.toARGB32()),
+        previewColorScheme,
+      ),
+      _PreviewPane.editor => _editorScreenPreview(
+        (role, fallback) => Color(_schemeColors()[role] ?? fallback.toARGB32()),
+        previewColorScheme,
+      ),
+    };
     return Theme(
       data: previewTheme,
-      child: _previewCanvas(
-        page,
-        color('outlineVariant', cs.outlineVariant),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _previewTarget(
-              id: 'component:appBarBackground',
-              title: context.l10n.skinAppBarBackground,
-              explanation: context
-                  .l10n
-                  .skinTheDashboardAndOtherAppBarsUseThisIndependentColor,
-              child: Container(
-                height: 64,
-                color: _componentColor('appBarBackground'),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    _previewTarget(
-                      id: 'component:appBarForeground',
-                      title: context.l10n.skinDashboardMenuIcon,
-                      explanation: context
-                          .l10n
-                          .skinTheHamburgerButtonUsesTheAppBarIconColor,
-                      child: Icon(
-                        Icons.menu_rounded,
-                        color: _componentColor('appBarForeground'),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    _previewTarget(
-                      id: 'component:appBarForeground',
-                      title: context.l10n.skinDashboardTitle,
-                      explanation: context
-                          .l10n
-                          .skinTheDashboardTitleUsesTheAppBarForegroundColor,
-                      child: Text(
-                        context.l10n.appNameVaultExplorer,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: _componentColor('appBarForeground'),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _appShellPreview(ColorScheme cs) {
+    final page = cs.surface;
+    return _previewCanvas(
+      page,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _previewTarget(
+            id: 'component:appBarBackground',
+            title: context.l10n.skinAppBarBackground,
+            explanation: context
+                .l10n
+                .skinTheDashboardAndOtherAppBarsUseThisIndependentColor,
+            child: Container(
+              height: 64,
+              color: _componentColor('appBarBackground'),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _mountedVaultCardPreview(previewColorScheme),
-                  ),
-                  if (_showAppOverflowMenu)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: _dashboardOverflowMenu(previewColorScheme),
-                      ),
+                  _previewTarget(
+                    id: 'component:appBarForeground',
+                    title: context.l10n.skinDashboardMenuIcon,
+                    explanation: context
+                        .l10n
+                        .skinTheHamburgerButtonUsesTheAppBarIconColor,
+                    child: Icon(
+                      Icons.menu_rounded,
+                      color: _componentColor('appBarForeground'),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _lockedVaultCardPreview(previewColorScheme),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _previewTarget(
-                          id: 'app:primary',
-                          title: context.l10n.skinActionLabelAndIcon,
-                          explanation: context
-                              .l10n
-                              .skinTheActionAccentColorsLabelsb08a63,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.add_rounded,
-                                  color: previewColorScheme.primary,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  context.l10n.addAVaultTitle,
-                                  style: TextStyle(
-                                    color: previewColorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        _floatingActionPreview(
-                          title: context.l10n.skinDashboardAddButton,
-                          explanation: context
-                              .l10n
-                              .skinTheButtonFillAndPlusIconHaveSeparateSkinColors,
-                          size: 56,
-                        ),
-                      ],
+                  const SizedBox(width: 24),
+                  _previewTarget(
+                    id: 'component:appBarForeground',
+                    title: context.l10n.skinDashboardTitle,
+                    explanation: context
+                        .l10n
+                        .skinTheDashboardTitleUsesTheAppBarForegroundColor,
+                    child: Text(
+                      context.l10n.appNameVaultExplorer,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: _componentColor('appBarForeground'),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _mountedVaultCardPreview(cs),
+                ),
+                if (_showAppOverflowMenu)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _dashboardOverflowMenu(cs),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _lockedVaultCardPreview(cs),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _statusBannerExamples(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _surfaceTokenExamples(cs),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _previewTarget(
+                        id: 'app:primary',
+                        title: context.l10n.skinActionLabelAndIcon,
+                        explanation:
+                            context.l10n.skinTheActionAccentColorsLabelsb08a63,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_rounded, color: cs.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                context.l10n.addAVaultTitle,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _floatingActionPreview(
+                        title: context.l10n.skinDashboardAddButton,
+                        explanation: context
+                            .l10n
+                            .skinTheButtonFillAndPlusIconHaveSeparateSkinColors,
+                        size: 56,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBannerExamples() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          context.l10n.skinStatusBannerExamples,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
+      _statusBannerPreview(
+        fillId: 'semantic:successContainer',
+        foregroundId: 'semantic:onSuccessContainer',
+        title: context.l10n.skinSuccessBanner,
+        message: context.l10n.skinPreviewChangesSaved,
+        explanation: context.l10n.skinSuccessBannerUsesSuccessContainer,
+      ),
+      _statusBannerPreview(
+        fillId: 'semantic:warningContainer',
+        foregroundId: 'semantic:onWarningContainer',
+        title: context.l10n.skinWarningBanner,
+        message: context.l10n.skinPreviewStorageAlmostFull,
+        explanation: context.l10n.skinWarningBannerUsesWarningContainer,
+      ),
+      _statusBannerPreview(
+        fillId: 'app:errorContainer',
+        foregroundId: 'app:onErrorContainer',
+        title: context.l10n.skinErrorBanner,
+        message: context.l10n.skinPreviewCouldNotUnlockVault,
+        explanation: context.l10n.skinErrorBannerUsesErrorContainer,
+      ),
+    ],
+  );
+
+  Widget _statusBannerPreview({
+    required String fillId,
+    required String foregroundId,
+    required String title,
+    required String message,
+    required String explanation,
+  }) {
+    final fill = _previewSelectionColor(fillId);
+    final foreground = _previewSelectionColor(foregroundId);
+    return _previewTarget(
+      id: fillId,
+      title: title,
+      explanation: explanation,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: _previewTarget(
+          id: foregroundId,
+          title: title,
+          explanation: context.l10n.skinStatusBannerTextColor,
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: foreground,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _surfaceTokenExamples(ColorScheme colorScheme) {
+    final roleCopy = _colorRoleCopy(context);
+    final schemeColors = colorSchemeToMap(colorScheme);
+
+    Widget sample(String role, Widget child) => _previewTarget(
+      id: 'app:$role',
+      title: roleCopy[role]!.$1,
+      explanation: roleCopy[role]!.$2,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Color(schemeColors[role]!),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: child,
+      ),
+    );
+
+    Widget sampleLabel(String role) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          roleCopy[role]!.$1,
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          roleCopy[role]!.$2,
+          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
+        ),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            context.l10n.skinSurfaceAndBorderExamples,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        sample('surfaceContainerLowest', sampleLabel('surfaceContainerLowest')),
+        sample(
+          'surfaceContainerLow',
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  Icons.palette_outlined,
+                  color: colorScheme.onSurface,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: sampleLabel('surfaceContainerLow')),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+        sample(
+          'surfaceContainer',
+          Column(
+            children: [
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.tune_rounded, color: colorScheme.onSurface),
+                title: Text(context.l10n.edit),
+              ),
+              Divider(height: 1, color: colorScheme.outlineVariant),
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.delete_outline_rounded,
+                  color: colorScheme.error,
+                ),
+                title: Text(
+                  context.l10n.remove,
+                  style: TextStyle(color: colorScheme.error),
+                ),
+              ),
+            ],
+          ),
+        ),
+        sample(
+          'surfaceContainerHigh',
+          Row(
+            children: [
+              Icon(
+                Icons.folder_open_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: sampleLabel('surfaceContainerHigh')),
+              Icon(
+                Icons.more_vert_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+        sample(
+          'surfaceContainerHighest',
+          Row(
+            children: [
+              Icon(Icons.search_rounded, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(child: sampleLabel('surfaceContainerHighest')),
+              Icon(Icons.keyboard_rounded, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: _previewTarget(
+                  id: 'app:outlineVariant',
+                  title: roleCopy['outlineVariant']!.$1,
+                  explanation: roleCopy['outlineVariant']!.$2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        roleCopy['outlineVariant']!.$1,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      Divider(height: 12, color: colorScheme.outlineVariant),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _previewTarget(
+                  id: 'app:outline',
+                  title: roleCopy['outline']!.$1,
+                  explanation: roleCopy['outline']!.$2,
+                  child: OutlinedButton(
+                    onPressed: null,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colorScheme.outline),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    child: Text(roleCopy['outline']!.$1),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1564,7 +1805,23 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       icon: icon,
       iconBackgroundColor: cs.primaryContainer,
       avatarBadge: badge,
-      title: 'vault5GB',
+      title: context.l10n.skinPreviewMountedVaultName,
+      titleContent: _previewTarget(
+        id: 'app:onSurface',
+        title: context.l10n.skinPreviewVaultName,
+        explanation: context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
+        child: Text(
+          context.l10n.skinPreviewMountedVaultName,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.1,
+            height: 1.2,
+          ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+      ),
       subtitle: subtitle,
       trailingAction: trailing,
       backgroundColor: cardTint,
@@ -1590,6 +1847,22 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     ),
     iconBackgroundColor: cs.surfaceContainerHighest,
     title: context.l10n.skinSharedArchive,
+    titleContent: _previewTarget(
+      id: 'app:onSurface',
+      title: context.l10n.skinPreviewVaultName,
+      explanation: context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
+      child: Text(
+        context.l10n.skinSharedArchive,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: cs.onSurface,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.1,
+          height: 1.2,
+        ),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
+    ),
     subtitle: _previewTarget(
       id: 'app:onSurfaceVariant',
       title: context.l10n.skinLockedVaultStatusText,
@@ -1640,7 +1913,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             id: 'app:onSurface',
             title: context.l10n.skinEditMenuItem,
             explanation:
-                context.l10n.skinTheEditActionUsesTheRegularForegroundColor,
+                context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
             child: ListTile(
               dense: true,
               leading: Icon(Icons.tune_rounded, size: 20),
@@ -1681,7 +1954,6 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     final details = skin.fileManagerSkin.detailsColor ?? secondaryText;
     return _previewCanvas(
       page,
-      color('outlineVariant', cs.outlineVariant),
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1909,7 +2181,6 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     ColorScheme cs,
   ) => _previewCanvas(
     color('surface', cs.surface),
-    color('outlineVariant', cs.outlineVariant),
     Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1982,28 +2253,22 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     ),
   );
 
-  Widget _previewCanvas(Color background, Color outline, Widget child) =>
-      _previewTarget(
-        id: 'app:surface',
-        title: context.l10n.skinPageBackground,
-        explanation: context.l10n.skinTheMainBackgroundBehindThisScreen,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: background,
-            border: Border.all(color: outline.withValues(alpha: 0.55)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: DefaultTextStyle(
-              style: TextStyle(
-                color: _storedColor(_schemeColors(), 'onSurface'),
-              ),
-              child: child,
-            ),
-          ),
+  Widget _previewCanvas(Color background, Widget child) => _previewTarget(
+    id: 'app:surface',
+    title: context.l10n.skinPageBackground,
+    explanation: context.l10n.skinTheMainBackgroundBehindThisScreen,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      decoration: BoxDecoration(color: background),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: DefaultTextStyle(
+          style: TextStyle(color: _storedColor(_schemeColors(), 'onSurface')),
+          child: child,
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _filePreviewRow({
     required String label,
@@ -2045,7 +2310,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       SkinContainerStyle.none => null,
     };
     final row = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: selected ? 4 : 8,
+        vertical: selected ? 3 : 7,
+      ),
       child: Row(
         children: [
           _previewTarget(
@@ -2084,7 +2352,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                 ),
                 _previewTarget(
                   id: 'file:details',
-                  title: context.l10n.skinFileDetailsColor,
+                  title: context.l10n.skinFileRowDetailsColor,
                   explanation: context
                       .l10n
                       .skinTheSmallerDateSizeAndTypeLabelsUseThisColor,
@@ -2098,14 +2366,14 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           ),
           _previewTarget(
             id: 'app:onSurfaceVariant',
-            title: context.l10n.skinFileOverflowButton,
+            title: context.l10n.skinFileActionOverflowIconColor,
             explanation: context
                 .l10n
                 .skinEachRowSThreeDotButtonUsesTheSupportingIconColor,
             onTap: () {
               _selectPreview(
                 'app:onSurfaceVariant',
-                context.l10n.skinFileOverflowButton,
+                context.l10n.skinFileActionOverflowIconColor,
                 context
                     .l10n
                     .skinEachRowSThreeDotButtonUsesTheSupportingIconColor,
@@ -2123,7 +2391,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       title: context.l10n.skinSelectedFileRow,
       explanation: context.l10n.skinSelectedRowsUseATranslucente0ff21,
       child: Container(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: row,
       ),
     );
@@ -2509,6 +2780,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   }) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 5),
     child: DropdownButtonFormField<T>(
+      isExpanded: true,
       initialValue: value,
       decoration: InputDecoration(
         labelText: label,
@@ -2518,7 +2790,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         for (final option in options)
           DropdownMenuItem(
             value: option,
-            child: Text(_optionLabel(context, option)),
+            child: Text(
+              _optionLabel(context, option),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
       ],
       onChanged: (option) {

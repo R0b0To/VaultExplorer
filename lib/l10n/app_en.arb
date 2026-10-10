@@ -12359,7 +12359,7 @@
   "skinThePlusIconUsesTheButtonForegroundColor": "The plus icon uses the button foreground color.",
   "skinEditorFileName": "Editor file name",
   "skinTheEditorToolbarUsesTheAppForegroundColor": "The editor toolbar uses the app foreground color.",
-  "skinDartUTF8Ln3Col12": "Dart · UTF-8 · Ln 3, Col 12",
+  "skinDartUTF8Ln3Col12": "Ln 3, Col 12",
   "skinTheMainBackgroundBehindThisScreen": "The main background behind this screen.",
   "skinFolderIconColor": "Folder icon color",
   "skinFileIconColor": "File icon color",
@@ -12533,5 +12533,23 @@
   "automationBatterySettingsOpenFailedMessage": "Couldn't open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.",
   "@automationBatterySettingsOpenFailedMessage": {
     "description": "Snackbar shown when the system app settings page could not be opened from the automation battery hint card"
-  }
+  },
+  "skinPreviewMountedVaultName": "Personal vault",
+  "skinPreviewVaultName": "Vault title",
+  "skinMainTextColorAlsoColorsRegularMenuItems": "Vault titles and regular menu actions share the app main text color.",
+  "skinStatusBannerExamples": "Status banners",
+  "skinSuccessBanner": "Success banner",
+  "skinWarningBanner": "Warning banner",
+  "skinErrorBanner": "Error banner",
+  "skinSuccessBannerUsesSuccessContainer": "The banner fill and message use success colors.",
+  "skinWarningBannerUsesWarningContainer": "The banner fill and message use warning colors.",
+  "skinErrorBannerUsesErrorContainer": "The banner fill and message use error colors.",
+  "skinPreviewChangesSaved": "Changes saved",
+  "skinPreviewStorageAlmostFull": "Storage is almost full",
+  "skinPreviewCouldNotUnlockVault": "Could not unlock the vault",
+  "skinSurfaceAndBorderExamples": "Surfaces and borders",
+  "skinFileRowDetailsColor": "File row details color",
+  "skinFileActionOverflowIconColor": "File row action icon color",
+  "skinMatchingElementsHighlightTogether": "Other preview elements with the same color are highlighted too.",
+  "skinStatusBannerTextColor": "The banner text uses this color."
 }

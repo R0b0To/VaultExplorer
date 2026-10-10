@@ -10552,7 +10552,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Editor-Symbolleiste nutzt die App-Vordergrundfarbe.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Zl 3, Sp 12';
+  String get skinDartUTF8Ln3Col12 => ' Zl 3, Sp 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -10922,4 +10922,66 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'App-Einstellungen konnten nicht geöffnet werden. Öffnen Sie Einstellungen > Apps > VaultExplorer > Akku und wählen Sie „Uneingeschränkt“.';
+
+  @override
+  String get skinPreviewMountedVaultName => 'Persönlicher Tresor';
+
+  @override
+  String get skinPreviewVaultName => 'Tresor-Titel';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'Tresor-Titel und normale Menüaktionen teilen die Haupttextfarbe der App.';
+
+  @override
+  String get skinStatusBannerExamples => 'Status-Banner';
+
+  @override
+  String get skinSuccessBanner => 'Erfolgs-Banner';
+
+  @override
+  String get skinWarningBanner => 'Warn-Banner';
+
+  @override
+  String get skinErrorBanner => 'Fehler-Banner';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'Die Banner-Füllung und Nachricht verwenden Erfolgsfarben.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'Die Banner-Füllung und Nachricht verwenden Warnfarben.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'Die Banner-Füllung und Nachricht verwenden Fehlerfarben.';
+
+  @override
+  String get skinPreviewChangesSaved => 'Änderungen gespeichert';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'Speicher ist fast voll';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault =>
+      'Tresor konnte nicht entsperrt werden';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'Oberflächen und Ränder';
+
+  @override
+  String get skinFileRowDetailsColor => 'Farbe der Dateizeilen-Details';
+
+  @override
+  String get skinFileActionOverflowIconColor =>
+      'Farbe des Aktionssymbols der Dateizeile';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'Andere Vorschauelemente mit derselben Farbe werden ebenfalls hervorgehoben.';
+
+  @override
+  String get skinStatusBannerTextColor =>
+      'Der Bannertext verwendet diese Farbe.';
 }

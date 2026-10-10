@@ -10549,7 +10549,7 @@ class AppLocalizationsPt extends AppLocalizations {
       'A barra de ferramentas do editor usa a cor de primeiro plano do aplicativo.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Lin 3, Col 12';
+  String get skinDartUTF8Ln3Col12 => ' Lin 3, Col 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -10920,4 +10920,65 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Não foi possível abrir as configurações do aplicativo. Vá para Configurações > Aplicativos > VaultExplorer > Bateria e escolha «Sem restrições».';
+
+  @override
+  String get skinPreviewMountedVaultName => 'Cofre pessoal';
+
+  @override
+  String get skinPreviewVaultName => 'Título do cofre';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'Os títulos do cofre e as ações comuns de menu compartilham a cor do texto principal do aplicativo.';
+
+  @override
+  String get skinStatusBannerExamples => 'Banners de status';
+
+  @override
+  String get skinSuccessBanner => 'Banner de sucesso';
+
+  @override
+  String get skinWarningBanner => 'Banner de aviso';
+
+  @override
+  String get skinErrorBanner => 'Banner de erro';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'O preenchimento do banner e a mensagem usam cores de sucesso.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'O preenchimento do banner e a mensagem usam cores de aviso.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'O preenchimento do banner e a mensagem usam cores de erro.';
+
+  @override
+  String get skinPreviewChangesSaved => 'Alterações salvas';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'O armazenamento está quase cheio';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault =>
+      'Não foi possível desbloquear o cofre';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'Superfícies e bordas';
+
+  @override
+  String get skinFileRowDetailsColor => 'Cor dos detalhes da linha de arquivo';
+
+  @override
+  String get skinFileActionOverflowIconColor =>
+      'Cor do ícone de ação da linha de arquivo';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'Outros elementos de pré-visualização com a mesma cor também são destacados.';
+
+  @override
+  String get skinStatusBannerTextColor => 'O texto do banner usa esta cor.';
 }

@@ -9973,7 +9973,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '편집기 도구 모음은 앱 전경색을 사용합니다.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · 3행, 12열';
+  String get skinDartUTF8Ln3Col12 => ' 3행, 12열';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen => '이 화면 뒤의 기본 배경입니다.';
@@ -10330,4 +10330,62 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       '앱 설정을 열 수 없습니다. 설정 > 애플리케이션 > VaultExplorer > 배터리로 이동하여 \'제한 없음\'을 선택하세요.';
+
+  @override
+  String get skinPreviewMountedVaultName => '개인 금고';
+
+  @override
+  String get skinPreviewVaultName => '금고 제목';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      '금고 제목과 일반 메뉴 작업은 앱의 기본 텍스트 색상을 공유합니다.';
+
+  @override
+  String get skinStatusBannerExamples => '상태 배너';
+
+  @override
+  String get skinSuccessBanner => '성공 배너';
+
+  @override
+  String get skinWarningBanner => '경고 배너';
+
+  @override
+  String get skinErrorBanner => '오류 배너';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      '배너 채우기와 메시지는 성공 색상을 사용합니다.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      '배너 채우기와 메시지는 경고 색상을 사용합니다.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer => '배너 채우기와 메시지는 오류 색상을 사용합니다.';
+
+  @override
+  String get skinPreviewChangesSaved => '변경 사항이 저장되었습니다';
+
+  @override
+  String get skinPreviewStorageAlmostFull => '저장 공간이 거의 가득 찼습니다';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault => '금고를 잠금 해제할 수 없습니다';
+
+  @override
+  String get skinSurfaceAndBorderExamples => '표면 및 테두리';
+
+  @override
+  String get skinFileRowDetailsColor => '파일 행 세부정보 색상';
+
+  @override
+  String get skinFileActionOverflowIconColor => '파일 행 작업 아이콘 색상';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      '같은 색상의 다른 미리보기 요소도 함께 강조 표시됩니다.';
+
+  @override
+  String get skinStatusBannerTextColor => '배너 텍스트는 이 색상을 사용합니다.';
 }

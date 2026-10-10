@@ -17560,7 +17560,7 @@ abstract class AppLocalizations {
   /// No description provided for @skinDartUTF8Ln3Col12.
   ///
   /// In en, this message translates to:
-  /// **'Dart · UTF-8 · Ln 3, Col 12'**
+  /// **'Ln 3, Col 12'**
   String get skinDartUTF8Ln3Col12;
 
   /// No description provided for @skinTheMainBackgroundBehindThisScreen.
@@ -18198,6 +18198,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.'**
   String get automationBatterySettingsOpenFailedMessage;
+
+  /// No description provided for @skinPreviewMountedVaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal vault'**
+  String get skinPreviewMountedVaultName;
+
+  /// No description provided for @skinPreviewVaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault title'**
+  String get skinPreviewVaultName;
+
+  /// No description provided for @skinMainTextColorAlsoColorsRegularMenuItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault titles and regular menu actions share the app main text color.'**
+  String get skinMainTextColorAlsoColorsRegularMenuItems;
+
+  /// No description provided for @skinStatusBannerExamples.
+  ///
+  /// In en, this message translates to:
+  /// **'Status banners'**
+  String get skinStatusBannerExamples;
+
+  /// No description provided for @skinSuccessBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Success banner'**
+  String get skinSuccessBanner;
+
+  /// No description provided for @skinWarningBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning banner'**
+  String get skinWarningBanner;
+
+  /// No description provided for @skinErrorBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Error banner'**
+  String get skinErrorBanner;
+
+  /// No description provided for @skinSuccessBannerUsesSuccessContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The banner fill and message use success colors.'**
+  String get skinSuccessBannerUsesSuccessContainer;
+
+  /// No description provided for @skinWarningBannerUsesWarningContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The banner fill and message use warning colors.'**
+  String get skinWarningBannerUsesWarningContainer;
+
+  /// No description provided for @skinErrorBannerUsesErrorContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'The banner fill and message use error colors.'**
+  String get skinErrorBannerUsesErrorContainer;
+
+  /// No description provided for @skinPreviewChangesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes saved'**
+  String get skinPreviewChangesSaved;
+
+  /// No description provided for @skinPreviewStorageAlmostFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage is almost full'**
+  String get skinPreviewStorageAlmostFull;
+
+  /// No description provided for @skinPreviewCouldNotUnlockVault.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not unlock the vault'**
+  String get skinPreviewCouldNotUnlockVault;
+
+  /// No description provided for @skinSurfaceAndBorderExamples.
+  ///
+  /// In en, this message translates to:
+  /// **'Surfaces and borders'**
+  String get skinSurfaceAndBorderExamples;
+
+  /// No description provided for @skinFileRowDetailsColor.
+  ///
+  /// In en, this message translates to:
+  /// **'File row details color'**
+  String get skinFileRowDetailsColor;
+
+  /// No description provided for @skinFileActionOverflowIconColor.
+  ///
+  /// In en, this message translates to:
+  /// **'File row action icon color'**
+  String get skinFileActionOverflowIconColor;
+
+  /// No description provided for @skinMatchingElementsHighlightTogether.
+  ///
+  /// In en, this message translates to:
+  /// **'Other preview elements with the same color are highlighted too.'**
+  String get skinMatchingElementsHighlightTogether;
+
+  /// No description provided for @skinStatusBannerTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The banner text uses this color.'**
+  String get skinStatusBannerTextColor;
 }
 
 class _AppLocalizationsDelegate

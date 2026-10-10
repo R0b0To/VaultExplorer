@@ -10583,7 +10583,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'يستخدم شريط أدوات المحرر اللون الأمامي للتطبيق.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · سطر 3، عمود 12';
+  String get skinDartUTF8Ln3Col12 => ' سطر 3، عمود 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -10950,4 +10950,63 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'تعذر فتح إعدادات التطبيق. افتح الإعدادات > التطبيقات > VaultExplorer > البطارية واختر \"غير مقيّد\".';
+
+  @override
+  String get skinPreviewMountedVaultName => 'خزينة شخصية';
+
+  @override
+  String get skinPreviewVaultName => 'عنوان الخزينة';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'تشترك عناوين الخزينة وإجراءات القائمة العادية في لون النص الرئيسي للتطبيق.';
+
+  @override
+  String get skinStatusBannerExamples => 'لافتات الحالة';
+
+  @override
+  String get skinSuccessBanner => 'لافتة النجاح';
+
+  @override
+  String get skinWarningBanner => 'لافتة التحذير';
+
+  @override
+  String get skinErrorBanner => 'لافتة الخطأ';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'يستخدم ملء اللافتة والرسالة ألوان النجاح.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'يستخدم ملء اللافتة والرسالة ألوان التحذير.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'يستخدم ملء اللافتة والرسالة ألوان الخطأ.';
+
+  @override
+  String get skinPreviewChangesSaved => 'تم حفظ التغييرات';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'مساحة التخزين ممتلئة تقريبًا';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault => 'تعذر فتح قفل الخزينة';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'الأسطح والحدود';
+
+  @override
+  String get skinFileRowDetailsColor => 'لون تفاصيل صف الملف';
+
+  @override
+  String get skinFileActionOverflowIconColor => 'لون رمز إجراء صف الملف';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'يتم أيضًا تمييز عناصر المعاينة الأخرى التي لها نفس اللون.';
+
+  @override
+  String get skinStatusBannerTextColor => 'يستخدم نص اللافتة هذا اللون.';
 }

@@ -557,28 +557,51 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   Future<void> _showEncodingPicker(EditorTab tab) async {
     final encodings = await EditorTextEncoding.available();
     if (!mounted) return;
+    final activeIndex = encodings.indexWhere(
+      (e) => e.name == tab.encoding.name,
+    );
+    final activeKey = GlobalKey();
+    var scrolledToActive = false;
     final encoding = await showDialog<EditorTextEncoding>(
       context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: Text(dialogContext.l10n.textEditorEncodingTooltip),
-        children: [
-          for (final option in encodings)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(dialogContext).pop(option),
-              child: Row(
-                children: [
-                  Expanded(child: Text(option.label)),
-                  if (tab.encoding.name == option.name)
-                    Icon(
-                      Icons.check_rounded,
-                      size: 18,
-                      color: Theme.of(dialogContext).colorScheme.primary,
-                    ),
-                ],
+      builder: (dialogContext) {
+        final cs = Theme.of(dialogContext).colorScheme;
+        if (!scrolledToActive) {
+          // The charset list is long, so bring the active row into view
+          // once the dialog has been laid out.
+          scrolledToActive = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final activeContext = activeKey.currentContext;
+            if (activeContext != null) {
+              Scrollable.ensureVisible(activeContext, alignment: 0.5);
+            }
+          });
+        }
+        return SimpleDialog(
+          title: Text(dialogContext.l10n.textEditorEncodingTooltip),
+          children: [
+            for (var i = 0; i < encodings.length; i++)
+              ListTile(
+                key: i == activeIndex ? activeKey : null,
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                selected: i == activeIndex,
+                selectedColor: cs.onPrimaryContainer,
+                selectedTileColor: cs.primaryContainer,
+                title: Text(
+                  encodings[i].label,
+                  style: i == activeIndex
+                      ? const TextStyle(fontWeight: FontWeight.w600)
+                      : null,
+                ),
+                trailing: i == activeIndex
+                    ? const Icon(Icons.check_rounded, size: 18)
+                    : null,
+                onTap: () => Navigator.of(dialogContext).pop(encodings[i]),
               ),
-            ),
-        ],
-      ),
+          ],
+        );
+      },
     );
     if (encoding != null) await _changeEncoding(tab, encoding);
   }
@@ -3237,7 +3260,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             children: [
               Expanded(
                 child: Text(
-                  '${activeTab.encoding.label}  |  $posStr${context.l10n.linesCount(activeTab.lineCount)}  |  ${context.l10n.charsCount(activeTab.charCount)}',
+                  '$posStr${context.l10n.linesCount(activeTab.lineCount)}  |  ${context.l10n.charsCount(activeTab.charCount)}',
                   style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

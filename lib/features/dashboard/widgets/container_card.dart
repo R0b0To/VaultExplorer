@@ -30,6 +30,7 @@ class BaseContainerCard extends StatelessWidget {
   final Color iconBackgroundColor;
   final Widget? avatarBadge;
   final String title;
+  final Widget? titleContent;
   final Widget? titleTrailing;
   final Widget? subtitle;
   final Widget? trailingAction;
@@ -43,6 +44,7 @@ class BaseContainerCard extends StatelessWidget {
     required this.iconBackgroundColor,
     this.avatarBadge,
     required this.title,
+    this.titleContent,
     this.titleTrailing,
     this.subtitle,
     this.trailingAction,
@@ -60,12 +62,10 @@ class BaseContainerCard extends StatelessWidget {
       elevation: 0,
       color: backgroundColor ?? cs.surfaceContainer,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: effectiveRadius,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: effectiveRadius),
       child: InkWell(
         onTap: onTap,
-         child: Padding(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
@@ -82,11 +82,7 @@ class BaseContainerCard extends StatelessWidget {
                     child: Center(child: icon),
                   ),
                   if (avatarBadge != null)
-                    Positioned(
-                      right: -3,
-                      bottom: -3,
-                      child: avatarBadge!,
-                    ),
+                    Positioned(right: -3, bottom: -3, child: avatarBadge!),
                 ],
               ),
               const SizedBox(width: 14),
@@ -99,16 +95,18 @@ class BaseContainerCard extends StatelessWidget {
                       children: [
                         // Changed from Flexible to Expanded:
                         Expanded(
-                          child: Text(
-                            title,
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.1,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
+                          child:
+                              titleContent ??
+                              Text(
+                                title,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.1,
+                                  height: 1.2,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                         ),
                         if (titleTrailing != null) ...[
                           const SizedBox(width: 8), // Gap before trailing item
@@ -221,7 +219,7 @@ class ContainerCard extends StatelessWidget {
                   formatBytes(container.totalSpace),
                 )
               : context.l10n.volMountedSummary(container.volId),
-         style: textTheme.bodySmall?.copyWith(
+          style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
             fontSize: 11.5,
             letterSpacing: -0.2,
@@ -247,7 +245,7 @@ class ContainerCard extends StatelessWidget {
           : cs.primaryContainer.withValues(alpha: 0.35),
       cs.surfaceContainerHigh,
     );
-     return BaseContainerCard(
+    return BaseContainerCard(
       onTap: onBrowse,
       icon: iconWidget,
       iconBackgroundColor: cs.primaryContainer,
@@ -257,7 +255,7 @@ class ContainerCard extends StatelessWidget {
       trailingAction: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-           _LockButton(container: container, onLocked: onLocked),
+          _LockButton(container: container, onLocked: onLocked),
           const SizedBox(width: 6),
           _VaultMoreMenuButton(
             onEdit: onEdit,
@@ -308,8 +306,10 @@ class SavedContainerCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
-         style: textTheme.bodySmall?.copyWith(
+          isUsb
+              ? context.l10n.usbDriveLockedLabel
+              : context.l10n.lockedContainerLabel,
+          style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
             fontSize: 11.5,
             letterSpacing: -0.2,
@@ -318,7 +318,7 @@ class SavedContainerCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
         ),
-       // Reserves the exact height of ContainerCard's progress bar +
+        // Reserves the exact height of ContainerCard's progress bar +
         // spacing (4 + 4 = 8) so mounted and locked cards maintain identical
         // height and prevent Cumulative Layout Shift (CLS).
         const SizedBox(height: 8),
@@ -359,10 +359,12 @@ class _CompactIconButton extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final message = isLoading && tooltip != null ? '$tooltip, in progress' : (tooltip ?? '');
+    final message = isLoading && tooltip != null
+        ? '$tooltip, in progress'
+        : (tooltip ?? '');
     return Tooltip(
       message: message,
-       child: SizedBox(
+      child: SizedBox(
         width: 38,
         height: 38,
         child: FilledButton(
@@ -412,7 +414,10 @@ class _LockButtonState extends ConsumerState<_LockButton> {
     HapticFeedback.mediumImpact();
     final events = ref.read(vaultEngineEventsProvider);
     if (!events.acquireLockGuard(volId)) {
-      VeLog.d(_kLogTag, '_lock: volId=$volId guard busy, showing snackbar and bailing');
+      VeLog.d(
+        _kLogTag,
+        '_lock: volId=$volId guard busy, showing snackbar and bailing',
+      );
       if (mounted) {
         showAppSnackBar(
           context,
@@ -450,10 +455,17 @@ class _LockButtonState extends ConsumerState<_LockButton> {
         }
         return;
       }
-      VeLog.i(_kLogTag, '_lock: native lockContainer succeeded for volId=$volId, notifying controller');
+      VeLog.i(
+        _kLogTag,
+        '_lock: native lockContainer succeeded for volId=$volId, notifying controller',
+      );
       widget.onLocked(volId);
     } catch (e) {
-      VeLog.e(_kLogTag, '_lock: native lockContainer threw for volId=$volId', e);
+      VeLog.e(
+        _kLogTag,
+        '_lock: native lockContainer threw for volId=$volId',
+        e,
+      );
       if (mounted) {
         showAppSnackBar(
           context,
@@ -503,13 +515,9 @@ class _VaultMoreMenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-     return PopupMenuButton<String>(
+    return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
-      icon: Icon(
-        Icons.more_vert_rounded,
-        color: cs.onSurfaceVariant,
-        size: 22,
-      ),
+      icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant, size: 22),
       tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (action) {
@@ -536,10 +544,7 @@ class _VaultMoreMenuButton extends StatelessWidget {
             children: [
               Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
               const SizedBox(width: 12),
-              Text(
-                context.l10n.remove,
-                style: TextStyle(color: cs.error),
-              ),
+              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
             ],
           ),
         ),

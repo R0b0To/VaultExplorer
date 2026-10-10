@@ -9974,7 +9974,7 @@ class AppLocalizationsJa extends AppLocalizations {
       'エディタツールバーはアプリの前景色を使用します。';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · 3行, 12列';
+  String get skinDartUTF8Ln3Col12 => ' 3行, 12列';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen => 'この画面の背後にあるメインの背景。';
@@ -10331,4 +10331,61 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'アプリの設定を開けませんでした。「設定」>「アプリ」>「VaultExplorer」>「バッテリー」を開き、「制限なし」を選択してください。';
+
+  @override
+  String get skinPreviewMountedVaultName => '個人用保管庫';
+
+  @override
+  String get skinPreviewVaultName => '保管庫のタイトル';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      '保管庫のタイトルと通常のメニュー操作は、アプリのメインテキスト色を共有します。';
+
+  @override
+  String get skinStatusBannerExamples => 'ステータスバナー';
+
+  @override
+  String get skinSuccessBanner => '成功バナー';
+
+  @override
+  String get skinWarningBanner => '警告バナー';
+
+  @override
+  String get skinErrorBanner => 'エラーバナー';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'バナーの背景とメッセージには成功の色が使用されます。';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'バナーの背景とメッセージには警告の色が使用されます。';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer => 'バナーの背景とメッセージにはエラーの色が使用されます。';
+
+  @override
+  String get skinPreviewChangesSaved => '変更が保存されました';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'ストレージの空き容量が少なくなっています';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault => '保管庫のロックを解除できませんでした';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'サーフェスと境界線';
+
+  @override
+  String get skinFileRowDetailsColor => 'ファイル行の詳細の色';
+
+  @override
+  String get skinFileActionOverflowIconColor => 'ファイル行のアクションアイコンの色';
+
+  @override
+  String get skinMatchingElementsHighlightTogether => '同じ色の他のプレビュー要素も強調表示されます。';
+
+  @override
+  String get skinStatusBannerTextColor => 'バナーテキストにはこの色が使用されます。';
 }

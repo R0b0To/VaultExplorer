@@ -10639,7 +10639,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'La barre d\'outils de l\'éditeur utilise la couleur de premier plan de l\'application.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Lg 3, Col 12';
+  String get skinDartUTF8Ln3Col12 => ' Lg 3, Col 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -11018,4 +11018,68 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Impossible d\'ouvrir les paramètres de l\'application. Allez dans Paramètres > Applications > VaultExplorer > Batterie et choisissez « Non restreinte ».';
+
+  @override
+  String get skinPreviewMountedVaultName => 'Coffre-fort personnel';
+
+  @override
+  String get skinPreviewVaultName => 'Titre du coffre-fort';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'Les titres des coffres-forts et les actions normales du menu partagent la couleur du texte principal de l\'application.';
+
+  @override
+  String get skinStatusBannerExamples => 'Bannières d\'état';
+
+  @override
+  String get skinSuccessBanner => 'Bannière de succès';
+
+  @override
+  String get skinWarningBanner => 'Bannière d\'avertissement';
+
+  @override
+  String get skinErrorBanner => 'Bannière d\'erreur';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'Le remplissage de la bannière et le message utilisent les couleurs de succès.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'Le remplissage de la bannière et le message utilisent les couleurs d\'avertissement.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'Le remplissage de la bannière et le message utilisent les couleurs d\'erreur.';
+
+  @override
+  String get skinPreviewChangesSaved => 'Modifications enregistrées';
+
+  @override
+  String get skinPreviewStorageAlmostFull =>
+      'L\'espace de stockage est presque plein';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault =>
+      'Impossible de déverrouiller le coffre-fort';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'Surfaces et bordures';
+
+  @override
+  String get skinFileRowDetailsColor =>
+      'Couleur des détails de la ligne de fichier';
+
+  @override
+  String get skinFileActionOverflowIconColor =>
+      'Couleur de l\'icône d\'action de la ligne de fichier';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'Les autres éléments d\'aperçu de la même couleur sont également mis en surbrillance.';
+
+  @override
+  String get skinStatusBannerTextColor =>
+      'Le texte de la bannière utilise cette couleur.';
 }

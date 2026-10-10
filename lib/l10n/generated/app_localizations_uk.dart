@@ -10626,7 +10626,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Панель інструментів редактора використовує колір переднього плану програми.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Ряд 3, Стовп 12';
+  String get skinDartUTF8Ln3Col12 => ' Ряд 3, Стовп 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -11001,4 +11001,65 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Не вдалося відкрити налаштування програми. Відкрийте Налаштування > Програми > VaultExplorer > Батарея та виберіть «Без обмежень».';
+
+  @override
+  String get skinPreviewMountedVaultName => 'Особисте сховище';
+
+  @override
+  String get skinPreviewVaultName => 'Назва сховища';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'Назви сховищ і звичайні дії меню використовують основний колір тексту програми.';
+
+  @override
+  String get skinStatusBannerExamples => 'Банери стану';
+
+  @override
+  String get skinSuccessBanner => 'Банер успіху';
+
+  @override
+  String get skinWarningBanner => 'Банер попередження';
+
+  @override
+  String get skinErrorBanner => 'Банер помилки';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'Заливка банера та повідомлення використовують кольори успіху.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'Заливка банера та повідомлення використовують кольори попередження.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'Заливка банера та повідомлення використовують кольори помилки.';
+
+  @override
+  String get skinPreviewChangesSaved => 'Зміни збережено';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'Сховище майже заповнене';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault =>
+      'Не вдалося розблокувати сховище';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'Поверхні та межі';
+
+  @override
+  String get skinFileRowDetailsColor => 'Колір деталей рядка файлу';
+
+  @override
+  String get skinFileActionOverflowIconColor => 'Колір значка дії рядка файлу';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'Інші елементи попереднього перегляду з таким самим кольором також виділяються.';
+
+  @override
+  String get skinStatusBannerTextColor =>
+      'Текст банера використовує цей колір.';
 }

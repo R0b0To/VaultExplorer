@@ -10391,7 +10391,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The editor toolbar uses the app foreground color.';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · Ln 3, Col 12';
+  String get skinDartUTF8Ln3Col12 => 'Ln 3, Col 12';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
@@ -10758,4 +10758,63 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.';
+
+  @override
+  String get skinPreviewMountedVaultName => 'Personal vault';
+
+  @override
+  String get skinPreviewVaultName => 'Vault title';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      'Vault titles and regular menu actions share the app main text color.';
+
+  @override
+  String get skinStatusBannerExamples => 'Status banners';
+
+  @override
+  String get skinSuccessBanner => 'Success banner';
+
+  @override
+  String get skinWarningBanner => 'Warning banner';
+
+  @override
+  String get skinErrorBanner => 'Error banner';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer =>
+      'The banner fill and message use success colors.';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer =>
+      'The banner fill and message use warning colors.';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer =>
+      'The banner fill and message use error colors.';
+
+  @override
+  String get skinPreviewChangesSaved => 'Changes saved';
+
+  @override
+  String get skinPreviewStorageAlmostFull => 'Storage is almost full';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault => 'Could not unlock the vault';
+
+  @override
+  String get skinSurfaceAndBorderExamples => 'Surfaces and borders';
+
+  @override
+  String get skinFileRowDetailsColor => 'File row details color';
+
+  @override
+  String get skinFileActionOverflowIconColor => 'File row action icon color';
+
+  @override
+  String get skinMatchingElementsHighlightTogether =>
+      'Other preview elements with the same color are highlighted too.';
+
+  @override
+  String get skinStatusBannerTextColor => 'The banner text uses this color.';
 }

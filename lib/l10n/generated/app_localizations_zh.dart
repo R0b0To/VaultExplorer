@@ -9824,7 +9824,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinTheEditorToolbarUsesTheAppForegroundColor => '编辑器工具栏使用应用前景色。';
 
   @override
-  String get skinDartUTF8Ln3Col12 => 'Dart · UTF-8 · 第 3 行，第 12 列';
+  String get skinDartUTF8Ln3Col12 => ' 第 3 行，第 12 列';
 
   @override
   String get skinTheMainBackgroundBehindThisScreen => '此屏幕背后的主要背景。';
@@ -10173,4 +10173,59 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get automationBatterySettingsOpenFailedMessage =>
       '无法打开应用设置。请前往 设置 > 应用 > VaultExplorer > 电池 并选择“无限制”。';
+
+  @override
+  String get skinPreviewMountedVaultName => '个人保险库';
+
+  @override
+  String get skinPreviewVaultName => '保险库标题';
+
+  @override
+  String get skinMainTextColorAlsoColorsRegularMenuItems =>
+      '保险库标题和常规菜单操作共享应用的主要文本颜色。';
+
+  @override
+  String get skinStatusBannerExamples => '状态横幅';
+
+  @override
+  String get skinSuccessBanner => '成功横幅';
+
+  @override
+  String get skinWarningBanner => '警告横幅';
+
+  @override
+  String get skinErrorBanner => '错误横幅';
+
+  @override
+  String get skinSuccessBannerUsesSuccessContainer => '横幅填充和消息使用成功颜色。';
+
+  @override
+  String get skinWarningBannerUsesWarningContainer => '横幅填充和消息使用警告颜色。';
+
+  @override
+  String get skinErrorBannerUsesErrorContainer => '横幅填充和消息使用错误颜色。';
+
+  @override
+  String get skinPreviewChangesSaved => '更改已保存';
+
+  @override
+  String get skinPreviewStorageAlmostFull => '存储空间几乎已满';
+
+  @override
+  String get skinPreviewCouldNotUnlockVault => '无法解锁保险库';
+
+  @override
+  String get skinSurfaceAndBorderExamples => '表面和边框';
+
+  @override
+  String get skinFileRowDetailsColor => '文件行详细信息颜色';
+
+  @override
+  String get skinFileActionOverflowIconColor => '文件行操作图标颜色';
+
+  @override
+  String get skinMatchingElementsHighlightTogether => '具有相同颜色的其他预览元素也会同时高亮显示。';
+
+  @override
+  String get skinStatusBannerTextColor => '横幅文本使用此颜色。';
 }

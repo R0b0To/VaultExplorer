@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "يتم التحكم في هذا اللون بواسطة إعداد لون الأيقونة في قسم مدير الملفات.",
   "skinFileNameColorSettingDescription": "يتم التحكم في هذا اللون بواسطة إعداد لون الاسم في قسم مدير الملفات.",
   "skinExportedSingle": "تم تصدير المظهر.",
-  "skinExportedMultiple": "تم تصدير المظاهر."
+  "skinExportedMultiple": "تم تصدير المظاهر.",
+  "automationBatteryHintTitle": "السماح بالبدء في الخلفية",
+  "automationBatteryHintMessage": "عند إغلاق VaultExplorer تمامًا، قد يمنع Android الأتمتة من إلغاء قفل هذه الخزينة. اضبط استخدام بطارية VaultExplorer على \"غير مقيّد\" حتى يتمكن Tasker وMacroDroid والتطبيقات الأخرى من إلغاء قفلها في الخلفية.",
+  "automationBatteryHintButton": "فتح إعدادات التطبيق",
+  "automationBatterySettingsOpenFailedMessage": "تعذر فتح إعدادات التطبيق. افتح الإعدادات > التطبيقات > VaultExplorer > البطارية واختر \"غير مقيّد\"."
 }

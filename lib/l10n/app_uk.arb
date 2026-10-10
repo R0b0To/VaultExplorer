@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "Цей колір контролюється налаштуванням кольору піктограми в розділі менеджера файлів.",
   "skinFileNameColorSettingDescription": "Цей колір контролюється налаштуванням кольору назви в розділі менеджера файлів.",
   "skinExportedSingle": "Скін експортовано.",
-  "skinExportedMultiple": "Скіни експортовано."
+  "skinExportedMultiple": "Скіни експортовано.",
+  "automationBatteryHintTitle": "Дозволити запуск у фоні",
+  "automationBatteryHintMessage": "Коли VaultExplorer повністю закрито, Android може заблокувати автоматичне розблокування цього сховища. Установіть використання батареї VaultExplorer на «Без обмежень», щоб Tasker, MacroDroid та інші програми могли розблоковувати його у фоновому режимі.",
+  "automationBatteryHintButton": "Відкрити налаштування програми",
+  "automationBatterySettingsOpenFailedMessage": "Не вдалося відкрити налаштування програми. Відкрийте Налаштування > Програми > VaultExplorer > Батарея та виберіть «Без обмежень»."
 }

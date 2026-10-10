@@ -10159,4 +10159,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => '皮肤已导出。';
+
+  @override
+  String get automationBatteryHintTitle => '允许后台启动';
+
+  @override
+  String get automationBatteryHintMessage =>
+      '当 VaultExplorer 完全关闭时，Android 可能会阻止自动化解锁此保险库。请将 VaultExplorer 的电池用量设置为“无限制”，以便 Tasker、MacroDroid 和其他应用可以在后台解锁。';
+
+  @override
+  String get automationBatteryHintButton => '打开应用设置';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      '无法打开应用设置。请前往 设置 > 应用 > VaultExplorer > 电池 并选择“无限制”。';
 }

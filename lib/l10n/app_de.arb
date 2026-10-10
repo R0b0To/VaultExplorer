@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "Diese Farbe wird durch die Symbolfarbeinstellung im Dateimanager-Bereich gesteuert.",
   "skinFileNameColorSettingDescription": "Diese Farbe wird durch die Namensfarbeinstellung im Dateimanager-Bereich gesteuert.",
   "skinExportedSingle": "Skin exportiert.",
-  "skinExportedMultiple": "Skins exportiert."
+  "skinExportedMultiple": "Skins exportiert.",
+  "automationBatteryHintTitle": "Start im Hintergrund erlauben",
+  "automationBatteryHintMessage": "Wenn VaultExplorer vollständig geschlossen ist, kann Android die Entsperrung dieses Tresors durch Automationen blockieren. Setzen Sie die Akkunutzung von VaultExplorer auf „Uneingeschränkt“, damit Tasker, MacroDroid und andere Apps ihn im Hintergrund entsperren können.",
+  "automationBatteryHintButton": "App-Einstellungen öffnen",
+  "automationBatterySettingsOpenFailedMessage": "App-Einstellungen konnten nicht geöffnet werden. Öffnen Sie Einstellungen > Apps > VaultExplorer > Akku und wählen Sie „Uneingeschränkt“."
 }

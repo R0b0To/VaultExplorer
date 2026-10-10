@@ -11002,4 +11002,20 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => 'Thèmes exportés.';
+
+  @override
+  String get automationBatteryHintTitle =>
+      'Autoriser le démarrage en arrière-plan';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'Lorsque VaultExplorer est complètement fermé, Android peut empêcher une automatisation de déverrouiller ce coffre. Définissez l\'utilisation de la batterie de VaultExplorer sur « Non restreinte » afin que Tasker, MacroDroid et d\'autres applications puissent le déverrouiller en arrière-plan.';
+
+  @override
+  String get automationBatteryHintButton =>
+      'Ouvrir les paramètres de l\'application';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      'Impossible d\'ouvrir les paramètres de l\'application. Allez dans Paramètres > Applications > VaultExplorer > Batterie et choisissez « Non restreinte ».';
 }

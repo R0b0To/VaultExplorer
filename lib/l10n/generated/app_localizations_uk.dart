@@ -10987,4 +10987,18 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => 'Скіни експортовано.';
+
+  @override
+  String get automationBatteryHintTitle => 'Дозволити запуск у фоні';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'Коли VaultExplorer повністю закрито, Android може заблокувати автоматичне розблокування цього сховища. Установіть використання батареї VaultExplorer на «Без обмежень», щоб Tasker, MacroDroid та інші програми могли розблоковувати його у фоновому режимі.';
+
+  @override
+  String get automationBatteryHintButton => 'Відкрити налаштування програми';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      'Не вдалося відкрити налаштування програми. Відкрийте Налаштування > Програми > VaultExplorer > Батарея та виберіть «Без обмежень».';
 }

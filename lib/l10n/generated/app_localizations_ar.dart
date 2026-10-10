@@ -10936,4 +10936,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => 'تم تصدير المظاهر.';
+
+  @override
+  String get automationBatteryHintTitle => 'السماح بالبدء في الخلفية';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'عند إغلاق VaultExplorer تمامًا، قد يمنع Android الأتمتة من إلغاء قفل هذه الخزينة. اضبط استخدام بطارية VaultExplorer على \"غير مقيّد\" حتى يتمكن Tasker وMacroDroid والتطبيقات الأخرى من إلغاء قفلها في الخلفية.';
+
+  @override
+  String get automationBatteryHintButton => 'فتح إعدادات التطبيق';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      'تعذر فتح إعدادات التطبيق. افتح الإعدادات > التطبيقات > VaultExplorer > البطارية واختر \"غير مقيّد\".';
 }

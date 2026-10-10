@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "Questo colore è controllato dall'impostazione del colore dell'icona nella sezione gestore file.",
   "skinFileNameColorSettingDescription": "Questo colore è controllato dall'impostazione del colore del nome nella sezione gestore file.",
   "skinExportedSingle": "Skin esportata.",
-  "skinExportedMultiple": "Skin esportate."
+  "skinExportedMultiple": "Skin esportate.",
+  "automationBatteryHintTitle": "Consenti avvio in background",
+  "automationBatteryHintMessage": "Quando VaultExplorer è completamente chiuso, Android potrebbe impedire a un'automazione di sbloccare questa cassaforte. Imposta l'utilizzo della batteria di VaultExplorer su «Senza restrizioni» in modo che Tasker, MacroDroid e altre app possano sbloccarlo in background.",
+  "automationBatteryHintButton": "Apri impostazioni app",
+  "automationBatterySettingsOpenFailedMessage": "Impossibile aprire le impostazioni dell'app. Apri Impostazioni > App > VaultExplorer > Batteria e scegli «Senza restrizioni»."
 }

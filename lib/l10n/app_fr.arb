@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "Cette couleur est contrôlée par le paramètre de couleur d'icône dans la section gestionnaire de fichiers.",
   "skinFileNameColorSettingDescription": "Cette couleur est contrôlée par le paramètre de couleur de nom dans la section gestionnaire de fichiers.",
   "skinExportedSingle": "Thème exporté.",
-  "skinExportedMultiple": "Thèmes exportés."
+  "skinExportedMultiple": "Thèmes exportés.",
+  "automationBatteryHintTitle": "Autoriser le démarrage en arrière-plan",
+  "automationBatteryHintMessage": "Lorsque VaultExplorer est complètement fermé, Android peut empêcher une automatisation de déverrouiller ce coffre. Définissez l'utilisation de la batterie de VaultExplorer sur « Non restreinte » afin que Tasker, MacroDroid et d'autres applications puissent le déverrouiller en arrière-plan.",
+  "automationBatteryHintButton": "Ouvrir les paramètres de l'application",
+  "automationBatterySettingsOpenFailedMessage": "Impossible d'ouvrir les paramètres de l'application. Allez dans Paramètres > Applications > VaultExplorer > Batterie et choisissez « Non restreinte »."
 }

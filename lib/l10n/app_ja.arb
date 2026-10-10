@@ -3002,5 +3002,9 @@
   "skinFileIconColorSettingDescription": "この色はファイルマネージャーセクションのアイコン色設定で制御されます。",
   "skinFileNameColorSettingDescription": "この色はファイルマネージャーセクションの名前色設定で制御されます。",
   "skinExportedSingle": "スキンをエクスポートしました。",
-  "skinExportedMultiple": "スキンをエクスポートしました。"
+  "skinExportedMultiple": "スキンをエクスポートしました。",
+  "automationBatteryHintTitle": "バックグラウンドでの開始を許可",
+  "automationBatteryHintMessage": "VaultExplorerが完全に終了している場合、Androidがオートメーションによる保管庫のロック解除をブロックすることがあります。TaskerやMacroDroidなどのアプリがバックグラウンドでロック解除できるように、VaultExplorerのバッテリー使用量を「制限なし」に設定してください。",
+  "automationBatteryHintButton": "アプリの設定を開く",
+  "automationBatterySettingsOpenFailedMessage": "アプリの設定を開けませんでした。「設定」>「アプリ」>「VaultExplorer」>「バッテリー」を開き、「制限なし」を選択してください。"
 }

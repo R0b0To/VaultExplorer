@@ -18174,6 +18174,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skins exported.'**
   String get skinExportedMultiple;
+
+  /// Title of the hint card on the automation settings screen asking the user to set battery usage to Unrestricted
+  ///
+  /// In en, this message translates to:
+  /// **'Allow background start'**
+  String get automationBatteryHintTitle;
+
+  /// Body of the automation settings hint card explaining why battery usage should be Unrestricted
+  ///
+  /// In en, this message translates to:
+  /// **'When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer\'s battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.'**
+  String get automationBatteryHintMessage;
+
+  /// Button on the automation battery hint card that opens the app's system settings page
+  ///
+  /// In en, this message translates to:
+  /// **'Open app settings'**
+  String get automationBatteryHintButton;
+
+  /// Snackbar shown when the system app settings page could not be opened from the automation battery hint card
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.'**
+  String get automationBatterySettingsOpenFailedMessage;
 }
 
 class _AppLocalizationsDelegate

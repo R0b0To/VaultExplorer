@@ -10317,4 +10317,18 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => 'スキンをエクスポートしました。';
+
+  @override
+  String get automationBatteryHintTitle => 'バックグラウンドでの開始を許可';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'VaultExplorerが完全に終了している場合、Androidがオートメーションによる保管庫のロック解除をブロックすることがあります。TaskerやMacroDroidなどのアプリがバックグラウンドでロック解除できるように、VaultExplorerのバッテリー使用量を「制限なし」に設定してください。';
+
+  @override
+  String get automationBatteryHintButton => 'アプリの設定を開く';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      'アプリの設定を開けませんでした。「設定」>「アプリ」>「VaultExplorer」>「バッテリー」を開き、「制限なし」を選択してください。';
 }

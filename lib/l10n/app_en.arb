@@ -12517,5 +12517,21 @@
         "type": "String"
       }
     }
+  },
+  "automationBatteryHintTitle": "Allow background start",
+  "@automationBatteryHintTitle": {
+    "description": "Title of the hint card on the automation settings screen asking the user to set battery usage to Unrestricted"
+  },
+  "automationBatteryHintMessage": "When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer's battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.",
+  "@automationBatteryHintMessage": {
+    "description": "Body of the automation settings hint card explaining why battery usage should be Unrestricted"
+  },
+  "automationBatteryHintButton": "Open app settings",
+  "@automationBatteryHintButton": {
+    "description": "Button on the automation battery hint card that opens the app's system settings page"
+  },
+  "automationBatterySettingsOpenFailedMessage": "Couldn't open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.",
+  "@automationBatterySettingsOpenFailedMessage": {
+    "description": "Snackbar shown when the system app settings page could not be opened from the automation battery hint card"
   }
 }

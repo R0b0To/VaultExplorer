@@ -10744,4 +10744,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => 'Skins exported.';
+
+  @override
+  String get automationBatteryHintTitle => 'Allow background start';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer\'s battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.';
+
+  @override
+  String get automationBatteryHintButton => 'Open app settings';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.';
 }

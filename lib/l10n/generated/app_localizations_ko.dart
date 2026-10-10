@@ -10316,4 +10316,18 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skinExportedMultiple => '스킨들을 내보냈습니다.';
+
+  @override
+  String get automationBatteryHintTitle => '백그라운드 실행 허용';
+
+  @override
+  String get automationBatteryHintMessage =>
+      'VaultExplorer가 완전히 종료된 경우 Android에서 자동화의 볼트 잠금 해제를 차단할 수 있습니다. Tasker, MacroDroid 및 기타 앱이 백그라운드에서 볼트를 잠금 해제할 수 있도록 VaultExplorer의 배터리 사용량을 \'제한 없음\'으로 설정하세요.';
+
+  @override
+  String get automationBatteryHintButton => '앱 설정 열기';
+
+  @override
+  String get automationBatterySettingsOpenFailedMessage =>
+      '앱 설정을 열 수 없습니다. 설정 > 애플리케이션 > VaultExplorer > 배터리로 이동하여 \'제한 없음\'을 선택하세요.';
 }

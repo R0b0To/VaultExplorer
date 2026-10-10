@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/rendering.dart' show AxisDirection;
@@ -34,6 +35,82 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 
+class _ParsedEditorText {
+  final CodeLines codeLines;
+  final int charCount;
+
+  const _ParsedEditorText(this.codeLines, this.charCount);
+}
+
+/// Splits the document without creating the temporary `List<String>` that
+/// String.split would allocate for files containing many lines.
+_ParsedEditorText _codeLinesFromText(String text) {
+  final lines = <CodeLine>[];
+  var lineStart = 0;
+  var index = 0;
+  var charCount = 0;
+
+  while (index < text.length) {
+    final codeUnit = text.codeUnitAt(index);
+    if (codeUnit == 0x0A || codeUnit == 0x0D) {
+      final lineText = text.substring(lineStart, index);
+      lines.add(CodeLine(lineText));
+      charCount += lineText.length + 1;
+      if (codeUnit == 0x0D &&
+          index + 1 < text.length &&
+          text.codeUnitAt(index + 1) == 0x0A) {
+        index++;
+      }
+      lineStart = index + 1;
+    }
+    index++;
+  }
+
+  final lastLine = text.substring(lineStart);
+  lines.add(CodeLine(lastLine));
+  charCount += lastLine.length;
+  return _ParsedEditorText(CodeLines.of(lines), charCount);
+}
+
+/// UTF-8 line breaks are single-byte ASCII values, so large UTF-8 documents
+/// can be decoded one line at a time without first allocating a full copy of
+/// the document as a Dart String.
+_ParsedEditorText _codeLinesFromUtf8Bytes(
+  Uint8List bytes, {
+  required int startOffset,
+}) {
+  final lines = <CodeLine>[];
+  var lineStart = startOffset;
+  var index = startOffset;
+  var charCount = 0;
+
+  void addLine(int end, {required bool hasLineBreak}) {
+    final lineText = utf8.decode(
+      Uint8List.sublistView(bytes, lineStart, end),
+      allowMalformed: true,
+    );
+    lines.add(CodeLine(lineText));
+    charCount += lineText.length + (hasLineBreak ? 1 : 0);
+  }
+
+  while (index < bytes.length) {
+    final byte = bytes[index];
+    if (byte == 0x0A || byte == 0x0D) {
+      addLine(index, hasLineBreak: true);
+      if (byte == 0x0D &&
+          index + 1 < bytes.length &&
+          bytes[index + 1] == 0x0A) {
+        index++;
+      }
+      lineStart = index + 1;
+    }
+    index++;
+  }
+
+  addLine(bytes.length, hasLineBreak: false);
+  return _ParsedEditorText(CodeLines.of(lines), charCount);
+}
+
 class EditorTab {
   String filePath;
   final CodeLineEditingController codeController;
@@ -58,8 +135,8 @@ class EditorTab {
   DateTime? lastSavedAt;
   bool lastSaveWasAutosave = false;
   bool appliedInitialText = false;
-  String lastKnownText = '';
   Object? lastCodeLines;
+  bool isApplyingProgrammaticText = false;
   bool showMarkdownPreview;
   EditorTextEncoding encoding = EditorTextEncoding.utf8;
   bool encodingWasChosen = false;
@@ -85,6 +162,8 @@ class EditorTab {
   bool get isMarkdownFile =>
       filePath.toLowerCase().endsWith('.md') ||
       filePath.toLowerCase().endsWith('.markdown');
+
+  bool get isLargeFile => lineCount > 4000 || charCount > 300 * 1024;
 
   void dispose() {
     autosaveTimer?.cancel();
@@ -124,6 +203,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   final Map<int, Offset> _pinchPointers = {};
   double? _initialPinchDistance;
   double _pinchStartFontSize = 14.0;
+  bool _pinchFontSizeChanged = false;
+  DateTime? _lastPinchFontSizeUpdate;
 
   bool _readOnly = false;
   bool _wordWrap = true;
@@ -339,6 +420,40 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     if (mounted) setState(() {});
   }
 
+  void _finishPinchFontSizeGesture() {
+    _initialPinchDistance = null;
+    _lastPinchFontSizeUpdate = null;
+    if (!_pinchFontSizeChanged) return;
+
+    _pinchFontSizeChanged = false;
+    final fontSize = ref.read(textEditorAppearanceProvider).fontSize;
+    ref.read(textEditorAppearanceProvider.notifier).setFontSize(fontSize);
+  }
+
+  void _applyPinchFontSize({bool force = false}) {
+    if (_pinchPointers.length != 2 ||
+        _initialPinchDistance == null ||
+        _initialPinchDistance! <= 10) {
+      return;
+    }
+
+    final points = _pinchPointers.values.toList();
+    final scale = (points[0] - points[1]).distance / _initialPinchDistance!;
+    final newSize = (_pinchStartFontSize * scale).clamp(10.0, 24.0);
+    final rounded = (newSize * 2).round() / 2.0;
+    final currentFontSize = ref.read(textEditorAppearanceProvider).fontSize;
+    if (rounded == currentFontSize ||
+        (!force && (rounded - currentFontSize).abs() < 1.0)) {
+      return;
+    }
+
+    _pinchFontSizeChanged = true;
+    _lastPinchFontSizeUpdate = DateTime.now();
+    ref
+        .read(textEditorAppearanceProvider.notifier)
+        .setFontSize(rounded, persist: false);
+  }
+
   Future<void> _loadFileForTab(
     EditorTab tab, {
     EditorTextEncoding? encoding,
@@ -352,7 +467,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     });
 
     try {
-      final bytes = await ref
+      var bytes = await ref
           .read(vaultFileIoApiProvider)
           .readWholeFile(widget.container, tab.filePath);
       if (bytes == null) {
@@ -364,21 +479,44 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       } else if (!tab.encodingWasChosen) {
         tab.encoding = EditorTextEncoding.detect(bytes);
       }
-      String text;
+      late final _ParsedEditorText parsedDocument;
       try {
-        text = await tab.encoding.decode(bytes);
+        if (tab.encoding.isUtf8) {
+          parsedDocument = _codeLinesFromUtf8Bytes(
+            bytes,
+            startOffset: tab.encoding.utf8PayloadOffset(bytes),
+          );
+        } else {
+          final text = await tab.encoding.decode(bytes);
+          bytes = Uint8List(0);
+          parsedDocument = _codeLinesFromText(text);
+        }
       } on FormatException {
         throw FormatException(l10n.textEditorInvalidTextFileMessage);
       }
+      // The editor now owns its line model, so the raw file buffer can go.
+      bytes = Uint8List(0);
 
       if (!mounted) return;
       tab.appliedInitialText = true;
-      tab.lastKnownText = text;
-      tab.codeController.text = text;
+      tab.isApplyingProgrammaticText = true;
+      try {
+        tab.codeController.value = CodeLineEditingValue(
+          codeLines: parsedDocument.codeLines,
+        );
+      } finally {
+        tab.isApplyingProgrammaticText = false;
+      }
       tab.lastCodeLines = tab.codeController.value.codeLines;
       tab.codeController.clearHistory();
       tab.lineCount = tab.codeController.lineCount;
-      tab.charCount = text.length;
+      tab.charCount = parsedDocument.charCount;
+      if (tab.isLargeFile) {
+        _wordWrap = false;
+        tab.showMarkdownPreview = false;
+      }
+      tab.cursorLine = 1;
+      tab.cursorCol = 1;
       tab.isLoading = false;
       tab.isDirty = markDirty;
       if (mounted) setState(() {});
@@ -474,8 +612,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   }
 
   void _onTabTextChanged(EditorTab tab) {
+    if (tab.isApplyingProgrammaticText) {
+      tab.lastCodeLines = tab.codeController.value.codeLines;
+      return;
+    }
+
     final selection = tab.codeController.selection;
-    final lineCount = tab.codeController.lineCount;
+    final codeLines = tab.codeController.value.codeLines;
+    final isSameCodeLines = identical(codeLines, tab.lastCodeLines);
+    final lineCount = isSameCodeLines ? tab.lineCount : codeLines.lineCount;
     final newLine = (selection.extentIndex + 1).clamp(
       1,
       lineCount > 0 ? lineCount : 1,
@@ -488,18 +633,14 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       tab.cursorCol = newCol;
     }
 
-    final codeLines = tab.codeController.value.codeLines;
-    final isSameCodeLines = identical(codeLines, tab.lastCodeLines);
-    final currentText = tab.codeController.text;
-    final isSameText = currentText == tab.lastKnownText;
-
     final isBusyBuilding =
         SchedulerBinding.instance.schedulerPhase ==
             SchedulerPhase.persistentCallbacks ||
         (WidgetsBinding.instance.buildOwner?.debugBuilding ?? false);
 
-    if (isSameCodeLines || isSameText) {
-      tab.lastCodeLines = codeLines;
+    // If codeLines didn't change, only the selection/cursor changed.
+    // Avoid serializing the whole document via tab.codeController.text!
+    if (isSameCodeLines) {
       if (!cursorChanged) return;
 
       void updateCursor() {
@@ -516,14 +657,22 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     tab.lastCodeLines = codeLines;
-    tab.lastKnownText = currentText;
+
+    // Calculate charCount without allocating a new massive String for the entire document
+    final updatedLineCount = lineCount;
+    int totalChars = updatedLineCount > 0 ? updatedLineCount - 1 : 0;
+    for (final segment in codeLines.segments) {
+      for (final line in segment.codeLines) {
+        totalChars += line.charCount;
+      }
+    }
 
     void updateState() {
       if (!mounted) return;
       setState(() {
         tab.isDirty = true;
-        tab.lineCount = tab.codeController.lineCount;
-        tab.charCount = currentText.length;
+        tab.lineCount = updatedLineCount;
+        tab.charCount = totalChars;
       });
     }
 
@@ -621,9 +770,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     await _loadFileForTab(tab, encoding: encoding, markDirty: true);
   }
 
-  Future<Uint8List?> _encodeTabContent(EditorTab tab) async {
+  Future<Uint8List?> _encodeTabContent(EditorTab tab, [String? text]) async {
     try {
-      return await tab.encoding.encode(tab.codeController.text);
+      final content = text ?? tab.codeController.text;
+      return await tab.encoding.encode(content);
     } on FormatException {
       if (mounted) {
         showAppSnackBar(
@@ -639,7 +789,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   Future<bool> _saveFile(EditorTab tab, {bool isAutosave = false}) async {
     tab.autosaveTimer?.cancel();
 
-    final encodedContent = await _encodeTabContent(tab);
+    final content = tab.codeController.text;
+    final encodedContent = await _encodeTabContent(tab, content);
     if (encodedContent == null) return false;
 
     setState(() {
@@ -649,15 +800,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
         tab.isSaving = true;
       }
     });
-
-    final content = tab.codeController.text;
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .writeWholeFile(widget.container, tab.filePath, encodedContent);
 
     if (ok) {
       if (mounted) {
-        tab.lastKnownText = content;
         tab.lastCodeLines = tab.codeController.value.codeLines;
         setState(() {
           tab.isSaving = false;
@@ -1545,6 +1693,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   void _toggleMarkdownPreview() {
     final tab = _activeTab;
+    if (tab.isLargeFile && !tab.showMarkdownPreview) return;
     if (!tab.showMarkdownPreview) {
       final cursorLine = tab.codeController.selection.extentIndex.clamp(
         0,
@@ -1800,6 +1949,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
         appTheme.colorScheme,
         background: appearance.background,
         syntaxTheme: appearance.syntaxTheme,
+        disableHighlight: activeTab.isLargeFile,
       ),
       appSkinTokens,
     );
@@ -1959,7 +2109,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                       ],
                     ),
                   if (!activeTab.isLoading && !activeTab.hasError) ...[
-                    if (activeTab.isMarkdownFile) ...[
+                    if (activeTab.isMarkdownFile && !activeTab.isLargeFile) ...[
                       if (!activeTab.showMarkdownPreview && !_readOnly)
                         IconButton(
                           icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -2873,38 +3023,42 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               if (_pinchPointers.length == 2) {
                 final pts = _pinchPointers.values.toList();
                 _initialPinchDistance = (pts[0] - pts[1]).distance;
-                _pinchStartFontSize = appearance.fontSize;
+                _pinchStartFontSize = ref
+                    .read(textEditorAppearanceProvider)
+                    .fontSize;
+                _pinchFontSizeChanged = false;
+                _lastPinchFontSizeUpdate = null;
               }
             },
             onPointerMove: (event) {
               if (_pinchPointers.containsKey(event.pointer)) {
                 _pinchPointers[event.pointer] = event.position;
               }
-              if (_pinchPointers.length == 2 &&
-                  _initialPinchDistance != null &&
-                  _initialPinchDistance! > 10) {
-                final pts = _pinchPointers.values.toList();
-                final currentDist = (pts[0] - pts[1]).distance;
-                final scale = currentDist / _initialPinchDistance!;
-                final newSize = (_pinchStartFontSize * scale).clamp(10.0, 24.0);
-                final rounded = (newSize * 2).round() / 2.0;
-                if ((rounded - appearance.fontSize).abs() >= 0.5) {
-                  ref
-                      .read(textEditorAppearanceProvider.notifier)
-                      .setFontSize(rounded);
-                }
+              final lastUpdate = _lastPinchFontSizeUpdate;
+              if (lastUpdate == null ||
+                  DateTime.now().difference(lastUpdate) >=
+                      const Duration(milliseconds: 120)) {
+                _applyPinchFontSize();
               }
             },
             onPointerUp: (event) {
+              if (_pinchPointers.containsKey(event.pointer)) {
+                _pinchPointers[event.pointer] = event.position;
+                _applyPinchFontSize(force: true);
+              }
               _pinchPointers.remove(event.pointer);
               if (_pinchPointers.length < 2) {
-                _initialPinchDistance = null;
+                _finishPinchFontSizeGesture();
               }
             },
             onPointerCancel: (event) {
+              if (_pinchPointers.containsKey(event.pointer)) {
+                _pinchPointers[event.pointer] = event.position;
+                _applyPinchFontSize(force: true);
+              }
               _pinchPointers.remove(event.pointer);
               if (_pinchPointers.length < 2) {
-                _initialPinchDistance = null;
+                _finishPinchFontSizeGesture();
               }
             },
             child: Focus(
@@ -2988,22 +3142,23 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                       }
                     }
 
+                    final whitespaceRe = RegExp(r'\s');
+                    final wordRe = RegExp(r'\w');
+
                     if (key == LogicalKeyboardKey.arrowLeft) {
                       if (isControl) {
                         moveLeft();
                         while (extLine >= 0) {
                           final text = lines[extLine].text;
                           while (extOffset > 0 &&
-                              RegExp(r'\s').hasMatch(text[extOffset - 1]))
+                              whitespaceRe.hasMatch(text[extOffset - 1]))
                             extOffset--;
                           if (extOffset > 0) {
-                            bool isWord = RegExp(
-                              r'\w',
-                            ).hasMatch(text[extOffset - 1]);
+                            bool isWord = wordRe.hasMatch(text[extOffset - 1]);
                             while (extOffset > 0 &&
-                                (RegExp(r'\w').hasMatch(text[extOffset - 1]) ==
+                                (wordRe.hasMatch(text[extOffset - 1]) ==
                                     isWord) &&
-                                !RegExp(r'\s').hasMatch(text[extOffset - 1])) {
+                                !whitespaceRe.hasMatch(text[extOffset - 1])) {
                               extOffset--;
                             }
                             break;
@@ -3023,16 +3178,13 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                         while (extLine < lines.length) {
                           final text = lines[extLine].text;
                           while (extOffset < text.length &&
-                              RegExp(r'\s').hasMatch(text[extOffset]))
+                              whitespaceRe.hasMatch(text[extOffset]))
                             extOffset++;
                           if (extOffset < text.length) {
-                            bool isWord = RegExp(
-                              r'\w',
-                            ).hasMatch(text[extOffset]);
+                            bool isWord = wordRe.hasMatch(text[extOffset]);
                             while (extOffset < text.length &&
-                                (RegExp(r'\w').hasMatch(text[extOffset]) ==
-                                    isWord) &&
-                                !RegExp(r'\s').hasMatch(text[extOffset])) {
+                                (wordRe.hasMatch(text[extOffset]) == isWord) &&
+                                !whitespaceRe.hasMatch(text[extOffset])) {
                               extOffset++;
                             }
                             break;
@@ -3112,7 +3264,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                             controller: controller,
                             readOnly: readOnly,
                           ),
-                      chunkAnalyzer: const DefaultCodeChunkAnalyzer(),
+                      chunkAnalyzer: activeTab.isLargeFile
+                          ? const NonCodeChunkAnalyzer()
+                          : const DefaultCodeChunkAnalyzer(),
                       style: CodeEditorStyle(
                         fontFamily: 'JetBrains Mono',
                         fontFamilyFallback: const ['monospace'],
@@ -3171,14 +3325,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                                           }
                                         : null,
                                   ),
-                                  DefaultCodeChunkIndicator(
-                                    width: 14,
-                                    controller: chunkController,
-                                    notifier: notifier,
-                                    painter: DefaultCodeChunkIndicatorPainter(
-                                      color: gutterColor,
+                                  if (!activeTab.isLargeFile)
+                                    DefaultCodeChunkIndicator(
+                                      width: 14,
+                                      controller: chunkController,
+                                      notifier: notifier,
+                                      painter: DefaultCodeChunkIndicatorPainter(
+                                        color: gutterColor,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               );
                             }

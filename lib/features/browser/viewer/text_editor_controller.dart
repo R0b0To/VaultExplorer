@@ -11,6 +11,7 @@
 // only volId (not the full container) is meaningful as part of "which
 // screen session is this".
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -55,7 +56,7 @@ class TextEditorLoad extends _$TextEditorLoad {
       }
       String text;
       try {
-        text = utf8.decode(bytes);
+        text = await Isolate.run(() => utf8.decode(bytes));
       } on FormatException {
         throw FormatException(invalidTextMessage);
       }
@@ -74,11 +75,14 @@ class TextEditorLoad extends _$TextEditorLoad {
   /// which stages the write as ciphertext inside the vault itself (atomic
   /// temp-path-then-rename, all server-side) -- no plaintext copy of the
   /// edited text ever touches host disk.
-  Future<String?> save(MountedContainer container, String content, String writeBackFailedMessage) async {
+ Future<String?> save(MountedContainer container, String content, String writeBackFailedMessage) async {
     try {
+      final bytes = await Isolate.run(
+        () => Uint8List.fromList(utf8.encode(content)),
+      );
       final ok = await ref
           .read(vaultFileIoApiProvider)
-          .writeWholeFile(container, filePath, Uint8List.fromList(utf8.encode(content)));
+          .writeWholeFile(container, filePath, bytes);
       if (!ok) throw Exception(writeBackFailedMessage);
       return null;
     } catch (e) {

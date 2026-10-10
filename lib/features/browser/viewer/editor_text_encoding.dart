@@ -1,3 +1,5 @@
+import 'dart:convert' as convert;
+
 import 'package:flutter/services.dart';
 
 const _textEncodingChannel = MethodChannel(
@@ -62,12 +64,25 @@ class EditorTextEncoding {
 
   Future<String> decode(Uint8List bytes) async {
     final payload = _withoutPrefix(bytes, _bom);
+    // Most editor files are UTF-8. Decode these in Dart to avoid copying the
+    // entire file through a platform-channel message and a native String.
+    if (_isUtf8) return convert.utf8.decode(payload, allowMalformed: true);
     return _textEncodingChannel
         .invokeMethod<String>('decode', {'charset': name, 'bytes': payload})
         .then((text) => text!);
   }
 
   Future<Uint8List> encode(String text) async {
+    if (_isUtf8) {
+      final payload = convert.utf8.encoder.convert(text);
+      if (_bom.isEmpty) return payload;
+
+      final bytes = Uint8List(_bom.length + payload.length);
+      bytes.setRange(0, _bom.length, _bom);
+      bytes.setRange(_bom.length, bytes.length, payload);
+      return bytes;
+    }
+
     final bytes = await _textEncodingChannel.invokeMethod<Uint8List>('encode', {
       'charset': name,
       'text': text,
@@ -75,6 +90,14 @@ class EditorTextEncoding {
     if (bytes == null || _bom.isEmpty) return bytes ?? Uint8List(0);
     return Uint8List.fromList([..._bom, ...bytes]);
   }
+
+  bool get _isUtf8 =>
+      name.toUpperCase() == 'UTF-8' || name.toUpperCase() == 'UTF8';
+
+  bool get isUtf8 => _isUtf8;
+
+  int utf8PayloadOffset(Uint8List bytes) =>
+      _isUtf8 && _bom.isNotEmpty && _startsWith(bytes, _bom) ? _bom.length : 0;
 
   @override
   bool operator ==(Object other) =>

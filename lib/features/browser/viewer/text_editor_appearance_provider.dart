@@ -78,9 +78,11 @@ class TextEditorAppearanceNotifier extends Notifier<TextEditorAppearancePrefs> {
     _service.save(state);
   }
 
-  void setFontSize(double size) {
-    state = state.copyWith(fontSize: size);
-    _service.save(state);
+  void setFontSize(double size, {bool persist = true}) {
+    if (state.fontSize != size) {
+      state = state.copyWith(fontSize: size);
+    }
+    if (persist) _service.save(state);
   }
 
   void setAccessorySymbols(List<String> symbols) {

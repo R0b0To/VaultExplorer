@@ -151,8 +151,10 @@ _LanguageMatch? _matchFor(String filePath) {
 CodeHighlightTheme? _resolveCodeHighlightTheme(
   String filePath,
   Brightness brightness,
-  EditorSyntaxThemeOption syntaxTheme,
-) {
+  EditorSyntaxThemeOption syntaxTheme, {
+  bool disableHighlight = false,
+}) {
+  if (disableHighlight) return null;
   final match = _matchFor(filePath);
   if (match == null) return null;
   return CodeHighlightTheme(
@@ -205,13 +207,15 @@ EditorSyntaxStyle resolveEditorSyntaxStyle(
   ColorScheme fallback, {
   required EditorBackgroundOption background,
   required EditorSyntaxThemeOption syntaxTheme,
+  bool disableHighlight = false,
 }) {
   final codeTheme = _resolveCodeHighlightTheme(
     filePath,
     brightness,
     syntaxTheme,
+    disableHighlight: disableHighlight,
   );
-  final root = codeTheme?.theme['root'];
+  final root = syntaxTheme.themeMap(brightness)['root'];
 
   return EditorSyntaxStyle(
     codeTheme: codeTheme,

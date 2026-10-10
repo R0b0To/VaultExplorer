@@ -2134,9 +2134,23 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (lastViewedFile == fullPath &&
         initialOffset != null &&
         _browserScrollController.hasClients) {
-      if ((_browserScrollController.offset - initialOffset).abs() > 0.5) {
-        _browserScrollController.jumpTo(initialOffset);
-      }
+      // Navigator completes the pushed route's result while its reverse
+      // transition is being finalized. Defer the scroll notification until
+      // the next frame so it cannot bubble through an inactive route element
+      // (which can happen when returning from an external app as well).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_browserScrollController.hasClients) return;
+        if (ModalRoute.of(context)?.isCurrent == false) return;
+
+        final position = _browserScrollController.position;
+        if (!position.hasContentDimensions) return;
+        final restoredOffset = initialOffset
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((position.pixels - restoredOffset).abs() > 0.5) {
+          _browserScrollController.jumpTo(restoredOffset);
+        }
+      });
     }
 
     // Only reload directory contents if files were actually modified/deleted in the viewer

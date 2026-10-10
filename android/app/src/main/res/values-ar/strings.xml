@@ -8,4 +8,11 @@
     <string name="vault_keep_alive_lock_all_action">قفل كل الخزائن</string><string name="vault_keep_alive_notification_text_decoy">مستكشف الأرشيف قيد التشغيل</string><string name="vault_keep_alive_close_action_decoy">إغلاق</string>
     <string name="camera_recording_channel_description">حالة التسجيل المستمر</string><string name="camera_recording_notification_title">جارٍ تسجيل الفيديو</string><string name="camera_recording_notification_text">جارٍ الحفظ في %1$s</string><string name="camera_recording_stop_action">إيقاف وحفظ</string><string name="camera_recording_notification_text_decoy">مستكشف الأرشيف قيد التشغيل</string><string name="camera_recording_stop_action_decoy">إغلاق</string>
     <string name="mirror_push_notification_title">جارٍ حفظ تغييرات الخزنة</string><string name="mirror_push_notification_text">جارٍ رفع التغييرات إلى وحدة التخزين</string>
+    <string name="vault_media_channel_description">عناصر التحكم في تشغيل الوسائط من الخزائن المفتوحة</string>
+    <string name="vault_media_notification_title">التشغيل من الخزنة</string>
+    <string name="vault_media_action_play">تشغيل</string>
+    <string name="vault_media_action_pause">إيقاف مؤقت</string>
+    <string name="vault_media_action_previous">السابق</string>
+    <string name="vault_media_action_next">التالي</string>
+    <string name="vault_media_action_stop">إيقاف</string>
 </resources>

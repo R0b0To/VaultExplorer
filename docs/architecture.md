@@ -537,6 +537,46 @@ OS, which tears down an unfocused app's camera/mic connection on Android 9+
 unless a matching foreground service is running. It is independent of
 `VaultKeepAliveService` and only runs while a recording is in progress.
 
+Background playback of vault media (audio/video continuing with the app
+minimized or the screen off, with a media notification and lock screen
+controls) is split three ways. `NativePlayerManager` still owns the single
+ExoPlayer; `VaultPlaybackSession` owns the Media3 `MediaSession` wrapped
+around it (`VaultSessionPlayer`) and the playback window; and
+`VaultMediaPlaybackService` (type `mediaPlayback`) owns only the notification
+and the foreground state. It applies to items opened from the media viewer out
+of an unlocked vault (the viewer opts in per `initialize` call); the video
+editor, camera review and local-storage (Mask Mode) playback are unchanged.
+
+- **Lock coupling.** Playback is bound to a `volId`. `ContainerSessionRegistry`
+  reports every session removal, so any path in §4.1 that moves that `volId`
+  to Locked stops the player and removes the notification. The foreground
+  service adds no lock trigger and does not delay one: the existing timers
+  and screen-off policy apply as before. The one adjustment is in
+  `SessionLockController`: media still playing when the app returns to the
+  foreground counts as activity for a *timed* `autoLockMins`, as foreground
+  playback already does (not for "Immediately", per-container overrides or
+  the app-lock gate).
+- **File names stay private by default.** The session publishes a generic
+  title (the decoy identity in Mask Mode), playlist position, and never tags
+  embedded in the media. The Media Player Controls setting can opt in to
+  publishing decrypted file names to the notification and MediaSession
+  metadata, which may be shown by lock-screen and connected media controls.
+  The notification's public version remains generic. In either mode,
+  `VaultSessionPlayer` replaces the player's merged metadata, both as a getter
+  and in `onMediaMetadataChanged` events.
+- **Foreground state is held explicitly.** The Dart viewer releases and
+  recreates the player on every item change, which would drop a Media3-managed
+  foreground state and make background auto-advance impossible on Android 12+
+  (no foreground-service starts from the background). The service therefore
+  stays foreground while playing and for a short linger afterwards, and the
+  playback window outlives a released player for a grace period.
+- **Previous / Next** are playlist operations owned by Dart: the viewer
+  reports availability and position (`setMediaNavigation`) and receives
+  presses as a `mediaSessionAction` player event. Changing items rebinds the
+  existing MediaSession to the new player so the notification remains open.
+- While the activity is stopped the video track is disabled, so only audio is
+  decoded; it is re-enabled on `onStart`.
+
 ---
 
 ## 5. Public API surface

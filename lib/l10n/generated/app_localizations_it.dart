@@ -9543,6 +9543,14 @@ class AppLocalizationsIt extends AppLocalizations {
       'Dopo l’ultimo elemento, torna al primo durante la navigazione o la riproduzione.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'Mostra i nomi dei file nelle notifiche multimediali';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'Mostra i nomi dei file decifrati nella notifica, nella schermata di blocco e sui dispositivi connessi.';
+
+  @override
   String get textEditorEncodingTooltip => 'Codifica del testo';
 
   @override

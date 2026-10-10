@@ -17,6 +17,7 @@ class MediaViewerToolbarConfig {
   final bool showCenterScreenPlayButton;
   final bool showCenterTransportForImages;
   final bool showStatusBadge;
+  final bool showFileNamesInMediaNotification;
 
   /// What the seekbar shows while dragging; see [ScrubPreviewStyle].
   final ScrubPreviewStyle scrubPreviewStyle;
@@ -86,6 +87,7 @@ class MediaViewerToolbarConfig {
     this.showCenterScreenPlayButton = false,
     this.showCenterTransportForImages = false,
     this.showStatusBadge = true,
+    this.showFileNamesInMediaNotification = false,
     this.scrubPreviewStyle = ScrubPreviewStyle.miniBox,
     this.edgeSwipeBrightnessEnabled = true,
     this.edgeSwipeVolumeEnabled = true,
@@ -125,6 +127,7 @@ class MediaViewerToolbarConfig {
     bool? showCenterScreenPlayButton,
     bool? showCenterTransportForImages,
     bool? showStatusBadge,
+    bool? showFileNamesInMediaNotification,
     ScrubPreviewStyle? scrubPreviewStyle,
     bool? edgeSwipeBrightnessEnabled,
     bool? edgeSwipeVolumeEnabled,
@@ -162,6 +165,9 @@ class MediaViewerToolbarConfig {
     showCenterTransportForImages:
         showCenterTransportForImages ?? this.showCenterTransportForImages,
     showStatusBadge: showStatusBadge ?? this.showStatusBadge,
+    showFileNamesInMediaNotification:
+        showFileNamesInMediaNotification ??
+        this.showFileNamesInMediaNotification,
     scrubPreviewStyle: scrubPreviewStyle ?? this.scrubPreviewStyle,
     edgeSwipeBrightnessEnabled:
         edgeSwipeBrightnessEnabled ?? this.edgeSwipeBrightnessEnabled,
@@ -208,6 +214,7 @@ class MediaViewerToolbarConfig {
     'showCenterScreenPlayButton': showCenterScreenPlayButton,
     'showCenterTransportForImages': showCenterTransportForImages,
     'showStatusBadge': showStatusBadge,
+    'showFileNamesInMediaNotification': showFileNamesInMediaNotification,
     'scrubPreviewStyle': scrubPreviewStyle.toJson(),
     'edgeSwipeBrightnessEnabled': edgeSwipeBrightnessEnabled,
     'edgeSwipeVolumeEnabled': edgeSwipeVolumeEnabled,
@@ -311,6 +318,8 @@ class MediaViewerToolbarConfig {
       showCenterTransportForImages:
           j['showCenterTransportForImages'] as bool? ?? false,
       showStatusBadge: j['showStatusBadge'] as bool? ?? true,
+      showFileNamesInMediaNotification:
+          j['showFileNamesInMediaNotification'] as bool? ?? false,
       scrubPreviewStyle: ScrubPreviewStyle.fromJson(
         j['scrubPreviewStyle'] as String?,
       ),

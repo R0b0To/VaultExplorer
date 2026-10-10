@@ -61,6 +61,7 @@ class VideoPlaybackManager {
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
     Duration? initialPosition,
+    bool mediaSession = false,
   }) async {
     final token = ++_activationToken;
     final previousFuture = _currentActivationFuture;
@@ -119,6 +120,7 @@ class VideoPlaybackManager {
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
             initialPositionMs: initialPositionMs,
+            mediaSession: mediaSession,
           );
         } else if (contentUriString != null) {
           return NativeVideoController.fromUri(
@@ -130,6 +132,7 @@ class VideoPlaybackManager {
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
             initialPositionMs: initialPositionMs,
+            mediaSession: mediaSession,
           );
         } else {
           throw ArgumentError(

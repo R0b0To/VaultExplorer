@@ -9625,6 +9625,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Після останнього елемента переходити до першого під час навігації або відтворення.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'Показувати назви файлів у медіасповіщеннях';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'Показує розшифровані назви файлів у сповіщенні, на заблокованому екрані та підключених пристроях.';
+
+  @override
   String get textEditorEncodingTooltip => 'Кодування тексту';
 
   @override

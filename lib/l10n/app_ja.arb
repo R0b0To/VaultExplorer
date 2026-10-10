@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "画面の左端または右端をタップして、前または次のメディアを表示します。",
   "loopPlaylistTitle": "プレイリストをループ",
   "loopPlaylistSubtitle": "移動中または再生中に最後の項目の後で最初の項目に戻ります。",
+  "showFileNamesInMediaNotificationTitle": "メディア通知にファイル名を表示",
+  "showFileNamesInMediaNotificationSubtitle": "復号されたファイル名を通知、ロック画面、接続済みデバイスに表示します。",
   "textEditorEncodingTooltip": "テキストのエンコード",
   "textEditorEncodingEncodeError": "このエンコードでは保存できない文字が含まれています。",
   "textEditorShowTabBarLabel": "エディターのタブを表示",

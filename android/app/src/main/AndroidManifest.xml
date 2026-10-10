@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -212,6 +213,14 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps unlocked encrypted vaults mounted and available to other apps while the app is in the background" />
         </service>
+        <!-- Background playback + media notification / lock screen controls for
+             media opened from an unlocked vault. Not exported: it is only ever
+             driven in-process by VaultPlaybackSession, and its notification
+             actions use explicit, immutable PendingIntents. -->
+        <service
+            android:name="com.aeidolon.vaultexplorer.service.VaultMediaPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

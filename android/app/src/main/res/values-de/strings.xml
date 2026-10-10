@@ -7,4 +7,11 @@
     <string name="vault_keep_alive_lock_all_action">Alle Tresore sperren</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer läuft</string><string name="vault_keep_alive_close_action_decoy">Schließen</string>
     <string name="camera_recording_channel_description">Laufender Aufnahmestatus</string><string name="camera_recording_notification_title">Videoaufnahme</string><string name="camera_recording_notification_text">Speichern unter %1$s</string><string name="camera_recording_stop_action">Stoppen und speichern</string><string name="camera_recording_notification_text_decoy">Archive Explorer läuft</string><string name="camera_recording_stop_action_decoy">Schließen</string>
     <string name="mirror_push_notification_title">Tresoränderungen werden gespeichert</string><string name="mirror_push_notification_text">Änderungen werden in den Speicher hochgeladen</string>
+    <string name="vault_media_channel_description">Wiedergabesteuerung für Medien aus entsperrten Tresoren</string>
+    <string name="vault_media_notification_title">Wiedergabe aus Tresor</string>
+    <string name="vault_media_action_play">Wiedergabe</string>
+    <string name="vault_media_action_pause">Pause</string>
+    <string name="vault_media_action_previous">Zurück</string>
+    <string name="vault_media_action_next">Weiter</string>
+    <string name="vault_media_action_stop">Stopp</string>
 </resources>

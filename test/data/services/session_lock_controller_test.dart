@@ -228,6 +228,111 @@ void main() {
     });
   });
 
+  group('background media playback', () {
+    test('returning after a long away period does not vault-lock while media is still playing', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.setMediaPlaying(true);
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('vault inactivity lock re-arms once background playback stops', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.setMediaPlaying(true);
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.setMediaPlaying(false);
+        async.elapse(const Duration(minutes: 4, seconds: 59));
+        expect(lockAllMountedContainersCalls, 0);
+        async.elapse(const Duration(seconds: 1));
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('returning after a long away period still vault-locks when nothing is playing', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('"Immediately" (autoLockMins 0) still vault-locks on return even while media plays', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 0, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.setMediaPlaying(true);
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        async.elapse(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('playing media does not stop the app-lock gate from applying on return', () {
+      fakeAsync((async) {
+        settings = AppSettings(
+          appLockAfterMins: 5,
+          useMasterPassword: true,
+          masterPasswordHash: 'h',
+        );
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.setMediaPlaying(true);
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(enforceAppLockCalls, 1);
+
+        controller.dispose();
+      });
+    });
+  });
+
   group('performAppLock, performVaultLock, performAutoLock', () {
     test('performAppLock locks app gate when master password is set', () {
       settings = AppSettings(

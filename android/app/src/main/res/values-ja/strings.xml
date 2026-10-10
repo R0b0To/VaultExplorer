@@ -7,4 +7,11 @@
     <string name="vault_keep_alive_lock_all_action">すべての保管庫をロック</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer を実行中</string><string name="vault_keep_alive_close_action_decoy">閉じる</string>
     <string name="camera_recording_channel_description">録画中の状態</string><string name="camera_recording_notification_title">動画を録画中</string><string name="camera_recording_notification_text">保存先: %1$s</string><string name="camera_recording_stop_action">停止して保存</string><string name="camera_recording_notification_text_decoy">Archive Explorer を実行中</string><string name="camera_recording_stop_action_decoy">閉じる</string>
     <string name="mirror_push_notification_title">保管庫の変更を保存中</string><string name="mirror_push_notification_text">ストレージに変更をアップロード中</string>
+    <string name="vault_media_channel_description">ロック解除済みの保管庫のメディアの再生コントロール</string>
+    <string name="vault_media_notification_title">保管庫から再生中</string>
+    <string name="vault_media_action_play">再生</string>
+    <string name="vault_media_action_pause">一時停止</string>
+    <string name="vault_media_action_previous">前へ</string>
+    <string name="vault_media_action_next">次へ</string>
+    <string name="vault_media_action_stop">停止</string>
 </resources>

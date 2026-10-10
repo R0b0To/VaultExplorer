@@ -97,7 +97,11 @@ class SessionLockController {
     }
   }
 
-  /// Suppresses inactivity timers while media is actively playing in the foreground.
+  /// Suppresses inactivity timers while media is actively playing -- in the
+  /// foreground, or in the background (background playback keeps going with
+  /// the app minimized or the screen off). See also the resumed branch of
+  /// [handleAppLifecycleState], which treats playback that is still running
+  /// on return as activity rather than as time spent away.
   void setMediaPlaying(bool isPlaying) {
     if (_isMediaPlaying == isPlaying) return;
     _isMediaPlaying = isPlaying;
@@ -370,7 +374,25 @@ class SessionLockController {
         _scheduleAppLockTimer();
       }
 
-      if (settings.lockContainersOnScreenLock && !lockedVaultOnScreenOff) {
+      if (_isMediaPlaying && settings.autoLockMins > 0) {
+        // Media kept playing from the unlocked vault the whole time the app
+        // was in the background (background playback). That is the vault
+        // being used, not sitting idle, so the time away must not count
+        // towards a *timed* inactivity lock -- otherwise returning to the
+        // app after a long listen would lock the vault and cut the playback
+        // off. Same rule foreground playback already gets (see
+        // setMediaPlaying); the timers re-arm normally once playback stops.
+        // Deliberately not applied to autoLockMins == 0 ("Immediately"),
+        // which is an explicit instruction to lock on return, nor to a
+        // genuine screen-off lock, per-container "Immediately", or the
+        // app-lock gate: those are separate paths and unaffected.
+        VeLog.d(
+          _kLogTag,
+          'handleAppLifecycleState: media still playing on resume, '
+          'not counting awayDuration=$awayDuration towards vault lock',
+        );
+      } else if (settings.lockContainersOnScreenLock &&
+          !lockedVaultOnScreenOff) {
         if (settings.autoLockScreenLockOnly) {
           // This mode ignores mere backgrounding entirely -- only a genuine
           // screen-off signal (handleScreenOff) should lock the vault. If

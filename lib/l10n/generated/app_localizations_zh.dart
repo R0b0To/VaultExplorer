@@ -8919,6 +8919,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loopPlaylistSubtitle => '导航或播放列表时，到达末尾后继续从第一个项目开始。';
 
   @override
+  String get showFileNamesInMediaNotificationTitle => '在媒体通知中显示文件名';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      '在通知、锁屏和已连接的设备上显示解密后的文件名。';
+
+  @override
   String get textEditorEncodingTooltip => '文本编码';
 
   @override

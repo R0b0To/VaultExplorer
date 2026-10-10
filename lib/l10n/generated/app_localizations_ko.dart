@@ -9042,6 +9042,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loopPlaylistSubtitle => '이동하거나 재생할 때 마지막 항목 다음에 첫 항목으로 돌아갑니다.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle => '미디어 알림에 파일 이름 표시';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      '복호화된 파일 이름을 알림, 잠금 화면 및 연결된 기기에 표시합니다.';
+
+  @override
   String get textEditorEncodingTooltip => '텍스트 인코딩';
 
   @override

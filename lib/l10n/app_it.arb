@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "Tocca il bordo sinistro o destro per mostrare l’elemento precedente o successivo.",
   "loopPlaylistTitle": "Ripeti playlist",
   "loopPlaylistSubtitle": "Dopo l’ultimo elemento, torna al primo durante la navigazione o la riproduzione.",
+  "showFileNamesInMediaNotificationTitle": "Mostra i nomi dei file nelle notifiche multimediali",
+  "showFileNamesInMediaNotificationSubtitle": "Mostra i nomi dei file decifrati nella notifica, nella schermata di blocco e sui dispositivi connessi.",
   "textEditorEncodingTooltip": "Codifica del testo",
   "textEditorEncodingEncodeError": "Alcuni caratteri non possono essere salvati con questa codifica.",
   "textEditorShowTabBarLabel": "Mostra schede dell’editor",

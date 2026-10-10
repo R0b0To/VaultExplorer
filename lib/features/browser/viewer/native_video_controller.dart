@@ -89,6 +89,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
     int initialPositionMs = 0,
+    bool mediaSession = false,
   }) : _media3 = NativeMedia3Controller(
          volId: volId,
          filePath: filePath,
@@ -100,6 +101,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
          volumeBoostEnabled: volumeBoostEnabled,
          volumeBoostGainMb: volumeBoostGainMb,
          initialPositionMs: initialPositionMs,
+         mediaSession: mediaSession,
        ),
        super(const NativeVideoValue()) {
     _media3.addListener(_onMedia3StateChanged);
@@ -116,6 +118,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
     int initialPositionMs = 0,
+    bool mediaSession = false,
   }) {
     final parsed = _parseContentUri(contentUriString);
     return NativeVideoController(
@@ -128,6 +131,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
       volumeBoostEnabled: volumeBoostEnabled,
       volumeBoostGainMb: volumeBoostGainMb,
       initialPositionMs: initialPositionMs,
+      mediaSession: mediaSession,
     );
   }
 

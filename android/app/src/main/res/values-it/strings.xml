@@ -7,4 +7,11 @@
     <string name="vault_keep_alive_lock_all_action">Blocca tutti i vault</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer è in esecuzione</string><string name="vault_keep_alive_close_action_decoy">Chiudi</string>
     <string name="camera_recording_channel_description">Stato di registrazione in corso</string><string name="camera_recording_notification_title">Registrazione video</string><string name="camera_recording_notification_text">Salvataggio in %1$s</string><string name="camera_recording_stop_action">Interrompi e salva</string><string name="camera_recording_notification_text_decoy">Archive Explorer è in esecuzione</string><string name="camera_recording_stop_action_decoy">Chiudi</string>
     <string name="mirror_push_notification_title">Salvataggio delle modifiche del vault</string><string name="mirror_push_notification_text">Caricamento delle modifiche nell’archivio</string>
+    <string name="vault_media_channel_description">Controlli di riproduzione per i contenuti dei vault sbloccati</string>
+    <string name="vault_media_notification_title">Riproduzione dal vault</string>
+    <string name="vault_media_action_play">Riproduci</string>
+    <string name="vault_media_action_pause">Pausa</string>
+    <string name="vault_media_action_previous">Precedente</string>
+    <string name="vault_media_action_next">Successivo</string>
+    <string name="vault_media_action_stop">Interrompi</string>
 </resources>

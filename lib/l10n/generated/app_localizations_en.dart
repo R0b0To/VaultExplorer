@@ -9404,6 +9404,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Continue from the first item after the last when navigating or playing through the playlist.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'Show file names in media notifications';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'Displays decrypted file names in the notification, lock screen, and on connected devices.';
+
+  @override
   String get textEditorEncodingTooltip => 'Text encoding';
 
   @override

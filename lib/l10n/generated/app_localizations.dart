@@ -15829,6 +15829,18 @@ abstract class AppLocalizations {
   /// **'Continue from the first item after the last when navigating or playing through the playlist.'**
   String get loopPlaylistSubtitle;
 
+  /// Settings toggle for showing decrypted file names in the media notification and connected media controls
+  ///
+  /// In en, this message translates to:
+  /// **'Show file names in media notifications'**
+  String get showFileNamesInMediaNotificationTitle;
+
+  /// Explains that enabling this may expose decrypted file names on the notification, lock screen, and connected devices
+  ///
+  /// In en, this message translates to:
+  /// **'Displays decrypted file names in the notification, lock screen, and on connected devices.'**
+  String get showFileNamesInMediaNotificationSubtitle;
+
   /// Tooltip for choosing the text file encoding in the editor.
   ///
   /// In en, this message translates to:

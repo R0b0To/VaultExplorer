@@ -387,7 +387,10 @@ open class MainActivity : FlutterFragmentActivity() {
     private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
-    private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
+    // Held as a Lazy so onStart/onStop can tell whether a player exists
+    // without forcing one into existence.
+    private val nativePlayerManagerLazy = lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
+    private val nativePlayerManager by nativePlayerManagerLazy
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
     private val videoEditHandlers = VideoEditHandlers(this, ioExecutor)
      private val panicSettingsHandlers = PanicSettingsHandlers(this, ioExecutor)
@@ -443,6 +446,18 @@ open class MainActivity : FlutterFragmentActivity() {
                 runOnUiThread { methodChannel?.invokeMethod("onPanicCredentialsPurged", null) }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (nativePlayerManagerLazy.isInitialized()) nativePlayerManager.setAppInBackground(false)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Screen off, another app in front, or the picker open: nothing is
+        // visible, so only audio needs to keep playing.
+        if (nativePlayerManagerLazy.isInitialized()) nativePlayerManager.setAppInBackground(true)
     }
 
     override fun onPause() {
@@ -640,6 +655,7 @@ open class MainActivity : FlutterFragmentActivity() {
                     val volumeBoostEnabled = call.argument<Boolean>("volumeBoostEnabled") ?: false
                     val volumeBoostGainMb = call.argument<Int>("volumeBoostGainMb") ?: 2000
                     val initialPositionMs = (call.argument<Number>("initialPositionMs") ?: 0).toLong()
+                    val mediaSession = call.argument<Boolean>("mediaSession") ?: false
                     val textureId = nativePlayerManager.initialize(
                         volId,
                         filePath,
@@ -649,6 +665,7 @@ open class MainActivity : FlutterFragmentActivity() {
                         volumeBoostEnabled,
                         volumeBoostGainMb,
                         initialPositionMs,
+                        mediaSession,
                     )
                     result.success(mapOf("textureId" to textureId))
                 }
@@ -782,6 +799,28 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 "endScrubPreview" -> {
                     nativePlayerManager.endScrubPreview()
+                    result.success(null)
+                }
+                "setMediaNavigation" -> {
+                    // Whether the Dart playlist has an item before / after
+                    // the current one, plus the playlist position shown on
+                    // the lock screen and notification.
+                    val hasPrevious = call.argument<Boolean>("hasPrevious") ?: false
+                    val hasNext = call.argument<Boolean>("hasNext") ?: false
+                    val currentPosition = call.argument<Int>("currentPosition") ?: 0
+                    val totalItems = call.argument<Int>("totalItems") ?: 0
+                    com.aeidolon.vaultexplorer.engine.VaultPlaybackSession.setNavigation(
+                        hasPrevious,
+                        hasNext,
+                        currentPosition,
+                        totalItems,
+                    )
+                    result.success(null)
+                }
+                "setMediaFileNamesVisible" -> {
+                    val show = call.argument<Boolean>("show") ?: false
+                    com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
+                        .setShowFileNames(show)
                     result.success(null)
                 }
                 "release" -> {

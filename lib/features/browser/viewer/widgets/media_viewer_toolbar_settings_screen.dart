@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 /// The settings sections for the Media Player Controls page, mirroring the
@@ -608,6 +609,9 @@ class _MediaViewerToolbarSettingsScreenState
               tooltip: l10n.resetToDefaultsTooltip,
               onPressed: () {
                 unawaited(controller.resetMediaViewerConfigToDefaults());
+                unawaited(
+                  MediaSessionBridge.setShowFileNamesInNotification(false),
+                );
                 showAppSnackBar(
                   context,
                   message: l10n.mediaControlsResetSuccess,
@@ -1180,6 +1184,36 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                     ),
                     secondary: Icon(
                       Icons.repeat_rounded,
+                      color: cs.primary,
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.showFileNamesInMediaNotification,
+                    onChanged: (show) {
+                      unawaited(
+                        controller.setMediaViewerShowFileNamesInNotification(
+                          show,
+                        ),
+                      );
+                      unawaited(
+                        MediaSessionBridge.setShowFileNamesInNotification(show),
+                      );
+                    },
+                    title: Text(
+                      l10n.showFileNamesInMediaNotificationTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.showFileNamesInMediaNotificationSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.description_outlined,
                       color: cs.primary,
                     ),
                   ),

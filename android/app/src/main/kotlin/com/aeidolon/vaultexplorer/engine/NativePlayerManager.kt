@@ -94,6 +94,16 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     // there's no session to decrypt from and nothing here needs one.
     private var currentIsLocalStorage: Boolean = false
 
+    // True when the viewer that opened this item asked for background
+    // playback + a media notification (vault items only -- see initialize()).
+    // Other users of this single player (video editor, camera review) leave
+    // it off and never get a notification.
+    private var mediaSessionEnabled: Boolean = false
+    // Mirrors the activity's started/stopped state (MainActivity.onStart/
+    // onStop): while stopped nothing is on screen, so video decoding is
+    // switched off and only audio keeps playing.
+    private var appInBackground: Boolean = false
+
     var methodChannel: MethodChannel? = null
     var eventSink: EventChannel.EventSink? = null
         set(value) {
@@ -108,6 +118,35 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var isFallbackMode = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * What the media session / notification may do to this player. Skip
+     * requests go to the Dart viewer (which owns the playlist) as events.
+     */
+    private val sessionHost = object : VaultPlaybackSession.Host {
+        override fun play() {
+            this@NativePlayerManager.play()
+        }
+
+        override fun pause() {
+            this@NativePlayerManager.pause()
+        }
+
+        override fun skipToNext() {
+            emitEvent("mediaSessionAction", mapOf("action" to "next"))
+        }
+
+        override fun skipToPrevious() {
+            emitEvent("mediaSessionAction", mapOf("action" to "previous"))
+        }
+
+        override fun stopForLock() {
+            player?.let {
+                it.stop()
+                it.clearMediaItems()
+            }
+        }
+    }
 
     // --- Scrub-preview (seekbar drag thumbnail) state ---
     // A single dedicated thread, separate from VideoThumbnailCoordinator's
@@ -360,6 +399,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         volumeBoostEnabled: Boolean = false,
         volumeBoostGainMb: Int = 2000,
         initialPositionMs: Long = 0L,
+        mediaSession: Boolean = false,
     ): Long {
         // A scrub-preview session from the outgoing video (if the user
         // swiped to the next item mid-drag) is pinned to that video's
@@ -368,6 +408,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         currentVolId = volId
         currentFilePath = filePath
         currentIsLocalStorage = isLocalStorage
+        // Background playback + notification are for items streamed out of an
+        // unlocked vault only; plain local-storage playback keeps behaving
+        // exactly as before.
+        mediaSessionEnabled = mediaSession && !isLocalStorage
+        if (mediaSessionEnabled) VaultPlaybackSession.onMediaChanged(volId, filePath)
         requestedVideoDecoderMode = parseDecoderMode(videoDecoderModeName)
         requestedAudioDecoderMode = parseDecoderMode(audioDecoderModeName)
         this.volumeBoostEnabled = volumeBoostEnabled
@@ -425,6 +470,12 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                         .build(),
                     true
                 )
+                // Playback must survive the screen turning off: keep the CPU
+                // awake while playing (released again on pause/stop)...
+                .setWakeMode(C.WAKE_MODE_LOCAL)
+                // ...and pause when headphones are unplugged / the headset
+                // disconnects, which matters once audio can play unattended.
+                .setHandleAudioBecomingNoisy(true)
                 .build()
             exoPlayer.setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
             exoPlayer.addListener(this)
@@ -436,6 +487,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             decoderManager?.selectAudioDecoder(requestedAudioDecoderMode)
         }
         applyVolumeBoost(exoPlayer.audioSessionId)
+        applyBackgroundVideoPolicy(exoPlayer)
 
         // 5. Connect newSurface to ExoPlayer and prepare
         exoPlayer.setVideoSurface(newSurface)
@@ -474,6 +526,26 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     private data class Quadruple(val a: Int, val b: Int, val c: Int, val d: Int)
+
+    /**
+     * Called from MainActivity.onStart/onStop. While the activity is stopped
+     * nothing can be seen, so the video track is switched off (frees the video
+     * decoder, and stops frames being pushed at a texture nobody is drawing)
+     * and only audio keeps playing; it is switched back on when the activity
+     * returns.
+     */
+    fun setAppInBackground(background: Boolean) {
+        appInBackground = background
+        player?.let { applyBackgroundVideoPolicy(it) }
+    }
+
+    private fun applyBackgroundVideoPolicy(p: ExoPlayer) {
+        val disabled = appInBackground
+        if (p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == disabled) return
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, disabled)
+            .build()
+    }
 
     fun play() {
         val p = player ?: return
@@ -851,11 +923,17 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         isFallbackMode = false
         mainHandler.removeCallbacks(positionUpdateRunnable)
         player?.let { p ->
+            // The media session must let go of a live player, so this goes
+            // first. It keeps the playback window (service/notification)
+            // open briefly -- the viewer releases and recreates the player on
+            // every item change.
+            VaultPlaybackSession.onPlayerReleasing(p)
             decoderManager?.detach()
             p.clearVideoSurface()
             p.removeListener(this)
             p.release()
         }
+        mediaSessionEnabled = false
         player = null
         decoderManager = null
         releaseVolumeBoost()
@@ -904,6 +982,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         emitEvent("playingChanged", mapOf("isPlaying" to isPlaying))
+        val p = player
+        if (isPlaying && mediaSessionEnabled && p != null) {
+            VaultPlaybackSession.onPlaying(context, p, sessionHost, currentVolId, currentFilePath)
+        }
         if (isPlaying) {
             mainHandler.post(positionUpdateRunnable)
         } else {

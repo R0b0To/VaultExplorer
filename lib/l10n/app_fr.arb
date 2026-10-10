@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "Touchez le bord gauche ou droit pour afficher l’élément précédent ou suivant.",
   "loopPlaylistTitle": "Répéter la liste de lecture",
   "loopPlaylistSubtitle": "Revenir au premier élément après le dernier pendant la navigation ou la lecture.",
+  "showFileNamesInMediaNotificationTitle": "Afficher les noms de fichiers dans les notifications multimédias",
+  "showFileNamesInMediaNotificationSubtitle": "Affiche les noms de fichiers déchiffrés dans la notification, sur l’écran de verrouillage et les appareils connectés.",
   "textEditorEncodingTooltip": "Encodage du texte",
   "textEditorEncodingEncodeError": "Certains caractères ne peuvent pas être enregistrés avec cet encodage.",
   "textEditorShowTabBarLabel": "Afficher les onglets de l’éditeur",

@@ -9547,6 +9547,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nach dem letzten Eintrag beim Navigieren oder Abspielen wieder beim ersten beginnen.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'Dateinamen in Medienbenachrichtigungen anzeigen';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'Zeigt entschlüsselte Dateinamen in der Benachrichtigung, auf dem Sperrbildschirm und auf verbundenen Geräten.';
+
+  @override
   String get textEditorEncodingTooltip => 'Textkodierung';
 
   @override

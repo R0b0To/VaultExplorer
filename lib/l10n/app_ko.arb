@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "왼쪽 또는 오른쪽 가장자리를 눌러 이전 또는 다음 미디어를 표시합니다.",
   "loopPlaylistTitle": "재생목록 반복",
   "loopPlaylistSubtitle": "이동하거나 재생할 때 마지막 항목 다음에 첫 항목으로 돌아갑니다.",
+  "showFileNamesInMediaNotificationTitle": "미디어 알림에 파일 이름 표시",
+  "showFileNamesInMediaNotificationSubtitle": "복호화된 파일 이름을 알림, 잠금 화면 및 연결된 기기에 표시합니다.",
   "textEditorEncodingTooltip": "텍스트 인코딩",
   "textEditorEncodingEncodeError": "이 인코딩으로 저장할 수 없는 문자가 포함되어 있습니다.",
   "textEditorShowTabBarLabel": "편집기 탭 표시",

@@ -418,6 +418,13 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     return updateMediaViewerConfig(updated);
   }
 
+  Future<void> setMediaViewerShowFileNamesInNotification(bool show) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      showFileNamesInMediaNotification: show,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
   Future<void> setMediaViewerScrubPreviewStyle(ScrubPreviewStyle style) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       scrubPreviewStyle: style,

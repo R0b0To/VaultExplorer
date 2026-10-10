@@ -9042,6 +9042,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loopPlaylistSubtitle => '移動中または再生中に最後の項目の後で最初の項目に戻ります。';
 
   @override
+  String get showFileNamesInMediaNotificationTitle => 'メディア通知にファイル名を表示';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      '復号されたファイル名を通知、ロック画面、接続済みデバイスに表示します。';
+
+  @override
   String get textEditorEncodingTooltip => 'テキストのエンコード';
 
   @override

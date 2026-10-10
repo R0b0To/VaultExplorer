@@ -9598,6 +9598,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'انتقل إلى العنصر الأول بعد الأخير أثناء التنقل أو تشغيل القائمة.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'إظهار أسماء الملفات في إشعارات الوسائط';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'يعرض أسماء الملفات التي تم فك تشفيرها في الإشعار وشاشة القفل والأجهزة المتصلة.';
+
+  @override
   String get textEditorEncodingTooltip => 'ترميز النص';
 
   @override

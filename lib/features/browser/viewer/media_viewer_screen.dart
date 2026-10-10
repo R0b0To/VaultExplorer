@@ -38,6 +38,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/carousel_geometry.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
@@ -274,28 +275,35 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         savedPosition < duration - const Duration(seconds: 5);
     var shouldResume = canResume && mode == ResumePlaybackMode.always;
     if (canResume && mode == ResumePlaybackMode.askEveryTime) {
-      final answer = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(context.l10n.resumePlaybackPromptTitle),
-          content: Text(
-            context.l10n.resumePlaybackPromptMessage(
-              formatClockDuration(savedPosition),
+      if (_isAppInBackground) {
+        // Nobody can answer the prompt (e.g. background playback moved on to
+        // an item with a saved position): start over rather than leave the
+        // playback stalled behind a dialog nobody can see.
+        shouldResume = false;
+      } else {
+        final answer = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(context.l10n.resumePlaybackPromptTitle),
+            content: Text(
+              context.l10n.resumePlaybackPromptMessage(
+                formatClockDuration(savedPosition),
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(context.l10n.resumePlaybackStartOver),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(context.l10n.resumePlaybackResume),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(context.l10n.resumePlaybackStartOver),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(context.l10n.resumePlaybackResume),
-            ),
-          ],
-        ),
-      );
-      shouldResume = answer == true;
+        );
+        shouldResume = answer == true;
+      }
     }
     if (!mounted ||
         flowToken != _resumeFlowToken ||
@@ -406,6 +414,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);
+    _mediaSessionSubscription = MediaSessionBridge.actions.listen(
+      _onMediaSessionAction,
+    );
 
     _playlistController = PlaylistController(
       container: widget.container,
@@ -458,6 +469,45 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     });
   }
 
+  StreamSubscription<MediaSessionAction>? _mediaSessionSubscription;
+
+  /// True while the app is minimized or the screen is off. No frames are
+  /// produced then, so anything that waits on an animation or on the end of a
+  /// frame would stall until the app returns -- including auto-advancing to
+  /// the next item during background playback.
+  bool get _isAppInBackground {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden;
+  }
+
+  /// Previous / Next on the media notification and lock screen act on the
+  /// playlist, so the native media session is told whether either exists.
+  void _syncMediaSessionNavigation() {
+    if (widget.container.isLocalStorage || widget._isPreviewOnly) return;
+    final index = _playlistController.currentIndex;
+    final count = _playlistController.playlist.length;
+    final loop = _isPlaylistLoopEnabled;
+    unawaited(
+      MediaSessionBridge.setNavigation(
+        hasPrevious: count > 1 && (index > 0 || loop),
+        hasNext: count > 1 && (index < count - 1 || loop),
+        currentPosition: count > 1 ? index + 1 : 0,
+        totalItems: count > 1 ? count : 0,
+      ),
+    );
+  }
+
+  void _onMediaSessionAction(MediaSessionAction action) {
+    if (!mounted) return;
+    switch (action) {
+      case MediaSessionAction.next:
+        _navigateToNext();
+      case MediaSessionAction.previous:
+        _navigateToPrev();
+    }
+  }
+
   int _activateToken = 0;
   Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
@@ -483,6 +533,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           .read(fileManagerToolbarSettingsProvider(null))
           .config
           .mediaViewerToolbarConfig;
+      // Before the native player is (re)initialized for this item, so the
+      // media session never advertises the previous item's neighbours.
+      _syncMediaSessionNavigation();
       final mode = playbackSettings.resumePlaybackMode;
       final savedPosition = widget._isPreviewOnly
           ? null
@@ -521,6 +574,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           volumeBoostEnabled: playbackSettings.volumeBoostEnabled,
           volumeBoostGainMb: playbackSettings.volumeBoostGainMb,
           initialPosition: shouldPreSeek ? savedPosition : null,
+          // Background playback + media notification / lock screen controls:
+          // vault items only (plain local storage is the decoy's file
+          // manager), and never for the archive preview.
+          mediaSession:
+              !widget.container.isLocalStorage && !widget._isPreviewOnly,
         ),
       );
     } else {
@@ -540,6 +598,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final bookmarkPaths = containerRecord?.bookmarkPaths;
     final pinnedPaths = containerRecord?.pinnedPaths;
     if (mounted) {
+      unawaited(
+        MediaSessionBridge.setShowFileNamesInNotification(
+          config.mediaViewerToolbarConfig.showFileNamesInMediaNotification,
+        ),
+      );
       _sessionController.setEnableCarousel(config.showMediaCarousel);
       if (!config.showMediaCarousel) {
         _sessionController.setCarouselVisible(false);
@@ -906,6 +969,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     Curve curve = Curves.easeOutCubic,
   }) async {
     if (index < 0 || index >= _playlistController.playlist.length) return;
+    // Backgrounded (background playback auto-advancing, or Next pressed on
+    // the lock screen): no frames are produced, so an animation -- or waiting
+    // for the end of a frame -- would never complete and the transition would
+    // hang until the app returned. Jump instead; the item is activated (and
+    // starts playing) regardless of the page animation.
+    final inBackground = _isAppInBackground;
+    if (inBackground) animate = false;
     final token = ++_transitionToken;
     _cancelSlideshowTimer();
     _startHideTimer();
@@ -946,7 +1016,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           );
         } else {
           _listScrollController.jumpTo(target);
-          await WidgetsBinding.instance.endOfFrame;
+          if (!inBackground) await WidgetsBinding.instance.endOfFrame;
         }
       }
     } else {
@@ -2539,6 +2609,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void dispose() {
     unawaited(_saveActivePlaybackPosition());
     PlaybackThrottleController.setActive(false);
+    unawaited(_mediaSessionSubscription!.cancel());
     _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
     if (_lastListenedController != null) {

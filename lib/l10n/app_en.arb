@@ -11951,6 +11951,14 @@
     "description": "Setting label for wrapping playlist navigation from the last item to the first."
   },
   "loopPlaylistSubtitle": "Continue from the first item after the last when navigating or playing through the playlist.",
+  "showFileNamesInMediaNotificationTitle": "Show file names in media notifications",
+  "showFileNamesInMediaNotificationSubtitle": "Displays decrypted file names in the notification, lock screen, and on connected devices.",
+  "@showFileNamesInMediaNotificationTitle": {
+    "description": "Settings toggle for showing decrypted file names in the media notification and connected media controls"
+  },
+  "@showFileNamesInMediaNotificationSubtitle": {
+    "description": "Explains that enabling this may expose decrypted file names on the notification, lock screen, and connected devices"
+  },
   "@loopPlaylistSubtitle": {
     "description": "Explains that playlist navigation and playback advance wrap to the beginning."
   },

@@ -231,7 +231,29 @@ object ContainerSessionRegistry {
     fun getVolumeIdByStableId(stableId: String): Int? =
         activeSessions.entries.find { it.value.stableId == stableId }?.key
 
-    fun removeSession(volId: Int) { activeSessions.remove(volId) }
+    // Observers told whenever a session goes away -- every lock path (manual,
+    // auto-lock, "lock all", panic, USB detach, SAF root removal) funnels
+    // through removeSession(). Used by VaultPlaybackSession to stop playback
+    // and clear the media notification the moment the playing vault locks.
+    // Invoked on whichever thread removed the session (often an I/O thread),
+    // so listeners must hop threads themselves if they need to.
+    private val sessionRemovedListeners =
+        java.util.concurrent.CopyOnWriteArrayList<(Int) -> Unit>()
+
+    fun addSessionRemovedListener(listener: (Int) -> Unit) {
+        sessionRemovedListeners.add(listener)
+    }
+
+    fun removeSession(volId: Int) {
+        if (activeSessions.remove(volId) == null) return
+        for (listener in sessionRemovedListeners) {
+            try {
+                listener(volId)
+            } catch (_: Exception) {
+                // One misbehaving observer must not break a lock in progress.
+            }
+        }
+    }
 
     /**
      * Re-establishes subfolder document-provider roots right after unlock,

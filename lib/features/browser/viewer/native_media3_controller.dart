@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 @immutable
@@ -152,6 +153,12 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   /// NativePlayerManager.kt's buildMediaSource for how the native side
   /// branches on this.
   final bool isLocalStorage;
+
+  /// Opts this item into background playback with a media notification and
+  /// lock screen controls (vault items opened from the media viewer only --
+  /// see NativePlayerManager.initialize / VaultPlaybackSession). Off for every
+  /// other user of the native player, e.g. the video editor.
+  final bool mediaSession;
   double _currentSpeed;
   int _currentVolume = 100;
   MediaDecoderMode _videoDecoderMode;
@@ -191,6 +198,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
     this.initialPositionMs = 0,
+    this.mediaSession = false,
   }) : _currentSpeed = initialSpeed,
        _videoDecoderMode = videoDecoderMode,
        _audioDecoderMode = audioDecoderMode,
@@ -232,6 +240,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
             'volumeBoostEnabled': _volumeBoostEnabled,
             'volumeBoostGainMb': _volumeBoostGainMb,
             if (initialPositionMs > 0) 'initialPositionMs': initialPositionMs,
+            if (mediaSession) 'mediaSession': true,
           });
           if (result is Map && result.containsKey('textureId')) {
             textureId = (result['textureId'] as num?)?.toInt();
@@ -329,6 +338,9 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         break;
       case 'diagnosticsUpdate':
         diagnosticsNotifier.value = MediaDiagnosticsInfo.fromMap(eventMap);
+        break;
+      case 'mediaSessionAction':
+        MediaSessionBridge.dispatch(eventMap['action'] as String?);
         break;
       case 'error':
         final msg = eventMap['message'] as String? ?? 'Playback error';

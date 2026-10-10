@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "Торкніться лівого або правого краю, щоб показати попередній або наступний медіафайл.",
   "loopPlaylistTitle": "Повторювати список відтворення",
   "loopPlaylistSubtitle": "Після останнього елемента переходити до першого під час навігації або відтворення.",
+  "showFileNamesInMediaNotificationTitle": "Показувати назви файлів у медіасповіщеннях",
+  "showFileNamesInMediaNotificationSubtitle": "Показує розшифровані назви файлів у сповіщенні, на заблокованому екрані та підключених пристроях.",
   "textEditorEncodingTooltip": "Кодування тексту",
   "textEditorEncodingEncodeError": "Деякі символи не можна зберегти в цьому кодуванні.",
   "textEditorShowTabBarLabel": "Показувати вкладки редактора",

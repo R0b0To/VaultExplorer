@@ -9563,6 +9563,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Volver al primer elemento después del último al navegar o reproducir la lista.';
 
   @override
+  String get showFileNamesInMediaNotificationTitle =>
+      'Mostrar nombres de archivo en notificaciones multimedia';
+
+  @override
+  String get showFileNamesInMediaNotificationSubtitle =>
+      'Muestra los nombres de archivo descifrados en la notificación, la pantalla de bloqueo y los dispositivos conectados.';
+
+  @override
   String get textEditorEncodingTooltip => 'Codificación de texto';
 
   @override

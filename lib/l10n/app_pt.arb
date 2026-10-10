@@ -2612,6 +2612,8 @@
   "tapEdgesToNavigateSubtitle": "Toque na borda esquerda ou direita para mostrar a mídia anterior ou seguinte.",
   "loopPlaylistTitle": "Repetir lista de reprodução",
   "loopPlaylistSubtitle": "Volte ao primeiro item após o último ao navegar ou reproduzir a lista.",
+  "showFileNamesInMediaNotificationTitle": "Mostrar nomes dos arquivos nas notificações de mídia",
+  "showFileNamesInMediaNotificationSubtitle": "Exibe nomes de arquivos descriptografados na notificação, na tela de bloqueio e em dispositivos conectados.",
   "textEditorEncodingTooltip": "Codificação de texto",
   "textEditorEncodingEncodeError": "Alguns caracteres não podem ser salvos com esta codificação.",
   "textEditorShowTabBarLabel": "Mostrar abas do editor",

@@ -65,8 +65,8 @@ class _FakeArchiveApi extends VaultArchiveApi {
     );
   }
 
-  @override
-  Future<String?> stageBrowseEntry({
+ @override
+  Future<ArchiveEntryStageResult> stageBrowseEntry({
     required String filePath,
     String? vaultPath,
     required int targetIndex,
@@ -74,7 +74,11 @@ class _FakeArchiveApi extends VaultArchiveApi {
     String? passphrase,
   }) async {
     stagedIndexes.add(targetIndex);
-    return '/private/cache/archive_browse_$entryName';
+    return ArchiveEntryStageResult(
+      status: ArchiveOpenStatus.ok,
+      path: '/private/cache/archive_browse_$entryName',
+      errorMessage: '',
+    );
   }
 }
 
@@ -154,11 +158,41 @@ void main() {
         pathStackEntryIndex: 0,
       );
 
-      expect(
-        await context.stageEntryForBrowse('clip.mp4'),
-        '/private/cache/archive_browse_clip.mp4',
-      );
+       final stageResult = await context.stageEntryForBrowse('clip.mp4');
+      expect(stageResult.status, ArchiveOpenStatus.ok);
+      expect(stageResult.path, '/private/cache/archive_browse_clip.mp4');
       expect(archiveApi.stagedIndexes, [0]);
     },
   );
+
+  group('ArchiveService extension helpers', () {
+    test('.apk is openable as an archive but is not an archive extension', () {
+      // isArchive() also backs isUnsupportedArchiveCarrierName() (composite
+      // containers), where an .apk is a valid carrier -- so it must stay
+      // false there even though the native engine can read an APK as a ZIP.
+      expect(ArchiveService.isArchive('apk'), isFalse);
+      expect(ArchiveService.isZipLikePackage('apk'), isTrue);
+      expect(ArchiveService.isOpenableAsArchive('apk'), isTrue);
+    });
+
+    test('helpers are case-insensitive', () {
+      expect(ArchiveService.isZipLikePackage('APK'), isTrue);
+      expect(ArchiveService.isOpenableAsArchive('Apk'), isTrue);
+      expect(ArchiveService.isOpenableAsArchive('ZIP'), isTrue);
+    });
+
+    test('real archive extensions stay openable', () {
+      for (final ext in ArchiveService.allArchiveExtensions) {
+        expect(ArchiveService.isArchive(ext), isTrue, reason: ext);
+        expect(ArchiveService.isOpenableAsArchive(ext), isTrue, reason: ext);
+        expect(ArchiveService.isZipLikePackage(ext), isFalse, reason: ext);
+      }
+    });
+
+    test('unrelated extensions are not openable as an archive', () {
+      for (final ext in ['txt', 'pdf', 'xapk', '']) {
+        expect(ArchiveService.isOpenableAsArchive(ext), isFalse, reason: ext);
+      }
+    });
+  });
 }

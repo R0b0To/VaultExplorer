@@ -8,14 +8,6 @@
 #include <ctime>
 #include <cstring>
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-#define ARCHIVE_DIAG(...) \
-    __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Archive", __VA_ARGS__)
-#else
-#define ARCHIVE_DIAG(...) ((void)0)
-#endif
-
 namespace {
 
 constexpr size_t kSequentialChunkSize = 256 * 1024;
@@ -26,7 +18,6 @@ struct CallbackState {
     uint64_t position = 0;
     uint64_t size = 0;
     bool positionJustJumped = false;
-    bool passphraseProvided = false;
     std::vector<uint8_t> buffer;
     bool ioErrorSeen = false;
 
@@ -88,14 +79,6 @@ la_int64_t seekCallback(struct archive*, void* clientData, la_int64_t offset, in
 int openCallback(struct archive*, void*) { return ARCHIVE_OK; }
 int closeCallback(struct archive*, void*) { return ARCHIVE_OK; }
 
-const char* passphraseRequestCallback(struct archive*, void* clientData) {
-    const auto* state = static_cast<const CallbackState*>(clientData);
-    ARCHIVE_DIAG(
-        "libarchive passphrase callback invoked; queued candidate was unavailable or exhausted; appPassphraseProvided=%s",
-        state && state->passphraseProvided ? "true" : "false");
-    return nullptr;
-}
-
 bool containsCaseInsensitive(const char* haystack, const char* needle) {
     if (!haystack || !needle) return false;
     std::string h(haystack), n(needle);
@@ -120,19 +103,9 @@ std::string archiveErrorAt(struct archive* a, const char* stage, const char* fal
 int openArchiveWithCallbacks(struct archive* a, CallbackState& state, const std::string& passphrase) {
     archive_read_support_format_all(a);
     archive_read_support_filter_all(a);
-    const bool passphraseProvided = !passphrase.empty();
-    state.passphraseProvided = passphraseProvided;
     if (!passphrase.empty()) {
-        const int addStatus = archive_read_add_passphrase(a, passphrase.c_str());
-        const char* error = archive_error_string(a);
-        ARCHIVE_DIAG("archive_read_add_passphrase: status=%d appPassphraseProvided=true error=%s",
-                     addStatus, error ? error : "<none>");
-    } else {
-        ARCHIVE_DIAG("archive_read_add_passphrase skipped: appPassphraseProvided=false");
+        archive_read_add_passphrase(a, passphrase.c_str());
     }
-    const int callbackStatus = archive_read_set_passphrase_callback(
-        a, &state, passphraseRequestCallback);
-    ARCHIVE_DIAG("archive_read_set_passphrase_callback: status=%d", callbackStatus);
     archive_read_set_seek_callback(a, seekCallback);
     return archive_read_open2(a, &state, openCallback, readCallback, skipCallback, closeCallback);
 }
@@ -201,8 +174,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
             formatFamily == ARCHIVE_FORMAT_7ZIP && passphrase.empty();
         if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
             if (deferSevenZipPassphrase) {
-                ARCHIVE_DIAG("deferring 7-Zip encrypted-entry password check until read: entryIndex=%d",
-                             info.index);
+                // Checked when the data is actually read.
             } else if (passphrase.empty()) {
                 result.status = ArchiveOpenStatus::PassphraseRequired;
                 result.errorMessage = "Archive is password protected";
@@ -216,16 +188,11 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
                 uint8_t probe[64];
                 const la_ssize_t n = archive_read_data(a, probe, sizeof(probe));
                 if (n < 0) {
-                    const char* error = archive_error_string(a);
-                    ARCHIVE_DIAG("encrypted-entry probe failed: passphraseProvided=true nativeError=%s",
-                                 error ? error : "<none>");
                     result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                                       : classifyFailure(a, /*passphraseGiven=*/true);
                     result.errorMessage = archiveErrorAt(a, "scan/encrypted-entry probe", "incorrect passphrase");
                     break;
                 }
-                ARCHIVE_DIAG("encrypted-entry probe returned %lld bytes; passphraseProvided=true",
-                             static_cast<long long>(n));
                 passphraseVerified = true;
             }
         }

@@ -1,3 +1,710 @@
+diff --git a/libarchive/archive_read_support_format_7zip.c b/libarchive/archive_read_support_format_7zip.c
+index 9c9f9a0..85ff5bb 100644
+--- a/libarchive/archive_read_support_format_7zip.c
++++ b/libarchive/archive_read_support_format_7zip.c
+@@ -59,6 +59,9 @@
+ #include "archive_read_private.h"
+ #include "archive_time_private.h"
+ #include "archive_endian.h"
++#ifdef HAVE_LIBCRYPTO
++#include "archive_openssl_evp_private.h"
++#endif
+ 
+ #ifndef HAVE_ZLIB_H
+ #include "archive_crc32.h"
+@@ -312,6 +315,23 @@ struct _7zip {
+ 	/* The codec information of a folder. */
+ 	int64_t			 codec;
+ 	int64_t			 codec2;
++	/* 7zAES sits before the compression codec in the decode chain. */
++#ifdef HAVE_LIBCRYPTO
++	EVP_CIPHER_CTX		*aes_ctx;
++	unsigned char		*aes_buffer;
++	char			*aes_passphrase;
++	/* Derived key of the last folder; every folder of an archive normally
++	 * shares salt and cost, and deriving it takes 2^19 SHA-256 rounds. */
++	unsigned char		 aes_key[32];
++	unsigned char		 aes_key_salt[16];
++	size_t			 aes_key_salt_len;
++	unsigned		 aes_key_cycles;
++	int			 aes_key_valid;
++	size_t			 aes_buffer_offset;
++	size_t			 aes_buffer_remaining;
++	int64_t			 aes_plaintext_remaining;
++	int			 aes_active;
++#endif
+ 
+ 	/*
+ 	 * Decompressor controllers.
+@@ -427,6 +447,13 @@ static ssize_t	get_uncompressed_data(struct archive_read *, const void **,
+ static const unsigned char *header_bytes(struct archive_read *, size_t);
+ static int	init_decompression(struct archive_read *, struct _7zip *,
+ 		    const struct _7z_coder *, const struct _7z_coder *);
++#ifdef HAVE_LIBCRYPTO
++static void	sevenzip_zero(void *, size_t);
++static void	clear_7zip_aes(struct _7zip *);
++static void	free_7zip_aes(struct _7zip *);
++static int	init_7zip_aes_decryption(struct archive_read *, struct _7zip *,
++		    const struct _7z_coder *, int64_t);
++#endif
+ static int	parse_7zip_size(struct archive_read *, size_t *);
+ static int	parse_7zip_int64(struct archive_read *, int64_t *);
+ static int	read_Bools(struct archive_read *, unsigned char *, size_t);
+@@ -1144,11 +1171,21 @@ archive_read_format_7zip_read_data(struct archive_read *a,
+ 		if ((zip->entry->flg & CRC32_IS_SET) &&
+ 			zip->si.ss.digests[zip->entry->ssIndex] !=
+ 		    zip->entry_crc32) {
+-			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
+-			    "7-Zip bad CRC: 0x%lx should be 0x%lx",
+-			    zip->entry_crc32,
+-			    (unsigned long)zip->si.ss.digests[
+-			    		zip->entry->ssIndex]);
++#ifdef HAVE_LIBCRYPTO
++			if (zip->aes_active)
++				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++				    "Incorrect 7-Zip passphrase or bad CRC: "
++				    "0x%lx should be 0x%lx",
++				    zip->entry_crc32,
++				    (unsigned long)zip->si.ss.digests[
++					    zip->entry->ssIndex]);
++			else
++#endif
++				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++				    "7-Zip bad CRC: 0x%lx should be 0x%lx",
++				    zip->entry_crc32,
++				    (unsigned long)zip->si.ss.digests[
++					    zip->entry->ssIndex]);
+ 			ret = ARCHIVE_WARN;
+ 		}
+ 	}
+@@ -2042,6 +2079,9 @@ free_decompression(struct archive_read *a, struct _7zip *zip)
+ 			&zip->ppmd7_context);
+ 		zip->ppmd7_valid = 0;
+ 	}
++#ifdef HAVE_LIBCRYPTO
++	free_7zip_aes(zip);
++#endif
+ 	return (r);
+ }
+ 
+@@ -3410,6 +3450,12 @@ slurp_central_directory(struct archive_read *a, struct _7zip *zip,
+ 			if (errno == ENOMEM)
+ 				archive_set_error(&a->archive, -1,
+ 				    "Couldn't allocate memory");
++#ifdef HAVE_LIBCRYPTO
++			else if (zip->aes_active)
++				archive_set_error(&a->archive, -1,
++				    "Incorrect 7-Zip passphrase or damaged "
++				    "encrypted header");
++#endif
+ 			else
+ 				archive_set_error(&a->archive, -1,
+ 				    "Damaged 7-Zip archive");
+@@ -3421,6 +3467,11 @@ slurp_central_directory(struct archive_read *a, struct _7zip *zip,
+ 		 */
+ 		if ((p = header_bytes(a, 1)) == NULL ||*p != kEnd) {
+ 			archive_set_error(&a->archive, -1,
++#ifdef HAVE_LIBCRYPTO
++			    zip->aes_active ?
++			    "Incorrect 7-Zip passphrase or damaged "
++			    "encrypted header" :
++#endif
+ 			    "Malformed 7-Zip archive");
+ 			return (ARCHIVE_FATAL);
+ 		}
+@@ -3429,6 +3480,11 @@ slurp_central_directory(struct archive_read *a, struct _7zip *zip,
+ 		if (check_header_crc && zip->header_crc32 != next_header_crc) {
+ #ifndef DONT_FAIL_ON_CRC_ERROR
+ 			archive_set_error(&a->archive, -1,
++#ifdef HAVE_LIBCRYPTO
++			    zip->aes_active ?
++			    "Incorrect 7-Zip passphrase or damaged "
++			    "encrypted header" :
++#endif
+ 			    "Malformed 7-Zip archive");
+ 			return (ARCHIVE_FATAL);
+ #endif
+@@ -3458,7 +3514,11 @@ get_uncompressed_data(struct archive_read *a, const void **buff, size_t size,
+ 	struct _7zip *zip = a->format->data;
+ 	ssize_t bytes_avail;
+ 
++#ifdef HAVE_LIBCRYPTO
++	if (!zip->aes_active && zip->codec == _7Z_COPY && zip->codec2 == -1) {
++#else
+ 	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
++#endif
+ 		/* Copy mode. */
+ 
+ 		*buff = __archive_read_ahead(a, minimum, &bytes_avail);
+@@ -3522,7 +3582,11 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
+ 	ssize_t bytes_avail;
+ 	int r;
+ 
++#ifdef HAVE_LIBCRYPTO
++	if (!zip->aes_active && zip->codec == _7Z_COPY && zip->codec2 == -1) {
++#else
+ 	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
++#endif
+ 		if (minimum == 0)
+ 			minimum = 1;
+ 		if (__archive_read_ahead(a, minimum, &bytes_avail) == NULL
+@@ -3603,27 +3667,89 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
+ 		unsigned char *buff_out;
+ 		int end_of_data;
+ 
+-		/*
+-		 * Note: '1' here is a performance optimization.
+-		 * Recall that the decompression layer returns a count of
+-		 * available bytes; asking for more than that forces the
+-		 * decompressor to combine reads by copying data.
+-		 */
+-		buff_in = __archive_read_ahead(a, 1, &bytes_avail);
+-		if (bytes_avail <= 0) {
+-			archive_set_error(&a->archive,
+-			    ARCHIVE_ERRNO_FILE_FORMAT,
+-			    "Truncated 7-Zip file body");
+-			return (ARCHIVE_FATAL);
++#ifdef HAVE_LIBCRYPTO
++		if (zip->aes_active) {
++			if (zip->aes_buffer_remaining == 0) {
++				const void *ciphertext;
++				size_t cipher_bytes, plain_bytes;
++				int out_len = 0;
++
++				if (zip->pack_stream_inbytes_remaining <= 0) {
++					if (zip->aes_plaintext_remaining > 0) {
++						archive_set_error(&a->archive,
++						    ARCHIVE_ERRNO_FILE_FORMAT,
++						    "Incorrect 7-Zip passphrase or damaged encrypted data");
++						return (ARCHIVE_FATAL);
++					}
++					buff_in = zip->aes_buffer;
++					bytes_in = 0;
++				} else {
++					if (zip->aes_plaintext_remaining <= 0) {
++						archive_set_error(&a->archive,
++						    ARCHIVE_ERRNO_FILE_FORMAT,
++						    "Incorrect 7-Zip passphrase or damaged encrypted data");
++						return (ARCHIVE_FATAL);
++					}
++					ciphertext = __archive_read_ahead(a, 16, &bytes_avail);
++					if (ciphertext == NULL || bytes_avail < 16) {
++						archive_set_error(&a->archive,
++						    ARCHIVE_ERRNO_FILE_FORMAT,
++						    "Truncated 7-Zip encrypted data");
++						return (ARCHIVE_FATAL);
++					}
++					cipher_bytes = (size_t)bytes_avail;
++					if (cipher_bytes > (uint64_t)zip->pack_stream_inbytes_remaining)
++						cipher_bytes = (size_t)zip->pack_stream_inbytes_remaining;
++					if (cipher_bytes > UBUFF_SIZE)
++						cipher_bytes = UBUFF_SIZE;
++					cipher_bytes &= ~(size_t)15;
++					if (cipher_bytes == 0 || cipher_bytes > INT_MAX ||
++					    EVP_DecryptUpdate(zip->aes_ctx, zip->aes_buffer,
++						&out_len, ciphertext, (int)cipher_bytes) != 1 ||
++					    out_len < 0 || (size_t)out_len != cipher_bytes) {
++						archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++						    "7-Zip AES decryption failed");
++						return (ARCHIVE_FATAL);
++					}
++					zip->pack_stream_inbytes_remaining -= cipher_bytes;
++					zip->pack_stream_bytes_unconsumed = cipher_bytes;
++					if (read_consume(a) < 0)
++						return (ARCHIVE_FATAL);
++					plain_bytes = (size_t)out_len;
++					if (plain_bytes > (uint64_t)zip->aes_plaintext_remaining)
++						plain_bytes = (size_t)zip->aes_plaintext_remaining;
++					zip->aes_plaintext_remaining -= (int64_t)plain_bytes;
++					zip->aes_buffer_offset = 0;
++					zip->aes_buffer_remaining = plain_bytes;
++				}
++			}
++			buff_in = zip->aes_buffer + zip->aes_buffer_offset;
++			bytes_in = zip->aes_buffer_remaining;
++		} else
++#endif
++		{
++			/*
++			 * Note: '1' here is a performance optimization.
++			 * Recall that the decompression layer returns a count of
++			 * available bytes; asking for more than that forces the
++			 * decompressor to combine reads by copying data.
++			 */
++			buff_in = __archive_read_ahead(a, 1, &bytes_avail);
++			if (bytes_avail <= 0) {
++				archive_set_error(&a->archive,
++				    ARCHIVE_ERRNO_FILE_FORMAT,
++				    "Truncated 7-Zip file body");
++				return (ARCHIVE_FATAL);
++			}
++			bytes_in = bytes_avail;
++			if (bytes_in > (uint64_t)zip->pack_stream_inbytes_remaining)
++				bytes_in = (size_t)zip->pack_stream_inbytes_remaining;
+ 		}
+ 
+ 		buff_out = zip->uncompressed_buffer
+ 			+ zip->uncompressed_buffer_bytes_remaining;
+ 		bytes_out = zip->uncompressed_buffer_size
+ 			- zip->uncompressed_buffer_bytes_remaining;
+-		bytes_in = bytes_avail;
+-		if (bytes_in > (uint64_t)zip->pack_stream_inbytes_remaining)
+-			bytes_in = (size_t)zip->pack_stream_inbytes_remaining;
+ 		/* Drive decompression. */
+ 		r = decompress(a, zip, buff_out, &bytes_out,
+ 			buff_in, &bytes_in);
+@@ -3635,14 +3761,40 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
+ 			end_of_data = 1;
+ 			break;
+ 		default:
++#ifdef HAVE_LIBCRYPTO
++			if (zip->aes_active) {
++				const char *detail = archive_error_string(&a->archive);
++				char detail_copy[128];
++				size_t detail_len = 0;
++				if (detail != NULL) {
++					while (detail_len < sizeof(detail_copy) - 1 &&
++					    detail[detail_len] != '\0') {
++						detail_copy[detail_len] = detail[detail_len];
++						detail_len++;
++					}
++				}
++				detail_copy[detail_len] = '\0';
++				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++				    "Incorrect 7-Zip passphrase or damaged encrypted data (%s)",
++				    detail_len ? detail_copy : "decoder failure");
++			}
++#endif
+ 			return (ARCHIVE_FATAL);
+ 		}
+-		zip->pack_stream_inbytes_remaining -= bytes_in;
++#ifdef HAVE_LIBCRYPTO
++		if (zip->aes_active) {
++			zip->aes_buffer_offset += bytes_in;
++			zip->aes_buffer_remaining -= bytes_in;
++		} else
++#endif
++		{
++			zip->pack_stream_inbytes_remaining -= bytes_in;
++			zip->pack_stream_bytes_unconsumed = bytes_in;
++		}
+ 		if (bytes_out > (uint64_t)zip->folder_outbytes_remaining)
+ 			bytes_out = (size_t)zip->folder_outbytes_remaining;
+ 		zip->folder_outbytes_remaining -= bytes_out;
+ 		zip->uncompressed_buffer_bytes_remaining += bytes_out;
+-		zip->pack_stream_bytes_unconsumed = bytes_in;
+ 
+ 		/*
+ 		 * Continue decompression until uncompressed_buffer is full.
+@@ -3659,10 +3811,20 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
+ 			break;
+ 		if (end_of_data || (bytes_in == 0 && bytes_out == 0)) {
+ 			archive_set_error(&(a->archive),
+-			    ARCHIVE_ERRNO_MISC, "Damaged 7-Zip archive");
++			    ARCHIVE_ERRNO_MISC,
++#ifdef HAVE_LIBCRYPTO
++			    zip->aes_active ?
++			    "Incorrect 7-Zip passphrase or damaged encrypted data" :
++#endif
++			    "Damaged 7-Zip archive");
+ 			return (ARCHIVE_FATAL);
+ 		}
++#ifdef HAVE_LIBCRYPTO
++		if (!zip->aes_active)
++			read_consume(a);
++#else
+ 		read_consume(a);
++#endif
+ 	}
+ 	if (zip->uncompressed_buffer_bytes_remaining < minimum) {
+ 		archive_set_error(&(a->archive),
+@@ -3822,16 +3984,310 @@ read_stream(struct archive_read *a, const void **buff, size_t size,
+ 	return (get_uncompressed_data(a, buff, size, minimum));
+ }
+ 
++#ifdef HAVE_LIBCRYPTO
++static void
++clear_7zip_aes(struct _7zip *zip)
++{
++	if (zip->aes_ctx != NULL)
++		EVP_CIPHER_CTX_free(zip->aes_ctx);
++	zip->aes_ctx = NULL;
++	if (zip->aes_buffer != NULL) {
++		volatile unsigned char *p = zip->aes_buffer;
++		size_t n = UBUFF_SIZE;
++		while (n-- > 0)
++			*p++ = 0;
++		free(zip->aes_buffer);
++	}
++	zip->aes_buffer = NULL;
++	zip->aes_buffer_offset = 0;
++	zip->aes_buffer_remaining = 0;
++	zip->aes_plaintext_remaining = 0;
++	zip->aes_active = 0;
++}
++
++static void
++free_7zip_aes(struct _7zip *zip)
++{
++	clear_7zip_aes(zip);
++	if (zip->aes_passphrase != NULL) {
++		volatile unsigned char *p = (unsigned char *)zip->aes_passphrase;
++		size_t n = strlen(zip->aes_passphrase) + 1;
++		while (n-- > 0)
++			*p++ = 0;
++		free(zip->aes_passphrase);
++		zip->aes_passphrase = NULL;
++	}
++	sevenzip_zero(zip->aes_key, sizeof(zip->aes_key));
++	zip->aes_key_valid = 0;
++}
++
++static int
++sevenzip_utf8_to_utf16le(const char *s, unsigned char **out, size_t *out_len)
++{
++	const unsigned char *p = (const unsigned char *)s;
++	size_t input_len = strlen(s), cap, used = 0;
++	unsigned char *dst;
++
++	if (input_len > (SIZE_MAX - 2) / 2)
++		return (-1);
++	cap = input_len * 2 + 2;
++	dst = malloc(cap);
++	if (dst == NULL)
++		return (-1);
++
++	while (*p != 0) {
++		uint32_t cp;
++		int extra, i;
++		static const uint32_t min_cp[] = {0, 0x80, 0x800, 0x10000};
++
++		if (*p < 0x80) { cp = *p; extra = 0; }
++		else if ((*p & 0xE0) == 0xC0) { cp = *p & 0x1F; extra = 1; }
++		else if ((*p & 0xF0) == 0xE0) { cp = *p & 0x0F; extra = 2; }
++		else if ((*p & 0xF8) == 0xF0) { cp = *p & 0x07; extra = 3; }
++		else { free(dst); return (-1); }
++		p++;
++		for (i = 0; i < extra; i++, p++) {
++			if ((*p & 0xC0) != 0x80) { free(dst); return (-1); }
++			cp = (cp << 6) | (*p & 0x3F);
++		}
++		if (cp < min_cp[extra] || cp > 0x10FFFF ||
++		    (cp >= 0xD800 && cp <= 0xDFFF)) {
++			free(dst);
++			return (-1);
++		}
++		if (cp >= 0x10000) {
++			cp -= 0x10000;
++			archive_le16enc(dst + used, (uint16_t)(0xD800 | (cp >> 10)));
++			archive_le16enc(dst + used + 2,
++			    (uint16_t)(0xDC00 | (cp & 0x3FF)));
++			used += 4;
++		} else {
++			archive_le16enc(dst + used, (uint16_t)cp);
++			used += 2;
++		}
++	}
++	*out = dst;
++	*out_len = used;
++	return (0);
++}
++
++static void
++sevenzip_zero(void *p, size_t n)
++{
++	volatile unsigned char *v = p;
++	while (n-- > 0)
++		*v++ = 0;
++}
++
++static int
++sevenzip_derive_key(struct archive_read *a, const char *passphrase,
++	const unsigned char *salt, size_t salt_len, unsigned cycles_power,
++	unsigned char key[32])
++{
++	unsigned char *password = NULL, *batch = NULL;
++	EVP_MD_CTX *md = NULL;
++	size_t password_len = 0, record_len, per_batch, batch_bytes;
++	uint64_t rounds, pos;
++	unsigned int digest_len = 0;
++	int ret = ARCHIVE_FAILED;
++
++	if (sevenzip_utf8_to_utf16le(passphrase, &password, &password_len) != 0) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "7-Zip passphrase is not valid UTF-8");
++		return (ARCHIVE_FAILED);
++	}
++	if (cycles_power == 0x3F) {
++		size_t copied = 0;
++		memset(key, 0, 32);
++		if (salt_len > 32)
++			salt_len = 32;
++		memcpy(key, salt, salt_len);
++		copied = salt_len;
++		if (password_len > 32 - copied)
++			password_len = 32 - copied;
++		memcpy(key + copied, password, password_len);
++		ret = ARCHIVE_OK;
++		goto cleanup;
++	}
++	if (cycles_power > 24) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "Unsupported 7-Zip AES key derivation strength");
++		goto cleanup;
++	}
++	if (salt_len > SIZE_MAX - password_len - 8) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "Invalid 7-Zip AES parameters");
++		goto cleanup;
++	}
++	record_len = salt_len + password_len + 8;
++	per_batch = record_len == 0 ? 1 : 4096 / record_len;
++	if (per_batch == 0)
++		per_batch = 1;
++	if (per_batch > 4096 / record_len)
++		per_batch = 4096 / record_len;
++	if (per_batch == 0)
++		per_batch = 1;
++	if (per_batch > SIZE_MAX / record_len) {
++		archive_set_error(&a->archive, ENOMEM,
++		    "Can't allocate memory for 7-Zip key derivation");
++		goto cleanup;
++	}
++	batch_bytes = per_batch * record_len;
++	batch = malloc(batch_bytes);
++	md = EVP_MD_CTX_new();
++	if (batch == NULL || md == NULL ||
++	    EVP_DigestInit_ex(md, EVP_sha256(), NULL) != 1) {
++		archive_set_error(&a->archive, ENOMEM,
++		    "Can't set up 7-Zip key derivation");
++		goto cleanup;
++	}
++	rounds = (uint64_t)1 << cycles_power;
++	for (pos = 0; pos < rounds;) {
++		uint64_t count = rounds - pos;
++		uint64_t i;
++		if (count > per_batch)
++			count = per_batch;
++		for (i = 0; i < count; i++) {
++			unsigned char *record = batch + (size_t)i * record_len;
++			memcpy(record, salt, salt_len);
++			memcpy(record + salt_len, password, password_len);
++			archive_le64enc(record + salt_len + password_len, pos + i);
++		}
++		if (EVP_DigestUpdate(md, batch, (size_t)count * record_len) != 1) {
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "7-Zip key derivation failed");
++			goto cleanup;
++		}
++		pos += count;
++	}
++	if (EVP_DigestFinal_ex(md, key, &digest_len) != 1 || digest_len != 32) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "7-Zip key derivation failed");
++		goto cleanup;
++	}
++	ret = ARCHIVE_OK;
++cleanup:
++	if (md != NULL)
++		EVP_MD_CTX_free(md);
++	if (batch != NULL) {
++		sevenzip_zero(batch, batch_bytes);
++		free(batch);
++	}
++	if (password != NULL) {
++		sevenzip_zero(password, strlen(passphrase) * 2 + 2);
++		free(password);
++	}
++	return (ret);
++}
++
++static int
++init_7zip_aes_decryption(struct archive_read *a, struct _7zip *zip,
++	const struct _7z_coder *coder, int64_t plaintext_size)
++{
++	const unsigned char *props = coder->properties;
++	const char *passphrase = zip->aes_passphrase;
++	unsigned char key[32], iv[16] = {0};
++	unsigned char flags;
++	size_t salt_len = 0, iv_len = 0, offset = 1;
++	const unsigned char *salt = NULL, *ivp = NULL;
++	int ret = ARCHIVE_FAILED;
++
++	clear_7zip_aes(zip);
++	if (coder->propertiesSize < 1 || props == NULL) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "Malformed 7-Zip AES properties");
++		return (ARCHIVE_FAILED);
++	}
++	flags = props[0];
++	if (flags & 0x80 || flags & 0x40) {
++		if (coder->propertiesSize < 2) {
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "Malformed 7-Zip AES properties");
++			return (ARCHIVE_FAILED);
++		}
++		salt_len = (flags & 0x80) ? ((props[1] >> 4) & 0x0F) + 1 : 0;
++		iv_len = (flags & 0x40) ? (props[1] & 0x0F) + 1 : 0;
++		offset = 2;
++	}
++	if (salt_len > 16 || iv_len > 16 || salt_len + iv_len > coder->propertiesSize - offset) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "Malformed 7-Zip AES salt or IV");
++		return (ARCHIVE_FAILED);
++	}
++	salt = props + offset;
++	ivp = salt + salt_len;
++	if (iv_len > 0)
++		memcpy(iv, ivp, iv_len);
++	if (passphrase == NULL) {
++		/*
++		 * The passphrase queue has to be rewound before it is walked,
++		 * otherwise the first candidate is never returned.
++		 */
++		__archive_read_reset_passphrase(a);
++		passphrase = __archive_read_next_passphrase(a);
++		if (passphrase == NULL) {
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "Passphrase required for this 7-Zip archive");
++			return (ARCHIVE_FAILED);
++		}
++		zip->aes_passphrase = malloc(strlen(passphrase) + 1);
++		if (zip->aes_passphrase == NULL) {
++			archive_set_error(&a->archive, ENOMEM,
++			    "Can't save 7-Zip passphrase");
++			return (ARCHIVE_FATAL);
++		}
++		strcpy(zip->aes_passphrase, passphrase);
++	}
++	if (zip->aes_key_valid && zip->aes_key_cycles == (flags & 0x3F) &&
++	    zip->aes_key_salt_len == salt_len &&
++	    memcmp(zip->aes_key_salt, salt, salt_len) == 0) {
++		memcpy(key, zip->aes_key, sizeof(key));
++	} else {
++		if (sevenzip_derive_key(a, passphrase, salt, salt_len,
++		    flags & 0x3F, key) != ARCHIVE_OK)
++			goto cleanup;
++		memcpy(zip->aes_key, key, sizeof(key));
++		memcpy(zip->aes_key_salt, salt, salt_len);
++		zip->aes_key_salt_len = salt_len;
++		zip->aes_key_cycles = flags & 0x3F;
++		zip->aes_key_valid = 1;
++	}
++	zip->aes_ctx = EVP_CIPHER_CTX_new();
++	zip->aes_buffer = malloc(UBUFF_SIZE);
++	if (zip->aes_ctx == NULL || zip->aes_buffer == NULL ||
++	    EVP_DecryptInit_ex(zip->aes_ctx, EVP_aes_256_cbc(), NULL, key, iv) != 1 ||
++	    EVP_CIPHER_CTX_set_padding(zip->aes_ctx, 0) != 1) {
++		archive_set_error(&a->archive, ENOMEM,
++		    "Can't set up 7-Zip AES decryption");
++		goto cleanup;
++	}
++	zip->aes_plaintext_remaining = plaintext_size;
++	zip->aes_active = 1;
++	ret = ARCHIVE_OK;
++cleanup:
++	sevenzip_zero(key, sizeof(key));
++	sevenzip_zero(iv, sizeof(iv));
++	if (ret != ARCHIVE_OK)
++		clear_7zip_aes(zip);
++	return (ret);
++}
++#endif
++
+ static int
+ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+     int header)
+ {
+ 	struct _7zip *zip = a->format->data;
+ 	const struct _7z_coder *coder1, *coder2;
++	const struct _7z_coder *aes_coder = NULL;
+ 	const char *cname = (header)?"archive header":"file content";
+-	size_t i;
++	size_t i, aes_index = 0;
+ 	int r, found_bcj2 = 0;
+ 
++#ifdef HAVE_LIBCRYPTO
++	clear_7zip_aes(zip);
++#endif
++
+ 	/*
+ 	 * Release the memory which the previous folder used for BCJ2.
+ 	 */
+@@ -3848,8 +4304,7 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+ 	for (i = 0; i < folder->numCoders; i++) {
+ 		switch(folder->coders[i].codec) {
+ 			case _7Z_CRYPTO_MAIN_ZIP:
+-			case _7Z_CRYPTO_RAR_29:
+-			case _7Z_CRYPTO_AES_256_SHA_256: {
++			case _7Z_CRYPTO_RAR_29: {
+ 				/* For entry that is associated with this folder, mark
+ 				   it as encrypted (data+metadata). */
+ 				zip->has_encrypted_entries = 1;
+@@ -3863,6 +4318,16 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+ 					"but currently not supported", cname);
+ 				return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
+ 			}
++			case _7Z_CRYPTO_AES_256_SHA_256:
++				zip->has_encrypted_entries = 1;
++				if (a->entry) {
++					archive_entry_set_is_data_encrypted(a->entry, 1);
++					if (header)
++						archive_entry_set_is_metadata_encrypted(a->entry, 1);
++				}
++				aes_coder = &folder->coders[i];
++				aes_index = i;
++				break;
+ 			case _7Z_X86_BCJ2: {
+ 				found_bcj2++;
+ 				break;
+@@ -3876,7 +4341,9 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+ 		zip->has_encrypted_entries = 0;
+ 	}
+ 
+-	if ((folder->numCoders > 2 && !found_bcj2) || found_bcj2 > 1) {
++	/* An AES layer is decrypted separately and is not a "filter". */
++	if (((folder->numCoders - (aes_coder != NULL ? 1 : 0)) > 2 &&
++	    !found_bcj2) || found_bcj2 > 1) {
+ 		archive_set_error(&(a->archive),
+ 		    ARCHIVE_ERRNO_MISC,
+ 		    "The %s is encoded with many filters, "
+@@ -3897,6 +4364,36 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+ 	else
+ 		coder2 = NULL;
+ 
++	if (aes_coder != NULL) {
++#ifdef HAVE_LIBCRYPTO
++		/*
++		 * Supported: [AES, codec] and [AES, codec, filter], a plain chain
++		 * in decoding order with a single packed stream.
++		 */
++		if (aes_index != 0 ||
++		    (folder->numCoders != 2 && folder->numCoders != 3) ||
++		    folder->numBindPairs != folder->numCoders - 1 ||
++		    folder->numPackedStreams != 1 ||
++		    folder->numInStreams != folder->numCoders ||
++		    folder->numOutStreams != folder->numCoders ||
++		    aes_coder->numInStreams != 1 || aes_coder->numOutStreams != 1 ||
++		    found_bcj2 || folder->unPackSize == NULL) {
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "Unsupported 7-Zip AES folder layout");
++			return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
++		}
++		if (init_7zip_aes_decryption(a, zip, aes_coder,
++		    folder->unPackSize[0]) != ARCHIVE_OK)
++			return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
++		coder1 = &folder->coders[1];
++		coder2 = (folder->numCoders == 3) ? &folder->coders[2] : NULL;
++#else
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++		    "7-Zip AES decryption is unsupported due to lack of crypto library");
++		return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
++#endif
++	}
++
+ 	if (found_bcj2) {
+ 		/*
+ 		 * Preparation to decode BCJ2.
 diff --git a/libarchive/archive_write_set_format_7zip.c b/libarchive/archive_write_set_format_7zip.c
 index b5cc8e5..f57ca24 100644
 --- a/libarchive/archive_write_set_format_7zip.c
@@ -618,627 +1325,3 @@ index b5cc8e5..f57ca24 100644
  	free(zip);
  
  	return (ARCHIVE_OK);
-diff --git a/libarchive/archive_read_support_format_7zip.c b/libarchive/archive_read_support_format_7zip.c
-index 9c9f9a0e..4511a0e2 100644
---- a/libarchive/archive_read_support_format_7zip.c
-+++ b/libarchive/archive_read_support_format_7zip.c
-@@ -59,6 +59,9 @@
- #include "archive_read_private.h"
- #include "archive_time_private.h"
- #include "archive_endian.h"
-+#ifdef HAVE_LIBCRYPTO
-+#include "archive_openssl_evp_private.h"
-+#endif
- 
- #ifndef HAVE_ZLIB_H
- #include "archive_crc32.h"
-@@ -312,6 +315,16 @@ struct _7zip {
- 	/* The codec information of a folder. */
- 	int64_t			 codec;
- 	int64_t			 codec2;
-+	/* 7zAES sits before the compression codec in the decode chain. */
-+#ifdef HAVE_LIBCRYPTO
-+	EVP_CIPHER_CTX		*aes_ctx;
-+	unsigned char		*aes_buffer;
-+	char			*aes_passphrase;
-+	size_t			 aes_buffer_offset;
-+	size_t			 aes_buffer_remaining;
-+	int64_t			 aes_plaintext_remaining;
-+	int			 aes_active;
-+#endif
- 
- 	/*
- 	 * Decompressor controllers.
-@@ -427,6 +440,12 @@ static ssize_t	get_uncompressed_data(struct archive_read *, const void **,
- static const unsigned char *header_bytes(struct archive_read *, size_t);
- static int	init_decompression(struct archive_read *, struct _7zip *,
- 		    const struct _7z_coder *, const struct _7z_coder *);
-+#ifdef HAVE_LIBCRYPTO
-+static void	clear_7zip_aes(struct _7zip *);
-+static void	free_7zip_aes(struct _7zip *);
-+static int	init_7zip_aes_decryption(struct archive_read *, struct _7zip *,
-+		    const struct _7z_coder *, int64_t);
-+#endif
- static int	parse_7zip_size(struct archive_read *, size_t *);
- static int	parse_7zip_int64(struct archive_read *, int64_t *);
- static int	read_Bools(struct archive_read *, unsigned char *, size_t);
-@@ -1144,11 +1163,21 @@ archive_read_format_7zip_read_data(struct archive_read *a,
- 		if ((zip->entry->flg & CRC32_IS_SET) &&
- 			zip->si.ss.digests[zip->entry->ssIndex] !=
- 		    zip->entry_crc32) {
--			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
--			    "7-Zip bad CRC: 0x%lx should be 0x%lx",
--			    zip->entry_crc32,
--			    (unsigned long)zip->si.ss.digests[
--			    		zip->entry->ssIndex]);
-+#ifdef HAVE_LIBCRYPTO
-+			if (zip->aes_active)
-+				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+				    "Incorrect 7-Zip passphrase or bad CRC: "
-+				    "0x%lx should be 0x%lx",
-+				    zip->entry_crc32,
-+				    (unsigned long)zip->si.ss.digests[
-+					    zip->entry->ssIndex]);
-+			else
-+#endif
-+				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+				    "7-Zip bad CRC: 0x%lx should be 0x%lx",
-+				    zip->entry_crc32,
-+				    (unsigned long)zip->si.ss.digests[
-+					    zip->entry->ssIndex]);
- 			ret = ARCHIVE_WARN;
- 		}
- 	}
-@@ -2042,6 +2071,9 @@ free_decompression(struct archive_read *a, struct _7zip *zip)
- 			&zip->ppmd7_context);
- 		zip->ppmd7_valid = 0;
- 	}
-+#ifdef HAVE_LIBCRYPTO
-+	free_7zip_aes(zip);
-+#endif
- 	return (r);
- }
- 
-@@ -3458,4 +3491,8 @@ get_uncompressed_data(struct archive_read *a, const void **buff, size_t size,
- 	struct _7zip *zip = a->format->data;
- 	ssize_t bytes_avail;
- 
--	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#ifdef HAVE_LIBCRYPTO
-+	if (!zip->aes_active && zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#else
-+	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#endif
-@@ -3521,6 +3553,10 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
- 	struct _7zip *zip = a->format->data;
- 	ssize_t bytes_avail;
- 	int r;
- 
--	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#ifdef HAVE_LIBCRYPTO
-+	if (!zip->aes_active && zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#else
-+	if (zip->codec == _7Z_COPY && zip->codec2 == -1) {
-+#endif
- 		if (minimum == 0)
-@@ -3603,27 +3635,89 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
- 		unsigned char *buff_out;
- 		int end_of_data;
- 
--		/*
--		 * Note: '1' here is a performance optimization.
--		 * Recall that the decompression layer returns a count of
--		 * available bytes; asking for more than that forces the
--		 * decompressor to combine reads by copying data.
--		 */
--		buff_in = __archive_read_ahead(a, 1, &bytes_avail);
--		if (bytes_avail <= 0) {
--			archive_set_error(&a->archive,
--			    ARCHIVE_ERRNO_FILE_FORMAT,
--			    "Truncated 7-Zip file body");
--			return (ARCHIVE_FATAL);
-+#ifdef HAVE_LIBCRYPTO
-+		if (zip->aes_active) {
-+			if (zip->aes_buffer_remaining == 0) {
-+				const void *ciphertext;
-+				size_t cipher_bytes, plain_bytes;
-+				int out_len = 0;
-+
-+				if (zip->pack_stream_inbytes_remaining <= 0) {
-+					if (zip->aes_plaintext_remaining > 0) {
-+						archive_set_error(&a->archive,
-+						    ARCHIVE_ERRNO_FILE_FORMAT,
-+						    "Incorrect 7-Zip passphrase or damaged encrypted data");
-+						return (ARCHIVE_FATAL);
-+					}
-+					buff_in = zip->aes_buffer;
-+					bytes_in = 0;
-+				} else {
-+					if (zip->aes_plaintext_remaining <= 0) {
-+						archive_set_error(&a->archive,
-+						    ARCHIVE_ERRNO_FILE_FORMAT,
-+						    "Incorrect 7-Zip passphrase or damaged encrypted data");
-+						return (ARCHIVE_FATAL);
-+					}
-+					ciphertext = __archive_read_ahead(a, 16, &bytes_avail);
-+					if (ciphertext == NULL || bytes_avail < 16) {
-+						archive_set_error(&a->archive,
-+						    ARCHIVE_ERRNO_FILE_FORMAT,
-+						    "Truncated 7-Zip encrypted data");
-+						return (ARCHIVE_FATAL);
-+					}
-+					cipher_bytes = (size_t)bytes_avail;
-+					if (cipher_bytes > (uint64_t)zip->pack_stream_inbytes_remaining)
-+						cipher_bytes = (size_t)zip->pack_stream_inbytes_remaining;
-+					if (cipher_bytes > UBUFF_SIZE)
-+						cipher_bytes = UBUFF_SIZE;
-+					cipher_bytes &= ~(size_t)15;
-+					if (cipher_bytes == 0 || cipher_bytes > INT_MAX ||
-+					    EVP_DecryptUpdate(zip->aes_ctx, zip->aes_buffer,
-+						&out_len, ciphertext, (int)cipher_bytes) != 1 ||
-+					    out_len < 0 || (size_t)out_len != cipher_bytes) {
-+						archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+						    "7-Zip AES decryption failed");
-+						return (ARCHIVE_FATAL);
-+					}
-+					zip->pack_stream_inbytes_remaining -= cipher_bytes;
-+					zip->pack_stream_bytes_unconsumed = cipher_bytes;
-+					if (read_consume(a) < 0)
-+						return (ARCHIVE_FATAL);
-+					plain_bytes = (size_t)out_len;
-+					if (plain_bytes > (uint64_t)zip->aes_plaintext_remaining)
-+						plain_bytes = (size_t)zip->aes_plaintext_remaining;
-+					zip->aes_plaintext_remaining -= (int64_t)plain_bytes;
-+					zip->aes_buffer_offset = 0;
-+					zip->aes_buffer_remaining = plain_bytes;
-+				}
-+			}
-+			buff_in = zip->aes_buffer + zip->aes_buffer_offset;
-+			bytes_in = zip->aes_buffer_remaining;
-+		} else
-+#endif
-+		{
-+			/*
-+			 * Note: '1' here is a performance optimization.
-+			 * Recall that the decompression layer returns a count of
-+			 * available bytes; asking for more than that forces the
-+			 * decompressor to combine reads by copying data.
-+			 */
-+			buff_in = __archive_read_ahead(a, 1, &bytes_avail);
-+			if (bytes_avail <= 0) {
-+				archive_set_error(&a->archive,
-+				    ARCHIVE_ERRNO_FILE_FORMAT,
-+				    "Truncated 7-Zip file body");
-+				return (ARCHIVE_FATAL);
-+			}
-+			bytes_in = bytes_avail;
-+			if (bytes_in > (uint64_t)zip->pack_stream_inbytes_remaining)
-+				bytes_in = (size_t)zip->pack_stream_inbytes_remaining;
- 		}
- 
- 		buff_out = zip->uncompressed_buffer
- 			+ zip->uncompressed_buffer_bytes_remaining;
- 		bytes_out = zip->uncompressed_buffer_size
- 			- zip->uncompressed_buffer_bytes_remaining;
--		bytes_in = bytes_avail;
--		if (bytes_in > (uint64_t)zip->pack_stream_inbytes_remaining)
--			bytes_in = (size_t)zip->pack_stream_inbytes_remaining;
- 		/* Drive decompression. */
- 		r = decompress(a, zip, buff_out, &bytes_out,
- 			buff_in, &bytes_in);
-@@ -3635,14 +3729,40 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
- 			end_of_data = 1;
- 			break;
- 		default:
-+#ifdef HAVE_LIBCRYPTO
-+			if (zip->aes_active) {
-+				const char *detail = archive_error_string(&a->archive);
-+				char detail_copy[128];
-+				size_t detail_len = 0;
-+				if (detail != NULL) {
-+					while (detail_len < sizeof(detail_copy) - 1 &&
-+					    detail[detail_len] != '\0') {
-+						detail_copy[detail_len] = detail[detail_len];
-+						detail_len++;
-+					}
-+				}
-+				detail_copy[detail_len] = '\0';
-+				archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+				    "Incorrect 7-Zip passphrase or damaged encrypted data (%s)",
-+				    detail_len ? detail_copy : "decoder failure");
-+			}
-+#endif
- 			return (ARCHIVE_FATAL);
- 		}
--		zip->pack_stream_inbytes_remaining -= bytes_in;
-+#ifdef HAVE_LIBCRYPTO
-+		if (zip->aes_active) {
-+			zip->aes_buffer_offset += bytes_in;
-+			zip->aes_buffer_remaining -= bytes_in;
-+		} else
-+#endif
-+		{
-+			zip->pack_stream_inbytes_remaining -= bytes_in;
-+			zip->pack_stream_bytes_unconsumed = bytes_in;
-+		}
- 		if (bytes_out > (uint64_t)zip->folder_outbytes_remaining)
- 			bytes_out = (size_t)zip->folder_outbytes_remaining;
- 		zip->folder_outbytes_remaining -= bytes_out;
- 		zip->uncompressed_buffer_bytes_remaining += bytes_out;
--		zip->pack_stream_bytes_unconsumed = bytes_in;
- 
- 		/*
- 		 * Continue decompression until uncompressed_buffer is full.
-@@ -3659,10 +3779,20 @@ extract_pack_stream(struct archive_read *a, size_t minimum)
- 			break;
- 		if (end_of_data || (bytes_in == 0 && bytes_out == 0)) {
- 			archive_set_error(&(a->archive),
--			    ARCHIVE_ERRNO_MISC, "Damaged 7-Zip archive");
-+			    ARCHIVE_ERRNO_MISC,
-+#ifdef HAVE_LIBCRYPTO
-+			    zip->aes_active ?
-+			    "Incorrect 7-Zip passphrase or damaged encrypted data" :
-+#endif
-+			    "Damaged 7-Zip archive");
- 			return (ARCHIVE_FATAL);
- 		}
-+#ifdef HAVE_LIBCRYPTO
-+		if (!zip->aes_active)
-+			read_consume(a);
-+#else
- 		read_consume(a);
-+#endif
- 	}
- 	if (zip->uncompressed_buffer_bytes_remaining < minimum) {
- 		archive_set_error(&(a->archive),
-@@ -3822,16 +3952,292 @@ read_stream(struct archive_read *a, const void **buff, size_t size,
- 	return (get_uncompressed_data(a, buff, size, minimum));
- }
- 
-+#ifdef HAVE_LIBCRYPTO
-+static void
-+clear_7zip_aes(struct _7zip *zip)
-+{
-+	if (zip->aes_ctx != NULL)
-+		EVP_CIPHER_CTX_free(zip->aes_ctx);
-+	zip->aes_ctx = NULL;
-+	if (zip->aes_buffer != NULL) {
-+		volatile unsigned char *p = zip->aes_buffer;
-+		size_t n = UBUFF_SIZE;
-+		while (n-- > 0)
-+			*p++ = 0;
-+		free(zip->aes_buffer);
-+	}
-+	zip->aes_buffer = NULL;
-+	zip->aes_buffer_offset = 0;
-+	zip->aes_buffer_remaining = 0;
-+	zip->aes_plaintext_remaining = 0;
-+	zip->aes_active = 0;
-+}
-+
-+static void
-+free_7zip_aes(struct _7zip *zip)
-+{
-+	clear_7zip_aes(zip);
-+	if (zip->aes_passphrase != NULL) {
-+		volatile unsigned char *p = (unsigned char *)zip->aes_passphrase;
-+		size_t n = strlen(zip->aes_passphrase) + 1;
-+		while (n-- > 0)
-+			*p++ = 0;
-+		free(zip->aes_passphrase);
-+		zip->aes_passphrase = NULL;
-+	}
-+}
-+
-+static int
-+sevenzip_utf8_to_utf16le(const char *s, unsigned char **out, size_t *out_len)
-+{
-+	const unsigned char *p = (const unsigned char *)s;
-+	size_t input_len = strlen(s), cap, used = 0;
-+	unsigned char *dst;
-+
-+	if (input_len > (SIZE_MAX - 2) / 2)
-+		return (-1);
-+	cap = input_len * 2 + 2;
-+	dst = malloc(cap);
-+	if (dst == NULL)
-+		return (-1);
-+
-+	while (*p != 0) {
-+		uint32_t cp;
-+		int extra, i;
-+		static const uint32_t min_cp[] = {0, 0x80, 0x800, 0x10000};
-+
-+		if (*p < 0x80) { cp = *p; extra = 0; }
-+		else if ((*p & 0xE0) == 0xC0) { cp = *p & 0x1F; extra = 1; }
-+		else if ((*p & 0xF0) == 0xE0) { cp = *p & 0x0F; extra = 2; }
-+		else if ((*p & 0xF8) == 0xF0) { cp = *p & 0x07; extra = 3; }
-+		else { free(dst); return (-1); }
-+		p++;
-+		for (i = 0; i < extra; i++, p++) {
-+			if ((*p & 0xC0) != 0x80) { free(dst); return (-1); }
-+			cp = (cp << 6) | (*p & 0x3F);
-+		}
-+		if (cp < min_cp[extra] || cp > 0x10FFFF ||
-+		    (cp >= 0xD800 && cp <= 0xDFFF)) {
-+			free(dst);
-+			return (-1);
-+		}
-+		if (cp >= 0x10000) {
-+			cp -= 0x10000;
-+			archive_le16enc(dst + used, (uint16_t)(0xD800 | (cp >> 10)));
-+			archive_le16enc(dst + used + 2,
-+			    (uint16_t)(0xDC00 | (cp & 0x3FF)));
-+			used += 4;
-+		} else {
-+			archive_le16enc(dst + used, (uint16_t)cp);
-+			used += 2;
-+		}
-+	}
-+	*out = dst;
-+	*out_len = used;
-+	return (0);
-+}
-+
-+static void
-+sevenzip_zero(void *p, size_t n)
-+{
-+	volatile unsigned char *v = p;
-+	while (n-- > 0)
-+		*v++ = 0;
-+}
-+
-+static int
-+sevenzip_derive_key(struct archive_read *a, const char *passphrase,
-+	const unsigned char *salt, size_t salt_len, unsigned cycles_power,
-+	unsigned char key[32])
-+{
-+	unsigned char *password = NULL, *batch = NULL;
-+	EVP_MD_CTX *md = NULL;
-+	size_t password_len = 0, record_len, per_batch, batch_bytes;
-+	uint64_t rounds, pos;
-+	unsigned int digest_len = 0;
-+	int ret = ARCHIVE_FAILED;
-+
-+	if (sevenzip_utf8_to_utf16le(passphrase, &password, &password_len) != 0) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "7-Zip passphrase is not valid UTF-8");
-+		return (ARCHIVE_FAILED);
-+	}
-+	if (cycles_power == 0x3F) {
-+		size_t copied = 0;
-+		memset(key, 0, 32);
-+		if (salt_len > 32)
-+			salt_len = 32;
-+		memcpy(key, salt, salt_len);
-+		copied = salt_len;
-+		if (password_len > 32 - copied)
-+			password_len = 32 - copied;
-+		memcpy(key + copied, password, password_len);
-+		ret = ARCHIVE_OK;
-+		goto cleanup;
-+	}
-+	if (cycles_power > 24) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "Unsupported 7-Zip AES key derivation strength");
-+		goto cleanup;
-+	}
-+	if (salt_len > SIZE_MAX - password_len - 8) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "Invalid 7-Zip AES parameters");
-+		goto cleanup;
-+	}
-+	record_len = salt_len + password_len + 8;
-+	per_batch = record_len == 0 ? 1 : 4096 / record_len;
-+	if (per_batch == 0)
-+		per_batch = 1;
-+	if (per_batch > 4096 / record_len)
-+		per_batch = 4096 / record_len;
-+	if (per_batch == 0)
-+		per_batch = 1;
-+	if (per_batch > SIZE_MAX / record_len) {
-+		archive_set_error(&a->archive, ENOMEM,
-+		    "Can't allocate memory for 7-Zip key derivation");
-+		goto cleanup;
-+	}
-+	batch_bytes = per_batch * record_len;
-+	batch = malloc(batch_bytes);
-+	md = EVP_MD_CTX_new();
-+	if (batch == NULL || md == NULL ||
-+	    EVP_DigestInit_ex(md, EVP_sha256(), NULL) != 1) {
-+		archive_set_error(&a->archive, ENOMEM,
-+		    "Can't set up 7-Zip key derivation");
-+		goto cleanup;
-+	}
-+	rounds = (uint64_t)1 << cycles_power;
-+	for (pos = 0; pos < rounds;) {
-+		uint64_t count = rounds - pos;
-+		uint64_t i;
-+		if (count > per_batch)
-+			count = per_batch;
-+		for (i = 0; i < count; i++) {
-+			unsigned char *record = batch + (size_t)i * record_len;
-+			memcpy(record, salt, salt_len);
-+			memcpy(record + salt_len, password, password_len);
-+			archive_le64enc(record + salt_len + password_len, pos + i);
-+		}
-+		if (EVP_DigestUpdate(md, batch, (size_t)count * record_len) != 1) {
-+			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+			    "7-Zip key derivation failed");
-+			goto cleanup;
-+		}
-+		pos += count;
-+	}
-+	if (EVP_DigestFinal_ex(md, key, &digest_len) != 1 || digest_len != 32) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "7-Zip key derivation failed");
-+		goto cleanup;
-+	}
-+	ret = ARCHIVE_OK;
-+cleanup:
-+	if (md != NULL)
-+		EVP_MD_CTX_free(md);
-+	if (batch != NULL) {
-+		sevenzip_zero(batch, batch_bytes);
-+		free(batch);
-+	}
-+	if (password != NULL) {
-+		sevenzip_zero(password, strlen(passphrase) * 2 + 2);
-+		free(password);
-+	}
-+	return (ret);
-+}
-+
-+static int
-+init_7zip_aes_decryption(struct archive_read *a, struct _7zip *zip,
-+	const struct _7z_coder *coder, int64_t plaintext_size)
-+{
-+	const unsigned char *props = coder->properties;
-+	const char *passphrase = zip->aes_passphrase;
-+	unsigned char key[32], iv[16] = {0};
-+	unsigned char flags;
-+	size_t salt_len = 0, iv_len = 0, offset = 1;
-+	const unsigned char *salt = NULL, *ivp = NULL;
-+	int ret = ARCHIVE_FAILED;
-+
-+	clear_7zip_aes(zip);
-+	if (coder->propertiesSize < 1 || props == NULL) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "Malformed 7-Zip AES properties");
-+		return (ARCHIVE_FAILED);
-+	}
-+	flags = props[0];
-+	if (flags & 0x80 || flags & 0x40) {
-+		if (coder->propertiesSize < 2) {
-+			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+			    "Malformed 7-Zip AES properties");
-+			return (ARCHIVE_FAILED);
-+		}
-+		salt_len = (flags & 0x80) ? ((props[1] >> 4) & 0x0F) + 1 : 0;
-+		iv_len = (flags & 0x40) ? (props[1] & 0x0F) + 1 : 0;
-+		offset = 2;
-+	}
-+	if (salt_len > 16 || iv_len > 16 || salt_len + iv_len > coder->propertiesSize - offset) {
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "Malformed 7-Zip AES salt or IV");
-+		return (ARCHIVE_FAILED);
-+	}
-+	salt = props + offset;
-+	ivp = salt + salt_len;
-+	if (iv_len > 0)
-+		memcpy(iv, ivp, iv_len);
-+	if (passphrase == NULL) {
-+		passphrase = __archive_read_next_passphrase(a);
-+		if (passphrase == NULL) {
-+			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+			    "Passphrase required for this 7-Zip archive");
-+			return (ARCHIVE_FAILED);
-+		}
-+		zip->aes_passphrase = malloc(strlen(passphrase) + 1);
-+		if (zip->aes_passphrase == NULL) {
-+			archive_set_error(&a->archive, ENOMEM,
-+			    "Can't save 7-Zip passphrase");
-+			return (ARCHIVE_FATAL);
-+		}
-+		strcpy(zip->aes_passphrase, passphrase);
-+	}
-+	if (sevenzip_derive_key(a, passphrase, salt, salt_len,
-+	    flags & 0x3F, key) != ARCHIVE_OK)
-+		goto cleanup;
-+	zip->aes_ctx = EVP_CIPHER_CTX_new();
-+	zip->aes_buffer = malloc(UBUFF_SIZE);
-+	if (zip->aes_ctx == NULL || zip->aes_buffer == NULL ||
-+	    EVP_DecryptInit_ex(zip->aes_ctx, EVP_aes_256_cbc(), NULL, key, iv) != 1 ||
-+	    EVP_CIPHER_CTX_set_padding(zip->aes_ctx, 0) != 1) {
-+		archive_set_error(&a->archive, ENOMEM,
-+		    "Can't set up 7-Zip AES decryption");
-+		goto cleanup;
-+	}
-+	zip->aes_plaintext_remaining = plaintext_size;
-+	zip->aes_active = 1;
-+	ret = ARCHIVE_OK;
-+cleanup:
-+	sevenzip_zero(key, sizeof(key));
-+	sevenzip_zero(iv, sizeof(iv));
-+	if (ret != ARCHIVE_OK)
-+		clear_7zip_aes(zip);
-+	return (ret);
-+}
-+#endif
-+
- static int
- setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
-     int header)
- {
- 	struct _7zip *zip = a->format->data;
- 	const struct _7z_coder *coder1, *coder2;
-+	const struct _7z_coder *aes_coder = NULL;
- 	const char *cname = (header)?"archive header":"file content";
--	size_t i;
-+	size_t i, aes_index = 0;
- 	int r, found_bcj2 = 0;
- 
-+#ifdef HAVE_LIBCRYPTO
-+	clear_7zip_aes(zip);
-+#endif
-+
- 	/*
- 	 * Release the memory which the previous folder used for BCJ2.
- 	 */
-@@ -3848,8 +4254,7 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
- 	for (i = 0; i < folder->numCoders; i++) {
- 		switch(folder->coders[i].codec) {
- 			case _7Z_CRYPTO_MAIN_ZIP:
--			case _7Z_CRYPTO_RAR_29:
--			case _7Z_CRYPTO_AES_256_SHA_256: {
-+			case _7Z_CRYPTO_RAR_29: {
- 				/* For entry that is associated with this folder, mark
- 				   it as encrypted (data+metadata). */
- 				zip->has_encrypted_entries = 1;
-@@ -3863,6 +4268,16 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
- 					"but currently not supported", cname);
- 				return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
- 			}
-+			case _7Z_CRYPTO_AES_256_SHA_256:
-+				zip->has_encrypted_entries = 1;
-+				if (a->entry) {
-+					archive_entry_set_is_data_encrypted(a->entry, 1);
-+					if (header)
-+						archive_entry_set_is_metadata_encrypted(a->entry, 1);
-+				}
-+				aes_coder = &folder->coders[i];
-+				aes_index = i;
-+				break;
- 			case _7Z_X86_BCJ2: {
- 				found_bcj2++;
- 				break;
-@@ -3897,6 +4312,29 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
- 	else
- 		coder2 = NULL;
- 
-+	if (aes_coder != NULL) {
-+#ifdef HAVE_LIBCRYPTO
-+		if (aes_index != 0 || folder->numCoders != 2 ||
-+		    folder->numBindPairs != 1 || folder->numPackedStreams != 1 ||
-+		    folder->numInStreams != 2 || folder->numOutStreams != 2 ||
-+		    aes_coder->numInStreams != 1 || aes_coder->numOutStreams != 1 ||
-+		    folder->unPackSize == NULL) {
-+			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+			    "Unsupported 7-Zip AES folder layout");
-+			return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
-+		}
-+		if (init_7zip_aes_decryption(a, zip, aes_coder,
-+		    folder->unPackSize[0]) != ARCHIVE_OK)
-+			return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
-+		coder1 = &folder->coders[1];
-+		coder2 = NULL;
-+#else
-+		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-+		    "7-Zip AES decryption is unsupported due to lack of crypto library");
-+		return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
-+#endif
-+	}
-+
- 	if (found_bcj2) {
- 		/*
- 		 * Preparation to decode BCJ2.

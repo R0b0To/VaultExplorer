@@ -1,4 +1,3 @@
-import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/gestures.dart';
 
 /// Claims a vertical drag that starts on a brightness/volume edge strip,

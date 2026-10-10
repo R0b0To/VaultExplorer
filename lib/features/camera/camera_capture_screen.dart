@@ -1,12 +1,8 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:vaultexplorer/core/api/vault_engine_events.dart';
-import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
-import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -19,7 +15,6 @@ import 'camera_ui_components.dart';
 import 'capture_screen_mixin.dart';
 import 'camera_media_review_view.dart';
 import 'vault_camera_controller.dart';
-import '../image_editor/image_editor_screen.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
   final MountedContainer container;

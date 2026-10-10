@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show immutable;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 

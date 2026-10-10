@@ -14,7 +14,6 @@
 // variants give every recognized language sensible, readable colors that
 // track the app's own dark/light setting with no extra configuration.
 import 'package:material_ui/material_ui.dart';
-import 'package:meta/meta.dart' show immutable;
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/bash.dart';
 import 'package:re_highlight/languages/c.dart';

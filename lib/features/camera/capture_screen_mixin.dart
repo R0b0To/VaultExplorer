@@ -17,14 +17,11 @@ import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
 import 'camera_capture_session_controller.dart';
 import 'camera_ui_components.dart';
 import 'camera_media_review_view.dart';
 import 'vault_camera_controller.dart';
-import '../image_editor/image_editor_screen.dart';
 
 mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   // --- Hooks: where the two screens differ -------------------------------

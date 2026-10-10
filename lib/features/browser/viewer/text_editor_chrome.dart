@@ -10,7 +10,6 @@
 // unchanged and simply resolve to editor colors.
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:meta/meta.dart' show immutable;
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 

@@ -8,7 +8,6 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/data/models/password_exchange/exchange_record.dart';
-import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/password_interchange/authenticator_backup_crypto.dart';
 import 'package:vaultexplorer/data/services/password_interchange/authenticator_import_shared.dart';
 import 'package:vaultexplorer/data/services/password_interchange/password_format_codec.dart';

@@ -112,7 +112,7 @@ void main() {
 
       final l10n = AppLocalizations.of(
         tester.element(find.byType(ShareDestinationSheet)),
-      )!;
+      );
       expect(
         find.text(l10n.noVaultsAvailableAddFromDashboardPrompt),
         findsNothing,
@@ -188,6 +188,7 @@ void main() {
 
       final l10n = AppLocalizations.of(
         tester.element(find.byType(ShareDestinationSheet)),
+      // ignore: unnecessary_non_null_assertion
       )!;
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(

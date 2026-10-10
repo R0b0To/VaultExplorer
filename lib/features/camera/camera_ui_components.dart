@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'vault_camera_controller.dart';
 
 class CameraPopupMenuItem<T> {
   final T value;

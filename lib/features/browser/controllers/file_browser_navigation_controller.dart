@@ -379,11 +379,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
             ? List<RawEntry>.of(state.pathStack.last.items!)
             : null);
 
-    state = state.copyWith(
-      isLoading: true,
-      currentItems: const [],
-      clearCurrentFilter: true,
-    );
+    state = state.copyWith(isLoading: true);
 
     try {
       final ctx = container.isLocalStorage
@@ -420,6 +416,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         archiveContext: ctx,
         pathStack: newStack,
         layoutMode: layoutMode ?? state.layoutMode,
+        clearCurrentFilter: true,
       );
       _liveArchiveContext = ctx;
 
@@ -435,6 +432,12 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     state.archiveContext?.dispose();
     state = state.copyWith(clearArchiveContext: true);
     _liveArchiveContext = null;
+  }
+
+  void updateArchiveContext(ArchiveContext archiveContext) {
+    if (state.archiveContext == null) return;
+    _liveArchiveContext = archiveContext;
+    state = state.copyWith(archiveContext: archiveContext);
   }
 
   void enterDirectory(

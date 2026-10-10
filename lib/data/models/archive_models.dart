@@ -228,6 +228,43 @@ class ArchiveEntryExtractResult {
         errorMessage: message,
       );
 }
+
+/// Result of streaming an archive entry to a temporary file for preview.
+/// Preserves passphrase failures so the browser can ask for a password and
+/// retry without rescanning the archive.
+@immutable
+class ArchiveEntryStageResult {
+  final ArchiveOpenStatus status;
+  final String? path;
+  final String errorMessage;
+
+  const ArchiveEntryStageResult({
+    required this.status,
+    required this.path,
+    required this.errorMessage,
+  });
+
+  bool get needsPassphrase =>
+      status == ArchiveOpenStatus.passphraseRequired ||
+      status == ArchiveOpenStatus.wrongPassphrase;
+
+  factory ArchiveEntryStageResult.fromMap(Map<Object?, Object?> map) {
+    final rawStatus = map['status'] as num? ?? 4;
+    return ArchiveEntryStageResult(
+      status: ArchiveOpenStatus.fromInt(rawStatus.toInt()),
+      path: map['path'] as String?,
+      errorMessage: map['errorMessage'] as String? ?? '',
+    );
+  }
+
+  factory ArchiveEntryStageResult.ioError(String message) =>
+      ArchiveEntryStageResult(
+        status: ArchiveOpenStatus.ioError,
+        path: null,
+        errorMessage: message,
+      );
+}
+
 @immutable
 class ArchiveBulkExtractResult {
   final ArchiveOpenStatus status;

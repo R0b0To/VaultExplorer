@@ -403,6 +403,19 @@ counted in `skipped_count`.
 For device-specific instructions on keeping the background foreground service
 alive on Samsung, Xiaomi, OnePlus, and Pixel devices, see the OEM Setup Guide.
 
+**Set VaultExplorer's battery usage to Unrestricted.** When an automation fires
+while VaultExplorer is fully closed, Android starts the app from nothing, and
+on Android 12 and newer it will not let a freshly started background process
+start a foreground service unless the app has an exemption. Unrestricted
+battery usage is one such exemption. Without it the action fails, and the
+`AUTOMATION_RESULT` has `result_code` `ERROR` with a `result_message` that
+says Android refused to start foreground work and tells you to change the
+battery setting. If an `UNLOCK_VAULT` succeeds but the message says the
+keep-alive service could not start, the vault is unlocked but may re-lock if
+Android stops the app -- the same setting fixes that. VaultExplorer shows a hint
+with a shortcut to the right settings page on a vault's Automation screen
+whenever the setting is not Unrestricted.
+
 ## 8. Important Notes & Gotchas
 
   - Windows / PowerShell Quoting: When passing vault URIs containing parentheses

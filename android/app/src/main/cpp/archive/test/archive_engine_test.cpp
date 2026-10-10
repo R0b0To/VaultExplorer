@@ -95,6 +95,35 @@ ArchiveStreamSource sourceOver(const std::vector<uint8_t>& bytes) {
     return source;
 }
 
+// Builds a 7-Zip archive through the engine's own archiveCreate() -- the code
+// path the app uses -- from name->content files, optionally password protected.
+std::vector<uint8_t> buildSevenZipViaEngine(const std::vector<std::pair<std::string, std::string>>& files,
+                                            const std::string& passphrase = "") {
+    std::vector<uint8_t> out;
+    ArchiveSink sink;
+    sink.write = [&out](const uint8_t* data, size_t length) -> int64_t {
+        out.insert(out.end(), data, data + length);
+        return static_cast<int64_t>(length);
+    };
+    std::vector<size_t> offsets(files.size(), 0);
+    std::vector<ArchiveSourceEntry> entries(files.size());
+    for (size_t i = 0; i < files.size(); ++i) {
+        const std::string& content = files[i].second;
+        entries[i].pathInArchive = files[i].first;
+        entries[i].uncompressedSize = content.size();
+        entries[i].readData = [&content, &offsets, i](uint8_t* dest, size_t length) -> int64_t {
+            const size_t n = std::min(length, content.size() - offsets[i]);
+            std::memcpy(dest, content.data() + offsets[i], n);
+            offsets[i] += n;
+            return static_cast<int64_t>(n);
+        };
+    }
+    const auto result = archiveCreate(sink, ArchiveFormat::SevenZip, entries, passphrase);
+    assert(result.status == ArchiveOpenStatus::Ok);
+    assert(result.entriesArchived == files.size());
+    return out;
+}
+
 }  // namespace
 
 int main() {
@@ -222,6 +251,60 @@ int main() {
         assert(std::string(last.data.begin(), last.data.end()) == "third");
 
         printf("tar.gz index+extract: ok\n");
+    }
+
+    // --- 7-Zip creation through the engine: a plain archive must stay
+    // plain, and one created with a passphrase must really be encrypted.
+    // (Stock libarchive accepts a passphrase for 7-Zip and then silently
+    // writes an unprotected archive; libarchive-7zip-encryption.patch fixes
+    // that, and this fails if the patch is ever missing.) ---
+    {
+        const std::vector<std::pair<std::string, std::string>> files = {
+            {"docs/a.txt", std::string(70000, 'A')},
+            {"b.txt", "short secret"},
+        };
+
+        const auto plain = buildSevenZipViaEngine(files);
+        const auto plainScan = archiveScanEntries(sourceOver(plain));
+        assert(plainScan.status == ArchiveOpenStatus::Ok);
+        assert(plainScan.entries.size() == 2);
+        for (const auto& e : plainScan.entries) assert(!e.isEncrypted);
+
+        const auto locked = buildSevenZipViaEngine(files, "hunter2");
+        // Without a password the archive must be recognised as protected.
+        const auto lockedScan = archiveScanEntries(sourceOver(locked));
+        assert(lockedScan.status == ArchiveOpenStatus::PassphraseRequired);
+
+        const auto wrongPassScan = archiveScanEntries(sourceOver(locked), "wrong password");
+        assert(wrongPassScan.status == ArchiveOpenStatus::WrongPassphrase);
+
+        const auto unlockedScan = archiveScanEntries(sourceOver(locked), "hunter2");
+        assert(unlockedScan.status == ArchiveOpenStatus::Ok);
+        assert(unlockedScan.entries.size() == files.size());
+        int32_t firstFileIndex = -1;
+        for (const auto& entry : unlockedScan.entries) {
+            assert(entry.isEncrypted);
+            if (entry.path == "docs/a.txt") firstFileIndex = entry.index;
+        }
+        assert(firstFileIndex >= 0);
+
+        const auto extracted = archiveExtractEntry(sourceOver(locked), firstFileIndex, "hunter2");
+        assert(extracted.status == ArchiveOpenStatus::Ok);
+        assert(std::string(extracted.data.begin(), extracted.data.end()) == files[0].second);
+
+        // The archive ends exactly where its start header says: no zero
+        // padding after the header (7-Zip warns about trailing data).
+        for (const auto* archiveBytes : {&plain, &locked}) {
+            const auto& b = *archiveBytes;
+            assert(b.size() > 32 && std::memcmp(b.data(), "7z\xBC\xAF\x27\x1C", 6) == 0);
+            uint64_t headerOffset = 0, headerSize = 0;
+            for (int i = 7; i >= 0; --i) {
+                headerOffset = (headerOffset << 8) | b[12 + i];
+                headerSize = (headerSize << 8) | b[20 + i];
+            }
+            assert(32 + headerOffset + headerSize == b.size());
+        }
+        printf("7z create (plain + password): ok\n");
     }
 
     // --- Out-of-range index: should fail cleanly, not crash or return

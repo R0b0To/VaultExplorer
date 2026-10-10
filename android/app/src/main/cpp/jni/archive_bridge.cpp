@@ -16,6 +16,15 @@
 
 // ── Helper Functions & Builders ────────────────────────────────────────
 
+static void logArchiveFailure(const char* operation, ArchiveOpenStatus status,
+                              const std::string& errorMessage) {
+    if (status == ArchiveOpenStatus::Ok) return;
+    __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_Archive",
+                        "%s failed (status=%d): %s", operation,
+                        static_cast<int>(status),
+                        errorMessage.empty() ? "<no native error message>" : errorMessage.c_str());
+}
+
 static void ensureParentDirs(int volId, const std::string& path) {
     size_t pos = 0;
     while ((pos = path.find('/', pos)) != std::string::npos) {
@@ -86,6 +95,7 @@ static jobject buildEntryInfoMap(JNIEnv* env, jclass mapClass, jmethodID mapInit
 }
 
 static jobject buildIndexResultMap(JNIEnv* env, const ArchiveIndexResult& result) {
+    logArchiveFailure("scan", result.status, result.errorMessage);
     jclass mapClass = env->FindClass("java/util/HashMap");
     jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
     jmethodID mapPut = env->GetMethodID(mapClass, "put",
@@ -146,6 +156,7 @@ static jobject buildIndexResultMap(JNIEnv* env, const ArchiveIndexResult& result
 }
 
 static jobject buildExtractResultMap(JNIEnv* env, const ArchiveExtractResult& result) {
+    logArchiveFailure("extract", result.status, result.errorMessage);
     jclass mapClass = env->FindClass("java/util/HashMap");
     jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
     jmethodID mapPut = env->GetMethodID(mapClass, "put",
@@ -187,6 +198,7 @@ static jobject buildExtractResultMap(JNIEnv* env, const ArchiveExtractResult& re
 }
 
 static jobject buildBulkExtractResultMap(JNIEnv* env, const ArchiveBulkExtractResult& result) {
+    logArchiveFailure("extract-all", result.status, result.errorMessage);
     jclass mapClass = env->FindClass("java/util/HashMap");
     jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
     jmethodID mapPut = env->GetMethodID(mapClass, "put",

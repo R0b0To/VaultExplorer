@@ -8,6 +8,14 @@
 #include <ctime>
 #include <cstring>
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#define ARCHIVE_DIAG(...) \
+    __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Archive", __VA_ARGS__)
+#else
+#define ARCHIVE_DIAG(...) ((void)0)
+#endif
+
 namespace {
 
 constexpr size_t kSequentialChunkSize = 256 * 1024;
@@ -18,6 +26,7 @@ struct CallbackState {
     uint64_t position = 0;
     uint64_t size = 0;
     bool positionJustJumped = false;
+    bool passphraseProvided = false;
     std::vector<uint8_t> buffer;
     bool ioErrorSeen = false;
 
@@ -79,6 +88,14 @@ la_int64_t seekCallback(struct archive*, void* clientData, la_int64_t offset, in
 int openCallback(struct archive*, void*) { return ARCHIVE_OK; }
 int closeCallback(struct archive*, void*) { return ARCHIVE_OK; }
 
+const char* passphraseRequestCallback(struct archive*, void* clientData) {
+    const auto* state = static_cast<const CallbackState*>(clientData);
+    ARCHIVE_DIAG(
+        "libarchive passphrase callback invoked; queued candidate was unavailable or exhausted; appPassphraseProvided=%s",
+        state && state->passphraseProvided ? "true" : "false");
+    return nullptr;
+}
+
 bool containsCaseInsensitive(const char* haystack, const char* needle) {
     if (!haystack || !needle) return false;
     std::string h(haystack), n(needle);
@@ -95,12 +112,27 @@ ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
     return ArchiveOpenStatus::IoError;
 }
 
+std::string archiveErrorAt(struct archive* a, const char* stage, const char* fallback) {
+    const char* error = archive_error_string(a);
+    return std::string(stage) + ": " + (error ? error : fallback);
+}
+
 int openArchiveWithCallbacks(struct archive* a, CallbackState& state, const std::string& passphrase) {
     archive_read_support_format_all(a);
     archive_read_support_filter_all(a);
+    const bool passphraseProvided = !passphrase.empty();
+    state.passphraseProvided = passphraseProvided;
     if (!passphrase.empty()) {
-        archive_read_add_passphrase(a, passphrase.c_str());
+        const int addStatus = archive_read_add_passphrase(a, passphrase.c_str());
+        const char* error = archive_error_string(a);
+        ARCHIVE_DIAG("archive_read_add_passphrase: status=%d appPassphraseProvided=true error=%s",
+                     addStatus, error ? error : "<none>");
+    } else {
+        ARCHIVE_DIAG("archive_read_add_passphrase skipped: appPassphraseProvided=false");
     }
+    const int callbackStatus = archive_read_set_passphrase_callback(
+        a, &state, passphraseRequestCallback);
+    ARCHIVE_DIAG("archive_read_set_passphrase_callback: status=%d", callbackStatus);
     archive_read_set_seek_callback(a, seekCallback);
     return archive_read_open2(a, &state, openCallback, readCallback, skipCallback, closeCallback);
 }
@@ -130,7 +162,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
     if (openArchiveWithCallbacks(a, state, passphrase) != ARCHIVE_OK) {
         result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                           : classifyFailure(a, !passphrase.empty());
-        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive";
+        result.errorMessage = archiveErrorAt(a, "scan/open", "failed to open archive");
         archive_read_free(a);
         return result;
     }
@@ -148,7 +180,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read header";
+            result.errorMessage = archiveErrorAt(a, "scan/header", "failed to read header");
             break;
         }
         ArchiveEntryInfo info = buildEntryInfo(entry, index);
@@ -156,32 +188,44 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
             ++nonDirectoryCount;
         }
 
-        // Header metadata (name/size/the encrypted flag) is readable on ZIP
-        // and several other formats without the passphrase, since only the
-        // entry *payload* is encrypted. archive_read_data_skip() below just
-        // advances past that payload using the size from the header (or via
-        // the central directory when seekable) -- it never decrypts anything,
-        // so a missing or wrong passphrase would otherwise go undetected here
-        // and this scan would report Ok regardless. Probe-decrypt a few bytes
-        // of the first encrypted file entry we hit so we can actually tell.
+        // 7-Zip normally leaves its header (including filenames) unencrypted
+        // even when file data is encrypted. Let the browser index those
+        // entries without a passphrase; extraction will request and validate
+        // the password when data is actually read. If the 7-Zip header itself
+        // is encrypted, libarchive requests a passphrase from
+        // archive_read_next_header() above, so that case still prompts here.
+        // Other formats retain the scan-time probe so their existing
+        // password-required behavior is unchanged.
+        const int formatFamily = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
+        const bool deferSevenZipPassphrase =
+            formatFamily == ARCHIVE_FORMAT_7ZIP && passphrase.empty();
         if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
-            if (passphrase.empty()) {
+            if (deferSevenZipPassphrase) {
+                ARCHIVE_DIAG("deferring 7-Zip encrypted-entry password check until read: entryIndex=%d",
+                             info.index);
+            } else if (passphrase.empty()) {
                 result.status = ArchiveOpenStatus::PassphraseRequired;
                 result.errorMessage = "Archive is password protected";
                 break;
             }
-            // A zero-byte entry has nothing to decrypt, so a probe read can't
-            // tell us anything -- keep scanning for a non-empty encrypted
-            // entry to actually validate the passphrase against.
-            if (archive_entry_size_is_set(entry) && archive_entry_size(entry) > 0) {
+            // Probe only when validating a supplied passphrase. A zero-byte
+            // entry has nothing to decrypt, so keep scanning for a non-empty
+            // encrypted entry that can validate it.
+            if (!deferSevenZipPassphrase &&
+                archive_entry_size_is_set(entry) && archive_entry_size(entry) > 0) {
                 uint8_t probe[64];
                 const la_ssize_t n = archive_read_data(a, probe, sizeof(probe));
                 if (n < 0) {
+                    const char* error = archive_error_string(a);
+                    ARCHIVE_DIAG("encrypted-entry probe failed: passphraseProvided=true nativeError=%s",
+                                 error ? error : "<none>");
                     result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                                       : classifyFailure(a, /*passphraseGiven=*/true);
-                    result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "incorrect passphrase";
+                    result.errorMessage = archiveErrorAt(a, "scan/encrypted-entry probe", "incorrect passphrase");
                     break;
                 }
+                ARCHIVE_DIAG("encrypted-entry probe returned %lld bytes; passphraseProvided=true",
+                             static_cast<long long>(n));
                 passphraseVerified = true;
             }
         }
@@ -214,7 +258,7 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
     if (openArchiveWithCallbacks(a, state, passphrase) != ARCHIVE_OK) {
         result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                           : classifyFailure(a, !passphrase.empty());
-        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive";
+        result.errorMessage = archiveErrorAt(a, "extract/open", "failed to open archive");
         archive_read_free(a);
         return result;
     }
@@ -230,7 +274,7 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read header";
+            result.errorMessage = archiveErrorAt(a, "extract/header", "failed to read header");
             archive_read_free(a);
             return result;
         }
@@ -262,7 +306,7 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
         if (n < 0) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read entry data";
+            result.errorMessage = archiveErrorAt(a, "extract/entry data", "failed to read entry data");
             result.data.clear();
             archive_read_free(a);
             return result;
@@ -296,7 +340,7 @@ ArchiveExtractResult archiveExtractEntryToSink(
     if (openArchiveWithCallbacks(a, state, passphrase) != ARCHIVE_OK) {
         result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                           : classifyFailure(a, !passphrase.empty());
-        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive";
+        result.errorMessage = archiveErrorAt(a, "extract-to-sink/open", "failed to open archive");
         archive_read_free(a);
         return result;
     }
@@ -310,7 +354,7 @@ ArchiveExtractResult archiveExtractEntryToSink(
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read header";
+            result.errorMessage = archiveErrorAt(a, "extract-to-sink/header", "failed to read header");
             archive_read_free(a);
             return result;
         }
@@ -335,7 +379,7 @@ ArchiveExtractResult archiveExtractEntryToSink(
         if (n < 0) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read entry data";
+            result.errorMessage = archiveErrorAt(a, "extract-to-sink/entry data", "failed to read entry data");
             archive_read_free(a);
             return result;
         }
@@ -365,7 +409,7 @@ ArchiveBulkExtractResult archiveExtractAll(
     if (openArchiveWithCallbacks(a, state, passphrase) != ARCHIVE_OK) {
         result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                           : classifyFailure(a, !passphrase.empty());
-        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive";
+        result.errorMessage = archiveErrorAt(a, "extract-all/open", "failed to open archive");
         archive_read_free(a);
         return result;
     }
@@ -386,7 +430,7 @@ ArchiveBulkExtractResult archiveExtractAll(
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                               : classifyFailure(a, !passphrase.empty());
-            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read header";
+            result.errorMessage = archiveErrorAt(a, "extract-all/header", "failed to read header");
             break;
         }
 
@@ -446,7 +490,7 @@ ArchiveBulkExtractResult archiveExtractAll(
             if (n < 0) {
                 result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
                                                   : classifyFailure(a, !passphrase.empty());
-                result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read entry data";
+                result.errorMessage = archiveErrorAt(a, "extract-all/entry data", "failed to read entry data");
                 writeSuccess = false;
                 break;
             }
@@ -525,8 +569,15 @@ int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std
             break;
         case ArchiveFormat::SevenZip:
             if (archive_write_set_format_7zip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            // The archive ends at the 7z header; without this libarchive pads the
+            // last 10 KiB block with zeros, which 7-Zip reports as trailing data.
+            archive_write_set_bytes_in_last_block(a, 1);
             if (!passphrase.empty()) {
-                archive_write_set_passphrase(a, passphrase.c_str());
+                // Stock libarchive accepts a passphrase here but never encrypts a
+                // 7-Zip archive. libarchive-7zip-encryption.patch (applied from
+                // archive_deps.cmake) adds 7zAES (AES-256, SHA-256 key derivation),
+                // and archive_engine_test.cpp fails if it is ever missing.
+                if (archive_write_set_passphrase(a, passphrase.c_str()) != ARCHIVE_OK) return ARCHIVE_FATAL;
             }
             break;
         case ArchiveFormat::Tar:

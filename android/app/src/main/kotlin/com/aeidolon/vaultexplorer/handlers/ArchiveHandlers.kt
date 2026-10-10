@@ -2,10 +2,13 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.system.ErrnoException
+import android.system.Os
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.SecureFileWipe
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
@@ -19,6 +22,10 @@ class ArchiveHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    private companion object {
+        const val TAG = "ArchiveHandlers"
+    }
+
     /** Securely removes one temporary file created for archive preview.
      *
      * Dart can only request files immediately below this app's cache directory
@@ -149,13 +156,29 @@ class ArchiveHandlers(
                 val status = (staged?.get("status") as? Number)?.toInt()
                 if (status != 0) {
                     val error = staged?.get("errorMessage") as? String
-                    throw java.io.IOException(error ?: "Failed to extract archive entry")
+                    runCatching { openedPreviewPfd.close() }
+                    previewPfd = null
+                    SecureFileWipe.secureDeleteFile(stagedPreviewFile)
+                    previewFile = null
+                    activity.runOnUiThread {
+                        result.success(
+                            mapOf(
+                                "status" to (status ?: 4),
+                                "errorMessage" to (error ?: "Failed to extract archive entry"),
+                            ),
+                        )
+                    }
+                    return@execute
                 }
 
                 openedPreviewPfd.fileDescriptor.sync()
                 openedPreviewPfd.close()
                 previewPfd = null
-                activity.runOnUiThread { result.success(stagedPreviewFile.canonicalPath) }
+                activity.runOnUiThread {
+                    result.success(
+                        mapOf("status" to 0, "path" to stagedPreviewFile.canonicalPath),
+                    )
+                }
             } catch (e: Exception) {
                 runCatching { previewPfd?.close() }
                 previewPfd = null
@@ -666,7 +689,25 @@ class ArchiveHandlers(
         }
     }
 
+    /**
+     * libarchive's 7-Zip writer (like its ISO writer) stages the archive in an
+     * anonymous temporary file, because the 7z start header needs the final
+     * header offset and CRC. It looks for the directory in $TMPDIR and otherwise
+     * uses bionic's `/data/local/tmp`, which an app cannot write to, so 7z
+     * creation fails there. Point it at the app's private cache directory.
+     * The file is unlinked by libarchive as soon as it is created and, for a
+     * password-protected archive, holds only ciphertext.
+     */
+    private fun pointNativeTempDirAtCache() {
+        try {
+            Os.setenv("TMPDIR", activity.cacheDir.absolutePath, true)
+        } catch (e: ErrnoException) {
+            VeLog.w(TAG, e) { "Could not set TMPDIR for native archive creation" }
+        }
+    }
+
     fun handleArchiveCreate(call: MethodCall, result: MethodChannel.Result) {
+        pointNativeTempDirAtCache()
         val format = call.argument<Number>("format")?.toInt() ?: 0
         val passphrase = call.argument<String>("passphrase")
         val opId = call.argument<Number>("opId")?.toInt() ?: 0

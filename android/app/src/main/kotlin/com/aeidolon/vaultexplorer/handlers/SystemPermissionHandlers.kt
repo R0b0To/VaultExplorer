@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.PowerManager
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.WindowManager
@@ -91,6 +92,43 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             }
         } else {
             result.success(true)
+        }
+    }
+
+    /**
+     * True when the app's battery usage is Unrestricted (Android's "not
+     * battery-optimized" state). Automation broadcasts that cold-start the
+     * app need this on Android 12+ so the foreground service they rely on
+     * is allowed to start from the background -- see BackgroundStartAdvice.
+     */
+    fun handleHasUnrestrictedBattery(call: MethodCall, result: MethodChannel.Result) {
+        val powerManager = activity.getSystemService(PowerManager::class.java)
+        result.success(powerManager?.isIgnoringBatteryOptimizations(activity.packageName) ?: true)
+    }
+
+    /**
+     * Opens this app's system settings page, where Battery > Unrestricted
+     * lives on stock Android and Samsung (matching docs/oem-setup-guide.md).
+     * Needs no permission, unlike ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS.
+     * Falls back to the general battery-optimization list if the app-details
+     * screen can't be opened.
+     */
+    fun handleOpenBatterySettings(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            activity.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${activity.packageName}"),
+                ),
+            )
+            result.success(true)
+        } catch (e: Exception) {
+            try {
+                activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                result.success(true)
+            } catch (e2: Exception) {
+                result.error("BATTERY_SETTINGS_ERROR", e2.message, null)
+            }
         }
     }
 

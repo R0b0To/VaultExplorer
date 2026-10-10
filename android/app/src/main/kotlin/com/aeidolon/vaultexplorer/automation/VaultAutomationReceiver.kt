@@ -393,17 +393,34 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         sendResult(context, action, outcome)
     }
 
-    private fun startKeepAlive(context: Context) {
-        if (VaultKeepAliveService.isRunning) return
-        try {
+    /**
+     * Returns true if the keep-alive service is running or was started, false
+     * if Android refused. A refusal does not fail the action -- its
+     * WorkManager foreground worker already protects the current operation --
+     * but the caller reports it in RESULT_MESSAGE (see [unlockedOutcome]),
+     * because without the keep-alive service the unlocked session can vanish
+     * whenever Android stops the process, and VeLog is off in a cold start so
+     * the log line below is usually silent.
+     */
+    private fun startKeepAlive(context: Context): Boolean {
+        if (VaultKeepAliveService.isRunning) return true
+        return try {
             ContextCompat.startForegroundService(context, Intent(context, VaultKeepAliveService::class.java))
+            true
         } catch (e: Exception) {
             // A background automation broadcast is not an Android FGS-start
-            // exemption. Keep the action successful; its WorkManager
-            // foreground worker already protects the current operation.
+            // exemption (the app's battery usage being Unrestricted is one).
             VeLog.w(TAG, e) { "Keep-alive service was not allowed to start after automation unlock" }
+            false
         }
     }
+
+    private fun unlockedOutcome(context: Context, base: String, keepAliveStarted: Boolean): Outcome =
+        if (keepAliveStarted) {
+            Outcome("OK", base)
+        } else {
+            Outcome("OK", BackgroundStartAdvice.keepAliveNotStartedMessage(context, base))
+        }
 
     /**
      * Notifies VaultAutomationUnlockedBridge (and, through it, the dashboard
@@ -471,9 +488,9 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             if (!startKeepAliveService) {
                 return Outcome("BUSY", "Vault became unlocked before scheduled sync started")
             }
-            startKeepAlive(context)
+            val keepAliveStarted = startKeepAlive(context)
             reportAutomationUnlock(context, existingVolId)
-            return Outcome("OK", "Already unlocked")
+            return unlockedOutcome(context, "Already unlocked", keepAliveStarted)
         }
         val password = intent.getStringExtra(EXTRA_PASSWORD)
             ?: AutomationSettings.getStoredPassword(context, vaultUri)
@@ -502,9 +519,9 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             )
             return when (result) {
                 is ContainerLifecycleCore.DirectoryVaultOutcome.Success -> {
-                    if (startKeepAliveService) startKeepAlive(context)
+                    val keepAliveStarted = !startKeepAliveService || startKeepAlive(context)
                     reportAutomationUnlock(context, result.result.volId)
-                    Outcome("OK", "Unlocked")
+                    unlockedOutcome(context, "Unlocked", keepAliveStarted)
                 }
                 is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.code.name)
                 is ContainerLifecycleCore.DirectoryVaultOutcome.InvalidVault -> Outcome("ERROR", result.reason)
@@ -537,9 +554,9 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         )
         return when (result) {
             is ContainerLifecycleCore.UnlockCoreOutcome.Success -> {
-                if (startKeepAliveService) startKeepAlive(context)
+                val keepAliveStarted = !startKeepAliveService || startKeepAlive(context)
                 reportAutomationUnlock(context, result.result.volId)
-                Outcome("OK", "Unlocked")
+                unlockedOutcome(context, "Unlocked", keepAliveStarted)
             }
             is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.code.name)
             is ContainerLifecycleCore.UnlockCoreOutcome.Error ->

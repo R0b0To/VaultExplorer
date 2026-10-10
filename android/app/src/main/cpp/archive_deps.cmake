@@ -133,10 +133,18 @@ set(LIBMD_FOUND FALSE CACHE BOOL "" FORCE)
 set(LIBMD_LIBRARY "" CACHE STRING "" FORCE)
 
 # ── libarchive itself ─────────────────────────────────────────────────
+# libarchive's 7-Zip writer accepts but ignores passwords, and its reader rejects
+# encrypted streams. This patch adds 7zAES (AES-256-CBC with 7-Zip's SHA-256 KDF)
+# writing and streaming reads for AES + compression folders. The script skips a
+# tree that is already patched, and fails configure if the patch stops applying.
 FetchContent_Declare(
     libarchive_upstream
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git
     GIT_TAG        27cbc7827172698143e440801fc0ba39ccb4f1f5 # v3.8.9
+    PATCH_COMMAND  ${CMAKE_COMMAND}
+                   -DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch
+                   -DPATCH_FILE_2=${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-passphrase-diagnostics.patch
+                   -P ${CMAKE_CURRENT_LIST_DIR}/archive/patches/apply_patch_once.cmake
 )
 
 # Formats/filters required

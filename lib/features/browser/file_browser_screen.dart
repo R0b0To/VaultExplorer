@@ -1350,6 +1350,101 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
+  Future<ArchiveEntryExtractResult?> _extractArchiveEntryWithPassword(
+    String entryPath,
+  ) async {
+    final currentArchive = _archiveContext;
+    if (currentArchive == null) return null;
+    var archive = currentArchive;
+
+    while (mounted) {
+      final result = await archive.extractEntryResult(entryPath);
+      if (!result.needsPassphrase) return result;
+
+      final entered = await BrowserDialogs.showArchivePasswordPrompt(
+        context,
+        wrongPassword: result.status == ArchiveOpenStatus.wrongPassphrase,
+      );
+      if (entered == null || !mounted) return null;
+
+      archive = archive.withPassphrase(entered);
+      _navNotifier.updateArchiveContext(archive);
+    }
+    return null;
+  }
+
+  Future<ArchiveEntryStageResult?> _stageArchiveEntryWithPassword(
+    String entryPath,
+  ) async {
+    final currentArchive = _archiveContext;
+    if (currentArchive == null) return null;
+    var archive = currentArchive;
+
+    while (mounted) {
+      final result = await archive.stageEntryForBrowse(entryPath);
+      if (!result.needsPassphrase) return result;
+
+      final entered = await BrowserDialogs.showArchivePasswordPrompt(
+        context,
+        wrongPassword: result.status == ArchiveOpenStatus.wrongPassphrase,
+      );
+      if (entered == null || !mounted) return null;
+
+      archive = archive.withPassphrase(entered);
+      _navNotifier.updateArchiveContext(archive);
+    }
+    return null;
+  }
+
+  Future<ArchiveContext?> _ensureArchivePasswordForExtraction(
+    ArchiveContext archive,
+  ) async {
+    if (archive.passphrase?.isNotEmpty == true) return archive;
+
+    ArchiveEntryInfo? encryptedEntry;
+    for (final entry in archive.allEntries) {
+      if (!entry.isDirectory &&
+          entry.isEncrypted &&
+          entry.uncompressedSize > 0) {
+        encryptedEntry = entry;
+        break;
+      }
+    }
+    if (encryptedEntry == null) return archive;
+
+    var wrongPassword = false;
+    while (mounted) {
+      final entered = await BrowserDialogs.showArchivePasswordPrompt(
+        context,
+        wrongPassword: wrongPassword,
+      );
+      if (entered == null || !mounted) return null;
+      if (entered.isEmpty) {
+        wrongPassword = true;
+        continue;
+      }
+
+      final candidate = await archive.rescanWithPassphrase(entered);
+      if (candidate.status == ArchiveOpenStatus.ok) return candidate;
+      if (candidate.status == ArchiveOpenStatus.passphraseRequired ||
+          candidate.status == ArchiveOpenStatus.wrongPassphrase) {
+        wrongPassword = candidate.status == ArchiveOpenStatus.wrongPassphrase;
+        continue;
+      }
+
+      _setStatus(
+        context.l10n.failedToReadArchive(
+          candidate.indexResult.errorMessage.isEmpty
+              ? 'Archive scan failed'
+              : candidate.indexResult.errorMessage,
+        ),
+        error: true,
+      );
+      return null;
+    }
+    return null;
+  }
+
   void _closeArchive() {
     _navNotifier.closeArchive();
   }
@@ -1659,9 +1754,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             'xml',
           }.contains(ext);
           if (opensInNativeViewer || opensInTextEditor) {
-            final previewPath = await _archiveContext!.stageEntryForBrowse(
-              subPath,
-            );
+            final stageResult = await _stageArchiveEntryWithPassword(subPath);
+            final previewPath = stageResult?.path;
             if (previewPath != null) {
               if (opensInTextEditor) {
                 await _openArchiveTextPreview(entry.name, previewPath);
@@ -1670,22 +1764,30 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               }
             } else if (mounted) {
               _navNotifier.setLoading(false);
-              _setStatus(context.l10n.failedToReadFileFromArchive, error: true);
+              if (stageResult != null) {
+                _setStatus(
+                  context.l10n.failedToReadFileFromArchive,
+                  error: true,
+                );
+              }
             }
           } else {
-            final entryBytes = await _archiveContext!.extractEntry(subPath);
+            final extractResult = await _extractArchiveEntryWithPassword(
+              subPath,
+            );
             _navNotifier.setLoading(false);
-            if (entryBytes != null) {
+            if (extractResult?.status == ArchiveOpenStatus.ok &&
+                extractResult?.data != null) {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ArchiveFileViewer(
-                    bytes: entryBytes,
+                    bytes: extractResult!.data!,
                     fileName: entry.name,
                   ),
                 ),
               );
-            } else {
+            } else if (extractResult != null) {
               _setStatus(context.l10n.failedToReadFileFromArchive, error: true);
             }
           }
@@ -2485,7 +2587,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // ── Archive Extract Paste ───────────────────────────────────────────
     if (clip.isArchiveExtract) {
       final archiveName = clip.archiveName ?? 'archive.zip';
-      final archiveContext = clip.archiveContext;
+      var archiveContext = clip.archiveContext;
       if (archiveContext == null) return;
 
       final options = await ArchivePasteOptionsSheet.show(
@@ -2497,6 +2599,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         itemCount: clip.items.length,
       );
       if (options == null || !mounted) return;
+
+      final verifiedArchive = await _ensureArchivePasswordForExtraction(
+        archiveContext,
+      );
+      if (verifiedArchive == null || !mounted) return;
+      archiveContext = verifiedArchive;
 
       var targetDir = _currentDirPath;
       if (options.extractIntoSubfolder) {
@@ -3230,11 +3338,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ),
     );
     if (confirm != true || !mounted) return;
+    final verifiedArchive = await _ensureArchivePasswordForExtraction(
+      _archiveContext!,
+    );
+    if (verifiedArchive == null || !mounted) return;
+    _navNotifier.updateArchiveContext(verifiedArchive);
     _navNotifier.setLoading(true);
     try {
       final count = await ArchiveService.extractAllToContainer(
         container: widget.container,
-        archiveContext: _archiveContext!,
+        archiveContext: verifiedArchive,
         targetDirInContainer: parentDir,
       );
       if (mounted) {

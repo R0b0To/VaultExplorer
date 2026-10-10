@@ -37,7 +37,10 @@ class VaultAutomationWorker(
             VaultAutomationReceiver.sendResult(
                 applicationContext,
                 action,
-                VaultAutomationReceiver.Outcome("ERROR", "Android could not start foreground work for this action"),
+                VaultAutomationReceiver.Outcome(
+                    "ERROR",
+                    BackgroundStartAdvice.foregroundWorkBlockedMessage(applicationContext),
+                ),
             )
             return Result.failure()
         }

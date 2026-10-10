@@ -200,8 +200,8 @@ class VaultArchiveApi {
   }
 
   /// Streams an archive entry into a short-lived, private cache file for an
-  /// in-app PDF or media preview. Returns the staged absolute path on success.
-  Future<String?> stageBrowseEntry({
+  /// in-app PDF or media preview, preserving passphrase errors for retry.
+  Future<ArchiveEntryStageResult> stageBrowseEntry({
     required String filePath,
     String? vaultPath,
     required int targetIndex,
@@ -209,19 +209,25 @@ class VaultArchiveApi {
     String? passphrase,
   }) async {
     try {
-      return await _channel
-          .invokeMethod<String>(ChannelMethods.archiveStageBrowseEntry, {
-            'filePath': filePath,
-            'vaultPath': ?vaultPath,
-            'targetIndex': targetIndex,
-            'entryName': entryName,
-            'passphrase': ?passphrase,
-          });
+      final res = await _channel.invokeMethod<Map<Object?, Object?>>(
+        ChannelMethods.archiveStageBrowseEntry,
+        {
+          'filePath': filePath,
+          'vaultPath': ?vaultPath,
+          'targetIndex': targetIndex,
+          'entryName': entryName,
+          'passphrase': ?passphrase,
+        },
+      );
+      if (res == null) {
+        return ArchiveEntryStageResult.ioError('Failed to stage archive entry');
+      }
+      return ArchiveEntryStageResult.fromMap(res);
     } on PlatformException {
       rethrow;
     } catch (e) {
       logSwallowed('stageBrowseEntry', e);
-      return null;
+      return ArchiveEntryStageResult.ioError(e.toString());
     }
   }
 

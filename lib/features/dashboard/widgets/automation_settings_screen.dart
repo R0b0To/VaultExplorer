@@ -24,7 +24,8 @@ class AutomationSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _AutomationSettingsScreenState
-    extends ConsumerState<AutomationSettingsScreen> {
+    extends ConsumerState<AutomationSettingsScreen>
+    with WidgetsBindingObserver {
   static const _tutorialUrl =
       'https://github.com/R0b0To/VaultExplorer/blob/main/docs/vaultexplorer-automation-setup.md';
   static const _packageName = 'com.aeidolon.vaultexplorer';
@@ -58,6 +59,10 @@ class _AutomationSettingsScreenState
   final _automationPimCtrl = TextEditingController();
   bool _appliedLoadedPim = false;
 
+  // True until the check says otherwise, so the hint card never flashes in
+  // for a moment on a device that is already set up correctly.
+  bool _batteryUnrestricted = true;
+
   bool get _isUsbSource => widget.uri.startsWith('usb:');
 
   bool get _isLuks => ContainerFormat.fromWire(widget.containerFormat).isLuks;
@@ -68,10 +73,42 @@ class _AutomationSettingsScreenState
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshBatteryStatus();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The person comes back from the system settings page after changing it.
+    if (state == AppLifecycleState.resumed) _refreshBatteryStatus();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _passwordCtrl.dispose();
     _automationPimCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshBatteryStatus() async {
+    final unrestricted =
+        await ref.read(vaultLifecycleApiProvider).hasUnrestrictedBattery();
+    if (!mounted || unrestricted == _batteryUnrestricted) return;
+    setState(() => _batteryUnrestricted = unrestricted);
+  }
+
+  Future<void> _openBatterySettings() async {
+    final opened =
+        await ref.read(vaultLifecycleApiProvider).openBatterySettings();
+    if (!mounted || opened) return;
+    showAppSnackBar(
+      context,
+      message: context.l10n.automationBatterySettingsOpenFailedMessage,
+      tone: AppBannerTone.error,
+    );
   }
 
   void _copy(String label, String value) {
@@ -240,6 +277,49 @@ class _AutomationSettingsScreenState
           ),
         ],
       ),
+      if (state.tier != AutomationTier.none && !_batteryUnrestricted) ...[
+        const SizedBox(height: 12),
+        SectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.battery_alert_rounded, color: cs.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          l10n.automationBatteryHintTitle,
+                          style: textTheme.titleSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.automationBatteryHintMessage,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: _openBatterySettings,
+                      child: Text(l10n.automationBatteryHintButton),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
       if (state.tier != AutomationTier.none) ...[
         const SizedBox(height: 24),
         SectionHeader(l10n.automationPasswordSectionHeader),

@@ -123,6 +123,8 @@ private object ChannelMethods {
     const val REQUEST_ALL_FILES_ACCESS  = "requestAllFilesAccess"
     const val HAS_OVERLAY_PERMISSION    = "hasOverlayPermission"
     const val REQUEST_OVERLAY_PERMISSION = "requestOverlayPermission"
+    const val HAS_UNRESTRICTED_BATTERY  = "hasUnrestrictedBattery"
+    const val OPEN_BATTERY_SETTINGS     = "openBatterySettings"
     const val REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
     const val READ_MEDIA_FILE_CHUNK     = "readMediaFileChunk"
     const val WRITE_BACK_FILE           = "writeBackFile"
@@ -931,6 +933,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
                 ChannelMethods.HAS_OVERLAY_PERMISSION -> systemHandlers.handleHasOverlayPermission(call, result)
                 ChannelMethods.REQUEST_OVERLAY_PERMISSION -> systemHandlers.handleRequestOverlayPermission(call, result)
+                ChannelMethods.HAS_UNRESTRICTED_BATTERY -> systemHandlers.handleHasUnrestrictedBattery(call, result)
+                ChannelMethods.OPEN_BATTERY_SETTINGS -> systemHandlers.handleOpenBatterySettings(call, result)
                 ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)
                 ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
                 ChannelMethods.GET_LOCAL_FILE_URI -> localFileHandlers.handleGetLocalFileUri(call, result)

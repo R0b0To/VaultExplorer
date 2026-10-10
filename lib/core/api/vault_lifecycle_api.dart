@@ -158,6 +158,34 @@ class VaultLifecycleApi {
     }
   }
 
+  /// Whether the app's battery usage is Unrestricted. Headless automation
+  /// that starts the app from nothing needs this on Android 12+ so Android
+  /// lets it start its foreground service. Returns true on error so a
+  /// failed check never shows a warning that can't be resolved.
+  Future<bool> hasUnrestrictedBattery() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.hasUnrestrictedBattery,
+      );
+      return result ?? true;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /// Opens the app's system settings page (Battery > Unrestricted). Callers
+  /// should re-check [hasUnrestrictedBattery] on resume.
+  Future<bool> openBatterySettings() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.openBatterySettings,
+      );
+      return result ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Requests broad storage access, appropriate to the running Android
   /// version:
   /// - API 30+ (R): opens system Settings for the user to grant All Files

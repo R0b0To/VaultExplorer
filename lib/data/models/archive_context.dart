@@ -222,10 +222,14 @@ class ArchiveContext {
   /// Streams an entry directly into an app-private temporary file for a
   /// seekable in-app preview. Unlike [extractEntry], this never creates a
   /// full Dart-side byte array, so it is appropriate for large media files.
-  Future<String?> stageEntryForBrowse(String entryPath) async {
-    if (!_isSafeRelativePath(entryPath)) return null;
+  Future<ArchiveEntryStageResult> stageEntryForBrowse(String entryPath) async {
+    if (!_isSafeRelativePath(entryPath)) {
+      return ArchiveEntryStageResult.ioError('Unsafe entry path');
+    }
     final info = findEntry(entryPath);
-    if (info == null || info.isDirectory || _api == null) return null;
+    if (info == null || info.isDirectory || _api == null) {
+      return ArchiveEntryStageResult.ioError('Entry not found');
+    }
 
     if (vaultFilePath != null && vaultPath != null) {
       return _api.stageBrowseEntry(
@@ -244,7 +248,7 @@ class ArchiveContext {
         passphrase: passphrase,
       );
     }
-    return null;
+    return ArchiveEntryStageResult.ioError('Archive has no backing source');
   }
 
   /// Returns a copy of this context that will use [newPassphrase] for
@@ -263,6 +267,51 @@ class ArchiveContext {
       passphrase: newPassphrase,
       tree: _tree,
       entryMap: _entryMap,
+    );
+  }
+
+  /// Re-scans the archive with [newPassphrase]. For 7-Zip archives whose
+  /// filenames are visible without a password, passing a candidate password
+  /// asks the native scan to verify it against the first encrypted entry.
+  Future<ArchiveContext> rescanWithPassphrase(String newPassphrase) async {
+    final api = _api;
+    final ArchiveIndexResult result;
+    if (api == null) {
+      result = const ArchiveIndexResult(
+        status: ArchiveOpenStatus.ioError,
+        entries: [],
+        isSolid: false,
+        errorMessage: 'Archive API is unavailable',
+      );
+    } else if (vaultFilePath != null && vaultPath != null) {
+      result = await api.scanVaultArchive(
+        filePath: vaultFilePath!,
+        vaultPath: vaultPath!,
+        passphrase: newPassphrase,
+      );
+    } else if (localPathOrUri != null) {
+      result = await api.scanLocalArchive(
+        pathOrUri: localPathOrUri!,
+        passphrase: newPassphrase,
+      );
+    } else {
+      result = const ArchiveIndexResult(
+        status: ArchiveOpenStatus.ioError,
+        entries: [],
+        isSolid: false,
+        errorMessage: 'Archive has no backing source',
+      );
+    }
+
+    return ArchiveContext.fromScanResult(
+      archivePathInContainer: archivePathInContainer,
+      indexResult: result,
+      pathStackEntryIndex: pathStackEntryIndex,
+      api: api,
+      vaultFilePath: vaultFilePath,
+      vaultPath: vaultPath,
+      localPathOrUri: localPathOrUri,
+      passphrase: newPassphrase,
     );
   }
 

@@ -33,6 +33,8 @@ abstract final class ChannelMethods {
   static const requestAllFilesAccess = 'requestAllFilesAccess';
   static const hasOverlayPermission = 'hasOverlayPermission';
   static const requestOverlayPermission = 'requestOverlayPermission';
+  static const hasUnrestrictedBattery = 'hasUnrestrictedBattery';
+  static const openBatterySettings = 'openBatterySettings';
   static const requestNotificationPermission = 'requestNotificationPermission';
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';

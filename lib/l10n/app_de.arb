@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "Paketinstaller",
   "apkOpenPackageInstallerSubtitle": "Diese App auf dem Gerät installieren",
   "apkOpenAsZip": "Als ZIP öffnen",
-  "apkOpenAsZipSubtitle": "Enthaltene Dateien durchsuchen und extrahieren"
+  "apkOpenAsZipSubtitle": "Enthaltene Dateien durchsuchen und extrahieren",
+  "audioEditorEditAction": "Audio bearbeiten",
+  "audioEditorTimelineLabel": "Audio-Zeitleiste",
+  "audioEditorAnalyzing": "Audio wird gelesen…",
+  "audioEditorLoadFailed": "Diese Audiodatei konnte nicht geöffnet werden: {message}",
+  "audioEditorReadOnly": "Dieser Tresor ist schreibgeschützt, daher kann das bearbeitete Audio nicht gespeichert werden.",
+  "audioEditorExporting": "Audio wird exportiert",
+  "audioEditorSaved": "{count, plural, =1{1 Audiodatei gespeichert} other{{count} Audiodateien gespeichert}}",
+  "audioEditorExportMerge": "In einer Datei zusammenführen",
+  "audioEditorExportSeparate": "Als einzelne Dateien speichern",
+  "audioEditorReplaceOriginal": "Original-Audio ersetzen",
+  "audioEditorReplaceOriginalHint": "Die Originaldatei wird durch den exportierten Schnitt ersetzt.",
+  "audioEditorLosslessNote": "Schnitte sind verlustfrei: Das Audio wird kopiert und nicht neu kodiert, die Qualität bleibt also gleich. Schnitte landen am nächsten Audio-Frame, wenige Millisekunden von deiner Markierung entfernt. Tags und Titelbilder werden nicht übernommen.",
+  "audioEditorCutOutModeDescription": "Entferne die ausgewählten Segmente und exportiere den Rest.",
+  "audioEditorUnsupportedFormat": "{format}-Dateien lassen sich nicht ohne Neukodierung schneiden. Diese Datei kann hier abgespielt, aber nicht exportiert werden.",
+  "audioEditorPrevCutPoint": "Vorheriger Schnittpunkt",
+  "audioEditorNextCutPoint": "Nächster Schnittpunkt"
 }

@@ -11000,4 +11000,68 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => 'Sfoglia i file contenuti ed estraili';
+
+  @override
+  String get audioEditorEditAction => 'Modifica audio';
+
+  @override
+  String get audioEditorTimelineLabel => 'Timeline audio';
+
+  @override
+  String get audioEditorAnalyzing => 'Lettura dell\'audio…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'Impossibile aprire questo file audio: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'Questo vault è di sola lettura, quindi l\'audio modificato non può essere salvato.';
+
+  @override
+  String get audioEditorExporting => 'Esportazione dell\'audio';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count file audio salvati',
+      one: '1 file audio salvato',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'Unisci in un unico file';
+
+  @override
+  String get audioEditorExportSeparate => 'Salva come file separati';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Sostituisci audio originale';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'Il file originale verrà sostituito dal taglio esportato.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'I tagli sono senza perdita: l\'audio viene copiato, non ricodificato, quindi la qualità non cambia. I tagli cadono sul frame audio più vicino, a pochi millisecondi dal punto scelto. Tag e copertina non vengono mantenuti.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Rimuovi i segmenti selezionati ed esporta ciò che resta.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return 'I file $format non possono essere tagliati senza ricodifica, quindi questo file può essere riprodotto qui ma non esportato.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Punto di taglio precedente';
+
+  @override
+  String get audioEditorNextCutPoint => 'Punto di taglio successivo';
 }

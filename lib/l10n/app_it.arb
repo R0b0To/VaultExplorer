@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "Programma di installazione pacchetti",
   "apkOpenPackageInstallerSubtitle": "Installa questa app sul dispositivo",
   "apkOpenAsZip": "Apri come ZIP",
-  "apkOpenAsZipSubtitle": "Sfoglia i file contenuti ed estraili"
+  "apkOpenAsZipSubtitle": "Sfoglia i file contenuti ed estraili",
+  "audioEditorEditAction": "Modifica audio",
+  "audioEditorTimelineLabel": "Timeline audio",
+  "audioEditorAnalyzing": "Lettura dell'audio…",
+  "audioEditorLoadFailed": "Impossibile aprire questo file audio: {message}",
+  "audioEditorReadOnly": "Questo vault è di sola lettura, quindi l'audio modificato non può essere salvato.",
+  "audioEditorExporting": "Esportazione dell'audio",
+  "audioEditorSaved": "{count, plural, =1{1 file audio salvato} other{{count} file audio salvati}}",
+  "audioEditorExportMerge": "Unisci in un unico file",
+  "audioEditorExportSeparate": "Salva come file separati",
+  "audioEditorReplaceOriginal": "Sostituisci audio originale",
+  "audioEditorReplaceOriginalHint": "Il file originale verrà sostituito dal taglio esportato.",
+  "audioEditorLosslessNote": "I tagli sono senza perdita: l'audio viene copiato, non ricodificato, quindi la qualità non cambia. I tagli cadono sul frame audio più vicino, a pochi millisecondi dal punto scelto. Tag e copertina non vengono mantenuti.",
+  "audioEditorCutOutModeDescription": "Rimuovi i segmenti selezionati ed esporta ciò che resta.",
+  "audioEditorUnsupportedFormat": "I file {format} non possono essere tagliati senza ricodifica, quindi questo file può essere riprodotto qui ma non esportato.",
+  "audioEditorPrevCutPoint": "Punto di taglio precedente",
+  "audioEditorNextCutPoint": "Punto di taglio successivo"
 }

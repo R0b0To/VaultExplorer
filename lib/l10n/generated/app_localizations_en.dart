@@ -10838,4 +10838,68 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => 'Browse the files inside and extract them';
+
+  @override
+  String get audioEditorEditAction => 'Edit audio';
+
+  @override
+  String get audioEditorTimelineLabel => 'Audio timeline';
+
+  @override
+  String get audioEditorAnalyzing => 'Reading audio…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'Couldn\'t open this audio file: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'This vault is read-only, so the edited audio can\'t be saved.';
+
+  @override
+  String get audioEditorExporting => 'Exporting audio';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Saved $count audio files',
+      one: 'Saved 1 audio file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'Merge into one file';
+
+  @override
+  String get audioEditorExportSeparate => 'Save as separate files';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Replace original audio';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'The original file will be replaced with the exported cut.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'Cuts are lossless: the audio is copied, not re-encoded, so quality doesn\'t change. Cuts land on the nearest audio frame, a few milliseconds from where you set them. Tags and cover art aren\'t carried over.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Remove the selected segments and export what\'s left.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return '$format files can\'t be cut without re-encoding, so this file can be played here but not exported.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Previous cut point';
+
+  @override
+  String get audioEditorNextCutPoint => 'Next cut point';
 }

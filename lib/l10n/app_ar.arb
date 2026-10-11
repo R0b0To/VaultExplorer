@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "مُثبّت الحزم",
   "apkOpenPackageInstallerSubtitle": "ثبّت هذا التطبيق على جهازك",
   "apkOpenAsZip": "فتح كملف ZIP",
-  "apkOpenAsZipSubtitle": "تصفّح الملفات بداخله واستخراجها"
+  "apkOpenAsZipSubtitle": "تصفّح الملفات بداخله واستخراجها",
+  "audioEditorEditAction": "تحرير الصوت",
+  "audioEditorTimelineLabel": "المخطط الزمني للصوت",
+  "audioEditorAnalyzing": "جارٍ قراءة الصوت…",
+  "audioEditorLoadFailed": "تعذّر فتح ملف الصوت هذا: {message}",
+  "audioEditorReadOnly": "هذا المخزن للقراءة فقط، لذا لا يمكن حفظ الصوت المعدَّل.",
+  "audioEditorExporting": "جارٍ تصدير الصوت",
+  "audioEditorSaved": "{count, plural, =1{تم حفظ ملف صوتي واحد} other{تم حفظ {count} ملفات صوتية}}",
+  "audioEditorExportMerge": "دمج في ملف واحد",
+  "audioEditorExportSeparate": "حفظ كملفات منفصلة",
+  "audioEditorReplaceOriginal": "استبدال الصوت الأصلي",
+  "audioEditorReplaceOriginalHint": "سيتم استبدال الملف الأصلي بالمقطع المُصدَّر.",
+  "audioEditorLosslessNote": "القص بلا فقدان: يُنسخ الصوت دون إعادة ترميز، فلا تتغير الجودة. يقع القص عند أقرب إطار صوتي، على بعد أجزاء من الثانية من النقطة التي حددتها. لا تُنقل الوسوم وصورة الغلاف.",
+  "audioEditorCutOutModeDescription": "أزل المقاطع المحددة وصدّر ما تبقّى.",
+  "audioEditorUnsupportedFormat": "لا يمكن قص ملفات {format} دون إعادة ترميز، لذا يمكن تشغيل هذا الملف هنا ولكن لا يمكن تصديره.",
+  "audioEditorPrevCutPoint": "نقطة القص السابقة",
+  "audioEditorNextCutPoint": "نقطة القص التالية"
 }

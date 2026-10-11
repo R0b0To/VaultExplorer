@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "Installateur de paquets",
   "apkOpenPackageInstallerSubtitle": "Installer cette application sur votre appareil",
   "apkOpenAsZip": "Ouvrir comme ZIP",
-  "apkOpenAsZipSubtitle": "Parcourir les fichiers qu’il contient et les extraire"
+  "apkOpenAsZipSubtitle": "Parcourir les fichiers qu’il contient et les extraire",
+  "audioEditorEditAction": "Modifier l'audio",
+  "audioEditorTimelineLabel": "Chronologie audio",
+  "audioEditorAnalyzing": "Lecture de l'audio…",
+  "audioEditorLoadFailed": "Impossible d'ouvrir ce fichier audio : {message}",
+  "audioEditorReadOnly": "Ce coffre est en lecture seule : l'audio modifié ne peut pas être enregistré.",
+  "audioEditorExporting": "Exportation de l'audio",
+  "audioEditorSaved": "{count, plural, =1{1 fichier audio enregistré} other{{count} fichiers audio enregistrés}}",
+  "audioEditorExportMerge": "Fusionner en un seul fichier",
+  "audioEditorExportSeparate": "Enregistrer en fichiers séparés",
+  "audioEditorReplaceOriginal": "Remplacer l'audio d'origine",
+  "audioEditorReplaceOriginalHint": "Le fichier d'origine sera remplacé par la coupe exportée.",
+  "audioEditorLosslessNote": "Les coupes sont sans perte : l'audio est copié, pas réencodé, donc la qualité reste identique. Les coupes se font sur la trame audio la plus proche, à quelques millisecondes du point choisi. Les balises et la pochette ne sont pas conservées.",
+  "audioEditorCutOutModeDescription": "Supprimez les segments sélectionnés et exportez le reste.",
+  "audioEditorUnsupportedFormat": "Les fichiers {format} ne peuvent pas être coupés sans réencodage : ce fichier peut être lu ici, mais pas exporté.",
+  "audioEditorPrevCutPoint": "Point de coupe précédent",
+  "audioEditorNextCutPoint": "Point de coupe suivant"
 }

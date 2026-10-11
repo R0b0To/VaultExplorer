@@ -12575,5 +12575,84 @@
   "apkOpenAsZipSubtitle": "Browse the files inside and extract them",
   "@apkOpenAsZipSubtitle": {
     "description": "Subtitle under the \"Open as ZIP\" choice in the APK open dialog"
+  },
+  "audioEditorEditAction": "Edit audio",
+  "@audioEditorEditAction": {
+    "description": "Menu item that opens the audio editor for an audio file"
+  },
+  "audioEditorTimelineLabel": "Audio timeline",
+  "@audioEditorTimelineLabel": {
+    "description": "Accessibility label of the waveform timeline in the audio editor"
+  },
+  "audioEditorAnalyzing": "Reading audio…",
+  "@audioEditorAnalyzing": {
+    "description": "Shown while the audio editor opens a file and reads its length and format"
+  },
+  "audioEditorLoadFailed": "Couldn't open this audio file: {message}",
+  "@audioEditorLoadFailed": {
+    "description": "Error shown when the audio editor can't open a file. {message} is the technical reason",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "audioEditorReadOnly": "This vault is read-only, so the edited audio can't be saved.",
+  "@audioEditorReadOnly": {
+    "description": "Snackbar shown when exporting from the audio editor in a read-only vault"
+  },
+  "audioEditorExporting": "Exporting audio",
+  "@audioEditorExporting": {
+    "description": "Title of the progress dialog while the audio editor exports"
+  },
+  "audioEditorSaved": "{count, plural, =1{Saved 1 audio file} other{Saved {count} audio files}}",
+  "@audioEditorSaved": {
+    "description": "Snackbar after the audio editor saved its output file(s)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "audioEditorExportMerge": "Merge into one file",
+  "@audioEditorExportMerge": {
+    "description": "Export option in the audio editor: join all clips into a single audio file"
+  },
+  "audioEditorExportSeparate": "Save as separate files",
+  "@audioEditorExportSeparate": {
+    "description": "Export option in the audio editor: write each clip as its own audio file"
+  },
+  "audioEditorReplaceOriginal": "Replace original audio",
+  "@audioEditorReplaceOriginal": {
+    "description": "Switch title (and button label) in the audio editor's export sheet to overwrite the source file"
+  },
+  "audioEditorReplaceOriginalHint": "The original file will be replaced with the exported cut.",
+  "@audioEditorReplaceOriginalHint": {
+    "description": "Explanation under the replace-original switch in the audio editor's export sheet"
+  },
+  "audioEditorLosslessNote": "Cuts are lossless: the audio is copied, not re-encoded, so quality doesn't change. Cuts land on the nearest audio frame, a few milliseconds from where you set them. Tags and cover art aren't carried over.",
+  "@audioEditorLosslessNote": {
+    "description": "Explanation at the bottom of the audio editor's export sheet"
+  },
+  "audioEditorCutOutModeDescription": "Remove the selected segments and export what's left.",
+  "@audioEditorCutOutModeDescription": {
+    "description": "Explains the 'Cut out' mode in the audio editor's segments sheet"
+  },
+  "audioEditorUnsupportedFormat": "{format} files can't be cut without re-encoding, so this file can be played here but not exported.",
+  "@audioEditorUnsupportedFormat": {
+    "description": "Banner in the audio editor for a format that can't be cut losslessly. {format} is the file extension in capitals, e.g. FLAC",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "audioEditorPrevCutPoint": "Previous cut point",
+  "@audioEditorPrevCutPoint": {
+    "description": "Tooltip of the button that jumps the audio editor playhead to the previous segment edge"
+  },
+  "audioEditorNextCutPoint": "Next cut point",
+  "@audioEditorNextCutPoint": {
+    "description": "Tooltip of the button that jumps the audio editor playhead to the next segment edge"
   }
 }

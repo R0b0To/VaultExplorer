@@ -11006,4 +11006,68 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get apkOpenAsZipSubtitle =>
       'Enthaltene Dateien durchsuchen und extrahieren';
+
+  @override
+  String get audioEditorEditAction => 'Audio bearbeiten';
+
+  @override
+  String get audioEditorTimelineLabel => 'Audio-Zeitleiste';
+
+  @override
+  String get audioEditorAnalyzing => 'Audio wird gelesen…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'Diese Audiodatei konnte nicht geöffnet werden: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'Dieser Tresor ist schreibgeschützt, daher kann das bearbeitete Audio nicht gespeichert werden.';
+
+  @override
+  String get audioEditorExporting => 'Audio wird exportiert';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Audiodateien gespeichert',
+      one: '1 Audiodatei gespeichert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'In einer Datei zusammenführen';
+
+  @override
+  String get audioEditorExportSeparate => 'Als einzelne Dateien speichern';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Original-Audio ersetzen';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'Die Originaldatei wird durch den exportierten Schnitt ersetzt.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'Schnitte sind verlustfrei: Das Audio wird kopiert und nicht neu kodiert, die Qualität bleibt also gleich. Schnitte landen am nächsten Audio-Frame, wenige Millisekunden von deiner Markierung entfernt. Tags und Titelbilder werden nicht übernommen.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Entferne die ausgewählten Segmente und exportiere den Rest.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return '$format-Dateien lassen sich nicht ohne Neukodierung schneiden. Diese Datei kann hier abgespielt, aber nicht exportiert werden.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Vorheriger Schnittpunkt';
+
+  @override
+  String get audioEditorNextCutPoint => 'Nächster Schnittpunkt';
 }

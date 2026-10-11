@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "Instalador de pacotes",
   "apkOpenPackageInstallerSubtitle": "Instalar este app no seu dispositivo",
   "apkOpenAsZip": "Abrir como ZIP",
-  "apkOpenAsZipSubtitle": "Explorar os arquivos internos e extraí-los"
+  "apkOpenAsZipSubtitle": "Explorar os arquivos internos e extraí-los",
+  "audioEditorEditAction": "Editar áudio",
+  "audioEditorTimelineLabel": "Linha do tempo do áudio",
+  "audioEditorAnalyzing": "Lendo áudio…",
+  "audioEditorLoadFailed": "Não foi possível abrir este arquivo de áudio: {message}",
+  "audioEditorReadOnly": "Este cofre é somente leitura, então o áudio editado não pode ser salvo.",
+  "audioEditorExporting": "Exportando áudio",
+  "audioEditorSaved": "{count, plural, =1{1 arquivo de áudio salvo} other{{count} arquivos de áudio salvos}}",
+  "audioEditorExportMerge": "Mesclar em um único arquivo",
+  "audioEditorExportSeparate": "Salvar como arquivos separados",
+  "audioEditorReplaceOriginal": "Substituir áudio original",
+  "audioEditorReplaceOriginalHint": "O arquivo original será substituído pelo corte exportado.",
+  "audioEditorLosslessNote": "Os cortes são sem perda: o áudio é copiado, não recodificado, então a qualidade não muda. Os cortes caem no quadro de áudio mais próximo, a poucos milissegundos de onde você os definiu. Tags e capa não são mantidas.",
+  "audioEditorCutOutModeDescription": "Remova os segmentos selecionados e exporte o que sobrar.",
+  "audioEditorUnsupportedFormat": "Arquivos {format} não podem ser cortados sem recodificação, então este arquivo pode ser reproduzido aqui, mas não exportado.",
+  "audioEditorPrevCutPoint": "Ponto de corte anterior",
+  "audioEditorNextCutPoint": "Próximo ponto de corte"
 }

@@ -10407,4 +10407,64 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => '中のファイルを参照して展開します';
+
+  @override
+  String get audioEditorEditAction => 'オーディオを編集';
+
+  @override
+  String get audioEditorTimelineLabel => 'オーディオのタイムライン';
+
+  @override
+  String get audioEditorAnalyzing => 'オーディオを読み込み中…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'このオーディオファイルを開けませんでした: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly => 'この保管庫は読み取り専用のため、編集したオーディオを保存できません。';
+
+  @override
+  String get audioEditorExporting => 'オーディオをエクスポート中';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 件のオーディオファイルを保存しました',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => '1つのファイルに結合';
+
+  @override
+  String get audioEditorExportSeparate => '別々のファイルとして保存';
+
+  @override
+  String get audioEditorReplaceOriginal => '元のオーディオを置き換える';
+
+  @override
+  String get audioEditorReplaceOriginalHint => '元のファイルは、書き出したカット版に置き換えられます。';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'カットは劣化なしです。音声は再エンコードされずにコピーされるため、音質は変わりません。カット位置は設定した位置から数ミリ秒ほどずれた、最も近いオーディオフレームになります。タグとカバーアートは引き継がれません。';
+
+  @override
+  String get audioEditorCutOutModeDescription => '選択したセグメントを削除し、残りをエクスポートします。';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return '$format ファイルは再エンコードなしではカットできないため、ここで再生はできますがエクスポートはできません。';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => '前のカット位置';
+
+  @override
+  String get audioEditorNextCutPoint => '次のカット位置';
 }

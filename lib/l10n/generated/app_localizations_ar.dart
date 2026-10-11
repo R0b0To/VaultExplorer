@@ -11029,4 +11029,68 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => 'تصفّح الملفات بداخله واستخراجها';
+
+  @override
+  String get audioEditorEditAction => 'تحرير الصوت';
+
+  @override
+  String get audioEditorTimelineLabel => 'المخطط الزمني للصوت';
+
+  @override
+  String get audioEditorAnalyzing => 'جارٍ قراءة الصوت…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'تعذّر فتح ملف الصوت هذا: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'هذا المخزن للقراءة فقط، لذا لا يمكن حفظ الصوت المعدَّل.';
+
+  @override
+  String get audioEditorExporting => 'جارٍ تصدير الصوت';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم حفظ $count ملفات صوتية',
+      one: 'تم حفظ ملف صوتي واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'دمج في ملف واحد';
+
+  @override
+  String get audioEditorExportSeparate => 'حفظ كملفات منفصلة';
+
+  @override
+  String get audioEditorReplaceOriginal => 'استبدال الصوت الأصلي';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'سيتم استبدال الملف الأصلي بالمقطع المُصدَّر.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'القص بلا فقدان: يُنسخ الصوت دون إعادة ترميز، فلا تتغير الجودة. يقع القص عند أقرب إطار صوتي، على بعد أجزاء من الثانية من النقطة التي حددتها. لا تُنقل الوسوم وصورة الغلاف.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'أزل المقاطع المحددة وصدّر ما تبقّى.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return 'لا يمكن قص ملفات $format دون إعادة ترميز، لذا يمكن تشغيل هذا الملف هنا ولكن لا يمكن تصديره.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'نقطة القص السابقة';
+
+  @override
+  String get audioEditorNextCutPoint => 'نقطة القص التالية';
 }

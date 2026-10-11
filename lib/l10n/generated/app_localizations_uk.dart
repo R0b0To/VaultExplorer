@@ -11083,4 +11083,70 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => 'Переглянути вміст і видобути файли';
+
+  @override
+  String get audioEditorEditAction => 'Редагувати аудіо';
+
+  @override
+  String get audioEditorTimelineLabel => 'Часова шкала аудіо';
+
+  @override
+  String get audioEditorAnalyzing => 'Читання аудіо…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'Не вдалося відкрити цей аудіофайл: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'Це сховище доступне лише для читання, тому відредаговане аудіо не можна зберегти.';
+
+  @override
+  String get audioEditorExporting => 'Експорт аудіо';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Збережено $count аудіофайлу',
+      many: 'Збережено $count аудіофайлів',
+      few: 'Збережено $count аудіофайли',
+      one: 'Збережено $count аудіофайл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'Об\'єднати в один файл';
+
+  @override
+  String get audioEditorExportSeparate => 'Зберегти як окремі файли';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Замінити оригінальне аудіо';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'Оригінальний файл буде замінено експортованим фрагментом.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'Обрізання без втрат: аудіо копіюється без перекодування, тож якість не змінюється. Розріз припадає на найближчий аудіокадр, за кілька мілісекунд від заданої точки. Теги й обкладинка не переносяться.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Вилучити вибрані сегменти й експортувати решту.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return 'Файли $format не можна обрізати без перекодування, тож цей файл можна відтворити тут, але не експортувати.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Попередня точка розрізу';
+
+  @override
+  String get audioEditorNextCutPoint => 'Наступна точка розрізу';
 }

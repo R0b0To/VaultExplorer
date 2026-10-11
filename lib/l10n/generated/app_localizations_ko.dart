@@ -10407,4 +10407,64 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get apkOpenAsZipSubtitle => '내부 파일을 둘러보고 압축을 풉니다';
+
+  @override
+  String get audioEditorEditAction => '오디오 편집';
+
+  @override
+  String get audioEditorTimelineLabel => '오디오 타임라인';
+
+  @override
+  String get audioEditorAnalyzing => '오디오를 읽는 중…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return '이 오디오 파일을 열 수 없습니다: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly => '이 볼트는 읽기 전용이라 편집한 오디오를 저장할 수 없습니다.';
+
+  @override
+  String get audioEditorExporting => '오디오 내보내는 중';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '오디오 파일 $count개 저장됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => '하나의 파일로 병합';
+
+  @override
+  String get audioEditorExportSeparate => '별도의 파일로 저장';
+
+  @override
+  String get audioEditorReplaceOriginal => '원본 오디오 대체';
+
+  @override
+  String get audioEditorReplaceOriginalHint => '원본 파일이 내보낸 편집본으로 대체됩니다.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      '컷은 무손실입니다. 오디오를 재인코딩하지 않고 복사하므로 음질이 변하지 않습니다. 컷은 지정한 위치에서 몇 밀리초 떨어진 가장 가까운 오디오 프레임에 맞춰집니다. 태그와 커버 아트는 유지되지 않습니다.';
+
+  @override
+  String get audioEditorCutOutModeDescription => '선택한 세그먼트를 제거하고 나머지를 내보냅니다.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return '$format 파일은 재인코딩 없이는 자를 수 없으므로 여기서 재생만 가능하고 내보낼 수 없습니다.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => '이전 컷 지점';
+
+  @override
+  String get audioEditorNextCutPoint => '다음 컷 지점';
 }

@@ -11104,4 +11104,68 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get apkOpenAsZipSubtitle =>
       'Parcourir les fichiers qu’il contient et les extraire';
+
+  @override
+  String get audioEditorEditAction => 'Modifier l\'audio';
+
+  @override
+  String get audioEditorTimelineLabel => 'Chronologie audio';
+
+  @override
+  String get audioEditorAnalyzing => 'Lecture de l\'audio…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'Impossible d\'ouvrir ce fichier audio : $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'Ce coffre est en lecture seule : l\'audio modifié ne peut pas être enregistré.';
+
+  @override
+  String get audioEditorExporting => 'Exportation de l\'audio';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers audio enregistrés',
+      one: '1 fichier audio enregistré',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'Fusionner en un seul fichier';
+
+  @override
+  String get audioEditorExportSeparate => 'Enregistrer en fichiers séparés';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Remplacer l\'audio d\'origine';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'Le fichier d\'origine sera remplacé par la coupe exportée.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'Les coupes sont sans perte : l\'audio est copié, pas réencodé, donc la qualité reste identique. Les coupes se font sur la trame audio la plus proche, à quelques millisecondes du point choisi. Les balises et la pochette ne sont pas conservées.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Supprimez les segments sélectionnés et exportez le reste.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return 'Les fichiers $format ne peuvent pas être coupés sans réencodage : ce fichier peut être lu ici, mais pas exporté.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Point de coupe précédent';
+
+  @override
+  String get audioEditorNextCutPoint => 'Point de coupe suivant';
 }

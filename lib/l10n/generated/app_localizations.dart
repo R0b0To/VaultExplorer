@@ -18342,6 +18342,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Browse the files inside and extract them'**
   String get apkOpenAsZipSubtitle;
+
+  /// Menu item that opens the audio editor for an audio file
+  ///
+  /// In en, this message translates to:
+  /// **'Edit audio'**
+  String get audioEditorEditAction;
+
+  /// Accessibility label of the waveform timeline in the audio editor
+  ///
+  /// In en, this message translates to:
+  /// **'Audio timeline'**
+  String get audioEditorTimelineLabel;
+
+  /// Shown while the audio editor opens a file and reads its length and format
+  ///
+  /// In en, this message translates to:
+  /// **'Reading audio…'**
+  String get audioEditorAnalyzing;
+
+  /// Error shown when the audio editor can't open a file. {message} is the technical reason
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this audio file: {message}'**
+  String audioEditorLoadFailed(String message);
+
+  /// Snackbar shown when exporting from the audio editor in a read-only vault
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is read-only, so the edited audio can\'t be saved.'**
+  String get audioEditorReadOnly;
+
+  /// Title of the progress dialog while the audio editor exports
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting audio'**
+  String get audioEditorExporting;
+
+  /// Snackbar after the audio editor saved its output file(s)
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Saved 1 audio file} other{Saved {count} audio files}}'**
+  String audioEditorSaved(int count);
+
+  /// Export option in the audio editor: join all clips into a single audio file
+  ///
+  /// In en, this message translates to:
+  /// **'Merge into one file'**
+  String get audioEditorExportMerge;
+
+  /// Export option in the audio editor: write each clip as its own audio file
+  ///
+  /// In en, this message translates to:
+  /// **'Save as separate files'**
+  String get audioEditorExportSeparate;
+
+  /// Switch title (and button label) in the audio editor's export sheet to overwrite the source file
+  ///
+  /// In en, this message translates to:
+  /// **'Replace original audio'**
+  String get audioEditorReplaceOriginal;
+
+  /// Explanation under the replace-original switch in the audio editor's export sheet
+  ///
+  /// In en, this message translates to:
+  /// **'The original file will be replaced with the exported cut.'**
+  String get audioEditorReplaceOriginalHint;
+
+  /// Explanation at the bottom of the audio editor's export sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Cuts are lossless: the audio is copied, not re-encoded, so quality doesn\'t change. Cuts land on the nearest audio frame, a few milliseconds from where you set them. Tags and cover art aren\'t carried over.'**
+  String get audioEditorLosslessNote;
+
+  /// Explains the 'Cut out' mode in the audio editor's segments sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the selected segments and export what\'s left.'**
+  String get audioEditorCutOutModeDescription;
+
+  /// Banner in the audio editor for a format that can't be cut losslessly. {format} is the file extension in capitals, e.g. FLAC
+  ///
+  /// In en, this message translates to:
+  /// **'{format} files can\'t be cut without re-encoding, so this file can be played here but not exported.'**
+  String audioEditorUnsupportedFormat(String format);
+
+  /// Tooltip of the button that jumps the audio editor playhead to the previous segment edge
+  ///
+  /// In en, this message translates to:
+  /// **'Previous cut point'**
+  String get audioEditorPrevCutPoint;
+
+  /// Tooltip of the button that jumps the audio editor playhead to the next segment edge
+  ///
+  /// In en, this message translates to:
+  /// **'Next cut point'**
+  String get audioEditorNextCutPoint;
 }
 
 class _AppLocalizationsDelegate

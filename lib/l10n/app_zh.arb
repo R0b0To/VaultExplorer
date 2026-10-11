@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "软件包安装程序",
   "apkOpenPackageInstallerSubtitle": "将此应用安装到你的设备",
   "apkOpenAsZip": "作为 ZIP 打开",
-  "apkOpenAsZipSubtitle": "浏览其中的文件并解压"
+  "apkOpenAsZipSubtitle": "浏览其中的文件并解压",
+  "audioEditorEditAction": "编辑音频",
+  "audioEditorTimelineLabel": "音频时间轴",
+  "audioEditorAnalyzing": "正在读取音频…",
+  "audioEditorLoadFailed": "无法打开此音频文件：{message}",
+  "audioEditorReadOnly": "此保险库为只读，无法保存编辑后的音频。",
+  "audioEditorExporting": "正在导出音频",
+  "audioEditorSaved": "{count, plural, other{已保存 {count} 个音频文件}}",
+  "audioEditorExportMerge": "合并为一个文件",
+  "audioEditorExportSeparate": "保存为多个独立文件",
+  "audioEditorReplaceOriginal": "替换原音频",
+  "audioEditorReplaceOriginalHint": "原文件将被导出的剪辑结果替换。",
+  "audioEditorLosslessNote": "剪辑无损：音频直接复制而不重新编码，因此音质不变。剪辑点会落在最近的音频帧上，与你设置的位置相差几毫秒。标签和封面不会保留。",
+  "audioEditorCutOutModeDescription": "移除选中的片段并导出剩余部分。",
+  "audioEditorUnsupportedFormat": "{format} 文件无法在不重新编码的情况下剪辑，因此此文件可在此播放，但无法导出。",
+  "audioEditorPrevCutPoint": "上一个剪辑点",
+  "audioEditorNextCutPoint": "下一个剪辑点"
 }

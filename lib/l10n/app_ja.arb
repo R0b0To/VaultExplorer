@@ -3030,5 +3030,21 @@
   "apkOpenPackageInstaller": "パッケージインストーラー",
   "apkOpenPackageInstallerSubtitle": "このアプリを端末にインストールします",
   "apkOpenAsZip": "ZIPとして開く",
-  "apkOpenAsZipSubtitle": "中のファイルを参照して展開します"
+  "apkOpenAsZipSubtitle": "中のファイルを参照して展開します",
+  "audioEditorEditAction": "オーディオを編集",
+  "audioEditorTimelineLabel": "オーディオのタイムライン",
+  "audioEditorAnalyzing": "オーディオを読み込み中…",
+  "audioEditorLoadFailed": "このオーディオファイルを開けませんでした: {message}",
+  "audioEditorReadOnly": "この保管庫は読み取り専用のため、編集したオーディオを保存できません。",
+  "audioEditorExporting": "オーディオをエクスポート中",
+  "audioEditorSaved": "{count, plural, other{{count} 件のオーディオファイルを保存しました}}",
+  "audioEditorExportMerge": "1つのファイルに結合",
+  "audioEditorExportSeparate": "別々のファイルとして保存",
+  "audioEditorReplaceOriginal": "元のオーディオを置き換える",
+  "audioEditorReplaceOriginalHint": "元のファイルは、書き出したカット版に置き換えられます。",
+  "audioEditorLosslessNote": "カットは劣化なしです。音声は再エンコードされずにコピーされるため、音質は変わりません。カット位置は設定した位置から数ミリ秒ほどずれた、最も近いオーディオフレームになります。タグとカバーアートは引き継がれません。",
+  "audioEditorCutOutModeDescription": "選択したセグメントを削除し、残りをエクスポートします。",
+  "audioEditorUnsupportedFormat": "{format} ファイルは再エンコードなしではカットできないため、ここで再生はできますがエクスポートはできません。",
+  "audioEditorPrevCutPoint": "前のカット位置",
+  "audioEditorNextCutPoint": "次のカット位置"
 }

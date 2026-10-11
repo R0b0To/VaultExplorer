@@ -11030,4 +11030,68 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get apkOpenAsZipSubtitle =>
       'Explorar los archivos que contiene y extraerlos';
+
+  @override
+  String get audioEditorEditAction => 'Editar audio';
+
+  @override
+  String get audioEditorTimelineLabel => 'Línea de tiempo del audio';
+
+  @override
+  String get audioEditorAnalyzing => 'Leyendo audio…';
+
+  @override
+  String audioEditorLoadFailed(String message) {
+    return 'No se pudo abrir este archivo de audio: $message';
+  }
+
+  @override
+  String get audioEditorReadOnly =>
+      'Esta bóveda es de solo lectura, así que no se puede guardar el audio editado.';
+
+  @override
+  String get audioEditorExporting => 'Exportando audio';
+
+  @override
+  String audioEditorSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count archivos de audio guardados',
+      one: '1 archivo de audio guardado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get audioEditorExportMerge => 'Combinar en un solo archivo';
+
+  @override
+  String get audioEditorExportSeparate => 'Guardar como archivos separados';
+
+  @override
+  String get audioEditorReplaceOriginal => 'Reemplazar audio original';
+
+  @override
+  String get audioEditorReplaceOriginalHint =>
+      'El archivo original se reemplazará por el corte exportado.';
+
+  @override
+  String get audioEditorLosslessNote =>
+      'Los cortes no tienen pérdida: el audio se copia sin recodificar, así que la calidad no cambia. Los cortes caen en el fotograma de audio más cercano, a pocos milisegundos de donde los marques. Las etiquetas y la carátula no se conservan.';
+
+  @override
+  String get audioEditorCutOutModeDescription =>
+      'Elimina los segmentos seleccionados y exporta lo que queda.';
+
+  @override
+  String audioEditorUnsupportedFormat(String format) {
+    return 'Los archivos $format no se pueden cortar sin recodificar, así que este archivo se puede reproducir aquí pero no exportar.';
+  }
+
+  @override
+  String get audioEditorPrevCutPoint => 'Punto de corte anterior';
+
+  @override
+  String get audioEditorNextCutPoint => 'Punto de corte siguiente';
 }

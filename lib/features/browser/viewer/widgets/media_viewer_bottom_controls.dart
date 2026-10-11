@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -5,6 +6,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/ab_loop_state.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
@@ -17,6 +19,10 @@ class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
   final VideoPlaybackManager playbackManager;
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
+
+  /// The A-B repeat section of the playing video: drawn on the seekbar and
+  /// shown on the A-B repeat button.
+  final ValueListenable<AbLoopState> abLoopNotifier;
   final VideoScrubPreviewHost scrubPreviewHost;
   final MediaViewerToolbarConfig toolbarConfig;
   final bool isImage;
@@ -40,6 +46,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     required this.playlistController,
     required this.playbackManager,
     required this.videoProgressNotifier,
+    required this.abLoopNotifier,
     required this.scrubPreviewHost,
     required this.toolbarConfig,
     required this.isImage,
@@ -100,6 +107,20 @@ class MediaViewerBottomControls extends StatelessWidget {
         action: action,
         customIcon: screenOrientationIcon,
         onTap: () => onExecuteAction(action),
+      );
+    }
+
+    if (action == MediaViewerAction.abLoop) {
+      return ValueListenableBuilder<AbLoopState>(
+        valueListenable: abLoopNotifier,
+        builder: (context, loop, _) => MediaViewerActionButton(
+          action: action,
+          isHighlighted: !loop.isEmpty,
+          highlightColor: cs.primary,
+          // Drawn as the text "A-B" (see MediaViewerActionGlyph); only the
+          // highlight says whether a section is being set or repeating.
+          onTap: () => onExecuteAction(action),
+        ),
       );
     }
 
@@ -222,6 +243,7 @@ class MediaViewerBottomControls extends StatelessWidget {
               child: VideoScrubProgressBar(
                 playbackManager: playbackManager,
                 videoProgressNotifier: videoProgressNotifier,
+                abLoopNotifier: abLoopNotifier,
                 onShowUIChanged: onShowUIChanged,
                 onStartHideTimer: onStartHideTimer,
                 previewStyle: toolbarConfig.scrubPreviewStyle,

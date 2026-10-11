@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 
 class MediaViewerActionButton extends StatelessWidget {
   final MediaViewerAction action;
@@ -12,6 +13,7 @@ class MediaViewerActionButton extends StatelessWidget {
   final Color? highlightColor;
   final String? customTooltip;
   final IconData? customIcon;
+
   final double size;
 
   const MediaViewerActionButton({
@@ -56,8 +58,9 @@ class MediaViewerActionButton extends StatelessWidget {
                   }
                 : null,
             child: Center(
-              child: Icon(
-                customIcon ?? action.icon,
+              child: MediaViewerActionGlyph(
+                action: action,
+                icon: customIcon,
                 size: AppIconSize.standard,
                 color: iconColor,
               ),

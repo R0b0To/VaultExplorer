@@ -475,6 +475,52 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     }
   }
 
+  /// The player's exact position right now. [value]'s position only
+  /// refreshes every 200ms, which is too coarse for marking the ends of an
+  /// A-B loop. Null when it cannot be read (disposed, no player, or a failed
+  /// call); callers fall back to [value].
+  Future<Duration?> getExactPosition() async {
+    if (_disposed) return null;
+    try {
+      final ms = await _cmdChannel.invokeMethod<num>('getPosition');
+      if (ms == null || ms < 0) return null;
+      return Duration(milliseconds: ms.toInt());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Repeats the section [start]..[end] of this video until [clearAbLoop].
+  /// The jump back happens on the native playback thread at the exact end
+  /// position, so it does not drift with the position-event interval. While
+  /// it is set, seeks are kept between [start] and [end]. The
+  /// native side keeps [end] clear of the end of the video, and a loop is
+  /// dropped by it whenever a different item is loaded.
+  Future<void> setAbLoop(Duration start, Duration end) async {
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setAbLoop', {
+        'startMs': start.inMilliseconds,
+        'endMs': end.inMilliseconds,
+      });
+    }
+  }
+
+  /// Marks A while B is still to be chosen: until [setAbLoop] or
+  /// [clearAbLoop], seeking before [start] lands on [start] instead.
+  Future<void> setAbLoopStart(Duration start) async {
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setAbLoopStart', {
+        'startMs': start.inMilliseconds,
+      });
+    }
+  }
+
+  Future<void> clearAbLoop() async {
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('clearAbLoop');
+    }
+  }
+
   Future<void> selectAudioTrack(int groupIndex, int trackIndex) async {
     if (!_disposed) {
       await _cmdChannel.invokeMethod('selectAudioTrack', {

@@ -53,6 +53,7 @@ class MediaViewerToolbarConfig {
     this.bottomBarActions = const [
       MediaViewerAction.mute,
       MediaViewerAction.playbackMode,
+      MediaViewerAction.abLoop,
       MediaViewerAction.previous,
       MediaViewerAction.playPause,
       MediaViewerAction.next,
@@ -311,10 +312,23 @@ class MediaViewerToolbarConfig {
         ? advancedWithDecoder
         : [...advancedWithDecoder, MediaViewerAction.adjustments];
 
+    // Same for `abLoop`: a saved layout is the person's own arrangement, so
+    // the new action joins the More menu instead of crowding the bottom bar.
+    final placed4 = {
+      ...top,
+      ...bottom,
+      ...moreWithAudio,
+      ...advancedWithNew,
+      ...hidden,
+    };
+    final moreWithAbLoop = placed4.contains(MediaViewerAction.abLoop)
+        ? moreWithAudio
+        : [...moreWithAudio, MediaViewerAction.abLoop];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
-      moreMenuActions: moreWithAudio,
+      moreMenuActions: moreWithAbLoop,
       advancedSettingsActions: advancedWithNew,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,

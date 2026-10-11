@@ -26,6 +26,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.PlayerMessage
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
@@ -62,6 +63,17 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         private const val TAG = "NativePlayerManager"
         private const val POSITION_UPDATE_INTERVAL_MS = 200L
         private const val DIAGNOSTICS_EMIT_INTERVAL_MS = 1000L
+
+        // An A-B loop's end is kept this far short of the end of the item, so
+        // the jump back to A always happens during playback. Past it the item
+        // would end (or, under repeat-one, wrap to 0 rather than to A) before
+        // the loop message could be delivered. The Dart viewer applies the
+        // same margin (AbLoopState.endGuard) so the marker matches.
+        private const val AB_LOOP_END_GUARD_MS = 150L
+
+        // How far short of B a seek past it is put (see onPositionDiscontinuity).
+        // Far below AbLoopState.minLength, so it can never reach A.
+        private const val AB_LOOP_SEEK_BACKOFF_MS = 30L
 
         // How long one scrub-preview request may spend decoding forward from
         // a keyframe to reach the exact frame before it settles for the
@@ -269,6 +281,16 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
     }
 
+    // A-B loop. Both are C.TIME_UNSET while no loop is set; only the start is
+    // set between marking A and marking B, when it acts as a floor (see
+    // onPositionDiscontinuity). The jump back to
+    // the start is driven by a PlayerMessage delivered by the playback thread
+    // at the exact end position -- not by the 200ms position ticks sent to
+    // Dart, which would overshoot B by up to a tick on every pass.
+    private var abLoopStartMs: Long = C.TIME_UNSET
+    private var abLoopEndMs: Long = C.TIME_UNSET
+    private var abLoopMessage: PlayerMessage? = null
+
     private var videoDecoderName: String = "Initializing..."
     private var audioDecoderName: String = "Initializing..."
     private var isVideoHw: Boolean = true
@@ -430,6 +452,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         videoDecoderInitTimeMs = 0
         colorInfoString = "SDR"
         lastDiagnosticsEmitTimeMs = 0L
+
+        // A loop belongs to the outgoing item: a message left registered would
+        // fire against whatever timeline loads next.
+        clearAbLoop()
 
         // 1. ALWAYS disconnect ExoPlayer from surface FIRST before destroying the surface
         mainHandler.removeCallbacks(positionUpdateRunnable)
@@ -616,6 +642,56 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     fun setLooping(loop: Boolean) {
         player?.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
+
+    /**
+     * Repeats the section [startMs, endMs) of the current item until
+     * [clearAbLoop]. Playback that crosses [endMs] jumps back to [startMs]
+     * (the message is kept after delivery, so it fires on every pass).
+     * Takes precedence over the item-level repeat mode. An invalid range
+     * just clears any loop. While the loop is set, seeks are kept inside the
+     * section (see [onPositionDiscontinuity]).
+     */
+    fun setAbLoop(startMs: Long, endMs: Long) {
+        val p = player ?: return
+        clearAbLoop()
+        val duration = p.duration
+        val end = if (duration != C.TIME_UNSET && duration > 0L) {
+            minOf(endMs, duration - AB_LOOP_END_GUARD_MS)
+        } else {
+            endMs
+        }
+        if (startMs < 0L || end <= startMs) return
+        abLoopStartMs = startMs
+        abLoopEndMs = end
+        abLoopMessage = p.createMessage { _, _ ->
+            val loopStart = abLoopStartMs
+            if (loopStart != C.TIME_UNSET) player?.seekTo(loopStart)
+        }
+            .setLooper(Looper.getMainLooper())
+            .setPosition(end)
+            .setDeleteAfterDelivery(false)
+            .send()
+    }
+
+    /** The player's exact position, or -1 when there is no player. */
+    fun getPositionMs(): Long = player?.currentPosition ?: -1L
+
+    /**
+     * Marks A before B is chosen. Until [setAbLoop] or [clearAbLoop],
+     * the person cannot seek to anywhere before [startMs]: such a seek lands
+     * on [startMs] instead.
+     */
+    fun setAbLoopStart(startMs: Long) {
+        clearAbLoop()
+        if (startMs >= 0L) abLoopStartMs = startMs
+    }
+
+    fun clearAbLoop() {
+        abLoopStartMs = C.TIME_UNSET
+        abLoopEndMs = C.TIME_UNSET
+        runCatching { abLoopMessage?.cancel() }
+        abLoopMessage = null
     }
 
     fun getAudioTracks(): List<Map<String, Any?>> {
@@ -921,6 +997,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     fun release() {
         endScrubPreview()
+        clearAbLoop()
         isFallbackMode = false
         mainHandler.removeCallbacks(positionUpdateRunnable)
         player?.let { p ->
@@ -963,6 +1040,26 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         newPosition: Player.PositionInfo,
         reason: Int
     ) {
+        // Once A is marked nothing before it can be picked, and once B is
+        // marked nothing from it onwards. Whatever asked for the seek
+        // (seekbar, double-tap, notification controls), it ends up inside
+        // the section. A seek to exactly A is left alone, which also keeps
+        // the loop's own jump back from retriggering this.
+        if (reason == Player.DISCONTINUITY_REASON_SEEK && abLoopStartMs != C.TIME_UNSET) {
+            val target = newPosition.positionMs
+            if (target < abLoopStartMs) {
+                player?.seekTo(abLoopStartMs)
+                return
+            }
+            if (abLoopEndMs != C.TIME_UNSET && target >= abLoopEndMs) {
+                // Just short of B rather than on it: the loop message only
+                // fires when playback moves across B, which a seek that
+                // lands exactly on B would skip. Playing on from here
+                // crosses it within a few frames and wraps to A.
+                player?.seekTo(abLoopEndMs - AB_LOOP_SEEK_BACKOFF_MS)
+                return
+            }
+        }
         player?.let { emitPositionUpdate(it) }
     }
 
@@ -973,6 +1070,19 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             Player.STATE_READY -> "ready"
             Player.STATE_ENDED -> "ended"
             else -> "unknown"
+        }
+        // An active A-B loop never lets the item end: if playback gets all the
+        // way to the end anyway (B sits at the very end, or the person seeked
+        // past B), go back to A instead of stopping.
+        if (playbackState == Player.STATE_ENDED &&
+            abLoopStartMs != C.TIME_UNSET &&
+            abLoopEndMs != C.TIME_UNSET
+        ) {
+            player?.let { p ->
+                p.seekTo(abLoopStartMs)
+                p.play()
+            }
+            return
         }
         emitEvent("playbackState", mapOf("state" to state))
         if (playbackState == Player.STATE_READY) {

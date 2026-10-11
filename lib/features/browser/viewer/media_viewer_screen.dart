@@ -44,6 +44,7 @@ import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/ab_loop_toast.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
@@ -58,6 +59,7 @@ import 'package:vaultexplorer/features/audio_editor/audio_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/ab_loop_state.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/adjustments_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
@@ -129,6 +131,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   TapDownDetails? _continuousDoubleTapDetails;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
+
+  /// The A-B repeat section of the video now playing. In memory only, and
+  /// emptied whenever another item (hence a fresh native player) takes over.
+  final ValueNotifier<AbLoopState> _abLoopNotifier = ValueNotifier<AbLoopState>(
+    AbLoopState.empty,
+  );
+  final ValueNotifier<String?> _abLoopToast = ValueNotifier<String?>(null);
+  Timer? _abLoopToastTimer;
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
   // Carries the seekbar's current drag session to the fullscreen scrub
@@ -366,6 +376,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     MediaViewerAction.adjustments,
     MediaViewerAction.mute,
     MediaViewerAction.playbackMode,
+    MediaViewerAction.abLoop,
     MediaViewerAction.subtitles,
     MediaViewerAction.audioTrack,
     MediaViewerAction.aspectRatio,
@@ -822,6 +833,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   void _onActiveVideoControllerChanged() {
+    // A new controller means a freshly initialised native player, which has
+    // no A-B loop registered, so drop the one shown here too.
+    _abLoopNotifier.value = AbLoopState.empty;
     if (_lastListenedController != null) {
       try {
         _lastListenedController!.removeListener(_onControllerTickUpdate);
@@ -851,6 +865,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onCurrentMediaFileChanged() {
     _videoProgressNotifier.value = const VideoPlaybackProgress();
+    _abLoopNotifier.value = AbLoopState.empty;
+    _abLoopToastTimer?.cancel();
+    _abLoopToast.value = null;
     _resumeFlowToken++;
     _resumeFlowStarted = false;
   }
@@ -884,6 +901,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
 
     if (duration <= Duration.zero) return;
+
+    // While an A-B loop is active the video never ends: the native player
+    // jumps back to A instead. So neither whole-video repeat nor
+    // auto-advance may act on the position reaching the end.
+    if (_abLoopNotifier.value.isActive) return;
 
     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
       if (controller.value.isPlaying && position >= duration) {
@@ -2292,6 +2314,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         }
         _updatePlaybackMode(nextMode);
         break;
+      case MediaViewerAction.abLoop:
+        if (!isImage) unawaited(_advanceAbLoop());
+        break;
       case MediaViewerAction.thumbnailCarousel:
         if (_enableCarousel && _playlistController.isPlaylistMode) {
           _toggleCarousel();
@@ -2365,6 +2390,93 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         _cycleScreenOrientation();
         break;
     }
+  }
+
+  /// One press of the A-B repeat button: mark A, then mark B (which starts
+  /// repeating the section), then clear it.
+  Future<void> _advanceAbLoop() async {
+    final controller = _playbackManager.activeController;
+    if (controller == null ||
+        controller.isDisposed ||
+        !controller.value.isInitialized) {
+      return;
+    }
+
+    // The position shown in the UI is up to 200ms stale; ask the player for
+    // the exact one so A and B land where the person pressed.
+    final position =
+        await controller.getExactPosition() ?? controller.value.position;
+    if (!mounted ||
+        controller.isDisposed ||
+        _playbackManager.activeController != controller) {
+      return;
+    }
+
+    // Read after the await above, so a quick second press builds on the
+    // state the first one left rather than on a stale copy.
+    final result = _abLoopNotifier.value.advance(
+      position,
+      controller.value.duration,
+    );
+    final loop = result.state;
+
+    if (result.event == AbLoopEvent.endTooClose) {
+      // The playhead can't be before A (see setAbLoopStart), so this is a
+      // press within a hair of A: nothing to set yet. A tick is enough to
+      // show it registered.
+      unawaited(HapticFeedback.lightImpact());
+      return;
+    }
+
+    final l10n = context.l10n;
+    final message = switch (result.event) {
+      AbLoopEvent.startMarked => l10n.abLoopStartMarkedMessage(
+        formatClockDuration(loop.a!),
+      ),
+      AbLoopEvent.loopStarted => l10n.abLoopStartedMessage(
+        formatClockDuration(loop.a!),
+        formatClockDuration(loop.b!),
+      ),
+      AbLoopEvent.cleared => l10n.abLoopClearedMessage,
+      AbLoopEvent.endTooClose => '', // Returned above.
+    };
+
+    final previous = _abLoopNotifier.value;
+    _abLoopNotifier.value = loop;
+    try {
+      switch (result.event) {
+        case AbLoopEvent.loopStarted:
+          await controller.setAbLoop(loop.a!, loop.b!);
+          // B was marked at the playhead, so go straight back to A: the
+          // section starts repeating now rather than after the rest of the
+          // video has played.
+          await controller.seekTo(loop.a!);
+        case AbLoopEvent.cleared:
+          await controller.clearAbLoop();
+        case AbLoopEvent.startMarked:
+          // From here on nothing before A can be picked.
+          await controller.setAbLoopStart(loop.a!);
+        case AbLoopEvent.endTooClose:
+          break;
+      }
+    } catch (e) {
+      VeLog.w('MediaViewer', 'A-B repeat update failed', e);
+      _abLoopNotifier.value = previous;
+      return;
+    }
+
+    if (!mounted) return;
+    _showAbLoopToast(message);
+  }
+
+  /// Replaces whatever the A-B repeat toast is showing, so quick successive
+  /// presses never queue up or wait for the previous message to go away.
+  void _showAbLoopToast(String message) {
+    _abLoopToastTimer?.cancel();
+    _abLoopToast.value = message;
+    _abLoopToastTimer = Timer(const Duration(milliseconds: 1600), () {
+      _abLoopToast.value = null;
+    });
   }
 
   void _toggleCarousel() {
@@ -2672,6 +2784,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
+    _abLoopNotifier.dispose();
+    _abLoopToastTimer?.cancel();
+    _abLoopToast.dispose();
     _scrubPreviewHost.dispose();
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
@@ -3176,6 +3291,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                       ),
                     ),
                   ),
+                // A-B repeat feedback. Mid-screen and pointer-transparent so
+                // it can never cover or block the button that triggered it.
+                Positioned.fill(child: AbLoopToast(data: _abLoopToast)),
                 Positioned(
                   top: 0,
                   left: 0,
@@ -3303,6 +3421,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                   playlistController: _playlistController,
                                   playbackManager: _playbackManager,
                                   videoProgressNotifier: _videoProgressNotifier,
+                                  abLoopNotifier: _abLoopNotifier,
                                   scrubPreviewHost: _scrubPreviewHost,
                                   toolbarConfig: mediaViewerConfig,
                                   isImage: isImg,

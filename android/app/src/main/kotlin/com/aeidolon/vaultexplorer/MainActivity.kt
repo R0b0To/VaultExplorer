@@ -689,6 +689,9 @@ open class MainActivity : FlutterFragmentActivity() {
                     nativePlayerManager.seekTo(pos)
                     result.success(null)
                 }
+                "getPosition" -> {
+                    result.success(nativePlayerManager.getPositionMs())
+                }
                 "setSpeed" -> {
                     val speed = call.argument<Number>("speed")?.toFloat() ?: 1.0f
                     nativePlayerManager.setSpeed(speed)
@@ -764,6 +767,21 @@ open class MainActivity : FlutterFragmentActivity() {
                 "setLooping" -> {
                     val loop = call.argument<Boolean>("loop") ?: false
                     nativePlayerManager.setLooping(loop)
+                    result.success(null)
+                }
+                "setAbLoop" -> {
+                    val startMs = call.argument<Number>("startMs")?.toLong() ?: -1L
+                    val endMs = call.argument<Number>("endMs")?.toLong() ?: -1L
+                    nativePlayerManager.setAbLoop(startMs, endMs)
+                    result.success(null)
+                }
+                "setAbLoopStart" -> {
+                    val startMs = call.argument<Number>("startMs")?.toLong() ?: -1L
+                    nativePlayerManager.setAbLoopStart(startMs)
+                    result.success(null)
+                }
+                "clearAbLoop" -> {
+                    nativePlayerManager.clearAbLoop()
                     result.success(null)
                 }
                 "getAudioTracks" -> {

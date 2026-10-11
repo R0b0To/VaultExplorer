@@ -10,6 +10,7 @@ enum MediaViewerAction {
   screenOrientation,
   mute,
   playbackMode,
+  abLoop,
   thumbnailCarousel,
   subtitles,
   audioTrack,
@@ -39,6 +40,7 @@ enum MediaViewerAction {
         MediaViewerAction.screenOrientation => Icons.screen_rotation_rounded,
         MediaViewerAction.mute => Icons.volume_up_rounded,
         MediaViewerAction.playbackMode => Icons.repeat_rounded,
+        MediaViewerAction.abLoop => Icons.repeat_on_rounded,
         MediaViewerAction.thumbnailCarousel => Icons.view_carousel_rounded,
         MediaViewerAction.subtitles => Icons.subtitles_rounded,
         MediaViewerAction.audioTrack => Icons.audiotrack_rounded,
@@ -70,6 +72,7 @@ enum MediaViewerAction {
         MediaViewerAction.screenOrientation => l10n.screenOrientationMenu,
         MediaViewerAction.mute => l10n.muteTooltip,
         MediaViewerAction.playbackMode => l10n.mediaViewerActionPlaybackMode,
+        MediaViewerAction.abLoop => l10n.mediaViewerActionAbLoop,
         MediaViewerAction.thumbnailCarousel => l10n.thumbnailCarouselTooltip,
         MediaViewerAction.subtitles => l10n.subtitlesLabel,
         MediaViewerAction.audioTrack => l10n.audioTrackTitle,
@@ -100,6 +103,7 @@ enum MediaViewerAction {
           this == MediaViewerAction.aspectRatio ||
           this == MediaViewerAction.editVideo ||
           this == MediaViewerAction.editAudio ||
+          this == MediaViewerAction.abLoop ||
           this == MediaViewerAction.decoder ||
           this == MediaViewerAction.diagnostics) {
         return false;

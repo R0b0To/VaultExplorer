@@ -205,6 +205,15 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     await _media3.setLooping(loop);
   }
 
+  Future<Duration?> getExactPosition() => _media3.getExactPosition();
+
+  Future<void> setAbLoop(Duration start, Duration end) =>
+      _media3.setAbLoop(start, end);
+
+  Future<void> setAbLoopStart(Duration start) => _media3.setAbLoopStart(start);
+
+  Future<void> clearAbLoop() => _media3.clearAbLoop();
+
   Future<void> selectAudioTrack(int groupIndex, int trackIndex) async {
     await _media3.selectAudioTrack(groupIndex, trackIndex);
   }

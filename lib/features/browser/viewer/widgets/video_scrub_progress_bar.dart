@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/ab_loop_state.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart'
@@ -30,6 +33,10 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widge
 class VideoScrubProgressBar extends StatefulWidget {
   final VideoPlaybackManager playbackManager;
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
+
+  /// The A-B repeat section to mark on the track (nothing is drawn while it
+  /// is empty).
+  final ValueListenable<AbLoopState> abLoopNotifier;
   final ValueChanged<bool> onShowUIChanged;
   final VoidCallback onStartHideTimer;
   final ScrubPreviewStyle previewStyle;
@@ -39,6 +46,7 @@ class VideoScrubProgressBar extends StatefulWidget {
     super.key,
     required this.playbackManager,
     required this.videoProgressNotifier,
+    required this.abLoopNotifier,
     required this.onShowUIChanged,
     required this.onStartHideTimer,
     required this.previewStyle,
@@ -68,6 +76,19 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
     final size = widget.playbackManager.activeController?.value.size;
     if (size == null || size.width <= 0 || size.height <= 0) return 16 / 9;
     return size.width / size.height;
+  }
+
+  /// Keeps a drag inside the A-B section: nothing before A once A is marked,
+  /// nothing past B once B is too.
+  double _clampToLoop(double value, Duration duration) {
+    final loop = widget.abLoopNotifier.value;
+    final a = loop.a;
+    if (a == null || duration <= Duration.zero) return value;
+    final ms = duration.inMilliseconds;
+    final lower = a.inMilliseconds / ms;
+    final b = loop.b;
+    final upper = b == null ? 1.0 : b.inMilliseconds / ms;
+    return math.min(math.max(value, lower), upper);
   }
 
   void _beginScrub() {
@@ -161,6 +182,22 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
                         clipBehavior: Clip.none,
                         alignment: Alignment.centerLeft,
                         children: [
+                          // Under the slider, so its thumb stays on top of
+                          // the section's highlight.
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: ValueListenableBuilder<AbLoopState>(
+                                valueListenable: widget.abLoopNotifier,
+                                builder: (context, loop, _) => CustomPaint(
+                                  painter: _AbLoopPainter(
+                                    loop: loop,
+                                    duration: progress.duration,
+                                    color: cs.tertiary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                           Slider(
                             value: progress.sliderValue.clamp(0.0, 1.0),
                             onChangeStart: hasValidDuration
@@ -172,7 +209,11 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
                                   }
                                 : null,
                             onChanged: hasValidDuration
-                                ? (value) {
+                                ? (rawValue) {
+                                    final value = _clampToLoop(
+                                      rawValue,
+                                      progress.duration,
+                                    );
                                     widget.onShowUIChanged(true);
                                     final ms = progress.duration.inMilliseconds;
                                     final target = Duration(
@@ -187,7 +228,11 @@ class _VideoScrubProgressBarState extends State<VideoScrubProgressBar> {
                                   }
                                 : null,
                             onChangeEnd: hasValidDuration
-                                ? (value) async {
+                                ? (rawValue) async {
+                                    final value = _clampToLoop(
+                                      rawValue,
+                                      progress.duration,
+                                    );
                                     final controller = widget.playbackManager.activeController;
                                     final ms = progress.duration.inMilliseconds;
                                     final targetDuration = Duration(
@@ -354,4 +399,82 @@ class _ScrubPreviewBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Marks the A-B repeat section on the seekbar: a band over the track
+/// between the two ends, and a short tick at each end.
+///
+/// Uses the same geometry as [_ScrubPreviewBubble] (the [Slider]'s track and
+/// thumb travel are inset by the thumb radius on both sides) so the ticks sit
+/// exactly where the thumb is when playback is at A or B.
+class _AbLoopPainter extends CustomPainter {
+  static const double _thumbRadius = 6;
+  static const double _bandHeight = 6;
+  static const double _tickWidth = 3;
+  static const double _tickHeight = 16;
+
+  final AbLoopState loop;
+  final Duration duration;
+  final Color color;
+
+  const _AbLoopPainter({
+    required this.loop,
+    required this.duration,
+    required this.color,
+  });
+
+  double _xFor(Duration position, double width) {
+    final usable = (width - _thumbRadius * 2).clamp(0.0, double.infinity);
+    final fraction =
+        (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    return _thumbRadius + usable * fraction;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = loop.a;
+    if (a == null || duration <= Duration.zero) return;
+
+    final centerY = size.height / 2;
+    final startX = _xFor(a, size.width);
+    final b = loop.b;
+    final endX = b == null ? null : _xFor(b, size.width);
+
+    if (endX != null) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(
+            startX,
+            centerY - _bandHeight / 2,
+            endX,
+            centerY + _bandHeight / 2,
+          ),
+          const Radius.circular(_bandHeight / 2),
+        ),
+        Paint()..color = color.withValues(alpha: 0.55),
+      );
+    }
+
+    final tickPaint = Paint()..color = color;
+    void tick(double x) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(x, centerY),
+            width: _tickWidth,
+            height: _tickHeight,
+          ),
+          const Radius.circular(_tickWidth / 2),
+        ),
+        tickPaint,
+      );
+    }
+
+    tick(startX);
+    if (endX != null) tick(endX);
+  }
+
+  @override
+  bool shouldRepaint(_AbLoopPainter old) =>
+      old.loop != loop || old.duration != duration || old.color != color;
 }

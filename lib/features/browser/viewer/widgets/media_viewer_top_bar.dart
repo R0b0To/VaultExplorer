@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 
 class MediaViewerTopBar extends StatelessWidget {
   final PlaylistController playlistController;
@@ -215,7 +216,12 @@ class MediaViewerTopBar extends StatelessWidget {
             style: isDelete || (isMuteAction && isMuted)
                 ? MenuItemButton.styleFrom(foregroundColor: cs.error)
                 : null,
-            leadingIcon: Icon(icon, size: AppIconSize.small, color: iconColor),
+            leadingIcon: MediaViewerActionGlyph(
+              action: action,
+              icon: icon,
+              size: AppIconSize.small,
+              color: iconColor,
+            ),
             onPressed: () {
               HapticFeedback.lightImpact();
               onExecuteAction(action);

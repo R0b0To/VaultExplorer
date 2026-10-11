@@ -10,6 +10,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class AdvancedSettingsSheet extends ConsumerStatefulWidget {
@@ -548,7 +549,10 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
         final isDelete = action == MediaViewerAction.delete;
         return ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(action.icon, color: isDelete ? cs.error : null),
+          leading: MediaViewerActionGlyph(
+            action: action,
+            color: isDelete ? cs.error : null,
+          ),
           title: Text(
             action.getLocalizedLabel(context.l10n),
             style: isDelete ? TextStyle(color: cs.error) : null,

@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 /// The settings sections for the Media Player Controls page, mirroring the
@@ -971,7 +972,7 @@ class _MediaViewerToolbarSettingsScreenState
                     color: cs.primaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(action.icon, size: 20, color: cs.primary),
+                  child: MediaViewerActionGlyph(action: action, size: 20, color: cs.primary),
                 ),
                 title: Text(
                   action.getLocalizedLabel(l10n),
@@ -1599,7 +1600,7 @@ class _MediaViewerToolbarLayoutScreenState
                 ...mediaConfig.topBarActions.take(5).map(
                   (a) => Padding(
                     padding: const EdgeInsets.only(left: 4),
-                    child: Icon(a.icon, size: 16, color: cs.primary),
+                    child: MediaViewerActionGlyph(action: a, size: 16, color: cs.primary),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -1688,7 +1689,7 @@ class _MediaViewerToolbarLayoutScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: mediaConfig.bottomBarActions
                       .map(
-                        (a) => Icon(a.icon, size: 18, color: cs.primary),
+                        (a) => MediaViewerActionGlyph(action: a, size: 18, color: cs.primary),
                       )
                       .toList(),
                 ),
@@ -1895,7 +1896,7 @@ class _MediaViewerToolbarLayoutScreenState
                   color: cs.primaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(action.icon, size: 20, color: cs.primary),
+                child: MediaViewerActionGlyph(action: action, size: 20, color: cs.primary),
               ),
               title: Text(
                 action.getLocalizedLabel(l10n),
@@ -2070,7 +2071,7 @@ class _MediaViewerToolbarLayoutScreenState
                     color: cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(action.icon, size: 20, color: cs.primary),
+                  child: MediaViewerActionGlyph(action: action, size: 20, color: cs.primary),
                 ),
                 title: Text(
                   action.getLocalizedLabel(l10n),

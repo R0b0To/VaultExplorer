@@ -11,11 +11,14 @@ import 'dart:typed_data';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_audio_edit_api.dart';
 import 'package:vaultexplorer/core/api/vault_video_edit_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
+import 'package:vaultexplorer/features/browser/viewer/audio_metadata_parser.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart'
     show ParsedMetadata, MetadataParser;
@@ -28,6 +31,8 @@ class FileInfoState {
   final bool loading;
   final ParsedMetadata? metadata;
   final VideoProbe? videoMetadata;
+  final AudioProbe? audioMetadata;
+  final ParsedAudioMetadata? audioTags;
   final String? sha256;
   final bool calculatingSha256;
   final int? folderItemCount;
@@ -38,6 +43,8 @@ class FileInfoState {
     this.loading = true,
     this.metadata,
     this.videoMetadata,
+    this.audioMetadata,
+    this.audioTags,
     this.sha256,
     this.calculatingSha256 = false,
     this.folderItemCount,
@@ -49,6 +56,8 @@ class FileInfoState {
     bool? loading,
     ParsedMetadata? metadata,
     VideoProbe? videoMetadata,
+    AudioProbe? audioMetadata,
+    ParsedAudioMetadata? audioTags,
     String? sha256,
     bool? calculatingSha256,
     int? folderItemCount,
@@ -58,6 +67,8 @@ class FileInfoState {
     loading: loading ?? this.loading,
     metadata: metadata ?? this.metadata,
     videoMetadata: videoMetadata ?? this.videoMetadata,
+    audioMetadata: audioMetadata ?? this.audioMetadata,
+    audioTags: audioTags ?? this.audioTags,
     sha256: sha256 ?? this.sha256,
     calculatingSha256: calculatingSha256 ?? this.calculatingSha256,
     folderItemCount: folderItemCount ?? this.folderItemCount,
@@ -80,6 +91,7 @@ class FileInfo extends _$FileInfo {
     try {
       final isImg = MediaViewerConstants.isImage(entry.name);
       final isVid = MediaViewerConstants.isVideo(entry.name);
+      final isAud = MediaViewerConstants.isAudio(entry.name);
 
       Uint8List? headerBytes;
       if (!entry.isDir && isImg) {
@@ -88,6 +100,25 @@ class FileInfo extends _$FileInfo {
           headerBytes = await ref
               .read(vaultFileIoApiProvider)
               .readFileChunk(container, fullPath, 0, readLen);
+        }
+      }
+
+      // Tags (and cover art) sit at the start of an audio file, so read more
+      // of it than an image header. A failed read just means no tags.
+      ParsedAudioMetadata? audioTags;
+      if (!entry.isDir && isAud) {
+        final readLen = min(entry.sizeBytes, AudioMetadataParser.headerReadBytes);
+        if (readLen > 0) {
+          try {
+            final audioHeader = await ref
+                .read(vaultFileIoApiProvider)
+                .readFileChunk(container, fullPath, 0, readLen);
+            if (audioHeader != null) {
+              audioTags = AudioMetadataParser.parse(audioHeader);
+            }
+          } catch (_) {
+            // Keep ordinary file properties available.
+          }
         }
       }
 
@@ -119,10 +150,31 @@ class FileInfo extends _$FileInfo {
         }
       }
 
+      AudioProbe? audioMetadata;
+      if (!entry.isDir && isAud) {
+        final nativePath = container.isLocalStorage
+            ? p.join(container.uri, fullPath)
+            : fullPath;
+        try {
+          audioMetadata = await ref
+              .read(vaultAudioEditApiProvider)
+              .probe(
+                volId: container.volId,
+                filePath: nativePath,
+                isLocalStorage: container.isLocalStorage,
+              );
+        } catch (_) {
+          // Same as video: a file the platform can't inspect still shows its
+          // ordinary properties (and any tags read above).
+        }
+      }
+
       if (!ref.mounted) return;
       state = state.copyWith(
         metadata: parsed,
         videoMetadata: videoMetadata,
+        audioMetadata: audioMetadata,
+        audioTags: audioTags,
         loading: false,
       );
 

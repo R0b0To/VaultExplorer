@@ -83,6 +83,8 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     );
     final metadata = controllerState.metadata;
     final videoMetadata = controllerState.videoMetadata;
+    final audioMetadata = controllerState.audioMetadata;
+    final audioTags = controllerState.audioTags;
     final sha256 = controllerState.sha256;
     final calculatingSha256 = controllerState.calculatingSha256;
     final loading = controllerState.loading;
@@ -96,6 +98,28 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     final ext = widget.entry.name.contains('.')
         ? widget.entry.name.split('.').last
         : '';
+
+    // Some containers (MP3 in particular) report no bitrate; fall back to the
+    // file's average (size / duration), flagged as approximate. It includes
+    // tags and cover art, so it is only an estimate.
+    int? audioBitrate = audioMetadata?.bitrate;
+    var audioBitrateApprox = false;
+    if ((audioBitrate ?? 0) <= 0 &&
+        audioMetadata != null &&
+        audioMetadata.durationUs > 0 &&
+        widget.entry.sizeBytes > 0) {
+      audioBitrate =
+          (widget.entry.sizeBytes * 8 * 1000000 / audioMetadata.durationUs)
+              .round();
+      audioBitrateApprox = true;
+    }
+    final hasAudioProperties =
+        (audioMetadata != null &&
+            (audioMetadata.durationUs > 0 ||
+                audioMetadata.mime?.isNotEmpty == true ||
+                (audioMetadata.sampleRate ?? 0) > 0 ||
+                (audioMetadata.channels ?? 0) > 0)) ||
+        audioTags?.bitDepth != null;
 
     return AppBottomSheet(
       child: SizedBox(
@@ -248,6 +272,52 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                     context.l10n.formatLabel,
                                     metadata!.mimeType!,
                                   ),
+                                if (metadata?.colorMode != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.colorModeLabel,
+                                    metadata!.colorMode!,
+                                  ),
+                                if (metadata?.bitDepth != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.bitDepthLabel,
+                                    metadata!.bitDepth!,
+                                  ),
+                                if (metadata?.hasAlpha != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.transparencyLabel,
+                                    metadata!.hasAlpha!
+                                        ? context.l10n.vaultInfoYesValue
+                                        : context.l10n.vaultInfoNoValue,
+                                  ),
+                                if (metadata?.isAnimated != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.animationLabel,
+                                    metadata!.isAnimated!
+                                        ? context.l10n.vaultInfoYesValue
+                                        : context.l10n.vaultInfoNoValue,
+                                  ),
+                                if (metadata?.orientation != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.orientationLabel,
+                                    metadata!.orientation!,
+                                  ),
+                                if (metadata?.density != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.densityLabel,
+                                    metadata!.density!,
+                                  ),
+                                if (metadata?.encoding != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.encodingLabel,
+                                    metadata!.encoding!,
+                                  ),
                               ],
                             ),
                           ],
@@ -344,6 +414,106 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                     context,
                                     context.l10n.subtitleTracksLabel,
                                     videoMetadata.subtitleTracks.toString(),
+                                  ),
+                              ],
+                            ),
+                          ],
+                          if (audioTags?.hasTags == true) ...[
+                            const SizedBox(height: 16),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.audioTagsSectionHeader,
+                            ),
+                            AppCard.rows(
+                              dividerIndent: 16,
+                              children: [
+                                if (audioTags?.title != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.titleSectionLabel,
+                                    audioTags!.title!,
+                                  ),
+                                if (audioTags?.artist != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.artistLabel,
+                                    audioTags!.artist!,
+                                  ),
+                                if (audioTags?.album != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.albumLabel,
+                                    audioTags!.album!,
+                                  ),
+                                if (audioTags?.trackNumber != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioTrackLabel,
+                                    audioTags!.trackNumber!,
+                                  ),
+                                if (audioTags?.year != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.yearLabel,
+                                    audioTags!.year!,
+                                  ),
+                                if (audioTags?.genre != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.genreLabel,
+                                    audioTags!.genre!,
+                                  ),
+                              ],
+                            ),
+                          ],
+                          if (hasAudioProperties) ...[
+                            const SizedBox(height: 16),
+                            _buildSectionTitle(
+                              context,
+                              context.l10n.audioFilePropertiesSectionHeader,
+                            ),
+                            AppCard.rows(
+                              dividerIndent: 16,
+                              children: [
+                                if ((audioMetadata?.durationUs ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.durationLabel,
+                                    formatClockDuration(
+                                      Duration(
+                                        microseconds: audioMetadata!.durationUs,
+                                      ),
+                                    ),
+                                  ),
+                                if (audioMetadata?.mime?.isNotEmpty == true)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioCodecLabel,
+                                    _prettyCodec(audioMetadata!.mime!),
+                                  ),
+                                if ((audioBitrate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioBitrateLabel,
+                                    '${audioBitrateApprox ? '~' : ''}${_formatBitrate(audioBitrate!)}',
+                                  ),
+                                if ((audioMetadata?.sampleRate ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.sampleRateLabel,
+                                    '${audioMetadata!.sampleRate} Hz',
+                                  ),
+                                if (audioTags?.bitDepth != null)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.bitDepthLabel,
+                                    '${audioTags!.bitDepth}-bit',
+                                  ),
+                                if ((audioMetadata?.channels ?? 0) > 0)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.audioChannelsLabel,
+                                    audioMetadata!.channels.toString(),
                                   ),
                               ],
                             ),
@@ -527,6 +697,15 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     'audio/ac3' => 'Dolby Digital (AC-3)',
     'audio/eac3' => 'Dolby Digital Plus (E-AC-3)',
     'audio/mpeg' => 'MP3',
+    'audio/flac' => 'FLAC',
+    'audio/raw' => 'PCM (WAV)',
+    'audio/alac' => 'ALAC',
+    'audio/3gpp' => 'AMR-NB',
+    'audio/amr-wb' => 'AMR-WB',
+    'audio/vnd.dts' => 'DTS',
+    'audio/vnd.dts.hd' => 'DTS-HD',
+    'audio/g711-alaw' => 'G.711 A-law',
+    'audio/g711-mlaw' => 'G.711 mu-law',
     _ => mime,
   };
 
@@ -608,6 +787,27 @@ class ParsedMetadata {
   final String? software;
   final String? gpsCoordinates;
 
+  /// Bits per channel, e.g. `8-bit` (or palette index bits for GIF).
+  final String? bitDepth;
+
+  /// Colour model of the stored pixels, e.g. `RGB`, `RGBA`, `Grayscale`.
+  final String? colorMode;
+
+  /// Whether the image has an alpha/transparency channel; null when unknown.
+  final bool? hasAlpha;
+
+  /// Whether the image holds more than one frame; null when unknown.
+  final bool? isAnimated;
+
+  /// EXIF orientation, e.g. `Rotated 90° CW`.
+  final String? orientation;
+
+  /// Print density, e.g. `300 dpi`.
+  final String? density;
+
+  /// How the pixel data is stored, e.g. `Progressive`, `Lossless`.
+  final String? encoding;
+
   const ParsedMetadata({
     this.width,
     this.height,
@@ -622,6 +822,13 @@ class ParsedMetadata {
     this.flash,
     this.software,
     this.gpsCoordinates,
+    this.bitDepth,
+    this.colorMode,
+    this.hasAlpha,
+    this.isAnimated,
+    this.orientation,
+    this.density,
+    this.encoding,
   });
 
   bool get hasMediaInfo => width != null || height != null || mimeType != null;
@@ -666,18 +873,59 @@ class MetadataParser {
       return const ParsedMetadata();
     }
 
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      return _parseJpeg(headerBytes);
-    } else if (lower.endsWith('.png')) {
-      return _parsePng(headerBytes);
-    } else if (lower.endsWith('.gif')) {
-      return _parseGif(headerBytes);
-    } else if (lower.endsWith('.webp')) {
-      return _parseWebp(headerBytes);
+    // Trust the bytes over the extension: a JPEG saved as `.png` (common with
+    // downloaded wallpapers) would otherwise be fed to the wrong parser and
+    // show nothing. The extension is only a fallback for unrecognised headers.
+    final kind = _sniffKind(headerBytes) ?? _kindFromName(fileName);
+    switch (kind) {
+      case 'jpeg':
+        return _parseJpeg(headerBytes);
+      case 'png':
+        return _parsePng(headerBytes);
+      case 'gif':
+        return _parseGif(headerBytes);
+      case 'webp':
+        return _parseWebp(headerBytes);
+      case 'bmff':
+        return _parseIsoBmff(headerBytes);
     }
 
     return const ParsedMetadata();
+  }
+
+  static String? _sniffKind(Uint8List b) {
+    if (b.length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
+      return 'jpeg';
+    }
+    if (b.length >= 4 &&
+        b[0] == 0x89 &&
+        b[1] == 0x50 &&
+        b[2] == 0x4E &&
+        b[3] == 0x47) {
+      return 'png';
+    }
+    if (b.length >= 3 && b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46) {
+      return 'gif';
+    }
+    if (b.length >= 12 &&
+        String.fromCharCodes(b.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(b.sublist(8, 12)) == 'WEBP') {
+      return 'webp';
+    }
+    if (b.length >= 12 && String.fromCharCodes(b.sublist(4, 8)) == 'ftyp') {
+      return 'bmff';
+    }
+    return null;
+  }
+
+  static String? _kindFromName(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'jpeg';
+    if (lower.endsWith('.png')) return 'png';
+    if (lower.endsWith('.gif')) return 'gif';
+    if (lower.endsWith('.webp')) return 'webp';
+    if (lower.endsWith('.avif') || lower.endsWith('.heic')) return 'bmff';
+    return null;
   }
 
   static ParsedMetadata _parseJpeg(Uint8List bytes) {
@@ -698,6 +946,12 @@ class MetadataParser {
     String? flash;
     String? software;
     String? gpsCoordinates;
+    int? precision;
+    int? components;
+    bool progressive = false;
+    String? orientationRaw;
+    String? xResolution;
+    String? resolutionUnit;
 
     int offset = 2;
     while (offset < bytes.length - 4) {
@@ -723,6 +977,9 @@ class MetadataParser {
         if (offset + 9 <= bytes.length) {
           height = (bytes[offset + 5] << 8) | bytes[offset + 6];
           width = (bytes[offset + 7] << 8) | bytes[offset + 8];
+          precision = bytes[offset + 4];
+          if (offset + 10 <= bytes.length) components = bytes[offset + 9];
+          progressive = marker == 0xC2 || marker == 0xC6;
         }
       }
 
@@ -749,6 +1006,9 @@ class MetadataParser {
           flash = exif['flash'];
           software = exif['software'];
           gpsCoordinates = exif['gps'];
+          orientationRaw = exif['orientation'];
+          xResolution = exif['xResolution'];
+          resolutionUnit = exif['resolutionUnit'];
         }
       }
 
@@ -778,7 +1038,43 @@ class MetadataParser {
       flash: flash,
       software: software,
       gpsCoordinates: gpsCoordinates,
+      bitDepth: precision != null && precision > 0 ? '$precision-bit' : null,
+      colorMode: switch (components) {
+        1 => 'Grayscale',
+        3 => 'YCbCr',
+        4 => 'CMYK',
+        _ => null,
+      },
+      isAnimated: false,
+      orientation: _orientationName(int.tryParse(orientationRaw ?? '')),
+      density: _densityString(xResolution, resolutionUnit),
+      encoding: width != null ? (progressive ? 'Progressive' : 'Baseline') : null,
     );
+  }
+
+  static String? _orientationName(int? value) => switch (value) {
+    1 => 'Normal',
+    2 => 'Flipped horizontally',
+    3 => 'Rotated 180°',
+    4 => 'Flipped vertically',
+    5 => 'Transposed',
+    6 => 'Rotated 90° CW',
+    7 => 'Transverse',
+    8 => 'Rotated 90° CCW',
+    _ => null,
+  };
+
+  /// EXIF ResolutionUnit: 2 = inch (the default when absent), 3 = centimetre,
+  /// 1 = no absolute unit (then the number means nothing, so nothing is shown).
+  static String? _densityString(String? xRes, String? unit) {
+    final value = double.tryParse(xRes ?? '');
+    if (value == null || value <= 0) return null;
+    final u = int.tryParse(unit ?? '') ?? 2;
+    if (u == 1) return null;
+    final text = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
+    return u == 3 ? '$text dpcm' : '$text dpi';
   }
 
   static Map<String, String> _parseTiffExif(Uint8List tiff) {
@@ -845,6 +1141,18 @@ class MetadataParser {
         if (tag == 0x8769) readIfd(valOffset, true, false, depth + 1);
         if (tag == 0x8825) readIfd(valOffset, false, true, depth + 1);
 
+        // IFD0-only tags. SHORT values sit in the first two bytes of the
+        // value field, so read them as U16 (a U32 read is wrong when the
+        // data is big-endian).
+        if (!isSubIfd && !isGps) {
+          if (tag == 0x0112) result['orientation'] = '${readU16(p + 8)}';
+          if (tag == 0x011A) {
+            final xr = readRational(valOffset);
+            if (xr != null) result['xResolution'] = '$xr';
+          }
+          if (tag == 0x0128) result['resolutionUnit'] = '${readU16(p + 8)}';
+        }
+
         if (isSubIfd) {
           if (tag == 0x9003 || tag == 0x9004) result['dateTaken'] = readAscii();
           if (tag == 0xA434) result['lensModel'] = readAscii();
@@ -880,59 +1188,275 @@ class MetadataParser {
   }
 
   static ParsedMetadata _parsePng(Uint8List bytes) {
-    if (bytes.length >= 24 &&
-        bytes[0] == 0x89 &&
-        bytes[1] == 0x50 &&
-        bytes[2] == 0x4E &&
-        bytes[3] == 0x47) {
-      final w =
-          (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-      final h =
-          (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
-      return ParsedMetadata(width: w, height: h, mimeType: 'PNG Image');
+    if (bytes.length < 24 ||
+        bytes[0] != 0x89 ||
+        bytes[1] != 0x50 ||
+        bytes[2] != 0x4E ||
+        bytes[3] != 0x47) {
+      return const ParsedMetadata();
     }
-    return const ParsedMetadata();
+    int u32(int o) =>
+        (bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3];
+
+    final w = u32(16);
+    final h = u32(20);
+
+    String? bitDepth;
+    String? colorMode;
+    bool? hasAlpha;
+    String? encoding;
+    if (bytes.length >= 29) {
+      bitDepth = '${bytes[24]}-bit';
+      final (String? mode, bool? alpha) = switch (bytes[25]) {
+        0 => ('Grayscale', false),
+        2 => ('RGB', false),
+        3 => ('Indexed', false),
+        4 => ('Grayscale + Alpha', true),
+        6 => ('RGBA', true),
+        _ => (null, null),
+      };
+      colorMode = mode;
+      hasAlpha = alpha;
+      encoding = bytes[28] == 1 ? 'Interlaced (Adam7)' : 'Non-interlaced';
+    }
+
+    // Walk the chunks that precede the pixel data: tRNS adds transparency to
+    // any colour type, and acTL marks an animated PNG (APNG).
+    var animated = false;
+    var off = 8;
+    while (off + 8 <= bytes.length) {
+      final len = u32(off);
+      final type = String.fromCharCodes(bytes.sublist(off + 4, off + 8));
+      if (type == 'IDAT' || type == 'IEND') break;
+      if (type == 'tRNS') hasAlpha = true;
+      if (type == 'acTL') animated = true;
+      if (off + 12 + len > bytes.length) break;
+      off += 12 + len;
+    }
+
+    return ParsedMetadata(
+      width: w,
+      height: h,
+      mimeType: 'PNG Image',
+      bitDepth: bitDepth,
+      colorMode: colorMode,
+      hasAlpha: hasAlpha,
+      isAnimated: animated,
+      encoding: encoding,
+    );
   }
 
   static ParsedMetadata _parseGif(Uint8List bytes) {
-    if (bytes.length >= 10 &&
-        bytes[0] == 0x47 &&
-        bytes[1] == 0x49 &&
-        bytes[2] == 0x46) {
-      final w = bytes[6] | (bytes[7] << 8);
-      final h = bytes[8] | (bytes[9] << 8);
-      return ParsedMetadata(width: w, height: h, mimeType: 'GIF Image');
+    if (bytes.length < 13 ||
+        bytes[0] != 0x47 ||
+        bytes[1] != 0x49 ||
+        bytes[2] != 0x46) {
+      return const ParsedMetadata();
     }
-    return const ParsedMetadata();
+    final w = bytes[6] | (bytes[7] << 8);
+    final h = bytes[8] | (bytes[9] << 8);
+    final version = String.fromCharCodes(bytes.sublist(3, 6));
+
+    final packed = bytes[10];
+    final hasPalette = (packed & 0x80) != 0;
+    final paletteBits = (packed & 0x07) + 1;
+    final paletteBytes = hasPalette ? 3 * (1 << paletteBits) : 0;
+
+    // Walk the blocks to count frames and spot a transparent colour. Only the
+    // start of the file is available, so a long animation may be cut short.
+    int skipSubBlocks(int p) {
+      while (p < bytes.length) {
+        final n = bytes[p];
+        p += 1 + n;
+        if (n == 0) return p;
+      }
+      return bytes.length + 1;
+    }
+
+    var pos = 13 + paletteBytes;
+    var frames = 0;
+    var transparent = false;
+    var complete = false;
+    while (pos < bytes.length) {
+      final block = bytes[pos];
+      if (block == 0x3B) {
+        complete = true;
+        break;
+      }
+      if (block == 0x21) {
+        if (pos + 2 > bytes.length) break;
+        // Graphic Control Extension: bit 0 of the packed byte = transparency.
+        if (bytes[pos + 1] == 0xF9 &&
+            pos + 4 <= bytes.length &&
+            (bytes[pos + 3] & 0x01) != 0) {
+          transparent = true;
+        }
+        pos = skipSubBlocks(pos + 2);
+      } else if (block == 0x2C) {
+        if (pos + 10 > bytes.length) break;
+        frames++;
+        final imagePacked = bytes[pos + 9];
+        final localPalette = (imagePacked & 0x80) != 0
+            ? 3 * (1 << ((imagePacked & 0x07) + 1))
+            : 0;
+        pos += 10 + localPalette + 1; // +1: LZW minimum code size
+        if (pos >= bytes.length) break;
+        pos = skipSubBlocks(pos);
+      } else {
+        break;
+      }
+    }
+
+    return ParsedMetadata(
+      width: w,
+      height: h,
+      mimeType: 'GIF Image',
+      bitDepth: hasPalette ? '$paletteBits-bit' : null,
+      colorMode: hasPalette ? 'Indexed' : null,
+      hasAlpha: transparent ? true : (complete ? false : null),
+      isAnimated: frames > 1 ? true : (complete ? false : null),
+      encoding: version,
+    );
   }
 
   static ParsedMetadata _parseWebp(Uint8List bytes) {
-    if (bytes.length >= 30 &&
-        bytes[0] == 0x52 &&
-        bytes[1] == 0x49 &&
-        bytes[2] == 0x46 &&
-        bytes[3] == 0x46 &&
-        bytes[8] == 0x57 &&
-        bytes[9] == 0x45 &&
-        bytes[10] == 0x42 &&
-        bytes[11] == 0x50) {
-      if (bytes[12] == 0x56 &&
-          bytes[13] == 0x50 &&
-          bytes[14] == 0x38 &&
-          bytes[15] == 0x20) {
-        final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
-        final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
-        return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
-      }
-      if (bytes[12] == 0x56 &&
-          bytes[13] == 0x50 &&
-          bytes[14] == 0x38 &&
-          bytes[15] == 0x58) {
-        final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
-        final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
-        return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
-      }
+    if (bytes.length < 30 ||
+        bytes[0] != 0x52 ||
+        bytes[1] != 0x49 ||
+        bytes[2] != 0x46 ||
+        bytes[3] != 0x46 ||
+        bytes[8] != 0x57 ||
+        bytes[9] != 0x45 ||
+        bytes[10] != 0x42 ||
+        bytes[11] != 0x50) {
+      return const ParsedMetadata();
     }
-    return const ParsedMetadata();
+    int u32le(int o) =>
+        bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) | (bytes[o + 3] << 24);
+
+    final fourcc = String.fromCharCodes(bytes.sublist(12, 16));
+    int? w;
+    int? h;
+    bool? alpha;
+    bool? animated;
+    String? encoding;
+
+    if (fourcc == 'VP8 ') {
+      w = ((bytes[27] & 0x3F) << 8) | bytes[26];
+      h = ((bytes[29] & 0x3F) << 8) | bytes[28];
+      alpha = false;
+      animated = false;
+      encoding = 'Lossy';
+    } else if (fourcc == 'VP8L') {
+      // Lossless: signature 0x2F, then 14+14 bits of (size - 1) and an alpha
+      // flag. This variant had no dimensions before.
+      if (bytes[20] == 0x2F) {
+        final bits = u32le(21);
+        w = (bits & 0x3FFF) + 1;
+        h = ((bits >> 14) & 0x3FFF) + 1;
+        alpha = ((bits >> 28) & 1) == 1;
+      }
+      animated = false;
+      encoding = 'Lossless';
+    } else if (fourcc == 'VP8X') {
+      final flags = bytes[20];
+      alpha = (flags & 0x10) != 0;
+      animated = (flags & 0x02) != 0;
+      w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
+      h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
+      if (!animated) {
+        var off = 30;
+        while (off + 8 <= bytes.length) {
+          final id = String.fromCharCodes(bytes.sublist(off, off + 4));
+          final size = u32le(off + 4);
+          if (id == 'VP8 ') {
+            encoding = 'Lossy';
+            break;
+          }
+          if (id == 'VP8L') {
+            encoding = 'Lossless';
+            break;
+          }
+          off += 8 + size + (size & 1);
+        }
+      }
+    } else {
+      return const ParsedMetadata();
+    }
+
+    return ParsedMetadata(
+      width: w,
+      height: h,
+      mimeType: 'WebP Image',
+      bitDepth: '8-bit',
+      colorMode: alpha == null ? null : (alpha ? 'RGBA' : 'RGB'),
+      hasAlpha: alpha,
+      isAnimated: animated,
+      encoding: encoding,
+    );
+  }
+
+  /// AVIF and HEIC are ISO-BMFF files: the pixel size sits in `ispe` boxes and
+  /// the channel bit depth in `pixi`. A HEIC image is often a grid of tiles,
+  /// each with its own `ispe`, so the largest one is the full picture.
+  static ParsedMetadata _parseIsoBmff(Uint8List bytes) {
+    if (bytes.length < 16 ||
+        String.fromCharCodes(bytes.sublist(4, 8)) != 'ftyp') {
+      return const ParsedMetadata();
+    }
+    int u32(int o) =>
+        (bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3];
+
+    final ftypEnd = min(bytes.length, max(16, u32(0)));
+    final brands = String.fromCharCodes(bytes.sublist(8, ftypEnd));
+    final isAvif = brands.contains('avif') || brands.contains('avis');
+
+    var bestW = 0;
+    var bestH = 0;
+    var from = 0;
+    while (true) {
+      final idx = _indexOfBytes(bytes, const [0x69, 0x73, 0x70, 0x65], from);
+      if (idx < 0 || idx + 16 > bytes.length) break;
+      final w = u32(idx + 8);
+      final h = u32(idx + 12);
+      if (w * h > bestW * bestH) {
+        bestW = w;
+        bestH = h;
+      }
+      from = idx + 4;
+    }
+
+    String? bitDepth;
+    String? colorMode;
+    final pixi = _indexOfBytes(bytes, const [0x70, 0x69, 0x78, 0x69], 0);
+    if (pixi >= 0 && pixi + 10 <= bytes.length) {
+      final channels = bytes[pixi + 8];
+      final bits = bytes[pixi + 9];
+      if (bits >= 1 && bits <= 16) bitDepth = '$bits-bit';
+      if (channels == 1) colorMode = 'Grayscale';
+      if (channels >= 3) colorMode = 'RGB';
+    }
+
+    return ParsedMetadata(
+      width: bestW > 0 ? bestW : null,
+      height: bestH > 0 ? bestH : null,
+      mimeType: isAvif ? 'AVIF Image' : 'HEIC Image',
+      bitDepth: bitDepth,
+      colorMode: colorMode,
+    );
+  }
+
+  static int _indexOfBytes(Uint8List b, List<int> pattern, int from) {
+    for (var i = from; i + pattern.length <= b.length; i++) {
+      var match = true;
+      for (var j = 0; j < pattern.length; j++) {
+        if (b[i + j] != pattern[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return i;
+    }
+    return -1;
   }
 }

@@ -54,6 +54,29 @@ class ScheduledVaultSyncRunner(
         return lock.withLock { performScheduledSync(vaultUri, ruleId) }
     }
 
+    /** Runs every configured unlock-sync rule against an already-mounted vault. */
+    suspend fun runAutoSyncOnUnlock(
+        vaultUri: String,
+        vaultName: String,
+        progressId: Int,
+    ): Boolean {
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri) ?: return false
+        val lock = vaultSyncLocks.computeIfAbsent(vaultUri) { Mutex() }
+        return lock.withLock {
+            val vaultRawPath = UriToPath.getRawPath(context, Uri.parse(vaultUri))
+            runHeadlessFlutter(
+                mapOf(
+                    "mode" to "autoSyncOnUnlock",
+                    ScheduledVaultSyncWorker.KEY_VAULT_URI to vaultUri,
+                    ScheduledVaultSyncWorker.KEY_VAULT_NAME to vaultName,
+                    "vaultVolId" to volId,
+                    "vaultRawPath" to (vaultRawPath ?: vaultUri),
+                    "progressOpId" to progressId,
+                ),
+            )
+        }
+    }
+
     private suspend fun performScheduledSync(vaultUri: String, ruleId: String): Boolean {
         if (!ScheduledSyncHandlers.isScheduleActive(context, inputData)) return true
         var ownsVaultSession = false
@@ -161,8 +184,13 @@ class ScheduledVaultSyncRunner(
         return withTimeout(5 * 60 * 60 * 1000L + 30 * 60 * 1000L) {
             withContext(Dispatchers.Main) {
                 suspendCancellableCoroutine { continuation ->
+                    val method = if (args["mode"] == "autoSyncOnUnlock") {
+                        "runAutoSyncOnUnlock"
+                    } else {
+                        "runScheduledSync"
+                    }
                     channel.invokeMethod(
-                        "runScheduledSync",
+                        method,
                         args,
                         object : MethodChannel.Result {
                             override fun success(result: Any?) {

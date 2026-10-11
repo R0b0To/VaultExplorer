@@ -2,6 +2,7 @@
 // the pattern already used by e.g. ExternalStorageLocationsNotifier: a
 // plain Notifier subclass plus a NotifierProvider constructed from it.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 
@@ -92,6 +93,22 @@ class TextEditorAppearanceNotifier extends Notifier<TextEditorAppearancePrefs> {
 
   void setAccessoryActions(List<String> actions) {
     state = state.copyWith(accessoryActions: actions);
+    _service.save(state);
+  }
+
+  void setCustomColor(String role, Color? color) {
+    final next = Map<String, int>.from(state.customColors);
+    if (color == null) {
+      next.remove(role);
+    } else {
+      next[role] = color.toARGB32();
+    }
+    state = state.copyWith(customColors: next);
+    _service.save(state);
+  }
+
+  void resetCustomColors() {
+    state = state.copyWith(customColors: const {});
     _service.save(state);
   }
 }

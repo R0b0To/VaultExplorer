@@ -43,6 +43,7 @@ import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.panic.PanicSettings
 import com.aeidolon.vaultexplorer.panic.PanicTier
 import com.aeidolon.vaultexplorer.util.NotificationLocale
+import kotlinx.coroutines.runBlocking
 
 /**
  * Headless entry point for any automation app to unlock, lock, import into,
@@ -54,11 +55,11 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
  * at all (see handleAction) so a probing app can't even learn the feature
  * is configured.
  *
- * UNLOCK_VAULT/LOCK_VAULT need only the LIFECYCLE tier. IMPORT_FILE/
- * EXPORT_FILE/IMPORT_FOLDER/EXPORT_FOLDER need FULL, since they read/write
- * arbitrary filesystem paths -- a materially bigger trust decision than
- * lifecycle control alone, hence two separate opt-in switches rather than
- * one. TAKE_PHOTO/START_RECORDING/STOP_RECORDING need FULL *and* the
+ * UNLOCK_VAULT/LOCK_VAULT need only the LIFECYCLE tier. SYNC_VAULT and
+ * IMPORT_FILE/EXPORT_FILE/IMPORT_FOLDER/EXPORT_FOLDER need FULL, since they
+ * read or write files -- a materially bigger trust decision than lifecycle
+ * control alone, hence two separate opt-in switches rather than one.
+ * TAKE_PHOTO/START_RECORDING/STOP_RECORDING need FULL *and* the
  * separate AutomationSettings.canCapture opt-in -- see that function's doc
  * comment for why silent camera/mic capture gets its own switch on top of
  * FULL rather than riding along with file import/export.
@@ -91,6 +92,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         private const val TAG = "VaultExplorer_Automation"
 
         const val ACTION_UNLOCK_VAULT = "com.aeidolon.vaultexplorer.action.UNLOCK_VAULT"
+        const val ACTION_SYNC_VAULT = "com.aeidolon.vaultexplorer.action.SYNC_VAULT"
         const val ACTION_LOCK_VAULT = "com.aeidolon.vaultexplorer.action.LOCK_VAULT"
         const val ACTION_IMPORT_FILE = "com.aeidolon.vaultexplorer.action.IMPORT_FILE"
         const val ACTION_EXPORT_FILE = "com.aeidolon.vaultexplorer.action.EXPORT_FILE"
@@ -279,7 +281,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         val knownActions = setOf(
-            ACTION_UNLOCK_VAULT, ACTION_LOCK_VAULT,
+            ACTION_UNLOCK_VAULT, ACTION_SYNC_VAULT, ACTION_LOCK_VAULT,
             ACTION_IMPORT_FILE, ACTION_EXPORT_FILE,
             ACTION_IMPORT_FOLDER, ACTION_EXPORT_FOLDER,
             ACTION_TAKE_PHOTO, ACTION_START_RECORDING, ACTION_STOP_RECORDING,
@@ -317,6 +319,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val resources = NotificationLocale.wrap(context)
         val titleId = when (action) {
             ACTION_UNLOCK_VAULT -> R.string.automation_unlocking_notification_title
+            ACTION_SYNC_VAULT -> R.string.syncing_vault_notification
             ACTION_IMPORT_FILE, ACTION_IMPORT_FOLDER -> R.string.automation_importing_notification_title
             ACTION_EXPORT_FILE, ACTION_EXPORT_FOLDER -> R.string.automation_exporting_notification_title
             else -> return null
@@ -380,6 +383,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                 Outcome(if (result.success) "OK" else "ERROR", "Emergency purge tier ${tier.level} executed")
             }
             ACTION_UNLOCK_VAULT -> handleUnlock(context, vaultUri!!, intent)
+            ACTION_SYNC_VAULT -> handleSync(context, vaultUri!!, progressId)
             ACTION_LOCK_VAULT -> handleLock(context, vaultUri!!)
             ACTION_IMPORT_FILE -> handleImport(context, vaultUri!!, intent, progressId)
             ACTION_EXPORT_FILE -> handleExport(context, vaultUri!!, intent, progressId)
@@ -390,7 +394,90 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ACTION_STOP_RECORDING -> handleStopRecording(context, vaultUri!!)
             else -> handleWipe(context, intent) // ACTION_WIPE_FILE; doesn't need vaultUri, see handleWipe
         }
+        var automaticSyncOutcome: Outcome? = null
+        val unlockedSession = vaultUri?.let { uri ->
+            ContainerSessionRegistry.getVolumeIdByUri(uri)?.let { ContainerSessionRegistry.activeSessions[it] }
+        }
+        if (action == ACTION_UNLOCK_VAULT && outcome.code == "OK" &&
+            VaultAutomationUnlockedBridge.channel == null &&
+            unlockedSession?.readOnly == false &&
+            hasUnlockSyncRules(unlockedSession.volId)
+        ) {
+            val syncProgressId = VaultAutomationProgress.begin(
+                context,
+                progressTitleForAction(context, ACTION_SYNC_VAULT)
+                    ?: context.getString(R.string.syncing_vault_notification),
+            )
+            automaticSyncOutcome = try {
+                handleSync(context, vaultUri, syncProgressId)
+            } finally {
+                VaultAutomationProgress.finish(syncProgressId)
+            }
+        }
+
+        // Hold the unlock result until any headless sync it started has ended.
+        // Automation profiles that chain a lock after unlock therefore won't
+        // race the sync worker's writes.
         sendResult(context, action, outcome)
+        automaticSyncOutcome?.let { sendResult(context, ACTION_SYNC_VAULT, it) }
+    }
+
+    /** Avoid starting a second Flutter engine when the vault has no sync rules. */
+    private fun hasUnlockSyncRules(volId: Int): Boolean {
+        return try {
+            val entries = ContainerFileSystem.listDirectory(volId, ".vaultexplorer") ?: return false
+            if (entries.none { VaultAutomationFolderOps.parseDirEntry(it)?.name == "sync_config.json" }) {
+                return false
+            }
+            val size = ContainerFileSystem.getFileSize(volId, ".vaultexplorer/sync_config.json")
+            if (size <= 0L || size > 1024 * 1024) return true
+            val bytes = ContainerFileSystem.readFileChunk(
+                volId,
+                ".vaultexplorer/sync_config.json",
+                0L,
+                size.toInt(),
+            ) ?: return true
+            val rules = org.json.JSONObject(String(bytes, Charsets.UTF_8)).optJSONArray("rules") ?: return true
+            (0 until rules.length()).any { index ->
+                val rule = rules.optJSONObject(index) ?: return@any false
+                rule.optBoolean("autoSyncOnUnlock", true) || rule.optBoolean("liveWatch", false)
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "Could not inspect sync rules after automation unlock" }
+            true
+        }
+    }
+
+    private fun handleSync(context: Context, vaultUri: String, progressId: Int): Outcome {
+        if (VaultAutomationUnlockedBridge.channel != null) {
+            return Outcome("BUSY", "Sync is managed by the open app session")
+        }
+        if (!AutomationSettings.canImportExport(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "Background sync requires FULL automation opt-in")
+        }
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
+            ?: return Outcome("NOT_MOUNTED", "Unlock the vault before starting sync")
+        val session = ContainerSessionRegistry.activeSessions[volId]
+        if (session?.readOnly != false) {
+            return Outcome("FORBIDDEN", "Background sync requires a writable vault")
+        }
+        val displayName = session.displayName ?: runCatching {
+            UriNameResolver.resolve(context.contentResolver, Uri.parse(vaultUri))
+        }.getOrDefault("Vault")
+        val succeeded = try {
+            runBlocking {
+                ScheduledVaultSyncRunner(context.applicationContext, Data.Builder().build())
+                    .runAutoSyncOnUnlock(vaultUri, displayName, progressId)
+            }
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "Unlock sync failed for $vaultUri" }
+            false
+        }
+        return if (succeeded) {
+            Outcome("OK", "Unlock sync completed")
+        } else {
+            Outcome("ERROR", "Unlock sync did not complete cleanly")
+        }
     }
 
     /**

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
@@ -108,6 +109,12 @@ AppSkinTokens buildAppSkinTokens({
         dark: isDark,
       ),
     },
+    editorSyntaxColors: {
+      if (preset == AppSkinPreset.custom)
+        for (final role in editorSyntaxColorRoles)
+          if (customAppSkin.editorColorOrNull(role, dark: isDark) != null)
+            role: customAppSkin.editorColorOrNull(role, dark: isDark)!,
+    },
     fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
     editorFollowsAppSkin: editorFollowsAppSkin,
   );
@@ -136,6 +143,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
   final Color editorSelection;
   final String editorBackgroundOption;
   final String editorSyntaxThemeOption;
+  final Map<String, Color> editorSyntaxColors;
   final bool fileManagerFollowsAppSkin;
   final bool editorFollowsAppSkin;
 
@@ -156,6 +164,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     required this.editorSelection,
     required this.editorBackgroundOption,
     required this.editorSyntaxThemeOption,
+    this.editorSyntaxColors = const {},
     required this.fileManagerFollowsAppSkin,
     required this.editorFollowsAppSkin,
   });
@@ -178,6 +187,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     Color? editorSelection,
     String? editorBackgroundOption,
     String? editorSyntaxThemeOption,
+    Map<String, Color>? editorSyntaxColors,
     bool? fileManagerFollowsAppSkin,
     bool? editorFollowsAppSkin,
   }) => AppSkinTokens(
@@ -200,6 +210,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
         editorBackgroundOption ?? this.editorBackgroundOption,
     editorSyntaxThemeOption:
         editorSyntaxThemeOption ?? this.editorSyntaxThemeOption,
+    editorSyntaxColors: editorSyntaxColors ?? this.editorSyntaxColors,
     fileManagerFollowsAppSkin:
         fileManagerFollowsAppSkin ?? this.fileManagerFollowsAppSkin,
     editorFollowsAppSkin: editorFollowsAppSkin ?? this.editorFollowsAppSkin,
@@ -250,6 +261,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
       editorSelection: Color.lerp(editorSelection, other.editorSelection, t)!,
       editorBackgroundOption: discrete.editorBackgroundOption,
       editorSyntaxThemeOption: discrete.editorSyntaxThemeOption,
+      editorSyntaxColors: discrete.editorSyntaxColors,
       fileManagerFollowsAppSkin: discrete.fileManagerFollowsAppSkin,
       editorFollowsAppSkin: discrete.editorFollowsAppSkin,
     );
@@ -275,11 +287,12 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
           editorSelection == other.editorSelection &&
           editorBackgroundOption == other.editorBackgroundOption &&
           editorSyntaxThemeOption == other.editorSyntaxThemeOption &&
+          mapEquals(editorSyntaxColors, other.editorSyntaxColors) &&
           fileManagerFollowsAppSkin == other.fileManagerFollowsAppSkin &&
           editorFollowsAppSkin == other.editorFollowsAppSkin;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     preset,
     appBarBackground,
     appBarForeground,
@@ -296,7 +309,8 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     editorSelection,
     editorBackgroundOption,
     editorSyntaxThemeOption,
+    Object.hashAll(editorSyntaxColors.entries.map((e) => Object.hash(e.key, e.value))),
     fileManagerFollowsAppSkin,
     editorFollowsAppSkin,
-  );
+  ]);
 }

@@ -64,6 +64,24 @@ const appSemanticColorRoles = <String>[
   'bookmark',
 ];
 
+const editorSyntaxColorRoles = <String>[
+  'keyword',
+  'type',
+  'string',
+  'number',
+  'function',
+  'comment',
+];
+
+const editorColorRoles = <String>[
+  'foreground',
+  'background',
+  'gutter',
+  'cursor',
+  'selection',
+  ...editorSyntaxColorRoles,
+];
+
 Color _color(Object? value, Color fallback) =>
     value is num ? Color(value.toInt()) : fallback;
 
@@ -145,6 +163,12 @@ class CustomAppSkin {
       _ => 0xFF808080,
     };
     return _color(colors[role], Color(legacy));
+  }
+
+  Color? editorColorOrNull(String role, {required bool dark}) {
+    final colors = dark ? darkEditorColors : lightEditorColors;
+    final val = colors[role];
+    return val != null ? Color(val) : null;
   }
 
   String editorOption(String role, {required bool dark}) =>

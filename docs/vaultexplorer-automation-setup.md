@@ -13,7 +13,7 @@ Every intent is sent as a **Broadcast** to VaultExplorer's receiver, which retur
 3. Under **Automation access**, select your desired tier:
    - **Off**: Automation cannot access this vault.
    - **Unlock / lock only (Lifecycle)**: Permits `UNLOCK_VAULT` and `LOCK_VAULT` actions.
-   - **Unlock / lock + file import-export (Full)**: Permits all file-level actions -- `IMPORT_FILE`, `EXPORT_FILE`, `IMPORT_FOLDER`, `EXPORT_FOLDER`.
+   - **Unlock / lock + file import-export (Full)**: Permits file-level actions -- `IMPORT_FILE`, `EXPORT_FILE`, `IMPORT_FOLDER`, `EXPORT_FOLDER` -- and background sync (`SYNC_VAULT` and unlock-triggered auto-sync).
 4. *(Optional)* **Automation Password**: Set a password if you want `UNLOCK_VAULT` to mount unattended without requiring the automation task to supply the password in plaintext.
 5. *(Optional, only shown once the tier above is set to Full)* **Allow camera capture**: a separate switch that unlocks `TAKE_PHOTO`, `START_RECORDING`, and `STOP_RECORDING` for this vault. It's off by default even at Full tier -- a photo taken this way needs no on-screen indication at all, so it's a bigger trust decision than file import/export and gets its own explicit opt-in. Turning tier back down from Full and later back up to Full clears this switch again; you'll need to re-enable it.
 6. Copy your **API Token** and **Vault URI** displayed on the screen.
@@ -62,6 +62,32 @@ Mounts the vault so files can be accessed or imported/exported.
   - `read_only` *(Boolean, optional)*: Mount in read-only mode (`true` / `false`). Default: `false`.
 
 *Note: If the vault is already mounted, it returns `OK` immediately.*
+
+If the app is closed and the vault has sync rules enabled for **Sync when
+the vault is unlocked** or live watch, a successful writable unlock also
+runs those rules in the background. This needs the vault's **Full**
+automation tier because sync can write or delete files. The unlock result is
+sent after that background run finishes, and a foreground notification
+shows the sync progress. When the app is already open, its normal sync
+coordinator handles the unlock instead.
+
+---
+
+### `SYNC_VAULT`
+Runs all configured unlock-sync and live-watch rules for an already
+unlocked, writable vault. This is also available as an explicit action if
+you want to run sync independently of an unlock.
+
+- **Action**: `com.aeidolon.vaultexplorer.action.SYNC_VAULT`
+- **Extras**:
+  - `api_token` *(String, required)*
+  - `vault_uri` *(String, required)*
+
+The vault must have the **Full** automation tier. The operation runs as
+foreground work and reports its progress in a notification. A missing or
+unavailable sync target is reported as a failed sync result. If the app is
+open, use its sync controls; the broadcast returns `BUSY` rather than run a
+second sync beside the app's coordinator.
 
 ---
 

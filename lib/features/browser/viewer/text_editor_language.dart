@@ -142,6 +142,54 @@ _LanguageMatch? _matchFor(String filePath) {
   return _extensionLanguages[ext];
 }
 
+Map<String, TextStyle> customizeSyntaxTheme(
+  Map<String, TextStyle> baseTheme, {
+  Map<String, Color>? customSyntaxColors,
+  Color? textColor,
+  Color? backgroundColor,
+}) {
+  final theme = Map<String, TextStyle>.from(baseTheme);
+  final baseRoot = theme['root'] ?? const TextStyle();
+  if (textColor != null || backgroundColor != null) {
+    theme['root'] = baseRoot.copyWith(
+      color: textColor ?? baseRoot.color,
+      backgroundColor: backgroundColor ?? baseRoot.backgroundColor,
+    );
+  }
+  if (customSyntaxColors != null && customSyntaxColors.isNotEmpty) {
+    for (final entry in customSyntaxColors.entries) {
+      final role = entry.key;
+      final color = entry.value;
+      final keys = switch (role) {
+        'keyword' => const ['keyword', 'selector-tag'],
+        'string' => const ['string', 'regexp', 'meta-string'],
+        'number' => const ['number', 'literal', 'boolean'],
+        'comment' => const ['comment', 'doctag'],
+        'type' => const [
+          'type',
+          'title.class_',
+          'title.class.inherited__',
+          'class',
+          'section',
+        ],
+        'function' => const [
+          'title.function_',
+          'title.function.invoke__',
+          'function',
+          'built_in',
+          'link',
+        ],
+        _ => [role],
+      };
+      for (final key in keys) {
+        final existing = theme[key] ?? const TextStyle();
+        theme[key] = existing.copyWith(color: color);
+      }
+    }
+  }
+  return theme;
+}
+
 /// Builds the [CodeHighlightTheme] to pass as `CodeEditorStyle.codeTheme`
 /// for [filePath], or `null` when the extension isn't recognized -- plain
 /// `.txt`/`.log` files and anything else unmapped render as plain
@@ -152,13 +200,23 @@ CodeHighlightTheme? _resolveCodeHighlightTheme(
   Brightness brightness,
   EditorSyntaxThemeOption syntaxTheme, {
   bool disableHighlight = false,
+  Map<String, Color>? customSyntaxColors,
+  Color? customTextColor,
+  Color? customBackgroundColor,
 }) {
   if (disableHighlight) return null;
   final match = _matchFor(filePath);
   if (match == null) return null;
+  final baseTheme = syntaxTheme.themeMap(brightness);
+  final theme = customizeSyntaxTheme(
+    baseTheme,
+    customSyntaxColors: customSyntaxColors,
+    textColor: customTextColor,
+    backgroundColor: customBackgroundColor,
+  );
   return CodeHighlightTheme(
     languages: {match.id: CodeHighlightThemeMode(mode: match.mode)},
-    theme: syntaxTheme.themeMap(brightness),
+    theme: theme,
   );
 }
 
@@ -187,8 +245,21 @@ EditorSyntaxStyle applyAppSkinEditorTokens(
   AppSkinTokens? tokens,
 ) {
   if (tokens == null || !tokens.editorFollowsAppSkin) return style;
+  CodeHighlightTheme? updatedCodeTheme = style.codeTheme;
+  if (updatedCodeTheme != null) {
+    final theme = customizeSyntaxTheme(
+      updatedCodeTheme.theme,
+      customSyntaxColors: tokens.editorSyntaxColors,
+      textColor: tokens.editorForeground,
+      backgroundColor: tokens.editorBackground,
+    );
+    updatedCodeTheme = CodeHighlightTheme(
+      languages: updatedCodeTheme.languages,
+      theme: theme,
+    );
+  }
   return EditorSyntaxStyle(
-    codeTheme: style.codeTheme,
+    codeTheme: updatedCodeTheme,
     backgroundColor: tokens.editorBackground,
     textColor: tokens.editorForeground,
   );
@@ -207,21 +278,46 @@ EditorSyntaxStyle resolveEditorSyntaxStyle(
   required EditorBackgroundOption background,
   required EditorSyntaxThemeOption syntaxTheme,
   bool disableHighlight = false,
+  Map<String, Color>? customColors,
 }) {
+  final customBg = customColors?['background'];
+  final customFg = customColors?['foreground'];
+  final syntaxOverrides = customColors != null
+      ? {
+          for (final entry in customColors.entries)
+            if (entry.key != 'background' &&
+                entry.key != 'foreground' &&
+                entry.key != 'gutter' &&
+                entry.key != 'cursor' &&
+                entry.key != 'selection')
+              entry.key: entry.value,
+        }
+      : null;
+
   final codeTheme = _resolveCodeHighlightTheme(
     filePath,
     brightness,
     syntaxTheme,
     disableHighlight: disableHighlight,
+    customSyntaxColors: syntaxOverrides,
+    customTextColor: customFg,
+    customBackgroundColor: customBg,
   );
   final root = syntaxTheme.themeMap(brightness)['root'];
 
+  final resolvedBg = customBg ??
+      background.overrideColor ??
+      root?.backgroundColor ??
+      fallback.surface;
+
+  final resolvedFg = customFg ??
+      ((background == EditorBackgroundOption.matchSyntaxTheme)
+          ? (root?.color ?? fallback.onSurface)
+          : background.fallbackTextColor);
+
   return EditorSyntaxStyle(
     codeTheme: codeTheme,
-    backgroundColor:
-        background.overrideColor ?? root?.backgroundColor ?? fallback.surface,
-    textColor: (background == EditorBackgroundOption.matchSyntaxTheme)
-        ? (root?.color ?? fallback.onSurface)
-        : background.fallbackTextColor,
+    backgroundColor: resolvedBg,
+    textColor: resolvedFg,
   );
 }

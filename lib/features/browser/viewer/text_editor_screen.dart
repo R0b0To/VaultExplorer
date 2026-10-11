@@ -321,6 +321,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             final appearance = _effectiveAppearance(
               ref.read(textEditorAppearanceProvider),
             );
+            final tokens = appTheme.extension<AppSkinTokens>();
+            final customColors = tokens?.editorFollowsAppSkin == true
+                ? null
+                : appearance.customColors.map((k, v) => MapEntry(k, Color(v)));
             final editorStyle = applyAppSkinEditorTokens(
               resolveEditorSyntaxStyle(
                 _activeTab.filePath,
@@ -328,8 +332,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                 cs,
                 background: appearance.background,
                 syntaxTheme: appearance.syntaxTheme,
+                customColors: customColors,
               ),
-              appTheme.extension<AppSkinTokens>(),
+              tokens,
             );
             final editorBg = editorStyle.backgroundColor;
 
@@ -1939,6 +1944,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     // menus, system navigation bar), not just the text area. `cs` from here
     // on is the editor-derived scheme; `appTheme` is only used to resolve the
     // editor style itself, whose "auto" syntax theme follows the app.
+    final customColors = appSkinTokens?.editorFollowsAppSkin == true
+        ? null
+        : appearance.customColors.map((k, v) => MapEntry(k, Color(v)));
     final syntaxStyle = applyAppSkinEditorTokens(
       resolveEditorSyntaxStyle(
         activeTab.filePath,
@@ -1947,6 +1955,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
         background: appearance.background,
         syntaxTheme: appearance.syntaxTheme,
         disableHighlight: activeTab.isLargeFile,
+        customColors: customColors,
       ),
       appSkinTokens,
     );
@@ -3000,15 +3009,23 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final contrast = (primaryLuminance - bgLuminance).abs();
     final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     final followsAppSkin = skinTokens?.editorFollowsAppSkin == true;
-    final safeAccentColor = contrast > 0.25
-        ? (followsAppSkin ? skinTokens!.editorCursor : cs.primary)
-        : (bgLuminance < 0.5 ? Colors.white : Colors.black);
-    final selectionColor = followsAppSkin
+    final customCursor = followsAppSkin
+        ? skinTokens!.editorCursor
+        : appearance.customColor('cursor');
+    final safeAccentColor = customCursor ??
+        (contrast > 0.25
+            ? cs.primary
+            : (bgLuminance < 0.5 ? Colors.white : Colors.black));
+    final customSelection = followsAppSkin
         ? skinTokens!.editorSelection
-        : safeAccentColor.withValues(alpha: 0.28);
-    final gutterColor = followsAppSkin
+        : appearance.customColor('selection');
+    final selectionColor =
+        customSelection ?? safeAccentColor.withValues(alpha: 0.28);
+    final customGutter = followsAppSkin
         ? skinTokens!.editorGutter
-        : syntaxStyle.textColor.withValues(alpha: 0.45);
+        : appearance.customColor('gutter');
+    final gutterColor =
+        customGutter ?? syntaxStyle.textColor.withValues(alpha: 0.45);
 
     return Column(
       children: [

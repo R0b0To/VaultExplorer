@@ -702,6 +702,7 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
             targetDisplayName: _targetName,
             scheduledHour: _scheduledTime.hour,
             scheduledMinute: _scheduledTime.minute,
+            removeTargetBinding: true,
           );
       try {
         await ref

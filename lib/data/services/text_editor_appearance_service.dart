@@ -9,6 +9,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -29,6 +30,7 @@ class TextEditorAppearancePrefs {
   final double fontSize;
   final List<String> accessorySymbols;
   final List<String> accessoryActions;
+  final Map<String, int> customColors;
 
   static const List<String> defaultSymbols = [
     'Tab',
@@ -106,7 +108,13 @@ class TextEditorAppearancePrefs {
     this.fontSize = 14.0,
     this.accessorySymbols = defaultSymbols,
     this.accessoryActions = defaultActions,
+    this.customColors = const {},
   });
+
+  Color? customColor(String role) {
+    final val = customColors[role];
+    return val != null ? Color(val) : null;
+  }
 
   TextEditorAppearancePrefs copyWith({
     EditorBackgroundOption? background,
@@ -124,6 +132,7 @@ class TextEditorAppearancePrefs {
     double? fontSize,
     List<String>? accessorySymbols,
     List<String>? accessoryActions,
+    Map<String, int>? customColors,
   }) => TextEditorAppearancePrefs(
     background: background ?? this.background,
     syntaxTheme: syntaxTheme ?? this.syntaxTheme,
@@ -140,6 +149,7 @@ class TextEditorAppearancePrefs {
     fontSize: fontSize ?? this.fontSize,
     accessorySymbols: accessorySymbols ?? this.accessorySymbols,
     accessoryActions: accessoryActions ?? this.accessoryActions,
+    customColors: customColors ?? this.customColors,
   );
 
   Map<String, dynamic> toJson() => {
@@ -158,6 +168,7 @@ class TextEditorAppearancePrefs {
     'fontSize': fontSize,
     'accessorySymbols': accessorySymbols,
     'accessoryActions': accessoryActions,
+    'customColors': customColors,
   };
 
   factory TextEditorAppearancePrefs.fromJson(Map<String, dynamic> json) {
@@ -191,6 +202,11 @@ class TextEditorAppearancePrefs {
               ?.map((e) => e.toString())
               .toList() ??
           defaultActions,
+      customColors: (json['customColors'] is Map)
+          ? (json['customColors'] as Map).map(
+              (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+            )
+          : const {},
     );
   }
 }

@@ -8,6 +8,8 @@ import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.saf.SafStorageManager
+import com.aeidolon.vaultexplorer.saf.UriToPath
+import com.aeidolon.vaultexplorer.automation.VaultAutomationProgress
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
@@ -188,6 +190,33 @@ internal class ScheduledSyncFileBridge(context: Context) : MethodChannel.MethodC
             }
             "discardHashSession" -> run(call, result) {
                 hashSessions.remove(number(call, "opId").toInt())
+                null
+            }
+            "getSyncTargetBinding" -> run(call, result) {
+                ScheduledSyncHandlers.getSyncTargetBinding(
+                    appContext,
+                    requiredString(call, "vaultUri"),
+                    requiredString(call, "ruleId"),
+                )
+            }
+            "getMountedVolumeId" -> run(call, result) {
+                ContainerSessionRegistry.getVolumeIdByUri(requiredString(call, "vaultUri"))
+            }
+            "getRawPath" -> run(call, result) {
+                UriToPath.getRawPath(
+                    appContext,
+                    Uri.parse(requiredString(call, "uri")),
+                )
+            }
+            "updateAutomationSyncProgress" -> run(call, result) {
+                val progress = call.argument<Number>("progress")?.toInt()
+                VaultAutomationProgress.updateProgress(
+                    opId = number(call, "opId").toInt(),
+                    text = requiredString(call, "text"),
+                    progress = progress,
+                    max = number(call, "max", 1000).toInt(),
+                    indeterminate = call.argument<Boolean>("indeterminate") ?: (progress == null),
+                )
                 null
             }
             else -> result.notImplemented()

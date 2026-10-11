@@ -72,6 +72,8 @@ Map<String, int> _editorColorMap(AppSkinTokens tokens) => {
   'gutter': tokens.editorGutter.toARGB32(),
   'cursor': tokens.editorCursor.toARGB32(),
   'selection': tokens.editorSelection.toARGB32(),
+  for (final entry in tokens.editorSyntaxColors.entries)
+    entry.key: entry.value.toARGB32(),
 };
 
 Map<String, String> _editorOptionMap(AppSkinTokens tokens) => {
@@ -586,7 +588,42 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     _save(updated);
   }
 
-  Color _editorColor(String role) => _skin.editorColor(role, dark: _darkColors);
+  void _clearEditorColor(String role) {
+    final values = Map<String, int>.from(
+      _darkColors ? _skin.darkEditorColors : _skin.lightEditorColors,
+    )..remove(role);
+    if (_darkColors) {
+      _save(_skin.copyWith(darkEditorColors: values));
+    } else {
+      _save(_skin.copyWith(lightEditorColors: values));
+    }
+  }
+
+  Color _editorColor(String role) {
+    final custom = _skin.editorColorOrNull(role, dark: _darkColors);
+    if (custom != null) return custom;
+    if (editorSyntaxColorRoles.contains(role)) {
+      final syntaxOption = EditorSyntaxThemeOption.values.firstWhere(
+        (option) => option.name == _editorOption('syntax'),
+        orElse: () => EditorSyntaxThemeOption.auto,
+      );
+      final styles = syntaxOption.themeMap(
+        _darkColors ? Brightness.dark : Brightness.light,
+      );
+      final key = switch (role) {
+        'keyword' => 'keyword',
+        'type' => 'title.class_',
+        'string' => 'string',
+        'number' => 'number',
+        'function' => 'built_in',
+        'comment' => 'comment',
+        _ => role,
+      };
+      return styles[key]?.color ??
+          _skin.editorColor('foreground', dark: _darkColors);
+    }
+    return _skin.editorColor(role, dark: _darkColors);
+  }
 
   String _editorOption(String role) =>
       _skin.editorOption(role, dark: _darkColors);
@@ -674,10 +711,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     }
     if (id.startsWith('editor:')) {
       final role = id.substring(7);
+      final allowDefault = editorSyntaxColorRoles.contains(role);
       return _pickColor(
         title: selection.title,
         current: _editorColor(role),
+        allowDefault: allowDefault,
         onColor: (value) => _setEditorColor(role, value),
+        onDefault: allowDefault ? () => _clearEditorColor(role) : null,
       );
     }
     final customSkin = _skin;
@@ -2179,9 +2219,12 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   Widget _editorScreenPreview(
     Color Function(String, Color) color,
     ColorScheme cs,
-  ) => _previewCanvas(
-    color('surface', cs.surface),
-    Column(
+  ) => Container(
+    decoration: BoxDecoration(
+      color: _editorColor('background'),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
@@ -2219,12 +2262,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: _editorPreview(color('onSurface', cs.onSurface)),
-        ),
-        Padding(
+        _editorPreview(color('onSurface', cs.onSurface)),
+        Container(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+          color: color(
+            'surfaceContainerHigh',
+            cs.surfaceContainerHigh,
+          ).withValues(alpha: 0.5),
           child: Row(
             children: [
               Icon(
@@ -2475,6 +2519,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   Widget _editorPreview(Color foreground) {
     final background = _editorColor('background');
     final gutter = _editorColor('gutter');
+    final fontColor = _editorColor('foreground');
     final syntaxOption = EditorSyntaxThemeOption.values.firstWhere(
       (option) => option.name == _editorOption('syntax'),
       orElse: () => EditorSyntaxThemeOption.auto,
@@ -2482,15 +2527,38 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     final styles = syntaxOption.themeMap(
       _darkColors ? Brightness.dark : Brightness.light,
     );
-    TextStyle syntax(String key) =>
-        styles[key] ?? styles['root'] ?? TextStyle(color: foreground);
+
+    TextStyle syntax(String role) {
+      final custom = _skin.editorColorOrNull(role, dark: _darkColors);
+      if (custom != null) {
+        return TextStyle(color: custom, fontFamily: 'monospace', height: 1.55);
+      }
+      final key = switch (role) {
+        'keyword' => 'keyword',
+        'type' => 'title.class_',
+        'string' => 'string',
+        'number' => 'number',
+        'comment' => 'comment',
+        'function' => 'built_in',
+        _ => role,
+      };
+      return (styles[key] ?? styles['root'] ?? TextStyle(color: fontColor))
+          .copyWith(fontFamily: 'monospace', height: 1.55);
+    }
+
+    final codeTextStyle = TextStyle(
+      color: fontColor,
+      fontFamily: 'monospace',
+      height: 1.55,
+    );
+
     return _previewTarget(
       id: 'editor:background',
       title: context.l10n.skinEditorBackground,
       explanation: context.l10n.skinTheCanvasColorBehindTheCode,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           color: background,
           borderRadius: BorderRadius.circular(11),
@@ -2505,7 +2573,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
               explanation:
                   context.l10n.skinTheGutterAndLineNumbersBesideTheCode,
               child: Text(
-                '1\n2\n3',
+                '1\n2\n3\n4\n5',
                 style: TextStyle(
                   color: gutter,
                   fontFamily: 'monospace',
@@ -2513,86 +2581,162 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
-              child: _previewTarget(
-                id: 'editor:foreground',
-                title: context.l10n.skinEditorTextColor,
-                explanation: context.l10n.skinTheDefaultCodeAndEditorTextColor,
-                child: DefaultTextStyle(
-                  style: TextStyle(
-                    color: _editorColor('foreground'),
-                    fontFamily: 'monospace',
-                    height: 1.55,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: 'class ', style: syntax('keyword')),
-                            TextSpan(
-                              text: 'Vault',
-                              style: syntax('title.class_'),
-                            ),
-                            TextSpan(text: ' {', style: syntax('root')),
-                          ],
-                        ),
+              child: DefaultTextStyle(
+                style: codeTextStyle,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Line 1: // Vault model
+                    _previewTarget(
+                      id: 'editor:comment',
+                      title: context.l10n.skinEditorComments,
+                      explanation: context.l10n.skinEditorCommentsExplanation,
+                      child: Text(
+                        '// Vault model',
+                        style: syntax('comment'),
                       ),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(text: '  name = '),
-                            TextSpan(
-                              text: '"My vault"',
-                              style: syntax('string'),
-                            ),
-                            TextSpan(text: ';', style: syntax('root')),
-                          ],
+                    ),
+                    // Line 2: class Vault {
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _previewTarget(
+                          id: 'editor:keyword',
+                          title: context.l10n.skinEditorKeywords,
+                          explanation:
+                              context.l10n.skinEditorKeywordsExplanation,
+                          child: Text('class ', style: syntax('keyword')),
                         ),
-                      ),
-                      Row(
-                        children: [
-                          _previewTarget(
-                            id: 'editor:cursor',
-                            title: context.l10n.skinEditorCursor,
-                            explanation:
-                                context.l10n.skinTheInsertionCaretColor,
-                            child: SizedBox(
-                              width: 18,
-                              height: 24,
-                              child: Center(
-                                child: Container(
-                                  width: 2,
-                                  height: 15,
-                                  color: _editorColor('cursor'),
-                                ),
+                        _previewTarget(
+                          id: 'editor:type',
+                          title: context.l10n.skinEditorTypes,
+                          explanation: context.l10n.skinEditorTypesExplanation,
+                          child: Text('Vault', style: syntax('type')),
+                        ),
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text(' {', style: codeTextStyle),
+                        ),
+                      ],
+                    ),
+                    // Line 3:   name = "My vault";
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text('  name = ', style: codeTextStyle),
+                        ),
+                        _previewTarget(
+                          id: 'editor:string',
+                          title: context.l10n.skinEditorStrings,
+                          explanation:
+                              context.l10n.skinEditorStringsExplanation,
+                          child: Text('"My vault"', style: syntax('string')),
+                        ),
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text(';', style: codeTextStyle),
+                        ),
+                      ],
+                    ),
+                    // Line 4:   count = 42;
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text('  count = ', style: codeTextStyle),
+                        ),
+                        _previewTarget(
+                          id: 'editor:number',
+                          title: context.l10n.skinEditorNumbers,
+                          explanation:
+                              context.l10n.skinEditorNumbersExplanation,
+                          child: Text('42', style: syntax('number')),
+                        ),
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text(';', style: codeTextStyle),
+                        ),
+                      ],
+                    ),
+                    // Line 5:   | [open()] ; }
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text('  ', style: codeTextStyle),
+                        ),
+                        _previewTarget(
+                          id: 'editor:cursor',
+                          title: context.l10n.skinEditorCursor,
+                          explanation:
+                              context.l10n.skinTheInsertionCaretColor,
+                          child: SizedBox(
+                            width: 14,
+                            height: 20,
+                            child: Center(
+                              child: Container(
+                                width: 2,
+                                height: 16,
+                                color: _editorColor('cursor'),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 3),
-                          _previewTarget(
-                            id: 'editor:selection',
-                            title: context.l10n.skinEditorSelectionHighlight,
-                            explanation: context
-                                .l10n
-                                .skinTheBackgroundUsedToHighlightSelectedCode,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _editorColor('selection'),
-                              ),
-                              child: Text('open()', style: syntax('built_in')),
+                        ),
+                        const SizedBox(width: 2),
+                        _previewTarget(
+                          id: 'editor:selection',
+                          title: context.l10n.skinEditorSelectionHighlight,
+                          explanation: context
+                              .l10n
+                              .skinTheBackgroundUsedToHighlightSelectedCode,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                            ),
+                            color: _editorColor('selection'),
+                            child: _previewTarget(
+                              id: 'editor:function',
+                              title: context.l10n.skinEditorFunctions,
+                              explanation:
+                                  context.l10n.skinEditorFunctionsExplanation,
+                              child: Text('open()', style: syntax('function')),
                             ),
                           ),
-                          Text('; }', style: syntax('root')),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        _previewTarget(
+                          id: 'editor:foreground',
+                          title: context.l10n.skinEditorTextColor,
+                          explanation:
+                              context.l10n.skinTheDefaultCodeAndEditorTextColor,
+                          child: Text('; }', style: codeTextStyle),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -2733,13 +2877,71 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         context.l10n.skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate,
     children: [
       _editorColorTile(
-        context.l10n.textEditorBackgroundSectionTitle,
-        'background',
+        context.l10n.skinEditorTextColor,
+        'foreground',
+        subtitle: context.l10n.skinTheDefaultCodeAndEditorTextColor,
       ),
-      _editorColorTile(context.l10n.mimeTypeText, 'foreground'),
-      _editorColorTile(context.l10n.skinGutterAndLineNumbers, 'gutter'),
-      _editorColorTile(context.l10n.skinCursor, 'cursor'),
-      _editorColorTile(context.l10n.skinSelection, 'selection'),
+      _editorColorTile(
+        context.l10n.skinEditorBackground,
+        'background',
+        subtitle: context.l10n.skinTheCanvasColorBehindTheCode,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorLineNumbers,
+        'gutter',
+        subtitle: context.l10n.skinTheGutterAndLineNumbersBesideTheCode,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorCursor,
+        'cursor',
+        subtitle: context.l10n.skinTheInsertionCaretColor,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorSelectionHighlight,
+        'selection',
+        subtitle: context.l10n.skinTheBackgroundUsedToHighlightSelectedCode,
+      ),
+      const Divider(height: 24),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        child: Text(
+          context.l10n.textEditorSyntaxColorsSectionTitle,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorKeywords,
+        'keyword',
+        allowDefault: true,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorTypes,
+        'type',
+        allowDefault: true,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorStrings,
+        'string',
+        allowDefault: true,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorNumbers,
+        'number',
+        allowDefault: true,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorFunctions,
+        'function',
+        allowDefault: true,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorComments,
+        'comment',
+        allowDefault: true,
+      ),
+      const Divider(height: 24),
       _dropdown<EditorBackgroundOption>(
         label: context.l10n.skinEditorBackgroundTemplate,
         value: EditorBackgroundOption.values.firstWhere(
@@ -2761,16 +2963,32 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     ],
   );
 
-  Widget _editorColorTile(String title, String role) => ListTile(
-    title: Text(title),
-    subtitle: Text(context.l10n.skinTapTheColorCircleToChooseAColor246981),
-    trailing: _ColorDot(color: _editorColor(role)),
-    onTap: () => _pickColor(
-      title: title,
-      current: _editorColor(role),
-      onColor: (color) => _setEditorColor(role, color),
-    ),
-  );
+  Widget _editorColorTile(
+    String title,
+    String role, {
+    String? subtitle,
+    bool allowDefault = false,
+  }) {
+    final isCustom = _skin.editorColorOrNull(role, dark: _darkColors) != null;
+    final sub = subtitle ??
+        (allowDefault
+            ? (isCustom
+                ? context.l10n.skinCustomColor
+                : context.l10n.textEditorDefaultFromTheme)
+            : context.l10n.skinTapTheColorCircleToChooseAColor246981);
+    return ListTile(
+      title: Text(title),
+      subtitle: Text(sub),
+      trailing: _ColorDot(color: _editorColor(role)),
+      onTap: () => _pickColor(
+        title: title,
+        current: _editorColor(role),
+        allowDefault: allowDefault,
+        onColor: (color) => _setEditorColor(role, color),
+        onDefault: allowDefault ? () => _clearEditorColor(role) : null,
+      ),
+    );
+  }
 
   Widget _dropdown<T extends Enum>({
     required String label,

@@ -406,7 +406,10 @@ internal object VaultPlaybackSession {
         cancelGraceTimer()
         val runnable = Runnable {
             graceRunnable = null
-            if (mediaSession == null) {
+            // The session intentionally outlives the released player (item
+            // changes rebind it), so "no player came back" is the signal to
+            // end the window -- not "no session", which is never true here.
+            if (rawPlayer == null) {
                 VeLog.d(TAG) { "No player came back within the grace period -> ending media session" }
                 end()
             }

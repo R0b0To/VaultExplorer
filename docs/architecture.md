@@ -712,6 +712,7 @@ than through it.
 | Action | Requires tier | Purpose |
 |---|---|---|
 | `ACTION_UNLOCK_VAULT` | LIFECYCLE | Unlock a vault opted in to automation; dispatches to the block-device or directory-vault path per `AutomationSettings.getFormat`. Starts `VaultKeepAliveService`. No hidden-volume or keyfile support. |
+| `ACTION_SYNC_VAULT` | FULL | Run every unlock-sync or live-watch rule for an already-unlocked writable vault; uses the foreground automation notification. Successful cold automation unlocks also run these rules before returning the unlock result. |
 | `ACTION_LOCK_VAULT` | LIFECYCLE | Lock a vault; stops `VaultKeepAliveService` if no session remains active anywhere. |
 | `ACTION_IMPORT_FILE` | FULL | Import a real filesystem path into the vault, with an option to securely wipe the source afterward; batch mode supports include/exclude globs. |
 | `ACTION_EXPORT_FILE` | FULL | Export a path from inside the vault to a real filesystem path; batch mode supports include/exclude globs. |

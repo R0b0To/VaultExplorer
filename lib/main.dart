@@ -29,6 +29,12 @@ void scheduledSyncBackgroundEntrypoint() {
         return _scheduledSyncBackgroundRunner.run(
           Map<Object?, Object?>.from(raw),
         );
+      case 'runAutoSyncOnUnlock':
+        final raw = call.arguments;
+        if (raw is! Map) return const {'success': false};
+        return _scheduledSyncBackgroundRunner.runAutoSyncOnUnlock(
+          Map<Object?, Object?>.from(raw),
+        );
       case 'cancelScheduledSync':
         _scheduledSyncBackgroundRunner.cancel();
         return const {'success': true};

@@ -55,7 +55,7 @@ object AutomationSettings {
         /** Automation may send UNLOCK_VAULT / LOCK_VAULT for this vault. */
         LIFECYCLE,
 
-        /** LIFECYCLE, plus IMPORT_FILE / EXPORT_FILE / IMPORT_FOLDER / EXPORT_FOLDER for this vault. */
+        /** LIFECYCLE, plus file import/export and background sync for this vault. */
         FULL,
     }
 

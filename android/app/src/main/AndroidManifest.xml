@@ -260,6 +260,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.aeidolon.vaultexplorer.action.UNLOCK_VAULT" />
+                <action android:name="com.aeidolon.vaultexplorer.action.SYNC_VAULT" />
                 <action android:name="com.aeidolon.vaultexplorer.action.LOCK_VAULT" />
                 <action android:name="com.aeidolon.vaultexplorer.action.IMPORT_FILE" />
                 <action android:name="com.aeidolon.vaultexplorer.action.EXPORT_FILE" />

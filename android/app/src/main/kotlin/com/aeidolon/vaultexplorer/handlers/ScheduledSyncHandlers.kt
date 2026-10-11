@@ -7,6 +7,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import androidx.work.Data
 import androidx.work.WorkManager
 import com.aeidolon.vaultexplorer.automation.AutomationSettings
@@ -15,7 +18,12 @@ import com.aeidolon.vaultexplorer.automation.ScheduledVaultSyncWorker
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
+import java.security.KeyStore
 import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import java.util.Calendar
 import java.util.Locale
 
@@ -35,7 +43,107 @@ class ScheduledSyncHandlers(context: Context) {
         private const val RULE_TAG_PREFIX = "scheduled-vault-sync-rule-"
         private const val CONFIG_PREFIX = "schedule-"
         private const val PREFS_NAME = "scheduled_vault_sync"
+        private const val BINDINGS_PREFS_NAME = "sync_target_bindings"
+        private const val BINDING_PREFIX = "binding-"
+        private const val BINDING_KEY_ALIAS = "vaultexplorer_sync_bindings_key"
         private val scheduleLock = Any()
+
+        private val androidKeyStore: KeyStore by lazy {
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        }
+
+        @Synchronized
+        private fun getOrCreateBindingKey(): SecretKey {
+            val existing = androidKeyStore.getEntry(BINDING_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (existing != null) return existing.secretKey
+            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+            generator.init(
+                KeyGenParameterSpec.Builder(
+                    BINDING_KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                )
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .build(),
+            )
+            return generator.generateKey()
+        }
+
+        private fun encryptBinding(value: String): String? = runCatching {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateBindingKey())
+            val iv = cipher.iv
+            val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+            Base64.encodeToString(iv + encrypted, Base64.NO_WRAP)
+        }.getOrNull()
+
+        private fun decryptBinding(value: String): String? = runCatching {
+            val combined = Base64.decode(value, Base64.NO_WRAP)
+            require(combined.size > 12) { "Invalid encrypted sync binding" }
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                getOrCreateBindingKey(),
+                GCMParameterSpec(128, combined.copyOfRange(0, 12)),
+            )
+            String(cipher.doFinal(combined.copyOfRange(12, combined.size)), Charsets.UTF_8)
+        }.getOrNull()
+
+        /** Device-local target selection used by both daily and unlock syncs. */
+        fun getSyncTargetBinding(
+            context: Context,
+            vaultUri: String,
+            ruleId: String,
+        ): Map<String, String>? {
+            val key = bindingKey(vaultUri, ruleId)
+            val appContext = context.applicationContext
+            val stored = appContext
+                .getSharedPreferences(BINDINGS_PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(key, null)
+                ?.let(::decryptBinding)
+                ?.let { runCatching { JSONObject(it) }.getOrNull() }
+                ?: appContext
+                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(configKey(vaultUri, ruleId), null)
+                    ?.let { runCatching { JSONObject(it) }.getOrNull() }
+                ?: return null
+            val uri = stored.optString("uri")
+                .ifBlank { stored.optString("targetUri") }
+            if (uri.isBlank()) return null
+            return mapOf(
+                "uri" to uri,
+                "subPath" to stored.optString("subPath", stored.optString("targetSubPath", "")),
+                "displayName" to stored.optString("displayName", stored.optString("targetName", "")),
+            )
+        }
+
+        private fun saveSyncTargetBinding(
+            context: Context,
+            vaultUri: String,
+            ruleId: String,
+            targetUri: String,
+            targetSubPath: String,
+            targetName: String,
+        ): Boolean {
+            val binding = JSONObject()
+                .put("uri", targetUri)
+                .put("subPath", targetSubPath)
+                .put("displayName", targetName)
+            val encrypted = encryptBinding(binding.toString()) ?: return false
+            return context.applicationContext
+                .getSharedPreferences(BINDINGS_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(bindingKey(vaultUri, ruleId), encrypted)
+                .commit()
+        }
+
+        private fun removeSyncTargetBinding(context: Context, vaultUri: String, ruleId: String) {
+            context.applicationContext
+                .getSharedPreferences(BINDINGS_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .remove(bindingKey(vaultUri, ruleId))
+                .commit()
+        }
 
         fun canScheduleExactAlarms(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -314,6 +422,9 @@ class ScheduledSyncHandlers(context: Context) {
         private fun configKey(vaultUri: String, ruleId: String): String =
             "$CONFIG_PREFIX${digest("$vaultUri\n$ruleId") }"
 
+        private fun bindingKey(vaultUri: String, ruleId: String): String =
+            "$BINDING_PREFIX${digest("$vaultUri\n$ruleId") }"
+
         private fun vaultTag(vaultUri: String): String = "$VAULT_TAG_PREFIX${digest(vaultUri)}"
 
         private fun ruleTag(vaultUri: String, ruleId: String): String =
@@ -343,6 +454,24 @@ class ScheduledSyncHandlers(context: Context) {
         if (vaultUri.isNullOrBlank() || ruleId.isNullOrBlank()) {
             result.error("INVALID_ARGS", "vaultUri and ruleId are required", null)
             return
+        }
+
+        if (call.argument<Boolean>("removeTargetBinding") == true) {
+            removeSyncTargetBinding(appContext, vaultUri, ruleId)
+        } else {
+            val targetUri = call.argument<String>("targetUri")
+            if (!targetUri.isNullOrBlank() && !saveSyncTargetBinding(
+                    appContext,
+                    vaultUri,
+                    ruleId,
+                    targetUri,
+                    call.argument<String>("targetSubPath") ?: "",
+                    call.argument<String>("targetDisplayName") ?: "",
+                )
+            ) {
+                result.success(false)
+                return
+            }
         }
 
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

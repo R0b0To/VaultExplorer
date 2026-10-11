@@ -18,6 +18,10 @@ internal object VaultAutomationProgress {
         var fileSize: Long = 0L,
         var bytesDone: Long = 0L,
         var filesProcessed: Int = 0,
+        var statusText: String? = null,
+        var statusProgress: Int? = null,
+        var statusProgressMax: Int = 1000,
+        var statusIndeterminate: Boolean = true,
         var lastPublishedAt: Long = 0L,
     )
 
@@ -79,6 +83,24 @@ internal object VaultAutomationProgress {
         publish(opId, force = true)
     }
 
+    /** Updates a non-file operation such as a multi-rule sync. */
+    fun updateProgress(
+        opId: Int,
+        text: String,
+        progress: Int?,
+        max: Int = 1000,
+        indeterminate: Boolean = progress == null,
+    ) {
+        val operation = operations[opId] ?: return
+        synchronized(operation) {
+            operation.statusText = text
+            operation.statusProgress = progress?.coerceIn(0, max.coerceAtLeast(1))
+            operation.statusProgressMax = max.coerceAtLeast(1)
+            operation.statusIndeterminate = indeterminate
+        }
+        publish(opId)
+    }
+
     fun finish(opId: Int) {
         val finished = operations.remove(opId) ?: return
         if (displayedOperationId == opId) {
@@ -116,24 +138,35 @@ internal object VaultAutomationProgress {
         val title: String
         val text: String
         val progress: Int?
+        val max: Int
         val indeterminate: Boolean
         synchronized(operation) {
             if (!force && now - operation.lastPublishedAt < 120L) return
             operation.lastPublishedAt = now
-            val name = operation.currentName
-            val size = operation.fileSize
-            val done = operation.bytesDone
-            title = operation.title
-            text = if (name != null) {
-                if (size > 0L) "$name · ${(done.toDouble() / size.toDouble() * 100.0).toInt().coerceIn(0, 100)}%"
-                else name
+            val customText = operation.statusText
+            if (customText != null) {
+                title = operation.title
+                text = customText
+                progress = operation.statusProgress
+                max = operation.statusProgressMax
+                indeterminate = operation.statusIndeterminate
             } else {
-                "${operation.filesProcessed} file(s) processed"
+                val name = operation.currentName
+                val size = operation.fileSize
+                val done = operation.bytesDone
+                title = operation.title
+                text = if (name != null) {
+                    if (size > 0L) "$name · ${(done.toDouble() / size.toDouble() * 100.0).toInt().coerceIn(0, 100)}%"
+                    else name
+                } else {
+                    "${operation.filesProcessed} file(s) processed"
+                }
+                indeterminate = name == null || size <= 0L
+                progress = if (!indeterminate) {
+                    (done.coerceAtMost(size).toDouble() / size.toDouble() * 1000.0).toInt()
+                } else null
+                max = 1000
             }
-            indeterminate = name == null || size <= 0L
-            progress = if (!indeterminate) {
-                (done.coerceAtMost(size).toDouble() / size.toDouble() * 1000.0).toInt()
-            } else null
         }
         VaultKeepAliveService.updateOperationProgress(
             context = operation.context,
@@ -141,7 +174,7 @@ internal object VaultAutomationProgress {
             title = title,
             text = text,
             progress = progress,
-            max = 1000,
+            max = max,
             indeterminate = indeterminate,
         )
         if (!VaultKeepAliveService.isRunning) {

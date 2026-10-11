@@ -1302,6 +1302,7 @@ class VaultLifecycleApi {
     required String targetDisplayName,
     required int scheduledHour,
     required int scheduledMinute,
+    bool removeTargetBinding = false,
   }) async {
     try {
       final result = await _channel
@@ -1315,6 +1316,7 @@ class VaultLifecycleApi {
             'targetDisplayName': targetDisplayName,
             'scheduledHour': scheduledHour,
             'scheduledMinute': scheduledMinute,
+            'removeTargetBinding': removeTargetBinding,
           });
       return result ?? false;
     } catch (e) {

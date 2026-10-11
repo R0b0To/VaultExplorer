@@ -12,6 +12,7 @@ import 'package:vaultexplorer/features/browser/viewer/text_editor_language.dart'
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
 
 Future<void> showEditorAppearanceSheet(BuildContext context) {
   return Navigator.of(context).push(
@@ -82,6 +83,14 @@ class _EditorAppearanceScreenState
     ColorScheme cs,
     Brightness appBrightness,
   ) {
+    final appSkinTokens = Theme.of(context).extension<AppSkinTokens>();
+    final followsAppSkin = appSkinTokens?.editorFollowsAppSkin == true;
+    final customColors = followsAppSkin
+        ? null
+        : prefs.customColors.isNotEmpty
+            ? prefs.customColors.map((k, v) => MapEntry(k, Color(v)))
+            : null;
+
     final syntaxStyle = applyAppSkinEditorTokens(
       resolveEditorSyntaxStyle(
         'preview.dart',
@@ -89,9 +98,32 @@ class _EditorAppearanceScreenState
         cs,
         background: prefs.background,
         syntaxTheme: prefs.syntaxTheme,
+        customColors: customColors,
       ),
-      Theme.of(context).extension<AppSkinTokens>(),
+      appSkinTokens,
     );
+
+    // Resolve cursor / selection / gutter from custom overrides or defaults.
+    final bgLuminance = syntaxStyle.backgroundColor.computeLuminance();
+    final contrast =
+        (cs.primary.computeLuminance() - bgLuminance).abs();
+    final customCursor = followsAppSkin
+        ? appSkinTokens!.editorCursor
+        : prefs.customColor('cursor');
+    final safeAccent = customCursor ??
+        (contrast > 0.25
+            ? cs.primary
+            : (bgLuminance < 0.5 ? Colors.white : Colors.black));
+    final customSelection = followsAppSkin
+        ? appSkinTokens!.editorSelection
+        : prefs.customColor('selection');
+    final selectionColor =
+        customSelection ?? safeAccent.withValues(alpha: 0.28);
+    final customGutter = followsAppSkin
+        ? appSkinTokens!.editorGutter
+        : prefs.customColor('gutter');
+    final gutterColor =
+        customGutter ?? syntaxStyle.textColor.withValues(alpha: 0.45);
 
     return Container(
       height: 145,
@@ -106,7 +138,7 @@ class _EditorAppearanceScreenState
       clipBehavior: Clip.antiAlias,
       child: CodeEditor(
         key: ValueKey(
-          'preview_${prefs.background.name}_${prefs.syntaxTheme.name}_${prefs.fontSize}_${prefs.showLineNumbers}_${prefs.relativeLineNumbers}_${appBrightness.name}',
+          'preview_${prefs.background.name}_${prefs.syntaxTheme.name}_${prefs.fontSize}_${prefs.showLineNumbers}_${prefs.relativeLineNumbers}_${appBrightness.name}_${prefs.customColors.hashCode}',
         ),
         controller: _previewCodeController,
         readOnly: true,
@@ -122,6 +154,8 @@ class _EditorAppearanceScreenState
           backgroundColor: syntaxStyle.backgroundColor,
           textColor: syntaxStyle.textColor,
           codeTheme: syntaxStyle.codeTheme,
+          cursorColor: safeAccent,
+          selectionColor: selectionColor,
         ),
         indicatorBuilder: prefs.showLineNumbers
             ? (context, editingController, chunkController, notifier) {
@@ -129,14 +163,14 @@ class _EditorAppearanceScreenState
                   controller: editingController,
                   notifier: notifier,
                   textStyle: TextStyle(
-                    color: syntaxStyle.textColor.withValues(alpha: 0.45),
+                    color: gutterColor,
                     fontFamily: 'JetBrains Mono',
                     fontFamilyFallback: const ['monospace'],
                     fontSize: prefs.fontSize,
                     height: 1.45,
                   ),
                   focusedTextStyle: TextStyle(
-                    color: cs.primary,
+                    color: safeAccent,
                     fontFamily: 'JetBrains Mono',
                     fontFamilyFallback: const ['monospace'],
                     fontSize: prefs.fontSize,
@@ -211,6 +245,7 @@ class _EditorAppearanceScreenState
                 TextEditorAppearancePrefs.defaultActions,
               );
               notifier.setAutoSave(false);
+              notifier.resetCustomColors();
             },
           ),
           const SizedBox(width: 4),

@@ -6,7 +6,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dar
 
 void main() {
   group('SwipeSeekHud', () {
-    testWidgets('renders positive delta, position, total and progress indicator', (
+    testWidgets('renders bold white position and total text without distracting elements', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -21,34 +21,32 @@ void main() {
         ),
       );
 
-      expect(find.text('+00:15'), findsOneWidget);
       expect(find.text('00:45 / 02:00'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(Icon), findsNothing);
 
-      final indicator = tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator),
-      );
-      expect(indicator.value, closeTo(45 / 120, 0.001));
+      final textWidget = tester.widget<Text>(find.text('00:45 / 02:00'));
+      expect(textWidget.style?.color, equals(Colors.white));
+      expect(textWidget.style?.fontWeight, equals(FontWeight.bold));
+      expect(textWidget.style?.shadows, isNotEmpty);
     });
 
-    testWidgets('renders negative delta with minus sign and rewind icon', (
+    testWidgets('renders milliseconds on target position when showMilliseconds is true', (
       tester,
     ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: SwipeSeekHud(
-              targetPosition: Duration(seconds: 30),
+              targetPosition: Duration(milliseconds: 30250),
               totalDuration: Duration(minutes: 5),
-              delta: Duration(seconds: -20),
+              showMilliseconds: true,
             ),
           ),
         ),
       );
 
-      expect(find.text('-00:20'), findsOneWidget);
-      expect(find.text('00:30 / 05:00'), findsOneWidget);
-      expect(find.byIcon(Icons.fast_rewind_rounded), findsOneWidget);
+      expect(find.text('00:30.250 / 05:00'), findsOneWidget);
     });
   });
 
@@ -283,7 +281,7 @@ void main() {
 
         // When visible range is < 10s, HUD renders milliseconds
         expect(find.byType(SwipeSeekHud), findsOneWidget);
-        expect(find.text('+00:00.250'), findsOneWidget);
+        expect(find.text('00:30.250 / 10:00'), findsOneWidget);
 
         await gesture.up();
         await tester.pump(const Duration(milliseconds: 750));

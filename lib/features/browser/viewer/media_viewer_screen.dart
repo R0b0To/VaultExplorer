@@ -1116,11 +1116,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   // Recomputes the shared swipe-physics notifier from the lock sources:
   // raw multi-touch (fires the instant a 2nd finger is detected), zoom/interaction
-  // state reported by the active media item, and swipe-to-seek gesture on videos.
-  // Either one holding the lock is enough to disable swipe-to-next-item.
+  // state reported by the active media item, and horizontal swipe-to-seek gesture on videos.
+  // When the playlist is vertical, swipe-to-seek is orthogonal to the page scroll
+  // direction, so item-change gestures do not interfere with seek and stay enabled.
   void _updateSwipePhysics() {
     final swipeToSeekActive =
-        !_scrollMode.isContinuous && _isCurrentItemSwipeToSeekEnabled;
+        _scrollMode == PlaylistScrollMode.horizontal &&
+        _isCurrentItemSwipeToSeekEnabled;
     final shouldLock =
         _multiTouchLock ||
         _zoomInteractionLock ||
@@ -2851,6 +2853,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           if (!next.config.showMediaCarousel) {
             _sessionController.setCarouselVisible(false);
           }
+        }
+      },
+    );
+    ref.listen<MediaViewerSessionState>(
+      mediaViewerSessionProvider(_sessionKey),
+      (previous, next) {
+        if (previous?.scrollMode != next.scrollMode) {
+          _updateSwipePhysics();
         }
       },
     );

@@ -1,0 +1,7 @@
+• Custom app skinning & full theme editor
+• New audio editor & video seek gestures
+• Media player: A-B repeat, notification controls, new formats
+• Automation: multi-pattern filters, keep-alive & background auto-sync
+• Text editor optimized for large files
+• Password-protected 7z fixes & APK install/extract prompt
+• Extended media info & UI/UX improvements

@@ -1,0 +1,26 @@
+## What's Changed
+
+### Themes & Customization
+* **Full-App Skinning System:** Introduced custom skin support across the entire app, allowing granular customization of UI colors, accents, and editor elements.
+
+### Media & Editors
+* **New Audio Editor:** Introduced a built-in audio editor for inspecting and trimming audio files.
+* **Video Editor Gesture:** Added a seek-across swipe gesture for faster timeline navigation.
+* **Media Player A-B Repeat:** Set start (A) and end (B) loop points to continuously repeat a specific section of any audio or video file.
+* **Background & Lockscreen Media Controls:** Added media notification controls to control playback and navigate playlists in the background or from the lockscreen (while the vault remains unlocked).
+* **Expanded Codec & Format Support:**
+  * **Video:** `.qt`, `.3g2`, `.mts`, `.mpe`
+  * **Audio:** `.aif`, `.aifc`, `.amr`, `.awb`, `.mka`, `.weba`, `.oga`
+* **Extended Media Info:** Added richer metadata and technical details to the Info page for images and audio files.
+
+### Automation & Background Operations
+* **Multi-String Pattern Matching:** `pattern` and `exclude_pattern` fields now accept comma-separated strings (e.g. `*.log, *.tmp`), allowing multi-rule matching in a single field.
+* **Improved Background Keep-Alive:** Implemented more aggressive keep-alive handling with user prompts to prevent Android from killing automation operations mid-run.
+* **Background Auto-Sync on Unlock:** When the app is closed, writable automation unlocks now run vault sync rules ("Sync when unlocked" and live-watch rules) before completing. Notification displays item counts for privacy without exposing file names.
+* **Sync Intent:** Added explicit intent action `com.aeidolon.vaultexplorer.action.SYNC_VAULT` for external automation workflows.
+
+###  File Handling & Performance
+* **Large File Text Editor Optimization:** Overhauled text editor memory consumption to prevent crashes and out-of-memory (OOM) errors when opening large text files.
+* **APK Handling & Extraction:** Opening APK files now prompts to either install via the system Package Installer or open as an archive; extraction actions are also available directly from selection menus.
+* **Password-Protected 7z Archives:** Fixed issues preventing the creation and extraction of password-protected 7-Zip (`.7z`) archives.
+* **UI/UX Refinements:** General design polish and layout consistency improvements across various pages.

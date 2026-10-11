@@ -1,7 +1,6 @@
 package com.aeidolon.vaultexplorer.audioedit
 
 import android.media.MediaCodec
-import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.SystemClock
 import com.aeidolon.vaultexplorer.VeLog
@@ -34,7 +33,7 @@ object AudioWaveformExtractor {
     )
 
     fun extract(
-        newExtractor: () -> MediaExtractor,
+        newExtractor: () -> AudioSource,
         isCancelled: () -> Boolean,
         onProgress: (Float) -> Unit,
     ): Waveform {
@@ -45,7 +44,14 @@ object AudioWaveformExtractor {
             if (track < 0) throw IllegalStateException("No audio track found in this file")
             val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("Unknown audio format")
-            val durationUs = LosslessAudioCutter.durationUsOf(format)
+            val isRawTrack = mime == AudioEditMath.MIME_RAW
+            if (LosslessAudioCutter.durationUsOf(format) <= 0L && !isRawTrack && !LosslessAudioCutter.hasDecoder(format)) {
+                // The length has to be measured by reading the whole stream; pointless without a decoder.
+                throw IllegalStateException("This device can't decode $mime, so there is no waveform")
+            }
+            val durationUs = LosslessAudioCutter.durationUsOrMeasure(extractor, track, format) {
+                if (isCancelled()) throw CancelledException()
+            }
             if (durationUs <= 0L) throw IllegalStateException("Unknown audio length")
 
             val peaksPerSecond = AudioEditMath.peaksPerSecondFor(durationUs)

@@ -26,11 +26,17 @@ import java.util.Locale
  * else WebM) and Vorbis (WebM). MP3 and WAV are by far the most common audio
  * files that it can't write, so they get small hand-rolled writers: MP3 frames
  * are self-contained and simply concatenated, and WAV PCM is re-wrapped in a
- * new header and trimmed to the exact sample. Anything else (FLAC, WMA, AC-3,
- * AMR, ...) can't be copied, so [AudioReencoder] decodes and re-encodes it as
- * AAC instead -- audio is cheap to re-encode, unlike video. The probe says
- * which of the two will happen so the editor can tell the user up front; see
- * [AudioEditMath.planOutput].
+ * new header and trimmed to the exact sample. AC-3 / E-AC-3 are handled like
+ * MP3 (concatenated syncframes in a raw `.ac3` / `.eac3`), which also means no
+ * decoder is needed for them. AIFF is PCM too, so it is cut to a WAV (byte-swapped
+ * when big-endian) without loss. Anything else (FLAC, WMA, AMR, ...) can't be
+ * copied, so [AudioReencoder] decodes and re-encodes it as AAC instead -- audio
+ * is cheap to re-encode, unlike video. The probe says which of the two will
+ * happen so the editor can tell the user up front; see [AudioEditMath.planOutput].
+ *
+ * **Sources.** Everything reads through [AudioSource], which is either the
+ * platform `MediaExtractor` or Media3's extractors (the player's demuxers,
+ * including AIFF); see `AudioEditHandlers.extractorFactory` for how one is picked.
  *
  * Known limits: tags/cover art and chapters aren't carried over (only the
  * audio stream is copied), and the first MP3 frame after a cut can click
@@ -73,6 +79,8 @@ object LosslessAudioCutter {
         val channels: Int,
         val bytesPerSample: Int,
         val isFloat: Boolean,
+        /** The source stores samples most-significant byte first (AIFF); the WAV output is always little-endian. */
+        val bigEndian: Boolean,
     ) {
         val blockAlign: Int get() = channels * bytesPerSample
     }
@@ -80,7 +88,7 @@ object LosslessAudioCutter {
     // ── Track helpers ────────────────────────────────────────────────────
 
     /** Index of the first audio track, or -1. Shared with [AudioWaveformExtractor]. */
-    internal fun firstAudioTrack(extractor: MediaExtractor): Int {
+    internal fun firstAudioTrack(extractor: AudioSource): Int {
         for (i in 0 until extractor.trackCount) {
             val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
             if (mime.startsWith("audio/")) return i
@@ -99,7 +107,45 @@ object LosslessAudioCutter {
         return runCatching { format.getLong(MediaFormat.KEY_DURATION) }.getOrDefault(0L)
     }
 
-    internal fun pcmEncodingOf(format: MediaFormat): Int? = intValue(format, MediaFormat.KEY_PCM_ENCODING)
+    /**
+     * Media3's MediaFormat key for the full PCM encoding (`MediaFormatUtil.KEY_PCM_ENCODING_EXTENDED`).
+     * `KEY_PCM_ENCODING` can't express big-endian PCM, so for those (AIFF) it is simply absent and
+     * reading only it would mistake big-endian samples for little-endian ones.
+     */
+    private const val KEY_PCM_ENCODING_EXTENDED = "exo-pcm-encoding-int"
+
+    /**
+     * The track's duration. Raw elementary streams (`.ac3`, `.eac3`) have no header or index to read
+     * it from -- Media3's extractor for them declares the length unknown and the stream unseekable --
+     * so then it is measured by stepping through every frame: timestamps accumulate from the frame
+     * sizes and no sample data is read. [onStep] runs now and then during that pass (throw from it to
+     * cancel). The source is rewound to the start afterwards (for an unseekable stream a seek simply
+     * restarts it). Returns 0 when it can't be determined.
+     */
+    internal fun durationUsOrMeasure(
+        extractor: AudioSource,
+        track: Int,
+        format: MediaFormat,
+        onStep: () -> Unit = {},
+    ): Long {
+        val known = durationUsOf(format)
+        if (known > 0L) return known
+        extractor.selectTrack(track)
+        val meter = StreamDurationMeter()
+        var steps = 0
+        while (extractor.sampleTrackIndex >= 0) {
+            val ts = extractor.sampleTime
+            if (ts < 0) break
+            meter.add(ts)
+            if (++steps % 512 == 0) onStep()
+            if (!extractor.advance()) break
+        }
+        extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+        return meter.durationUs
+    }
+
+    internal fun pcmEncodingOf(format: MediaFormat): Int? =
+        intValue(format, KEY_PCM_ENCODING_EXTENDED) ?: intValue(format, MediaFormat.KEY_PCM_ENCODING)
 
     private fun pcmLayoutOf(format: MediaFormat): PcmLayout {
         val sampleRate = intValue(format, MediaFormat.KEY_SAMPLE_RATE)
@@ -109,16 +155,27 @@ object LosslessAudioCutter {
         val encoding = pcmEncodingOf(format)
         val bytesPerSample = AudioEditMath.bytesPerSample(encoding)
             ?: throw UnsupportedCutException("This PCM sample format can't be cut without re-encoding")
-        return PcmLayout(sampleRate, channels, bytesPerSample, encoding == AudioEditMath.PCM_FLOAT)
+        return PcmLayout(
+            sampleRate,
+            channels,
+            bytesPerSample,
+            isFloat = AudioEditMath.isFloat(encoding),
+            bigEndian = AudioEditMath.isBigEndian(encoding),
+        )
     }
 
     private fun planFor(format: MediaFormat, sourceExtension: String): AudioCutPlan {
+        val mime = format.getString(MediaFormat.KEY_MIME)
+        // AIFF (and any other big-endian PCM) is cut to WAV rather than re-encoded.
+        val losslessPcm = mime == AudioEditMath.MIME_RAW &&
+            (AudioEditMath.isBigEndian(pcmEncodingOf(format)) ||
+                sourceExtension.lowercase(Locale.ROOT) in AudioEditMath.AIFF_EXTENSIONS)
         val plan = AudioEditMath.planOutput(
-            format.getString(MediaFormat.KEY_MIME),
+            mime,
             sourceExtension,
             Build.VERSION.SDK_INT,
+            losslessPcm,
         )
-        val mime = format.getString(MediaFormat.KEY_MIME)
         val unsupportedPcm = mime == AudioEditMath.MIME_RAW &&
             AudioEditMath.bytesPerSample(pcmEncodingOf(format)) == null
         if (unsupportedPcm && (plan is AudioCutPlan.Supported || plan is AudioCutPlan.Reencode)) {
@@ -128,7 +185,7 @@ object LosslessAudioCutter {
     }
 
     /** Whether this device has a decoder for [format] (the re-encode path needs one, unless it's raw PCM). */
-    private fun hasDecoder(format: MediaFormat): Boolean {
+    internal fun hasDecoder(format: MediaFormat): Boolean {
         if (format.getString(MediaFormat.KEY_MIME) == AudioEditMath.MIME_RAW) return true
         return runCatching {
             MediaCodecList(MediaCodecList.REGULAR_CODECS).findDecoderForFormat(format) != null
@@ -143,7 +200,7 @@ object LosslessAudioCutter {
 
     // ── Probe ────────────────────────────────────────────────────────────
 
-    fun probe(newExtractor: () -> MediaExtractor, sourceExtension: String): Probe {
+    fun probe(newExtractor: () -> AudioSource, sourceExtension: String): Probe {
         val extractor = newExtractor()
         try {
             val track = firstAudioTrack(extractor)
@@ -152,6 +209,7 @@ object LosslessAudioCutter {
             val plan = planFor(format, sourceExtension)
             val sampleRate = intValue(format, MediaFormat.KEY_SAMPLE_RATE)
             val channels = intValue(format, MediaFormat.KEY_CHANNEL_COUNT)
+            val durationUs = durationUsOrMeasure(extractor, track, format)
 
             // A re-encode is only an option if the device can decode the source and encode AAC.
             val reencodeProblem = if (plan is AudioCutPlan.Reencode) {
@@ -164,7 +222,7 @@ object LosslessAudioCutter {
             }
 
             return Probe(
-                durationUs = durationUsOf(format),
+                durationUs = durationUs,
                 mime = format.getString(MediaFormat.KEY_MIME),
                 bitrate = intValue(format, MediaFormat.KEY_BIT_RATE),
                 sampleRate = sampleRate,
@@ -234,7 +292,7 @@ object LosslessAudioCutter {
         }
     }
 
-    /** Appends each sample's bytes to the file as-is: MP3 frames are self-contained. */
+    /** Appends each sample's bytes to the file as-is: MP3 and AC-3 / E-AC-3 frames are self-contained. */
     private class RawFrameSink(outFile: File) : SampleSink {
         private val out = BufferedOutputStream(FileOutputStream(outFile), 64 * 1024)
         private var scratch = ByteArray(8 * 1024)
@@ -282,6 +340,7 @@ object LosslessAudioCutter {
             if (scratch.size < size) scratch = ByteArray(size)
             data.position(offset)
             data.get(scratch, 0, size)
+            if (pcm.bigEndian) AudioEditMath.swapSampleBytes(scratch, size, pcm.bytesPerSample)
             file.write(scratch, 0, size)
             dataBytes += size
         }
@@ -306,7 +365,7 @@ object LosslessAudioCutter {
         AudioContainer.MP4 -> MuxerSink(outFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4, format)
         AudioContainer.WEBM -> MuxerSink(outFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM, format)
         AudioContainer.OGG -> MuxerSink(outFile, MediaMuxer.OutputFormat.MUXER_OUTPUT_OGG, format)
-        AudioContainer.MP3 -> RawFrameSink(outFile)
+        AudioContainer.MP3, AudioContainer.AC3 -> RawFrameSink(outFile)
         AudioContainer.WAV -> WavSink(
             outFile,
             pcm ?: throw UnsupportedCutException("The PCM layout of this file is unknown"),
@@ -321,7 +380,7 @@ object LosslessAudioCutter {
      * 0..1 across the whole call.
      */
     fun cut(
-        newExtractor: () -> MediaExtractor,
+        newExtractor: () -> AudioSource,
         sourceExtension: String,
         ranges: List<Range>,
         outFile: File,

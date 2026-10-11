@@ -165,7 +165,7 @@ object AudioReencoder {
      * receives 0..1 across the whole call.
      */
     fun reencode(
-        newExtractor: () -> MediaExtractor,
+        newExtractor: () -> AudioSource,
         ranges: List<LosslessAudioCutter.Range>,
         outFile: File,
         isCancelled: () -> Boolean,

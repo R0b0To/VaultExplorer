@@ -68,7 +68,7 @@ class AudioEditMathTest {
 
     @Test
     fun codecsThatCantBeCopiedAreReEncodedToM4a() {
-        for (mime in listOf("audio/flac", "audio/amr-wb", "audio/3gpp", "audio/ac3", "audio/x-ms-wma")) {
+        for (mime in listOf("audio/flac", "audio/amr-wb", "audio/3gpp", "audio/vnd.dts", "audio/x-ms-wma")) {
             val plan = AudioEditMath.planOutput(mime, "x", 34)
             assertTrue("$mime should be re-encoded", plan is AudioCutPlan.Reencode)
             assertEquals("m4a", (plan as AudioCutPlan.Reencode).extension)
@@ -433,5 +433,148 @@ class AudioEditMathTest {
     @Test(expected = IllegalArgumentException::class)
     fun convertRejectsAnEncodingItDoesNotKnow() {
         PcmConvert.toPcm16(ByteBuffer.allocate(4), 0, 999, 1, 1, 0, 1, ShortArray(1))
+    }
+
+    // ── AC-3 / E-AC-3 / AIFF ─────────────────────────────────────────────
+
+    @Test
+    fun ac3AndEac3AreCopiedFrameByFrameWithoutADecoder() {
+        val ac3 = supported(AudioEditMath.planOutput(AudioEditMath.MIME_AC3, "ac3", 34))
+        assertEquals(AudioContainer.AC3, ac3.container)
+        assertEquals("ac3", ac3.extension)
+        // Whatever the source container (an MKV or MP4 carrying AC-3), the output is a raw stream.
+        assertEquals("ac3", supported(AudioEditMath.planOutput(AudioEditMath.MIME_AC3, "mka", 34)).extension)
+
+        for (mime in listOf(AudioEditMath.MIME_EAC3, AudioEditMath.MIME_EAC3_JOC)) {
+            val eac3 = supported(AudioEditMath.planOutput(mime, "eac3", 34))
+            assertEquals(AudioContainer.AC3, eac3.container)
+            assertEquals("eac3", eac3.extension)
+        }
+    }
+
+    @Test
+    fun aiffAndBigEndianPcmAreCutToWavInsteadOfReEncoded() {
+        // Extension alone is enough in the editor (".aif" -> losslessPcm), as is a big-endian layout.
+        val plan = supported(AudioEditMath.planOutput(AudioEditMath.MIME_RAW, "aiff", 34, losslessPcm = true))
+        assertEquals(AudioContainer.WAV, plan.container)
+        assertEquals("wav", plan.extension)
+        // Without the flag, PCM in an unrelated container is still re-encoded.
+        assertTrue(AudioEditMath.planOutput(AudioEditMath.MIME_RAW, "mka", 34) is AudioCutPlan.Reencode)
+        assertTrue(AudioEditMath.AIFF_EXTENSIONS.containsAll(listOf("aif", "aiff", "aifc")))
+    }
+
+    @Test
+    fun bigEndianEncodingsAreSupportedAndMapToTheirLittleEndianTwins() {
+        assertEquals(2, AudioEditMath.bytesPerSample(AudioEditMath.PCM_16BIT_BE))
+        assertEquals(3, AudioEditMath.bytesPerSample(AudioEditMath.PCM_24BIT_BE))
+        assertEquals(4, AudioEditMath.bytesPerSample(AudioEditMath.PCM_32BIT_BE))
+        assertEquals(4, AudioEditMath.bytesPerSample(AudioEditMath.PCM_FLOAT_BE))
+
+        assertTrue(AudioEditMath.isBigEndian(AudioEditMath.PCM_16BIT_BE))
+        assertTrue(AudioEditMath.isBigEndian(AudioEditMath.PCM_FLOAT_BE))
+        assertTrue(!AudioEditMath.isBigEndian(AudioEditMath.PCM_16BIT))
+        assertTrue(!AudioEditMath.isBigEndian(null))
+
+        assertTrue(AudioEditMath.isFloat(AudioEditMath.PCM_FLOAT))
+        assertTrue(AudioEditMath.isFloat(AudioEditMath.PCM_FLOAT_BE))
+        assertTrue(!AudioEditMath.isFloat(AudioEditMath.PCM_32BIT_BE))
+
+        assertEquals(AudioEditMath.PCM_16BIT, AudioEditMath.littleEndianOf(AudioEditMath.PCM_16BIT_BE))
+        assertEquals(AudioEditMath.PCM_24BIT_PACKED, AudioEditMath.littleEndianOf(AudioEditMath.PCM_24BIT_BE))
+        assertEquals(AudioEditMath.PCM_32BIT, AudioEditMath.littleEndianOf(AudioEditMath.PCM_32BIT_BE))
+        assertEquals(AudioEditMath.PCM_FLOAT, AudioEditMath.littleEndianOf(AudioEditMath.PCM_FLOAT_BE))
+        assertEquals(AudioEditMath.PCM_16BIT, AudioEditMath.littleEndianOf(AudioEditMath.PCM_16BIT))
+    }
+
+    @Test
+    fun swapSampleBytesReversesEachWholeSampleInPlace() {
+        val sixteen = byteArrayOf(0x12, 0x34, 0x56, 0x78)
+        AudioEditMath.swapSampleBytes(sixteen, 4, 2)
+        assertArrayEquals(byteArrayOf(0x34, 0x12, 0x78, 0x56), sixteen)
+
+        val twentyFour = byteArrayOf(1, 2, 3, 4, 5, 6)
+        AudioEditMath.swapSampleBytes(twentyFour, 6, 3)
+        assertArrayEquals(byteArrayOf(3, 2, 1, 6, 5, 4), twentyFour)
+
+        val thirtyTwo = byteArrayOf(1, 2, 3, 4)
+        AudioEditMath.swapSampleBytes(thirtyTwo, 4, 4)
+        assertArrayEquals(byteArrayOf(4, 3, 2, 1), thirtyTwo)
+
+        // Only the first `length` bytes count, and a trailing partial sample is left alone.
+        val partial = byteArrayOf(1, 2, 3, 4, 5, 9)
+        AudioEditMath.swapSampleBytes(partial, 5, 2)
+        assertArrayEquals(byteArrayOf(2, 1, 4, 3, 5, 9), partial)
+
+        // One-byte samples have no byte order.
+        val eight = byteArrayOf(1, 2, 3)
+        AudioEditMath.swapSampleBytes(eight, 3, 1)
+        assertArrayEquals(byteArrayOf(1, 2, 3), eight)
+    }
+
+    private fun be(size: Int) = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN)
+
+    @Test
+    fun readerReadsBigEndianSamplesTheSameAsLittleEndianOnes() {
+        fun peak(encoding: Int, fill: (ByteBuffer) -> Unit, size: Int): Int {
+            val acc = PeakAccumulator(1, 1.0)
+            val r = PcmPeakReader(acc).apply { channels = 1; this.encoding = encoding }
+            val b = be(size)
+            fill(b)
+            r.consume(b, 0, size)
+            return acc.peaks[0].toInt() and 0xFF
+        }
+        // Half scale in each layout -> 128 of 255, same as the little-endian readings.
+        assertEquals(128, peak(AudioEditMath.PCM_16BIT_BE, { it.putShort(0x4000) }, 2))
+        assertEquals(128, peak(AudioEditMath.PCM_32BIT_BE, { it.putInt(0x40000000) }, 4))
+        assertEquals(128, peak(AudioEditMath.PCM_FLOAT_BE, { it.putFloat(0.5f) }, 4))
+        // 24-bit big-endian: 0x400000 = half scale; a negative one (0x800000) is full scale.
+        assertEquals(128, peak(AudioEditMath.PCM_24BIT_BE, { it.put(0x40); it.put(0); it.put(0) }, 3))
+        assertEquals(255, peak(AudioEditMath.PCM_24BIT_BE, { it.put(0x80.toByte()); it.put(0); it.put(0) }, 3))
+    }
+
+    @Test
+    fun convertReadsBigEndianSamples() {
+        val out = ShortArray(1)
+
+        PcmConvert.toPcm16(be(2).apply { putShort(0x1234) }, 0, AudioEditMath.PCM_16BIT_BE, 1, 1, 0, 1, out)
+        assertEquals(0x1234.toShort(), out[0])
+
+        // 24-bit big-endian: 12 34 56 -> top 16 bits 0x1234; 80 00 00 -> Short.MIN_VALUE.
+        PcmConvert.toPcm16(
+            ByteBuffer.wrap(byteArrayOf(0x12, 0x34, 0x56)), 0, AudioEditMath.PCM_24BIT_BE, 1, 1, 0, 1, out,
+        )
+        assertEquals(0x1234.toShort(), out[0])
+        PcmConvert.toPcm16(
+            ByteBuffer.wrap(byteArrayOf(0x80.toByte(), 0x00, 0x00)), 0, AudioEditMath.PCM_24BIT_BE, 1, 1, 0, 1, out,
+        )
+        assertEquals(Short.MIN_VALUE, out[0])
+
+        PcmConvert.toPcm16(be(4).apply { putInt(0x12340000) }, 0, AudioEditMath.PCM_32BIT_BE, 1, 1, 0, 1, out)
+        assertEquals(0x1234.toShort(), out[0])
+
+        PcmConvert.toPcm16(be(4).apply { putFloat(0.5f) }, 0, AudioEditMath.PCM_FLOAT_BE, 1, 1, 0, 1, out)
+        assertEquals(16383.toShort(), out[0])
+    }
+
+    // ── StreamDurationMeter (raw .ac3 / .eac3 have no duration of their own) ──
+
+    @Test
+    fun meterAddsOneFrameToTheLastTimestamp() {
+        val m = StreamDurationMeter()
+        // AC-3 at 48 kHz: 1536 samples = 32 ms per frame.
+        for (i in 0 until 100) m.add(i * 32_000L)
+        assertEquals(100 * 32_000L, m.durationUs)
+    }
+
+    @Test
+    fun meterNeedsTwoSamplesAndIgnoresMissingTimestamps() {
+        val m = StreamDurationMeter()
+        assertEquals(0L, m.durationUs)
+        m.add(-1L)
+        assertEquals(0L, m.durationUs)
+        m.add(0L)
+        assertEquals(0L, m.durationUs) // one timestamp can't tell the frame length
+        m.add(32_000L)
+        assertEquals(64_000L, m.durationUs)
     }
 }

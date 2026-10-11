@@ -24,6 +24,12 @@ enum class AudioContainer {
 
     /** PCM re-wrapped in a fresh RIFF/WAVE header, written by hand. */
     WAV,
+
+    /**
+     * Concatenated AC-3 / E-AC-3 syncframes (a plain `.ac3` / `.eac3` elementary
+     * stream), written by hand: every frame is self-contained, like MP3's.
+     */
+    AC3,
 }
 
 sealed class AudioCutPlan {
@@ -54,11 +60,25 @@ object AudioEditMath {
     const val PCM_24BIT_PACKED = 21
     const val PCM_32BIT = 22
 
+    // Media3's big-endian encodings (C.ENCODING_PCM_*_BIG_ENDIAN). They have no android.media.AudioFormat
+    // equivalent, so Media3 reports them only through MediaFormat key "exo-pcm-encoding-int"; AIFF is the
+    // one place they come from here (AiffExtractor).
+    const val PCM_16BIT_BE = 0x10000000
+    const val PCM_24BIT_BE = 0x50000000
+    const val PCM_32BIT_BE = 0x60000000
+    const val PCM_FLOAT_BE = 0x71000000
+
+    /** Extensions of Apple's AIFF family; these decode as PCM and are cut to WAV without loss. */
+    val AIFF_EXTENSIONS: Set<String> = setOf("aif", "aiff", "aifc", "afc")
+
     const val MIME_AAC = "audio/mp4a-latm"
     const val MIME_MP3 = "audio/mpeg"
     const val MIME_OPUS = "audio/opus"
     const val MIME_VORBIS = "audio/vorbis"
     const val MIME_RAW = "audio/raw"
+    const val MIME_AC3 = "audio/ac3"
+    const val MIME_EAC3 = "audio/eac3"
+    const val MIME_EAC3_JOC = "audio/eac3-joc"
 
     /** RIFF sizes are 32-bit, so a WAV can't hold more data than this. */
     const val MAX_WAV_DATA_BYTES = 0xFFFF_FFFFL - 36L
@@ -75,10 +95,21 @@ object AudioEditMath {
      * AC-3, AMR, ...) is a [AudioCutPlan.Reencode]: it can't be copied, so it
      * is decoded and re-encoded to AAC. Lossless copying is always preferred.
      *
+     * AC-3 / E-AC-3 are copied frame by frame into a raw `.ac3` / `.eac3`
+     * stream, which (unlike a re-encode) needs no decoder at all.
+     *
      * [sourceExtension] only influences the result where several extensions
      * share a codec (`.opus` vs `.ogg`) or where `audio/raw` has to be a WAV.
+     * [losslessPcm] says the raw PCM can be written as a WAV whatever its
+     * container (AIFF, or any big-endian source): the WAV header is built from
+     * the track's own layout, so there is nothing to reuse from the source.
      */
-    fun planOutput(mime: String?, sourceExtension: String, sdkInt: Int): AudioCutPlan {
+    fun planOutput(
+        mime: String?,
+        sourceExtension: String,
+        sdkInt: Int,
+        losslessPcm: Boolean = false,
+    ): AudioCutPlan {
         val ext = sourceExtension.lowercase(Locale.ROOT)
         return when (mime) {
             null -> AudioCutPlan.Unsupported("No audio track found in this file")
@@ -92,8 +123,10 @@ object AudioEditMath {
                 } else {
                     AudioCutPlan.Supported(AudioContainer.WEBM, "weba")
                 }
+            MIME_AC3 -> AudioCutPlan.Supported(AudioContainer.AC3, "ac3")
+            MIME_EAC3, MIME_EAC3_JOC -> AudioCutPlan.Supported(AudioContainer.AC3, "eac3")
             MIME_RAW ->
-                if (ext == "wav" || ext == "wave") {
+                if (ext == "wav" || ext == "wave" || losslessPcm) {
                     AudioCutPlan.Supported(AudioContainer.WAV, "wav")
                 } else {
                     // PCM in some other container: no WAV header to reuse, so re-encode.
@@ -145,10 +178,46 @@ object AudioEditMath {
     /** Bytes per sample for [encoding] (null = the 16-bit default), or null when unsupported. */
     fun bytesPerSample(encoding: Int?): Int? = when (encoding ?: PCM_16BIT) {
         PCM_8BIT -> 1
-        PCM_16BIT -> 2
-        PCM_24BIT_PACKED -> 3
-        PCM_32BIT, PCM_FLOAT -> 4
+        PCM_16BIT, PCM_16BIT_BE -> 2
+        PCM_24BIT_PACKED, PCM_24BIT_BE -> 3
+        PCM_32BIT, PCM_FLOAT, PCM_32BIT_BE, PCM_FLOAT_BE -> 4
         else -> null
+    }
+
+    fun isBigEndian(encoding: Int?): Boolean = when (encoding) {
+        PCM_16BIT_BE, PCM_24BIT_BE, PCM_32BIT_BE, PCM_FLOAT_BE -> true
+        else -> false
+    }
+
+    fun isFloat(encoding: Int?): Boolean = encoding == PCM_FLOAT || encoding == PCM_FLOAT_BE
+
+    /** The little-endian encoding with the same sample layout as [encoding] (itself when already little-endian). */
+    fun littleEndianOf(encoding: Int): Int = when (encoding) {
+        PCM_16BIT_BE -> PCM_16BIT
+        PCM_24BIT_BE -> PCM_24BIT_PACKED
+        PCM_32BIT_BE -> PCM_32BIT
+        PCM_FLOAT_BE -> PCM_FLOAT
+        else -> encoding
+    }
+
+    /**
+     * Reverses the byte order of every [bytesPerSample]-byte sample in the first
+     * [length] bytes of [data], in place. A trailing partial sample is left alone;
+     * one-byte samples have no byte order, so nothing happens for them.
+     */
+    fun swapSampleBytes(data: ByteArray, length: Int, bytesPerSample: Int) {
+        if (bytesPerSample <= 1) return
+        val whole = length - length % bytesPerSample
+        var i = 0
+        while (i < whole) {
+            var lo = i
+            var hi = i + bytesPerSample - 1
+            while (lo < hi) {
+                val t = data[lo]; data[lo] = data[hi]; data[hi] = t
+                lo++; hi--
+            }
+            i += bytesPerSample
+        }
     }
 
     /** Microseconds -> a PCM frame index at [sampleRate], rounded to nearest. */
@@ -222,6 +291,27 @@ object AudioEditMath {
 }
 
 /**
+ * Works out a stream's length from its sample timestamps: the last one plus one
+ * frame. For raw elementary streams (`.ac3`, `.eac3`) that declare no duration.
+ * [durationUs] is 0 until at least two samples have been seen (one frame's
+ * length can't be told from a single timestamp).
+ */
+class StreamDurationMeter {
+    private var prevUs = -1L
+    private var lastUs = -1L
+    private var frameUs = 0L
+
+    fun add(timeUs: Long) {
+        if (timeUs < 0) return
+        if (prevUs >= 0 && timeUs > prevUs) frameUs = timeUs - prevUs
+        prevUs = timeUs
+        lastUs = timeUs
+    }
+
+    val durationUs: Long get() = if (lastUs < 0 || frameUs <= 0) 0L else lastUs + frameUs
+}
+
+/**
  * Keeps the loudest sample seen in each time bucket, as a 0..255 byte.
  * [bucketsPerFrame] is buckets per PCM frame (peaks-per-second / sample rate).
  */
@@ -251,13 +341,15 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
         val channelCount = max(1, channels)
         val frames = size / (bytesPerSample * channelCount)
 
-        val view = data.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        val bigEndian = AudioEditMath.isBigEndian(encoding)
+        val layout = AudioEditMath.littleEndianOf(encoding)
+        val view = data.duplicate().order(if (bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
         view.limit(offset + size)
         var pos = offset
         for (frame in 0 until frames) {
             var loudest = 0f
             for (channel in 0 until channelCount) {
-                val level = amplitudeAt(view, pos)
+                val level = amplitudeAt(view, pos, layout, bigEndian)
                 if (level > loudest) loudest = level
                 pos += bytesPerSample
             }
@@ -266,16 +358,11 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
         }
     }
 
-    private fun amplitudeAt(b: ByteBuffer, pos: Int): Float = when (encoding) {
+    /** [layout] is a little-endian encoding; [bigEndian] says the bytes (and [b]'s order) are reversed. */
+    private fun amplitudeAt(b: ByteBuffer, pos: Int, layout: Int, bigEndian: Boolean): Float = when (layout) {
         AudioEditMath.PCM_8BIT -> abs((b.get(pos).toInt() and 0xFF) - 128) / 128f
         AudioEditMath.PCM_16BIT -> abs(b.getShort(pos).toInt()) / 32768f
-        AudioEditMath.PCM_24BIT_PACKED -> {
-            // The top byte is read signed, which sign-extends the 24-bit value.
-            val v = (b.get(pos).toInt() and 0xFF) or
-                ((b.get(pos + 1).toInt() and 0xFF) shl 8) or
-                (b.get(pos + 2).toInt() shl 16)
-            abs(v) / 8388608f
-        }
+        AudioEditMath.PCM_24BIT_PACKED -> abs(PcmConvert.int24(b, pos, bigEndian)) / 8388608f
         AudioEditMath.PCM_32BIT -> abs(b.getInt(pos).toLong()).toFloat() / 2147483648f
         AudioEditMath.PCM_FLOAT -> abs(b.getFloat(pos))
         else -> 0f
@@ -303,27 +390,39 @@ object PcmConvert {
     ) {
         val bytesPerSample = AudioEditMath.bytesPerSample(encoding)
             ?: throw IllegalArgumentException("Unsupported PCM encoding $encoding")
-        val view = data.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        val bigEndian = AudioEditMath.isBigEndian(encoding)
+        val layout = AudioEditMath.littleEndianOf(encoding)
+        val view = data.duplicate().order(if (bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
         val frameBytes = bytesPerSample * inChannels
         var pos = offset + firstFrame * frameBytes
         var o = 0
         for (frame in 0 until frameCount) {
             for (channel in 0 until outChannels) {
-                out[o++] = sample16(view, pos + channel * bytesPerSample, encoding)
+                out[o++] = sample16(view, pos + channel * bytesPerSample, layout, bigEndian)
             }
             pos += frameBytes
         }
     }
 
-    private fun sample16(b: ByteBuffer, pos: Int, encoding: Int): Short = when (encoding) {
-        AudioEditMath.PCM_8BIT -> (((b.get(pos).toInt() and 0xFF) - 128) shl 8).toShort()
-        AudioEditMath.PCM_16BIT -> b.getShort(pos)
-        AudioEditMath.PCM_24BIT_PACKED -> {
-            val v = (b.get(pos).toInt() and 0xFF) or
+    /**
+     * A signed 24-bit sample at [pos]; [bigEndian] says its most significant byte comes first.
+     * The top byte is read signed, which sign-extends the value.
+     */
+    fun int24(b: ByteBuffer, pos: Int, bigEndian: Boolean): Int =
+        if (bigEndian) {
+            (b.get(pos).toInt() shl 16) or
+                ((b.get(pos + 1).toInt() and 0xFF) shl 8) or
+                (b.get(pos + 2).toInt() and 0xFF)
+        } else {
+            (b.get(pos).toInt() and 0xFF) or
                 ((b.get(pos + 1).toInt() and 0xFF) shl 8) or
                 (b.get(pos + 2).toInt() shl 16)
-            (v shr 8).toShort()
         }
+
+    private fun sample16(b: ByteBuffer, pos: Int, layout: Int, bigEndian: Boolean): Short = when (layout) {
+        AudioEditMath.PCM_8BIT -> (((b.get(pos).toInt() and 0xFF) - 128) shl 8).toShort()
+        AudioEditMath.PCM_16BIT -> b.getShort(pos)
+        AudioEditMath.PCM_24BIT_PACKED -> (int24(b, pos, bigEndian) shr 8).toShort()
         AudioEditMath.PCM_32BIT -> (b.getInt(pos) shr 16).toShort()
         AudioEditMath.PCM_FLOAT -> (b.getFloat(pos).coerceIn(-1f, 1f) * 32767f).toInt().toShort()
         else -> 0

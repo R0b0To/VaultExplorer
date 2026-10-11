@@ -2,16 +2,26 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.content.Context
 import android.media.MediaExtractor
+import android.net.Uri
 import android.os.PowerManager
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.inspector.MediaExtractorCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.audioedit.AudioSource
 import com.aeidolon.vaultexplorer.audioedit.AudioWaveformExtractor
 import com.aeidolon.vaultexplorer.audioedit.LosslessAudioCutter
+import com.aeidolon.vaultexplorer.audioedit.Media3AudioSource
+import com.aeidolon.vaultexplorer.audioedit.PlatformAudioSource
 import com.aeidolon.vaultexplorer.bridge.AudioEditProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.AudioEditCancellation
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
+import com.aeidolon.vaultexplorer.engine.AiffAwareExtractorsFactory
+import com.aeidolon.vaultexplorer.engine.VaultMedia3DataSourceFactory
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -49,7 +59,28 @@ class AudioEditHandlers(
         const val COPY_BUFFER = 256 * 1024
     }
 
-    private fun extractorFactory(volId: Int, filePath: String, isLocal: Boolean): () -> MediaExtractor = {
+    /**
+     * Opens the source for one operation. The platform `MediaExtractor` goes first, so every file it
+     * already handled keeps behaving exactly as before; when it can't open the file (AIFF, AC-3, DTS
+     * and the like -- "failed to instantiate extractor") or finds no audio in it, Media3's extractors
+     * take over. Those are the player's own demuxers, so anything the player can open is readable
+     * here too. Once the platform extractor has failed for this file it isn't retried: the cutter
+     * asks for a fresh source more than once (cut, then re-encode).
+     */
+    private fun extractorFactory(volId: Int, filePath: String, isLocal: Boolean): () -> AudioSource {
+        var preferMedia3 = false
+        return {
+            var source: AudioSource? = null
+            if (!preferMedia3) {
+                source = openPlatform(volId, filePath, isLocal)
+                if (source == null) preferMedia3 = true
+            }
+            source ?: openMedia3(volId, filePath, isLocal)
+        }
+    }
+
+    /** The platform extractor, or null when it can't open the file or sees no audio track in it. */
+    private fun openPlatform(volId: Int, filePath: String, isLocal: Boolean): AudioSource? {
         val extractor = MediaExtractor()
         try {
             if (isLocal) {
@@ -57,11 +88,50 @@ class AudioEditHandlers(
             } else {
                 extractor.setDataSource(ContainerMediaDataSource(activity, filePath, filePath, volId))
             }
+            val source = PlatformAudioSource(extractor)
+            if (LosslessAudioCutter.firstAudioTrack(source) < 0) {
+                source.release()
+                return null
+            }
+            return source
         } catch (e: Exception) {
             runCatching { extractor.release() }
-            throw e
+            VeLog.i(TAG) { "platform extractor can't open this file (${e.message}); using Media3's" }
+            return null
         }
-        extractor
+    }
+
+    /**
+     * Media3's extractors through `MediaExtractorCompat`: the same factory the player uses
+     * (`AiffAwareExtractorsFactory` over the default extractors) and the same data sources -- a vault
+     * file is decrypted on demand by [VaultMedia3DataSourceFactory], never copied out.
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun openMedia3(volId: Int, filePath: String, isLocal: Boolean): AudioSource {
+        val defaults = DefaultExtractorsFactory()
+        // As in the player: lets CBR audio without a seek table (plain MP3, AC-3) still be seeked.
+        defaults.setConstantBitrateSeekingEnabled(true)
+        val dataSourceFactory: DataSource.Factory =
+            if (isLocal) DefaultDataSource.Factory(activity) else VaultMedia3DataSourceFactory(volId, filePath)
+        val uri: Uri = when {
+            !isLocal -> Uri.parse("vault://$volId/$filePath")
+            filePath.startsWith("content://") ->
+                activity.safStorageManager.resolveDocumentUriFromTreePath(filePath) ?: Uri.parse(filePath)
+            else -> Uri.fromFile(File(filePath))
+        }
+        val compat = MediaExtractorCompat(AiffAwareExtractorsFactory(defaults), dataSourceFactory)
+        try {
+            compat.setDataSource(uri, 0L)
+        } catch (e: Exception) {
+            runCatching { compat.release() }
+            throw IOException("Couldn't open this audio file: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+        val source = Media3AudioSource(compat)
+        if (LosslessAudioCutter.firstAudioTrack(source) < 0) {
+            source.release()
+            throw IOException("No audio track found in this file")
+        }
+        return source
     }
 
     private fun extensionOf(path: String): String {

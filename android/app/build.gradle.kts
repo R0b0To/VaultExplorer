@@ -155,6 +155,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.11.1")
     implementation("androidx.media3:media3-session:1.11.1")
     implementation("androidx.media3:media3-datasource:1.11.1")
+    implementation("androidx.media3:media3-inspector:1.11.1")
     implementation("io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0")
     implementation("androidx.pdf:pdf-viewer-fragment:1.0.0-alpha19")
     implementation("androidx.pdf:pdf-core:1.0.0-alpha19")

@@ -9,9 +9,11 @@ This covers three different kinds of dependency, checked differently:
   `android/app/src/main/cpp` tree) must be GPL-compatible, because it
   becomes part of one combined binary work.
 - **AndroidX/Gradle dependencies** (`android/app/build.gradle.kts`) are
-  separately-compiled Kotlin/Java libraries pulled in at build time --
-  not compiled into `libvaultexplorer.so` -- used for native platform
-  views (PDF, video/camera) and SAF file access.
+  separately-compiled Kotlin/Java libraries and prebuilt AAR artifacts
+  pulled in at build time via Gradle -- not compiled into
+  `libvaultexplorer.so` -- used for native platform views (PDF, video/camera,
+  audio playback and editing with software decoder fallbacks), background
+  work execution (WorkManager), and SAF file access.
 - **Flutter/Dart packages** (`pubspec.yaml`) are linked at the Dart/Flutter
   level, mostly calling into their own separately-compiled native code
   (e.g. via platform channels or FFI) rather than being compiled into
@@ -42,7 +44,7 @@ All entries below were checked directly against upstream sources/licenses
 | xz / liblzma (libarchive filter) | tukaani-project/xz | 0BSD | 4b73f2ec (v5.8.3) | OK |
 | zstd (libarchive filter) | facebook/zstd | BSD-3-Clause OR GPL-2.0-or-later (dual, at your option) | f8745da6 (v1.5.7) | OK |
 | BoringSSL (AES-256 ZIP / RAR5 passphrase support for libarchive) | google/boringssl | ISC (new code) + OpenSSL License/SSLeay License (ported OpenSSL code) -- all permissive | ef0c0723 | OK |
-| VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
+| VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `Streebog.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), Streebog (BSD-2-clause, Alexey Degtyarev), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
 | `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo. A host test exists at `cpp/Common/test/test_endian.c`, but in this snapshot it does not compile as shipped (a `LE*/BE*` inside a block comment ends the comment early, and the build line in its header needs `-I../..` rather than `-I..`) and it is not registered in CMake or CI | OK |
 
 Archive-engine note: `archive/archive_engine.cpp` (this project's own libarchive
@@ -63,21 +65,46 @@ directly.
 
 ## AndroidX/Gradle (`android/app/build.gradle.kts`)
 
-PDF and video/camera viewing were moved off Flutter plugins (`pdfrx`,
-`video_player`) and onto native Kotlin platform views backed directly by
-these AndroidX/Jetpack libraries, so they're audited here instead of under
-Flutter/Dart below. All are decoded via the OS's own `MediaCodec`/PDF
-renderer -- no bundled codec or PDF-parsing binaries of any kind, and
-nothing unencrypted is written to disk; content streams from the vault
-engine straight into these views.
+PDF, video/camera, and audio playback and editing are handled by native Kotlin
+platform views and background services backed directly by these AndroidX/Jetpack
+and Media3 libraries, audited here instead of under Flutter/Dart below. Media
+playback and waveform extraction primarily use the OS's hardware-accelerated
+`MediaCodec` and the Jetpack PDF renderer.
+
+To support audio and video formats not universally guaranteed by device chipsets
+(such as AC-3, E-AC-3, DTS, or AV1 on older hardware), the player and waveform
+extractor integrate `nextlib-media3ext` (`io.github.anilbeesetti:nextlib-media3ext`),
+an open-source Media3 extension providing software decoders via FFmpeg and dav1d.
+`nextlib` is pulled as a prebuilt AAR from Maven Central containing free-software
+native shared libraries built in upstream CI. Content streams directly from
+decrypted vault memory straight into these views -- nothing unencrypted is
+written to disk.
 
 | Component | License | Notes |
 |---|---|---|
-| `androidx.documentfile:documentfile` | Apache-2.0 | Backs the "Open in other apps" SAF integration and directory-vault access. |
-| `androidx.media3:media3-exoplayer`, `-ui`, `-session`, `-datasource` (1.11.0) | Apache-2.0 | Native video/audio playback, replacing the Flutter `video_player` plugin. |
+| `androidx.work:work-runtime-ktx` (2.12.0) | Apache-2.0 | Powers daily scheduled background vault sync (`ScheduledVaultSyncService` / `ScheduledVaultSyncWorker`). |
+| `androidx.documentfile:documentfile` (1.0.1) | Apache-2.0 | Backs the "Open in other apps" SAF integration and directory-vault access. |
+| `androidx.media3:media3-exoplayer`, `-ui`, `-session`, `-datasource` (1.11.1) | Apache-2.0 | Native video/audio playback, playlist coordination, and background playback session controls (`VaultMediaPlaybackService`). Pinned version 1.11.1. |
+| `androidx.media3:media3-inspector` (1.11.1) | Apache-2.0 | Media track inspection and container parsing used by the audio editor and cutter pipelines. |
+| `io.github.anilbeesetti:nextlib-media3ext` (1.11.1-0.16.0) | GPL-3.0 | Media3 extension adding software decoder renderers (`NextRenderersFactory`). Fetched as a prebuilt AAR from Maven Central (see distribution notes below). Source is public at `github.com/anilbeesetti/nextlib`. |
+| ↳ `FFmpeg` (bundled in nextlib) | LGPL-3.0-or-later | Built in nextlib CI with `--enable-version3`, without `--enable-gpl` or `--enable-nonfree` (LGPLv3+ configuration). Provides software decoders for AC-3, E-AC-3, DTS, TrueHD, etc. Also directly driven for PCM sample decoding in the audio waveform extractor. |
+| ↳ `dav1d` (bundled in nextlib) | BSD-2-Clause | High-performance AV1 video decoder. |
+| ↳ `mbedTLS` (bundled in nextlib) | Apache-2.0 OR GPL-2.0-or-later | Cryptographic backend for FFmpeg network/TLS protocols. |
 | `androidx.pdf:pdf-viewer-fragment`, `:pdf-core` (1.0.0-alpha19) | Apache-2.0 | Jetpack PDF viewer, replacing the Flutter `pdfrx` plugin. Alpha API, pinned version. |
 | `com.google.android.material:material` (1.13.0) | Apache-2.0 | Material Components for the native platform-view UI. |
 | `androidx.exifinterface:exifinterface` (1.3.7) | Apache-2.0 | EXIF metadata reading for photos inside a vault. |
+
+### In-repo Media & Decoder Integration Code
+
+The app contains two specialized native Kotlin adapters written to bridge Media3 and nextlib:
+
+- `io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegPcmDecoder`: In-repo Kotlin class
+  placed inside nextlib's package namespace to access its package-private `FfmpegAudioDecoder`.
+  Provides non-blocking decode-to-PCM streaming for `AudioWaveformExtractor`, enabling waveform
+  generation for AC-3, E-AC-3, and DTS streams on devices lacking hardware codecs.
+- `com.aeidolon.vaultexplorer.engine.SeekableAc3Extractor`: In-repo Kotlin extractor wrapper around
+  Media3's `Ac3Extractor` that computes a `ConstantBitrateSeekMap` from the first frame's bitrate,
+  making raw `.ac3` and `.eac3` elementary streams seekable during in-app playback and audio editing.
 
 ## Flutter/Dart (`pubspec.yaml`)
 
@@ -89,41 +116,57 @@ engine straight into these views.
 | `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports almost everywhere in this project (one file, `lib/features/share_import/share_import_flow.dart`, still imports `package:flutter/material.dart` directly -- not a licensing concern either way since both come from the Flutter SDK/its own packages, just noted so this table doesn't overstate how complete the migration is). |
 | `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |
 | `riverpod_annotation` | MIT | Annotations consumed by `flutter_riverpod`; no separate codegen at runtime. |
-| `re_editor` | MIT | In-app text/code editor widget (`reqable.com`) backing `TextEditorScreen` -- line numbers, active-line indication, and syntax highlighting. Checked against upstream `reqable/re-editor`, not just pub.dev's badge. |
+| `re_editor` | MIT | In-app text/code editor widget (`reqable.com`), vendored in-tree under `packages/re_editor` with local performance patches (see `packages/re_editor/PATCHES.md`). Bounded paragraph cache, fast line lookup, and skipped isolate serialization for non-code files. Upstream license retained. |
 | `re_highlight` | MIT | `re_editor`'s syntax-highlighting engine (Dart port of `highlight.js`, itself BSD-3-Clause upstream -- the Dart translation is independently MIT-licensed by `reqable.com`). Supplies the bundled language grammars and color themes used by the editor. |
 | `isolate_manager` | MIT | Transitive dependency of `re_editor`; runs syntax highlighting off the UI isolate for large files. |
-| `kpasslib` | MIT | KeePass KDBX 3/4 reading and writing for Item Vault import/export (`kdbx_codec.dart`). License checked on its pub.dev page; its own transitive dependencies were not audited in this pass. |
+| `kpasslib` | MIT | KeePass KDBX 3/4 reading and writing for Item Vault import/export (`kdbx_codec.dart`). Uses pure-Dart `archive` and `crypto` internally for KDBX block compression and key derivation. |
 | `csv` | MIT | CSV parsing/encoding for password import/export (`csv_codec.dart`). No dependencies. |
-| `crypto` | BSD-3-Clause | Official Dart-team SHA/HMAC package, used for TOTP codes (`totp_engine.dart`) and for reading password-protected Bitwarden exports (`bitwarden_json_codec.dart`). |
 
-`archive` (MIT) is present only as a transitive/test-time package now -- it
-is not a direct `pubspec.yaml` dependency and ships in no release code
-path; its one remaining use is in
-`test/features/browser/controllers/file_browser_navigation_controller_test.dart`,
-which uses it to synthesize a ZIP byte blob as a fixture for testing the
-native `ArchiveService`. The actual ZIP/archive-browsing feature is the
-native libarchive engine (see the Native table above), not this package.
+`crypto` (BSD-3-Clause) was originally used for TOTP calculation and Bitwarden export
+decryption; both were migrated to native C++ (`VaultCryptoApi.hmac` / OpenSSL BoringSSL
+in `libvaultexplorer.so`). The package is now kept only under `dev_dependencies` as an
+independent reference check for `test/helpers/reference_hmac_crypto.dart`, and is pulled
+transitively by `kpasslib`. It is not imported directly by any release Dart code in `lib/`.
 
-`flutter_launcher_icons` is a dev-only build tool (generates launcher icon
-assets at build time) and ships no code in the release APK, so it isn't
-listed above. The same applies to `build_runner`, `riverpod_generator`,
-`riverpod_lint` (all MIT, by rrousselGit /
-dart-lang / invertase), and to the test-only mocking packages
-`path_provider_platform_interface`/`plugin_platform_interface` (both
-BSD-3-Clause, official Flutter-team packages): none of these are packaged
-into the release binary.
+`archive` (MIT) is not a direct `pubspec.yaml` dependency. It is pulled in transitively
+by `kpasslib` (for KDBX stream compression) and used in
+`test/features/browser/controllers/file_browser_navigation_controller_test.dart` to
+synthesize a mock ZIP byte fixture for testing `ArchiveService`. All user-facing archive
+browsing (ZIP, 7-Zip, RAR, TAR, GZ, BZ2, XZ, ZSTD) is handled exclusively by the native
+libarchive engine (`android/app/src/main/cpp/archive/`).
 
-## Fonts (`assets/fonts/`)
+Dev-only tooling and test packages include `flutter_launcher_icons` (generates icons at
+build time), `build_runner`, `riverpod_generator`, `riverpod_lint` (all MIT), `test`,
+`fake_async`, `flutter_lints`, and the mocking packages
+`path_provider_platform_interface`/`plugin_platform_interface` (BSD-3-Clause); on the
+Android side, `junit:junit`, `org.robolectric:robolectric`, `org.json:json`, and
+`androidx.test:core` are used only for local JVM tests (`testImplementation`). None of
+these test or build-time tools ship in the release APK.
+
+## Bundled assets & Fonts
 
 | Component | Upstream | License | Notes |
 |---|---|---|---|
-| JetBrains Mono (Regular, Bold, Italic) | `JetBrains/JetBrainsMono` | SIL Open Font License 1.1 | Bundled as the code editor's monospace typeface (`TextEditorScreen`), falling back to the platform's system monospace font if it fails to load. OFL permits embedding/redistribution in an application; full license text kept at `assets/licenses/JetBrainsMono-OFL.txt`. Not sold on its own, satisfying the OFL's one real restriction. |
+| JetBrains Mono (Regular, Bold, Italic) | `JetBrains/JetBrainsMono` | SIL Open Font License 1.1 | Bundled as the code editor's monospace typeface (`assets/fonts/JetBrainsMono-*.ttf`), falling back to the platform's system monospace font if it fails to load. Full license text kept at `assets/licenses/JetBrainsMono-OFL.txt`. Satisfies OFL condition by not being sold on its own. |
+| EFF Large Wordlist | Electronic Frontier Foundation (EFF), Joseph Bonneau | CC-BY-3.0 US | Bundled Diceware wordlist (`assets/data/eff_large_wordlist.txt`, 7,776 words) used by `KeyfilePassphraseGeneratorService` to generate cryptographically strong passphrases and keyfile passphrases. |
 
 ## Distribution notes
 
-- All GPL/LGPL native components are built from their original, unmodified
-  upstream source at the pinned commit via CMake `FetchContent`
-  (`android/app/src/main/cpp/CMakeLists.txt`) -- nothing is shipped as a
-  prebuilt binary in the native (`cpp/`) part of this repository.
-- If you fork this project and modify any GPL-licensed component in place,
-  you must publish your modified source per the GPL's terms.
+- **Native C++ code (`cpp/`)**: All native components compiled directly into
+  `libvaultexplorer.so` (`android/app/src/main/cpp/CMakeLists.txt`) are built from
+  original, unmodified upstream source at pinned Git commits via CMake `FetchContent`.
+  Nothing is shipped as a prebuilt binary in the `cpp/` directory of this repository.
+- **Prebuilt native libraries from Maven Central (`nextlib-media3ext`)**:
+  `nextlib-media3ext` is consumed as a prebuilt AAR artifact from Maven Central
+  (`io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0`). This is permitted under
+  F-Droid's Inclusion Policy, which allows prebuilt FLOSS binaries from trusted Maven
+  repositories including Maven Central. The artifact contains native shared libraries
+  (`libnextlib-media3ext.so`, FFmpeg, `libdav1d.so`) built from unmodified FLOSS sources
+  in nextlib's CI under GPL-3.0 / LGPL-3.0-or-later / BSD-2-Clause terms. The dependency
+  version is strictly pinned for reproducible builds.
+- **Vendored Dart packages**: `packages/re_editor` is vendored locally in the repository
+  with its upstream MIT license and README retained. All local performance modifications
+  are explicitly documented in `packages/re_editor/PATCHES.md`.
+- **Copyleft obligations**: Vault Explorer itself is GPLv3. If you fork this project
+  and modify any GPL- or LGPL-licensed component in place, you must publish your
+  modified source per the terms of the GNU General Public License v3.0 or LGPLv3.

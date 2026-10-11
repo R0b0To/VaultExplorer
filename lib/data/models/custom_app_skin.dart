@@ -75,6 +75,7 @@ const editorSyntaxColorRoles = <String>[
 
 const editorColorRoles = <String>[
   'foreground',
+  'chromeForeground',
   'background',
   'panel',
   'gutter',

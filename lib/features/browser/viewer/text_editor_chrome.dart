@@ -3,11 +3,10 @@
 // follow the editor's own background/syntax theme instead of only the text
 // area following it.
 //
-// The editor background and text color come from resolveEditorSyntaxStyle
-// (text_editor_language.dart), which is the single place they're decided.
-// This file turns that pair into a full [ColorScheme]/[ThemeData], so the
-// screen's existing `Theme.of(context).colorScheme` lookups keep working
-// unchanged and simply resolve to editor colors.
+// The code canvas background and plain-code foreground come from
+// resolveEditorSyntaxStyle (text_editor_language.dart). Interface foreground
+// comes from the app-skin token or a contrast-aware fallback. This file turns
+// both roles into a full [ColorScheme]/[ThemeData] for the editor screen.
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -16,7 +15,8 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 @immutable
 class EditorChrome {
   final Color background;
-  final Color foreground;
+  final Color canvasForeground;
+  final Color chromeForeground;
   final Color panelBackground;
   final ColorScheme appScheme;
   final AppSkinTokens? appSkinTokens;
@@ -26,7 +26,8 @@ class EditorChrome {
 
   const EditorChrome._({
     required this.background,
-    required this.foreground,
+    required this.canvasForeground,
+    required this.chromeForeground,
     required this.panelBackground,
     required this.appScheme,
     required this.appSkinTokens,
@@ -44,8 +45,8 @@ class EditorChrome {
     ColorScheme appScheme, {
     AppSkinTokens? appSkinTokens,
   }) =>
-      this.background == background &&
-      this.foreground == foreground &&
+      background == this.background &&
+      canvasForeground == foreground &&
       this.appScheme == appScheme &&
       this.appSkinTokens == appSkinTokens;
 
@@ -57,12 +58,15 @@ class EditorChrome {
   }) {
     final brightness = ThemeData.estimateBrightnessForColor(background);
     final isDark = brightness == Brightness.dark;
+    final chromeForeground = appSkinTokens?.editorFollowsAppSkin == true
+        ? appSkinTokens!.editorChromeForeground
+        : resolveEditorChromeForeground(background, appScheme);
 
-    // A solid blend of the text color over the background: a slightly
+    // A solid blend of the editor interface text color over the background: a slightly
     // lifted/dimmed surface that stays in the same hue family as the editor,
     // whichever background was picked.
     Color tone(double alpha) =>
-        Color.alphaBlend(foreground.withValues(alpha: alpha), background);
+        Color.alphaBlend(chromeForeground.withValues(alpha: alpha), background);
 
     final panel = appSkinTokens?.editorFollowsAppSkin == true
         ? appSkinTokens!.editorPanelBackground
@@ -84,7 +88,7 @@ class EditorChrome {
     final scheme = accents.copyWith(
       brightness: brightness,
       surface: background,
-      onSurface: foreground,
+      onSurface: chromeForeground,
       onSurfaceVariant: tone(0.72),
       surfaceTint: Colors.transparent,
       surfaceContainerLowest: background,
@@ -118,6 +122,18 @@ class EditorChrome {
       appSkinTokens: appSkinTokens,
     );
     final theme = baseTheme.copyWith(
+      appBarTheme: baseTheme.appBarTheme.copyWith(
+        foregroundColor: chromeForeground,
+        titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
+          color: chromeForeground,
+        ),
+        iconTheme: baseTheme.appBarTheme.iconTheme?.copyWith(
+          color: chromeForeground,
+        ),
+        actionsIconTheme: baseTheme.appBarTheme.actionsIconTheme?.copyWith(
+          color: chromeForeground,
+        ),
+      ),
       popupMenuTheme: baseTheme.popupMenuTheme.copyWith(color: panel),
       menuTheme: MenuThemeData(
         style: baseTheme.menuTheme.style?.copyWith(
@@ -128,7 +144,8 @@ class EditorChrome {
 
     return EditorChrome._(
       background: background,
-      foreground: foreground,
+      canvasForeground: foreground,
+      chromeForeground: chromeForeground,
       panelBackground: panel,
       appScheme: appScheme,
       colorScheme: scheme,

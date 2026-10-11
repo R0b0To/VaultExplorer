@@ -32,6 +32,18 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 
+double _contrastRatio(Color first, Color second) {
+  final firstLuminance = first.computeLuminance();
+  final secondLuminance = second.computeLuminance();
+  final lighter = firstLuminance >= secondLuminance
+      ? firstLuminance
+      : secondLuminance;
+  final darker = firstLuminance >= secondLuminance
+      ? secondLuminance
+      : firstLuminance;
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 class _ParsedEditorText {
   final CodeLines codeLines;
   final int charCount;
@@ -2421,7 +2433,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                           child: Align(
                             alignment: Alignment.bottomCenter,
                             heightFactor: _tabBarAnimationController.value,
-                            child: _buildTabBar(cs),
+                            child: _buildTabBar(cs, syntaxStyle.textColor),
                           ),
                         ),
                       )
@@ -2435,7 +2447,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                 top: false,
                 child: NotificationListener<ScrollNotification>(
                   onNotification: _handleTabBarScroll,
-                  child: _buildBody(cs, chrome.theme.textTheme, syntaxStyle),
+                  child: _buildBody(chrome.theme, syntaxStyle),
                 ),
               ),
               bottomNavigationBar:
@@ -2451,7 +2463,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     );
   }
 
-  Widget _buildTabBar(ColorScheme cs) {
+  Widget _buildTabBar(ColorScheme cs, Color canvasForeground) {
     while (_tabKeys.length < _tabs.length) {
       _tabKeys.add(GlobalKey());
     }
@@ -2459,10 +2471,25 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       _tabKeys.removeRange(_tabs.length, _tabKeys.length);
     }
 
+    final tabStripBackground = cs.surfaceContainer;
+    final activeTabBackground = cs.surfaceContainerHighest;
+
+    Color tabForeground(Color background, {double opacity = 1}) {
+      final preferred = Color.alphaBlend(
+        canvasForeground.withValues(alpha: opacity),
+        background,
+      );
+      if (_contrastRatio(preferred, background) >= 4.5) return preferred;
+
+      final blackContrast = _contrastRatio(Colors.black, background);
+      final whiteContrast = _contrastRatio(Colors.white, background);
+      return blackContrast >= whiteContrast ? Colors.black : Colors.white;
+    }
+
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: cs.surfaceContainer,
+        color: tabStripBackground,
         border: Border(
           bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
         ),
@@ -2478,12 +2505,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               itemBuilder: (context, index) {
                 final tab = _tabs[index];
                 final isActive = index == _activeTabIndex;
+                final tabBackground = isActive
+                    ? activeTabBackground
+                    : tabStripBackground;
+                final labelColor = tabForeground(tabBackground);
+                final closeColor = tabForeground(tabBackground, opacity: 0.78);
 
                 return Material(
                   key: _tabKeys[index],
-                  color: isActive
-                      ? cs.surfaceContainerHighest
-                      : Colors.transparent,
+                  color: isActive ? activeTabBackground : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
@@ -2524,9 +2554,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                               fontWeight: isActive
                                   ? FontWeight.bold
                                   : FontWeight.normal,
-                              color: isActive
-                                  ? cs.onSurface
-                                  : cs.onSurfaceVariant,
+                              color: labelColor,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -2538,9 +2566,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                               child: Icon(
                                 Icons.close_rounded,
                                 size: 14,
-                                color: isActive
-                                    ? cs.onSurfaceVariant
-                                    : cs.outline,
+                                color: closeColor,
                               ),
                             ),
                           ),
@@ -2681,7 +2707,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
           children: [
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              decoration: BoxDecoration(color: cs.surfaceContainerHigh),
+              decoration: BoxDecoration(
+                color: _chrome?.panelBackground ?? cs.surfaceContainer,
+              ),
               child: Row(
                 children: [
                   Icon(Icons.inventory_2_outlined, size: 20, color: cs.primary),
@@ -2930,11 +2958,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     );
   }
 
-  Widget _buildBody(
-    ColorScheme cs,
-    TextTheme textTheme,
-    EditorSyntaxStyle syntaxStyle,
-  ) {
+  Widget _buildBody(ThemeData editorTheme, EditorSyntaxStyle syntaxStyle) {
+    final cs = editorTheme.colorScheme;
+    final textTheme = editorTheme.textTheme;
     final activeTab = _activeTab;
 
     if (activeTab.isLoading) {
@@ -2985,17 +3011,51 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     if (activeTab.isMarkdownFile && activeTab.showMarkdownPreview) {
-      return FastScrollbar(
-        controller: activeTab.previewScrollController,
-        child: SelectionArea(
-          child: MarkdownBodyView(
-            key: activeTab.previewKey,
-            source: activeTab.codeController.text,
-            container: widget.container,
-            currentFilePath: activeTab.filePath,
-            onLinkTap: _handleLinkTap,
-            scrollController: activeTab.previewScrollController,
-            onTaskToggled: _toggleMarkdownTask,
+      final canvasForeground = syntaxStyle.textColor;
+      final canvasBackground = syntaxStyle.backgroundColor;
+      Color canvasTone(double alpha) => Color.alphaBlend(
+        canvasForeground.withValues(alpha: alpha),
+        canvasBackground,
+      );
+      final markdownColorScheme = cs.copyWith(
+        surface: canvasBackground,
+        onSurface: canvasForeground,
+        onSurfaceVariant: canvasTone(0.72),
+        surfaceContainerLowest: canvasBackground,
+        surfaceContainerLow: canvasBackground,
+        surfaceContainer: canvasTone(0.04),
+        surfaceContainerHigh: canvasTone(0.07),
+        surfaceContainerHighest: canvasTone(0.11),
+        outline: canvasTone(0.45),
+        outlineVariant: canvasTone(0.14),
+      );
+      final markdownTheme = editorTheme.copyWith(
+        colorScheme: markdownColorScheme,
+        scaffoldBackgroundColor: canvasBackground,
+        textTheme: textTheme.apply(
+          bodyColor: canvasForeground,
+          displayColor: canvasForeground,
+        ),
+      );
+      return Theme(
+        data: markdownTheme,
+        child: DefaultTextStyle(
+          style: markdownTheme.textTheme.bodyMedium!.copyWith(
+            color: canvasForeground,
+          ),
+          child: FastScrollbar(
+            controller: activeTab.previewScrollController,
+            child: SelectionArea(
+              child: MarkdownBodyView(
+                key: activeTab.previewKey,
+                source: activeTab.codeController.text,
+                container: widget.container,
+                currentFilePath: activeTab.filePath,
+                onLinkTap: _handleLinkTap,
+                scrollController: activeTab.previewScrollController,
+                onTaskToggled: _toggleMarkdownTask,
+              ),
+            ),
           ),
         ),
       );
@@ -3015,7 +3075,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final customCursor = followsAppSkin
         ? skinTokens!.editorCursor
         : appearance.customColor('cursor');
-    final safeAccentColor = customCursor ??
+    final safeAccentColor =
+        customCursor ??
         (contrast > 0.25
             ? cs.primary
             : (bgLuminance < 0.5 ? Colors.white : Colors.black));

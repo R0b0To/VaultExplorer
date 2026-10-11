@@ -69,6 +69,7 @@ Map<String, int> _semanticMap(AppSemanticColors colors) => {
 Map<String, int> _editorColorMap(AppSkinTokens tokens) => {
   'background': tokens.editorBackground.toARGB32(),
   'foreground': tokens.editorForeground.toARGB32(),
+  'chromeForeground': tokens.editorChromeForeground.toARGB32(),
   'panel': tokens.editorPanelBackground.toARGB32(),
   'gutter': tokens.editorGutter.toARGB32(),
   'cursor': tokens.editorCursor.toARGB32(),
@@ -605,8 +606,14 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     if (custom != null) return custom;
     if (role == 'panel') {
       return Color.alphaBlend(
-        _editorColor('foreground').withValues(alpha: 0.10),
+        _editorColor('chromeForeground').withValues(alpha: 0.10),
         _editorColor('background'),
+      );
+    }
+    if (role == 'chromeForeground') {
+      return resolveEditorChromeForeground(
+        _editorColor('background'),
+        _editorColorScheme(),
       );
     }
     if (editorSyntaxColorRoles.contains(role)) {
@@ -719,7 +726,9 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     if (id.startsWith('editor:')) {
       final role = id.substring(7);
       final allowDefault =
-          role == 'panel' || editorSyntaxColorRoles.contains(role);
+          role == 'panel' ||
+          role == 'chromeForeground' ||
+          editorSyntaxColorRoles.contains(role);
       return _pickColor(
         title: selection.title,
         current: _editorColor(role),
@@ -2235,42 +2244,57 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          color: color('surfaceContainerHigh', cs.surfaceContainerHigh),
-          child: Row(
-            children: [
-              Icon(
-                Icons.arrow_back_rounded,
-                color: color('onSurfaceVariant', cs.onSurfaceVariant),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _previewTarget(
-                  id: 'app:onSurface',
-                  title: context.l10n.skinEditorFileName,
-                  explanation: context
-                      .l10n
-                      .skinTheEditorToolbarUsesTheAppForegroundColor,
-                  child: Text(
-                    'main.dart',
-                    style: TextStyle(
-                      color: color('onSurface', cs.onSurface),
-                      fontWeight: FontWeight.w700,
+        _previewTarget(
+          id: 'component:appBarBackground',
+          title: context.l10n.skinAppBarBackground,
+          explanation:
+              context.l10n.skinFileBrowserToolbarsUseTheSameAppBarBackground,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            color: _componentColor('appBarBackground'),
+            child: Row(
+              children: [
+                _previewTarget(
+                  id: 'editor:chromeForeground',
+                  title: context.l10n.skinEditorInterfaceText,
+                  explanation: context.l10n.skinEditorInterfaceTextDescription,
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    color: _editorColor('chromeForeground'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _previewTarget(
+                    id: 'editor:chromeForeground',
+                    title: context.l10n.skinEditorInterfaceText,
+                    explanation:
+                        context.l10n.skinEditorInterfaceTextDescription,
+                    child: Text(
+                      'main.dart',
+                      style: TextStyle(
+                        color: _editorColor('chromeForeground'),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Icon(
-                Icons.undo_rounded,
-                color: color('onSurfaceVariant', cs.onSurfaceVariant),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.save_outlined, color: color('primary', cs.primary)),
-            ],
+                _previewTarget(
+                  id: 'editor:chromeForeground',
+                  title: context.l10n.skinEditorInterfaceText,
+                  explanation: context.l10n.skinEditorInterfaceTextDescription,
+                  child: Icon(
+                    Icons.undo_rounded,
+                    color: _editorColor('chromeForeground'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.save_outlined, color: color('primary', cs.primary)),
+              ],
+            ),
           ),
         ),
-        _editorPreview(color('onSurface', cs.onSurface)),
+        _editorPreview(),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: Row(
@@ -2287,7 +2311,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                     label: context.l10n.textEditorProjectFilesTitle,
                     icon: Icons.folder_open_rounded,
                     isMenu: false,
-                    foreground: _editorColor('foreground'),
+                    foreground: _editorColor('chromeForeground'),
                   ),
                 ),
               ),
@@ -2303,7 +2327,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                     label: context.l10n.textEditorMoreActionsTooltip,
                     icon: Icons.more_horiz_rounded,
                     isMenu: true,
-                    foreground: _editorColor('foreground'),
+                    foreground: _editorColor('chromeForeground'),
                   ),
                 ),
               ),
@@ -2327,14 +2351,16 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
               Text(
                 context.l10n.skinDartUTF8Ln3Col12,
                 style: TextStyle(
-                  color: color('onSurfaceVariant', cs.onSurfaceVariant),
+                  color: _editorColor(
+                    'chromeForeground',
+                  ).withValues(alpha: 0.72),
                   fontSize: 12,
                 ),
               ),
               const Spacer(),
               Icon(
                 Icons.keyboard_rounded,
-                color: color('onSurfaceVariant', cs.onSurfaceVariant),
+                color: _editorColor('chromeForeground').withValues(alpha: 0.72),
                 size: 18,
               ),
             ],
@@ -2383,46 +2409,51 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             ]
           : null,
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: foreground),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: foreground,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+    child: _previewTarget(
+      id: 'editor:chromeForeground',
+      title: context.l10n.skinEditorInterfaceText,
+      explanation: context.l10n.skinEditorInterfaceTextDescription,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 3,
+            width: isMenu ? 38 : 52,
+            decoration: BoxDecoration(
+              color: foreground.withValues(alpha: 0.36),
+              borderRadius: BorderRadius.circular(4),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 3,
-          width: isMenu ? 38 : 52,
-          decoration: BoxDecoration(
-            color: foreground.withValues(alpha: 0.36),
-            borderRadius: BorderRadius.circular(4),
           ),
-        ),
-        const SizedBox(height: 5),
-        Container(
-          height: 3,
-          width: isMenu ? 28 : 42,
-          decoration: BoxDecoration(
-            color: foreground.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(4),
+          const SizedBox(height: 5),
+          Container(
+            height: 3,
+            width: isMenu ? 28 : 42,
+            decoration: BoxDecoration(
+              color: foreground.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 
@@ -2628,7 +2659,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         (SkinIconFamily.sharp, false) => Icons.description,
       };
 
-  Widget _editorPreview(Color foreground) {
+  Widget _editorPreview() {
     final background = _editorColor('background');
     final gutter = _editorColor('gutter');
     final fontColor = _editorColor('foreground');
@@ -2705,10 +2736,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                       id: 'editor:comment',
                       title: context.l10n.skinEditorComments,
                       explanation: context.l10n.skinEditorCommentsExplanation,
-                      child: Text(
-                        '// Vault model',
-                        style: syntax('comment'),
-                      ),
+                      child: Text('// Vault model', style: syntax('comment')),
                     ),
                     // Line 2: class Vault {
                     Wrap(
@@ -2804,8 +2832,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                         _previewTarget(
                           id: 'editor:cursor',
                           title: context.l10n.skinEditorCursor,
-                          explanation:
-                              context.l10n.skinTheInsertionCaretColor,
+                          explanation: context.l10n.skinTheInsertionCaretColor,
                           child: SizedBox(
                             width: 14,
                             height: 20,
@@ -2826,9 +2853,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                               .l10n
                               .skinTheBackgroundUsedToHighlightSelectedCode,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 3,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
                             color: _editorColor('selection'),
                             child: _previewTarget(
                               id: 'editor:function',
@@ -2991,7 +3016,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       _editorColorTile(
         context.l10n.skinEditorTextColor,
         'foreground',
-        subtitle: context.l10n.skinTheDefaultCodeAndEditorTextColor,
+        subtitle: context.l10n.skinEditorCodeTextColorDescription,
+      ),
+      _editorColorTile(
+        context.l10n.skinEditorInterfaceText,
+        'chromeForeground',
+        subtitle: context.l10n.skinEditorInterfaceTextDescription,
+        allowDefault: true,
       ),
       _editorColorTile(
         context.l10n.skinEditorBackground,
@@ -3024,9 +3055,9 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
         child: Text(
           context.l10n.textEditorSyntaxColorsSectionTitle,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
       _editorColorTile(

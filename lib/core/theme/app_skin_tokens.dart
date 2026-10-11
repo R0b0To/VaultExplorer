@@ -4,6 +4,18 @@ import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 
+/// Derives a readable editor-interface foreground independently of the
+/// editor's code text color, including when the canvas brightness differs
+/// from the app's current brightness.
+Color resolveEditorChromeForeground(Color background, ColorScheme appScheme) {
+  final brightness = ThemeData.estimateBrightnessForColor(background);
+  if (brightness == appScheme.brightness) return appScheme.onSurface;
+  return ColorScheme.fromSeed(
+    seedColor: appScheme.primary,
+    brightness: brightness,
+  ).onSurface;
+}
+
 AppSkinTokens buildAppSkinTokens({
   required AppSkinPreset preset,
   CustomAppSkin customAppSkin = const CustomAppSkin(),
@@ -26,6 +38,17 @@ AppSkinTokens buildAppSkinTokens({
       dark: isDark,
     ),
   };
+  final derivedEditorChromeForeground = resolveEditorChromeForeground(
+    editorBackground,
+    colorScheme,
+  );
+  // The code canvas foreground is deliberately independent from editor UI
+  // text (toolbar, menus, sidebar, and status bar). Older skins have no
+  // chrome token, so derive a readable value from the editor's own brightness.
+  final editorChromeForeground = preset == AppSkinPreset.custom
+      ? customAppSkin.editorColorOrNull('chromeForeground', dark: isDark) ??
+            derivedEditorChromeForeground
+      : derivedEditorChromeForeground;
   final editorForeground = switch (preset) {
     AppSkinPreset.custom => customAppSkin.editorColor(
       'foreground',
@@ -34,16 +57,16 @@ AppSkinTokens buildAppSkinTokens({
     _ => colorScheme.onSurface,
   };
   // Keep editor chrome visually separate from the code canvas. Blending a
-  // small amount of the editor text color creates a brightness-aware panel
-  // surface, including for legacy skins that do not store this token yet.
+  // little interface text into panel surfaces also supports legacy skins
+  // that do not store a panel background token.
   final editorPanelBackground = preset == AppSkinPreset.custom
       ? customAppSkin.editorColorOrNull('panel', dark: isDark) ??
             Color.alphaBlend(
-              editorForeground.withValues(alpha: 0.10),
+              editorChromeForeground.withValues(alpha: 0.10),
               editorBackground,
             )
       : Color.alphaBlend(
-          editorForeground.withValues(alpha: 0.10),
+          editorChromeForeground.withValues(alpha: 0.10),
           editorBackground,
         );
   final editorAccent = preset == AppSkinPreset.custom
@@ -102,6 +125,7 @@ AppSkinTokens buildAppSkinTokens({
     fileManagerSkin: fileManagerSkin,
     editorBackground: editorBackground,
     editorForeground: editorForeground,
+    editorChromeForeground: editorChromeForeground,
     editorPanelBackground: editorPanelBackground,
     editorGutter: preset == AppSkinPreset.custom
         ? customAppSkin.editorColor('gutter', dark: isDark)
@@ -151,7 +175,12 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
   final FileManagerSkin manualFileManagerSkin;
   final FileManagerSkin fileManagerSkin;
   final Color editorBackground;
+
+  /// Default/plain code text drawn on the editor canvas.
   final Color editorForeground;
+
+  /// Text and icons in editor chrome: toolbar, menus, sidebar, and status bar.
+  final Color editorChromeForeground;
   final Color editorPanelBackground;
   final Color editorGutter;
   final Color editorCursor;
@@ -174,6 +203,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     required this.fileManagerSkin,
     required this.editorBackground,
     required this.editorForeground,
+    required this.editorChromeForeground,
     required this.editorPanelBackground,
     required this.editorGutter,
     required this.editorCursor,
@@ -198,6 +228,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     FileManagerSkin? fileManagerSkin,
     Color? editorBackground,
     Color? editorForeground,
+    Color? editorChromeForeground,
     Color? editorPanelBackground,
     Color? editorGutter,
     Color? editorCursor,
@@ -220,6 +251,8 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     fileManagerSkin: fileManagerSkin ?? this.fileManagerSkin,
     editorBackground: editorBackground ?? this.editorBackground,
     editorForeground: editorForeground ?? this.editorForeground,
+    editorChromeForeground:
+        editorChromeForeground ?? this.editorChromeForeground,
     editorPanelBackground: editorPanelBackground ?? this.editorPanelBackground,
     editorGutter: editorGutter ?? this.editorGutter,
     editorCursor: editorCursor ?? this.editorCursor,
@@ -274,6 +307,11 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
         other.editorForeground,
         t,
       )!,
+      editorChromeForeground: Color.lerp(
+        editorChromeForeground,
+        other.editorChromeForeground,
+        t,
+      )!,
       editorPanelBackground: Color.lerp(
         editorPanelBackground,
         other.editorPanelBackground,
@@ -305,6 +343,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
           fileManagerSkin == other.fileManagerSkin &&
           editorBackground == other.editorBackground &&
           editorForeground == other.editorForeground &&
+          editorChromeForeground == other.editorChromeForeground &&
           editorPanelBackground == other.editorPanelBackground &&
           editorGutter == other.editorGutter &&
           editorCursor == other.editorCursor &&
@@ -328,6 +367,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     fileManagerSkin,
     editorBackground,
     editorForeground,
+    editorChromeForeground,
     editorPanelBackground,
     editorGutter,
     editorCursor,

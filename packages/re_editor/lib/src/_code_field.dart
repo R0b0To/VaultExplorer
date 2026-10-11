@@ -313,10 +313,13 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
     _textStyle = value;
     if (comparison.index >= RenderComparison.layout.index) {
       _calculatePreferredLineHeight();
-      markNeedsLayout();
-    } else {
-      markNeedsPaint();
     }
+    // Paragraphs are cached with the resolved TextStyle (including its color).
+    // Repainting the old paragraphs leaves text color changes stale until an
+    // unrelated selection/layout event happens, so rebuild them immediately.
+    _highlighter.clearCache();
+    _displayParagraphs.clear();
+    markNeedsLayout();
   }
 
   TextStyle get textStyle => _textStyle;

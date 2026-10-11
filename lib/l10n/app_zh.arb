@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "将颜色重置为默认值",
   "textEditorFollowAppSkinNotice": "编辑器颜色遵循当前应用皮肤。",
   "textEditorCustomizeColorsIndependently": "单独自定义颜色",
-  "textEditorDefaultFromTheme": "默认（来自主题）"
+  "textEditorDefaultFromTheme": "默认（来自主题）",
+  "mediaViewerActionAbLoop": "A-B 循环",
+  "abLoopStartMarkedMessage": "A 点已设为 {time}。再次轻按以设置 B 点。",
+  "abLoopStartedMessage": "正在循环 {start} – {end}",
+  "abLoopEndTooCloseMessage": "B 点必须在 A 点之后。请快进后再次轻按。",
+  "abLoopClearedMessage": "A-B 循环已关闭"
 }

@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "Farben auf Standard zurücksetzen",
   "textEditorFollowAppSkinNotice": "Editor-Farben folgen dem aktiven App-Design.",
   "textEditorCustomizeColorsIndependently": "Farben unabhängig anpassen",
-  "textEditorDefaultFromTheme": "Standard (aus Design)"
+  "textEditorDefaultFromTheme": "Standard (aus Design)",
+  "mediaViewerActionAbLoop": "A-B-Wiederholung",
+  "abLoopStartMarkedMessage": "A bei {time} gesetzt. Erneut tippen, um B zu setzen.",
+  "abLoopStartedMessage": "Wiederhole {start} – {end}",
+  "abLoopEndTooCloseMessage": "B muss nach A liegen. Weiter vorspulen und erneut tippen.",
+  "abLoopClearedMessage": "A-B-Wiederholung aus"
 }

@@ -11144,4 +11144,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       'Dieses Format lässt sich nicht unverändert kopieren, daher wird das exportierte Audio in AAC neu kodiert. Die Qualität bleibt hoch, ist aber nicht bitgenau identisch. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen.';
+
+  @override
+  String get mediaViewerActionAbLoop => 'A-B-Wiederholung';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'A bei $time gesetzt. Erneut tippen, um B zu setzen.';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return 'Wiederhole $start – $end';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage =>
+      'B muss nach A liegen. Weiter vorspulen und erneut tippen.';
+
+  @override
+  String get abLoopClearedMessage => 'A-B-Wiederholung aus';
 }

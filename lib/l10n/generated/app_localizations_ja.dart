@@ -10534,4 +10534,23 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       'この形式はそのままコピーできないため、書き出すオーディオは AAC に再エンコードされます。音質は高いままですが、ビット単位では同一になりません。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。';
+
+  @override
+  String get mediaViewerActionAbLoop => 'A-Bリピート';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'A地点を $time に設定しました。もう一度タップしてB地点を設定してください。';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return '$start – $end をリピート再生中';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage => 'BはAより後である必要があります。先に進めてから再度タップしてください。';
+
+  @override
+  String get abLoopClearedMessage => 'A-Bリピート オフ';
 }

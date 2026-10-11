@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "Réinitialiser les couleurs par défaut",
   "textEditorFollowAppSkinNotice": "Les couleurs de l'éditeur suivent le thème actif de l'application.",
   "textEditorCustomizeColorsIndependently": "Personnaliser les couleurs indépendamment",
-  "textEditorDefaultFromTheme": "Par défaut (du thème)"
+  "textEditorDefaultFromTheme": "Par défaut (du thème)",
+  "mediaViewerActionAbLoop": "Répétition A-B",
+  "abLoopStartMarkedMessage": "Point A défini à {time}. Appuyez à nouveau pour définir B.",
+  "abLoopStartedMessage": "Répétition {start} – {end}",
+  "abLoopEndTooCloseMessage": "B doit être après A. Avancez et appuyez à nouveau.",
+  "abLoopClearedMessage": "Répétition A-B désactivée"
 }

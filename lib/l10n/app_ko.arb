@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "색상을 기본값으로 재설정",
   "textEditorFollowAppSkinNotice": "편집기 색상은 현재 앱 스킨을 따릅니다.",
   "textEditorCustomizeColorsIndependently": "색상 독립적으로 사용자 지정",
-  "textEditorDefaultFromTheme": "기본값 (테마 기준)"
+  "textEditorDefaultFromTheme": "기본값 (테마 기준)",
+  "mediaViewerActionAbLoop": "A-B 구간 반복",
+  "abLoopStartMarkedMessage": "A 지점이 {time}에 설정되었습니다. 다시 탭하여 B 지점을 설정하세요.",
+  "abLoopStartedMessage": "{start} – {end} 반복 중",
+  "abLoopEndTooCloseMessage": "B는 A 이후여야 합니다. 앞으로 이동한 후 다시 탭하세요.",
+  "abLoopClearedMessage": "A-B 구간 반복 꺼짐"
 }

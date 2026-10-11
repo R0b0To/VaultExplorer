@@ -12743,5 +12743,38 @@
   },
   "@textEditorDefaultFromTheme": {
     "description": "Label indicating a color uses the default from the active theme"
+  },
+  "mediaViewerActionAbLoop": "A-B repeat",
+  "@mediaViewerActionAbLoop": {
+    "description": "Label of the media viewer action that repeats a chosen section of a video or audio file"
+  },
+  "abLoopStartMarkedMessage": "A set at {time}. Tap again to set B.",
+  "@abLoopStartMarkedMessage": {
+    "description": "Shown after the start (A) of an A-B repeat section is marked; time is the position of A, e.g. 01:23",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "abLoopStartedMessage": "Repeating {start} – {end}",
+  "@abLoopStartedMessage": {
+    "description": "Shown when an A-B repeat section starts looping; start and end are the positions of A and B, e.g. 01:23",
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "abLoopEndTooCloseMessage": "B must come after A. Move forward and tap again.",
+  "@abLoopEndTooCloseMessage": {
+    "description": "Shown when the end (B) of an A-B repeat section is set at or before its start (A), or too close to it"
+  },
+  "abLoopClearedMessage": "A-B repeat off",
+  "@abLoopClearedMessage": {
+    "description": "Shown when an A-B repeat section is removed"
   }
 }

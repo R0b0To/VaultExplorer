@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "Скинути кольори до стандартних",
   "textEditorFollowAppSkinNotice": "Кольори редактора відповідають активній темі програми.",
   "textEditorCustomizeColorsIndependently": "Налаштувати кольори окремо",
-  "textEditorDefaultFromTheme": "За замовчуванням (з теми)"
+  "textEditorDefaultFromTheme": "За замовчуванням (з теми)",
+  "mediaViewerActionAbLoop": "Повторення A-B",
+  "abLoopStartMarkedMessage": "A встановлено на {time}. Торкніться знову, щоб встановити B.",
+  "abLoopStartedMessage": "Повторення {start} – {end}",
+  "abLoopEndTooCloseMessage": "B має бути після A. Перемотайте вперед і торкніться знову.",
+  "abLoopClearedMessage": "Повторення A-B вимкнено"
 }

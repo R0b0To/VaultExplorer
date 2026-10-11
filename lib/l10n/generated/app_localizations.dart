@@ -18564,6 +18564,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This format can\'t be copied, so the exported audio is re-encoded to AAC. Quality stays high, but it isn\'t bit-for-bit identical. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.'**
   String get audioEditorReencodeNote;
+
+  /// Label of the media viewer action that repeats a chosen section of a video or audio file
+  ///
+  /// In en, this message translates to:
+  /// **'A-B repeat'**
+  String get mediaViewerActionAbLoop;
+
+  /// Shown after the start (A) of an A-B repeat section is marked; time is the position of A, e.g. 01:23
+  ///
+  /// In en, this message translates to:
+  /// **'A set at {time}. Tap again to set B.'**
+  String abLoopStartMarkedMessage(String time);
+
+  /// Shown when an A-B repeat section starts looping; start and end are the positions of A and B, e.g. 01:23
+  ///
+  /// In en, this message translates to:
+  /// **'Repeating {start} – {end}'**
+  String abLoopStartedMessage(String start, String end);
+
+  /// Shown when the end (B) of an A-B repeat section is set at or before its start (A), or too close to it
+  ///
+  /// In en, this message translates to:
+  /// **'B must come after A. Move forward and tap again.'**
+  String get abLoopEndTooCloseMessage;
+
+  /// Shown when an A-B repeat section is removed
+  ///
+  /// In en, this message translates to:
+  /// **'A-B repeat off'**
+  String get abLoopClearedMessage;
 }
 
 class _AppLocalizationsDelegate

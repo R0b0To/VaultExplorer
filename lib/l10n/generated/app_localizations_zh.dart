@@ -10374,4 +10374,23 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       '此格式无法按原样复制，因此导出的音频会重新编码为 AAC。音质仍然很高，但与原文件并非逐位相同。剪辑点会精确落在你设置的位置。标签和封面不会保留。';
+
+  @override
+  String get mediaViewerActionAbLoop => 'A-B 循环';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'A 点已设为 $time。再次轻按以设置 B 点。';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return '正在循环 $start – $end';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage => 'B 点必须在 A 点之后。请快进后再次轻按。';
+
+  @override
+  String get abLoopClearedMessage => 'A-B 循环已关闭';
 }

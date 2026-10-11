@@ -11166,4 +11166,24 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       'لا يمكن نسخ هذا التنسيق كما هو، لذا يُعاد ترميز الصوت المُصدَّر إلى AAC. تبقى الجودة عالية لكنها ليست مطابقة تمامًا للأصل. يقع القص عند النقطة التي حددتها بالضبط. لا تُنقل الوسوم وصورة الغلاف.';
+
+  @override
+  String get mediaViewerActionAbLoop => 'تكرار A-B';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'تم تعيين A عند $time. اضغط مرة أخرى لتعيين B.';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return 'تكرار $start – $end';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage =>
+      'يجب أن تكون النقطة B بعد النقطة A. تقدم للأمام واضغط مرة أخرى.';
+
+  @override
+  String get abLoopClearedMessage => 'تم إيقاف تكرار A-B';
 }

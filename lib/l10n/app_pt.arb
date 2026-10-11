@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "Restaurar cores padrão",
   "textEditorFollowAppSkinNotice": "As cores do editor seguem o tema ativo do aplicativo.",
   "textEditorCustomizeColorsIndependently": "Personalizar cores de forma independente",
-  "textEditorDefaultFromTheme": "Padrão (do tema)"
+  "textEditorDefaultFromTheme": "Padrão (do tema)",
+  "mediaViewerActionAbLoop": "Repetição A-B",
+  "abLoopStartMarkedMessage": "A definido em {time}. Toque novamente para definir B.",
+  "abLoopStartedMessage": "Repetindo {start} – {end}",
+  "abLoopEndTooCloseMessage": "B deve vir depois de A. Avance e toque novamente.",
+  "abLoopClearedMessage": "Repetição A-B desativada"
 }

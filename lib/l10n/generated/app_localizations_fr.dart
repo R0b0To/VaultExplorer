@@ -11243,4 +11243,24 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       'Ce format ne peut pas être copié tel quel, l\'audio exporté est donc réencodé en AAC. La qualité reste élevée, mais elle n\'est pas identique bit à bit. Les coupes tombent exactement là où vous les placez. Les balises et la pochette ne sont pas conservées.';
+
+  @override
+  String get mediaViewerActionAbLoop => 'Répétition A-B';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'Point A défini à $time. Appuyez à nouveau pour définir B.';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return 'Répétition $start – $end';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage =>
+      'B doit être après A. Avancez et appuyez à nouveau.';
+
+  @override
+  String get abLoopClearedMessage => 'Répétition A-B désactivée';
 }

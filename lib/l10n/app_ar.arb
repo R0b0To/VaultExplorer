@@ -3067,5 +3067,10 @@
   "textEditorResetColors": "إعادة ضبط الألوان إلى الافتراضية",
   "textEditorFollowAppSkinNotice": "تتبع ألوان المحرر مظهر التطبيق النشط.",
   "textEditorCustomizeColorsIndependently": "تخصيص الألوان بشكل مستقل",
-  "textEditorDefaultFromTheme": "افتراضي (من السمة)"
+  "textEditorDefaultFromTheme": "افتراضي (من السمة)",
+  "mediaViewerActionAbLoop": "تكرار A-B",
+  "abLoopStartMarkedMessage": "تم تعيين A عند {time}. اضغط مرة أخرى لتعيين B.",
+  "abLoopStartedMessage": "تكرار {start} – {end}",
+  "abLoopEndTooCloseMessage": "يجب أن تكون النقطة B بعد النقطة A. تقدم للأمام واضغط مرة أخرى.",
+  "abLoopClearedMessage": "تم إيقاف تكرار A-B"
 }

@@ -11223,4 +11223,24 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       'Цей формат не можна скопіювати як є, тому експортоване аудіо перекодовується в AAC. Якість лишається високою, але не ідентична побітово. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться.';
+
+  @override
+  String get mediaViewerActionAbLoop => 'Повторення A-B';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'A встановлено на $time. Торкніться знову, щоб встановити B.';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return 'Повторення $start – $end';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage =>
+      'B має бути після A. Перемотайте вперед і торкніться знову.';
+
+  @override
+  String get abLoopClearedMessage => 'Повторення A-B вимкнено';
 }

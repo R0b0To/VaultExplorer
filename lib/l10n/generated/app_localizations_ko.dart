@@ -10534,4 +10534,23 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get audioEditorReencodeNote =>
       '이 형식은 그대로 복사할 수 없어 내보내는 오디오가 AAC로 다시 인코딩됩니다. 음질은 높게 유지되지만 비트 단위로 동일하지는 않습니다. 컷은 지정한 위치 그대로 적용됩니다. 태그와 커버 아트는 유지되지 않습니다.';
+
+  @override
+  String get mediaViewerActionAbLoop => 'A-B 구간 반복';
+
+  @override
+  String abLoopStartMarkedMessage(String time) {
+    return 'A 지점이 $time에 설정되었습니다. 다시 탭하여 B 지점을 설정하세요.';
+  }
+
+  @override
+  String abLoopStartedMessage(String start, String end) {
+    return '$start – $end 반복 중';
+  }
+
+  @override
+  String get abLoopEndTooCloseMessage => 'B는 A 이후여야 합니다. 앞으로 이동한 후 다시 탭하세요.';
+
+  @override
+  String get abLoopClearedMessage => 'A-B 구간 반복 꺼짐';
 }

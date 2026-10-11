@@ -95,9 +95,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install libarchive (for archive_engine_test)
-        run: sudo apt-get update && sudo apt-get install -y libarchive-dev
-
       - name: Configure (host build)
         run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug -DLIBGAV1_THREADPOOL_USE_STD_MUTEX=1
 

@@ -16,6 +16,7 @@ final _scheduledSyncControl = MethodChannel(
 final _scheduledSyncBackgroundRunner = ScheduledSyncBackgroundRunner(
   io: VaultFileIoApi(kVaultEngineChannel),
   hash: VaultHashApi(kVaultEngineChannel),
+  platform: kVaultEngineChannel,
 );
 
 @pragma('vm:entry-point')

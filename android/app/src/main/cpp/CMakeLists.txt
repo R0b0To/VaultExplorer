@@ -611,24 +611,17 @@ if(NOT ANDROID)
             containers/test/chunked_block_device_test.cpp
             containers/chunked_block_device.cpp)
 
-    # archive_engine.cpp is deliberately independent of libarchive's
-    # Android/FetchContent vendoring above -- it just needs *a* libarchive
-    # to link against, so the host test links whatever's installed on the
-    # machine running `cmake --build .` (e.g. `apt-get install
-    # libarchive-dev`) rather than pulling in the full archive_deps.cmake
-    # vendoring chain. Skips gracefully, rather than failing configure, if
-    # no libarchive is present on this host.
-    find_package(LibArchive)
-    if(LibArchive_FOUND)
-        add_executable(archive_engine_test
-                archive/test/archive_engine_test.cpp
-                archive/archive_engine.cpp)
-        target_include_directories(archive_engine_test PRIVATE ${LibArchive_INCLUDE_DIRS})
-        target_link_libraries(archive_engine_test ${LibArchive_LIBRARIES})
-        list(APPEND VAULTEXPLORER_HOST_TESTS archive_engine_test)
-    else()
-        message(STATUS "libarchive not found on this host -- skipping archive_engine_test (install libarchive-dev to enable it)")
-    endif()
+    # Use the same pinned, patched libarchive as the Android engine. In
+    # particular, the 7-Zip encryption coverage below depends on the
+    # libarchive-7zip-encryption.patch applied by archive_deps.cmake; a host
+    # system libarchive may accept the writer passphrase but silently emit a
+    # plain archive.
+    add_executable(archive_engine_test
+            archive/test/archive_engine_test.cpp
+            archive/archive_engine.cpp)
+    target_include_directories(archive_engine_test PRIVATE ${ARCHIVE_ENGINE_INCLUDE_DIRS})
+    target_link_libraries(archive_engine_test ${ARCHIVE_ENGINE_LIBRARY})
+    list(APPEND VAULTEXPLORER_HOST_TESTS archive_engine_test)
 
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test

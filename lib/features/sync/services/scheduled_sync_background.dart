@@ -18,10 +18,12 @@ import 'package:vaultexplorer/features/sync/domain/sync_rule_runner.dart';
 /// Headless runner called by ScheduledVaultSyncWorker's FlutterEngine.
 class ScheduledSyncBackgroundRunner {
   ScheduledSyncBackgroundRunner({
-    required this._io,
-    required this._hash,
-    this._platform = const MethodChannel('com.aeidolon.vaultexplorer/engine'),
-  });
+    required VaultFileIoApi io,
+    required VaultHashApi hash,
+    required MethodChannel platform,
+  }) : _io = io,
+       _hash = hash,
+       _platform = platform;
 
   final VaultFileIoApi _io;
   final VaultHashApi _hash;

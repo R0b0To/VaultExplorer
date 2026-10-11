@@ -11062,7 +11062,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String audioEditorUnsupportedFormat(String format) {
-    return '$format-Dateien lassen sich nicht ohne Neukodierung schneiden. Diese Datei kann hier abgespielt, aber nicht exportiert werden.';
+    return '$format-Dateien lassen sich auf diesem Gerät nicht bearbeiten. Diese Datei kann hier abgespielt, aber nicht exportiert werden.';
   }
 
   @override
@@ -11070,4 +11070,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get audioEditorNextCutPoint => 'Nächster Schnittpunkt';
+
+  @override
+  String audioEditorReencodeBanner(String format) {
+    return '$format-Audio lässt sich nicht unverändert kopieren und wird beim Export in AAC (.m4a) neu kodiert.';
+  }
+
+  @override
+  String get audioEditorReencodeNote =>
+      'Dieses Format lässt sich nicht unverändert kopieren, daher wird das exportierte Audio in AAC neu kodiert. Die Qualität bleibt hoch, ist aber nicht bitgenau identisch. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen.';
 }

@@ -10459,7 +10459,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String audioEditorUnsupportedFormat(String format) {
-    return '$format 파일은 재인코딩 없이는 자를 수 없으므로 여기서 재생만 가능하고 내보낼 수 없습니다.';
+    return '$format 파일은 이 기기에서 편집할 수 없으므로 여기서 재생만 가능하고 내보낼 수 없습니다.';
   }
 
   @override
@@ -10467,4 +10467,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get audioEditorNextCutPoint => '다음 컷 지점';
+
+  @override
+  String audioEditorReencodeBanner(String format) {
+    return '$format 오디오는 그대로 복사할 수 없어 내보낼 때 AAC(.m4a)로 다시 인코딩됩니다.';
+  }
+
+  @override
+  String get audioEditorReencodeNote =>
+      '이 형식은 그대로 복사할 수 없어 내보내는 오디오가 AAC로 다시 인코딩됩니다. 음질은 높게 유지되지만 비트 단위로 동일하지는 않습니다. 컷은 지정한 위치 그대로 적용됩니다. 태그와 커버 아트는 유지되지 않습니다.';
 }

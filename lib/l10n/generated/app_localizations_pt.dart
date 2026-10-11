@@ -11059,7 +11059,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String audioEditorUnsupportedFormat(String format) {
-    return 'Arquivos $format não podem ser cortados sem recodificação, então este arquivo pode ser reproduzido aqui, mas não exportado.';
+    return 'Arquivos $format não podem ser editados neste dispositivo, então este arquivo pode ser reproduzido aqui, mas não exportado.';
   }
 
   @override
@@ -11067,4 +11067,13 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get audioEditorNextCutPoint => 'Próximo ponto de corte';
+
+  @override
+  String audioEditorReencodeBanner(String format) {
+    return 'O áudio $format não pode ser copiado como está, então será recodificado para AAC (.m4a) ao exportar.';
+  }
+
+  @override
+  String get audioEditorReencodeNote =>
+      'Este formato não pode ser copiado como está, então o áudio exportado é recodificado para AAC. A qualidade continua alta, mas não é idêntica bit a bit. Os cortes caem exatamente onde você os definiu. Tags e capa não são mantidas.';
 }

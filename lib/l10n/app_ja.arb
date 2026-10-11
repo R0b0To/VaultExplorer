@@ -3044,7 +3044,9 @@
   "audioEditorReplaceOriginalHint": "元のファイルは、書き出したカット版に置き換えられます。",
   "audioEditorLosslessNote": "カットは劣化なしです。音声は再エンコードされずにコピーされるため、音質は変わりません。カット位置は設定した位置から数ミリ秒ほどずれた、最も近いオーディオフレームになります。タグとカバーアートは引き継がれません。",
   "audioEditorCutOutModeDescription": "選択したセグメントを削除し、残りをエクスポートします。",
-  "audioEditorUnsupportedFormat": "{format} ファイルは再エンコードなしではカットできないため、ここで再生はできますがエクスポートはできません。",
+  "audioEditorUnsupportedFormat": "{format} ファイルはこのデバイスでは編集できないため、ここで再生はできますがエクスポートはできません。",
   "audioEditorPrevCutPoint": "前のカット位置",
-  "audioEditorNextCutPoint": "次のカット位置"
+  "audioEditorNextCutPoint": "次のカット位置",
+  "audioEditorReencodeBanner": "{format} のオーディオはそのままコピーできないため、エクスポート時に AAC (.m4a) へ再エンコードされます。",
+  "audioEditorReencodeNote": "この形式はそのままコピーできないため、書き出すオーディオは AAC に再エンコードされます。音質は高いままですが、ビット単位では同一になりません。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。"
 }

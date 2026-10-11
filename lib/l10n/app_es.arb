@@ -3044,7 +3044,9 @@
   "audioEditorReplaceOriginalHint": "El archivo original se reemplazará por el corte exportado.",
   "audioEditorLosslessNote": "Los cortes no tienen pérdida: el audio se copia sin recodificar, así que la calidad no cambia. Los cortes caen en el fotograma de audio más cercano, a pocos milisegundos de donde los marques. Las etiquetas y la carátula no se conservan.",
   "audioEditorCutOutModeDescription": "Elimina los segmentos seleccionados y exporta lo que queda.",
-  "audioEditorUnsupportedFormat": "Los archivos {format} no se pueden cortar sin recodificar, así que este archivo se puede reproducir aquí pero no exportar.",
+  "audioEditorUnsupportedFormat": "Los archivos {format} no se pueden editar en este dispositivo, así que este archivo se puede reproducir aquí pero no exportar.",
   "audioEditorPrevCutPoint": "Punto de corte anterior",
-  "audioEditorNextCutPoint": "Punto de corte siguiente"
+  "audioEditorNextCutPoint": "Punto de corte siguiente",
+  "audioEditorReencodeBanner": "El audio {format} no se puede copiar tal cual, así que se recodificará a AAC (.m4a) al exportar.",
+  "audioEditorReencodeNote": "Este formato no se puede copiar tal cual, así que el audio exportado se recodifica a AAC. La calidad sigue siendo alta, pero no es idéntica bit a bit. Los cortes caen justo donde los marcas. Las etiquetas y la carátula no se conservan."
 }

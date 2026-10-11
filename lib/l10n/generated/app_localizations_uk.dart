@@ -11141,7 +11141,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String audioEditorUnsupportedFormat(String format) {
-    return 'Файли $format не можна обрізати без перекодування, тож цей файл можна відтворити тут, але не експортувати.';
+    return 'Файли $format не можна редагувати на цьому пристрої, тож цей файл можна відтворити тут, але не експортувати.';
   }
 
   @override
@@ -11149,4 +11149,13 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get audioEditorNextCutPoint => 'Наступна точка розрізу';
+
+  @override
+  String audioEditorReencodeBanner(String format) {
+    return 'Аудіо $format не можна скопіювати як є, тож під час експорту його буде перекодовано в AAC (.m4a).';
+  }
+
+  @override
+  String get audioEditorReencodeNote =>
+      'Цей формат не можна скопіювати як є, тому експортоване аудіо перекодовується в AAC. Якість лишається високою, але не ідентична побітово. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться.';
 }

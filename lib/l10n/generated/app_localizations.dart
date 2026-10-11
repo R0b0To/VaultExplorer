@@ -18421,10 +18421,10 @@ abstract class AppLocalizations {
   /// **'Remove the selected segments and export what\'s left.'**
   String get audioEditorCutOutModeDescription;
 
-  /// Banner in the audio editor for a format that can't be cut losslessly. {format} is the file extension in capitals, e.g. FLAC
+  /// Banner in the audio editor for a format this device can't decode (or encode), so it can be played but not exported. {format} is the file extension in capitals, e.g. WMA
   ///
   /// In en, this message translates to:
-  /// **'{format} files can\'t be cut without re-encoding, so this file can be played here but not exported.'**
+  /// **'{format} files can\'t be edited on this device, so this file can be played here but not exported.'**
   String audioEditorUnsupportedFormat(String format);
 
   /// Tooltip of the button that jumps the audio editor playhead to the previous segment edge
@@ -18438,6 +18438,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next cut point'**
   String get audioEditorNextCutPoint;
+
+  /// Info banner in the audio editor for a format that can't be copied and will be re-encoded to AAC on export. {format} is the file extension in capitals, e.g. FLAC
+  ///
+  /// In en, this message translates to:
+  /// **'{format} audio can\'t be copied as it is, so it will be re-encoded to AAC (.m4a) when you export.'**
+  String audioEditorReencodeBanner(String format);
+
+  /// Explanation at the bottom of the audio editor's export sheet when the output is re-encoded rather than copied
+  ///
+  /// In en, this message translates to:
+  /// **'This format can\'t be copied, so the exported audio is re-encoded to AAC. Quality stays high, but it isn\'t bit-for-bit identical. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.'**
+  String get audioEditorReencodeNote;
 }
 
 class _AppLocalizationsDelegate

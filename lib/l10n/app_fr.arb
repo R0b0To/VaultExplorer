@@ -3044,7 +3044,9 @@
   "audioEditorReplaceOriginalHint": "Le fichier d'origine sera remplacé par la coupe exportée.",
   "audioEditorLosslessNote": "Les coupes sont sans perte : l'audio est copié, pas réencodé, donc la qualité reste identique. Les coupes se font sur la trame audio la plus proche, à quelques millisecondes du point choisi. Les balises et la pochette ne sont pas conservées.",
   "audioEditorCutOutModeDescription": "Supprimez les segments sélectionnés et exportez le reste.",
-  "audioEditorUnsupportedFormat": "Les fichiers {format} ne peuvent pas être coupés sans réencodage : ce fichier peut être lu ici, mais pas exporté.",
+  "audioEditorUnsupportedFormat": "Les fichiers {format} ne peuvent pas être modifiés sur cet appareil : ce fichier peut être lu ici, mais pas exporté.",
   "audioEditorPrevCutPoint": "Point de coupe précédent",
-  "audioEditorNextCutPoint": "Point de coupe suivant"
+  "audioEditorNextCutPoint": "Point de coupe suivant",
+  "audioEditorReencodeBanner": "L'audio {format} ne peut pas être copié tel quel : il sera réencodé en AAC (.m4a) à l'export.",
+  "audioEditorReencodeNote": "Ce format ne peut pas être copié tel quel, l'audio exporté est donc réencodé en AAC. La qualité reste élevée, mais elle n'est pas identique bit à bit. Les coupes tombent exactement là où vous les placez. Les balises et la pochette ne sont pas conservées."
 }

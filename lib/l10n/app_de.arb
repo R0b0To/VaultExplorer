@@ -3044,7 +3044,9 @@
   "audioEditorReplaceOriginalHint": "Die Originaldatei wird durch den exportierten Schnitt ersetzt.",
   "audioEditorLosslessNote": "Schnitte sind verlustfrei: Das Audio wird kopiert und nicht neu kodiert, die Qualität bleibt also gleich. Schnitte landen am nächsten Audio-Frame, wenige Millisekunden von deiner Markierung entfernt. Tags und Titelbilder werden nicht übernommen.",
   "audioEditorCutOutModeDescription": "Entferne die ausgewählten Segmente und exportiere den Rest.",
-  "audioEditorUnsupportedFormat": "{format}-Dateien lassen sich nicht ohne Neukodierung schneiden. Diese Datei kann hier abgespielt, aber nicht exportiert werden.",
+  "audioEditorUnsupportedFormat": "{format}-Dateien lassen sich auf diesem Gerät nicht bearbeiten. Diese Datei kann hier abgespielt, aber nicht exportiert werden.",
   "audioEditorPrevCutPoint": "Vorheriger Schnittpunkt",
-  "audioEditorNextCutPoint": "Nächster Schnittpunkt"
+  "audioEditorNextCutPoint": "Nächster Schnittpunkt",
+  "audioEditorReencodeBanner": "{format}-Audio lässt sich nicht unverändert kopieren und wird beim Export in AAC (.m4a) neu kodiert.",
+  "audioEditorReencodeNote": "Dieses Format lässt sich nicht unverändert kopieren, daher wird das exportierte Audio in AAC neu kodiert. Die Qualität bleibt hoch, ist aber nicht bitgenau identisch. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen."
 }

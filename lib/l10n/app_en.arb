@@ -12638,9 +12638,9 @@
   "@audioEditorCutOutModeDescription": {
     "description": "Explains the 'Cut out' mode in the audio editor's segments sheet"
   },
-  "audioEditorUnsupportedFormat": "{format} files can't be cut without re-encoding, so this file can be played here but not exported.",
+  "audioEditorUnsupportedFormat": "{format} files can't be edited on this device, so this file can be played here but not exported.",
   "@audioEditorUnsupportedFormat": {
-    "description": "Banner in the audio editor for a format that can't be cut losslessly. {format} is the file extension in capitals, e.g. FLAC",
+    "description": "Banner in the audio editor for a format this device can't decode (or encode), so it can be played but not exported. {format} is the file extension in capitals, e.g. WMA",
     "placeholders": {
       "format": {
         "type": "String"
@@ -12654,5 +12654,18 @@
   "audioEditorNextCutPoint": "Next cut point",
   "@audioEditorNextCutPoint": {
     "description": "Tooltip of the button that jumps the audio editor playhead to the next segment edge"
+  },
+  "audioEditorReencodeBanner": "{format} audio can't be copied as it is, so it will be re-encoded to AAC (.m4a) when you export.",
+  "@audioEditorReencodeBanner": {
+    "description": "Info banner in the audio editor for a format that can't be copied and will be re-encoded to AAC on export. {format} is the file extension in capitals, e.g. FLAC",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "audioEditorReencodeNote": "This format can't be copied, so the exported audio is re-encoded to AAC. Quality stays high, but it isn't bit-for-bit identical. Cuts land exactly where you set them. Tags and cover art aren't carried over.",
+  "@audioEditorReencodeNote": {
+    "description": "Explanation at the bottom of the audio editor's export sheet when the output is re-encoded rather than copied"
   }
 }

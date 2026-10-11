@@ -11085,7 +11085,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String audioEditorUnsupportedFormat(String format) {
-    return 'لا يمكن قص ملفات $format دون إعادة ترميز، لذا يمكن تشغيل هذا الملف هنا ولكن لا يمكن تصديره.';
+    return 'لا يمكن تحرير ملفات $format على هذا الجهاز، لذا يمكن تشغيل هذا الملف هنا ولكن لا يمكن تصديره.';
   }
 
   @override
@@ -11093,4 +11093,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get audioEditorNextCutPoint => 'نقطة القص التالية';
+
+  @override
+  String audioEditorReencodeBanner(String format) {
+    return 'لا يمكن نسخ صوت $format كما هو، لذا ستتم إعادة ترميزه إلى AAC (.m4a) عند التصدير.';
+  }
+
+  @override
+  String get audioEditorReencodeNote =>
+      'لا يمكن نسخ هذا التنسيق كما هو، لذا يُعاد ترميز الصوت المُصدَّر إلى AAC. تبقى الجودة عالية لكنها ليست مطابقة تمامًا للأصل. يقع القص عند النقطة التي حددتها بالضبط. لا تُنقل الوسوم وصورة الغلاف.';
 }

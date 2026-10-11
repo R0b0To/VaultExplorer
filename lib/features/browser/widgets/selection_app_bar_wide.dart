@@ -40,6 +40,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onEditImage;
   final bool showEditVideoOption;
   final VoidCallback onEditVideo;
+  final bool showEditAudioOption;
+  final VoidCallback? onEditAudio;
   final VoidCallback onToggleDocumentProvider;
   final VoidCallback? onSyncSettings;
   final VoidCallback onPin;
@@ -86,6 +88,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onEditImage,
     this.showEditVideoOption = false,
     required this.onEditVideo,
+    this.showEditAudioOption = false,
+    this.onEditAudio,
     required this.onToggleDocumentProvider,
     this.onSyncSettings,
     required this.onPin,
@@ -194,6 +198,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'edit_image') onEditImage();
             if (value == 'edit_video') onEditVideo();
+            if (value == 'edit_audio') onEditAudio?.call();
             if (value == 'compress') onCompressSelection();
             if (value == 'export') onExport();
             if (value == 'encrypt') onEncrypt();
@@ -260,6 +265,22 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     ),
                     const SizedBox(width: 12),
                     Text(context.l10n.videoEditorEditAction),
+                  ],
+                ),
+              ),
+            if (!isInsideArchive && showEditAudioOption)
+              PopupMenuItem<String>(
+                value: 'edit_audio',
+                enabled: !readOnly,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.graphic_eq_rounded,
+                      color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.audioEditorEditAction),
                   ],
                 ),
               ),

@@ -45,6 +45,7 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onShare;
   final VoidCallback? onEditImage;
   final VoidCallback? onEditVideo;
+  final VoidCallback? onEditAudio;
   final VoidCallback? onToggleDocProvider;
   final VoidCallback? onSyncSettings;
 
@@ -75,6 +76,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onShare,
     this.onEditImage,
     this.onEditVideo,
+    this.onEditAudio,
     this.onToggleDocProvider,
     this.onSyncSettings,
   });
@@ -106,6 +108,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onShare,
     VoidCallback? onEditImage,
     VoidCallback? onEditVideo,
+    VoidCallback? onEditAudio,
     VoidCallback? onToggleDocProvider,
     VoidCallback? onSyncSettings,
   }) {
@@ -142,6 +145,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onShare: onShare,
         onEditImage: onEditImage,
         onEditVideo: onEditVideo,
+        onEditAudio: onEditAudio,
         onToggleDocProvider: onToggleDocProvider,
         onSyncSettings: onSyncSettings,
       ),
@@ -377,11 +381,22 @@ class FileItemActionsSheet extends ConsumerWidget {
                           onEditVideo!();
                         },
                       ),
+                    if (!isInsideArchive && onEditAudio != null)
+                      _ActionTile(
+                        icon: Icons.graphic_eq_rounded,
+                        label: context.l10n.audioEditorEditAction,
+                        enabled: !isReadOnly,
+                        onTap: () {
+                          Navigator.pop(context);
+                          onEditAudio!();
+                        },
+                      ),
                     if (!isInsideArchive &&
                         (onOpenWith != null ||
                             onShare != null ||
                             onEditImage != null ||
-                            onEditVideo != null))
+                            onEditVideo != null ||
+                            onEditAudio != null))
                       const SizedBox(height: 8),
 
                     // Group 2: Core File Operations

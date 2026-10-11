@@ -64,6 +64,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.openWithApp,
       MediaViewerAction.editImage,
       MediaViewerAction.editVideo,
+      MediaViewerAction.editAudio,
       MediaViewerAction.rename,
       MediaViewerAction.delete,
     ],
@@ -285,8 +286,14 @@ class MediaViewerToolbarConfig {
         ? more
         : [...more, MediaViewerAction.editVideo];
 
+    // Same for `editAudio`: it joins the More menu next to `editVideo`.
+    final placedAudio = {...top, ...bottom, ...moreWithNew, ...advanced, ...hidden};
+    final moreWithAudio = placedAudio.contains(MediaViewerAction.editAudio)
+        ? moreWithNew
+        : [...moreWithNew, MediaViewerAction.editAudio];
+
     // A config saved before `decoder` existed doesn't list it anywhere.
-    final placed2 = {...top, ...bottom, ...moreWithNew, ...advanced, ...hidden};
+    final placed2 = {...top, ...bottom, ...moreWithAudio, ...advanced, ...hidden};
     final advancedWithDecoder = placed2.contains(MediaViewerAction.decoder)
         ? advanced
         : [...advanced, MediaViewerAction.decoder];
@@ -296,7 +303,7 @@ class MediaViewerToolbarConfig {
     final placed3 = {
       ...top,
       ...bottom,
-      ...moreWithNew,
+      ...moreWithAudio,
       ...advancedWithDecoder,
       ...hidden,
     };
@@ -307,7 +314,7 @@ class MediaViewerToolbarConfig {
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
-      moreMenuActions: moreWithNew,
+      moreMenuActions: moreWithAudio,
       advancedSettingsActions: advancedWithNew,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,

@@ -155,6 +155,31 @@ archive handlers and the recording pipeline use the same temp-then-wipe
 sequence. Local storage (the decoy's plain-folder file manager) is the same
 flow with real paths in and out.
 
+**Audio editor (`lib/features/audio_editor`).** The audio sibling of the video
+editor, with the same lossless model (segments, keep / cut-out, undo, merge or
+separate outputs, replace original) and a waveform timeline instead of a
+filmstrip. It reuses the video editor's segment controller (an empty keyframe
+list, since any audio frame can start a cut), range math and segments sheet.
+Dart side: `VaultAudioEditApi` (`audioEditProbe`, `audioEditWaveform`,
+`audioEditExport`, `cancelAudioEdit`, progress via `onAudioEditProgress`);
+native side: `AudioEditHandlers` (plumbing, same temp-file / rollback rules as
+`VideoEditHandlers`, temp files named `vx_vid_aud_cut_*.mp4` so the same
+startup sweep covers them), `LosslessAudioCutter` (cutting) and
+`AudioWaveformExtractor` (decodes through `MediaCodec` straight off the
+extractor into 0..255 peak buckets, time-boxed to 60 s; `complete` is false if
+it ran out). `MediaMuxer` only writes AAC (`.m4a`), Opus (`.ogg`, API 30+, else
+WebM) and Vorbis (WebM), so MP3 (concatenated frames) and WAV (PCM re-wrapped
+in a new header, cut to the exact sample) have small hand-written writers.
+Everything else (FLAC, WMA, AC-3, AMR, PCM in odd containers, ...) can't be
+copied, so `AudioReencoder` decodes it with `MediaCodec`, trims to the exact
+frame and encodes AAC-LC into an `.m4a` (audio is cheap to re-encode, unlike
+video). The probe reports `reencode: true` so the editor says so before
+exporting; it reports `cutSupported: false` only when the device has no decoder
+for the file or the sample rate can't be encoded (176.4 / 192 kHz), and such a
+file can still be played in the editor. Wider than stereo is cut to the front
+pair. Tags, cover art and chapters are not carried over. The pure parts (output planning, WAV header, PCM slicing, peak
+accumulation) live in `AudioEditMath.kt` so they are unit-tested on the JVM.
+
 **Image editor (`lib/features/image_editor`).** Loads the whole file through
 `VaultFileIoApi.readWholeFile`, decodes it in Dart (AVIF frames via the native
 `decodeAvifFrame`), keeps edits as an in-memory document with annotations, and
@@ -602,7 +627,7 @@ Mask Mode (§6.3) has its own dedicated channel.
 ### 5.1 Dart → native (method calls)
 
 This is organized by group below rather than listed exhaustively —
-`ChannelMethods` currently defines 234 constants in Kotlin and 235 in Dart
+`ChannelMethods` currently defines 238 constants in Kotlin and 239 in Dart
 (the extra one is `onTrimMemory`); the groups below are a guide to them, and
 not every constant is spelled out by name.
 
@@ -615,6 +640,7 @@ not every constant is spelled out by name.
 | Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `copyFile`/`cancelCopy`/`clearCopyState`, `deleteFile`, `setLastModifiedTime` |
 | Media/thumbnails | `openWithApp`, `shareFile`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive`, `getAvifInfo`/`decodeAvifFrame`, `encodeImage` (image editor, §1.3) |
 | Video editor (§1.3) | `videoEditProbe`, `videoEditExport`, `cancelVideoEdit` |
+| Audio editor (§1.3) | `audioEditProbe`, `audioEditWaveform`, `audioEditExport`, `cancelAudioEdit` |
 | Native PDF viewer (`pdf/`, backs the AndroidX Jetpack platform view, NOTICE.md) | `openPdf`, `getPdfPageSize`, `renderPdfPage`, `closePdf`, `isJetpackPdfViewerSupported`, `register/revokeJetpackPdfSession`, `printPdf` |
 | Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, `archiveStageBrowseEntry`/`archiveDiscardBrowseFile`, plus `pickArchiveFile`/`pickExtractFolder` |
 | Header backup & repair ("Check & Repair" tool) | `diagnoseUnmountedContainerFile`, `diagnoseMountedVolumeFilesystem`, `runMountedVolumeFilesystemCheck`, `exportContainerHeader`, `restoreBackupHeaderUnmounted`/`restoreContainerHeaderRegion`, `pickFolderVaultForRepair`, `checkFolderVault`, `repairFolderVault`, `resolveFolderVaultConfigFile`/`restoreFolderVaultConfig` |

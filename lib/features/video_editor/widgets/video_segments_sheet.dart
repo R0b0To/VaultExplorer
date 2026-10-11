@@ -12,16 +12,22 @@ class VideoSegmentsSheet extends StatelessWidget {
   final VideoEditorController editor;
   final ValueChanged<int> onSeekTo;
 
+  /// Replaces the "cut out" mode explanation; the audio editor reuses this
+  /// sheet and needs wording that isn't about footage. Null keeps the video text.
+  final String? cutOutModeDescription;
+
   const VideoSegmentsSheet({
     super.key,
     required this.editor,
     required this.onSeekTo,
+    this.cutOutModeDescription,
   });
 
   static Future<void> show(
     BuildContext context, {
     required VideoEditorController editor,
     required ValueChanged<int> onSeekTo,
+    String? cutOutModeDescription,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -29,6 +35,7 @@ class VideoSegmentsSheet extends StatelessWidget {
       builder: (_) => VideoSegmentsSheet(
         editor: editor,
         onSeekTo: onSeekTo,
+        cutOutModeDescription: cutOutModeDescription,
       ),
     );
   }
@@ -97,7 +104,8 @@ class VideoSegmentsSheet extends StatelessWidget {
                   child: Text(
                     editor.mode == VideoEditMode.keep
                         ? l10n.videoEditorKeepModeDescription
-                        : l10n.videoEditorCutOutModeDescription,
+                        : cutOutModeDescription ??
+                            l10n.videoEditorCutOutModeDescription,
                     style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),

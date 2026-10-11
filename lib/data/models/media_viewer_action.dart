@@ -22,6 +22,7 @@ enum MediaViewerAction {
   openWithApp,
   editImage,
   editVideo,
+  editAudio,
   rename,
   delete,
   playlistMenu,
@@ -51,6 +52,7 @@ enum MediaViewerAction {
         MediaViewerAction.openWithApp => Icons.open_in_new_rounded,
         MediaViewerAction.editImage => Icons.edit_outlined,
         MediaViewerAction.editVideo => Icons.content_cut_rounded,
+        MediaViewerAction.editAudio => Icons.graphic_eq_rounded,
         MediaViewerAction.rename => Icons.drive_file_rename_outline_rounded,
         MediaViewerAction.delete => Icons.delete_outline_rounded,
         MediaViewerAction.playlistMenu => Icons.playlist_play_rounded,
@@ -80,6 +82,7 @@ enum MediaViewerAction {
         MediaViewerAction.openWithApp => l10n.openWithAppAction,
         MediaViewerAction.editImage => l10n.editImageAction,
         MediaViewerAction.editVideo => l10n.videoEditorEditAction,
+        MediaViewerAction.editAudio => l10n.audioEditorEditAction,
         MediaViewerAction.rename => l10n.renameFileMenu,
         MediaViewerAction.delete => l10n.deleteFileMenu,
         MediaViewerAction.playlistMenu => l10n.playlistOptionsTooltip,
@@ -96,6 +99,7 @@ enum MediaViewerAction {
           this == MediaViewerAction.audioTrack ||
           this == MediaViewerAction.aspectRatio ||
           this == MediaViewerAction.editVideo ||
+          this == MediaViewerAction.editAudio ||
           this == MediaViewerAction.decoder ||
           this == MediaViewerAction.diagnostics) {
         return false;
@@ -114,6 +118,8 @@ enum MediaViewerAction {
         this == MediaViewerAction.slideshowDelay) {
       return false;
     }
+    // Audio editing is only for audio files; video has its own editor.
+    if (this == MediaViewerAction.editAudio && !isAudio) return false;
     if (isAudio &&
         (this == MediaViewerAction.adjustments ||
             this == MediaViewerAction.editVideo ||

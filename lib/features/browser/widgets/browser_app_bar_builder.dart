@@ -72,6 +72,7 @@ PreferredSizeWidget buildBrowserAppBar(
   VoidCallback? onSyncRoot,
   required Future<void> Function(String fileName, String fullPath) onEditImage,
   required Future<void> Function(String fullPath) onEditVideo,
+  Future<void> Function(String fullPath)? onEditAudio,
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
@@ -133,6 +134,9 @@ PreferredSizeWidget buildBrowserAppBar(
         selectedItems.any((item) => !item.isDir && !isVaultItemFile(item));
     final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
     final showEditVideoOption = singleFile && MediaViewerConstants.isVideo(selectedItems.first.name);
+    final showEditAudioOption = onEditAudio != null &&
+        singleFile &&
+        MediaViewerConstants.isAudio(selectedItems.first.name);
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
@@ -216,6 +220,13 @@ PreferredSizeWidget buildBrowserAppBar(
       await onEditVideo(path);
     }
 
+    Future<void> doEditAudio() async {
+      final entry = selectedItems.first;
+      final path = currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      onExitSelectionMode();
+      await onEditAudio?.call(path);
+    }
+
     void doSyncSettings() {
       final entry = selectedItems.first;
       onExitSelectionMode();
@@ -265,6 +276,8 @@ PreferredSizeWidget buildBrowserAppBar(
         onEditImage: doEditImage,
         showEditVideoOption: showEditVideoOption,
         onEditVideo: doEditVideo,
+        showEditAudioOption: showEditAudioOption,
+        onEditAudio: doEditAudio,
       );
     }
     return SelectionAppBarWide(
@@ -311,6 +324,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onEditImage: doEditImage,
       showEditVideoOption: showEditVideoOption,
       onEditVideo: doEditVideo,
+      showEditAudioOption: showEditAudioOption,
+      onEditAudio: doEditAudio,
     );
   }
 

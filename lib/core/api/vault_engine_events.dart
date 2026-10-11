@@ -219,6 +219,15 @@ class VaultEngineEvents {
     void Function(VideoEditProgress progress) listener,
   ) => _videoEditProgressRegistry.remove(listener);
 
+  final ListenerRegistry<AudioEditProgress> _audioEditProgressRegistry =
+      ListenerRegistry<AudioEditProgress>();
+  void addAudioEditProgressListener(
+    void Function(AudioEditProgress progress) listener,
+  ) => _audioEditProgressRegistry.add(listener);
+  void removeAudioEditProgressListener(
+    void Function(AudioEditProgress progress) listener,
+  ) => _audioEditProgressRegistry.remove(listener);
+
   final ListenerRegistry<CopyProgress> _copyProgressRegistry =
       ListenerRegistry<CopyProgress>();
   void addCopyProgressListener(void Function(CopyProgress progress) listener) =>
@@ -501,6 +510,26 @@ class VaultEngineEvents {
             phase != null &&
             fraction != null) {
           _videoEditProgressRegistry.notify((
+            opId: opId,
+            outputIndex: outputIndex,
+            outputCount: outputCount,
+            phase: phase,
+            fraction: fraction,
+          ));
+        }
+      } else if (call.method == 'onAudioEditProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = (args['opId'] as num?)?.toInt();
+        final outputIndex = (args['outputIndex'] as num?)?.toInt();
+        final outputCount = (args['outputCount'] as num?)?.toInt();
+        final phase = args['phase'] as String?;
+        final fraction = (args['fraction'] as num?)?.toDouble();
+        if (opId != null &&
+            outputIndex != null &&
+            outputCount != null &&
+            phase != null &&
+            fraction != null) {
+          _audioEditProgressRegistry.notify((
             opId: opId,
             outputIndex: outputIndex,
             outputCount: outputCount,

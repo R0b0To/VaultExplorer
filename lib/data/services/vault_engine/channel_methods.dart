@@ -90,6 +90,10 @@ abstract final class ChannelMethods {
   static const videoEditProbe = 'videoEditProbe';
   static const videoEditExport = 'videoEditExport';
   static const cancelVideoEdit = 'cancelVideoEdit';
+  static const audioEditProbe = 'audioEditProbe';
+  static const audioEditWaveform = 'audioEditWaveform';
+  static const audioEditExport = 'audioEditExport';
+  static const cancelAudioEdit = 'cancelAudioEdit';
   static const unlockSplitContainer = 'unlockSplitContainer';
   static const encryptSingleFile = 'encryptSingleFile';
   static const decryptSingleFile = 'decryptSingleFile';

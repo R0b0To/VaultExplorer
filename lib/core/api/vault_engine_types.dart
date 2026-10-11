@@ -157,6 +157,18 @@ typedef VideoEditProgress = ({
   double fraction,
 });
 
+/// One tick of Audio Editor work. [phase] is `'waveform'` (decoding the file
+/// to draw its waveform), `'cutting'` or `'saving'`; [fraction] is 0..1 within
+/// that phase for output [outputIndex] (0-based) of [outputCount]. Waveform
+/// ticks always report output 0 of 1.
+typedef AudioEditProgress = ({
+  int opId,
+  int outputIndex,
+  int outputCount,
+  String phase,
+  double fraction,
+});
+
 typedef CopyProgress = ({int opId, int bytesDelta});
 
 typedef HashProgress = ({int opId, int bytesDone, int bytesTotal});

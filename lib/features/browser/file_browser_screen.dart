@@ -87,6 +87,7 @@ import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/video_editor/video_editor_screen.dart';
+import 'package:vaultexplorer/features/audio_editor/audio_editor_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -1038,6 +1039,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           : null,
       onEditVideo: (!entry.isDir && MediaViewerConstants.isVideo(entry.name))
           ? () => _editVideo(fullPath)
+          : null,
+      onEditAudio: (!entry.isDir && MediaViewerConstants.isAudio(entry.name))
+          ? () => _editAudio(fullPath)
           : null,
       onToggleDocProvider: entry.isDir && !widget.container.isLocalStorage
           ? () {
@@ -2045,6 +2049,19 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       MaterialPageRoute(
         builder: (_) =>
             VideoEditorScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
+    if (!mounted) return;
+    // The editor writes new files next to the original.
+    _loadDirectoryContents(_currentDirPath);
+  }
+
+  Future<void> _editAudio(String fullPath) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            AudioEditorScreen(container: widget.container, filePath: fullPath),
       ),
     );
     if (!mounted) return;
@@ -4014,6 +4031,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         onSyncRoot: _showRootSyncSettings,
         onEditImage: _editImage,
         onEditVideo: _editVideo,
+        onEditAudio: _editAudio,
         onSettingsClosed: _loadToolbarConfig,
         isFiltered: isFiltered,
         onPaste: _isReadOnly ? null : _paste,

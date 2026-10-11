@@ -45,6 +45,7 @@ gitattributes
 
 # Ignore local i18n WIP folder
 /vaultexplorer-i18n-wip/
+/copy/
 android/.gradle/
 android/local.properties
 android/.vscode

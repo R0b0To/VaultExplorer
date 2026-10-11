@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "A cor da tela atrás do código.",
   "skinEditorLineNumbers": "Números de linha do editor",
   "skinTheGutterAndLineNumbersBesideTheCode": "A margem e os números de linha ao lado do código.",
-  "skinEditorTextColor": "Cor do texto do editor",
-  "skinTheDefaultCodeAndEditorTextColor": "A cor de texto padrão do código e do editor.",
+  "skinEditorTextColor": "Cor do texto do código",
+  "skinTheDefaultCodeAndEditorTextColor": "Cor padrão para código simples; o texto destacado pela sintaxe usa cores próprias.",
   "skinEditorCursor": "Cursor do editor",
   "skinTheInsertionCaretColor": "A cor do cursor de inserção.",
   "skinEditorSelectionHighlight": "Destaque de seleção do editor",
@@ -3097,5 +3097,8 @@
   "animationLabel": "Animação",
   "orientationLabel": "Orientação",
   "densityLabel": "Densidade de pixels",
-  "encodingLabel": "Codificação"
+  "encodingLabel": "Codificação",
+  "skinEditorCodeTextColorDescription": "Cor padrão do texto para código simples. O texto destacado pela sintaxe mantém suas próprias cores.",
+  "skinEditorInterfaceText": "Texto da interface do editor",
+  "skinEditorInterfaceTextDescription": "Texto e ícones na barra de ferramentas, barra lateral, menus e barra de status do editor."
 }

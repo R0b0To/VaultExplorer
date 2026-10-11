@@ -10710,11 +10710,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Бічна смуга та номери рядків поруч із кодом.';
 
   @override
-  String get skinEditorTextColor => 'Колір тексту редактора';
+  String get skinEditorTextColor => 'Колір тексту коду';
 
   @override
   String get skinTheDefaultCodeAndEditorTextColor =>
-      'Стандартний колір коду та тексту в редакторі.';
+      'Стандартний колір звичайного коду; текст із підсвічуванням синтаксису має власні кольори.';
 
   @override
   String get skinEditorCursor => 'Курсор редактора';
@@ -11324,4 +11324,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get encodingLabel => 'Кодування';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      'Стандартний колір тексту звичайного коду. Підсвічений синтаксисом текст зберігає власні кольори.';
+
+  @override
+  String get skinEditorInterfaceText => 'Текст інтерфейсу редактора';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'Текст та значки на панелі інструментів, бічній панелі, у меню та рядку стану редактора.';
 }

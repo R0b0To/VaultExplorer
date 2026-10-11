@@ -10635,11 +10635,11 @@ class AppLocalizationsPt extends AppLocalizations {
       'A margem e os números de linha ao lado do código.';
 
   @override
-  String get skinEditorTextColor => 'Cor do texto do editor';
+  String get skinEditorTextColor => 'Cor do texto do código';
 
   @override
   String get skinTheDefaultCodeAndEditorTextColor =>
-      'A cor de texto padrão do código e do editor.';
+      'Cor padrão para código simples; o texto destacado pela sintaxe usa cores próprias.';
 
   @override
   String get skinEditorCursor => 'Cursor do editor';
@@ -11243,4 +11243,15 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get encodingLabel => 'Codificação';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      'Cor padrão do texto para código simples. O texto destacado pela sintaxe mantém suas próprias cores.';
+
+  @override
+  String get skinEditorInterfaceText => 'Texto da interface do editor';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'Texto e ícones na barra de ferramentas, barra lateral, menus e barra de status do editor.';
 }

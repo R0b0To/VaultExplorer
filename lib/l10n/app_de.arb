@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "Die Canvas-Farbe hinter dem Code.",
   "skinEditorLineNumbers": "Editor-Zeilennummern",
   "skinTheGutterAndLineNumbersBesideTheCode": "Der Randbereich und die Zeilennummern neben dem Code.",
-  "skinEditorTextColor": "Editor-Textfarbe",
-  "skinTheDefaultCodeAndEditorTextColor": "Die standardmäßige Code- und Editor-Textfarbe.",
+  "skinEditorTextColor": "Code-Textfarbe",
+  "skinTheDefaultCodeAndEditorTextColor": "Standardfarbe für normalen Code; syntaxhervorgehobener Text verwendet eigene Farben.",
   "skinEditorCursor": "Editor-Cursor",
   "skinTheInsertionCaretColor": "Die Farbe der Einfügemarke.",
   "skinEditorSelectionHighlight": "Editor-Auswahlhervorhebung",
@@ -3097,5 +3097,8 @@
   "animationLabel": "Animation",
   "orientationLabel": "Ausrichtung",
   "densityLabel": "Pixeldichte",
-  "encodingLabel": "Kodierung"
+  "encodingLabel": "Kodierung",
+  "skinEditorCodeTextColorDescription": "Standardtextfarbe für normalen Code. Syntaxhervorgehobener Text behält seine eigenen Farben.",
+  "skinEditorInterfaceText": "Text der Editoroberfläche",
+  "skinEditorInterfaceTextDescription": "Text und Symbole in Editorleiste, Seitenleiste, Menüs und Statusleiste."
 }

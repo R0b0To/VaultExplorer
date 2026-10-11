@@ -10054,10 +10054,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get skinTheGutterAndLineNumbersBesideTheCode => '코드 옆의 여백과 줄 번호입니다.';
 
   @override
-  String get skinEditorTextColor => '편집기 텍스트 색상';
+  String get skinEditorTextColor => '코드 텍스트 색상';
 
   @override
-  String get skinTheDefaultCodeAndEditorTextColor => '기본 코드 및 편집기 텍스트 색상입니다.';
+  String get skinTheDefaultCodeAndEditorTextColor =>
+      '일반 코드의 기본 색상입니다. 구문 강조 텍스트는 자체 색상을 사용합니다.';
 
   @override
   String get skinEditorCursor => '편집기 커서';
@@ -10633,4 +10634,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get encodingLabel => '인코딩';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      '일반 코드의 기본 텍스트 색상입니다. 구문 강조 텍스트는 자체 색상을 유지합니다.';
+
+  @override
+  String get skinEditorInterfaceText => '편집기 인터페이스 텍스트';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      '편집기 도구 모음, 사이드바, 메뉴 및 상태 표시줄의 텍스트와 아이콘입니다.';
 }

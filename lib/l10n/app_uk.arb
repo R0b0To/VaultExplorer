@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "Колір полотна позаду коду.",
   "skinEditorLineNumbers": "Номери рядків редактора",
   "skinTheGutterAndLineNumbersBesideTheCode": "Бічна смуга та номери рядків поруч із кодом.",
-  "skinEditorTextColor": "Колір тексту редактора",
-  "skinTheDefaultCodeAndEditorTextColor": "Стандартний колір коду та тексту в редакторі.",
+  "skinEditorTextColor": "Колір тексту коду",
+  "skinTheDefaultCodeAndEditorTextColor": "Стандартний колір звичайного коду; текст із підсвічуванням синтаксису має власні кольори.",
   "skinEditorCursor": "Курсор редактора",
   "skinTheInsertionCaretColor": "Колір курсора вставки.",
   "skinEditorSelectionHighlight": "Виділення вибраного в редакторі",
@@ -3097,5 +3097,8 @@
   "animationLabel": "Анімація",
   "orientationLabel": "Орієнтація",
   "densityLabel": "Щільність пікселів",
-  "encodingLabel": "Кодування"
+  "encodingLabel": "Кодування",
+  "skinEditorCodeTextColorDescription": "Стандартний колір тексту звичайного коду. Підсвічений синтаксисом текст зберігає власні кольори.",
+  "skinEditorInterfaceText": "Текст інтерфейсу редактора",
+  "skinEditorInterfaceTextDescription": "Текст та значки на панелі інструментів, бічній панелі, у меню та рядку стану редактора."
 }

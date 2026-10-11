@@ -9904,10 +9904,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinTheGutterAndLineNumbersBesideTheCode => '代码旁边的边槽和行号。';
 
   @override
-  String get skinEditorTextColor => '编辑器文本颜色';
+  String get skinEditorTextColor => '代码文本颜色';
 
   @override
-  String get skinTheDefaultCodeAndEditorTextColor => '默认代码和编辑器文本颜色。';
+  String get skinTheDefaultCodeAndEditorTextColor =>
+      '普通代码的默认文本颜色；语法高亮文本使用各自的颜色。';
 
   @override
   String get skinEditorCursor => '编辑器光标';
@@ -10470,4 +10471,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get encodingLabel => '编码';
+
+  @override
+  String get skinEditorCodeTextColorDescription => '普通代码的默认文本颜色。语法高亮文本保留各自的颜色。';
+
+  @override
+  String get skinEditorInterfaceText => '编辑器界面文字';
+
+  @override
+  String get skinEditorInterfaceTextDescription => '编辑器工具栏、侧边栏、菜单和状态栏中的文字与图标。';
 }

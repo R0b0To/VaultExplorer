@@ -10668,11 +10668,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'الهامش وأرقام الأسطر بجوار التعليمات البرمجية.';
 
   @override
-  String get skinEditorTextColor => 'لون نص المحرر';
+  String get skinEditorTextColor => 'لون نص الشيفرة';
 
   @override
   String get skinTheDefaultCodeAndEditorTextColor =>
-      'لون النص الافتراضي للتعليمات البرمجية والمحرر.';
+      'اللون الافتراضي للنص العادي في الشيفرة؛ أما النصوص المظللة حسب الصياغة فلها ألوانها الخاصة.';
 
   @override
   String get skinEditorCursor => 'مؤشر المحرر';
@@ -11267,4 +11267,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get encodingLabel => 'الترميز';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      'لون النص الافتراضي للشيفرة العادية. تحتفظ النصوص المظللة حسب الصياغة بألوانها الخاصة.';
+
+  @override
+  String get skinEditorInterfaceText => 'نص واجهة المحرر';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'النصوص والأيقونات في شريط أدوات المحرر والشريط الجانبي والقوائم وشريط الحالة.';
 }

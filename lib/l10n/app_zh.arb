@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "代码背后的画布颜色。",
   "skinEditorLineNumbers": "编辑器行号",
   "skinTheGutterAndLineNumbersBesideTheCode": "代码旁边的边槽和行号。",
-  "skinEditorTextColor": "编辑器文本颜色",
-  "skinTheDefaultCodeAndEditorTextColor": "默认代码和编辑器文本颜色。",
+  "skinEditorTextColor": "代码文本颜色",
+  "skinTheDefaultCodeAndEditorTextColor": "普通代码的默认文本颜色；语法高亮文本使用各自的颜色。",
   "skinEditorCursor": "编辑器光标",
   "skinTheInsertionCaretColor": "插入光标颜色。",
   "skinEditorSelectionHighlight": "编辑器选中高亮",
@@ -3097,5 +3097,8 @@
   "animationLabel": "动画",
   "orientationLabel": "方向",
   "densityLabel": "像素密度",
-  "encodingLabel": "编码"
+  "encodingLabel": "编码",
+  "skinEditorCodeTextColorDescription": "普通代码的默认文本颜色。语法高亮文本保留各自的颜色。",
+  "skinEditorInterfaceText": "编辑器界面文字",
+  "skinEditorInterfaceTextDescription": "编辑器工具栏、侧边栏、菜单和状态栏中的文字与图标。"
 }

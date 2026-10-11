@@ -17710,13 +17710,13 @@ abstract class AppLocalizations {
   /// No description provided for @skinEditorTextColor.
   ///
   /// In en, this message translates to:
-  /// **'Editor text color'**
+  /// **'Code text color'**
   String get skinEditorTextColor;
 
   /// No description provided for @skinTheDefaultCodeAndEditorTextColor.
   ///
   /// In en, this message translates to:
-  /// **'The default code and editor text color.'**
+  /// **'Default color for plain code; syntax-highlighted text uses its own colors.'**
   String get skinTheDefaultCodeAndEditorTextColor;
 
   /// No description provided for @skinEditorCursor.
@@ -18744,6 +18744,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Encoding'**
   String get encodingLabel;
+
+  /// No description provided for @skinEditorCodeTextColorDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default text color for plain code. Syntax-highlighted text keeps its own colors.'**
+  String get skinEditorCodeTextColorDescription;
+
+  /// Color role for non-code text and icons in the text editor interface
+  ///
+  /// In en, this message translates to:
+  /// **'Editor interface text'**
+  String get skinEditorInterfaceText;
+
+  /// No description provided for @skinEditorInterfaceTextDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons in the editor toolbar, sidebar, menus, and status bar.'**
+  String get skinEditorInterfaceTextDescription;
 }
 
 class _AppLocalizationsDelegate

@@ -10630,11 +10630,11 @@ class AppLocalizationsIt extends AppLocalizations {
       'Il margine e i numeri di riga accanto al codice.';
 
   @override
-  String get skinEditorTextColor => 'Colore testo dell\'editor';
+  String get skinEditorTextColor => 'Colore del testo del codice';
 
   @override
   String get skinTheDefaultCodeAndEditorTextColor =>
-      'Il colore predefinito del codice e del testo dell\'editor.';
+      'Colore predefinito del codice normale; il testo evidenziato dalla sintassi usa colori propri.';
 
   @override
   String get skinEditorCursor => 'Cursore editor';
@@ -11239,4 +11239,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get encodingLabel => 'Codifica';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      'Colore predefinito del testo per il codice normale. Il testo evidenziato dalla sintassi mantiene i propri colori.';
+
+  @override
+  String get skinEditorInterfaceText => 'Testo dell’interfaccia dell’editor';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'Testo e icone nella barra degli strumenti, nella barra laterale, nei menu e nella barra di stato dell’editor.';
 }

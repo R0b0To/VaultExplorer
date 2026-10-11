@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "لون اللوحة خلف التعليمات البرمجية.",
   "skinEditorLineNumbers": "أرقام أسطر المحرر",
   "skinTheGutterAndLineNumbersBesideTheCode": "الهامش وأرقام الأسطر بجوار التعليمات البرمجية.",
-  "skinEditorTextColor": "لون نص المحرر",
-  "skinTheDefaultCodeAndEditorTextColor": "لون النص الافتراضي للتعليمات البرمجية والمحرر.",
+  "skinEditorTextColor": "لون نص الشيفرة",
+  "skinTheDefaultCodeAndEditorTextColor": "اللون الافتراضي للنص العادي في الشيفرة؛ أما النصوص المظللة حسب الصياغة فلها ألوانها الخاصة.",
   "skinEditorCursor": "مؤشر المحرر",
   "skinTheInsertionCaretColor": "لون علامة الإدراج.",
   "skinEditorSelectionHighlight": "تمييز التحديد في المحرر",
@@ -3097,5 +3097,8 @@
   "animationLabel": "الرسوم المتحركة",
   "orientationLabel": "الاتجاه",
   "densityLabel": "كثافة البكسل",
-  "encodingLabel": "الترميز"
+  "encodingLabel": "الترميز",
+  "skinEditorCodeTextColorDescription": "لون النص الافتراضي للشيفرة العادية. تحتفظ النصوص المظللة حسب الصياغة بألوانها الخاصة.",
+  "skinEditorInterfaceText": "نص واجهة المحرر",
+  "skinEditorInterfaceTextDescription": "النصوص والأيقونات في شريط أدوات المحرر والشريط الجانبي والقوائم وشريط الحالة."
 }

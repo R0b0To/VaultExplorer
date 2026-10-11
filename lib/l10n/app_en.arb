@@ -12390,8 +12390,8 @@
   "skinTheCanvasColorBehindTheCode": "The canvas color behind the code.",
   "skinEditorLineNumbers": "Editor line numbers",
   "skinTheGutterAndLineNumbersBesideTheCode": "The gutter and line numbers beside the code.",
-  "skinEditorTextColor": "Editor text color",
-  "skinTheDefaultCodeAndEditorTextColor": "The default code and editor text color.",
+  "skinEditorTextColor": "Code text color",
+  "skinTheDefaultCodeAndEditorTextColor": "Default color for plain code; syntax-highlighted text uses its own colors.",
   "skinEditorCursor": "Editor cursor",
   "skinTheInsertionCaretColor": "The insertion caret color.",
   "skinEditorSelectionHighlight": "Editor selection highlight",
@@ -12846,5 +12846,11 @@
   "encodingLabel": "Encoding",
   "@encodingLabel": {
     "description": "How an image's pixel data is stored, such as progressive or lossless"
-  }
+  },
+  "skinEditorCodeTextColorDescription": "Default text color for plain code. Syntax-highlighted text keeps its own colors.",
+  "skinEditorInterfaceText": "Editor interface text",
+  "@skinEditorInterfaceText": {
+    "description": "Color role for non-code text and icons in the text editor interface"
+  },
+  "skinEditorInterfaceTextDescription": "Text and icons in the editor toolbar, sidebar, menus, and status bar."
 }

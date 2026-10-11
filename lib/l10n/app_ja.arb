@@ -2925,8 +2925,8 @@
   "skinTheCanvasColorBehindTheCode": "コードの背後にあるキャンバスの色。",
   "skinEditorLineNumbers": "エディタの行番号",
   "skinTheGutterAndLineNumbersBesideTheCode": "コード横の余白と行番号。",
-  "skinEditorTextColor": "エディタのテキスト色",
-  "skinTheDefaultCodeAndEditorTextColor": "デフォルトのコードおよびエディタテキストの色。",
+  "skinEditorTextColor": "コードの文字色",
+  "skinTheDefaultCodeAndEditorTextColor": "通常のコードに使う既定の文字色です。構文強調表示の文字にはそれぞれの色が使われます。",
   "skinEditorCursor": "エディタカーソル",
   "skinTheInsertionCaretColor": "挿入キャレットの色。",
   "skinEditorSelectionHighlight": "エディタの選択ハイライト",
@@ -3097,5 +3097,8 @@
   "animationLabel": "アニメーション",
   "orientationLabel": "向き",
   "densityLabel": "ピクセル密度",
-  "encodingLabel": "エンコード"
+  "encodingLabel": "エンコード",
+  "skinEditorCodeTextColorDescription": "通常のコードに使う既定の文字色です。構文強調表示の文字は個別の色を保持します。",
+  "skinEditorInterfaceText": "エディターインターフェースの文字色",
+  "skinEditorInterfaceTextDescription": "エディターのツールバー、サイドバー、メニュー、ステータスバーの文字とアイコンです。"
 }

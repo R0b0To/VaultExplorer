@@ -10477,11 +10477,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'The gutter and line numbers beside the code.';
 
   @override
-  String get skinEditorTextColor => 'Editor text color';
+  String get skinEditorTextColor => 'Code text color';
 
   @override
   String get skinTheDefaultCodeAndEditorTextColor =>
-      'The default code and editor text color.';
+      'Default color for plain code; syntax-highlighted text uses its own colors.';
 
   @override
   String get skinEditorCursor => 'Editor cursor';
@@ -11077,4 +11077,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get encodingLabel => 'Encoding';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      'Default text color for plain code. Syntax-highlighted text keeps its own colors.';
+
+  @override
+  String get skinEditorInterfaceText => 'Editor interface text';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'Text and icons in the editor toolbar, sidebar, menus, and status bar.';
 }

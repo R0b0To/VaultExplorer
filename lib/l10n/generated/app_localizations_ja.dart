@@ -10055,10 +10055,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get skinTheGutterAndLineNumbersBesideTheCode => 'コード横の余白と行番号。';
 
   @override
-  String get skinEditorTextColor => 'エディタのテキスト色';
+  String get skinEditorTextColor => 'コードの文字色';
 
   @override
-  String get skinTheDefaultCodeAndEditorTextColor => 'デフォルトのコードおよびエディタテキストの色。';
+  String get skinTheDefaultCodeAndEditorTextColor =>
+      '通常のコードに使う既定の文字色です。構文強調表示の文字にはそれぞれの色が使われます。';
 
   @override
   String get skinEditorCursor => 'エディタカーソル';
@@ -10634,4 +10635,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get encodingLabel => 'エンコード';
+
+  @override
+  String get skinEditorCodeTextColorDescription =>
+      '通常のコードに使う既定の文字色です。構文強調表示の文字は個別の色を保持します。';
+
+  @override
+  String get skinEditorInterfaceText => 'エディターインターフェースの文字色';
+
+  @override
+  String get skinEditorInterfaceTextDescription =>
+      'エディターのツールバー、サイドバー、メニュー、ステータスバーの文字とアイコンです。';
 }

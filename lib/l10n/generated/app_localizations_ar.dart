@@ -6283,11 +6283,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get automationTierFullLabel =>
-      'فتح القفل / القفل + استيراد وتصدير الملفات';
+      'فتح القفل / القفل + استيراد وتصدير الملفات + المزامنة';
 
   @override
   String get automationTierFullSubtitle =>
-      'يمكن للأتمتة أيضًا استيراد الملفات وتصديرها أثناء فتح قفل هذه الخزنة';
+      'يمكن للأتمتة أيضًا مزامنة المجلدات المُعدّة واستيراد الملفات وتصديرها أثناء فتح قفل هذه الخزنة';
 
   @override
   String get automationTutorialLinkLabel =>
@@ -10686,6 +10686,70 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       'الخلفية المستخدمة لتمييز التعليمات البرمجية المحددة.';
+
+  @override
+  String get skinEditorKeywords => 'الكلمات المفتاحية';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'الكلمات المفتاحية للغة مثل class وvoid وreturn وif.';
+
+  @override
+  String get skinEditorTypes => 'الأنواع والفئات';
+
+  @override
+  String get skinEditorTypesExplanation => 'أسماء الفئات والأنواع والواجهات.';
+
+  @override
+  String get skinEditorStrings => 'السلاسل النصية';
+
+  @override
+  String get skinEditorStringsExplanation =>
+      'النصوص بين علامات اقتباس والعبارات النصية الحرفية.';
+
+  @override
+  String get skinEditorNumbers => 'الأرقام والقيم';
+
+  @override
+  String get skinEditorNumbersExplanation =>
+      'القيم الرقمية الحرفية والقيم المنطقية والثوابت.';
+
+  @override
+  String get skinEditorFunctions => 'الدوال والأساليب';
+
+  @override
+  String get skinEditorFunctionsExplanation =>
+      'أسماء الدوال واستدعاءات الأساليب والعناصر المدمجة.';
+
+  @override
+  String get skinEditorComments => 'التعليقات';
+
+  @override
+  String get skinEditorCommentsExplanation =>
+      'تعليقات التعليمات البرمجية وكتل التوثيق.';
+
+  @override
+  String get textEditorColorsSectionTitle => 'ألوان وخط المحرر';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => 'ألوان عناصر بناء الجملة';
+
+  @override
+  String get textEditorColorsCustomized => 'الألوان المخصصة نشطة';
+
+  @override
+  String get textEditorResetColors => 'إعادة ضبط الألوان إلى الافتراضية';
+
+  @override
+  String get textEditorFollowAppSkinNotice =>
+      'تتبع ألوان المحرر مظهر التطبيق النشط.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently =>
+      'تخصيص الألوان بشكل مستقل';
+
+  @override
+  String get textEditorDefaultFromTheme => 'افتراضي (من السمة)';
 
   @override
   String get skinFileManager => 'مدير الملفات';

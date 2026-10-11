@@ -6255,11 +6255,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get automationTierFullLabel =>
-      'Розблокування / блокування + імпорт/експорт файлів';
+      'Розблокування / блокування + імпорт/експорт файлів + синхронізація';
 
   @override
   String get automationTierFullSubtitle =>
-      'Автоматизація також може імпортувати та експортувати файли, коли сховище відкрите';
+      'Автоматизація також може синхронізувати налаштовані папки, імпортувати та експортувати файли, коли сховище відкрите';
 
   @override
   String get automationTutorialLinkLabel => 'Читати повну покрокову інструкцію';
@@ -10728,6 +10728,71 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       'Тло для виділення вибраного коду.';
+
+  @override
+  String get skinEditorKeywords => 'Ключові слова';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'Ключові слова мови, такі як class, void, return та if.';
+
+  @override
+  String get skinEditorTypes => 'Типи та класи';
+
+  @override
+  String get skinEditorTypesExplanation => 'Назви класів, типи та інтерфейси.';
+
+  @override
+  String get skinEditorStrings => 'Рядки';
+
+  @override
+  String get skinEditorStringsExplanation =>
+      'Текст у лапках та рядкові літерали.';
+
+  @override
+  String get skinEditorNumbers => 'Числа та значення';
+
+  @override
+  String get skinEditorNumbersExplanation =>
+      'Числові літерали, логічні значення та константи.';
+
+  @override
+  String get skinEditorFunctions => 'Функції та методи';
+
+  @override
+  String get skinEditorFunctionsExplanation =>
+      'Назви функцій, виклики методів і вбудовані елементи.';
+
+  @override
+  String get skinEditorComments => 'Коментарі';
+
+  @override
+  String get skinEditorCommentsExplanation =>
+      'Коментарі до коду та блоки документації.';
+
+  @override
+  String get textEditorColorsSectionTitle => 'Кольори та шрифт редактора';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle =>
+      'Кольори елементів синтаксису';
+
+  @override
+  String get textEditorColorsCustomized => 'Користувацькі кольори активні';
+
+  @override
+  String get textEditorResetColors => 'Скинути кольори до стандартних';
+
+  @override
+  String get textEditorFollowAppSkinNotice =>
+      'Кольори редактора відповідають активній темі програми.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently =>
+      'Налаштувати кольори окремо';
+
+  @override
+  String get textEditorDefaultFromTheme => 'За замовчуванням (з теми)';
 
   @override
   String get skinFileManager => 'Менеджер файлів';

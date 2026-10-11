@@ -10155,16 +10155,16 @@ abstract class AppLocalizations {
   /// **'Automation may unlock and lock this vault, nothing else'**
   String get automationTierLifecycleSubtitle;
 
-  /// Automation tier picker option: unlock/lock plus file import-export
+  /// Automation tier picker option: unlock/lock plus file import-export and sync
   ///
   /// In en, this message translates to:
-  /// **'Unlock / lock + file import-export'**
+  /// **'Unlock / lock + file import-export + sync'**
   String get automationTierFullLabel;
 
   /// Subtitle for the full automation tier option
   ///
   /// In en, this message translates to:
-  /// **'Automation may also import and export files while this vault is unlocked'**
+  /// **'Automation may also sync configured folders and import or export files while this vault is unlocked'**
   String get automationTierFullSubtitle;
 
   /// Tappable link on the Automation settings screen that opens the in-app automation tutorial
@@ -17742,6 +17742,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The background used to highlight selected code.'**
   String get skinTheBackgroundUsedToHighlightSelectedCode;
+
+  /// Label for language keywords syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Keywords'**
+  String get skinEditorKeywords;
+
+  /// Explanation for language keywords syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Language keywords such as class, void, return, and if.'**
+  String get skinEditorKeywordsExplanation;
+
+  /// Label for types and classes syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Types & classes'**
+  String get skinEditorTypes;
+
+  /// Explanation for types and classes syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Class names, types, and interfaces.'**
+  String get skinEditorTypesExplanation;
+
+  /// Label for string literals syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Strings'**
+  String get skinEditorStrings;
+
+  /// Explanation for string literals syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Quoted text and string literals.'**
+  String get skinEditorStringsExplanation;
+
+  /// Label for numeric literals and values syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Numbers & values'**
+  String get skinEditorNumbers;
+
+  /// Explanation for numeric literals and values syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric literals, booleans, and constants.'**
+  String get skinEditorNumbersExplanation;
+
+  /// Label for functions and methods syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Functions & methods'**
+  String get skinEditorFunctions;
+
+  /// Explanation for functions and methods syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Function names, method calls, and built-ins.'**
+  String get skinEditorFunctionsExplanation;
+
+  /// Label for comments syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get skinEditorComments;
+
+  /// Explanation for comments syntax element
+  ///
+  /// In en, this message translates to:
+  /// **'Code comments and documentation blocks.'**
+  String get skinEditorCommentsExplanation;
+
+  /// Section title for editor colors and font settings
+  ///
+  /// In en, this message translates to:
+  /// **'Editor colors & font'**
+  String get textEditorColorsSectionTitle;
+
+  /// Section title for syntax element colors
+  ///
+  /// In en, this message translates to:
+  /// **'Syntax element colors'**
+  String get textEditorSyntaxColorsSectionTitle;
+
+  /// Indicator showing custom editor colors are currently active
+  ///
+  /// In en, this message translates to:
+  /// **'Custom colors active'**
+  String get textEditorColorsCustomized;
+
+  /// Action to reset editor colors back to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset colors to default'**
+  String get textEditorResetColors;
+
+  /// Notice explaining editor colors match the active app skin
+  ///
+  /// In en, this message translates to:
+  /// **'Editor colors follow the active app skin.'**
+  String get textEditorFollowAppSkinNotice;
+
+  /// Option to customize editor colors independently from the app skin
+  ///
+  /// In en, this message translates to:
+  /// **'Customize colors independently'**
+  String get textEditorCustomizeColorsIndependently;
+
+  /// Label indicating a color uses the default from the active theme
+  ///
+  /// In en, this message translates to:
+  /// **'Default (from theme)'**
+  String get textEditorDefaultFromTheme;
 
   /// No description provided for @skinFileManager.
   ///

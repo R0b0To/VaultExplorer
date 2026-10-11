@@ -5892,11 +5892,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get automationTierLifecycleSubtitle => '自動化はこの保管庫のロック解除とロックのみ行えます';
 
   @override
-  String get automationTierFullLabel => 'ロック解除／ロック + ファイルのインポート・エクスポート';
+  String get automationTierFullLabel => 'ロック解除／ロック + ファイルのインポート・エクスポート + 同期';
 
   @override
   String get automationTierFullSubtitle =>
-      '自動化は、この保管庫のロックが解除されている間、ファイルのインポート・エクスポートも行えます';
+      '自動化は、この保管庫のロック解除中に、設定済みフォルダの同期やファイルのインポート・エクスポートも行えます';
 
   @override
   String get automationTutorialLinkLabel => '手順を追った完全なチュートリアルを読む';
@@ -10072,6 +10072,64 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       '選択されたコードのハイライトに使用される背景。';
+
+  @override
+  String get skinEditorKeywords => 'キーワード';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'class、void、return、if などの言語キーワード。';
+
+  @override
+  String get skinEditorTypes => '型とクラス';
+
+  @override
+  String get skinEditorTypesExplanation => 'クラス名、型、インターフェース。';
+
+  @override
+  String get skinEditorStrings => '文字列';
+
+  @override
+  String get skinEditorStringsExplanation => '引用符で囲まれたテキストと文字列リテラル。';
+
+  @override
+  String get skinEditorNumbers => '数値と値';
+
+  @override
+  String get skinEditorNumbersExplanation => '数値リテラル、ブール値、定数。';
+
+  @override
+  String get skinEditorFunctions => '関数とメソッド';
+
+  @override
+  String get skinEditorFunctionsExplanation => '関数名、メソッド呼び出し、組み込み要素。';
+
+  @override
+  String get skinEditorComments => 'コメント';
+
+  @override
+  String get skinEditorCommentsExplanation => 'コードコメントとドキュメントブロック。';
+
+  @override
+  String get textEditorColorsSectionTitle => 'エディタの色とフォント';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => '構文要素の色';
+
+  @override
+  String get textEditorColorsCustomized => 'カスタム色を適用中';
+
+  @override
+  String get textEditorResetColors => '色をデフォルトに戻す';
+
+  @override
+  String get textEditorFollowAppSkinNotice => 'エディタの色はアクティブなアプリスキンに従います。';
+
+  @override
+  String get textEditorCustomizeColorsIndependently => '個別に色をカスタマイズ';
+
+  @override
+  String get textEditorDefaultFromTheme => 'デフォルト（テーマから）';
 
   @override
   String get skinFileManager => 'ファイルマネージャー';

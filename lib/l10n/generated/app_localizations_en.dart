@@ -6111,11 +6111,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Automation may unlock and lock this vault, nothing else';
 
   @override
-  String get automationTierFullLabel => 'Unlock / lock + file import-export';
+  String get automationTierFullLabel =>
+      'Unlock / lock + file import-export + sync';
 
   @override
   String get automationTierFullSubtitle =>
-      'Automation may also import and export files while this vault is unlocked';
+      'Automation may also sync configured folders and import or export files while this vault is unlocked';
 
   @override
   String get automationTutorialLinkLabel =>
@@ -10494,6 +10495,70 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       'The background used to highlight selected code.';
+
+  @override
+  String get skinEditorKeywords => 'Keywords';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'Language keywords such as class, void, return, and if.';
+
+  @override
+  String get skinEditorTypes => 'Types & classes';
+
+  @override
+  String get skinEditorTypesExplanation =>
+      'Class names, types, and interfaces.';
+
+  @override
+  String get skinEditorStrings => 'Strings';
+
+  @override
+  String get skinEditorStringsExplanation => 'Quoted text and string literals.';
+
+  @override
+  String get skinEditorNumbers => 'Numbers & values';
+
+  @override
+  String get skinEditorNumbersExplanation =>
+      'Numeric literals, booleans, and constants.';
+
+  @override
+  String get skinEditorFunctions => 'Functions & methods';
+
+  @override
+  String get skinEditorFunctionsExplanation =>
+      'Function names, method calls, and built-ins.';
+
+  @override
+  String get skinEditorComments => 'Comments';
+
+  @override
+  String get skinEditorCommentsExplanation =>
+      'Code comments and documentation blocks.';
+
+  @override
+  String get textEditorColorsSectionTitle => 'Editor colors & font';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => 'Syntax element colors';
+
+  @override
+  String get textEditorColorsCustomized => 'Custom colors active';
+
+  @override
+  String get textEditorResetColors => 'Reset colors to default';
+
+  @override
+  String get textEditorFollowAppSkinNotice =>
+      'Editor colors follow the active app skin.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently =>
+      'Customize colors independently';
+
+  @override
+  String get textEditorDefaultFromTheme => 'Default (from theme)';
 
   @override
   String get skinFileManager => 'File manager';

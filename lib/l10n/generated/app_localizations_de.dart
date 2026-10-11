@@ -6205,11 +6205,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get automationTierFullLabel =>
-      'Entsperren/Sperren + Datei-Import/-Export';
+      'Entsperren/Sperren + Datei-Import/-Export + Synchronisierung';
 
   @override
   String get automationTierFullSubtitle =>
-      'Automatisierung darf zusätzlich Dateien importieren und exportieren, solange dieser Tresor entsperrt ist';
+      'Automatisierung darf konfigurierte Ordner synchronisieren sowie Dateien importieren und exportieren, solange dieser Tresor entsperrt ist';
 
   @override
   String get automationTutorialLinkLabel =>
@@ -10656,6 +10656,71 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       'Der Hintergrund zum Hervorheben von ausgewähltem Code.';
+
+  @override
+  String get skinEditorKeywords => 'Schlüsselwörter';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'Schlüsselwörter der Sprache wie class, void, return und if.';
+
+  @override
+  String get skinEditorTypes => 'Typen & Klassen';
+
+  @override
+  String get skinEditorTypesExplanation =>
+      'Klassennamen, Typen und Schnittstellen.';
+
+  @override
+  String get skinEditorStrings => 'Zeichenfolgen';
+
+  @override
+  String get skinEditorStringsExplanation =>
+      'Text in Anführungszeichen und Zeichenfolgenliterale.';
+
+  @override
+  String get skinEditorNumbers => 'Zahlen & Werte';
+
+  @override
+  String get skinEditorNumbersExplanation =>
+      'Numerische Literale, boolesche Werte und Konstanten.';
+
+  @override
+  String get skinEditorFunctions => 'Funktionen & Methoden';
+
+  @override
+  String get skinEditorFunctionsExplanation =>
+      'Funktionsnamen, Methodenaufrufe und integrierte Funktionen.';
+
+  @override
+  String get skinEditorComments => 'Kommentare';
+
+  @override
+  String get skinEditorCommentsExplanation =>
+      'Codekommentare und Dokumentationsblöcke.';
+
+  @override
+  String get textEditorColorsSectionTitle => 'Editor-Farben & Schriftart';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => 'Farben für Syntaxelemente';
+
+  @override
+  String get textEditorColorsCustomized => 'Benutzerdefinierte Farben aktiv';
+
+  @override
+  String get textEditorResetColors => 'Farben auf Standard zurücksetzen';
+
+  @override
+  String get textEditorFollowAppSkinNotice =>
+      'Editor-Farben folgen dem aktiven App-Design.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently =>
+      'Farben unabhängig anpassen';
+
+  @override
+  String get textEditorDefaultFromTheme => 'Standard (aus Design)';
 
   @override
   String get skinFileManager => 'Dateimanager';

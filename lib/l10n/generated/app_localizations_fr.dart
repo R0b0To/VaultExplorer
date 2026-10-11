@@ -6259,11 +6259,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get automationTierFullLabel =>
-      'Déverrouillage / verrouillage + import-export de fichiers';
+      'Déverrouillage / verrouillage + import-export de fichiers + synchronisation';
 
   @override
   String get automationTierFullSubtitle =>
-      'L\'automatisation peut aussi importer et exporter des fichiers tant que ce coffre est déverrouillé';
+      'L\'automatisation peut aussi synchroniser les dossiers configurés et importer ou exporter des fichiers tant que ce coffre est déverrouillé';
 
   @override
   String get automationTutorialLinkLabel =>
@@ -10745,6 +10745,72 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       'L\'arrière-plan utilisé pour surligner le code sélectionné.';
+
+  @override
+  String get skinEditorKeywords => 'Mots-clés';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'Mots-clés du langage tels que class, void, return et if.';
+
+  @override
+  String get skinEditorTypes => 'Types et classes';
+
+  @override
+  String get skinEditorTypesExplanation =>
+      'Noms de classes, types et interfaces.';
+
+  @override
+  String get skinEditorStrings => 'Chaînes de caractères';
+
+  @override
+  String get skinEditorStringsExplanation =>
+      'Texte entre guillemets et littéraux de chaîne.';
+
+  @override
+  String get skinEditorNumbers => 'Nombres et valeurs';
+
+  @override
+  String get skinEditorNumbersExplanation =>
+      'Littéraux numériques, booléens et constantes.';
+
+  @override
+  String get skinEditorFunctions => 'Fonctions et méthodes';
+
+  @override
+  String get skinEditorFunctionsExplanation =>
+      'Noms de fonctions, appels de méthodes et éléments intégrés.';
+
+  @override
+  String get skinEditorComments => 'Commentaires';
+
+  @override
+  String get skinEditorCommentsExplanation =>
+      'Commentaires de code et blocs de documentation.';
+
+  @override
+  String get textEditorColorsSectionTitle => 'Couleurs et police de l\'éditeur';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle =>
+      'Couleurs des éléments de syntaxe';
+
+  @override
+  String get textEditorColorsCustomized => 'Couleurs personnalisées actives';
+
+  @override
+  String get textEditorResetColors => 'Réinitialiser les couleurs par défaut';
+
+  @override
+  String get textEditorFollowAppSkinNotice =>
+      'Les couleurs de l\'éditeur suivent le thème actif de l\'application.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently =>
+      'Personnaliser les couleurs indépendamment';
+
+  @override
+  String get textEditorDefaultFromTheme => 'Par défaut (du thème)';
 
   @override
   String get skinFileManager => 'Gestionnaire de fichiers';

@@ -5820,10 +5820,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationTierLifecycleSubtitle => '自动化只能解锁和锁定此保险库，不能执行其他操作';
 
   @override
-  String get automationTierFullLabel => '解锁／锁定 + 文件导入导出';
+  String get automationTierFullLabel => '解锁／锁定 + 文件导入导出 + 同步';
 
   @override
-  String get automationTierFullSubtitle => '在此保险库解锁期间，自动化还可以导入和导出文件';
+  String get automationTierFullSubtitle => '此保险库解锁期间，自动化还可以同步已配置的文件夹并导入或导出文件';
 
   @override
   String get automationTutorialLinkLabel => '阅读完整的分步教程';
@@ -9920,6 +9920,64 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode => '用于高亮所选代码的背景。';
+
+  @override
+  String get skinEditorKeywords => '关键字';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      '诸如 class、void、return 和 if 等语言关键字。';
+
+  @override
+  String get skinEditorTypes => '类型与类';
+
+  @override
+  String get skinEditorTypesExplanation => '类名、类型和接口。';
+
+  @override
+  String get skinEditorStrings => '字符串';
+
+  @override
+  String get skinEditorStringsExplanation => '带引号的文本和字符串字面量。';
+
+  @override
+  String get skinEditorNumbers => '数字与值';
+
+  @override
+  String get skinEditorNumbersExplanation => '数值字面量、布尔值和常量。';
+
+  @override
+  String get skinEditorFunctions => '函数与方法';
+
+  @override
+  String get skinEditorFunctionsExplanation => '函数名称、方法调用和内置函数。';
+
+  @override
+  String get skinEditorComments => '注释';
+
+  @override
+  String get skinEditorCommentsExplanation => '代码注释和文档块。';
+
+  @override
+  String get textEditorColorsSectionTitle => '编辑器颜色与字体';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => '语法元素颜色';
+
+  @override
+  String get textEditorColorsCustomized => '已启用自定义颜色';
+
+  @override
+  String get textEditorResetColors => '将颜色重置为默认值';
+
+  @override
+  String get textEditorFollowAppSkinNotice => '编辑器颜色遵循当前应用皮肤。';
+
+  @override
+  String get textEditorCustomizeColorsIndependently => '单独自定义颜色';
+
+  @override
+  String get textEditorDefaultFromTheme => '默认（来自主题）';
 
   @override
   String get skinFileManager => '文件管理器';

@@ -7831,11 +7831,11 @@
   "@automationTierLifecycleSubtitle": {
     "description": "Subtitle for the lifecycle-only automation tier option"
   },
-  "automationTierFullLabel": "Unlock / lock + file import-export",
+  "automationTierFullLabel": "Unlock / lock + file import-export + sync",
   "@automationTierFullLabel": {
-    "description": "Automation tier picker option: unlock/lock plus file import-export"
+    "description": "Automation tier picker option: unlock/lock plus file import-export and sync"
   },
-  "automationTierFullSubtitle": "Automation may also import and export files while this vault is unlocked",
+  "automationTierFullSubtitle": "Automation may also sync configured folders and import or export files while this vault is unlocked",
   "@automationTierFullSubtitle": {
     "description": "Subtitle for the full automation tier option"
   },
@@ -12396,6 +12396,25 @@
   "skinTheInsertionCaretColor": "The insertion caret color.",
   "skinEditorSelectionHighlight": "Editor selection highlight",
   "skinTheBackgroundUsedToHighlightSelectedCode": "The background used to highlight selected code.",
+  "skinEditorKeywords": "Keywords",
+  "skinEditorKeywordsExplanation": "Language keywords such as class, void, return, and if.",
+  "skinEditorTypes": "Types & classes",
+  "skinEditorTypesExplanation": "Class names, types, and interfaces.",
+  "skinEditorStrings": "Strings",
+  "skinEditorStringsExplanation": "Quoted text and string literals.",
+  "skinEditorNumbers": "Numbers & values",
+  "skinEditorNumbersExplanation": "Numeric literals, booleans, and constants.",
+  "skinEditorFunctions": "Functions & methods",
+  "skinEditorFunctionsExplanation": "Function names, method calls, and built-ins.",
+  "skinEditorComments": "Comments",
+  "skinEditorCommentsExplanation": "Code comments and documentation blocks.",
+  "textEditorColorsSectionTitle": "Editor colors & font",
+  "textEditorSyntaxColorsSectionTitle": "Syntax element colors",
+  "textEditorColorsCustomized": "Custom colors active",
+  "textEditorResetColors": "Reset colors to default",
+  "textEditorFollowAppSkinNotice": "Editor colors follow the active app skin.",
+  "textEditorCustomizeColorsIndependently": "Customize colors independently",
+  "textEditorDefaultFromTheme": "Default (from theme)",
   "skinFileManager": "File manager",
   "skinFolderAndFileGlyphsTilesAndLabelColors": "Folder and file glyphs, tiles, and label colors.",
   "skinDetailsTextColor": "Details text color",
@@ -12667,5 +12686,62 @@
   "audioEditorReencodeNote": "This format can't be copied, so the exported audio is re-encoded to AAC. Quality stays high, but it isn't bit-for-bit identical. Cuts land exactly where you set them. Tags and cover art aren't carried over.",
   "@audioEditorReencodeNote": {
     "description": "Explanation at the bottom of the audio editor's export sheet when the output is re-encoded rather than copied"
+  },
+  "@skinEditorKeywords": {
+    "description": "Label for language keywords syntax element"
+  },
+  "@skinEditorKeywordsExplanation": {
+    "description": "Explanation for language keywords syntax element"
+  },
+  "@skinEditorTypes": {
+    "description": "Label for types and classes syntax element"
+  },
+  "@skinEditorTypesExplanation": {
+    "description": "Explanation for types and classes syntax element"
+  },
+  "@skinEditorStrings": {
+    "description": "Label for string literals syntax element"
+  },
+  "@skinEditorStringsExplanation": {
+    "description": "Explanation for string literals syntax element"
+  },
+  "@skinEditorNumbers": {
+    "description": "Label for numeric literals and values syntax element"
+  },
+  "@skinEditorNumbersExplanation": {
+    "description": "Explanation for numeric literals and values syntax element"
+  },
+  "@skinEditorFunctions": {
+    "description": "Label for functions and methods syntax element"
+  },
+  "@skinEditorFunctionsExplanation": {
+    "description": "Explanation for functions and methods syntax element"
+  },
+  "@skinEditorComments": {
+    "description": "Label for comments syntax element"
+  },
+  "@skinEditorCommentsExplanation": {
+    "description": "Explanation for comments syntax element"
+  },
+  "@textEditorColorsSectionTitle": {
+    "description": "Section title for editor colors and font settings"
+  },
+  "@textEditorSyntaxColorsSectionTitle": {
+    "description": "Section title for syntax element colors"
+  },
+  "@textEditorColorsCustomized": {
+    "description": "Indicator showing custom editor colors are currently active"
+  },
+  "@textEditorResetColors": {
+    "description": "Action to reset editor colors back to defaults"
+  },
+  "@textEditorFollowAppSkinNotice": {
+    "description": "Notice explaining editor colors match the active app skin"
+  },
+  "@textEditorCustomizeColorsIndependently": {
+    "description": "Option to customize editor colors independently from the app skin"
+  },
+  "@textEditorDefaultFromTheme": {
+    "description": "Label indicating a color uses the default from the active theme"
   }
 }

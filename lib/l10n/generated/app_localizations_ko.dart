@@ -5891,11 +5891,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get automationTierLifecycleSubtitle => '자동화는 이 볼트를 잠금 해제하고 잠글 수만 있습니다';
 
   @override
-  String get automationTierFullLabel => '잠금 해제/잠금 + 파일 가져오기-내보내기';
+  String get automationTierFullLabel => '잠금 해제/잠금 + 파일 가져오기-내보내기 + 동기화';
 
   @override
   String get automationTierFullSubtitle =>
-      '자동화는 이 볼트가 잠금 해제된 동안 파일을 가져오고 내보낼 수도 있습니다';
+      '자동화는 이 볼트가 잠금 해제된 동안 설정된 폴더를 동기화하고 파일을 가져오거나 내보낼 수도 있습니다';
 
   @override
   String get automationTutorialLinkLabel => '전체 단계별 튜토리얼 읽기';
@@ -10071,6 +10071,64 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
       '선택한 코드를 강조 표시하는 데 사용되는 배경입니다.';
+
+  @override
+  String get skinEditorKeywords => '키워드';
+
+  @override
+  String get skinEditorKeywordsExplanation =>
+      'class, void, return, if와 같은 언어 키워드입니다.';
+
+  @override
+  String get skinEditorTypes => '타입 및 클래스';
+
+  @override
+  String get skinEditorTypesExplanation => '클래스 이름, 타입 및 인터페이스입니다.';
+
+  @override
+  String get skinEditorStrings => '문자열';
+
+  @override
+  String get skinEditorStringsExplanation => '따옴표로 묶인 텍스트 및 문자열 리터럴입니다.';
+
+  @override
+  String get skinEditorNumbers => '숫자 및 값';
+
+  @override
+  String get skinEditorNumbersExplanation => '숫자 리터럴, 부울(Boolean) 및 상수입니다.';
+
+  @override
+  String get skinEditorFunctions => '함수 및 메서드';
+
+  @override
+  String get skinEditorFunctionsExplanation => '함수 이름, 메서드 호출 및 기본 제공 요소입니다.';
+
+  @override
+  String get skinEditorComments => '주석';
+
+  @override
+  String get skinEditorCommentsExplanation => '코드 주석 및 문서 블록입니다.';
+
+  @override
+  String get textEditorColorsSectionTitle => '편집기 색상 및 글꼴';
+
+  @override
+  String get textEditorSyntaxColorsSectionTitle => '구문 요소 색상';
+
+  @override
+  String get textEditorColorsCustomized => '사용자 지정 색상 활성화됨';
+
+  @override
+  String get textEditorResetColors => '색상을 기본값으로 재설정';
+
+  @override
+  String get textEditorFollowAppSkinNotice => '편집기 색상은 현재 앱 스킨을 따릅니다.';
+
+  @override
+  String get textEditorCustomizeColorsIndependently => '색상 독립적으로 사용자 지정';
+
+  @override
+  String get textEditorDefaultFromTheme => '기본값 (테마 기준)';
 
   @override
   String get skinFileManager => '파일 관리자';

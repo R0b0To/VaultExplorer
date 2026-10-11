@@ -11229,4 +11229,46 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Estilo del editor';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'AUDIO';
+
+  @override
+  String get audioTagsSectionHeader => 'INFORMACIÓN DE LA PISTA';
+
+  @override
+  String get artistLabel => 'Artista';
+
+  @override
+  String get albumLabel => 'Álbum';
+
+  @override
+  String get yearLabel => 'Año';
+
+  @override
+  String get genreLabel => 'Género';
+
+  @override
+  String get audioTrackLabel => 'Pista';
+
+  @override
+  String get bitDepthLabel => 'Profundidad de bits';
+
+  @override
+  String get colorModeLabel => 'Modo de color';
+
+  @override
+  String get transparencyLabel => 'Transparencia';
+
+  @override
+  String get animationLabel => 'Animación';
+
+  @override
+  String get orientationLabel => 'Orientación';
+
+  @override
+  String get densityLabel => 'Densidad de píxeles';
+
+  @override
+  String get encodingLabel => 'Codificación';
 }

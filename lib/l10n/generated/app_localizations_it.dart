@@ -11197,4 +11197,46 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Stile dell’editor';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'AUDIO';
+
+  @override
+  String get audioTagsSectionHeader => 'INFO BRANO';
+
+  @override
+  String get artistLabel => 'Artista';
+
+  @override
+  String get albumLabel => 'Album';
+
+  @override
+  String get yearLabel => 'Anno';
+
+  @override
+  String get genreLabel => 'Genere';
+
+  @override
+  String get audioTrackLabel => 'Traccia';
+
+  @override
+  String get bitDepthLabel => 'Profondità di bit';
+
+  @override
+  String get colorModeLabel => 'Modalità colore';
+
+  @override
+  String get transparencyLabel => 'Trasparenza';
+
+  @override
+  String get animationLabel => 'Animazione';
+
+  @override
+  String get orientationLabel => 'Orientamento';
+
+  @override
+  String get densityLabel => 'Densità di pixel';
+
+  @override
+  String get encodingLabel => 'Codifica';
 }

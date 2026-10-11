@@ -11035,4 +11035,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Editor styling';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'AUDIO';
+
+  @override
+  String get audioTagsSectionHeader => 'TRACK INFO';
+
+  @override
+  String get artistLabel => 'Artist';
+
+  @override
+  String get albumLabel => 'Album';
+
+  @override
+  String get yearLabel => 'Year';
+
+  @override
+  String get genreLabel => 'Genre';
+
+  @override
+  String get audioTrackLabel => 'Track';
+
+  @override
+  String get bitDepthLabel => 'Bit Depth';
+
+  @override
+  String get colorModeLabel => 'Color Mode';
+
+  @override
+  String get transparencyLabel => 'Transparency';
+
+  @override
+  String get animationLabel => 'Animation';
+
+  @override
+  String get orientationLabel => 'Orientation';
+
+  @override
+  String get densityLabel => 'Pixel Density';
+
+  @override
+  String get encodingLabel => 'Encoding';
 }

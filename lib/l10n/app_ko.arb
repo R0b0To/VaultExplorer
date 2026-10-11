@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "기본 제공 스킨을 둘러보거나 현재 모습으로 사용자 지정 스킨을 만듭니다.",
   "textEditorUseIndependentAppearanceDescription": "아래에서 편집기 전용 배경과 구문 테마를 선택합니다.",
   "fileSkinComponentStyling": "구성 요소 스타일",
-  "textEditorStyling": "편집기 스타일"
+  "textEditorStyling": "편집기 스타일",
+  "audioFilePropertiesSectionHeader": "오디오",
+  "audioTagsSectionHeader": "트랙 정보",
+  "artistLabel": "아티스트",
+  "albumLabel": "앨범",
+  "yearLabel": "연도",
+  "genreLabel": "장르",
+  "audioTrackLabel": "트랙",
+  "bitDepthLabel": "비트 심도",
+  "colorModeLabel": "색상 모드",
+  "transparencyLabel": "투명도",
+  "animationLabel": "애니메이션",
+  "orientationLabel": "방향",
+  "densityLabel": "픽셀 밀도",
+  "encodingLabel": "인코딩"
 }

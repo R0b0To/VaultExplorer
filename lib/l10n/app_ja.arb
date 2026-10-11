@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "内蔵スキンを確認するか、現在の外観からカスタムスキンを作成します。",
   "textEditorUseIndependentAppearanceDescription": "以下でエディター専用の背景色と構文テーマを選択します。",
   "fileSkinComponentStyling": "コンポーネントのスタイル",
-  "textEditorStyling": "エディターのスタイル"
+  "textEditorStyling": "エディターのスタイル",
+  "audioFilePropertiesSectionHeader": "オーディオ",
+  "audioTagsSectionHeader": "トラック情報",
+  "artistLabel": "アーティスト",
+  "albumLabel": "アルバム",
+  "yearLabel": "年",
+  "genreLabel": "ジャンル",
+  "audioTrackLabel": "トラック",
+  "bitDepthLabel": "ビット深度",
+  "colorModeLabel": "カラーモード",
+  "transparencyLabel": "透明度",
+  "animationLabel": "アニメーション",
+  "orientationLabel": "向き",
+  "densityLabel": "ピクセル密度",
+  "encodingLabel": "エンコード"
 }

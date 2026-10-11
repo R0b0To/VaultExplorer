@@ -11282,4 +11282,46 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Стиль редактора';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'АУДІО';
+
+  @override
+  String get audioTagsSectionHeader => 'ІНФОРМАЦІЯ ПРО ТРЕК';
+
+  @override
+  String get artistLabel => 'Виконавець';
+
+  @override
+  String get albumLabel => 'Альбом';
+
+  @override
+  String get yearLabel => 'Рік';
+
+  @override
+  String get genreLabel => 'Жанр';
+
+  @override
+  String get audioTrackLabel => 'Трек';
+
+  @override
+  String get bitDepthLabel => 'Бітова глибина';
+
+  @override
+  String get colorModeLabel => 'Колірний режим';
+
+  @override
+  String get transparencyLabel => 'Прозорість';
+
+  @override
+  String get animationLabel => 'Анімація';
+
+  @override
+  String get orientationLabel => 'Орієнтація';
+
+  @override
+  String get densityLabel => 'Щільність пікселів';
+
+  @override
+  String get encodingLabel => 'Кодування';
 }

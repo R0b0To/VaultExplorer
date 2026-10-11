@@ -12790,5 +12790,61 @@
   "skinSkinShortcutPresetDescription": "Browse built-in skins or create a custom skin from this look.",
   "textEditorUseIndependentAppearanceDescription": "Choose an independent editor background and syntax theme below.",
   "fileSkinComponentStyling": "Component styling",
-  "textEditorStyling": "Editor styling"
+  "textEditorStyling": "Editor styling",
+  "audioFilePropertiesSectionHeader": "AUDIO",
+  "@audioFilePropertiesSectionHeader": {
+    "description": "Section header for technical properties of an audio file"
+  },
+  "audioTagsSectionHeader": "TRACK INFO",
+  "@audioTagsSectionHeader": {
+    "description": "Section header for embedded tags of an audio file (title, artist, album)"
+  },
+  "artistLabel": "Artist",
+  "@artistLabel": {
+    "description": "Audio tag label for the performing artist"
+  },
+  "albumLabel": "Album",
+  "@albumLabel": {
+    "description": "Audio tag label for the album name"
+  },
+  "yearLabel": "Year",
+  "@yearLabel": {
+    "description": "Audio tag label for the release year"
+  },
+  "genreLabel": "Genre",
+  "@genreLabel": {
+    "description": "Audio tag label for the music genre"
+  },
+  "audioTrackLabel": "Track",
+  "@audioTrackLabel": {
+    "description": "Audio tag label for the track number within an album, shown as a value such as 3/12"
+  },
+  "bitDepthLabel": "Bit Depth",
+  "@bitDepthLabel": {
+    "description": "Bits per sample (audio) or bits per channel (image) property label"
+  },
+  "colorModeLabel": "Color Mode",
+  "@colorModeLabel": {
+    "description": "Image color model property label, such as RGB or Grayscale"
+  },
+  "transparencyLabel": "Transparency",
+  "@transparencyLabel": {
+    "description": "Whether an image has an alpha/transparency channel"
+  },
+  "animationLabel": "Animation",
+  "@animationLabel": {
+    "description": "Whether an image contains multiple animation frames"
+  },
+  "orientationLabel": "Orientation",
+  "@orientationLabel": {
+    "description": "Image EXIF orientation property label"
+  },
+  "densityLabel": "Pixel Density",
+  "@densityLabel": {
+    "description": "Image print density (dots per inch) property label"
+  },
+  "encodingLabel": "Encoding",
+  "@encodingLabel": {
+    "description": "How an image's pixel data is stored, such as progressive or lossless"
+  }
 }

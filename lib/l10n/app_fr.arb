@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "Parcourez les thèmes intégrés ou créez un thème personnalisé à partir de cette apparence.",
   "textEditorUseIndependentAppearanceDescription": "Choisissez ci-dessous un arrière-plan et un thème de syntaxe indépendants pour l’éditeur.",
   "fileSkinComponentStyling": "Style des composants",
-  "textEditorStyling": "Style de l’éditeur"
+  "textEditorStyling": "Style de l’éditeur",
+  "audioFilePropertiesSectionHeader": "AUDIO",
+  "audioTagsSectionHeader": "INFOS DU TITRE",
+  "artistLabel": "Artiste",
+  "albumLabel": "Album",
+  "yearLabel": "Année",
+  "genreLabel": "Genre",
+  "audioTrackLabel": "Piste",
+  "bitDepthLabel": "Profondeur de bits",
+  "colorModeLabel": "Mode colorimétrique",
+  "transparencyLabel": "Transparence",
+  "animationLabel": "Animation",
+  "orientationLabel": "Orientation",
+  "densityLabel": "Densité de pixels",
+  "encodingLabel": "Encodage"
 }

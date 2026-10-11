@@ -11303,4 +11303,46 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Style de l’éditeur';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'AUDIO';
+
+  @override
+  String get audioTagsSectionHeader => 'INFOS DU TITRE';
+
+  @override
+  String get artistLabel => 'Artiste';
+
+  @override
+  String get albumLabel => 'Album';
+
+  @override
+  String get yearLabel => 'Année';
+
+  @override
+  String get genreLabel => 'Genre';
+
+  @override
+  String get audioTrackLabel => 'Piste';
+
+  @override
+  String get bitDepthLabel => 'Profondeur de bits';
+
+  @override
+  String get colorModeLabel => 'Mode colorimétrique';
+
+  @override
+  String get transparencyLabel => 'Transparence';
+
+  @override
+  String get animationLabel => 'Animation';
+
+  @override
+  String get orientationLabel => 'Orientation';
+
+  @override
+  String get densityLabel => 'Densité de pixels';
+
+  @override
+  String get encodingLabel => 'Encodage';
 }

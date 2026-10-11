@@ -10428,4 +10428,46 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorStyling => '编辑器样式';
+
+  @override
+  String get audioFilePropertiesSectionHeader => '音频';
+
+  @override
+  String get audioTagsSectionHeader => '曲目信息';
+
+  @override
+  String get artistLabel => '艺术家';
+
+  @override
+  String get albumLabel => '专辑';
+
+  @override
+  String get yearLabel => '年份';
+
+  @override
+  String get genreLabel => '流派';
+
+  @override
+  String get audioTrackLabel => '曲目';
+
+  @override
+  String get bitDepthLabel => '位深度';
+
+  @override
+  String get colorModeLabel => '色彩模式';
+
+  @override
+  String get transparencyLabel => '透明度';
+
+  @override
+  String get animationLabel => '动画';
+
+  @override
+  String get orientationLabel => '方向';
+
+  @override
+  String get densityLabel => '像素密度';
+
+  @override
+  String get encodingLabel => '编码';
 }

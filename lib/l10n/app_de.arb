@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "Integrierte Designs ansehen oder ein eigenes Design aus diesem Look erstellen.",
   "textEditorUseIndependentAppearanceDescription": "Wähle unten einen unabhängigen Editorhintergrund und ein Syntaxdesign.",
   "fileSkinComponentStyling": "Komponentenstil",
-  "textEditorStyling": "Editorstil"
+  "textEditorStyling": "Editorstil",
+  "audioFilePropertiesSectionHeader": "AUDIO",
+  "audioTagsSectionHeader": "TITELINFOS",
+  "artistLabel": "Interpret",
+  "albumLabel": "Album",
+  "yearLabel": "Jahr",
+  "genreLabel": "Genre",
+  "audioTrackLabel": "Titelnummer",
+  "bitDepthLabel": "Bittiefe",
+  "colorModeLabel": "Farbmodus",
+  "transparencyLabel": "Transparenz",
+  "animationLabel": "Animation",
+  "orientationLabel": "Ausrichtung",
+  "densityLabel": "Pixeldichte",
+  "encodingLabel": "Kodierung"
 }

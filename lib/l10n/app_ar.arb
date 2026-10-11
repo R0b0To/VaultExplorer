@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "تصفّح المظاهر المضمنة أو أنشئ مظهرًا مخصصًا من هذا التصميم.",
   "textEditorUseIndependentAppearanceDescription": "اختر خلفية مستقلة للمحرر وقالب تمييز الصياغة أدناه.",
   "fileSkinComponentStyling": "تنسيق المكوّنات",
-  "textEditorStyling": "تنسيق المحرر"
+  "textEditorStyling": "تنسيق المحرر",
+  "audioFilePropertiesSectionHeader": "الصوت",
+  "audioTagsSectionHeader": "معلومات المقطع",
+  "artistLabel": "الفنان",
+  "albumLabel": "الألبوم",
+  "yearLabel": "السنة",
+  "genreLabel": "النوع",
+  "audioTrackLabel": "المقطع",
+  "bitDepthLabel": "عمق البت",
+  "colorModeLabel": "وضع اللون",
+  "transparencyLabel": "الشفافية",
+  "animationLabel": "الرسوم المتحركة",
+  "orientationLabel": "الاتجاه",
+  "densityLabel": "كثافة البكسل",
+  "encodingLabel": "الترميز"
 }

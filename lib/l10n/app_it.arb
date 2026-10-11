@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "Esplora i temi integrati o creane uno personalizzato partendo da questo aspetto.",
   "textEditorUseIndependentAppearanceDescription": "Scegli qui sotto uno sfondo e un tema di sintassi indipendenti per l’editor.",
   "fileSkinComponentStyling": "Stile dei componenti",
-  "textEditorStyling": "Stile dell’editor"
+  "textEditorStyling": "Stile dell’editor",
+  "audioFilePropertiesSectionHeader": "AUDIO",
+  "audioTagsSectionHeader": "INFO BRANO",
+  "artistLabel": "Artista",
+  "albumLabel": "Album",
+  "yearLabel": "Anno",
+  "genreLabel": "Genere",
+  "audioTrackLabel": "Traccia",
+  "bitDepthLabel": "Profondità di bit",
+  "colorModeLabel": "Modalità colore",
+  "transparencyLabel": "Trasparenza",
+  "animationLabel": "Animazione",
+  "orientationLabel": "Orientamento",
+  "densityLabel": "Densità di pixel",
+  "encodingLabel": "Codifica"
 }

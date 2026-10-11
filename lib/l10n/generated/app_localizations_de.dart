@@ -11203,4 +11203,46 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'Editorstil';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'AUDIO';
+
+  @override
+  String get audioTagsSectionHeader => 'TITELINFOS';
+
+  @override
+  String get artistLabel => 'Interpret';
+
+  @override
+  String get albumLabel => 'Album';
+
+  @override
+  String get yearLabel => 'Jahr';
+
+  @override
+  String get genreLabel => 'Genre';
+
+  @override
+  String get audioTrackLabel => 'Titelnummer';
+
+  @override
+  String get bitDepthLabel => 'Bittiefe';
+
+  @override
+  String get colorModeLabel => 'Farbmodus';
+
+  @override
+  String get transparencyLabel => 'Transparenz';
+
+  @override
+  String get animationLabel => 'Animation';
+
+  @override
+  String get orientationLabel => 'Ausrichtung';
+
+  @override
+  String get densityLabel => 'Pixeldichte';
+
+  @override
+  String get encodingLabel => 'Kodierung';
 }

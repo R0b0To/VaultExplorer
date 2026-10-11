@@ -11225,4 +11225,46 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'تنسيق المحرر';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'الصوت';
+
+  @override
+  String get audioTagsSectionHeader => 'معلومات المقطع';
+
+  @override
+  String get artistLabel => 'الفنان';
+
+  @override
+  String get albumLabel => 'الألبوم';
+
+  @override
+  String get yearLabel => 'السنة';
+
+  @override
+  String get genreLabel => 'النوع';
+
+  @override
+  String get audioTrackLabel => 'المقطع';
+
+  @override
+  String get bitDepthLabel => 'عمق البت';
+
+  @override
+  String get colorModeLabel => 'وضع اللون';
+
+  @override
+  String get transparencyLabel => 'الشفافية';
+
+  @override
+  String get animationLabel => 'الرسوم المتحركة';
+
+  @override
+  String get orientationLabel => 'الاتجاه';
+
+  @override
+  String get densityLabel => 'كثافة البكسل';
+
+  @override
+  String get encodingLabel => 'الترميز';
 }

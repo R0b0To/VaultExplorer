@@ -10591,4 +10591,46 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get textEditorStyling => '편집기 스타일';
+
+  @override
+  String get audioFilePropertiesSectionHeader => '오디오';
+
+  @override
+  String get audioTagsSectionHeader => '트랙 정보';
+
+  @override
+  String get artistLabel => '아티스트';
+
+  @override
+  String get albumLabel => '앨범';
+
+  @override
+  String get yearLabel => '연도';
+
+  @override
+  String get genreLabel => '장르';
+
+  @override
+  String get audioTrackLabel => '트랙';
+
+  @override
+  String get bitDepthLabel => '비트 심도';
+
+  @override
+  String get colorModeLabel => '색상 모드';
+
+  @override
+  String get transparencyLabel => '투명도';
+
+  @override
+  String get animationLabel => '애니메이션';
+
+  @override
+  String get orientationLabel => '방향';
+
+  @override
+  String get densityLabel => '픽셀 밀도';
+
+  @override
+  String get encodingLabel => '인코딩';
 }

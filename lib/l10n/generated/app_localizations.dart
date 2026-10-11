@@ -18660,6 +18660,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Editor styling'**
   String get textEditorStyling;
+
+  /// Section header for technical properties of an audio file
+  ///
+  /// In en, this message translates to:
+  /// **'AUDIO'**
+  String get audioFilePropertiesSectionHeader;
+
+  /// Section header for embedded tags of an audio file (title, artist, album)
+  ///
+  /// In en, this message translates to:
+  /// **'TRACK INFO'**
+  String get audioTagsSectionHeader;
+
+  /// Audio tag label for the performing artist
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get artistLabel;
+
+  /// Audio tag label for the album name
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get albumLabel;
+
+  /// Audio tag label for the release year
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get yearLabel;
+
+  /// Audio tag label for the music genre
+  ///
+  /// In en, this message translates to:
+  /// **'Genre'**
+  String get genreLabel;
+
+  /// Audio tag label for the track number within an album, shown as a value such as 3/12
+  ///
+  /// In en, this message translates to:
+  /// **'Track'**
+  String get audioTrackLabel;
+
+  /// Bits per sample (audio) or bits per channel (image) property label
+  ///
+  /// In en, this message translates to:
+  /// **'Bit Depth'**
+  String get bitDepthLabel;
+
+  /// Image color model property label, such as RGB or Grayscale
+  ///
+  /// In en, this message translates to:
+  /// **'Color Mode'**
+  String get colorModeLabel;
+
+  /// Whether an image has an alpha/transparency channel
+  ///
+  /// In en, this message translates to:
+  /// **'Transparency'**
+  String get transparencyLabel;
+
+  /// Whether an image contains multiple animation frames
+  ///
+  /// In en, this message translates to:
+  /// **'Animation'**
+  String get animationLabel;
+
+  /// Image EXIF orientation property label
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get orientationLabel;
+
+  /// Image print density (dots per inch) property label
+  ///
+  /// In en, this message translates to:
+  /// **'Pixel Density'**
+  String get densityLabel;
+
+  /// How an image's pixel data is stored, such as progressive or lossless
+  ///
+  /// In en, this message translates to:
+  /// **'Encoding'**
+  String get encodingLabel;
 }
 
 class _AppLocalizationsDelegate

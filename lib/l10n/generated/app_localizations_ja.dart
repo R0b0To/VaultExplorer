@@ -10592,4 +10592,46 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get textEditorStyling => 'エディターのスタイル';
+
+  @override
+  String get audioFilePropertiesSectionHeader => 'オーディオ';
+
+  @override
+  String get audioTagsSectionHeader => 'トラック情報';
+
+  @override
+  String get artistLabel => 'アーティスト';
+
+  @override
+  String get albumLabel => 'アルバム';
+
+  @override
+  String get yearLabel => '年';
+
+  @override
+  String get genreLabel => 'ジャンル';
+
+  @override
+  String get audioTrackLabel => 'トラック';
+
+  @override
+  String get bitDepthLabel => 'ビット深度';
+
+  @override
+  String get colorModeLabel => 'カラーモード';
+
+  @override
+  String get transparencyLabel => '透明度';
+
+  @override
+  String get animationLabel => 'アニメーション';
+
+  @override
+  String get orientationLabel => '向き';
+
+  @override
+  String get densityLabel => 'ピクセル密度';
+
+  @override
+  String get encodingLabel => 'エンコード';
 }

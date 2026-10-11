@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "浏览内置皮肤，或根据当前外观创建自定义皮肤。",
   "textEditorUseIndependentAppearanceDescription": "在下方选择独立的编辑器背景和语法主题。",
   "fileSkinComponentStyling": "组件样式",
-  "textEditorStyling": "编辑器样式"
+  "textEditorStyling": "编辑器样式",
+  "audioFilePropertiesSectionHeader": "音频",
+  "audioTagsSectionHeader": "曲目信息",
+  "artistLabel": "艺术家",
+  "albumLabel": "专辑",
+  "yearLabel": "年份",
+  "genreLabel": "流派",
+  "audioTrackLabel": "曲目",
+  "bitDepthLabel": "位深度",
+  "colorModeLabel": "色彩模式",
+  "transparencyLabel": "透明度",
+  "animationLabel": "动画",
+  "orientationLabel": "方向",
+  "densityLabel": "像素密度",
+  "encodingLabel": "编码"
 }

@@ -3083,5 +3083,19 @@
   "skinSkinShortcutPresetDescription": "Перегляньте вбудовані теми або створіть власну на основі цього вигляду.",
   "textEditorUseIndependentAppearanceDescription": "Нижче виберіть окреме тло редактора та тему підсвічування синтаксису.",
   "fileSkinComponentStyling": "Стиль компонентів",
-  "textEditorStyling": "Стиль редактора"
+  "textEditorStyling": "Стиль редактора",
+  "audioFilePropertiesSectionHeader": "АУДІО",
+  "audioTagsSectionHeader": "ІНФОРМАЦІЯ ПРО ТРЕК",
+  "artistLabel": "Виконавець",
+  "albumLabel": "Альбом",
+  "yearLabel": "Рік",
+  "genreLabel": "Жанр",
+  "audioTrackLabel": "Трек",
+  "bitDepthLabel": "Бітова глибина",
+  "colorModeLabel": "Колірний режим",
+  "transparencyLabel": "Прозорість",
+  "animationLabel": "Анімація",
+  "orientationLabel": "Орієнтація",
+  "densityLabel": "Щільність пікселів",
+  "encodingLabel": "Кодування"
 }

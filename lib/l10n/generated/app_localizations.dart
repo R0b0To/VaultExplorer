@@ -18594,6 +18594,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A-B repeat off'**
   String get abLoopClearedMessage;
+
+  /// Custom skin color used behind the text editor sidebar and More Actions menu
+  ///
+  /// In en, this message translates to:
+  /// **'Editor panel background'**
+  String get skinEditorPanelBackground;
+
+  /// No description provided for @skinEditorPanelBackgroundDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared background for the editor sidebar and More Actions menus.'**
+  String get skinEditorPanelBackgroundDescription;
+
+  /// No description provided for @skinFollowAppSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow app skin'**
+  String get skinFollowAppSkin;
+
+  /// No description provided for @fileSkinFollowAppSkinDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'File and folder styling follows the selected app skin.'**
+  String get fileSkinFollowAppSkinDescription;
+
+  /// No description provided for @fileSkinUseIndependentStylesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the file manager icon and color choices below.'**
+  String get fileSkinUseIndependentStylesDescription;
+
+  /// No description provided for @skinChooseOrCreateSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose or create a skin'**
+  String get skinChooseOrCreateSkin;
+
+  /// No description provided for @skinSkinShortcutCustomDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit app-wide colors and shared tokens. Component overrides stay on this page.'**
+  String get skinSkinShortcutCustomDescription;
+
+  /// No description provided for @skinSkinShortcutPresetDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse built-in skins or create a custom skin from this look.'**
+  String get skinSkinShortcutPresetDescription;
+
+  /// No description provided for @textEditorUseIndependentAppearanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an independent editor background and syntax theme below.'**
+  String get textEditorUseIndependentAppearanceDescription;
+
+  /// No description provided for @fileSkinComponentStyling.
+  ///
+  /// In en, this message translates to:
+  /// **'Component styling'**
+  String get fileSkinComponentStyling;
+
+  /// No description provided for @textEditorStyling.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor styling'**
+  String get textEditorStyling;
 }
 
 class _AppLocalizationsDelegate

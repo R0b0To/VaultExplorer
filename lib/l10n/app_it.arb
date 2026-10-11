@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "A impostato a {time}. Tocca di nuovo per impostare B.",
   "abLoopStartedMessage": "Ripetizione {start} – {end}",
   "abLoopEndTooCloseMessage": "B deve venire dopo A. Avanza e tocca di nuovo.",
-  "abLoopClearedMessage": "Ripetizione A-B disattivata"
+  "abLoopClearedMessage": "Ripetizione A-B disattivata",
+  "skinEditorPanelBackground": "Sfondo dei pannelli dell’editor",
+  "skinEditorPanelBackgroundDescription": "Sfondo condiviso per la barra laterale e il menu Altre azioni dell’editor.",
+  "skinFollowAppSkin": "Segui il tema dell’app",
+  "fileSkinFollowAppSkinDescription": "Lo stile di file e cartelle segue il tema selezionato dell’app.",
+  "fileSkinUseIndependentStylesDescription": "Usa le opzioni di icone e colori del file manager qui sotto.",
+  "skinChooseOrCreateSkin": "Scegli o crea un tema",
+  "skinSkinShortcutCustomDescription": "Modifica colori e token condivisi dell’app. Le personalizzazioni del componente restano in questa pagina.",
+  "skinSkinShortcutPresetDescription": "Esplora i temi integrati o creane uno personalizzato partendo da questo aspetto.",
+  "textEditorUseIndependentAppearanceDescription": "Scegli qui sotto uno sfondo e un tema di sintassi indipendenti per l’editor.",
+  "fileSkinComponentStyling": "Stile dei componenti",
+  "textEditorStyling": "Stile dell’editor"
 }

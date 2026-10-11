@@ -11243,4 +11243,43 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'Повторення A-B вимкнено';
+
+  @override
+  String get skinEditorPanelBackground => 'Тло панелей редактора';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      'Спільне тло бічної панелі та меню додаткових дій редактора.';
+
+  @override
+  String get skinFollowAppSkin => 'Використовувати тему програми';
+
+  @override
+  String get fileSkinFollowAppSkinDescription =>
+      'Стиль файлів і папок відповідає вибраній темі програми.';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      'Використовуйте наведені нижче параметри значків і кольорів файлового менеджера.';
+
+  @override
+  String get skinChooseOrCreateSkin => 'Вибрати або створити тему';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      'Змініть спільні кольори й токени програми. Перевизначення компонентів залишаються на цій сторінці.';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      'Перегляньте вбудовані теми або створіть власну на основі цього вигляду.';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      'Нижче виберіть окреме тло редактора та тему підсвічування синтаксису.';
+
+  @override
+  String get fileSkinComponentStyling => 'Стиль компонентів';
+
+  @override
+  String get textEditorStyling => 'Стиль редактора';
 }

@@ -10553,4 +10553,42 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'A-B 구간 반복 꺼짐';
+
+  @override
+  String get skinEditorPanelBackground => '편집기 패널 배경';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      '편집기 사이드바와 더보기 작업 메뉴에서 함께 사용하는 배경입니다.';
+
+  @override
+  String get skinFollowAppSkin => '앱 스킨 따르기';
+
+  @override
+  String get fileSkinFollowAppSkinDescription => '파일과 폴더 스타일이 선택한 앱 스킨을 따릅니다.';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      '아래의 파일 관리자 아이콘 및 색상 옵션을 사용합니다.';
+
+  @override
+  String get skinChooseOrCreateSkin => '스킨 선택 또는 만들기';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      '앱 전체 색상과 공통 토큰을 편집합니다. 구성 요소별 설정은 이 페이지에 유지됩니다.';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      '기본 제공 스킨을 둘러보거나 현재 모습으로 사용자 지정 스킨을 만듭니다.';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      '아래에서 편집기 전용 배경과 구문 테마를 선택합니다.';
+
+  @override
+  String get fileSkinComponentStyling => '구성 요소 스타일';
+
+  @override
+  String get textEditorStyling => '편집기 스타일';
 }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -341,6 +342,7 @@ class _HsvWheelState extends State<_HsvWheel> {
   _WheelDragMode? _dragMode;
 
   void _start(Offset position, Size size) {
+    _dragMode = null;
     final geometry = _WheelGeometry.fromSize(size);
     final distance = (position - geometry.center).distance;
     if (geometry.square.contains(position)) {
@@ -380,15 +382,29 @@ class _HsvWheelState extends State<_HsvWheel> {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanDown: (event) => _start(event.localPosition, constraints.biggest),
-      onPanUpdate: (event) => _update(event.localPosition, constraints.biggest),
-      onPanEnd: (_) => _dragMode = null,
-      onPanCancel: () => _dragMode = null,
-      child: CustomPaint(
-        painter: _HsvWheelPainter(widget.value),
-        child: const SizedBox.expand(),
+    builder: (context, constraints) => RawGestureDetector(
+      gestures: {
+        EagerGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+              EagerGestureRecognizer.new,
+              (recognizer) {},
+            ),
+      },
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (event) =>
+            _start(event.localPosition, constraints.biggest),
+        onPointerMove: (event) {
+          if (_dragMode != null) {
+            _update(event.localPosition, constraints.biggest);
+          }
+        },
+        onPointerUp: (_) => _dragMode = null,
+        onPointerCancel: (_) => _dragMode = null,
+        child: CustomPaint(
+          painter: _HsvWheelPainter(widget.value),
+          child: const SizedBox.expand(),
+        ),
       ),
     ),
   );

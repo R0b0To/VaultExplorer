@@ -17,6 +17,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 class EditorChrome {
   final Color background;
   final Color foreground;
+  final Color panelBackground;
   final ColorScheme appScheme;
   final AppSkinTokens? appSkinTokens;
   final ColorScheme colorScheme;
@@ -26,6 +27,7 @@ class EditorChrome {
   const EditorChrome._({
     required this.background,
     required this.foreground,
+    required this.panelBackground,
     required this.appScheme,
     required this.appSkinTokens,
     required this.colorScheme,
@@ -61,6 +63,10 @@ class EditorChrome {
     // whichever background was picked.
     Color tone(double alpha) =>
         Color.alphaBlend(foreground.withValues(alpha: alpha), background);
+
+    final panel = appSkinTokens?.editorFollowsAppSkin == true
+        ? appSkinTokens!.editorPanelBackground
+        : tone(0.10);
 
     // When the editor's brightness differs from the app's (a light "Sepia"
     // editor inside the dark app, or AMOLED black inside the light app), the
@@ -107,12 +113,26 @@ class EditorChrome {
       systemStatusBarContrastEnforced: false,
     );
 
+    final baseTheme = buildThemeFromColorScheme(
+      scheme,
+      appSkinTokens: appSkinTokens,
+    );
+    final theme = baseTheme.copyWith(
+      popupMenuTheme: baseTheme.popupMenuTheme.copyWith(color: panel),
+      menuTheme: MenuThemeData(
+        style: baseTheme.menuTheme.style?.copyWith(
+          backgroundColor: WidgetStatePropertyAll(panel),
+        ),
+      ),
+    );
+
     return EditorChrome._(
       background: background,
       foreground: foreground,
+      panelBackground: panel,
       appScheme: appScheme,
       colorScheme: scheme,
-      theme: buildThemeFromColorScheme(scheme, appSkinTokens: appSkinTokens),
+      theme: theme,
       overlayStyle: overlay,
       appSkinTokens: appSkinTokens,
     );

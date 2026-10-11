@@ -96,14 +96,23 @@ class TextEditorAppearanceNotifier extends Notifier<TextEditorAppearancePrefs> {
     _service.save(state);
   }
 
-  void setCustomColor(String role, Color? color) {
+  void setCustomColor(
+    String role,
+    Color? color, {
+    EditorBackgroundOption? background,
+    EditorSyntaxThemeOption? syntaxTheme,
+  }) {
     final next = Map<String, int>.from(state.customColors);
     if (color == null) {
       next.remove(role);
     } else {
       next[role] = color.toARGB32();
     }
-    state = state.copyWith(customColors: next);
+    state = state.copyWith(
+      background: background,
+      syntaxTheme: syntaxTheme,
+      customColors: next,
+    );
     _service.save(state);
   }
 

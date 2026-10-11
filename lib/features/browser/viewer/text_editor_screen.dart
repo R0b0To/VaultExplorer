@@ -2674,6 +2674,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
         .config
         .skin;
     return Drawer(
+      backgroundColor: _chrome?.panelBackground ?? cs.surfaceContainer,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2723,7 +2724,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               ),
             ),
             Container(
-              decoration: BoxDecoration(color: cs.surfaceContainer),
+              decoration: BoxDecoration(
+                color: _chrome?.panelBackground ?? cs.surfaceContainer,
+              ),
               child: BreadcrumbBar(
                 stack: _drawerPathStack,
                 backgroundColor: Colors.transparent,

@@ -10553,4 +10553,43 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'A-Bリピート オフ';
+
+  @override
+  String get skinEditorPanelBackground => 'エディターパネルの背景';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      'エディターのサイドバーとその他のアクションメニューで共有する背景です。';
+
+  @override
+  String get skinFollowAppSkin => 'アプリのスキンに合わせる';
+
+  @override
+  String get fileSkinFollowAppSkinDescription =>
+      'ファイルとフォルダーのスタイルを選択中のアプリスキンに合わせます。';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      '以下のファイルマネージャーのアイコンと色の設定を使います。';
+
+  @override
+  String get skinChooseOrCreateSkin => 'スキンを選択または作成';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      'アプリ全体の色と共通トークンを編集します。コンポーネント固有の設定はこのページに残ります。';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      '内蔵スキンを確認するか、現在の外観からカスタムスキンを作成します。';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      '以下でエディター専用の背景色と構文テーマを選択します。';
+
+  @override
+  String get fileSkinComponentStyling => 'コンポーネントのスタイル';
+
+  @override
+  String get textEditorStyling => 'エディターのスタイル';
 }

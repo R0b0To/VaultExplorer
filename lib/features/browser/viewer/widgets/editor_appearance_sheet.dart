@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
+import 'package:vaultexplorer/features/settings/widgets/app_skin_shortcut_tile.dart';
 
 Future<void> showEditorAppearanceSheet(BuildContext context) {
   return Navigator.of(context).push(
@@ -77,6 +78,54 @@ class _EditorAppearanceScreenState
     EditorSyntaxThemeOption.nord => context.l10n.textEditorSyntaxThemeNord,
   };
 
+  Future<void> _editColorOverride({
+    required String role,
+    required String title,
+    required Color current,
+    required TextEditorAppearancePrefs shownPrefs,
+    required bool followsAppSkin,
+  }) async {
+    final result = await showSkinColorPicker(
+      context,
+      title: title,
+      initial: current,
+      allowDefault: true,
+    );
+    if (result == null || !mounted) return;
+
+    ref
+        .read(textEditorAppearanceProvider.notifier)
+        .setCustomColor(
+          role,
+          result.color,
+          background: result.color != null && followsAppSkin
+              ? shownPrefs.background
+              : null,
+          syntaxTheme: result.color != null && followsAppSkin
+              ? shownPrefs.syntaxTheme
+              : null,
+        );
+    if (result.color != null && followsAppSkin) {
+      await ref
+          .read(appSkinSettingsProvider.notifier)
+          .setEditorFollowsAppSkin(false);
+    }
+  }
+
+  Widget _editorColorTile({
+    required String title,
+    required Color color,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    leading: _EditorColorSwatch(color: color),
+    title: Text(title),
+    subtitle: Text(subtitle),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: onTap,
+  );
+
   Widget _buildPreviewCard(
     BuildContext context,
     TextEditorAppearancePrefs prefs,
@@ -88,8 +137,8 @@ class _EditorAppearanceScreenState
     final customColors = followsAppSkin
         ? null
         : prefs.customColors.isNotEmpty
-            ? prefs.customColors.map((k, v) => MapEntry(k, Color(v)))
-            : null;
+        ? prefs.customColors.map((k, v) => MapEntry(k, Color(v)))
+        : null;
 
     final syntaxStyle = applyAppSkinEditorTokens(
       resolveEditorSyntaxStyle(
@@ -105,12 +154,12 @@ class _EditorAppearanceScreenState
 
     // Resolve cursor / selection / gutter from custom overrides or defaults.
     final bgLuminance = syntaxStyle.backgroundColor.computeLuminance();
-    final contrast =
-        (cs.primary.computeLuminance() - bgLuminance).abs();
+    final contrast = (cs.primary.computeLuminance() - bgLuminance).abs();
     final customCursor = followsAppSkin
         ? appSkinTokens!.editorCursor
         : prefs.customColor('cursor');
-    final safeAccent = customCursor ??
+    final safeAccent =
+        customCursor ??
         (contrast > 0.25
             ? cs.primary
             : (bgLuminance < 0.5 ? Colors.white : Colors.black));
@@ -214,6 +263,21 @@ class _EditorAppearanceScreenState
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final appBrightness = Theme.of(context).brightness;
+    final effectiveEditorStyle = applyAppSkinEditorTokens(
+      resolveEditorSyntaxStyle(
+        'preview.dart',
+        appBrightness,
+        cs,
+        background: shownPrefs.background,
+        syntaxTheme: shownPrefs.syntaxTheme,
+        customColors: appSkinSettings.editorFollowsAppSkin
+            ? null
+            : shownPrefs.customColors.map(
+                (key, value) => MapEntry(key, Color(value)),
+              ),
+      ),
+      appSkinTokens,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -259,7 +323,7 @@ class _EditorAppearanceScreenState
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                const SectionHeader('Editor styling'),
+                SectionHeader(context.l10n.textEditorStyling),
                 SectionCard(
                   children: [
                     SwitchListTile(
@@ -271,21 +335,24 @@ class _EditorAppearanceScreenState
                           .read(appSkinSettingsProvider.notifier)
                           .setEditorFollowsAppSkin(value),
                       title: Text(
-                        'Follow app skin',
+                        context.l10n.skinFollowAppSkin,
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
                         appSkinSettings.editorFollowsAppSkin
-                            ? 'The editor uses the selected skin’s color template.'
-                            : 'Choose an independent editor background and syntax theme below.',
+                            ? context.l10n.textEditorFollowAppSkinNotice
+                            : context
+                                  .l10n
+                                  .textEditorUseIndependentAppearanceDescription,
                         style: textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
                       ),
                       secondary: Icon(Icons.code_rounded, color: cs.primary),
                     ),
+                    AppSkinShortcutTile(preset: appSkinSettings.preset),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -396,6 +463,83 @@ class _EditorAppearanceScreenState
                                   },
                                 ),
                             ],
+                          ),
+                          const SizedBox(height: 18),
+                          const Divider(height: 1),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16, bottom: 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    context.l10n.textEditorColorsSectionTitle,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (!appSkinSettings.editorFollowsAppSkin &&
+                                    shownPrefs.customColors.isNotEmpty)
+                                  Chip(
+                                    visualDensity: VisualDensity.compact,
+                                    label: Text(
+                                      context.l10n.textEditorColorsCustomized,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              appSkinSettings.editorFollowsAppSkin
+                                  ? context.l10n.textEditorFollowAppSkinNotice
+                                  : context
+                                        .l10n
+                                        .textEditorCustomizeColorsIndependently,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          _editorColorTile(
+                            title: context.l10n.skinEditorBackground,
+                            color: effectiveEditorStyle.backgroundColor,
+                            subtitle:
+                                !appSkinSettings.editorFollowsAppSkin &&
+                                    shownPrefs.customColor('background') != null
+                                ? context.l10n.skinCustomColor
+                                : appSkinSettings.editorFollowsAppSkin
+                                ? context.l10n.textEditorFollowAppSkinNotice
+                                : context.l10n.textEditorDefaultFromTheme,
+                            onTap: () => _editColorOverride(
+                              role: 'background',
+                              title: context.l10n.skinEditorBackground,
+                              current: effectiveEditorStyle.backgroundColor,
+                              shownPrefs: shownPrefs,
+                              followsAppSkin:
+                                  appSkinSettings.editorFollowsAppSkin,
+                            ),
+                          ),
+                          _editorColorTile(
+                            title: context.l10n.skinEditorTextColor,
+                            color: effectiveEditorStyle.textColor,
+                            subtitle:
+                                !appSkinSettings.editorFollowsAppSkin &&
+                                    shownPrefs.customColor('foreground') != null
+                                ? context.l10n.skinCustomColor
+                                : appSkinSettings.editorFollowsAppSkin
+                                ? context.l10n.textEditorFollowAppSkinNotice
+                                : context.l10n.textEditorDefaultFromTheme,
+                            onTap: () => _editColorOverride(
+                              role: 'foreground',
+                              title: context.l10n.skinEditorTextColor,
+                              current: effectiveEditorStyle.textColor,
+                              shownPrefs: shownPrefs,
+                              followsAppSkin:
+                                  appSkinSettings.editorFollowsAppSkin,
+                            ),
                           ),
                         ],
                       ),
@@ -1017,6 +1161,23 @@ class _CustomizeActionsDialogState extends State<_CustomizeActionsDialog> {
       ],
     );
   }
+}
+
+class _EditorColorSwatch extends StatelessWidget {
+  final Color color;
+
+  const _EditorColorSwatch({required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 30,
+    height: 30,
+    decoration: BoxDecoration(
+      color: color,
+      shape: BoxShape.circle,
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+  );
 }
 
 class _BackgroundChip extends StatelessWidget {

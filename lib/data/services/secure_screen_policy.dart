@@ -11,15 +11,13 @@ SecureScreenPolicy secureScreenPolicy(Ref ref) =>
 class SecureScreenPolicy {
   final VaultFileIoApi _fileIoApi;
 
-  bool anyContainerMounted = false;
-
   SecureScreenPolicy(this._fileIoApi);
 
-  /// Applies the user's security preference when inside the real Vault app.
+  /// Applies the user's global security preference in the real Vault app.
   Future<void> apply({required bool preference}) {
     return Future.wait([
       _fileIoApi.setSecureScreen(preference),
-      _fileIoApi.setRecentsSnapshotBlocked(anyContainerMounted),
+      _fileIoApi.setRecentsSnapshotBlocked(preference),
     ]);
   }
 

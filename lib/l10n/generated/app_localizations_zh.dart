@@ -10393,4 +10393,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'A-B 循环已关闭';
+
+  @override
+  String get skinEditorPanelBackground => '编辑器面板背景';
+
+  @override
+  String get skinEditorPanelBackgroundDescription => '编辑器侧边栏和更多操作菜单共用的背景。';
+
+  @override
+  String get skinFollowAppSkin => '跟随应用皮肤';
+
+  @override
+  String get fileSkinFollowAppSkinDescription => '文件和文件夹样式跟随当前应用皮肤。';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription => '使用下方的文件管理器图标和颜色选项。';
+
+  @override
+  String get skinChooseOrCreateSkin => '选择或创建皮肤';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      '编辑应用全局颜色和共享标记。此页面上的组件覆盖设置会保留。';
+
+  @override
+  String get skinSkinShortcutPresetDescription => '浏览内置皮肤，或根据当前外观创建自定义皮肤。';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      '在下方选择独立的编辑器背景和语法主题。';
+
+  @override
+  String get fileSkinComponentStyling => '组件样式';
+
+  @override
+  String get textEditorStyling => '编辑器样式';
 }

@@ -12776,5 +12776,19 @@
   "abLoopClearedMessage": "A-B repeat off",
   "@abLoopClearedMessage": {
     "description": "Shown when an A-B repeat section is removed"
-  }
+  },
+  "skinEditorPanelBackground": "Editor panel background",
+  "@skinEditorPanelBackground": {
+    "description": "Custom skin color used behind the text editor sidebar and More Actions menu"
+  },
+  "skinEditorPanelBackgroundDescription": "Shared background for the editor sidebar and More Actions menus.",
+  "skinFollowAppSkin": "Follow app skin",
+  "fileSkinFollowAppSkinDescription": "File and folder styling follows the selected app skin.",
+  "fileSkinUseIndependentStylesDescription": "Use the file manager icon and color choices below.",
+  "skinChooseOrCreateSkin": "Choose or create a skin",
+  "skinSkinShortcutCustomDescription": "Edit app-wide colors and shared tokens. Component overrides stay on this page.",
+  "skinSkinShortcutPresetDescription": "Browse built-in skins or create a custom skin from this look.",
+  "textEditorUseIndependentAppearanceDescription": "Choose an independent editor background and syntax theme below.",
+  "fileSkinComponentStyling": "Component styling",
+  "textEditorStyling": "Editor styling"
 }

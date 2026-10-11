@@ -11190,4 +11190,43 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'Repetición A-B desactivada';
+
+  @override
+  String get skinEditorPanelBackground => 'Fondo de los paneles del editor';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      'Fondo compartido de la barra lateral y los menús de más acciones del editor.';
+
+  @override
+  String get skinFollowAppSkin => 'Seguir el tema de la app';
+
+  @override
+  String get fileSkinFollowAppSkinDescription =>
+      'El estilo de archivos y carpetas sigue el tema seleccionado de la app.';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      'Usa las opciones de iconos y colores del gestor de archivos que aparecen abajo.';
+
+  @override
+  String get skinChooseOrCreateSkin => 'Elegir o crear un tema';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      'Edita los colores y tokens compartidos de la app. Los ajustes del componente permanecen en esta página.';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      'Explora los temas incluidos o crea uno personalizado a partir de este aspecto.';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      'Elige abajo un fondo y un tema de sintaxis independientes para el editor.';
+
+  @override
+  String get fileSkinComponentStyling => 'Estilo de los componentes';
+
+  @override
+  String get textEditorStyling => 'Estilo del editor';
 }

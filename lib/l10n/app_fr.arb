@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "Point A défini à {time}. Appuyez à nouveau pour définir B.",
   "abLoopStartedMessage": "Répétition {start} – {end}",
   "abLoopEndTooCloseMessage": "B doit être après A. Avancez et appuyez à nouveau.",
-  "abLoopClearedMessage": "Répétition A-B désactivée"
+  "abLoopClearedMessage": "Répétition A-B désactivée",
+  "skinEditorPanelBackground": "Arrière-plan des panneaux de l’éditeur",
+  "skinEditorPanelBackgroundDescription": "Arrière-plan commun de la barre latérale et du menu d’actions de l’éditeur.",
+  "skinFollowAppSkin": "Suivre le thème de l’application",
+  "fileSkinFollowAppSkinDescription": "L’apparence des fichiers et dossiers suit le thème sélectionné.",
+  "fileSkinUseIndependentStylesDescription": "Utilisez les options d’icônes et de couleurs du gestionnaire de fichiers ci-dessous.",
+  "skinChooseOrCreateSkin": "Choisir ou créer un thème",
+  "skinSkinShortcutCustomDescription": "Modifiez les couleurs et tokens partagés de l’application. Les réglages du composant restent sur cette page.",
+  "skinSkinShortcutPresetDescription": "Parcourez les thèmes intégrés ou créez un thème personnalisé à partir de cette apparence.",
+  "textEditorUseIndependentAppearanceDescription": "Choisissez ci-dessous un arrière-plan et un thème de syntaxe indépendants pour l’éditeur.",
+  "fileSkinComponentStyling": "Style des composants",
+  "textEditorStyling": "Style de l’éditeur"
 }

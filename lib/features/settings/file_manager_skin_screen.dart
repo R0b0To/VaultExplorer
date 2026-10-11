@@ -12,6 +12,7 @@ import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/widgets/app_skin_shortcut_tile.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
 
 /// Where the person chooses how the file manager looks: a built-in skin, or
@@ -73,7 +74,7 @@ class FileManagerSkinScreen extends ConsumerWidget {
                       vertical: 12,
                     ),
                     children: [
-                      const SectionHeader('Component styling'),
+                      SectionHeader(l10n.fileSkinComponentStyling),
                       SectionCard(
                         children: [
                           SwitchListTile(
@@ -85,15 +86,15 @@ class FileManagerSkinScreen extends ConsumerWidget {
                                 .read(appSkinSettingsProvider.notifier)
                                 .setFileManagerFollowsAppSkin(value),
                             title: Text(
-                              'Follow app skin',
+                              l10n.skinFollowAppSkin,
                               style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Text(
                               appSkinSettings.fileManagerFollowsAppSkin
-                                  ? 'File and folder styling follows the selected app skin.'
-                                  : 'Use the file manager icon and color choices below.',
+                                  ? l10n.fileSkinFollowAppSkinDescription
+                                  : l10n.fileSkinUseIndependentStylesDescription,
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
@@ -103,6 +104,7 @@ class FileManagerSkinScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          AppSkinShortcutTile(preset: appSkinSettings.preset),
                         ],
                       ),
                       SectionHeader(l10n.fileSkinPreviewHeader),

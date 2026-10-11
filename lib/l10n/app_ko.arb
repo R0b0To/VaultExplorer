@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "A 지점이 {time}에 설정되었습니다. 다시 탭하여 B 지점을 설정하세요.",
   "abLoopStartedMessage": "{start} – {end} 반복 중",
   "abLoopEndTooCloseMessage": "B는 A 이후여야 합니다. 앞으로 이동한 후 다시 탭하세요.",
-  "abLoopClearedMessage": "A-B 구간 반복 꺼짐"
+  "abLoopClearedMessage": "A-B 구간 반복 꺼짐",
+  "skinEditorPanelBackground": "편집기 패널 배경",
+  "skinEditorPanelBackgroundDescription": "편집기 사이드바와 더보기 작업 메뉴에서 함께 사용하는 배경입니다.",
+  "skinFollowAppSkin": "앱 스킨 따르기",
+  "fileSkinFollowAppSkinDescription": "파일과 폴더 스타일이 선택한 앱 스킨을 따릅니다.",
+  "fileSkinUseIndependentStylesDescription": "아래의 파일 관리자 아이콘 및 색상 옵션을 사용합니다.",
+  "skinChooseOrCreateSkin": "스킨 선택 또는 만들기",
+  "skinSkinShortcutCustomDescription": "앱 전체 색상과 공통 토큰을 편집합니다. 구성 요소별 설정은 이 페이지에 유지됩니다.",
+  "skinSkinShortcutPresetDescription": "기본 제공 스킨을 둘러보거나 현재 모습으로 사용자 지정 스킨을 만듭니다.",
+  "textEditorUseIndependentAppearanceDescription": "아래에서 편집기 전용 배경과 구문 테마를 선택합니다.",
+  "fileSkinComponentStyling": "구성 요소 스타일",
+  "textEditorStyling": "편집기 스타일"
 }

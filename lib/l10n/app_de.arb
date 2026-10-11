@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "A bei {time} gesetzt. Erneut tippen, um B zu setzen.",
   "abLoopStartedMessage": "Wiederhole {start} – {end}",
   "abLoopEndTooCloseMessage": "B muss nach A liegen. Weiter vorspulen und erneut tippen.",
-  "abLoopClearedMessage": "A-B-Wiederholung aus"
+  "abLoopClearedMessage": "A-B-Wiederholung aus",
+  "skinEditorPanelBackground": "Hintergrund der Editorbereiche",
+  "skinEditorPanelBackgroundDescription": "Gemeinsamer Hintergrund für die Editor-Seitenleiste und das Menü „Weitere Aktionen“.",
+  "skinFollowAppSkin": "App-Design übernehmen",
+  "fileSkinFollowAppSkinDescription": "Datei- und Ordnerdarstellung folgt dem ausgewählten App-Design.",
+  "fileSkinUseIndependentStylesDescription": "Verwende die folgenden Symbol- und Farboptionen des Dateimanagers.",
+  "skinChooseOrCreateSkin": "Design auswählen oder erstellen",
+  "skinSkinShortcutCustomDescription": "App-weite Farben und gemeinsame Tokens bearbeiten. Komponentenüberschreibungen bleiben auf dieser Seite.",
+  "skinSkinShortcutPresetDescription": "Integrierte Designs ansehen oder ein eigenes Design aus diesem Look erstellen.",
+  "textEditorUseIndependentAppearanceDescription": "Wähle unten einen unabhängigen Editorhintergrund und ein Syntaxdesign.",
+  "fileSkinComponentStyling": "Komponentenstil",
+  "textEditorStyling": "Editorstil"
 }

@@ -10996,4 +10996,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'A-B repeat off';
+
+  @override
+  String get skinEditorPanelBackground => 'Editor panel background';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      'Shared background for the editor sidebar and More Actions menus.';
+
+  @override
+  String get skinFollowAppSkin => 'Follow app skin';
+
+  @override
+  String get fileSkinFollowAppSkinDescription =>
+      'File and folder styling follows the selected app skin.';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      'Use the file manager icon and color choices below.';
+
+  @override
+  String get skinChooseOrCreateSkin => 'Choose or create a skin';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      'Edit app-wide colors and shared tokens. Component overrides stay on this page.';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      'Browse built-in skins or create a custom skin from this look.';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      'Choose an independent editor background and syntax theme below.';
+
+  @override
+  String get fileSkinComponentStyling => 'Component styling';
+
+  @override
+  String get textEditorStyling => 'Editor styling';
 }

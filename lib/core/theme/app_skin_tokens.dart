@@ -33,6 +33,19 @@ AppSkinTokens buildAppSkinTokens({
     ),
     _ => colorScheme.onSurface,
   };
+  // Keep editor chrome visually separate from the code canvas. Blending a
+  // small amount of the editor text color creates a brightness-aware panel
+  // surface, including for legacy skins that do not store this token yet.
+  final editorPanelBackground = preset == AppSkinPreset.custom
+      ? customAppSkin.editorColorOrNull('panel', dark: isDark) ??
+            Color.alphaBlend(
+              editorForeground.withValues(alpha: 0.10),
+              editorBackground,
+            )
+      : Color.alphaBlend(
+          editorForeground.withValues(alpha: 0.10),
+          editorBackground,
+        );
   final editorAccent = preset == AppSkinPreset.custom
       ? customAppSkin.editorColor('cursor', dark: isDark)
       : colorScheme.primary;
@@ -89,6 +102,7 @@ AppSkinTokens buildAppSkinTokens({
     fileManagerSkin: fileManagerSkin,
     editorBackground: editorBackground,
     editorForeground: editorForeground,
+    editorPanelBackground: editorPanelBackground,
     editorGutter: preset == AppSkinPreset.custom
         ? customAppSkin.editorColor('gutter', dark: isDark)
         : editorForeground.withValues(alpha: 0.48),
@@ -138,6 +152,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
   final FileManagerSkin fileManagerSkin;
   final Color editorBackground;
   final Color editorForeground;
+  final Color editorPanelBackground;
   final Color editorGutter;
   final Color editorCursor;
   final Color editorSelection;
@@ -159,6 +174,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     required this.fileManagerSkin,
     required this.editorBackground,
     required this.editorForeground,
+    required this.editorPanelBackground,
     required this.editorGutter,
     required this.editorCursor,
     required this.editorSelection,
@@ -182,6 +198,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     FileManagerSkin? fileManagerSkin,
     Color? editorBackground,
     Color? editorForeground,
+    Color? editorPanelBackground,
     Color? editorGutter,
     Color? editorCursor,
     Color? editorSelection,
@@ -203,6 +220,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     fileManagerSkin: fileManagerSkin ?? this.fileManagerSkin,
     editorBackground: editorBackground ?? this.editorBackground,
     editorForeground: editorForeground ?? this.editorForeground,
+    editorPanelBackground: editorPanelBackground ?? this.editorPanelBackground,
     editorGutter: editorGutter ?? this.editorGutter,
     editorCursor: editorCursor ?? this.editorCursor,
     editorSelection: editorSelection ?? this.editorSelection,
@@ -256,6 +274,11 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
         other.editorForeground,
         t,
       )!,
+      editorPanelBackground: Color.lerp(
+        editorPanelBackground,
+        other.editorPanelBackground,
+        t,
+      )!,
       editorGutter: Color.lerp(editorGutter, other.editorGutter, t)!,
       editorCursor: Color.lerp(editorCursor, other.editorCursor, t)!,
       editorSelection: Color.lerp(editorSelection, other.editorSelection, t)!,
@@ -282,6 +305,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
           fileManagerSkin == other.fileManagerSkin &&
           editorBackground == other.editorBackground &&
           editorForeground == other.editorForeground &&
+          editorPanelBackground == other.editorPanelBackground &&
           editorGutter == other.editorGutter &&
           editorCursor == other.editorCursor &&
           editorSelection == other.editorSelection &&
@@ -304,12 +328,15 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     fileManagerSkin,
     editorBackground,
     editorForeground,
+    editorPanelBackground,
     editorGutter,
     editorCursor,
     editorSelection,
     editorBackgroundOption,
     editorSyntaxThemeOption,
-    Object.hashAll(editorSyntaxColors.entries.map((e) => Object.hash(e.key, e.value))),
+    Object.hashAll(
+      editorSyntaxColors.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
     fileManagerFollowsAppSkin,
     editorFollowsAppSkin,
   ]);

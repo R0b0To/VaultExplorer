@@ -69,6 +69,7 @@ Map<String, int> _semanticMap(AppSemanticColors colors) => {
 Map<String, int> _editorColorMap(AppSkinTokens tokens) => {
   'background': tokens.editorBackground.toARGB32(),
   'foreground': tokens.editorForeground.toARGB32(),
+  'panel': tokens.editorPanelBackground.toARGB32(),
   'gutter': tokens.editorGutter.toARGB32(),
   'cursor': tokens.editorCursor.toARGB32(),
   'selection': tokens.editorSelection.toARGB32(),
@@ -602,6 +603,12 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   Color _editorColor(String role) {
     final custom = _skin.editorColorOrNull(role, dark: _darkColors);
     if (custom != null) return custom;
+    if (role == 'panel') {
+      return Color.alphaBlend(
+        _editorColor('foreground').withValues(alpha: 0.10),
+        _editorColor('background'),
+      );
+    }
     if (editorSyntaxColorRoles.contains(role)) {
       final syntaxOption = EditorSyntaxThemeOption.values.firstWhere(
         (option) => option.name == _editorOption('syntax'),
@@ -711,7 +718,8 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     }
     if (id.startsWith('editor:')) {
       final role = id.substring(7);
-      final allowDefault = editorSyntaxColorRoles.contains(role);
+      final allowDefault =
+          role == 'panel' || editorSyntaxColorRoles.contains(role);
       return _pickColor(
         title: selection.title,
         current: _editorColor(role),
@@ -2263,6 +2271,45 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           ),
         ),
         _editorPreview(color('onSurface', cs.onSurface)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _previewTarget(
+                  id: 'editor:panel',
+                  title: context.l10n.skinEditorPanelBackground,
+                  explanation:
+                      context.l10n.skinEditorPanelBackgroundDescription,
+                  child: _editorPanelPreview(
+                    background: _editorColor('panel'),
+                    label: context.l10n.textEditorProjectFilesTitle,
+                    icon: Icons.folder_open_rounded,
+                    isMenu: false,
+                    foreground: _editorColor('foreground'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _previewTarget(
+                  id: 'editor:panel',
+                  title: context.l10n.skinEditorPanelBackground,
+                  explanation:
+                      context.l10n.skinEditorPanelBackgroundDescription,
+                  child: _editorPanelPreview(
+                    background: _editorColor('panel'),
+                    label: context.l10n.textEditorMoreActionsTooltip,
+                    icon: Icons.more_horiz_rounded,
+                    isMenu: true,
+                    foreground: _editorColor('foreground'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         Container(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
           color: color(
@@ -2311,6 +2358,71 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           child: child,
         ),
       ),
+    ),
+  );
+
+  Widget _editorPanelPreview({
+    required Color background,
+    required String label,
+    required IconData icon,
+    required bool isMenu,
+    required Color foreground,
+  }) => Container(
+    constraints: const BoxConstraints(minHeight: 76),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(10),
+      boxShadow: isMenu
+          ? [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ]
+          : null,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: foreground),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 3,
+          width: isMenu ? 38 : 52,
+          decoration: BoxDecoration(
+            color: foreground.withValues(alpha: 0.36),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 3,
+          width: isMenu ? 28 : 42,
+          decoration: BoxDecoration(
+            color: foreground.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
     ),
   );
 
@@ -2887,6 +2999,12 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         subtitle: context.l10n.skinTheCanvasColorBehindTheCode,
       ),
       _editorColorTile(
+        context.l10n.skinEditorPanelBackground,
+        'panel',
+        subtitle: context.l10n.skinEditorPanelBackgroundDescription,
+        allowDefault: true,
+      ),
+      _editorColorTile(
         context.l10n.skinEditorLineNumbers,
         'gutter',
         subtitle: context.l10n.skinTheGutterAndLineNumbersBesideTheCode,
@@ -2970,11 +3088,12 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     bool allowDefault = false,
   }) {
     final isCustom = _skin.editorColorOrNull(role, dark: _darkColors) != null;
-    final sub = subtitle ??
+    final sub =
+        subtitle ??
         (allowDefault
             ? (isCustom
-                ? context.l10n.skinCustomColor
-                : context.l10n.textEditorDefaultFromTheme)
+                  ? context.l10n.skinCustomColor
+                  : context.l10n.textEditorDefaultFromTheme)
             : context.l10n.skinTapTheColorCircleToChooseAColor246981);
     return ListTile(
       title: Text(title),

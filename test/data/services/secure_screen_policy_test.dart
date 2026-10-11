@@ -31,45 +31,33 @@ void main() {
   });
 
   test(
-    'setSecureScreen follows preference alone when nothing is mounted',
+    'setSecureScreen follows the enabled global preference',
     () async {
-      policy.anyContainerMounted = false;
-
       await policy.apply(preference: true);
 
       expect(fake.secureScreenValue, isTrue);
     },
   );
 
-  test('setSecureScreen stays off when preference is false, even with a '
-      'container mounted -- a live screenshot must remain possible', () async {
-    policy.anyContainerMounted = true;
-
+  test('setSecureScreen follows the disabled global preference', () async {
     await policy.apply(preference: false);
 
-    // This is the behavior the class doc explicitly calls out as
-    // deliberate: FLAG_SECURE must never be forced on just because a
-    // container is mounted, or "block screenshots: off" stops meaning
-    // what it says.
+    // The disabled global preference must leave live screenshots available.
     expect(fake.secureScreenValue, isFalse);
   });
 
-  test('setRecentsSnapshotBlocked follows anyContainerMounted, not '
-      'preference', () async {
-    policy.anyContainerMounted = true;
-
+  test('setRecentsSnapshotBlocked follows the disabled global preference',
+      () async {
     await policy.apply(preference: false);
 
-    expect(fake.recentsSnapshotBlockedValue, isTrue);
+    expect(fake.recentsSnapshotBlockedValue, isFalse);
   });
 
-  test('setRecentsSnapshotBlocked is false when nothing is mounted, even '
-      'if the user has screenshot-blocking enabled', () async {
-    policy.anyContainerMounted = false;
-
+  test('setRecentsSnapshotBlocked follows the enabled global preference',
+      () async {
     await policy.apply(preference: true);
 
-    expect(fake.recentsSnapshotBlockedValue, isFalse);
+    expect(fake.recentsSnapshotBlockedValue, isTrue);
   });
 
   test('apply always calls both native setters', () async {

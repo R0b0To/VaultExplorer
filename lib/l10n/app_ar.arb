@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "تم تعيين A عند {time}. اضغط مرة أخرى لتعيين B.",
   "abLoopStartedMessage": "تكرار {start} – {end}",
   "abLoopEndTooCloseMessage": "يجب أن تكون النقطة B بعد النقطة A. تقدم للأمام واضغط مرة أخرى.",
-  "abLoopClearedMessage": "تم إيقاف تكرار A-B"
+  "abLoopClearedMessage": "تم إيقاف تكرار A-B",
+  "skinEditorPanelBackground": "خلفية لوحات المحرر",
+  "skinEditorPanelBackgroundDescription": "خلفية مشتركة للشريط الجانبي وقوائم المزيد من الإجراءات في المحرر.",
+  "skinFollowAppSkin": "اتباع مظهر التطبيق",
+  "fileSkinFollowAppSkinDescription": "يتبع تنسيق الملفات والمجلدات مظهر التطبيق المحدد.",
+  "fileSkinUseIndependentStylesDescription": "استخدم خيارات الأيقونات والألوان لمدير الملفات أدناه.",
+  "skinChooseOrCreateSkin": "اختر مظهرًا أو أنشئه",
+  "skinSkinShortcutCustomDescription": "عدّل ألوان التطبيق ورموزه المشتركة. تبقى تخصيصات المكوّنات في هذه الصفحة.",
+  "skinSkinShortcutPresetDescription": "تصفّح المظاهر المضمنة أو أنشئ مظهرًا مخصصًا من هذا التصميم.",
+  "textEditorUseIndependentAppearanceDescription": "اختر خلفية مستقلة للمحرر وقالب تمييز الصياغة أدناه.",
+  "fileSkinComponentStyling": "تنسيق المكوّنات",
+  "textEditorStyling": "تنسيق المحرر"
 }

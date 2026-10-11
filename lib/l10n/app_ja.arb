@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "A地点を {time} に設定しました。もう一度タップしてB地点を設定してください。",
   "abLoopStartedMessage": "{start} – {end} をリピート再生中",
   "abLoopEndTooCloseMessage": "BはAより後である必要があります。先に進めてから再度タップしてください。",
-  "abLoopClearedMessage": "A-Bリピート オフ"
+  "abLoopClearedMessage": "A-Bリピート オフ",
+  "skinEditorPanelBackground": "エディターパネルの背景",
+  "skinEditorPanelBackgroundDescription": "エディターのサイドバーとその他のアクションメニューで共有する背景です。",
+  "skinFollowAppSkin": "アプリのスキンに合わせる",
+  "fileSkinFollowAppSkinDescription": "ファイルとフォルダーのスタイルを選択中のアプリスキンに合わせます。",
+  "fileSkinUseIndependentStylesDescription": "以下のファイルマネージャーのアイコンと色の設定を使います。",
+  "skinChooseOrCreateSkin": "スキンを選択または作成",
+  "skinSkinShortcutCustomDescription": "アプリ全体の色と共通トークンを編集します。コンポーネント固有の設定はこのページに残ります。",
+  "skinSkinShortcutPresetDescription": "内蔵スキンを確認するか、現在の外観からカスタムスキンを作成します。",
+  "textEditorUseIndependentAppearanceDescription": "以下でエディター専用の背景色と構文テーマを選択します。",
+  "fileSkinComponentStyling": "コンポーネントのスタイル",
+  "textEditorStyling": "エディターのスタイル"
 }

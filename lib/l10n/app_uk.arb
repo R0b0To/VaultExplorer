@@ -3072,5 +3072,16 @@
   "abLoopStartMarkedMessage": "A встановлено на {time}. Торкніться знову, щоб встановити B.",
   "abLoopStartedMessage": "Повторення {start} – {end}",
   "abLoopEndTooCloseMessage": "B має бути після A. Перемотайте вперед і торкніться знову.",
-  "abLoopClearedMessage": "Повторення A-B вимкнено"
+  "abLoopClearedMessage": "Повторення A-B вимкнено",
+  "skinEditorPanelBackground": "Тло панелей редактора",
+  "skinEditorPanelBackgroundDescription": "Спільне тло бічної панелі та меню додаткових дій редактора.",
+  "skinFollowAppSkin": "Використовувати тему програми",
+  "fileSkinFollowAppSkinDescription": "Стиль файлів і папок відповідає вибраній темі програми.",
+  "fileSkinUseIndependentStylesDescription": "Використовуйте наведені нижче параметри значків і кольорів файлового менеджера.",
+  "skinChooseOrCreateSkin": "Вибрати або створити тему",
+  "skinSkinShortcutCustomDescription": "Змініть спільні кольори й токени програми. Перевизначення компонентів залишаються на цій сторінці.",
+  "skinSkinShortcutPresetDescription": "Перегляньте вбудовані теми або створіть власну на основі цього вигляду.",
+  "textEditorUseIndependentAppearanceDescription": "Нижче виберіть окреме тло редактора та тему підсвічування синтаксису.",
+  "fileSkinComponentStyling": "Стиль компонентів",
+  "textEditorStyling": "Стиль редактора"
 }

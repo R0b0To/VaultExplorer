@@ -11186,4 +11186,43 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get abLoopClearedMessage => 'تم إيقاف تكرار A-B';
+
+  @override
+  String get skinEditorPanelBackground => 'خلفية لوحات المحرر';
+
+  @override
+  String get skinEditorPanelBackgroundDescription =>
+      'خلفية مشتركة للشريط الجانبي وقوائم المزيد من الإجراءات في المحرر.';
+
+  @override
+  String get skinFollowAppSkin => 'اتباع مظهر التطبيق';
+
+  @override
+  String get fileSkinFollowAppSkinDescription =>
+      'يتبع تنسيق الملفات والمجلدات مظهر التطبيق المحدد.';
+
+  @override
+  String get fileSkinUseIndependentStylesDescription =>
+      'استخدم خيارات الأيقونات والألوان لمدير الملفات أدناه.';
+
+  @override
+  String get skinChooseOrCreateSkin => 'اختر مظهرًا أو أنشئه';
+
+  @override
+  String get skinSkinShortcutCustomDescription =>
+      'عدّل ألوان التطبيق ورموزه المشتركة. تبقى تخصيصات المكوّنات في هذه الصفحة.';
+
+  @override
+  String get skinSkinShortcutPresetDescription =>
+      'تصفّح المظاهر المضمنة أو أنشئ مظهرًا مخصصًا من هذا التصميم.';
+
+  @override
+  String get textEditorUseIndependentAppearanceDescription =>
+      'اختر خلفية مستقلة للمحرر وقالب تمييز الصياغة أدناه.';
+
+  @override
+  String get fileSkinComponentStyling => 'تنسيق المكوّنات';
+
+  @override
+  String get textEditorStyling => 'تنسيق المحرر';
 }

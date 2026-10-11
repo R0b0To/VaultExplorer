@@ -267,8 +267,7 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   void _syncSecureScreen() {
-    final secureScreenPolicy = ref.read(secureScreenPolicyProvider)
-      ..anyContainerMounted = state.mounted.isNotEmpty;
+    final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
     unawaited(
       secureScreenPolicy.apply(preference: state.appSettings.blockScreenshots),
     );

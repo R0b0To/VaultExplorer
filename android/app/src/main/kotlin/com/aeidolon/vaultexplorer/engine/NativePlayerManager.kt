@@ -202,8 +202,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
             )
         }
+        // Raw .ac3/.eac3 come out of Media3 unseekable (every seek lands on 0:00); make them seekable.
         // Media3 has no AIFF extractor; AiffExtractor sniffs first and is a no-op for other formats.
-        return AiffAwareExtractorsFactory(factory)
+        return AiffAwareExtractorsFactory(SeekableAc3ExtractorsFactory(factory))
     }
 
     /**

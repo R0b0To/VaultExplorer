@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.SystemClock
 import com.aeidolon.vaultexplorer.VeLog
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegPcmDecoder
 import java.nio.ByteBuffer
 
 /**
@@ -12,7 +13,10 @@ import java.nio.ByteBuffer
  * [AudioEditMath.peaksPerSecondFor]), as one byte per slice.
  *
  * The decode runs through `MediaCodec` straight off the extractor, so a vault
- * file is decrypted on demand and never written out in plaintext. It is
+ * file is decrypted on demand and never written out in plaintext. When the
+ * device has no `MediaCodec` decoder for the codec (AC-3 / E-AC-3 / DTS on many
+ * phones) the FFmpeg decoder the player already bundles is used instead, see
+ * [FfmpegPcmDecoder]; the data path is the same. It is
  * time-boxed: a very long file stops at [TIME_BUDGET_MS] and returns what it
  * has with [Waveform.complete] false (the editor draws the rest flat) -- the
  * same trade-off the video probe makes with `keyframesComplete`.
@@ -21,6 +25,7 @@ object AudioWaveformExtractor {
     private const val TAG = "AudioWaveformExtractor"
     private const val TIME_BUDGET_MS = 60_000L
     private const val DEQUEUE_TIMEOUT_US = 10_000L
+    private const val FFMPEG_IDLE_SLEEP_MS = 2L
 
     class CancelledException : Exception("Waveform cancelled")
 
@@ -39,14 +44,17 @@ object AudioWaveformExtractor {
     ): Waveform {
         val extractor = newExtractor()
         var codec: MediaCodec? = null
+        var ffmpeg: FfmpegPcmDecoder? = null
         try {
             val track = LosslessAudioCutter.firstAudioTrack(extractor)
             if (track < 0) throw IllegalStateException("No audio track found in this file")
             val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("Unknown audio format")
             val isRawTrack = mime == AudioEditMath.MIME_RAW
-            if (LosslessAudioCutter.durationUsOf(format) <= 0L && !isRawTrack && !LosslessAudioCutter.hasDecoder(format)) {
-                // The length has to be measured by reading the whole stream; pointless without a decoder.
+            // MediaCodec first. Without a platform decoder for this codec the bundled FFmpeg takes over;
+            // only when neither can decode it is there no waveform (and no point measuring the length).
+            val useFfmpeg = !isRawTrack && !LosslessAudioCutter.hasDecoder(format)
+            if (useFfmpeg && !FfmpegPcmDecoder.supports(mime)) {
                 throw IllegalStateException("This device can't decode $mime, so there is no waveform")
             }
             val durationUs = LosslessAudioCutter.durationUsOrMeasure(extractor, track, format) {
@@ -75,7 +83,7 @@ object AudioWaveformExtractor {
             accumulator.bucketsPerFrame = peaksPerSecond / sampleRate
 
             extractor.selectTrack(track)
-            val activeCodec = if (isRaw) {
+            val activeCodec = if (isRaw || useFfmpeg) {
                 null
             } else {
                 MediaCodec.createDecoderByType(mime).also {
@@ -84,6 +92,8 @@ object AudioWaveformExtractor {
                 }
             }
             codec = activeCodec
+            val activeFfmpeg = if (useFfmpeg) FfmpegPcmDecoder.create(format) else null
+            ffmpeg = activeFfmpeg
 
             val deadline = SystemClock.elapsedRealtime() + TIME_BUDGET_MS
             var lastPermille = -1
@@ -97,7 +107,72 @@ object AudioWaveformExtractor {
                 }
             }
 
-            if (activeCodec == null) {
+            if (activeFfmpeg != null) {
+                // No platform decoder: FFmpeg turns the samples into PCM. It decodes on its own thread and
+                // never blocks, so one loop feeds it and drains it, napping only when neither side moved.
+                var buffer = ByteBuffer.allocateDirect(64 * 1024)
+                var pendingSize = -1 // a sample read from the extractor, waiting for a free decoder input
+                var pendingTimeUs = 0L
+                var inputDone = false
+                var outputDone = false
+                while (!outputDone) {
+                    if (isCancelled()) throw CancelledException()
+                    if (SystemClock.elapsedRealtime() > deadline) {
+                        complete = false
+                        break
+                    }
+                    var progressed = false
+
+                    if (!inputDone) {
+                        if (pendingSize < 0 && extractor.sampleTrackIndex >= 0) {
+                            var size = -1
+                            while (true) {
+                                try {
+                                    buffer.clear()
+                                    size = extractor.readSampleData(buffer, 0)
+                                    break
+                                } catch (e: IllegalArgumentException) {
+                                    if (buffer.capacity() >= 16 * 1024 * 1024) throw e
+                                    buffer = ByteBuffer.allocateDirect(buffer.capacity() * 2)
+                                }
+                            }
+                            if (size >= 0) {
+                                pendingSize = size
+                                pendingTimeUs = extractor.sampleTime
+                                extractor.advance()
+                            }
+                        }
+                        if (pendingSize >= 0) {
+                            if (activeFfmpeg.queueSample(buffer, pendingSize, pendingTimeUs)) {
+                                report(pendingTimeUs)
+                                pendingSize = -1
+                                progressed = true
+                            }
+                        } else if (activeFfmpeg.queueEndOfStream()) {
+                            inputDone = true
+                            progressed = true
+                        }
+                    }
+
+                    val ended = activeFfmpeg.drain { data, offset, size ->
+                        // The decoder's real output layout (known from its first chunk on).
+                        val outRate = activeFfmpeg.sampleRate
+                        if (outRate > 0 && outRate != sampleRate) {
+                            sampleRate = outRate
+                            accumulator.bucketsPerFrame = peaksPerSecond / sampleRate
+                        }
+                        val outChannels = activeFfmpeg.channelCount
+                        if (outChannels > 0) reader.channels = outChannels
+                        reader.consume(data, offset, size)
+                        progressed = true
+                    }
+                    if (ended) {
+                        outputDone = true
+                    } else if (!progressed) {
+                        Thread.sleep(FFMPEG_IDLE_SLEEP_MS)
+                    }
+                }
+            } else if (activeCodec == null) {
                 // Raw PCM (WAV): the extractor already hands out samples, nothing to decode.
                 var buffer = ByteBuffer.allocateDirect(64 * 1024)
                 while (extractor.sampleTrackIndex >= 0) {
@@ -180,6 +255,7 @@ object AudioWaveformExtractor {
                 runCatching { it.stop() }
                 runCatching { it.release() }
             }
+            ffmpeg?.let { runCatching { it.close() } }
             runCatching { extractor.release() }
         }
     }

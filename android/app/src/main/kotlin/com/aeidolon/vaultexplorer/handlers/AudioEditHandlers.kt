@@ -109,7 +109,9 @@ class AudioEditHandlers(
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun openMedia3(volId: Int, filePath: String, isLocal: Boolean): AudioSource {
         val defaults = DefaultExtractorsFactory()
-        // As in the player: lets CBR audio without a seek table (plain MP3, AC-3) still be seeked.
+        // As in the player: lets CBR audio without a seek table (plain MP3, ADTS AAC) still be seeked.
+        // Not AC-3: Media3's extractor for it stays unseekable here, which is what the cutter wants --
+        // it scans from the start so frame timestamps are exact (the player wraps it, see SeekableAc3Extractor).
         defaults.setConstantBitrateSeekingEnabled(true)
         val dataSourceFactory: DataSource.Factory =
             if (isLocal) DefaultDataSource.Factory(activity) else VaultMedia3DataSourceFactory(volId, filePath)

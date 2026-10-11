@@ -41,13 +41,20 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
   final List<GlobalKey> _topLevelBlockKeys = [];
   List<int> _topLevelBlockLines = [];
 
-  final List<GlobalKey> _headingKeysList = [];
   final Map<String, GlobalKey> _headingAnchorKeys = {};
+  final Map<GlobalKey, int> _headingKeyBlockIndices = {};
+  final Map<MdHeading, GlobalKey> _headingKeys = {};
+  final Map<MdCallout, bool> _calloutCollapsedStates = {};
+  final GlobalKey _activeSearchMatchKey = GlobalKey();
 
-  final List<GlobalKey> _searchMatchKeys = [];
+  final Map<MdText, int> _textSearchMatchStarts = {};
+  List<int> _blockSearchMatchStarts = [];
+  List<MdBlock> _blocks = [];
+  int _searchCountCursor = 0;
+  String? _cachedSource;
+  String? _searchMetadataQuery;
+  int _totalSearchMatches = 0;
   late ScrollController _scrollController;
-
-  int _matchCounter = 0;
 
   @override
   void initState() {
@@ -74,18 +81,18 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
 
   void _scrollToActiveMatch() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.searchMatchIndex >= 0 &&
-          widget.searchMatchIndex < _searchMatchKeys.length) {
-        final key = _searchMatchKeys[widget.searchMatchIndex];
-        if (key.currentContext != null) {
-          Scrollable.ensureVisible(
-            key.currentContext!,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            alignment: 0.2,
-          );
-        }
-      }
+      if (!mounted || _blocks.isEmpty || _totalSearchMatches == 0) return;
+      final matchIndex = widget.searchMatchIndex.clamp(
+        0,
+        _totalSearchMatches - 1,
+      );
+      final blockIndex = _blockIndexForSearchMatch(matchIndex);
+      _scrollToBlockIndex(
+        blockIndex,
+        targetKey: _activeSearchMatchKey,
+        duration: const Duration(milliseconds: 300),
+        alignment: 0.2,
+      );
     });
   }
 
@@ -115,12 +122,13 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
 
       final key = _resolveHeadingKey(decodedTarget);
 
-      if (key?.currentContext != null) {
-        final box = key!.currentContext!.findRenderObject() as RenderBox?;
+      if (key != null && key.currentContext != null) {
+        final box = key.currentContext!.findRenderObject() as RenderBox?;
         final scrollBox = context.findRenderObject() as RenderBox?;
 
         if (box != null && scrollBox != null && _scrollController.hasClients) {
-          final targetOffset = box.localToGlobal(Offset.zero, ancestor: scrollBox).dy +
+          final targetOffset =
+              box.localToGlobal(Offset.zero, ancestor: scrollBox).dy +
               _scrollController.offset -
               12;
           _scrollController.animateTo(
@@ -139,6 +147,19 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
         );
         return;
       }
+
+      if (key != null) {
+        final blockIndex = _headingKeyBlockIndices[key];
+        if (blockIndex != null) {
+          _scrollToBlockIndex(
+            blockIndex,
+            targetKey: key,
+            duration: const Duration(milliseconds: 350),
+            alignment: 0.05,
+          );
+          return;
+        }
+      }
     }
     widget.onLinkTap(url);
   }
@@ -148,14 +169,20 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     final alpha = target.replaceAll(RegExp(r'[^a-z0-9]'), '');
 
     if (_headingAnchorKeys.containsKey(slug)) return _headingAnchorKeys[slug];
-    if (_headingAnchorKeys.containsKey(target)) return _headingAnchorKeys[target];
-    if (alpha.isNotEmpty && _headingAnchorKeys.containsKey(alpha)) return _headingAnchorKeys[alpha];
+    if (_headingAnchorKeys.containsKey(target)) {
+      return _headingAnchorKeys[target];
+    }
+    if (alpha.isNotEmpty && _headingAnchorKeys.containsKey(alpha)) {
+      return _headingAnchorKeys[alpha];
+    }
 
     for (final entry in _headingAnchorKeys.entries) {
       final k = entry.key;
       if (k == slug || k == target) return entry.value;
       if (k.endsWith('-$slug') || k.startsWith('$slug-')) return entry.value;
-      if (alpha.isNotEmpty && k.replaceAll('-', '').contains(alpha)) return entry.value;
+      if (alpha.isNotEmpty && k.replaceAll('-', '').contains(alpha)) {
+        return entry.value;
+      }
       if (slug.isNotEmpty && k.contains(slug)) return entry.value;
     }
     return null;
@@ -198,7 +225,7 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
   }
 
   void scrollToLine(int line) {
-    if (_topLevelBlockLines.isEmpty) return;
+    if (_topLevelBlockLines.isEmpty || _blocks.isEmpty) return;
 
     int bestIdx = 0;
     int minDiff = (_topLevelBlockLines.first - line).abs();
@@ -211,19 +238,12 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       }
     }
 
-    if (bestIdx < _topLevelBlockKeys.length) {
-      final key = _topLevelBlockKeys[bestIdx];
-      if (key.currentContext != null) {
-        final box = key.currentContext!.findRenderObject() as RenderBox?;
-        final scrollBox = context.findRenderObject() as RenderBox?;
-
-        if (box != null && scrollBox != null && _scrollController.hasClients) {
-          final blockTopInScrollable = box.localToGlobal(Offset.zero, ancestor: scrollBox).dy + _scrollController.offset;
-          final targetOffset = (blockTopInScrollable - 12.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-          _scrollController.jumpTo(targetOffset);
-        }
-      }
-    }
+    _scrollToBlockIndex(
+      bestIdx,
+      targetKey: _topLevelBlockKeys[bestIdx],
+      duration: Duration.zero,
+      alignment: 0,
+    );
   }
 
   int? getFirstVisibleLine() {
@@ -232,30 +252,313 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     final viewportTop = renderBox.localToGlobal(Offset.zero).dy;
     final probeY = viewportTop + 14.0;
 
+    int? bestIndex;
+    double bestTop = double.negativeInfinity;
+    int? nextIndex;
+    double nextTop = double.infinity;
     for (int i = 0; i < _topLevelBlockKeys.length; i++) {
       final ctx = _topLevelBlockKeys[i].currentContext;
       if (ctx != null) {
         final box = ctx.findRenderObject() as RenderBox?;
         if (box != null && box.hasSize) {
           final top = box.localToGlobal(Offset.zero).dy;
-          final bottom = top + box.size.height;
-          if (top <= probeY && bottom > probeY) {
-            return _topLevelBlockLines[i];
+          if (top <= probeY && top > bestTop) {
+            bestTop = top;
+            bestIndex = i;
+          } else if (top > probeY && top < nextTop) {
+            nextTop = top;
+            nextIndex = i;
           }
         }
       }
     }
-    return _topLevelBlockLines.isNotEmpty ? _topLevelBlockLines.first : 0;
+    final visibleIndex = bestIndex ?? nextIndex;
+    return visibleIndex == null ? 0 : _topLevelBlockLines[visibleIndex];
+  }
+
+  void _scrollToBlockIndex(
+    int blockIndex, {
+    GlobalKey? targetKey,
+    Duration duration = const Duration(milliseconds: 300),
+    double alignment = 0,
+  }) {
+    if (!_scrollController.hasClients || _blocks.isEmpty) return;
+    final boundedIndex = blockIndex.clamp(0, _blocks.length - 1);
+    final targetContext = targetKey?.currentContext;
+    if (targetContext != null) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: duration,
+        curve: Curves.easeInOut,
+        alignment: alignment,
+      );
+      return;
+    }
+
+    final position = _scrollController.position;
+    final fraction = _blocks.length <= 1
+        ? 0.0
+        : boundedIndex / (_blocks.length - 1);
+    final estimatedOffset = (position.maxScrollExtent * fraction).clamp(
+      0.0,
+      position.maxScrollExtent,
+    );
+
+    void revealTarget([int attempt = 0]) {
+      if (!mounted || targetKey == null) return;
+      final targetContext = targetKey.currentContext;
+      if (targetContext != null) {
+        Scrollable.ensureVisible(
+          targetContext,
+          duration: duration,
+          curve: Curves.easeInOut,
+          alignment: alignment,
+        );
+        return;
+      }
+
+      if (attempt >= 4 || !_scrollController.hasClients) return;
+      final viewport = context.findRenderObject() as RenderBox?;
+      if (viewport == null || !viewport.hasSize) return;
+      final viewportCenter = viewport
+          .localToGlobal(Offset(0, viewport.size.height / 2))
+          .dy;
+      var nearestIndex = -1;
+      var nearestDistance = double.infinity;
+      for (var i = 0; i < _topLevelBlockKeys.length; i++) {
+        final itemContext = _topLevelBlockKeys[i].currentContext;
+        final itemBox = itemContext?.findRenderObject() as RenderBox?;
+        if (itemBox == null || !itemBox.hasSize) continue;
+        final itemCenter = itemBox
+            .localToGlobal(Offset(0, itemBox.size.height / 2))
+            .dy;
+        final distance = (itemCenter - viewportCenter).abs();
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = i;
+        }
+      }
+      if (nearestIndex < 0) return;
+
+      final averageExtent =
+          _scrollController.position.maxScrollExtent /
+          (_blocks.length > 1 ? _blocks.length - 1 : 1);
+      final delta = boundedIndex - nearestIndex;
+      final nextOffset = (_scrollController.offset + delta * averageExtent)
+          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.jumpTo(nextOffset);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        revealTarget(attempt + 1);
+      });
+    }
+
+    if (duration == Duration.zero) {
+      _scrollController.jumpTo(estimatedOffset);
+      WidgetsBinding.instance.addPostFrameCallback((_) => revealTarget());
+    } else {
+      _scrollController
+          .animateTo(
+            estimatedOffset,
+            duration: duration,
+            curve: Curves.easeInOut,
+          )
+          .then((_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => revealTarget());
+          });
+    }
+  }
+
+  int _blockIndexForSearchMatch(int matchIndex) {
+    for (var i = 0; i < _blocks.length; i++) {
+      if (matchIndex >= _blockSearchMatchStarts[i] &&
+          matchIndex < _blockSearchMatchStarts[i + 1]) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  bool _ensureParsedDocument() {
+    if (_cachedSource == widget.source) return false;
+
+    _cachedSource = widget.source;
+    _blocks = parseMarkdownDocument(widget.source);
+    _topLevelBlockKeys
+      ..clear()
+      ..addAll(List.generate(_blocks.length, (_) => GlobalKey()));
+    _topLevelBlockLines = _blocks.map((block) => block.sourceLine).toList();
+    _headingAnchorKeys.clear();
+    _headingKeyBlockIndices.clear();
+    _headingKeys.clear();
+    _calloutCollapsedStates.clear();
+    _indexHeadings(_blocks);
+    _searchMetadataQuery = null;
+    return true;
+  }
+
+  void _indexHeadings(List<MdBlock> blocks) {
+    for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+      _visitHeadings(blocks[blockIndex], blockIndex);
+    }
+  }
+
+  void _visitHeadings(MdBlock block, int blockIndex) {
+    if (block is MdHeading) {
+      final plainText = _plainTextOf(block.content);
+      final baseSlug = _slugify(plainText);
+      var slug = baseSlug;
+      var duplicate = 1;
+      while (_headingAnchorKeys.containsKey(slug)) {
+        slug = '$baseSlug-${duplicate++}';
+      }
+
+      final key = _headingKeys.putIfAbsent(block, GlobalKey.new);
+      _headingKeyBlockIndices[key] = blockIndex;
+      _headingAnchorKeys[slug] = key;
+
+      final rawLower = plainText.toLowerCase().trim();
+      _headingAnchorKeys.putIfAbsent(rawLower, () => key);
+      final alpha = rawLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (alpha.isNotEmpty) _headingAnchorKeys.putIfAbsent(alpha, () => key);
+    } else if (block is MdBlockquote) {
+      for (final child in block.children) {
+        _visitHeadings(child, blockIndex);
+      }
+    } else if (block is MdCallout) {
+      if (!(_calloutCollapsedStates[block] ?? block.defaultCollapsed)) {
+        for (final child in block.children) {
+          _visitHeadings(child, blockIndex);
+        }
+      }
+    } else if (block is MdList) {
+      for (final item in block.items) {
+        for (final child in item.children) {
+          _visitHeadings(child, blockIndex);
+        }
+      }
+    }
+  }
+
+  bool _prepareSearchMetadata(String? rawQuery) {
+    final query = rawQuery?.trim().toLowerCase();
+    if (_searchMetadataQuery == query) return false;
+
+    _searchMetadataQuery = query;
+    _textSearchMatchStarts.clear();
+    _blockSearchMatchStarts = List<int>.filled(_blocks.length + 1, 0);
+    _totalSearchMatches = 0;
+
+    if (query != null && query.isNotEmpty) {
+      _searchCountCursor = 0;
+      for (var i = 0; i < _blocks.length; i++) {
+        _blockSearchMatchStarts[i] = _searchCountCursor;
+        _countBlockMatches(_blocks[i], query);
+      }
+      _totalSearchMatches = _searchCountCursor;
+      _blockSearchMatchStarts[_blocks.length] = _totalSearchMatches;
+    }
+
+    return true;
+  }
+
+  int _countBlockMatches(MdBlock block, String query) {
+    if (block is MdHeading) return _countInlineMatches(block.content, query);
+    if (block is MdParagraph) return _countInlineMatches(block.content, query);
+    if (block is MdBlockquote) {
+      for (final child in block.children) {
+        _countBlockMatches(child, query);
+      }
+      return 0;
+    }
+    if (block is MdCallout) {
+      if (_calloutCollapsedStates[block] ?? block.defaultCollapsed) return 0;
+      for (final child in block.children) {
+        _countBlockMatches(child, query);
+      }
+      return 0;
+    }
+    if (block is MdList) {
+      for (final item in block.items) {
+        for (final child in item.children) {
+          _countBlockMatches(child, query);
+        }
+      }
+      return 0;
+    }
+    if (block is MdTable) {
+      for (final cell in block.headerCells) {
+        _countInlineMatches(cell, query);
+      }
+      final columnCount = block.headerCells.length;
+      for (final row in block.rows) {
+        for (
+          var column = 0;
+          column < row.length && column < columnCount;
+          column++
+        ) {
+          _countInlineMatches(row[column], query);
+        }
+      }
+    }
+    return 0;
+  }
+
+  int _countInlineMatches(List<MdInline> nodes, String query) {
+    final start = _searchCountCursor;
+    for (final node in nodes) {
+      if (node is MdText) {
+        _textSearchMatchStarts[node] = _searchCountCursor;
+        _searchCountCursor += _countOccurrences(node.text.toLowerCase(), query);
+      } else if (node is MdBold ||
+          node is MdItalic ||
+          node is MdUnderline ||
+          node is MdHighlight ||
+          node is MdStrikethrough ||
+          node is MdSubscript ||
+          node is MdSuperscript ||
+          node is MdLink) {
+        final children = switch (node) {
+          MdBold value => value.children,
+          MdItalic value => value.children,
+          MdUnderline value => value.children,
+          MdHighlight value => value.children,
+          MdStrikethrough value => value.children,
+          MdSubscript value => value.children,
+          MdSuperscript value => value.children,
+          MdLink value => value.children,
+          _ => const <MdInline>[],
+        };
+        _countInlineMatches(children, query);
+      }
+    }
+    return _searchCountCursor - start;
+  }
+
+  int _countOccurrences(String text, String query) {
+    var count = 0;
+    var start = 0;
+    while (true) {
+      final index = text.indexOf(query, start);
+      if (index < 0) return count;
+      count++;
+      start = index + query.length;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    _matchCounter = 0;
-    _headingAnchorKeys.clear();
-
-    final blocks = parseMarkdownDocument(widget.source);
+    final sourceChanged = _ensureParsedDocument();
+    final searchChanged = _prepareSearchMetadata(widget.searchQuery);
+    final blocks = _blocks;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    if ((sourceChanged || searchChanged) && widget.onMatchesFound != null) {
+      final matchCount = _totalSearchMatches;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onMatchesFound?.call(matchCount);
+      });
+    }
 
     if (blocks.isEmpty) {
       return Center(
@@ -266,43 +569,13 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       );
     }
 
-    while (_topLevelBlockKeys.length < blocks.length) {
-      _topLevelBlockKeys.add(GlobalKey());
-    }
-    _topLevelBlockLines = blocks.map((b) => b.sourceLine).toList();
-
-    int headingIndex = 0;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.onMatchesFound != null) {
-        widget.onMatchesFound!(_matchCounter);
-      }
-    });
-
-    return SingleChildScrollView(
+    return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (int i = 0; i < blocks.length; i++)
-            KeyedSubtree(
-              key: _topLevelBlockKeys[i],
-              child: _buildBlock(
-                context,
-                blocks[i],
-                textTheme,
-                cs,
-                depth: 0,
-                onHeadingEncountered: () {
-                  while (_headingKeysList.length <= headingIndex) {
-                    _headingKeysList.add(GlobalKey());
-                  }
-                  return _headingKeysList[headingIndex++];
-                },
-              ),
-            ),
-        ],
+      itemCount: blocks.length,
+      itemBuilder: (context, index) => KeyedSubtree(
+        key: _topLevelBlockKeys[index],
+        child: _buildBlock(context, blocks[index], textTheme, cs, depth: 0),
       ),
     );
   }
@@ -314,35 +587,9 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     ColorScheme cs, {
     int depth = 0,
     bool isFirstInListItem = false,
-    GlobalKey Function()? onHeadingEncountered,
   }) {
     if (block is MdHeading) {
-      final plainText = _plainTextOf(block.content);
-      final baseSlug = _slugify(plainText);
-
-      GlobalKey headingKey;
-      if (onHeadingEncountered != null) {
-        headingKey = onHeadingEncountered();
-      } else {
-        headingKey = GlobalKey();
-      }
-
-      String slug = baseSlug;
-      int dup = 1;
-      while (_headingAnchorKeys.containsKey(slug)) {
-        slug = '$baseSlug-$dup';
-        dup++;
-      }
-      _headingAnchorKeys[slug] = headingKey;
-
-      final rawLower = plainText.toLowerCase().trim();
-      if (!_headingAnchorKeys.containsKey(rawLower)) {
-        _headingAnchorKeys[rawLower] = headingKey;
-      }
-      final alpha = rawLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
-      if (alpha.isNotEmpty && !_headingAnchorKeys.containsKey(alpha)) {
-        _headingAnchorKeys[alpha] = headingKey;
-      }
+      final headingKey = _headingKeys[block] ?? GlobalKey();
 
       return KeyedSubtree(
         key: headingKey,
@@ -359,10 +606,7 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     }
     if (block is MdParagraph) {
       return Padding(
-        padding: EdgeInsets.only(
-          top: isFirstInListItem ? 0 : 4,
-          bottom: 4,
-        ),
+        padding: EdgeInsets.only(top: isFirstInListItem ? 0 : 4, bottom: 4),
         child: _inlineRichText(
           context,
           block.content,
@@ -376,14 +620,20 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
         block: block,
         textTheme: textTheme,
         cs: cs,
-        buildChild: (child) => _buildBlock(
-          context,
-          child,
-          textTheme,
-          cs,
-          depth: depth,
-          onHeadingEncountered: onHeadingEncountered,
-        ),
+        initialCollapsed:
+            _calloutCollapsedStates[block] ?? block.defaultCollapsed,
+        onCollapsedChanged: (collapsed) {
+          _calloutCollapsedStates[block] = collapsed;
+          _headingAnchorKeys.clear();
+          _headingKeyBlockIndices.clear();
+          _indexHeadings(_blocks);
+          if (widget.searchQuery?.trim().isNotEmpty == true) {
+            _searchMetadataQuery = null;
+            setState(() {});
+          }
+        },
+        buildChild: (child) =>
+            _buildBlock(context, child, textTheme, cs, depth: depth),
       );
     }
     if (block is MdBlockquote) {
@@ -392,23 +642,21 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
         padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-          borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+          borderRadius: const BorderRadius.horizontal(
+            right: Radius.circular(6),
+          ),
           border: Border(
-            left: BorderSide(color: cs.primary.withValues(alpha: 0.7), width: 3.5),
+            left: BorderSide(
+              color: cs.primary.withValues(alpha: 0.7),
+              width: 3.5,
+            ),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final child in block.children)
-              _buildBlock(
-                context,
-                child,
-                textTheme,
-                cs,
-                depth: depth,
-                onHeadingEncountered: onHeadingEncountered,
-              ),
+              _buildBlock(context, child, textTheme, cs, depth: depth),
           ],
         ),
       );
@@ -443,7 +691,6 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
                 textTheme,
                 cs,
                 depth: depth,
-                onHeadingEncountered: onHeadingEncountered,
               ),
           ],
         ),
@@ -466,7 +713,6 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     TextTheme textTheme,
     ColorScheme cs, {
     required int depth,
-    GlobalKey Function()? onHeadingEncountered,
   }) {
     Widget markerWidget;
 
@@ -511,7 +757,10 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
         bulletShape = Container(
           width: 5.5,
           height: 5.5,
-          decoration: BoxDecoration(color: cs.onSurface, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: cs.onSurface,
+            shape: BoxShape.circle,
+          ),
         );
       } else if (level == 1) {
         bulletShape = Container(
@@ -548,7 +797,6 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
             cs,
             depth: depth + 1,
             isFirstInListItem: cIdx == 0,
-            onHeadingEncountered: onHeadingEncountered,
           ),
       ],
     );
@@ -588,7 +836,10 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     List<List<MdInline>> normalize(List<List<MdInline>> row) {
       if (row.length == columnCount) return row;
       if (row.length > columnCount) return row.sublist(0, columnCount);
-      return [...row, for (int i = row.length; i < columnCount; i++) const <MdInline>[]];
+      return [
+        ...row,
+        for (int i = row.length; i < columnCount; i++) const <MdInline>[],
+      ];
     }
 
     TextAlign alignFor(int col) {
@@ -631,7 +882,8 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
           for (final row in table.rows)
             TableRow(
               children: [
-                for (int c = 0; c < columnCount; c++) cell(normalize(row)[c], c),
+                for (int c = 0; c < columnCount; c++)
+                  cell(normalize(row)[c], c),
               ],
             ),
         ],
@@ -639,11 +891,20 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     );
   }
 
-  Widget _buildImage(BuildContext context, String alt, String path, ColorScheme cs) {
+  Widget _buildImage(
+    BuildContext context,
+    String alt,
+    String path,
+    ColorScheme cs,
+  ) {
     if (path.isEmpty) return const SizedBox.shrink();
 
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return _RemoteImagePlaceholder(alt: alt, url: path, onTap: widget.onLinkTap);
+      return _RemoteImagePlaceholder(
+        alt: alt,
+        url: path,
+        onTap: widget.onLinkTap,
+      );
     }
 
     final resolved = _resolveVaultPath(widget.currentFilePath, path);
@@ -709,7 +970,15 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     for (final node in nodes) {
       if (node is MdText) {
         if (query != null && query.isNotEmpty) {
-          spans.addAll(_buildSearchHighlightedSpans(node.text, style, query, cs));
+          spans.addAll(
+            _buildSearchHighlightedSpans(
+              node.text,
+              style,
+              query,
+              cs,
+              firstMatchIndex: _textSearchMatchStarts[node] ?? 0,
+            ),
+          );
         } else {
           spans.add(TextSpan(text: node.text, style: style));
         }
@@ -718,19 +987,34 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       } else if (node is MdBold) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(fontWeight: FontWeight.bold), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(fontWeight: FontWeight.bold),
+              cs,
+            ),
           ),
         );
       } else if (node is MdItalic) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(fontStyle: FontStyle.italic), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(fontStyle: FontStyle.italic),
+              cs,
+            ),
           ),
         );
       } else if (node is MdUnderline) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(decoration: TextDecoration.underline), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(decoration: TextDecoration.underline),
+              cs,
+            ),
           ),
         );
       } else if (node is MdHighlight) {
@@ -750,19 +1034,34 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       } else if (node is MdStrikethrough) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(decoration: TextDecoration.lineThrough), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(decoration: TextDecoration.lineThrough),
+              cs,
+            ),
           ),
         );
       } else if (node is MdSubscript) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(fontSize: (style.fontSize ?? 14) * 0.8), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(fontSize: (style.fontSize ?? 14) * 0.8),
+              cs,
+            ),
           ),
         );
       } else if (node is MdSuperscript) {
         spans.add(
           TextSpan(
-            children: _buildSpans(context, node.children, style.copyWith(fontSize: (style.fontSize ?? 14) * 0.8), cs),
+            children: _buildSpans(
+              context,
+              node.children,
+              style.copyWith(fontSize: (style.fontSize ?? 14) * 0.8),
+              cs,
+            ),
           ),
         );
       } else if (node is MdInlineCode) {
@@ -832,11 +1131,13 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     String text,
     TextStyle baseStyle,
     String query,
-    ColorScheme cs,
-  ) {
+    ColorScheme cs, {
+    required int firstMatchIndex,
+  }) {
     final spans = <InlineSpan>[];
     final lower = text.toLowerCase();
     int start = 0;
+    var matchOffset = 0;
 
     while (true) {
       final index = lower.indexOf(query, start);
@@ -846,41 +1147,51 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       }
 
       if (index > start) {
-        spans.add(TextSpan(text: text.substring(start, index), style: baseStyle));
+        spans.add(
+          TextSpan(text: text.substring(start, index), style: baseStyle),
+        );
       }
 
-      final matchIdx = _matchCounter++;
-      while (_searchMatchKeys.length <= matchIdx) {
-        _searchMatchKeys.add(GlobalKey());
-      }
-      final matchKey = _searchMatchKeys[matchIdx];
+      final matchIdx = firstMatchIndex + matchOffset++;
 
       final isCurrent = matchIdx == widget.searchMatchIndex;
       final matchedText = text.substring(index, index + query.length);
 
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.baseline,
-          baseline: TextBaseline.alphabetic,
-          child: KeyedSubtree(
-            key: matchKey,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                color: isCurrent ? Colors.orange : Colors.yellow.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: Text(
-                matchedText,
-                style: baseStyle.copyWith(
-                  color: Colors.black,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+      if (isCurrent) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: KeyedSubtree(
+              key: _activeSearchMatchKey,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Text(
+                  matchedText,
+                  style: baseStyle.copyWith(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
+      } else {
+        spans.add(
+          TextSpan(
+            text: matchedText,
+            style: baseStyle.copyWith(
+              backgroundColor: Colors.yellow.withValues(alpha: 0.7),
+              color: Colors.black,
+            ),
+          ),
+        );
+      }
 
       start = index + query.length;
     }
@@ -928,7 +1239,10 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5), width: 0.8),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.5),
+          width: 0.8,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -937,7 +1251,9 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(7),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -955,7 +1271,10 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
                   onTap: _copy,
                   borderRadius: BorderRadius.circular(4),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1002,12 +1321,16 @@ class _CalloutWidget extends StatefulWidget {
   final MdCallout block;
   final TextTheme textTheme;
   final ColorScheme cs;
+  final bool initialCollapsed;
+  final ValueChanged<bool> onCollapsedChanged;
   final Widget Function(MdBlock child) buildChild;
 
   const _CalloutWidget({
     required this.block,
     required this.textTheme,
     required this.cs,
+    required this.initialCollapsed,
+    required this.onCollapsedChanged,
     required this.buildChild,
   });
 
@@ -1021,7 +1344,15 @@ class _CalloutWidgetState extends State<_CalloutWidget> {
   @override
   void initState() {
     super.initState();
-    _isCollapsed = widget.block.defaultCollapsed;
+    _isCollapsed = widget.initialCollapsed;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CalloutWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCollapsed != widget.initialCollapsed) {
+      _isCollapsed = widget.initialCollapsed;
+    }
   }
 
   (Color, IconData, String) _styleForType(String type, ColorScheme cs) {
@@ -1063,8 +1394,13 @@ class _CalloutWidgetState extends State<_CalloutWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final (accentColor, iconData, defaultTitle) = _styleForType(widget.block.type, widget.cs);
-    final displayTitle = widget.block.title.isNotEmpty ? widget.block.title : defaultTitle;
+    final (accentColor, iconData, defaultTitle) = _styleForType(
+      widget.block.type,
+      widget.cs,
+    );
+    final displayTitle = widget.block.title.isNotEmpty
+        ? widget.block.title
+        : defaultTitle;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -1078,7 +1414,10 @@ class _CalloutWidgetState extends State<_CalloutWidget> {
         children: [
           InkWell(
             onTap: widget.block.collapsible
-                ? () => setState(() => _isCollapsed = !_isCollapsed)
+                ? () => setState(() {
+                    _isCollapsed = !_isCollapsed;
+                    widget.onCollapsedChanged(_isCollapsed);
+                  })
                 : null,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
@@ -1098,7 +1437,9 @@ class _CalloutWidgetState extends State<_CalloutWidget> {
                   ),
                   if (widget.block.collapsible)
                     Icon(
-                      _isCollapsed ? Icons.chevron_right_rounded : Icons.expand_more_rounded,
+                      _isCollapsed
+                          ? Icons.chevron_right_rounded
+                          : Icons.expand_more_rounded,
                       size: 18,
                       color: accentColor,
                     ),
@@ -1112,7 +1453,8 @@ class _CalloutWidgetState extends State<_CalloutWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final child in widget.block.children) widget.buildChild(child),
+                  for (final child in widget.block.children)
+                    widget.buildChild(child),
                 ],
               ),
             ),

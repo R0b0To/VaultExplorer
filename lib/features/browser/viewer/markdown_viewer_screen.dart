@@ -26,7 +26,11 @@ class SearchableTextEditingController extends TextEditingController {
   }) {
     final query = searchQuery?.trim();
     if (query == null || query.isEmpty) {
-      return super.buildTextSpan(context: context, style: style, withComposing: withComposing);
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
     }
 
     final fullText = text;
@@ -37,7 +41,9 @@ class SearchableTextEditingController extends TextEditingController {
     int start = 0;
     int matchCount = 0;
 
-    final baseStyle = style ?? const TextStyle(fontFamily: 'monospace', fontSize: 14, height: 1.5);
+    final baseStyle =
+        style ??
+        const TextStyle(fontFamily: 'monospace', fontSize: 14, height: 1.5);
 
     while (true) {
       final index = lowerFull.indexOf(lowerQuery, start);
@@ -47,7 +53,9 @@ class SearchableTextEditingController extends TextEditingController {
       }
 
       if (index > start) {
-        spans.add(TextSpan(text: fullText.substring(start, index), style: baseStyle));
+        spans.add(
+          TextSpan(text: fullText.substring(start, index), style: baseStyle),
+        );
       }
 
       final isCurrent = matchCount == currentMatchIndex;
@@ -57,7 +65,9 @@ class SearchableTextEditingController extends TextEditingController {
         TextSpan(
           text: fullText.substring(index, index + query.length),
           style: baseStyle.copyWith(
-            backgroundColor: isCurrent ? Colors.orange : Colors.yellow.withValues(alpha: 0.7),
+            backgroundColor: isCurrent
+                ? Colors.orange
+                : Colors.yellow.withValues(alpha: 0.7),
             color: Colors.black,
             fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
           ),
@@ -82,16 +92,19 @@ class MarkdownViewerScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<MarkdownViewerScreen> createState() => _MarkdownViewerScreenState();
+  ConsumerState<MarkdownViewerScreen> createState() =>
+      _MarkdownViewerScreenState();
 }
 
 class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
-  final SearchableTextEditingController _textController = SearchableTextEditingController();
+  final SearchableTextEditingController _textController =
+      SearchableTextEditingController();
   late final UndoHistoryController _undoController;
 
   final ScrollController _previewScrollController = ScrollController();
   final ScrollController _editScrollController = ScrollController();
-  final GlobalKey<MarkdownBodyViewState> _previewKey = GlobalKey<MarkdownBodyViewState>();
+  final GlobalKey<MarkdownBodyViewState> _previewKey =
+      GlobalKey<MarkdownBodyViewState>();
 
   static const TextStyle _editorTextStyle = TextStyle(
     fontFamily: 'monospace',
@@ -100,6 +113,7 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
   );
 
   bool _isPreview = true;
+  String _previewSourceSnapshot = '';
   bool _isSaving = false;
   bool _isAutosaving = false;
   bool _isDirty = false;
@@ -131,7 +145,12 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
 
   Future<void> _loadFile() {
     return ref
-        .read(textEditorLoadProvider(widget.container.volId, widget.filePath).notifier)
+        .read(
+          textEditorLoadProvider(
+            widget.container.volId,
+            widget.filePath,
+          ).notifier,
+        )
         .load(
           widget.container,
           context.l10n.textEditorDecryptFailedMessage,
@@ -169,7 +188,9 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     }
 
     _autosaveTimer?.cancel();
-    final loadState = ref.read(textEditorLoadProvider(widget.container.volId, widget.filePath));
+    final loadState = ref.read(
+      textEditorLoadProvider(widget.container.volId, widget.filePath),
+    );
     if (!loadState.isLoading && !loadState.hasError) {
       _autosaveTimer = Timer(const Duration(milliseconds: 2500), () {
         if (mounted && _isDirty && !_isSaving && !_isAutosaving) {
@@ -237,6 +258,7 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
       }
       child.visitChildren(visitor);
     }
+
     renderObject?.visitChildren(visitor);
     return found;
   }
@@ -252,11 +274,15 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
   double _getEditorYForCharOffset(int charOffset) {
     if (_textController.text.isEmpty) return 0.0;
     final safeOffset = charOffset.clamp(0, _textController.text.length);
-    final currentScroll = _editScrollController.hasClients ? _editScrollController.offset : 0.0;
+    final currentScroll = _editScrollController.hasClients
+        ? _editScrollController.offset
+        : 0.0;
 
     final renderEditable = _getRenderEditable();
     if (renderEditable != null) {
-      final caretRect = renderEditable.getLocalRectForCaret(TextPosition(offset: safeOffset));
+      final caretRect = renderEditable.getLocalRectForCaret(
+        TextPosition(offset: safeOffset),
+      );
       return caretRect.top + currentScroll;
     }
 
@@ -290,7 +316,9 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     int charOffset = 0;
     final renderEditable = _getRenderEditable();
     if (renderEditable != null) {
-      final globalPoint = renderEditable.localToGlobal(const Offset(16.0, 10.0));
+      final globalPoint = renderEditable.localToGlobal(
+        const Offset(16.0, 10.0),
+      );
       final position = renderEditable.getPositionForPoint(globalPoint);
       charOffset = position.offset.clamp(0, _textController.text.length);
     } else {
@@ -360,7 +388,8 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
   void _previousMatch() {
     if (_totalMatches == 0) return;
     setState(() {
-      _currentMatchIndex = (_currentMatchIndex - 1 + _totalMatches) % _totalMatches;
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _totalMatches) % _totalMatches;
       _textController.currentMatchIndex = _currentMatchIndex;
     });
     if (!_isPreview) {
@@ -386,6 +415,7 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
 
   void _togglePreviewMode() {
     if (_isPreview) {
+      _previewSourceSnapshot = _textController.text;
       final visibleLine = _previewKey.currentState?.getFirstVisibleLine() ?? 0;
       setState(() => _isPreview = false);
 
@@ -399,7 +429,10 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
         }
       });
     } else {
-      final scrollY = _editScrollController.hasClients ? _editScrollController.offset : 0.0;
+      _previewSourceSnapshot = _textController.text;
+      final scrollY = _editScrollController.hasClients
+          ? _editScrollController.offset
+          : 0.0;
       final sourceLine = _getEditorVisibleSourceLine(scrollY);
       setState(() => _isPreview = true);
 
@@ -412,15 +445,16 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
   Future<void> _insertImageTemplate() async {
     final imageExts = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'};
     final lastSlash = widget.filePath.lastIndexOf('/');
-    final parentDir = lastSlash >= 0 ? widget.filePath.substring(0, lastSlash) : '';
-    
-    final rawList = await ref.read(vaultFileIoApiProvider).listDirectory(
-          widget.container,
-          parentDir,
-        );
-        
-    final images = rawList == null 
-        ? <RawEntry>[] 
+    final parentDir = lastSlash >= 0
+        ? widget.filePath.substring(0, lastSlash)
+        : '';
+
+    final rawList = await ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, parentDir);
+
+    final images = rawList == null
+        ? <RawEntry>[]
         : RawEntry.parseAll(rawList).where((e) {
             if (e.isDir) return false;
             final dot = e.name.lastIndexOf('.');
@@ -477,7 +511,9 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     final newText = text.replaceRange(selection.start, selection.end, template);
     _textController.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: selection.start + template.length),
+      selection: TextSelection.collapsed(
+        offset: selection.start + template.length,
+      ),
     );
     _focusNode.requestFocus();
   }
@@ -495,8 +531,17 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
 
     final content = _textController.text;
     final error = await ref
-        .read(textEditorLoadProvider(widget.container.volId, widget.filePath).notifier)
-        .save(widget.container, content, context.l10n.textEditorWriteBackFailedMessage);
+        .read(
+          textEditorLoadProvider(
+            widget.container.volId,
+            widget.filePath,
+          ).notifier,
+        )
+        .save(
+          widget.container,
+          content,
+          context.l10n.textEditorWriteBackFailedMessage,
+        );
 
     if (error == null) {
       if (mounted) {
@@ -579,11 +624,19 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     try {
       final ok = await ref.read(vaultFileIoApiProvider).launchUrl(url);
       if (!ok && mounted) {
-        showAppSnackBar(context, message: context.l10n.couldNotOpenLinkMessage, tone: AppBannerTone.error);
+        showAppSnackBar(
+          context,
+          message: context.l10n.couldNotOpenLinkMessage,
+          tone: AppBannerTone.error,
+        );
       }
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, message: context.l10n.couldNotOpenLinkMessage, tone: AppBannerTone.error);
+        showAppSnackBar(
+          context,
+          message: context.l10n.couldNotOpenLinkMessage,
+          tone: AppBannerTone.error,
+        );
       }
     }
   }
@@ -593,21 +646,28 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final loadState = ref.watch(textEditorLoadProvider(widget.container.volId, widget.filePath));
+    final loadState = ref.watch(
+      textEditorLoadProvider(widget.container.volId, widget.filePath),
+    );
 
-    ref.listen(textEditorLoadProvider(widget.container.volId, widget.filePath), (previous, next) {
-      if (!_appliedInitialText && next.loadedText != null) {
-        _appliedInitialText = true;
-        _textController.text = next.loadedText!;
-        _autosaveTimer?.cancel();
-        final lines = next.loadedText!.isEmpty ? 0 : next.loadedText!.split('\n').length;
-        setState(() {
-          _isDirty = false;
-          _lineCount = lines;
-          _charCount = next.loadedText!.length;
-        });
-      }
-    });
+    ref.listen(
+      textEditorLoadProvider(widget.container.volId, widget.filePath),
+      (previous, next) {
+        if (!_appliedInitialText && next.loadedText != null) {
+          _appliedInitialText = true;
+          _textController.text = next.loadedText!;
+          _autosaveTimer?.cancel();
+          final lines = next.loadedText!.isEmpty
+              ? 0
+              : next.loadedText!.split('\n').length;
+          setState(() {
+            _isDirty = false;
+            _lineCount = lines;
+            _charCount = next.loadedText!.length;
+          });
+        }
+      },
+    );
 
     return PopScope(
       canPop: !_isDirty,
@@ -624,7 +684,11 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
           actions: [
             if (!loadState.isLoading && !loadState.hasError) ...[
               IconButton(
-                icon: Icon(_showFindBar ? Icons.search_off_rounded : Icons.search_rounded),
+                icon: Icon(
+                  _showFindBar
+                      ? Icons.search_off_rounded
+                      : Icons.search_rounded,
+                ),
                 tooltip: context.l10n.search,
                 onPressed: _toggleFindBar,
               ),
@@ -643,12 +707,16 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
                         IconButton(
                           icon: const Icon(Icons.undo_rounded),
                           tooltip: context.l10n.undoTooltip,
-                          onPressed: value.canUndo ? () => _undoController.undo() : null,
+                          onPressed: value.canUndo
+                              ? () => _undoController.undo()
+                              : null,
                         ),
                         IconButton(
                           icon: const Icon(Icons.redo_rounded),
                           tooltip: context.l10n.redoTooltip,
-                          onPressed: value.canRedo ? () => _undoController.redo() : null,
+                          onPressed: value.canRedo
+                              ? () => _undoController.redo()
+                              : null,
                         ),
                       ],
                     );
@@ -656,7 +724,11 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
                 ),
               ],
               IconButton(
-                icon: Icon(_isPreview ? Icons.edit_note_rounded : Icons.visibility_outlined),
+                icon: Icon(
+                  _isPreview
+                      ? Icons.edit_note_rounded
+                      : Icons.visibility_outlined,
+                ),
                 tooltip: _isPreview
                     ? context.l10n.markdownViewerEditTooltip
                     : context.l10n.markdownViewerPreviewTooltip,
@@ -674,18 +746,26 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
                         color: _isDirty ? cs.primary : cs.outline,
                       ),
                 tooltip: context.l10n.saveChangesTooltip,
-                onPressed: (_isDirty && !_isSaving && !_isAutosaving) ? () => _saveFile() : null,
+                onPressed: (_isDirty && !_isSaving && !_isAutosaving)
+                    ? () => _saveFile()
+                    : null,
               ),
             ],
           ],
         ),
         body: _buildBody(cs, Theme.of(context).textTheme, loadState),
-        bottomNavigationBar: loadState.isLoading || loadState.hasError ? null : _buildBottomBar(cs),
+        bottomNavigationBar: loadState.isLoading || loadState.hasError
+            ? null
+            : _buildBottomBar(cs),
       ),
     );
   }
 
-  Widget _buildBody(ColorScheme cs, TextTheme textTheme, TextEditorLoadState loadState) {
+  Widget _buildBody(
+    ColorScheme cs,
+    TextTheme textTheme,
+    TextEditorLoadState loadState,
+  ) {
     if (loadState.isLoading) {
       return Center(
         child: Column(
@@ -709,13 +789,17 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
               const SizedBox(height: 16),
               Text(
                 context.l10n.cannotOpenFile,
-                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 loadState.errorMessage,
                 textAlign: TextAlign.center,
-                style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(
@@ -739,7 +823,11 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
               SelectionArea(
                 child: MarkdownBodyView(
                   key: _previewKey,
-                  source: _textController.text,
+                  // Keep the offstage preview stable while the user edits. It
+                  // will parse the latest text once preview mode is selected.
+                  source: _isPreview
+                      ? _textController.text
+                      : _previewSourceSnapshot,
                   container: widget.container,
                   currentFilePath: widget.filePath,
                   onLinkTap: _handleLinkTap,
@@ -773,7 +861,10 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                   ),
                   style: _editorTextStyle,
                 ),
@@ -790,7 +881,9 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        border: Border(bottom: BorderSide(color: cs.outlineVariant, width: 0.5)),
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
@@ -811,7 +904,10 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
             Text(
               _totalMatches == 0
                   ? context.l10n.pdfViewerNoMatches
-                  : context.l10n.xOfYCounter(_currentMatchIndex + 1, _totalMatches),
+                  : context.l10n.xOfYCounter(
+                      _currentMatchIndex + 1,
+                      _totalMatches,
+                    ),
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
             ),
           IconButton(
@@ -856,17 +952,28 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
             SizedBox(
               width: 12,
               height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.8, color: cs.primary),
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: cs.primary,
+              ),
             ),
             const SizedBox(width: 6),
             Text(
               context.l10n.autosavingLabel,
-              style: TextStyle(color: cs.primary, fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ] else if (_isSaving) ...[
             Text(
               context.l10n.savingLabel,
-              style: TextStyle(color: cs.primary, fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ] else if (_isDirty) ...[
             Text(
@@ -878,10 +985,16 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
               ),
             ),
           ] else ...[
-            Icon(Icons.check_circle_outline_rounded, size: 14, color: context.semanticColors.success),
+            Icon(
+              Icons.check_circle_outline_rounded,
+              size: 14,
+              color: context.semanticColors.success,
+            ),
             const SizedBox(width: 4),
             Text(
-              timeStr != null ? context.l10n.autosavedAtLabel(timeStr) : context.l10n.savedToVault,
+              timeStr != null
+                  ? context.l10n.autosavedAtLabel(timeStr)
+                  : context.l10n.savedToVault,
               style: TextStyle(
                 color: context.semanticColors.success,
                 fontSize: 12,

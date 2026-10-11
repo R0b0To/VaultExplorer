@@ -146,6 +146,9 @@ class VideoTimelineState extends State<VideoTimeline> {
       });
 
   bool get isZoomed => _viewSpanUs < _fullSpan;
+  int get viewStartUs => _viewStartUs;
+  int get viewSpanUs => _viewSpanUs;
+  Duration get visibleDuration => Duration(microseconds: _viewSpanUs);
 
   /// Keeps the playhead on screen during playback and after seeks made with
   /// the buttons (not while the user's finger is on the timeline).

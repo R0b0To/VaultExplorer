@@ -4,8 +4,19 @@ const double _seekGestureThreshold = 12.0;
 
 /// Claims a clearly horizontal seek drag after a short movement threshold.
 class SwipeToSeekClaimRecognizer extends HorizontalDragGestureRecognizer {
-  SwipeToSeekClaimRecognizer({required this.canClaim})
-      : super(supportedDevices: const {PointerDeviceKind.touch}) {
+  SwipeToSeekClaimRecognizer({
+    required this.canClaim,
+    Set<PointerDeviceKind>? supportedDevices,
+  }) : super(
+         supportedDevices:
+             supportedDevices ??
+             const {
+               PointerDeviceKind.touch,
+               PointerDeviceKind.mouse,
+               PointerDeviceKind.stylus,
+               PointerDeviceKind.trackpad,
+             },
+       ) {
     onStart = (_) {};
   }
 

@@ -28,17 +28,21 @@ String formatDuration(Duration d) {
 
 /// Formats a playback position/length the way a media player's clock reads:
 /// "03:07", or "01:02:03" once it passes an hour. A negative duration keeps
-/// its sign ("-00:05").
-String formatClockDuration(Duration d) {
+/// its sign ("-00:05"). When [showMilliseconds] is true, appends millisecond
+/// precision (`"03:07.250"`).
+String formatClockDuration(Duration d, {bool showMilliseconds = false}) {
   final Duration abs = d.isNegative ? -d : d;
   final String minutes = abs.inMinutes.remainder(60).toString().padLeft(2, '0');
   final String seconds = abs.inSeconds.remainder(60).toString().padLeft(2, '0');
   final String sign = d.isNegative ? '-' : '';
+  final String millis = showMilliseconds
+      ? '.${(abs.inMilliseconds % 1000).toString().padLeft(3, '0')}'
+      : '';
   if (abs.inHours > 0) {
     final String hours = abs.inHours.toString().padLeft(2, '0');
-    return '$sign$hours:$minutes:$seconds';
+    return '$sign$hours:$minutes:$seconds$millis';
   }
-  return '$sign$minutes:$seconds';
+  return '$sign$minutes:$seconds$millis';
 }
 
 // ── Entry date formatting ────────────────────────────────────────────────────

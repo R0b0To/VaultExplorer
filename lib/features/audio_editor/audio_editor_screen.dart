@@ -24,6 +24,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/editor_swipe_to_seek_area.dart';
 import 'package:vaultexplorer/features/video_editor/models/edit_segment.dart';
 import 'package:vaultexplorer/features/video_editor/models/video_edit_math.dart';
 import 'package:vaultexplorer/features/video_editor/widgets/video_segments_sheet.dart';
@@ -832,10 +833,26 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     final text = context.typography;
     final probe = _probe;
     final details = probe == null ? '' : _describe(probe);
+    final editor = _editor;
+    final totalDuration = Duration(microseconds: editor?.durationUs ?? 0);
+    final canSeek = editor != null &&
+        player.value.isInitialized &&
+        !_exporting &&
+        totalDuration > Duration.zero;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return EditorSwipeToSeekArea(
+      totalDuration: totalDuration,
+      currentPosition: () => Duration(microseconds: _playhead.value),
+      visibleDuration: () => _timelineKey.currentState?.visibleDuration,
+      enabled: canSeek,
       onTap: () => unawaited(_togglePlay()),
+      onSeekStart: _onScrubStart,
+      onSeekUpdate: (pos) => _onScrub(pos.inMicroseconds),
+      onSeekEnd: (_) => _onScrubEnd(),
+      onSeekCancel: (pos) {
+        unawaited(_seekToUs(pos.inMicroseconds));
+        _onScrubEnd();
+      },
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

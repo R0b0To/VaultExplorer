@@ -71,7 +71,7 @@ void main() {
     final switchTile = tester.widget<SwitchListTile>(finder);
     expect(switchTile.value, isFalse);
 
-    await tester.tap(finder);
+    await tester.tap(find.text('Swipe to Seek'));
     await tester.pumpAndSettle();
 
     final updatedTile = tester.widget<SwitchListTile>(finder);

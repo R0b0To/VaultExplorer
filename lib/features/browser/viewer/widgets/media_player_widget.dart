@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_claim_recognizer.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
@@ -2166,68 +2167,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   }
 
   Widget _buildSwipeSeekHud() {
-    final target = _swipeSeekTargetPosition;
-    final total = _seekDragTotalDuration;
-    final delta = _swipeSeekDelta;
-    final isForward = !delta.isNegative;
-    final sign = isForward ? '+' : '-';
-    final deltaText = '$sign${formatClockDuration(delta.abs())}';
-    final posText = formatClockDuration(target);
-    final totalText = formatClockDuration(total);
-    final progressFactor = total.inMilliseconds > 0
-        ? (target.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
-
-    return Center(
-      child: IgnorePointer(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(width: 6),
-                  Text(
-                    deltaText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$posText / $totalText',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: 120,
-                height: 3,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: progressFactor,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return SwipeSeekHud(
+      targetPosition: _swipeSeekTargetPosition,
+      totalDuration: _seekDragTotalDuration,
+      delta: _swipeSeekDelta,
     );
   }
 

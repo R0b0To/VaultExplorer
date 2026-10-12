@@ -5,8 +5,9 @@
 //
 // The code canvas background and plain-code foreground come from
 // resolveEditorSyntaxStyle (text_editor_language.dart). Interface foreground
-// comes from the app-skin token or a contrast-aware fallback. This file turns
-// both roles into a full [ColorScheme]/[ThemeData] for the editor screen.
+// comes from the app-skin token when enabled, otherwise it follows the
+// resolved editor foreground. This file turns both roles into a full
+// [ColorScheme]/[ThemeData] for the editor screen.
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -60,7 +61,7 @@ class EditorChrome {
     final isDark = brightness == Brightness.dark;
     final chromeForeground = appSkinTokens?.editorFollowsAppSkin == true
         ? appSkinTokens!.editorChromeForeground
-        : resolveEditorChromeForeground(background, appScheme);
+        : foreground;
 
     // A solid blend of the editor interface text color over the background: a slightly
     // lifted/dimmed surface that stays in the same hue family as the editor,

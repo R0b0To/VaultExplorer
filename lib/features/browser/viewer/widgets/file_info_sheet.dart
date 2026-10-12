@@ -1255,7 +1255,7 @@ class MetadataParser {
     }
     final w = bytes[6] | (bytes[7] << 8);
     final h = bytes[8] | (bytes[9] << 8);
-    final version = String.fromCharCodes(bytes.sublist(3, 6));
+    final version = String.fromCharCodes(bytes.sublist(0, 6));
 
     final packed = bytes[10];
     final hasPalette = (packed & 0x80) != 0;

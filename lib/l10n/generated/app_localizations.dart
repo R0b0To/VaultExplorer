@@ -18852,6 +18852,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loudness'**
   String get equalizerPresetLoudness;
+
+  /// Title of the audio recorder screen and its entry in the Add menu
+  ///
+  /// In en, this message translates to:
+  /// **'Audio recorder'**
+  String get audioRecorder;
+
+  /// Status message after successfully saving a recorded audio file
+  ///
+  /// In en, this message translates to:
+  /// **'Audio saved'**
+  String get audioCapturedEncrypted;
+
+  /// Shown on the audio recorder when the microphone permission has not been granted
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is required to record audio.'**
+  String get audioMicPermissionRequiredMessage;
+
+  /// Button on the audio recorder that asks for the microphone permission
+  ///
+  /// In en, this message translates to:
+  /// **'Allow microphone'**
+  String get audioRecordingAllowMicrophone;
+
+  /// Tooltip of the record button on the audio recorder
+  ///
+  /// In en, this message translates to:
+  /// **'Start recording'**
+  String get audioRecordingStartTooltip;
+
+  /// Tooltip of the stop button on the audio recorder while recording
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get audioRecordingStopTooltip;
+
+  /// Tooltip of the pause button on the audio recorder while recording
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get audioRecordingPauseTooltip;
+
+  /// Tooltip of the resume button on the audio recorder while paused
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get audioRecordingResumeTooltip;
+
+  /// Label shown under the timer while an audio recording is paused
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get audioRecordingPausedLabel;
+
+  /// Title of the dialog confirming that an unsaved audio recording will be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Discard recording?'**
+  String get audioRecordingDiscardTitle;
+
+  /// Body of the dialog confirming that an unsaved audio recording will be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'This recording hasn\'t been saved and will be permanently deleted.'**
+  String get audioRecordingDiscardMessage;
 }
 
 class _AppLocalizationsDelegate

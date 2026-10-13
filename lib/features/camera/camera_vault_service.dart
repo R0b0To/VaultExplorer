@@ -25,13 +25,30 @@ class CameraVaultService {
     return target.isEmpty ? name : '$target/$name';
   }
 
-  Future<String> nextAvailableName({required bool isPhoto}) async {
+  Future<String> nextAvailableName({required bool isPhoto}) {
+    return _nextAvailableName(
+      prefix: isPhoto ? 'IMG_' : 'VID_',
+      ext: isPhoto ? '.jpg' : '.mp4',
+    );
+  }
+
+  /// Name for an audio-only recording: `AUD_<timestamp>.m4a` (AAC in an
+  /// MPEG-4 container, which is what the native recorder produces).
+  ///
+  /// [at] stamps the name with when the recording started rather than when
+  /// it is saved, which can be minutes later after review.
+  Future<String> nextAvailableAudioName({DateTime? at}) {
+    return _nextAvailableName(prefix: 'AUD_', ext: '.m4a', at: at);
+  }
+
+  Future<String> _nextAvailableName({
+    required String prefix,
+    required String ext,
+    DateTime? at,
+  }) async {
     final existing = await _getExistingNames();
-    final now = DateTime.now();
+    final now = at ?? DateTime.now();
     final stamp = '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-    
-    final prefix = isPhoto ? 'IMG_' : 'VID_';
-    final ext = isPhoto ? '.jpg' : '.mp4';
 
     var candidate = '$prefix$stamp$ext';
     var counter = 1;

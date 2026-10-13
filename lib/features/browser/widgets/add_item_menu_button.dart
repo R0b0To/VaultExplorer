@@ -27,6 +27,7 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
   final void Function() onSignalActivity;
   final Future<void> Function(String path) onLoadDirectoryContents;
   final Future<void> Function() onCaptureFromCamera;
+  final Future<void> Function() onRecordAudio;
   final Future<void> Function() onImportFilesFromDevice;
   final Future<void> Function() onImportFolderFromDevice;
   final Future<void> Function(VaultItemType type) onAddVaultItem;
@@ -58,6 +59,7 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
     required this.onSignalActivity,
     required this.onLoadDirectoryContents,
     required this.onCaptureFromCamera,
+    required this.onRecordAudio,
     required this.onImportFilesFromDevice,
     required this.onImportFolderFromDevice,
     required this.onAddVaultItem,
@@ -196,6 +198,13 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
                 .read(sessionLockControllerProvider)
                 .withLockSuppression(widget.onCaptureFromCamera),
             child: Text(context.l10n.camera),
+          ),
+          MenuItemButton(
+            leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
+            onPressed: () => ref
+                .read(sessionLockControllerProvider)
+                .withLockSuppression(widget.onRecordAudio),
+            child: Text(context.l10n.audioRecorder),
           ),
           const PopupMenuDivider(),
           MenuItemButton(

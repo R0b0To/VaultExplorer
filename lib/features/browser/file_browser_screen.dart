@@ -84,6 +84,7 @@ import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/open_with_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
+import 'package:vaultexplorer/features/camera/audio_capture_screen.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/video_editor/video_editor_screen.dart';
@@ -3375,6 +3376,40 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
+  Future<void> _recordAudio() async {
+    if (_isReadOnly) {
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
+      return;
+    }
+    _signalActivity();
+    try {
+      final savedName = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AudioCaptureScreen(
+            container: widget.container,
+            targetDirPath: _currentDirPath,
+          ),
+        ),
+      );
+      if (savedName == null || !mounted) return;
+      await _loadDirectoryContents(_currentDirPath);
+      _setStatus(
+        context.l10n.audioCapturedEncrypted,
+        autoClear: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      if (mounted) {
+        _setStatus(
+          context.l10n.cameraRecordingFailedWithReasonMessage(
+            '${e.runtimeType}',
+          ),
+          error: true,
+        );
+      }
+    }
+  }
+
   bool _matchesFilter(String fileName) =>
       matchesFilter(fileName, _currentFilter);
 
@@ -3615,6 +3650,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         onLoadDirectoryContents: (path) =>
             _loadDirectoryContents(path, refresh: true),
         onCaptureFromCamera: _captureFromCamera,
+        onRecordAudio: _recordAudio,
         onImportFilesFromDevice: _importFilesFromDevice,
         onImportFolderFromDevice: _importFolderFromDevice,
         onAddVaultItem: _addVaultItem,
@@ -3816,6 +3852,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             onLoadDirectoryContents: (path) =>
                 _loadDirectoryContents(path, refresh: true),
             onCaptureFromCamera: _captureFromCamera,
+            onRecordAudio: _recordAudio,
             onImportFilesFromDevice: _importFilesFromDevice,
             onImportFolderFromDevice: _importFolderFromDevice,
             onAddVaultItem: _addVaultItem,

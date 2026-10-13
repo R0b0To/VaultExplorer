@@ -11328,4 +11328,39 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => 'Sonoridad';
+
+  @override
+  String get audioRecorder => 'Grabadora de audio';
+
+  @override
+  String get audioCapturedEncrypted => 'Audio guardado';
+
+  @override
+  String get audioMicPermissionRequiredMessage =>
+      'Se requiere permiso de micrófono para grabar audio.';
+
+  @override
+  String get audioRecordingAllowMicrophone => 'Permitir micrófono';
+
+  @override
+  String get audioRecordingStartTooltip => 'Iniciar grabación';
+
+  @override
+  String get audioRecordingStopTooltip => 'Detener grabación';
+
+  @override
+  String get audioRecordingPauseTooltip => 'Pausar';
+
+  @override
+  String get audioRecordingResumeTooltip => 'Reanudar';
+
+  @override
+  String get audioRecordingPausedLabel => 'Pausado';
+
+  @override
+  String get audioRecordingDiscardTitle => '¿Descartar grabación?';
+
+  @override
+  String get audioRecordingDiscardMessage =>
+      'Esta grabación no se ha guardado y se eliminará de forma permanente.';
 }

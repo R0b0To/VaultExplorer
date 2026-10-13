@@ -10525,4 +10525,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => '响度';
+
+  @override
+  String get audioRecorder => '录音机';
+
+  @override
+  String get audioCapturedEncrypted => '音频已保存';
+
+  @override
+  String get audioMicPermissionRequiredMessage => '录制音频需要麦克风权限。';
+
+  @override
+  String get audioRecordingAllowMicrophone => '允许使用麦克风';
+
+  @override
+  String get audioRecordingStartTooltip => '开始录制';
+
+  @override
+  String get audioRecordingStopTooltip => '停止录制';
+
+  @override
+  String get audioRecordingPauseTooltip => '暂停';
+
+  @override
+  String get audioRecordingResumeTooltip => '继续';
+
+  @override
+  String get audioRecordingPausedLabel => '已暂停';
+
+  @override
+  String get audioRecordingDiscardTitle => '放弃录音？';
+
+  @override
+  String get audioRecordingDiscardMessage => '此录音尚未保存，将被永久删除。';
 }

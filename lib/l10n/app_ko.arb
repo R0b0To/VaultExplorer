@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "재즈",
   "equalizerPresetClassical": "클래식",
   "equalizerPresetElectronic": "일렉트로닉",
-  "equalizerPresetLoudness": "라우드니스"
+  "equalizerPresetLoudness": "라우드니스",
+  "audioRecorder": "오디오 녹음기",
+  "audioCapturedEncrypted": "오디오가 저장되었습니다",
+  "audioMicPermissionRequiredMessage": "오디오를 녹음하려면 마이크 권한이 필요합니다.",
+  "audioRecordingAllowMicrophone": "마이크 허용",
+  "audioRecordingStartTooltip": "녹화 시작",
+  "audioRecordingStopTooltip": "녹화 중지",
+  "audioRecordingPauseTooltip": "일시 정지",
+  "audioRecordingResumeTooltip": "이어보기",
+  "audioRecordingPausedLabel": "일시 중지됨",
+  "audioRecordingDiscardTitle": "녹음을 취소할까요?",
+  "audioRecordingDiscardMessage": "이 녹음은 저장되지 않았으며 영구적으로 삭제됩니다."
 }

@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "Jazz",
   "equalizerPresetClassical": "Classica",
   "equalizerPresetElectronic": "Elettronica",
-  "equalizerPresetLoudness": "Loudness"
+  "equalizerPresetLoudness": "Loudness",
+  "audioRecorder": "Registratore audio",
+  "audioCapturedEncrypted": "Audio salvato",
+  "audioMicPermissionRequiredMessage": "È richiesta l'autorizzazione per il microfono per registrare audio.",
+  "audioRecordingAllowMicrophone": "Consenti microfono",
+  "audioRecordingStartTooltip": "Avvia registrazione",
+  "audioRecordingStopTooltip": "Interrompi registrazione",
+  "audioRecordingPauseTooltip": "Pausa",
+  "audioRecordingResumeTooltip": "Riprendi",
+  "audioRecordingPausedLabel": "In pausa",
+  "audioRecordingDiscardTitle": "Annullare la registrazione?",
+  "audioRecordingDiscardMessage": "Questa registrazione non è stata salvata e verrà eliminata definitivamente."
 }

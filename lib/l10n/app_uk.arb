@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "Джаз",
   "equalizerPresetClassical": "Класика",
   "equalizerPresetElectronic": "Електроніка",
-  "equalizerPresetLoudness": "Тонкомпенсація"
+  "equalizerPresetLoudness": "Тонкомпенсація",
+  "audioRecorder": "Диктофон",
+  "audioCapturedEncrypted": "Аудіо збережено",
+  "audioMicPermissionRequiredMessage": "Для запису аудіо потрібен дозвіл на мікрофон.",
+  "audioRecordingAllowMicrophone": "Дозволити мікрофон",
+  "audioRecordingStartTooltip": "Почати запис",
+  "audioRecordingStopTooltip": "Зупинити запис",
+  "audioRecordingPauseTooltip": "Пауза",
+  "audioRecordingResumeTooltip": "Відновити",
+  "audioRecordingPausedLabel": "Пауза",
+  "audioRecordingDiscardTitle": "Відкинути запис?",
+  "audioRecordingDiscardMessage": "Цей запис не збережено, і його буде остаточно видалено."
 }

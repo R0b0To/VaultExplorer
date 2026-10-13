@@ -11324,4 +11324,39 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => 'الجهارة';
+
+  @override
+  String get audioRecorder => 'مسجّل الصوت';
+
+  @override
+  String get audioCapturedEncrypted => 'تم حفظ التسجيل الصوتي';
+
+  @override
+  String get audioMicPermissionRequiredMessage =>
+      'يلزم إذن الميكروفون لتسجيل الصوت.';
+
+  @override
+  String get audioRecordingAllowMicrophone => 'السماح بالميكروفون';
+
+  @override
+  String get audioRecordingStartTooltip => 'بدء التسجيل';
+
+  @override
+  String get audioRecordingStopTooltip => 'إيقاف التسجيل';
+
+  @override
+  String get audioRecordingPauseTooltip => 'إيقاف مؤقت';
+
+  @override
+  String get audioRecordingResumeTooltip => 'استئناف';
+
+  @override
+  String get audioRecordingPausedLabel => 'متوقف مؤقتًا';
+
+  @override
+  String get audioRecordingDiscardTitle => 'تجاهل التسجيل؟';
+
+  @override
+  String get audioRecordingDiscardMessage =>
+      'لم يتم حفظ هذا التسجيل وسيتم حذفه نهائيًا.';
 }

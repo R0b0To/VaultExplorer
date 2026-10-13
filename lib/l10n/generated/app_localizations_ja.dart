@@ -10692,4 +10692,37 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => 'ラウドネス';
+
+  @override
+  String get audioRecorder => '音声レコーダー';
+
+  @override
+  String get audioCapturedEncrypted => '音声を保存しました';
+
+  @override
+  String get audioMicPermissionRequiredMessage => '音声を録音するには、マイクの権限が必要です。';
+
+  @override
+  String get audioRecordingAllowMicrophone => 'マイクを許可';
+
+  @override
+  String get audioRecordingStartTooltip => '録画を開始';
+
+  @override
+  String get audioRecordingStopTooltip => '録画を停止';
+
+  @override
+  String get audioRecordingPauseTooltip => '一時停止';
+
+  @override
+  String get audioRecordingResumeTooltip => '再開';
+
+  @override
+  String get audioRecordingPausedLabel => '一時停止中';
+
+  @override
+  String get audioRecordingDiscardTitle => '録音を破棄しますか？';
+
+  @override
+  String get audioRecordingDiscardMessage => 'この録音は保存されておらず、完全に削除されます。';
 }

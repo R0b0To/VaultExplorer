@@ -39,6 +39,7 @@
 
     <string name="camera_recording_channel_description">Ongoing recording status</string>
     <string name="camera_recording_notification_title">Recording video</string>
+    <string name="audio_recording_notification_title">Recording audio</string>
     <string name="camera_recording_notification_text">Saving to %1$s</string>
     <string name="camera_recording_stop_action">Stop &amp; save</string>
     <string name="camera_recording_notification_text_decoy">Archive Explorer is running</string>

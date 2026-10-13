@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "Jazz",
   "equalizerPresetClassical": "Klassik",
   "equalizerPresetElectronic": "Elektronik",
-  "equalizerPresetLoudness": "Loudness"
+  "equalizerPresetLoudness": "Loudness",
+  "audioRecorder": "Audiorecorder",
+  "audioCapturedEncrypted": "Audio gespeichert",
+  "audioMicPermissionRequiredMessage": "Die Mikrofonberechtigung ist erforderlich, um Audio aufzunehmen.",
+  "audioRecordingAllowMicrophone": "Mikrofon erlauben",
+  "audioRecordingStartTooltip": "Aufnahme starten",
+  "audioRecordingStopTooltip": "Aufnahme stoppen",
+  "audioRecordingPauseTooltip": "Pause",
+  "audioRecordingResumeTooltip": "Fortsetzen",
+  "audioRecordingPausedLabel": "Pausiert",
+  "audioRecordingDiscardTitle": "Aufnahme verwerfen?",
+  "audioRecordingDiscardMessage": "Diese Aufnahme wurde nicht gespeichert und wird endgültig gelöscht."
 }

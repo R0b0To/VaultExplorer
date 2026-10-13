@@ -1346,15 +1346,18 @@ class VaultFileIoApi {
   /// the OS tearing down the camera/mic connection. Only called by
   /// CameraCaptureScreen, and only when "lock vaults on screen lock" is
   /// off for the container being recorded into. See that service for the
-  /// full rationale.
+  /// full rationale. [audioOnly] makes it declare only the microphone type
+  /// (used by AudioCaptureScreen, which has no camera in play).
   Future<void> startBackgroundRecording({
     required int volId,
     required String containerName,
+    bool audioOnly = false,
   }) async {
     try {
       await _channel.invokeMethod(ChannelMethods.startBackgroundRecording, {
         'volId': volId,
         'containerName': containerName,
+        'audioOnly': audioOnly,
       });
     } catch (e) {
       logSwallowed('startBackgroundRecording', e);

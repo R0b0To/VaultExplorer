@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "爵士",
   "equalizerPresetClassical": "古典",
   "equalizerPresetElectronic": "电子",
-  "equalizerPresetLoudness": "响度"
+  "equalizerPresetLoudness": "响度",
+  "audioRecorder": "录音机",
+  "audioCapturedEncrypted": "音频已保存",
+  "audioMicPermissionRequiredMessage": "录制音频需要麦克风权限。",
+  "audioRecordingAllowMicrophone": "允许使用麦克风",
+  "audioRecordingStartTooltip": "开始录制",
+  "audioRecordingStopTooltip": "停止录制",
+  "audioRecordingPauseTooltip": "暂停",
+  "audioRecordingResumeTooltip": "继续",
+  "audioRecordingPausedLabel": "已暂停",
+  "audioRecordingDiscardTitle": "放弃录音？",
+  "audioRecordingDiscardMessage": "此录音尚未保存，将被永久删除。"
 }

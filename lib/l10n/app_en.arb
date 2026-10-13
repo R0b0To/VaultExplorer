@@ -12912,5 +12912,49 @@
   "equalizerPresetLoudness": "Loudness",
   "@equalizerPresetLoudness": {
     "description": "Equalizer preset that boosts lows and highs to keep quiet playback sounding full"
+  },
+  "audioRecorder": "Audio recorder",
+  "@audioRecorder": {
+    "description": "Title of the audio recorder screen and its entry in the Add menu"
+  },
+  "audioCapturedEncrypted": "Audio saved",
+  "@audioCapturedEncrypted": {
+    "description": "Status message after successfully saving a recorded audio file"
+  },
+  "audioMicPermissionRequiredMessage": "Microphone permission is required to record audio.",
+  "@audioMicPermissionRequiredMessage": {
+    "description": "Shown on the audio recorder when the microphone permission has not been granted"
+  },
+  "audioRecordingAllowMicrophone": "Allow microphone",
+  "@audioRecordingAllowMicrophone": {
+    "description": "Button on the audio recorder that asks for the microphone permission"
+  },
+  "audioRecordingStartTooltip": "Start recording",
+  "@audioRecordingStartTooltip": {
+    "description": "Tooltip of the record button on the audio recorder"
+  },
+  "audioRecordingStopTooltip": "Stop recording",
+  "@audioRecordingStopTooltip": {
+    "description": "Tooltip of the stop button on the audio recorder while recording"
+  },
+  "audioRecordingPauseTooltip": "Pause",
+  "@audioRecordingPauseTooltip": {
+    "description": "Tooltip of the pause button on the audio recorder while recording"
+  },
+  "audioRecordingResumeTooltip": "Resume",
+  "@audioRecordingResumeTooltip": {
+    "description": "Tooltip of the resume button on the audio recorder while paused"
+  },
+  "audioRecordingPausedLabel": "Paused",
+  "@audioRecordingPausedLabel": {
+    "description": "Label shown under the timer while an audio recording is paused"
+  },
+  "audioRecordingDiscardTitle": "Discard recording?",
+  "@audioRecordingDiscardTitle": {
+    "description": "Title of the dialog confirming that an unsaved audio recording will be deleted"
+  },
+  "audioRecordingDiscardMessage": "This recording hasn't been saved and will be permanently deleted.",
+  "@audioRecordingDiscardMessage": {
+    "description": "Body of the dialog confirming that an unsaved audio recording will be deleted"
   }
 }

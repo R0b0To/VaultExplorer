@@ -11381,4 +11381,39 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => 'Тонкомпенсація';
+
+  @override
+  String get audioRecorder => 'Диктофон';
+
+  @override
+  String get audioCapturedEncrypted => 'Аудіо збережено';
+
+  @override
+  String get audioMicPermissionRequiredMessage =>
+      'Для запису аудіо потрібен дозвіл на мікрофон.';
+
+  @override
+  String get audioRecordingAllowMicrophone => 'Дозволити мікрофон';
+
+  @override
+  String get audioRecordingStartTooltip => 'Почати запис';
+
+  @override
+  String get audioRecordingStopTooltip => 'Зупинити запис';
+
+  @override
+  String get audioRecordingPauseTooltip => 'Пауза';
+
+  @override
+  String get audioRecordingResumeTooltip => 'Відновити';
+
+  @override
+  String get audioRecordingPausedLabel => 'Пауза';
+
+  @override
+  String get audioRecordingDiscardTitle => 'Відкинути запис?';
+
+  @override
+  String get audioRecordingDiscardMessage =>
+      'Цей запис не збережено, і його буде остаточно видалено.';
 }

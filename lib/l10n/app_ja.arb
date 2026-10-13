@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "ジャズ",
   "equalizerPresetClassical": "クラシック",
   "equalizerPresetElectronic": "エレクトロニック",
-  "equalizerPresetLoudness": "ラウドネス"
+  "equalizerPresetLoudness": "ラウドネス",
+  "audioRecorder": "音声レコーダー",
+  "audioCapturedEncrypted": "音声を保存しました",
+  "audioMicPermissionRequiredMessage": "音声を録音するには、マイクの権限が必要です。",
+  "audioRecordingAllowMicrophone": "マイクを許可",
+  "audioRecordingStartTooltip": "録画を開始",
+  "audioRecordingStopTooltip": "録画を停止",
+  "audioRecordingPauseTooltip": "一時停止",
+  "audioRecordingResumeTooltip": "再開",
+  "audioRecordingPausedLabel": "一時停止中",
+  "audioRecordingDiscardTitle": "録音を破棄しますか？",
+  "audioRecordingDiscardMessage": "この録音は保存されておらず、完全に削除されます。"
 }

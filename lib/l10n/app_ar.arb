@@ -3115,5 +3115,16 @@
   "equalizerPresetJazz": "جاز",
   "equalizerPresetClassical": "كلاسيكي",
   "equalizerPresetElectronic": "إلكتروني",
-  "equalizerPresetLoudness": "الجهارة"
+  "equalizerPresetLoudness": "الجهارة",
+  "audioRecorder": "مسجّل الصوت",
+  "audioCapturedEncrypted": "تم حفظ التسجيل الصوتي",
+  "audioMicPermissionRequiredMessage": "يلزم إذن الميكروفون لتسجيل الصوت.",
+  "audioRecordingAllowMicrophone": "السماح بالميكروفون",
+  "audioRecordingStartTooltip": "بدء التسجيل",
+  "audioRecordingStopTooltip": "إيقاف التسجيل",
+  "audioRecordingPauseTooltip": "إيقاف مؤقت",
+  "audioRecordingResumeTooltip": "استئناف",
+  "audioRecordingPausedLabel": "متوقف مؤقتًا",
+  "audioRecordingDiscardTitle": "تجاهل التسجيل؟",
+  "audioRecordingDiscardMessage": "لم يتم حفظ هذا التسجيل وسيتم حذفه نهائيًا."
 }

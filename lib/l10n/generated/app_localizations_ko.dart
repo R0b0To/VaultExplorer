@@ -10691,4 +10691,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get equalizerPresetLoudness => '라우드니스';
+
+  @override
+  String get audioRecorder => '오디오 녹음기';
+
+  @override
+  String get audioCapturedEncrypted => '오디오가 저장되었습니다';
+
+  @override
+  String get audioMicPermissionRequiredMessage => '오디오를 녹음하려면 마이크 권한이 필요합니다.';
+
+  @override
+  String get audioRecordingAllowMicrophone => '마이크 허용';
+
+  @override
+  String get audioRecordingStartTooltip => '녹화 시작';
+
+  @override
+  String get audioRecordingStopTooltip => '녹화 중지';
+
+  @override
+  String get audioRecordingPauseTooltip => '일시 정지';
+
+  @override
+  String get audioRecordingResumeTooltip => '이어보기';
+
+  @override
+  String get audioRecordingPausedLabel => '일시 중지됨';
+
+  @override
+  String get audioRecordingDiscardTitle => '녹음을 취소할까요?';
+
+  @override
+  String get audioRecordingDiscardMessage => '이 녹음은 저장되지 않았으며 영구적으로 삭제됩니다.';
 }

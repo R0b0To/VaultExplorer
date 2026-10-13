@@ -359,6 +359,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
+    private var vaultAudioCapturePlugin: com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin? = null
     private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
     private val privacyCurtain = PrivacyCurtain(this)
     private val pendingResult = PendingActivityResult()
@@ -417,6 +418,7 @@ open class MainActivity : FlutterFragmentActivity() {
         privacyCurtain.install()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
+            com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder.sweepOrphanedTempFiles(cacheDir)
             com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin.sweepOrphanedScratchpads(applicationContext)
             SecureFileWipe.sweepOrphanedFiles(
                 cacheDir,
@@ -528,6 +530,8 @@ open class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        vaultAudioCapturePlugin?.dispose()
+        vaultAudioCapturePlugin = null
         quickCaptureScratchpadPlugin?.dispose()
         quickCaptureScratchpadPlugin = null
         nativePlayerManager.release()
@@ -551,6 +555,9 @@ open class MainActivity : FlutterFragmentActivity() {
         if (requestCode == com.aeidolon.vaultexplorer.camera.CAMERA_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
             methodChannel?.invokeMethod("onCameraPermissionResult", mapOf("granted" to granted))
+        } else if (requestCode == com.aeidolon.vaultexplorer.audiocapture.AUDIO_CAPTURE_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            vaultAudioCapturePlugin?.onPermissionResult(granted)
         } else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
             methodChannel?.invokeMethod("onStoragePermissionResult", mapOf("granted" to granted))
@@ -637,6 +644,7 @@ open class MainActivity : FlutterFragmentActivity() {
         resizeExecutorPools()
         nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
+        vaultAudioCapturePlugin = com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin(this, flutterEngine.dartExecutor.binaryMessenger)
         quickCaptureScratchpadPlugin = com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
 
         flutterEngine.platformViewsController.registry.registerViewFactory(

@@ -33,6 +33,14 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
  * open rather than closing while this service is running -- see
  * CameraCaptureScreen._handleGoingInactive() in Dart.
  *
+ * The same service also keeps an audio-only recording (see
+ * AudioCaptureScreen / VaultAudioCapturePlugin) alive. In that mode
+ * [EXTRA_AUDIO_ONLY] is set and the service declares only the microphone
+ * type: claiming the camera type without a camera in use would be wrong,
+ * and on Android 14+ it fails outright when the camera permission has not
+ * been granted -- which is exactly the situation of someone who only wants
+ * to record audio.
+ *
  * Only started when the "lock vaults on screen lock" setting is off for
  * the container being recorded into -- if it's on, the screen turning
  * off is expected to lock (and therefore should stop) the recording
@@ -56,6 +64,9 @@ class VaultCameraRecordingService : Service() {
         const val EXTRA_VOL_ID = "volId"
         const val EXTRA_CONTAINER_NAME = "containerName"
 
+        /** True when the recording being kept alive is audio-only. */
+        const val EXTRA_AUDIO_ONLY = "audioOnly"
+
         @Volatile
         var isRunning: Boolean = false
             private set
@@ -73,6 +84,7 @@ class VaultCameraRecordingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentVolId: Int = -1
     private var currentContainerName: String = ""
+    private var audioOnly: Boolean = false
     private var cachedContentIntent: PendingIntent? = null
 
     override fun onCreate() {
@@ -87,7 +99,11 @@ class VaultCameraRecordingService : Service() {
 
      private fun startForegroundCompat() {
         val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            if (audioOnly) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
         } else {
             0
         }
@@ -107,6 +123,7 @@ class VaultCameraRecordingService : Service() {
 
         intent?.getIntExtra(EXTRA_VOL_ID, -1)?.let { if (it != -1) currentVolId = it }
         intent?.getStringExtra(EXTRA_CONTAINER_NAME)?.let { currentContainerName = it }
+        audioOnly = intent?.getBooleanExtra(EXTRA_AUDIO_ONLY, false) ?: audioOnly
 
         startForegroundCompat()
         wakeLock?.let { if (!it.isHeld) it.acquire(6 * 60 * 60 * 1000L /* 6h safety cap */) }
@@ -122,6 +139,7 @@ class VaultCameraRecordingService : Service() {
         wakeLock = null
         currentVolId = -1
         currentContainerName = ""
+        audioOnly = false
         cachedContentIntent = null
         super.onDestroy()
     }
@@ -187,10 +205,13 @@ class VaultCameraRecordingService : Service() {
             actionLabel = localized.getString(R.string.camera_recording_stop_action_decoy)
             smallIcon = R.drawable.ic_notification_folder
         } else {
-            contentTitle = localized.getString(R.string.camera_recording_notification_title)
+            contentTitle = localized.getString(
+                if (audioOnly) R.string.audio_recording_notification_title
+                else R.string.camera_recording_notification_title,
+            )
             contentText = localized.getString(R.string.camera_recording_notification_text, currentContainerName)
             actionLabel = localized.getString(R.string.camera_recording_stop_action)
-            smallIcon = R.drawable.ic_notification_camera
+            smallIcon = if (audioOnly) R.drawable.ic_notification_mic else R.drawable.ic_notification_camera
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)

@@ -1,4 +1,5 @@
 // Extracted from vault_explorer_api_file_io.dart (old _FileIoOps mixin) as part of the Riverpod migration, Phase 2.
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
@@ -26,6 +27,8 @@ import 'vault_engine_types.dart';
 class VaultFileIoApi {
   final MethodChannel _channel;
   static const LocalFileIoBackend _local = LocalFileIoBackend();
+  static int _archiveWriteSequence = 0;
+  static const int _localSourceChunkSize = 4 * 1024 * 1024;
   const VaultFileIoApi(this._channel);
 
   // ── File I/O ──────────────────────────────────────────────────────────────
@@ -303,7 +306,8 @@ class VaultFileIoApi {
   /// instead of going through a vault session -- the same `isLocalStorage`
   /// bypass [getVideoThumbnail] already relies on (see
   /// `ThumbnailHandlers.runImageThumbnail` on the Kotlin side). This keeps
-  /// the returned bytes real, small JPEGs either way; previously local
+  /// the returned bytes real, small JPEGs either way. Full-screen callers
+  /// may request an alpha-preserving WebP; previously local
   /// storage was decoded via `dart:ui` instead, which can only emit PNG
   /// and silently failed `ThumbnailCacheService`'s JPEG-only validation,
   /// so local thumbnails were never actually cached at any tier.
@@ -312,6 +316,7 @@ class VaultFileIoApi {
     String fileName, {
     int targetSize = 180,
     int quality = 70,
+    bool preserveAlpha = false,
   }) async {
     try {
       final Uint8List? bytes = await _channel
@@ -320,11 +325,36 @@ class VaultFileIoApi {
             'fileName': fileName,
             'targetSize': targetSize,
             'quality': quality,
+            'preserveAlpha': preserveAlpha,
             'isLocalStorage': container.isLocalStorage,
           });
       return bytes;
     } catch (e) {
       logSwallowed('getImageThumbnail', e, expected: true);
+      return null;
+    }
+  }
+
+  /// Generates a size-limited thumbnail from an app-private local file.
+  /// Used for archive entries after native extraction has streamed them to a
+  /// temporary file, so a large source image never crosses the method channel
+  /// as a full byte array.
+  Future<Uint8List?> getImageThumbnailFromLocalPath(
+    String sourcePath, {
+    int targetSize = 180,
+    int quality = 70,
+  }) async {
+    try {
+      return await _channel
+          .invokeMethod<Uint8List>(ChannelMethods.getImageThumbnail, {
+            'filePath': sourcePath,
+            'fileName': sourcePath,
+            'targetSize': targetSize,
+            'quality': quality,
+            'isLocalStorage': true,
+          });
+    } catch (e) {
+      logSwallowed('getImageThumbnailFromLocalPath', e, expected: true);
       return null;
     }
   }
@@ -788,6 +818,83 @@ class VaultFileIoApi {
           'opId': opId,
         });
     return result ?? false;
+  }
+
+  /// Streams a local file into a container without loading its full contents
+  /// into Dart memory. The destination is written to a unique sibling first,
+  /// then renamed into place after the write completes.
+  ///
+  /// Non-SAF destinations use the existing native write-back path. SAF
+  /// destinations are written in bounded chunks because writeBackFile expects
+  /// a mounted vault session.
+  Future<bool> writeFileFromLocalPath(
+    MountedContainer container,
+    String fileName,
+    String sourcePath, {
+    int opId = 0,
+  }) async {
+    final sequence = _archiveWriteSequence++;
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final parentSeparator = fileName.lastIndexOf('/');
+    final parent = parentSeparator < 0
+        ? ''
+        : fileName.substring(0, parentSeparator + 1);
+    final tempPath = '${parent}.archive_extract_${stamp}_$sequence.tmp';
+    var committed = false;
+
+    try {
+      final written = _isSaf(container)
+          ? await _writeLocalSourceInChunks(container, tempPath, sourcePath)
+          : await writeBackFile(container, tempPath, sourcePath, opId: opId);
+      if (!written) return false;
+
+      if (!_isSaf(container) && !await finishWrite(container, tempPath)) {
+        return false;
+      }
+
+      await deleteFile(container, fileName);
+      committed = await renameFile(container, tempPath, fileName);
+      return committed;
+    } finally {
+      if (!committed) {
+        await deleteFile(container, tempPath);
+      }
+    }
+  }
+
+  Future<bool> _writeLocalSourceInChunks(
+    MountedContainer container,
+    String targetPath,
+    String sourcePath,
+  ) async {
+    RandomAccessFile? source;
+    try {
+      source = await File(sourcePath).open(mode: FileMode.read);
+      final length = await source.length();
+      var offset = 0;
+
+      do {
+        final remaining = length - offset;
+        final chunkLength = remaining > _localSourceChunkSize
+            ? _localSourceChunkSize
+            : remaining;
+        final chunk = chunkLength == 0
+            ? Uint8List(0)
+            : await source.read(chunkLength);
+        if (chunk.length != chunkLength) return false;
+        if (!await writeFileChunk(container, targetPath, offset, chunk)) {
+          return false;
+        }
+        offset += chunk.length;
+      } while (offset < length);
+
+      return true;
+    } catch (e) {
+      logSwallowed('writeFileFromLocalPath', e);
+      return false;
+    } finally {
+      await source?.close();
+    }
   }
 
   Future<bool> createEmptyFile(

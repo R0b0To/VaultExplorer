@@ -46,6 +46,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   Uint8List? _thumbnailBytes;
   String? _error;
   bool _isFullResLoaded = false;
+  bool _isLargeImagePreview = false;
   String? _currentlyLoadingFile;
   Completer<void>? _limiterCompleter;
   late final ThumbnailCacheService _thumbnailCache;
@@ -57,6 +58,11 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       widget.onSizeKnown?.call(dims.$1, dims.$2);
     }
   }
+
+  bool _isWebpImage(Uint8List bytes) =>
+      bytes.length >= 12 &&
+      String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+      String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP';
 
   @override
   void initState() {
@@ -79,6 +85,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     if (cachedFullRes != null) {
       _bytes = cachedFullRes;
       _isFullResLoaded = true;
+      _isLargeImagePreview = false;
       _sniffAndNotifySize(cachedFullRes);
     } else {
       _loadImage();
@@ -102,6 +109,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
         widget.container,
         widget.fileName,
       );
+      _isLargeImagePreview = false;
       if (cachedFullRes != null) {
         _bytes = cachedFullRes;
         _isFullResLoaded = true;
@@ -153,6 +161,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
           _error = null;
           _bytes = cachedFullRes;
           _isFullResLoaded = true;
+          _isLargeImagePreview = false;
         });
       }
       return;
@@ -163,7 +172,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     _limiterCompleter = completer;
 
     if (_thumbnailBytes == null) {
-      _loadThumbnailFromCache(targetFile);
+      unawaited(_loadThumbnailFromCache(targetFile));
     }
 
     try {
@@ -186,6 +195,13 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
         _error = null;
         _bytes = data;
         _isFullResLoaded = true;
+        _isLargeImagePreview =
+            FullResImageCache.isLargeImagePreview(
+              widget.container,
+              targetFile,
+            ) ||
+            (widget.fileName.toLowerCase().endsWith('.avif') &&
+                _isWebpImage(data));
       });
       _sniffAndNotifySize(data);
     } catch (e) {
@@ -244,30 +260,32 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _error!,
-                style: TextStyle(color: cs.error, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _error = null;
-                  });
-                  _loadImage();
-                },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: Text(context.l10n.retryButton),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cs.errorContainer,
-                  foregroundColor: cs.onErrorContainer,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _error!,
+                  style: TextStyle(color: cs.error, fontSize: 13),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _error = null;
+                    });
+                    _loadImage();
+                  },
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: Text(context.l10n.retryButton),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cs.errorContainer,
+                    foregroundColor: cs.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -283,7 +301,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     }
 
     final isAvif = widget.fileName.toLowerCase().endsWith('.avif');
-    if (isAvif) {
+    if (isAvif && !_isLargeImagePreview) {
       return Stack(
         fit: StackFit.expand,
         children: [

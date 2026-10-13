@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "앱 잠금",
   "skinPreviewSettingOneHint": "생체 인식 및 자동 잠금",
   "skinPreviewSettingTwo": "저장소",
-  "skinPreviewSettingTwoHint": "외부 저장소 및 클라우드 브리지"
+  "skinPreviewSettingTwoHint": "외부 저장소 및 클라우드 브리지",
+  "inPlaceEditDone": "완료",
+  "inPlaceEditTitle": "컨트롤 배치",
+  "inPlaceEditHint": "바 사이로 동작을 드래그하거나 눌러서 배치",
+  "inPlaceEditAvailable": "사용 가능한 동작",
+  "inPlaceEditTopDock": "상단 바",
+  "inPlaceEditBottomDock": "하단 독",
+  "inPlaceEditDragToRemove": "삭제하려면 여기로 드래그",
+  "inPlaceEditAddToTop": "상단 바에 추가",
+  "inPlaceEditAddToBottom": "하단 독에 추가",
+  "inPlaceEditEmptyDock": "여기에 동작 놓기",
+  "inPlaceEditPlayerSettings": "플레이어 설정",
+  "inPlaceEditMoveToMore": "더보기 메뉴로 이동",
+  "inPlaceEditMoveToAdvanced": "고급 설정으로 이동",
+  "inPlaceEditHideAction": "동작 숨기기",
+  "inPlaceEditHidden": "숨김"
 }

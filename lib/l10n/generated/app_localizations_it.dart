@@ -11570,4 +11570,50 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get skinPreviewSettingTwoHint =>
       'Archiviazione esterna e bridge cloud';
+
+  @override
+  String get inPlaceEditDone => 'Fine';
+
+  @override
+  String get inPlaceEditTitle => 'Disponi controlli';
+
+  @override
+  String get inPlaceEditHint =>
+      'Trascina le azioni tra le barre o tocca per disporre';
+
+  @override
+  String get inPlaceEditAvailable => 'Azioni disponibili';
+
+  @override
+  String get inPlaceEditTopDock => 'Barra superiore';
+
+  @override
+  String get inPlaceEditBottomDock => 'Barra inferiore';
+
+  @override
+  String get inPlaceEditDragToRemove => 'Trascina qui per rimuovere';
+
+  @override
+  String get inPlaceEditAddToTop => 'Aggiungi alla barra superiore';
+
+  @override
+  String get inPlaceEditAddToBottom => 'Aggiungi alla barra inferiore';
+
+  @override
+  String get inPlaceEditEmptyDock => 'Rilascia le azioni qui';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'Impostazioni lettore';
+
+  @override
+  String get inPlaceEditMoveToMore => 'Sposta nel menu Altro';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => 'Sposta in Impostazioni avanzate';
+
+  @override
+  String get inPlaceEditHideAction => 'Nascondi azione';
+
+  @override
+  String get inPlaceEditHidden => 'Nascosto';
 }

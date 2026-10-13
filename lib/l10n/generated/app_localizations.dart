@@ -19338,6 +19338,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'External storage and cloud bridges'**
   String get skinPreviewSettingTwoHint;
+
+  /// Done button label for the in-place media viewer control layout editor
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get inPlaceEditDone;
+
+  /// Title for the in-place media viewer control layout editor
+  ///
+  /// In en, this message translates to:
+  /// **'Arrange Controls'**
+  String get inPlaceEditTitle;
+
+  /// Hint explaining how to arrange actions in the in-place editor
+  ///
+  /// In en, this message translates to:
+  /// **'Drag actions between docks or tap to organize'**
+  String get inPlaceEditHint;
+
+  /// Header for the unplaced actions picker panel in in-place editor
+  ///
+  /// In en, this message translates to:
+  /// **'Available Actions'**
+  String get inPlaceEditAvailable;
+
+  /// Label for the top bar dock in the in-place layout editor
+  ///
+  /// In en, this message translates to:
+  /// **'Top Bar'**
+  String get inPlaceEditTopDock;
+
+  /// Label for the bottom dock in the in-place layout editor
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom Dock'**
+  String get inPlaceEditBottomDock;
+
+  /// Hint showing that dropping an action in center removes it from dock
+  ///
+  /// In en, this message translates to:
+  /// **'Drag here to remove'**
+  String get inPlaceEditDragToRemove;
+
+  /// Option to add an action to the top bar dock
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Top Bar'**
+  String get inPlaceEditAddToTop;
+
+  /// Option to add an action to the bottom dock
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Bottom Dock'**
+  String get inPlaceEditAddToBottom;
+
+  /// Placeholder text shown inside an empty dock in in-place editor
+  ///
+  /// In en, this message translates to:
+  /// **'Drop actions here'**
+  String get inPlaceEditEmptyDock;
+
+  /// Tooltip for button opening playback and advanced player settings
+  ///
+  /// In en, this message translates to:
+  /// **'Player Settings'**
+  String get inPlaceEditPlayerSettings;
+
+  /// Option to move an action into the More overflow menu
+  ///
+  /// In en, this message translates to:
+  /// **'Move to More Menu'**
+  String get inPlaceEditMoveToMore;
+
+  /// Option to move an action into the Advanced Settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Advanced Settings'**
+  String get inPlaceEditMoveToAdvanced;
+
+  /// Option to completely hide an action from all menus
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Action'**
+  String get inPlaceEditHideAction;
+
+  /// Header and label for hidden / unused actions
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get inPlaceEditHidden;
 }
 
 class _AppLocalizationsDelegate

@@ -11,18 +11,18 @@ import 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart';
 export 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart'
     show TaskPriority;
 
-/// In-memory cache for full-resolution decrypted image bytes, keyed per
-/// container session (see [_key]).
+/// In-memory cache for decrypted image data, keyed per container session
+/// (see [_key]). Large files use a separate, bounded native-decoded preview.
 ///
 /// This exists specifically to avoid re-decrypting and re-transferring a
 /// full image file across the platform channel every time the user swipes
 /// back to something they've already viewed in this session. It is
 /// deliberately memory-only and not persisted to disk: unlike thumbnails,
-/// full-resolution bytes are cheap to regenerate from the still-mounted
-/// container (the native [ChunkedFileEngine] already keeps its own
-/// decrypted-chunk cache and open-handle LRU), so there's no need to pay
-/// disk-encryption overhead for a cache whose only job is to avoid redundant
-/// work within a single viewing session.
+/// image data is cheap to regenerate from the still-mounted container (the
+/// native [ChunkedFileEngine] already keeps its own decrypted-chunk cache
+/// and open-handle LRU), so there's no need to pay disk-encryption overhead
+/// for a cache whose only job is to avoid redundant work within a single
+/// viewing session.
 ///
 /// Budgeted by total bytes rather than entry count, since photo file sizes
 /// vary from a few hundred KB to tens of MB (or more for RAW) — see
@@ -35,8 +35,20 @@ class FullResImageCache {
   /// self-limiting since single files larger than this are simply not cached
   /// (see [ByteBudgetCache]).
   static const int _maxTotalBytes = 150 * 1024 * 1024;
+  // Keep method-channel image transfers small even on devices with little
+  // remaining heap; larger files are sampled by native code instead.
+  static const int _maxInlineImageBytes = 8 * 1024 * 1024;
+  static const int _largeImagePreviewSize = 2048;
+  static const int _largeImagePreviewQuality = 95;
+  static const int _largeImagePreviewBudget = 24 * 1024 * 1024;
 
-  static final _cache = ByteBudgetCache(_maxTotalBytes);
+  static final _cache = ByteBudgetCache(
+    _maxTotalBytes - _largeImagePreviewBudget,
+  );
+  // Large images are decoded to a bounded WebP on the native side. Keep
+  // those display copies separate so image editing never mistakes a
+  // downsampled preview for the original file bytes.
+  static final _largeImagePreviews = ByteBudgetCache(_largeImagePreviewBudget);
 
   static String _key(MountedContainer container, String filePath) =>
       '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
@@ -48,31 +60,58 @@ class FullResImageCache {
     MountedContainer container,
     String filePath,
     Uint8List data,
-  ) => _cache[_key(container, filePath)] = data;
+  ) {
+    final key = _key(container, filePath);
+    _largeImagePreviews.remove(key);
+    _cache[key] = data;
+  }
 
   static bool contains(MountedContainer container, String filePath) =>
-      _cache.containsKey(_key(container, filePath));
+      _cache.containsKey(_key(container, filePath)) ||
+      _largeImagePreviews.containsKey(_key(container, filePath));
 
-  static void invalidate(MountedContainer container, String filePath) =>
-      _cache.remove(_key(container, filePath));
+  static bool isLargeImagePreview(
+    MountedContainer container,
+    String filePath,
+  ) =>
+      _largeImagePreviews.containsKey(_key(container, filePath));
+
+  static void invalidate(MountedContainer container, String filePath) {
+    final key = _key(container, filePath);
+    _cache.remove(key);
+    _largeImagePreviews.remove(key);
+  }
 
   /// Clears all cached full-resolution bytes. Call this on container
   /// lock/unmount to release memory promptly rather than waiting for LRU
   /// eviction or process death.
-  static void clear() => _cache.clear();
+  static void clear() {
+    _cache.clear();
+    _largeImagePreviews.clear();
+  }
 
   /// Applies device-tier-scaled sizing (ADR-011) — see
   /// `DeviceCapabilityProfiler`/`runDeferredStartupWork()`. `FullResImageCache`
   /// is the one cache in this subsystem that was already byte-budgeted
   /// correctly from the start (ADR-002); this just exposes that primitive
   /// for the same profiler-driven sizing every other cache now has.
-  static void resize(int newMaxTotalBytes) => _cache.resize(newMaxTotalBytes);
+  static void resize(int newMaxTotalBytes) {
+    final previewBudget = (newMaxTotalBytes ~/ 6)
+        .clamp(1, _largeImagePreviewBudget)
+        .toInt();
+    _largeImagePreviews.resize(previewBudget);
+    _cache.resize(
+      (newMaxTotalBytes - previewBudget).clamp(1, newMaxTotalBytes).toInt(),
+    );
+  }
 
   /// Evicts [fraction] of currently-held bytes, oldest-first, without
   /// permanently lowering the budget — the full-res half of
   /// `CacheCoordinator.trimAll` (Finding F-15 / ADR-011).
-  static void trimToFraction(double fraction) =>
-      _cache.trimToFraction(fraction);
+  static void trimToFraction(double fraction) {
+    _cache.trimToFraction(fraction);
+    _largeImagePreviews.trimToFraction(fraction);
+  }
 
   // --------------------------------------------------------------------
   // Concurrency gate
@@ -134,6 +173,8 @@ class FullResImageCache {
   }) {
     final cached = get(container, filePath);
     if (cached != null) return Future.value(cached);
+    final cachedPreview = _largeImagePreviews[_key(container, filePath)];
+    if (cachedPreview != null) return Future.value(cachedPreview);
 
     final key = _key(container, filePath);
     final existing = _inFlight[key];
@@ -175,12 +216,30 @@ class FullResImageCache {
       // (isStillWanted() turning false) short-circuits to null instead of
       // being reported as a fetch error.
       Uint8List? result;
+      var sampledLargeImage = false;
       try {
         result = await retryWithBackoff<Uint8List>((attempt) async {
           if (!isStillWanted()) throw _StaleRequestException();
           final size = await fileIoApi.getMediaFileSize(container, filePath);
           if (size <= 0) throw Exception('File size is empty');
           if (!isStillWanted()) throw _StaleRequestException();
+
+          if (size >= _maxInlineImageBytes) {
+            final preview = await fileIoApi.getImageThumbnail(
+              container,
+              filePath,
+              targetSize: _largeImagePreviewSize,
+              quality: _largeImagePreviewQuality,
+              preserveAlpha: true,
+            );
+            if (preview == null || preview.isEmpty) {
+              throw Exception('Failed to decode large image');
+            }
+            if (!isStillWanted()) throw _StaleRequestException();
+            sampledLargeImage = true;
+            _largeImagePreviews[key] = preview;
+            return preview;
+          }
 
           final data = await fileIoApi.readMediaFileChunk(
             container,
@@ -197,7 +256,9 @@ class FullResImageCache {
         return null;
       }
 
-      put(container, filePath, result);
+      if (!sampledLargeImage) {
+        put(container, filePath, result);
+      }
       return result;
     } finally {
       if (acquired) limiter.release(completer);

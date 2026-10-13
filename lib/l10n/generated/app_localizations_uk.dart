@@ -11650,4 +11650,51 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => 'Зовнішні сховища та хмарні мости';
+
+  @override
+  String get inPlaceEditDone => 'Готово';
+
+  @override
+  String get inPlaceEditTitle => 'Розташування елементів керування';
+
+  @override
+  String get inPlaceEditHint =>
+      'Перетягуйте дії між панелями або торкніться для налаштування';
+
+  @override
+  String get inPlaceEditAvailable => 'Доступні дії';
+
+  @override
+  String get inPlaceEditTopDock => 'Верхня панель';
+
+  @override
+  String get inPlaceEditBottomDock => 'Нижня панель';
+
+  @override
+  String get inPlaceEditDragToRemove => 'Перетягніть сюди, щоб вилучити';
+
+  @override
+  String get inPlaceEditAddToTop => 'Додати на верхню панель';
+
+  @override
+  String get inPlaceEditAddToBottom => 'Додати на нижню панель';
+
+  @override
+  String get inPlaceEditEmptyDock => 'Перетягніть дії сюди';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'Налаштування програвача';
+
+  @override
+  String get inPlaceEditMoveToMore => 'Перемістити до меню «Більше»';
+
+  @override
+  String get inPlaceEditMoveToAdvanced =>
+      'Перемістити до розширених налаштувань';
+
+  @override
+  String get inPlaceEditHideAction => 'Приховати дію';
+
+  @override
+  String get inPlaceEditHidden => 'Приховано';
 }

@@ -13,6 +13,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 class ArchiveService {
   ArchiveService._();
 
+  static const int _maxEntryBytesInMemory = 4 * 1024 * 1024;
+
   static VaultArchiveApi? _archiveApi;
   static VaultFileIoApi? _fileIoApi;
 
@@ -161,15 +163,17 @@ class ArchiveService {
     int count = 0;
 
     for (final entryPath in entryPaths) {
-      final bytes = await archiveContext.extractEntry(entryPath);
-      if (bytes == null) continue;
-
       final baseName = p.basename(entryPath);
       final destPath = targetDirInContainer.isEmpty
           ? baseName
           : '$targetDirInContainer/$baseName';
 
-      final ok = await _fileIo.writeWholeFile(container, destPath, bytes);
+      final ok = await _extractEntryToContainer(
+        container: container,
+        archiveContext: archiveContext,
+        entryPath: entryPath,
+        destPath: destPath,
+      );
       if (ok) count++;
     }
 
@@ -248,11 +252,14 @@ class ArchiveService {
 
       onProgress?.call(p.basename(name));
 
-      final bytes = await archiveContext.extractEntry(name);
-      if (bytes != null) {
-        final ok = await _fileIo.writeWholeFile(container, destPath, bytes);
-        if (ok) count++;
-      }
+      final ok = await _extractEntryToContainer(
+        container: container,
+        archiveContext: archiveContext,
+        entryPath: name,
+        destPath: destPath,
+        opId: opId,
+      );
+      if (ok) count++;
     }
 
     return count;
@@ -291,9 +298,6 @@ class ArchiveService {
     }
 
     for (final relPath in targetFiles) {
-      final bytes = await archiveContext.extractEntry(relPath);
-      if (bytes == null) continue;
-
       final destPath = targetDirInContainer.isEmpty
           ? relPath
           : '$targetDirInContainer/$relPath';
@@ -303,13 +307,53 @@ class ArchiveService {
         await _fileIo.createDirectory(container, parentDir);
       }
 
-      final ok = await _fileIo.writeWholeFile(container, destPath, bytes);
+      final ok = await _extractEntryToContainer(
+        container: container,
+        archiveContext: archiveContext,
+        entryPath: relPath,
+        destPath: destPath,
+        opId: opId,
+      );
       if (ok) {
         count++;
         onProgress?.call(count, p.basename(destPath));
       }
     }
     return count;
+  }
+
+  static Future<bool> _extractEntryToContainer({
+    required MountedContainer container,
+    required ArchiveContext archiveContext,
+    required String entryPath,
+    required String destPath,
+    int? opId,
+  }) async {
+    final entry = archiveContext.findEntry(entryPath);
+    if (entry != null &&
+        entry.uncompressedSize > 0 &&
+        entry.uncompressedSize <= _maxEntryBytesInMemory) {
+      final bytes = await archiveContext.extractEntry(entryPath);
+      return bytes != null &&
+          await _fileIo.writeWholeFile(container, destPath, bytes);
+    }
+
+    final staged = await archiveContext.stageEntryForBrowse(entryPath);
+    final stagedPath = staged.path;
+    if (staged.status != ArchiveOpenStatus.ok || stagedPath == null) {
+      return false;
+    }
+
+    try {
+      return await _fileIo.writeFileFromLocalPath(
+        container,
+        destPath,
+        stagedPath,
+        opId: opId ?? 0,
+      );
+    } finally {
+      await _archive.discardBrowseFile(stagedPath);
+    }
   }
 
   /// Directly calls the archive creation API.

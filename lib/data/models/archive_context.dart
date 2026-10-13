@@ -173,9 +173,9 @@ class ArchiveContext {
 
   /// Extracts the raw bytes of a single file entry from the archive on-demand.
   ///
-  /// Convenience wrapper over [extractEntryResult] for callers (bulk
-  /// extraction loops) that just want bytes-or-null and don't need to react
-  /// to *why* an entry failed.
+  /// Convenience wrapper over [extractEntryResult] for callers that need a
+  /// small entry's contents in memory and don't need to react to *why* it
+  /// failed. Large files should use [stageEntryForBrowse] instead.
   Future<Uint8List?> extractEntry(String entryPath) async {
     final res = await extractEntryResult(entryPath);
     return res.status == ArchiveOpenStatus.ok ? res.data : null;
@@ -223,9 +223,9 @@ class ArchiveContext {
     );
   }
 
-  /// Streams an entry directly into an app-private temporary file for a
-  /// seekable in-app preview. Unlike [extractEntry], this never creates a
-  /// full Dart-side byte array, so it is appropriate for large media files.
+  /// Streams an entry directly into an app-private temporary file. Unlike
+  /// [extractEntry], this never creates a full Dart-side byte array, so it is
+  /// appropriate for large media previews and extraction transfers.
   Future<ArchiveEntryStageResult> stageEntryForBrowse(String entryPath) async {
     if (!_isSafeRelativePath(entryPath)) {
       return ArchiveEntryStageResult.ioError('Unsafe entry path');
@@ -253,6 +253,13 @@ class ArchiveContext {
       );
     }
     return ArchiveEntryStageResult.ioError('Archive has no backing source');
+  }
+
+  /// Removes a temporary file created by [stageEntryForBrowse].
+  Future<bool> discardStagedEntry(String path) async {
+    final api = _api;
+    if (api == null) return false;
+    return api.discardBrowseFile(path);
   }
 
   /// Returns a copy of this context that will use [newPassphrase] for

@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "Bloqueo de app",
   "skinPreviewSettingOneHint": "Biometría y bloqueo automático",
   "skinPreviewSettingTwo": "Almacenamiento",
-  "skinPreviewSettingTwoHint": "Almacenamiento externo y puentes en la nube"
+  "skinPreviewSettingTwoHint": "Almacenamiento externo y puentes en la nube",
+  "inPlaceEditDone": "Listo",
+  "inPlaceEditTitle": "Organizar controles",
+  "inPlaceEditHint": "Arrastra acciones entre barras o toca para organizar",
+  "inPlaceEditAvailable": "Acciones disponibles",
+  "inPlaceEditTopDock": "Barra superior",
+  "inPlaceEditBottomDock": "Barra inferior",
+  "inPlaceEditDragToRemove": "Arrastra aquí para quitar",
+  "inPlaceEditAddToTop": "Añadir a la barra superior",
+  "inPlaceEditAddToBottom": "Añadir a la barra inferior",
+  "inPlaceEditEmptyDock": "Suelta acciones aquí",
+  "inPlaceEditPlayerSettings": "Ajustes del reproductor",
+  "inPlaceEditMoveToMore": "Mover al menú Más",
+  "inPlaceEditMoveToAdvanced": "Mover a Ajustes avanzados",
+  "inPlaceEditHideAction": "Ocultar acción",
+  "inPlaceEditHidden": "Oculto"
 }

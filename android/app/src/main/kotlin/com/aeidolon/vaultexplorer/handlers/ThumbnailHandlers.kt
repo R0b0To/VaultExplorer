@@ -950,6 +950,7 @@ class ThumbnailHandlers(
         quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
+        preserveAlpha: Boolean = false,
     ): ImageThumbnailOutcome {
         // Read EXIF orientation from its own stream, before the bounds pass
         // below -- ExifInterface consumes/seeks the stream it's given, so it
@@ -1025,7 +1026,11 @@ class ThumbnailHandlers(
         val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
         val decodeOptions = BitmapFactory.Options().apply {
             this.inSampleSize = inSampleSize
-            this.inPreferredConfig = Bitmap.Config.RGB_565
+            this.inPreferredConfig = if (preserveAlpha) {
+                Bitmap.Config.ARGB_8888
+            } else {
+                Bitmap.Config.RGB_565
+            }
         }
 
         try {
@@ -1048,7 +1053,12 @@ class ThumbnailHandlers(
         if (scaledBitmap != rawBitmap) rawBitmap.recycle()
 
         val stream = ByteArrayOutputStream()
-        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+        val format = if (preserveAlpha) {
+            Bitmap.CompressFormat.WEBP
+        } else {
+            Bitmap.CompressFormat.JPEG
+        }
+        scaledBitmap.compress(format, quality.coerceIn(1, 100), stream)
         val bytes = stream.toByteArray()
         scaledBitmap.recycle()
 
@@ -1065,6 +1075,7 @@ class ThumbnailHandlers(
         val targetSize = call.argument<Int>("targetSize") ?: 180
         val quality = call.argument<Int>("quality") ?: 70
         val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+        val preserveAlpha = call.argument<Boolean>("preserveAlpha") ?: false
 
         if (uriString == null || fileName == null) {
             result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -1086,6 +1097,7 @@ class ThumbnailHandlers(
                         targetSize,
                         quality,
                         isVideo = false,
+                        preserveAlpha = preserveAlpha,
                     )
                     if (thumb != null) {
                         val bytes = thumb["bytes"] as ByteArray
@@ -1119,7 +1131,16 @@ class ThumbnailHandlers(
                         }
                 }
 
-                when (val outcome = extractImageThumbnail(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)) {
+                when (val outcome = extractImageThumbnail(
+                    uriString,
+                    fileName,
+                    volId,
+                    targetSize,
+                    quality,
+                    isLocalStorage,
+                    localFile,
+                    preserveAlpha,
+                )) {
                     is ImageThumbnailOutcome.Success ->
                         activity.runOnUiThread { result.success(onSuccess(outcome)) }
                     is ImageThumbnailOutcome.Failure ->

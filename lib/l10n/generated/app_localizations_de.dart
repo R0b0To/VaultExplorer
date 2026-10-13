@@ -11573,4 +11573,51 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => 'Externer Speicher und Cloud-Brücken';
+
+  @override
+  String get inPlaceEditDone => 'Fertig';
+
+  @override
+  String get inPlaceEditTitle => 'Steuerung anordnen';
+
+  @override
+  String get inPlaceEditHint =>
+      'Aktionen zwischen Leisten ziehen oder zum Anordnen tippen';
+
+  @override
+  String get inPlaceEditAvailable => 'Verfügbare Aktionen';
+
+  @override
+  String get inPlaceEditTopDock => 'Obere Leiste';
+
+  @override
+  String get inPlaceEditBottomDock => 'Untere Leiste';
+
+  @override
+  String get inPlaceEditDragToRemove => 'Hierher ziehen zum Entfernen';
+
+  @override
+  String get inPlaceEditAddToTop => 'Zur oberen Leiste hinzufügen';
+
+  @override
+  String get inPlaceEditAddToBottom => 'Zur unteren Leiste hinzufügen';
+
+  @override
+  String get inPlaceEditEmptyDock => 'Aktionen hier ablegen';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'Player-Einstellungen';
+
+  @override
+  String get inPlaceEditMoveToMore => 'Ins Mehr-Menü verschieben';
+
+  @override
+  String get inPlaceEditMoveToAdvanced =>
+      'Zu erweiterten Einstellungen verschieben';
+
+  @override
+  String get inPlaceEditHideAction => 'Aktion ausblenden';
+
+  @override
+  String get inPlaceEditHidden => 'Ausgeblendet';
 }

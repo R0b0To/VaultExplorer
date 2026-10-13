@@ -17,7 +17,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
   final String? initialPage;
   final List<MediaViewerAction> actions;
   final ValueChanged<MediaViewerAction> onExecuteAction;
-  final VoidCallback onCustomizeControls;
+  final VoidCallback? onCustomizeControls;
   final bool isPlaylistMode;
   final bool isImage;
   final String currentFileName;
@@ -47,7 +47,7 @@ class AdvancedSettingsSheet extends ConsumerStatefulWidget {
     this.initialPage,
     this.actions = const [],
     required this.onExecuteAction,
-    required this.onCustomizeControls,
+    this.onCustomizeControls,
     required this.isPlaylistMode,
     required this.isImage,
     this.isMuted = false,
@@ -216,16 +216,7 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (state.sheetPage == 'main') ...[
-                  _buildHeader(
-                    context,
-                    cs,
-                    widget.isImage
-                        ? context.l10n.imageSettingsTitle
-                        : context.l10n.playbackSettingsTitle,
-                    null,
-                  ),
-                  const SizedBox(height: 8),
+                 if (state.sheetPage == 'main') ...[
                   _buildDynamicControls(context, ref, params, state, cs),
                 ] else if (state.sheetPage == 'imageFit') ...[
                   _buildHeader(
@@ -249,16 +240,23 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
                   ),
                   const SizedBox(height: 8),
                   _buildSlideshowDelaySubmenu(context, ref, params, state, cs),
-                ] else if (state.sheetPage == 'playbackSpeed') ...[
-                  _buildHeader(
-                    context,
-                    cs,
-                    context.l10n.playbackSpeedLabel,
-                    () => ref
-                        .read(advancedSettingsControllerProvider(params).notifier)
-                        .setSheetPage('main'),
-                  ),
-                  const SizedBox(height: 8),
+                ]  else if (state.sheetPage == 'playbackSpeed') ...[
+                  if (widget.initialPage == null ||
+                      widget.initialPage == 'main')
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.arrow_back_rounded,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        onPressed: () => ref
+                            .read(
+                              advancedSettingsControllerProvider(params).notifier,
+                            )
+                            .setSheetPage('main'),
+                      ),
+                    ),
                   _buildPlaybackSpeedSubmenu(context, ref, params, state, cs),
                 ] else if (state.sheetPage == 'aspectRatio') ...[
                   _buildHeader(
@@ -337,20 +335,7 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             if (i > 0) const Divider(height: 1),
             _buildActionRow(context, ref, params, state, cs, effectiveActions[i]),
           ],
-        const Divider(),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.dashboard_customize_rounded, color: cs.primary),
-          title: Text(
-            context.l10n.mediaViewerCustomizeControls,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
-          ),
-          onTap: () {
-            Navigator.pop(context);
-            widget.onCustomizeControls();
-          },
-        ),
-      ],
+         ],
     );
   }
 
@@ -388,28 +373,67 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
                 .setSheetPage('imageFit');
           },
         );
-      case MediaViewerAction.playbackSpeed:
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.slow_motion_video_rounded),
-          title: Text(context.l10n.playbackSpeedLabel),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                context.l10n.playbackSpeedValue('${state.playbackSpeed}'),
-                style: TextStyle(color: cs.primary, fontSize: 13),
+    case MediaViewerAction.playbackSpeed:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.slow_motion_video_rounded),
+              title: Text(context.l10n.playbackSpeedLabel),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    state.playbackSpeed == 1.0
+                        ? context.l10n.playbackSpeedNormal('${state.playbackSpeed}')
+                        : context.l10n.playbackSpeedValue('${state.playbackSpeed}'),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 20),
+                ],
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, size: 20),
-            ],
-          ),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            ref
-                .read(advancedSettingsControllerProvider(params).notifier)
-                .setSheetPage('playbackSpeed');
-          },
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ref
+                    .read(advancedSettingsControllerProvider(params).notifier)
+                    .setSheetPage('playbackSpeed');
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 36, right: 8, bottom: 6),
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                ),
+                child: Slider(
+                  value: state.playbackSpeed.clamp(0.25, 2.0),
+                  min: 0.25,
+                  max: 2.0,
+                  divisions: 35,
+                  activeColor: cs.primary,
+                  inactiveColor: cs.surfaceContainerHighest,
+                  onChanged: (val) {
+                    final rounded = (val * 20).round() / 20;
+                    if ((rounded - state.playbackSpeed).abs() >= 0.01) {
+                      HapticFeedback.selectionClick();
+                      ref
+                          .read(advancedSettingsControllerProvider(params).notifier)
+                          .setPlaybackSpeed(rounded, widget.onPlaybackSpeedChanged);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       case MediaViewerAction.aspectRatio:
         return ListTile(
@@ -686,39 +710,112 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
     AdvancedSettingsState state,
     ColorScheme cs,
   ) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: MediaViewerConstants.playbackSpeeds.map((speed) {
-        final isSelected = state.playbackSpeed == speed;
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            speed == 1.0
-                ? context.l10n.playbackSpeedNormal('$speed')
-                : context.l10n.playbackSpeedValue('$speed'),
-            style: TextStyle(
-              color: isSelected ? cs.primary : null,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    final speeds = MediaViewerConstants.playbackSpeeds;
+    final minSpeed = speeds.isNotEmpty ? speeds.first : 0.25;
+    final maxSpeed = speeds.isNotEmpty ? speeds.last : 2.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              state.playbackSpeed == 1.0
+                  ? context.l10n.playbackSpeedNormal('${state.playbackSpeed}')
+                  : context.l10n.playbackSpeedValue('${state.playbackSpeed}'),
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
-          trailing: isSelected
-              ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : const SizedBox(width: 18),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            ref
-                .read(advancedSettingsControllerProvider(params).notifier)
-                .setPlaybackSpeed(speed, widget.onPlaybackSpeedChanged);
-            if (widget.initialPage != null && widget.initialPage != 'main') {
-              Navigator.pop(context);
-            } else {
-              ref
-                  .read(advancedSettingsControllerProvider(params).notifier)
-                  .setSheetPage('main');
-            }
-          },
-        );
-      }).toList(),
+          const SizedBox(height: 16),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+            ),
+            child: Slider(
+              value: state.playbackSpeed.clamp(minSpeed, maxSpeed),
+              min: minSpeed,
+              max: maxSpeed,
+              divisions: ((maxSpeed - minSpeed) / 0.05).round(),
+              activeColor: cs.primary,
+              inactiveColor: cs.surfaceContainerHighest,
+              onChanged: (val) {
+                final rounded = (val * 20).round() / 20;
+                if ((rounded - state.playbackSpeed).abs() >= 0.01) {
+                  HapticFeedback.selectionClick();
+                  ref
+                      .read(advancedSettingsControllerProvider(params).notifier)
+                      .setPlaybackSpeed(rounded, widget.onPlaybackSpeedChanged);
+                }
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${minSpeed}x',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                ),
+                Text(
+                  '1.0x',
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '${maxSpeed}x',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: speeds.map((speed) {
+              final isSelected = (state.playbackSpeed - speed).abs() < 0.01;
+              return ChoiceChip(
+                label: Text('${speed}x'),
+                selected: isSelected,
+                selectedColor: cs.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? cs.onPrimary : cs.onSurface,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 12,
+                ),
+                showCheckmark: false,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                onSelected: (_) {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(advancedSettingsControllerProvider(params).notifier)
+                      .setPlaybackSpeed(speed, widget.onPlaybackSpeedChanged);
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
     );
   }
 

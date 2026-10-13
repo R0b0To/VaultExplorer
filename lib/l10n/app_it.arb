@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "Blocco app",
   "skinPreviewSettingOneHint": "Biometria e blocco automatico",
   "skinPreviewSettingTwo": "Archiviazione",
-  "skinPreviewSettingTwoHint": "Archiviazione esterna e bridge cloud"
+  "skinPreviewSettingTwoHint": "Archiviazione esterna e bridge cloud",
+  "inPlaceEditDone": "Fine",
+  "inPlaceEditTitle": "Disponi controlli",
+  "inPlaceEditHint": "Trascina le azioni tra le barre o tocca per disporre",
+  "inPlaceEditAvailable": "Azioni disponibili",
+  "inPlaceEditTopDock": "Barra superiore",
+  "inPlaceEditBottomDock": "Barra inferiore",
+  "inPlaceEditDragToRemove": "Trascina qui per rimuovere",
+  "inPlaceEditAddToTop": "Aggiungi alla barra superiore",
+  "inPlaceEditAddToBottom": "Aggiungi alla barra inferiore",
+  "inPlaceEditEmptyDock": "Rilascia le azioni qui",
+  "inPlaceEditPlayerSettings": "Impostazioni lettore",
+  "inPlaceEditMoveToMore": "Sposta nel menu Altro",
+  "inPlaceEditMoveToAdvanced": "Sposta in Impostazioni avanzate",
+  "inPlaceEditHideAction": "Nascondi azione",
+  "inPlaceEditHidden": "Nascosto"
 }

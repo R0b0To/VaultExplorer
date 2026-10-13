@@ -11570,4 +11570,50 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get skinPreviewSettingTwoHint =>
       'Armazenamento externo e pontes na nuvem';
+
+  @override
+  String get inPlaceEditDone => 'Concluído';
+
+  @override
+  String get inPlaceEditTitle => 'Organizar controles';
+
+  @override
+  String get inPlaceEditHint =>
+      'Arraste ações entre as barras ou toque para organizar';
+
+  @override
+  String get inPlaceEditAvailable => 'Ações disponíveis';
+
+  @override
+  String get inPlaceEditTopDock => 'Barra superior';
+
+  @override
+  String get inPlaceEditBottomDock => 'Barra inferior';
+
+  @override
+  String get inPlaceEditDragToRemove => 'Arraste aqui para remover';
+
+  @override
+  String get inPlaceEditAddToTop => 'Adicionar à barra superior';
+
+  @override
+  String get inPlaceEditAddToBottom => 'Adicionar à barra inferior';
+
+  @override
+  String get inPlaceEditEmptyDock => 'Solte as ações aqui';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'Configurações do reprodutor';
+
+  @override
+  String get inPlaceEditMoveToMore => 'Mover para o menu Mais';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => 'Mover para Configurações avançadas';
+
+  @override
+  String get inPlaceEditHideAction => 'Ocultar ação';
+
+  @override
+  String get inPlaceEditHidden => 'Oculto';
 }

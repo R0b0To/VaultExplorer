@@ -10770,4 +10770,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => '外部存储与云桥接';
+
+  @override
+  String get inPlaceEditDone => '完成';
+
+  @override
+  String get inPlaceEditTitle => '排列控制项';
+
+  @override
+  String get inPlaceEditHint => '在工具栏之间拖动操作或点击进行排列';
+
+  @override
+  String get inPlaceEditAvailable => '可用操作';
+
+  @override
+  String get inPlaceEditTopDock => '顶部栏';
+
+  @override
+  String get inPlaceEditBottomDock => '底部栏';
+
+  @override
+  String get inPlaceEditDragToRemove => '拖动至此移除';
+
+  @override
+  String get inPlaceEditAddToTop => '添加至顶部栏';
+
+  @override
+  String get inPlaceEditAddToBottom => '添加至底部栏';
+
+  @override
+  String get inPlaceEditEmptyDock => '将操作拖放至此处';
+
+  @override
+  String get inPlaceEditPlayerSettings => '播放器设置';
+
+  @override
+  String get inPlaceEditMoveToMore => '移动至“更多”菜单';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => '移动至高级设置';
+
+  @override
+  String get inPlaceEditHideAction => '隐藏操作';
+
+  @override
+  String get inPlaceEditHidden => '已隐藏';
 }

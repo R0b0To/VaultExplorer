@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "应用锁",
   "skinPreviewSettingOneHint": "生物识别与自动锁定",
   "skinPreviewSettingTwo": "存储",
-  "skinPreviewSettingTwoHint": "外部存储与云桥接"
+  "skinPreviewSettingTwoHint": "外部存储与云桥接",
+  "inPlaceEditDone": "完成",
+  "inPlaceEditTitle": "排列控制项",
+  "inPlaceEditHint": "在工具栏之间拖动操作或点击进行排列",
+  "inPlaceEditAvailable": "可用操作",
+  "inPlaceEditTopDock": "顶部栏",
+  "inPlaceEditBottomDock": "底部栏",
+  "inPlaceEditDragToRemove": "拖动至此移除",
+  "inPlaceEditAddToTop": "添加至顶部栏",
+  "inPlaceEditAddToBottom": "添加至底部栏",
+  "inPlaceEditEmptyDock": "将操作拖放至此处",
+  "inPlaceEditPlayerSettings": "播放器设置",
+  "inPlaceEditMoveToMore": "移动至“更多”菜单",
+  "inPlaceEditMoveToAdvanced": "移动至高级设置",
+  "inPlaceEditHideAction": "隐藏操作",
+  "inPlaceEditHidden": "已隐藏"
 }

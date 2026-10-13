@@ -1748,6 +1748,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         if (mounted) {
           final opensInNativeViewer =
               ext == 'pdf' ||
+              MediaViewerConstants.isImage(entry.name) ||
               MediaViewerConstants.isVideo(entry.name) ||
               MediaViewerConstants.isAudio(entry.name);
           final opensInTextEditor = const {

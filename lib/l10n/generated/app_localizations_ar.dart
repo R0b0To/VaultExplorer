@@ -11590,4 +11590,49 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => 'التخزين الخارجي والجسور السحابية';
+
+  @override
+  String get inPlaceEditDone => 'تم';
+
+  @override
+  String get inPlaceEditTitle => 'ترتيب عناصر التحكم';
+
+  @override
+  String get inPlaceEditHint => 'اسحب الإجراءات بين الأشرطة أو اضغط للترتيب';
+
+  @override
+  String get inPlaceEditAvailable => 'الإجراءات المتاحة';
+
+  @override
+  String get inPlaceEditTopDock => 'الشريط العلوي';
+
+  @override
+  String get inPlaceEditBottomDock => 'الشريط السفلي';
+
+  @override
+  String get inPlaceEditDragToRemove => 'اسحب هنا للإزالة';
+
+  @override
+  String get inPlaceEditAddToTop => 'إضافة إلى الشريط العلوي';
+
+  @override
+  String get inPlaceEditAddToBottom => 'إضافة إلى الشريط السفلي';
+
+  @override
+  String get inPlaceEditEmptyDock => 'أفلت الإجراءات هنا';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'إعدادات المشغل';
+
+  @override
+  String get inPlaceEditMoveToMore => 'نقل إلى قائمة المزيد';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => 'نقل إلى الإعدادات المتقدمة';
+
+  @override
+  String get inPlaceEditHideAction => 'إخفاء الإجراء';
+
+  @override
+  String get inPlaceEditHidden => 'مخفي';
 }

@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "App-Sperre",
   "skinPreviewSettingOneHint": "Biometrie und automatische Sperre",
   "skinPreviewSettingTwo": "Speicher",
-  "skinPreviewSettingTwoHint": "Externer Speicher und Cloud-Brücken"
+  "skinPreviewSettingTwoHint": "Externer Speicher und Cloud-Brücken",
+  "inPlaceEditDone": "Fertig",
+  "inPlaceEditTitle": "Steuerung anordnen",
+  "inPlaceEditHint": "Aktionen zwischen Leisten ziehen oder zum Anordnen tippen",
+  "inPlaceEditAvailable": "Verfügbare Aktionen",
+  "inPlaceEditTopDock": "Obere Leiste",
+  "inPlaceEditBottomDock": "Untere Leiste",
+  "inPlaceEditDragToRemove": "Hierher ziehen zum Entfernen",
+  "inPlaceEditAddToTop": "Zur oberen Leiste hinzufügen",
+  "inPlaceEditAddToBottom": "Zur unteren Leiste hinzufügen",
+  "inPlaceEditEmptyDock": "Aktionen hier ablegen",
+  "inPlaceEditPlayerSettings": "Player-Einstellungen",
+  "inPlaceEditMoveToMore": "Ins Mehr-Menü verschieben",
+  "inPlaceEditMoveToAdvanced": "Zu erweiterten Einstellungen verschieben",
+  "inPlaceEditHideAction": "Aktion ausblenden",
+  "inPlaceEditHidden": "Ausgeblendet"
 }

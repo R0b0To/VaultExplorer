@@ -202,10 +202,20 @@ object VideoThumbnailCoordinator {
         return inSampleSize
     }
 
-    /** Square-target convenience overload — the in-app pipeline only ever
-     *  requests square thumbnails. */
-    fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int =
-        calculateInSampleSize(width, height, targetSize, targetSize)
+    /** Max-edge convenience overload for image thumbnails. Unlike the
+     *  width/height overload above, this must downsample panoramas based on
+     *  their long edge too; requiring both dimensions to exceed the target
+     *  can otherwise decode a huge source bitmap before scaling it down. */
+    fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
+        val sourceMaxEdge = maxOf(width, height)
+        if (sourceMaxEdge <= targetSize || targetSize <= 0) return 1
+
+        var inSampleSize = 1
+        while (sourceMaxEdge / inSampleSize / 2 >= targetSize) {
+            inSampleSize *= 2
+        }
+        return inSampleSize
+    }
 
     /** Scales [src] down to fit within [maxEdge] on its longer side,
      *  preserving aspect ratio. Returns [src] unchanged if it already

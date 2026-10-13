@@ -232,9 +232,9 @@ class ArchiveEntryExtractResult {
       );
 }
 
-/// Result of streaming an archive entry to a temporary file for preview.
-/// Preserves passphrase failures so the browser can ask for a password and
-/// retry without rescanning the archive.
+/// Result of streaming an archive entry to a temporary file for preview or
+/// extraction. Preserves passphrase failures so the browser can ask for a
+/// password and retry without rescanning the archive.
 @immutable
 class ArchiveEntryStageResult {
   final ArchiveOpenStatus status;

@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 
 /// Thrown when a thumbnail is requested for a file inside an archive that
 /// doesn't support cheap per-entry access (see [ArchiveContext.isSolid]).
@@ -27,18 +29,13 @@ String archiveRelativeSubPath(String fullPath, String archiveRootPath) {
   return sub;
 }
 
-/// Fetches the raw bytes of a file inside an open archive, for use as a
-/// thumbnail source.
+/// Fetches a size-limited thumbnail of a file inside an open archive.
 ///
-/// There is no native thumbnail generation for archive entries -- files
-/// inside an archive don't correspond to any real path in the container's
-/// filesystem, so the ordinary `getImageThumbnail`/`readFileChunk` native
-/// calls can never resolve them. Instead this decrypts+decompresses the
-/// single entry in full via the same on-demand extraction path used when
-/// the user taps a file to view it ([ArchiveContext.extractEntry]), and the
-/// caller displays it directly (`Image.memory` with `cacheHeight` already
-/// downsamples at decode time, so this doesn't need a separate native
-/// resize step the way a real container thumbnail does).
+/// Archive entries don't have a real path in the container filesystem, so
+/// this streams the entry to a private cache file, then asks Android's native
+/// thumbnail decoder to sample and resize it before returning bytes to
+/// Flutter. Large image payloads stay off the method channel and avoid a
+/// full-resolution Dart-side decode.
 ///
 /// RAR solid archives are skipped because extracting each visible tile can
 /// require replaying all preceding entries. 7z entries are allowed through:
@@ -48,14 +45,31 @@ Future<Uint8List> fetchArchiveEntryForThumbnail({
   required ArchiveContext archiveContext,
   required String archiveRootPath,
   required String fullPath,
+  required VaultFileIoApi fileIoApi,
+  required int targetSize,
+  required int quality,
 }) async {
   if (archiveContext.isSolid && !archiveContext.isSevenZip) {
     throw const ArchiveThumbnailUnavailable();
   }
   final subPath = archiveRelativeSubPath(fullPath, archiveRootPath);
-  final bytes = await archiveContext.extractEntry(subPath);
-  if (bytes == null || bytes.isEmpty) {
-    throw Exception('Failed to extract archive entry for thumbnail');
+  final staged = await archiveContext.stageEntryForBrowse(subPath);
+  final stagedPath = staged.path;
+  if (staged.status != ArchiveOpenStatus.ok || stagedPath == null) {
+    throw Exception('Failed to stage archive entry for thumbnail');
   }
-  return bytes;
+
+  try {
+    final bytes = await fileIoApi.getImageThumbnailFromLocalPath(
+      stagedPath,
+      targetSize: targetSize,
+      quality: quality,
+    );
+    if (bytes == null || bytes.isEmpty) {
+      throw Exception('Failed to decode archive entry thumbnail');
+    }
+    return bytes;
+  } finally {
+    await archiveContext.discardStagedEntry(stagedPath);
+  }
 }

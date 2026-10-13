@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "Verrouillage de l'application",
   "skinPreviewSettingOneHint": "Biométrie et verrouillage automatique",
   "skinPreviewSettingTwo": "Stockage",
-  "skinPreviewSettingTwoHint": "Stockage externe et ponts cloud"
+  "skinPreviewSettingTwoHint": "Stockage externe et ponts cloud",
+  "inPlaceEditDone": "Terminé",
+  "inPlaceEditTitle": "Organiser les commandes",
+  "inPlaceEditHint": "Faites glisser les actions entre les barres ou appuyez pour organiser",
+  "inPlaceEditAvailable": "Actions disponibles",
+  "inPlaceEditTopDock": "Barre supérieure",
+  "inPlaceEditBottomDock": "Barre inférieure",
+  "inPlaceEditDragToRemove": "Glisser ici pour retirer",
+  "inPlaceEditAddToTop": "Ajouter à la barre supérieure",
+  "inPlaceEditAddToBottom": "Ajouter à la barre inférieure",
+  "inPlaceEditEmptyDock": "Déposez les actions ici",
+  "inPlaceEditPlayerSettings": "Paramètres du lecteur",
+  "inPlaceEditMoveToMore": "Déplacer vers le menu Plus",
+  "inPlaceEditMoveToAdvanced": "Déplacer vers Paramètres avancés",
+  "inPlaceEditHideAction": "Masquer l'action",
+  "inPlaceEditHidden": "Masqué"
 }

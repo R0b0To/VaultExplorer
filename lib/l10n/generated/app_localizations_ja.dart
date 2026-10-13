@@ -10939,4 +10939,49 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => '外部ストレージとクラウドブリッジ';
+
+  @override
+  String get inPlaceEditDone => '完了';
+
+  @override
+  String get inPlaceEditTitle => 'コントロールを配置';
+
+  @override
+  String get inPlaceEditHint => 'バー間でアクションをドラッグするかタップして配置';
+
+  @override
+  String get inPlaceEditAvailable => '利用可能なアクション';
+
+  @override
+  String get inPlaceEditTopDock => '上部バー';
+
+  @override
+  String get inPlaceEditBottomDock => '下部ドック';
+
+  @override
+  String get inPlaceEditDragToRemove => 'ここにドラッグして削除';
+
+  @override
+  String get inPlaceEditAddToTop => '上部バーに追加';
+
+  @override
+  String get inPlaceEditAddToBottom => '下部ドックに追加';
+
+  @override
+  String get inPlaceEditEmptyDock => 'ここにアクションをドロップ';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'プレーヤー設定';
+
+  @override
+  String get inPlaceEditMoveToMore => '詳細メニューに移動';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => '詳細設定に移動';
+
+  @override
+  String get inPlaceEditHideAction => 'アクションを非表示';
+
+  @override
+  String get inPlaceEditHidden => '非表示';
 }

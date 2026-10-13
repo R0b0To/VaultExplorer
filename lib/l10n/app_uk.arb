@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "Блокування програми",
   "skinPreviewSettingOneHint": "Біометрія та автоблокування",
   "skinPreviewSettingTwo": "Сховище даних",
-  "skinPreviewSettingTwoHint": "Зовнішні сховища та хмарні мости"
+  "skinPreviewSettingTwoHint": "Зовнішні сховища та хмарні мости",
+  "inPlaceEditDone": "Готово",
+  "inPlaceEditTitle": "Розташування елементів керування",
+  "inPlaceEditHint": "Перетягуйте дії між панелями або торкніться для налаштування",
+  "inPlaceEditAvailable": "Доступні дії",
+  "inPlaceEditTopDock": "Верхня панель",
+  "inPlaceEditBottomDock": "Нижня панель",
+  "inPlaceEditDragToRemove": "Перетягніть сюди, щоб вилучити",
+  "inPlaceEditAddToTop": "Додати на верхню панель",
+  "inPlaceEditAddToBottom": "Додати на нижню панель",
+  "inPlaceEditEmptyDock": "Перетягніть дії сюди",
+  "inPlaceEditPlayerSettings": "Налаштування програвача",
+  "inPlaceEditMoveToMore": "Перемістити до меню «Більше»",
+  "inPlaceEditMoveToAdvanced": "Перемістити до розширених налаштувань",
+  "inPlaceEditHideAction": "Приховати дію",
+  "inPlaceEditHidden": "Приховано"
 }

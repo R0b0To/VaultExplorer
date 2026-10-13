@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "قفل التطبيق",
   "skinPreviewSettingOneHint": "القياسات الحيوية والقفل التلقائي",
   "skinPreviewSettingTwo": "التخزين",
-  "skinPreviewSettingTwoHint": "التخزين الخارجي والجسور السحابية"
+  "skinPreviewSettingTwoHint": "التخزين الخارجي والجسور السحابية",
+  "inPlaceEditDone": "تم",
+  "inPlaceEditTitle": "ترتيب عناصر التحكم",
+  "inPlaceEditHint": "اسحب الإجراءات بين الأشرطة أو اضغط للترتيب",
+  "inPlaceEditAvailable": "الإجراءات المتاحة",
+  "inPlaceEditTopDock": "الشريط العلوي",
+  "inPlaceEditBottomDock": "الشريط السفلي",
+  "inPlaceEditDragToRemove": "اسحب هنا للإزالة",
+  "inPlaceEditAddToTop": "إضافة إلى الشريط العلوي",
+  "inPlaceEditAddToBottom": "إضافة إلى الشريط السفلي",
+  "inPlaceEditEmptyDock": "أفلت الإجراءات هنا",
+  "inPlaceEditPlayerSettings": "إعدادات المشغل",
+  "inPlaceEditMoveToMore": "نقل إلى قائمة المزيد",
+  "inPlaceEditMoveToAdvanced": "نقل إلى الإعدادات المتقدمة",
+  "inPlaceEditHideAction": "إخفاء الإجراء",
+  "inPlaceEditHidden": "مخفي"
 }

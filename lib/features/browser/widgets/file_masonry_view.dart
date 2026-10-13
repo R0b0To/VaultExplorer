@@ -713,6 +713,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
         fullPath: path,
+        fileIoApi: fileIoApi,
+        targetSize: quality.scaledSize(180),
+        quality: quality.jpegQuality,
       );
       thumbnailCache.cacheInMemory(container, path, bytes, quality);
       await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);

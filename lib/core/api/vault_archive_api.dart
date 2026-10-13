@@ -200,7 +200,8 @@ class VaultArchiveApi {
   }
 
   /// Streams an archive entry into a short-lived, private cache file for an
-  /// in-app PDF or media preview, preserving passphrase errors for retry.
+  /// in-app preview or a large-file extraction transfer, preserving
+  /// passphrase errors for retry.
   Future<ArchiveEntryStageResult> stageBrowseEntry({
     required String filePath,
     String? vaultPath,

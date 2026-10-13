@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "Bloqueio do app",
   "skinPreviewSettingOneHint": "Biometria e bloqueio automático",
   "skinPreviewSettingTwo": "Armazenamento",
-  "skinPreviewSettingTwoHint": "Armazenamento externo e pontes na nuvem"
+  "skinPreviewSettingTwoHint": "Armazenamento externo e pontes na nuvem",
+  "inPlaceEditDone": "Concluído",
+  "inPlaceEditTitle": "Organizar controles",
+  "inPlaceEditHint": "Arraste ações entre as barras ou toque para organizar",
+  "inPlaceEditAvailable": "Ações disponíveis",
+  "inPlaceEditTopDock": "Barra superior",
+  "inPlaceEditBottomDock": "Barra inferior",
+  "inPlaceEditDragToRemove": "Arraste aqui para remover",
+  "inPlaceEditAddToTop": "Adicionar à barra superior",
+  "inPlaceEditAddToBottom": "Adicionar à barra inferior",
+  "inPlaceEditEmptyDock": "Solte as ações aqui",
+  "inPlaceEditPlayerSettings": "Configurações do reprodutor",
+  "inPlaceEditMoveToMore": "Mover para o menu Mais",
+  "inPlaceEditMoveToAdvanced": "Mover para Configurações avançadas",
+  "inPlaceEditHideAction": "Ocultar ação",
+  "inPlaceEditHidden": "Oculto"
 }

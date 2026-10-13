@@ -10938,4 +10938,49 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => '외부 저장소 및 클라우드 브리지';
+
+  @override
+  String get inPlaceEditDone => '완료';
+
+  @override
+  String get inPlaceEditTitle => '컨트롤 배치';
+
+  @override
+  String get inPlaceEditHint => '바 사이로 동작을 드래그하거나 눌러서 배치';
+
+  @override
+  String get inPlaceEditAvailable => '사용 가능한 동작';
+
+  @override
+  String get inPlaceEditTopDock => '상단 바';
+
+  @override
+  String get inPlaceEditBottomDock => '하단 독';
+
+  @override
+  String get inPlaceEditDragToRemove => '삭제하려면 여기로 드래그';
+
+  @override
+  String get inPlaceEditAddToTop => '상단 바에 추가';
+
+  @override
+  String get inPlaceEditAddToBottom => '하단 독에 추가';
+
+  @override
+  String get inPlaceEditEmptyDock => '여기에 동작 놓기';
+
+  @override
+  String get inPlaceEditPlayerSettings => '플레이어 설정';
+
+  @override
+  String get inPlaceEditMoveToMore => '더보기 메뉴로 이동';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => '고급 설정으로 이동';
+
+  @override
+  String get inPlaceEditHideAction => '동작 숨기기';
+
+  @override
+  String get inPlaceEditHidden => '숨김';
 }

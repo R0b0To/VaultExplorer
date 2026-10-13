@@ -11399,4 +11399,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinPreviewSettingTwoHint => 'External storage and cloud bridges';
+
+  @override
+  String get inPlaceEditDone => 'Done';
+
+  @override
+  String get inPlaceEditTitle => 'Arrange Controls';
+
+  @override
+  String get inPlaceEditHint => 'Drag actions between docks or tap to organize';
+
+  @override
+  String get inPlaceEditAvailable => 'Available Actions';
+
+  @override
+  String get inPlaceEditTopDock => 'Top Bar';
+
+  @override
+  String get inPlaceEditBottomDock => 'Bottom Dock';
+
+  @override
+  String get inPlaceEditDragToRemove => 'Drag here to remove';
+
+  @override
+  String get inPlaceEditAddToTop => 'Add to Top Bar';
+
+  @override
+  String get inPlaceEditAddToBottom => 'Add to Bottom Dock';
+
+  @override
+  String get inPlaceEditEmptyDock => 'Drop actions here';
+
+  @override
+  String get inPlaceEditPlayerSettings => 'Player Settings';
+
+  @override
+  String get inPlaceEditMoveToMore => 'Move to More Menu';
+
+  @override
+  String get inPlaceEditMoveToAdvanced => 'Move to Advanced Settings';
+
+  @override
+  String get inPlaceEditHideAction => 'Hide Action';
+
+  @override
+  String get inPlaceEditHidden => 'Hidden';
 }

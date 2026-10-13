@@ -3196,5 +3196,20 @@
   "skinPreviewSettingOne": "アプリのロック",
   "skinPreviewSettingOneHint": "生体認証と自動ロック",
   "skinPreviewSettingTwo": "ストレージ",
-  "skinPreviewSettingTwoHint": "外部ストレージとクラウドブリッジ"
+  "skinPreviewSettingTwoHint": "外部ストレージとクラウドブリッジ",
+  "inPlaceEditDone": "完了",
+  "inPlaceEditTitle": "コントロールを配置",
+  "inPlaceEditHint": "バー間でアクションをドラッグするかタップして配置",
+  "inPlaceEditAvailable": "利用可能なアクション",
+  "inPlaceEditTopDock": "上部バー",
+  "inPlaceEditBottomDock": "下部ドック",
+  "inPlaceEditDragToRemove": "ここにドラッグして削除",
+  "inPlaceEditAddToTop": "上部バーに追加",
+  "inPlaceEditAddToBottom": "下部ドックに追加",
+  "inPlaceEditEmptyDock": "ここにアクションをドロップ",
+  "inPlaceEditPlayerSettings": "プレーヤー設定",
+  "inPlaceEditMoveToMore": "詳細メニューに移動",
+  "inPlaceEditMoveToAdvanced": "詳細設定に移動",
+  "inPlaceEditHideAction": "アクションを非表示",
+  "inPlaceEditHidden": "非表示"
 }

@@ -686,6 +686,7 @@ class SafStorageManager(private val context: Context) {
         targetSize: Int,
         quality: Int,
         isVideo: Boolean,
+        preserveAlpha: Boolean = false,
         strategy: String = "hybrid",
         framePosition: Double = 0.12,
         explicitTimeUs: Long? = null,
@@ -741,7 +742,12 @@ class SafStorageManager(private val context: Context) {
                 if (thumb != null) {
                     val scaled = scaledToFit(thumb, targetSize)
                     val stream = ByteArrayOutputStream()
-                    scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+                    val format = if (preserveAlpha) {
+                        Bitmap.CompressFormat.WEBP
+                    } else {
+                        Bitmap.CompressFormat.JPEG
+                    }
+                    scaled.compress(format, quality.coerceIn(1, 100), stream)
                     val bytes = stream.toByteArray()
                     val w = thumb.width
                     val h = thumb.height
@@ -773,7 +779,11 @@ class SafStorageManager(private val context: Context) {
 
             val decodeOptions = BitmapFactory.Options().apply {
                 inSampleSize = calculateInSampleSize(srcW, srcH, targetSize)
-                inPreferredConfig = Bitmap.Config.RGB_565
+                inPreferredConfig = if (preserveAlpha) {
+                    Bitmap.Config.ARGB_8888
+                } else {
+                    Bitmap.Config.RGB_565
+                }
             }
 
             val decoded = context.contentResolver.openInputStream(docUri)?.use { stream ->
@@ -783,7 +793,12 @@ class SafStorageManager(private val context: Context) {
             val oriented = applyExifOrientation(decoded, exifOrientationMatrix(exifOrientation))
             val scaled = scaledToFit(oriented, targetSize)
             val stream = ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+            val format = if (preserveAlpha) {
+                Bitmap.CompressFormat.WEBP
+            } else {
+                Bitmap.CompressFormat.JPEG
+            }
+            scaled.compress(format, quality.coerceIn(1, 100), stream)
             val bytes = stream.toByteArray()
             if (scaled != oriented) scaled.recycle()
             oriented.recycle()

@@ -12308,7 +12308,7 @@
   "skinStatusAndBookmarkColors": "Status and bookmark colors",
   "skinColorsForSuccessWarningsErrorsAndBookmarks": "Colors for success, warnings, errors, and bookmarks.",
   "skinTheCustomSkinIsActive971ce3": "The custom skin is active immediately while File Manager and Editor are set to follow the app skin.",
-  "skinCustomColorTapToChangeOrReset": "Custom color · tap to change or reset",
+  "skinCustomColorTapToChangeOrReset": "Custom color — tap to change or reset to default.",
   "skinTapTheColorCircleToChooseAColor": "Tap the color circle to choose a color.",
   "skinAppBarBackground": "App bar background",
   "skinTheDashboardAndOtherAppBarsUseThisIndependentColor": "The dashboard and other app bars use this independent color.",
@@ -13027,5 +13027,64 @@
   "skinPreviewSettingOneHint": "Biometrics and auto-lock",
   "skinPreviewSettingTwo": "Storage",
   "skinPreviewSettingTwoHint": "External storage and cloud bridges",
-  "skinCustomColorTapToChangeOrReset": "Custom color — tap to change or reset to default."
+  "inPlaceEditDone": "Done",
+  "@inPlaceEditDone": {
+    "description": "Done button label for the in-place media viewer control layout editor"
+  },
+  "inPlaceEditTitle": "Arrange Controls",
+  "@inPlaceEditTitle": {
+    "description": "Title for the in-place media viewer control layout editor"
+  },
+  "inPlaceEditHint": "Drag actions between docks or tap to organize",
+  "@inPlaceEditHint": {
+    "description": "Hint explaining how to arrange actions in the in-place editor"
+  },
+  "inPlaceEditAvailable": "Available Actions",
+  "@inPlaceEditAvailable": {
+    "description": "Header for the unplaced actions picker panel in in-place editor"
+  },
+  "inPlaceEditTopDock": "Top Bar",
+  "@inPlaceEditTopDock": {
+    "description": "Label for the top bar dock in the in-place layout editor"
+  },
+  "inPlaceEditBottomDock": "Bottom Dock",
+  "@inPlaceEditBottomDock": {
+    "description": "Label for the bottom dock in the in-place layout editor"
+  },
+  "inPlaceEditDragToRemove": "Drag here to remove",
+  "@inPlaceEditDragToRemove": {
+    "description": "Hint showing that dropping an action in center removes it from dock"
+  },
+  "inPlaceEditAddToTop": "Add to Top Bar",
+  "@inPlaceEditAddToTop": {
+    "description": "Option to add an action to the top bar dock"
+  },
+  "inPlaceEditAddToBottom": "Add to Bottom Dock",
+  "@inPlaceEditAddToBottom": {
+    "description": "Option to add an action to the bottom dock"
+  },
+  "inPlaceEditEmptyDock": "Drop actions here",
+  "@inPlaceEditEmptyDock": {
+    "description": "Placeholder text shown inside an empty dock in in-place editor"
+  },
+  "inPlaceEditPlayerSettings": "Player Settings",
+  "@inPlaceEditPlayerSettings": {
+    "description": "Tooltip for button opening playback and advanced player settings"
+  },
+  "inPlaceEditMoveToMore": "Move to More Menu",
+  "@inPlaceEditMoveToMore": {
+    "description": "Option to move an action into the More overflow menu"
+  },
+  "inPlaceEditMoveToAdvanced": "Move to Advanced Settings",
+  "@inPlaceEditMoveToAdvanced": {
+    "description": "Option to move an action into the Advanced Settings sheet"
+  },
+  "inPlaceEditHideAction": "Hide Action",
+  "@inPlaceEditHideAction": {
+    "description": "Option to completely hide an action from all menus"
+  },
+  "inPlaceEditHidden": "Hidden",
+  "@inPlaceEditHidden": {
+    "description": "Header and label for hidden / unused actions"
+  }
 }

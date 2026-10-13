@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 
 @immutable
 class EditorChrome {
@@ -122,17 +123,31 @@ class EditorChrome {
       scheme,
       appSkinTokens: appSkinTokens,
     );
+    // The toolbar belongs to the editor, not to the app: unless the skin gives
+    // the Editor page its own toolbar colors it is a step off the editor's
+    // background in the editor's own text color, so it can never clash with
+    // the chosen editor theme (it used to take the app-wide top bar color).
+    final editorBars = appSkinTokens?.areaColors(SkinArea.editor);
+    final toolbarBackground =
+        editorBars != null && editorBars.isCustom(SkinToken.appBar)
+        ? editorBars.color(SkinToken.appBar)
+        : scheme.surfaceContainer;
+    final toolbarForeground =
+        editorBars != null && editorBars.isCustom(SkinToken.onAppBar)
+        ? editorBars.color(SkinToken.onAppBar)
+        : chromeForeground;
     final theme = baseTheme.copyWith(
       appBarTheme: baseTheme.appBarTheme.copyWith(
-        foregroundColor: chromeForeground,
+        backgroundColor: toolbarBackground,
+        foregroundColor: toolbarForeground,
         titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
-          color: chromeForeground,
+          color: toolbarForeground,
         ),
         iconTheme: baseTheme.appBarTheme.iconTheme?.copyWith(
-          color: chromeForeground,
+          color: toolbarForeground,
         ),
         actionsIconTheme: baseTheme.appBarTheme.actionsIconTheme?.copyWith(
-          color: chromeForeground,
+          color: toolbarForeground,
         ),
       ),
       popupMenuTheme: baseTheme.popupMenuTheme.copyWith(color: panel),

@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 
 /// All editable Material 3 ColorScheme roles (brightness is selected by the
@@ -84,6 +85,41 @@ const editorColorRoles = <String>[
   ...editorSyntaxColorRoles,
 ];
 
+/// Colors shared by every page that does not set its own: the top bar and the
+/// round add button. (The vault card colors that used to live here are now the
+/// Dashboard page's own `card` / `cardActive` tokens.)
+const appSharedComponentRoles = <String>[
+  'appBarBackground',
+  'appBarForeground',
+  'fabBackground',
+  'fabForeground',
+];
+
+const _legacyVaultCardTokens = <String, SkinToken>{
+  'vaultCardBackground': SkinToken.card,
+  'mountedVaultCardBackground': SkinToken.cardActive,
+};
+
+/// Moves the old global vault-card colors onto the Dashboard page so skins
+/// saved before pages had their own colors look identical and "reset" works.
+(Map<String, int>, Map<String, Map<String, int>>) _foldLegacyVaultCards(
+  Map<String, int> components,
+  Map<String, Map<String, int>> areas,
+) {
+  if (!_legacyVaultCardTokens.keys.any(components.containsKey)) {
+    return (components, areas);
+  }
+  final nextComponents = Map<String, int>.from(components);
+  final dashboard = Map<String, int>.from(
+    areas[SkinArea.dashboard.id] ?? const <String, int>{},
+  );
+  for (final entry in _legacyVaultCardTokens.entries) {
+    final value = nextComponents.remove(entry.key);
+    if (value != null) dashboard.putIfAbsent(entry.value.id, () => value);
+  }
+  return (nextComponents, {...areas, SkinArea.dashboard.id: dashboard});
+}
+
 Color _color(Object? value, Color fallback) =>
     value is num ? Color(value.toInt()) : fallback;
 
@@ -99,6 +135,11 @@ class CustomAppSkin {
   final Map<String, int> darkSemanticColors;
   final Map<String, int> lightComponentColors;
   final Map<String, int> darkComponentColors;
+
+  /// Per-page colors: page id -> token id -> ARGB. A page with no entry (or a
+  /// token with no entry) inherits from the shared palette above.
+  final Map<String, Map<String, int>> lightAreaColors;
+  final Map<String, Map<String, int>> darkAreaColors;
   final FileManagerSkin fileManagerSkin;
   final int editorBackground;
   final int editorForeground;
@@ -121,6 +162,8 @@ class CustomAppSkin {
     this.darkSemanticColors = const {},
     this.lightComponentColors = const {},
     this.darkComponentColors = const {},
+    this.lightAreaColors = const {},
+    this.darkAreaColors = const {},
     this.fileManagerSkin = FileManagerSkin.classic,
     this.editorBackground = 0xFF111318,
     this.editorForeground = 0xFFE2E2E9,
@@ -153,6 +196,55 @@ class CustomAppSkin {
     (dark ? darkComponentColors : lightComponentColors)[role],
     fallback,
   );
+
+  /// This page's own color for [token], or null when it inherits.
+  Color? areaColorOrNull(
+    SkinArea area,
+    SkinToken token, {
+    required bool dark,
+  }) {
+    final value = (dark ? darkAreaColors : lightAreaColors)[area.id]?[token.id];
+    return value == null ? null : Color(value);
+  }
+
+  /// A copy with [token] set on [area] (or cleared back to inheriting when
+  /// [color] is null) for the light or dark palette.
+  CustomAppSkin withAreaColor(
+    SkinArea area,
+    SkinToken token,
+    Color? color, {
+    required bool dark,
+  }) {
+    final source = dark ? darkAreaColors : lightAreaColors;
+    final tokens = Map<String, int>.from(
+      source[area.id] ?? const <String, int>{},
+    );
+    if (color == null) {
+      tokens.remove(token.id);
+    } else {
+      tokens[token.id] = color.toARGB32();
+    }
+    final next = Map<String, Map<String, int>>.from(source);
+    if (tokens.isEmpty) {
+      next.remove(area.id);
+    } else {
+      next[area.id] = tokens;
+    }
+    return dark
+        ? copyWith(darkAreaColors: next)
+        : copyWith(lightAreaColors: next);
+  }
+
+  /// A copy with every override of [area] cleared for the light or dark
+  /// palette, so the page inherits the shared palette again.
+  CustomAppSkin withoutAreaColors(SkinArea area, {required bool dark}) {
+    final source = dark ? darkAreaColors : lightAreaColors;
+    if (!source.containsKey(area.id)) return this;
+    final next = Map<String, Map<String, int>>.from(source)..remove(area.id);
+    return dark
+        ? copyWith(darkAreaColors: next)
+        : copyWith(lightAreaColors: next);
+  }
 
   Color editorColor(String role, {required bool dark}) {
     final colors = dark ? darkEditorColors : lightEditorColors;
@@ -190,6 +282,8 @@ class CustomAppSkin {
     Map<String, int>? darkSemanticColors,
     Map<String, int>? lightComponentColors,
     Map<String, int>? darkComponentColors,
+    Map<String, Map<String, int>>? lightAreaColors,
+    Map<String, Map<String, int>>? darkAreaColors,
     FileManagerSkin? fileManagerSkin,
     int? editorBackground,
     int? editorForeground,
@@ -211,6 +305,8 @@ class CustomAppSkin {
     darkSemanticColors: darkSemanticColors ?? this.darkSemanticColors,
     lightComponentColors: lightComponentColors ?? this.lightComponentColors,
     darkComponentColors: darkComponentColors ?? this.darkComponentColors,
+    lightAreaColors: lightAreaColors ?? this.lightAreaColors,
+    darkAreaColors: darkAreaColors ?? this.darkAreaColors,
     fileManagerSkin: fileManagerSkin ?? this.fileManagerSkin,
     editorBackground: editorBackground ?? this.editorBackground,
     editorForeground: editorForeground ?? this.editorForeground,
@@ -236,6 +332,8 @@ class CustomAppSkin {
     'darkSemanticColors': darkSemanticColors,
     'lightComponentColors': lightComponentColors,
     'darkComponentColors': darkComponentColors,
+    'lightAreaColors': lightAreaColors,
+    'darkAreaColors': darkAreaColors,
     'fileManagerSkin': fileManagerSkin.toJson(),
     'editorBackground': editorBackground,
     'editorForeground': editorForeground,
@@ -269,8 +367,39 @@ class CustomAppSkin {
       );
     }
 
+    // Unknown pages and tokens are dropped so a hand-edited or future file can
+    // never inject a color the app does not know how to apply.
+    Map<String, Map<String, int>> areas(String key) {
+      final value = raw[key];
+      if (value is! Map) return const {};
+      final result = <String, Map<String, int>>{};
+      for (final entry in value.entries) {
+        final area = SkinArea.tryParse(entry.key);
+        final inner = entry.value;
+        if (area == null || inner is! Map) continue;
+        final tokens = <String, int>{};
+        for (final token in inner.entries) {
+          final parsed = SkinToken.tryParse(token.key);
+          final argb = token.value;
+          if (parsed != null && argb is num) {
+            tokens[parsed.id] = argb.toInt();
+          }
+        }
+        if (tokens.isNotEmpty) result[area.id] = tokens;
+      }
+      return result;
+    }
+
     int color(String key, int fallback) =>
         raw[key] is num ? (raw[key] as num).toInt() : fallback;
+    final (lightComponents, lightAreas) = _foldLegacyVaultCards(
+      colors('lightComponentColors'),
+      areas('lightAreaColors'),
+    );
+    final (darkComponents, darkAreas) = _foldLegacyVaultCards(
+      colors('darkComponentColors'),
+      areas('darkAreaColors'),
+    );
     return CustomAppSkin(
       id: raw['id'] is String && (raw['id'] as String).isNotEmpty
           ? raw['id'] as String
@@ -280,8 +409,10 @@ class CustomAppSkin {
       darkColors: colors('darkColors'),
       lightSemanticColors: colors('lightSemanticColors'),
       darkSemanticColors: colors('darkSemanticColors'),
-      lightComponentColors: colors('lightComponentColors'),
-      darkComponentColors: colors('darkComponentColors'),
+      lightComponentColors: lightComponents,
+      darkComponentColors: darkComponents,
+      lightAreaColors: lightAreas,
+      darkAreaColors: darkAreas,
       fileManagerSkin: FileManagerSkin.fromJson(raw['fileManagerSkin']),
       editorBackground: color('editorBackground', 0xFF111318),
       editorForeground: color('editorForeground', 0xFFE2E2E9),

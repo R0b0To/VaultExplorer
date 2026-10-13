@@ -9781,7 +9781,8 @@ class AppLocalizationsKo extends AppLocalizations {
       '파일 관리자 및 편집기가 앱 스킨을 따르도록 설정된 상태에서 맞춤 스킨이 즉시 활성화됩니다.';
 
   @override
-  String get skinCustomColorTapToChangeOrReset => '사용자 지정 색상 · 탭하여 변경 또는 재설정';
+  String get skinCustomColorTapToChangeOrReset =>
+      '사용자 지정 색상 — 탭하여 변경하거나 기본값으로 재설정합니다.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor => '색상 원을 탭하여 색상을 선택하세요.';
@@ -10724,4 +10725,217 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get audioRecordingDiscardMessage => '이 녹음은 저장되지 않았으며 영구적으로 삭제됩니다.';
+
+  @override
+  String get skinAreaDashboard => '대시보드';
+
+  @override
+  String get skinAreaDashboardDescription => '금고 카드가 표시되는 기본 금고 목록입니다.';
+
+  @override
+  String get skinAreaDrawer => '사이드 메뉴';
+
+  @override
+  String get skinAreaDrawerDescription => '금고와 바로가기가 포함된 슬라이드 메뉴입니다.';
+
+  @override
+  String get skinAreaFilesDescription => '잠금 해제된 금고 내부의 파일 탐색기입니다.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      '텍스트 및 코드 편집기의 도구 모음입니다. 캔버스 및 구문 색상은 아래 편집기 테마에서 설정합니다.';
+
+  @override
+  String get skinAreaToolsDescription => '도구 탭 및 도구 탭에서 열린 모든 도구입니다.';
+
+  @override
+  String get skinAreaSettingsDescription => '설정 탭 및 해당 하위 페이지입니다.';
+
+  @override
+  String get skinSharedPaletteTitle => '공유 팔레트';
+
+  @override
+  String get skinSharedPaletteShort => '공유';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      '각 페이지가 자체 색상을 설정하기 전까지 상속받는 색상입니다. 잠금 해제, 카메라 등 전용 섹션이 없는 화면에서 직접 사용됩니다.';
+
+  @override
+  String get skinSharedBarDescription => '자체 설정을 하지 않은 모든 페이지의 상단 표시줄입니다.';
+
+  @override
+  String get skinSharedFabDescription => '자체 설정을 하지 않은 모든 페이지의 원형 추가 버튼입니다.';
+
+  @override
+  String get skinPagesTitle => '페이지 색상';
+
+  @override
+  String get skinPagesDescription =>
+      '각 페이지는 고유한 색상을 유지합니다. 한 페이지를 변경해도 다른 페이지에는 영향을 주지 않습니다.';
+
+  @override
+  String get skinResetPageColors => '페이지 색상 재설정';
+
+  @override
+  String get skinTokenBackground => '페이지 배경';
+
+  @override
+  String get skinTokenBackgroundHint => '이 페이지의 모든 요소 뒤에 있는 캔버스입니다.';
+
+  @override
+  String get skinTokenText => '기본 텍스트';
+
+  @override
+  String get skinTokenTextHint => '이 페이지의 제목, 이름 및 본문 텍스트입니다.';
+
+  @override
+  String get skinTokenTextSecondary => '보조 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenTextSecondaryHint => '부제목, 세부 정보, 힌트 및 차분한 아이콘입니다.';
+
+  @override
+  String get skinTokenAppBar => '상단 표시줄';
+
+  @override
+  String get skinTokenAppBarHint => '이 페이지 상단 표시줄의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOnAppBar => '상단 표시줄 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenOnAppBarHint => '상단 표시줄의 제목 및 아이콘 색상입니다.';
+
+  @override
+  String get skinTokenCard => '카드 및 행';
+
+  @override
+  String get skinTokenCardHint => '카드, 목록 행 및 그룹화된 패널입니다.';
+
+  @override
+  String get skinTokenCardActive => '활성 카드';
+
+  @override
+  String get skinTokenCardActiveHint => '잠금 해제된 금고와 같이 강조 표시된 카드입니다.';
+
+  @override
+  String get skinTokenRaised => '칩 및 컨트롤';
+
+  @override
+  String get skinTokenRaisedHint => '검색 필드, 칩, 썸네일 및 아이콘 타일입니다.';
+
+  @override
+  String get skinTokenOverlay => '메뉴, 대화상자 및 시트';
+
+  @override
+  String get skinTokenOverlayHint => '이 페이지에서 열린 팝업 메뉴, 대화상자 및 하단 시트입니다.';
+
+  @override
+  String get skinTokenAccent => '강조';
+
+  @override
+  String get skinTokenAccentHint => '버튼, 링크, 진행 표시줄 및 활성 아이콘입니다.';
+
+  @override
+  String get skinTokenOnAccent => '강조 위의 텍스트';
+
+  @override
+  String get skinTokenOnAccentHint => '강조 색상으로 채워진 버튼 위에 표시되는 라벨과 아이콘입니다.';
+
+  @override
+  String get skinTokenSelection => '선택 항목';
+
+  @override
+  String get skinTokenSelectionHint => '선택된 행 및 강조 표시된 아이콘 타일입니다.';
+
+  @override
+  String get skinTokenOnSelection => '선택 항목 위의 텍스트';
+
+  @override
+  String get skinTokenOnSelectionHint => '선택된 항목 위에 표시되는 아이콘과 텍스트입니다.';
+
+  @override
+  String get skinTokenDivider => '구분선';
+
+  @override
+  String get skinTokenDividerHint => '얇은 구분선과 은은한 테두리입니다.';
+
+  @override
+  String get skinTokenOutline => '외곽선';
+
+  @override
+  String get skinTokenOutlineHint => '외곽선 버튼과 입력 필드의 뚜렷한 테두리입니다.';
+
+  @override
+  String get skinTokenFab => '원형 추가 버튼';
+
+  @override
+  String get skinTokenFabHint => '원형 추가 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOnFab => '원형 추가 버튼 아이콘';
+
+  @override
+  String get skinTokenOnFabHint => '원형 추가 버튼의 더하기 아이콘입니다.';
+
+  @override
+  String get skinPreviewConfirm => '확인';
+
+  @override
+  String get skinPreviewCancelButton => '취소';
+
+  @override
+  String get skinPreviewSaveButton => '저장';
+
+  @override
+  String get skinPreviewRunButton => '실행';
+
+  @override
+  String get skinPreviewPasteButton => '여기에 붙여넣기';
+
+  @override
+  String get skinPreviewUnlockButton => '잠금 해제';
+
+  @override
+  String get skinPreviewSortChip => '정렬: 이름';
+
+  @override
+  String get skinPreviewSearchChip => '파일 검색';
+
+  @override
+  String get skinPreviewPinnedBadge => '고정됨';
+
+  @override
+  String get skinPreviewVaultsHeader => '금고';
+
+  @override
+  String get skinPreviewToolsSection => '파일 암호화';
+
+  @override
+  String get skinPreviewToolOne => '키 파일 및 암호 문구 생성기';
+
+  @override
+  String get skinPreviewToolOneHint => '비밀번호 및 키 파일 생성';
+
+  @override
+  String get skinPreviewToolTwo => '체크섬 및 해시 검증기';
+
+  @override
+  String get skinPreviewToolTwoHint => '대용량 파일 손상 여부 확인';
+
+  @override
+  String get skinPreviewSettingsSection => '보안';
+
+  @override
+  String get skinPreviewSettingOne => '앱 잠금';
+
+  @override
+  String get skinPreviewSettingOneHint => '생체 인식 및 자동 잠금';
+
+  @override
+  String get skinPreviewSettingTwo => '저장소';
+
+  @override
+  String get skinPreviewSettingTwoHint => '외부 저장소 및 클라우드 브리지';
 }

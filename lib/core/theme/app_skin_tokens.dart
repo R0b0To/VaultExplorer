@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -72,55 +74,53 @@ AppSkinTokens buildAppSkinTokens({
   final editorAccent = preset == AppSkinPreset.custom
       ? customAppSkin.editorColor('cursor', dark: isDark)
       : colorScheme.primary;
-  final baseVaultCard = colorScheme.surfaceContainerHigh;
-  final mountedVaultCard = Color.alphaBlend(
-    colorScheme.primaryContainer.withValues(alpha: isDark ? 0.35 : 0.55),
-    baseVaultCard,
+  // Colors shared by every page that does not set its own.
+  final appBarBackground = preset == AppSkinPreset.custom
+      ? customAppSkin.componentColorFor(
+          'appBarBackground',
+          dark: isDark,
+          fallback: colorScheme.surfaceContainerHigh,
+        )
+      : colorScheme.surfaceContainerHigh;
+  final appBarForeground = preset == AppSkinPreset.custom
+      ? customAppSkin.componentColorFor(
+          'appBarForeground',
+          dark: isDark,
+          fallback: colorScheme.onSurface,
+        )
+      : colorScheme.onSurface;
+  final fabBackground = preset == AppSkinPreset.custom
+      ? customAppSkin.componentColorFor(
+          'fabBackground',
+          dark: isDark,
+          fallback: colorScheme.primaryContainer,
+        )
+      : colorScheme.primaryContainer;
+  final fabForeground = preset == AppSkinPreset.custom
+      ? customAppSkin.componentColorFor(
+          'fabForeground',
+          dark: isDark,
+          fallback: colorScheme.onPrimaryContainer,
+        )
+      : colorScheme.onPrimaryContainer;
+  final areas = resolveSkinAreaColors(
+    scheme: colorScheme,
+    appBar: appBarBackground,
+    onAppBar: appBarForeground,
+    fab: fabBackground,
+    onFab: fabForeground,
+    overrideFor: preset == AppSkinPreset.custom
+        ? (area, token) =>
+              customAppSkin.areaColorOrNull(area, token, dark: isDark)
+        : null,
   );
   return AppSkinTokens(
     preset: preset,
-    appBarBackground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'appBarBackground',
-            dark: isDark,
-            fallback: colorScheme.surfaceContainerHigh,
-          )
-        : colorScheme.surfaceContainerHigh,
-    appBarForeground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'appBarForeground',
-            dark: isDark,
-            fallback: colorScheme.onSurface,
-          )
-        : colorScheme.onSurface,
-    fabBackground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'fabBackground',
-            dark: isDark,
-            fallback: colorScheme.primaryContainer,
-          )
-        : colorScheme.primaryContainer,
-    fabForeground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'fabForeground',
-            dark: isDark,
-            fallback: colorScheme.onPrimaryContainer,
-          )
-        : colorScheme.onPrimaryContainer,
-    vaultCardBackground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'vaultCardBackground',
-            dark: isDark,
-            fallback: baseVaultCard,
-          )
-        : baseVaultCard,
-    mountedVaultCardBackground: preset == AppSkinPreset.custom
-        ? customAppSkin.componentColorFor(
-            'mountedVaultCardBackground',
-            dark: isDark,
-            fallback: mountedVaultCard,
-          )
-        : mountedVaultCard,
+    appBarBackground: appBarBackground,
+    appBarForeground: appBarForeground,
+    fabBackground: fabBackground,
+    fabForeground: fabForeground,
+    areas: areas,
     manualFileManagerSkin: manualFileManagerSkin,
     fileManagerSkin: fileManagerSkin,
     editorBackground: editorBackground,
@@ -170,8 +170,11 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
   final Color appBarForeground;
   final Color fabBackground;
   final Color fabForeground;
-  final Color vaultCardBackground;
-  final Color mountedVaultCardBackground;
+
+  /// Every page's own resolved colors. Pages read these through
+  /// `SkinAreaScope`; the top-level values above are only the shared defaults
+  /// a page falls back to.
+  final Map<SkinArea, SkinAreaColors> areas;
   final FileManagerSkin manualFileManagerSkin;
   final FileManagerSkin fileManagerSkin;
   final Color editorBackground;
@@ -197,8 +200,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     required this.appBarForeground,
     required this.fabBackground,
     required this.fabForeground,
-    required this.vaultCardBackground,
-    required this.mountedVaultCardBackground,
+    required this.areas,
     required this.manualFileManagerSkin,
     required this.fileManagerSkin,
     required this.editorBackground,
@@ -215,6 +217,9 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     required this.editorFollowsAppSkin,
   });
 
+  /// The resolved colors of [area].
+  SkinAreaColors areaColors(SkinArea area) => areas[area]!;
+
   @override
   AppSkinTokens copyWith({
     AppSkinPreset? preset,
@@ -222,8 +227,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     Color? appBarForeground,
     Color? fabBackground,
     Color? fabForeground,
-    Color? vaultCardBackground,
-    Color? mountedVaultCardBackground,
+    Map<SkinArea, SkinAreaColors>? areas,
     FileManagerSkin? manualFileManagerSkin,
     FileManagerSkin? fileManagerSkin,
     Color? editorBackground,
@@ -244,9 +248,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     appBarForeground: appBarForeground ?? this.appBarForeground,
     fabBackground: fabBackground ?? this.fabBackground,
     fabForeground: fabForeground ?? this.fabForeground,
-    vaultCardBackground: vaultCardBackground ?? this.vaultCardBackground,
-    mountedVaultCardBackground:
-        mountedVaultCardBackground ?? this.mountedVaultCardBackground,
+    areas: areas ?? this.areas,
     manualFileManagerSkin: manualFileManagerSkin ?? this.manualFileManagerSkin,
     fileManagerSkin: fileManagerSkin ?? this.fileManagerSkin,
     editorBackground: editorBackground ?? this.editorBackground,
@@ -285,16 +287,10 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
       )!,
       fabBackground: Color.lerp(fabBackground, other.fabBackground, t)!,
       fabForeground: Color.lerp(fabForeground, other.fabForeground, t)!,
-      vaultCardBackground: Color.lerp(
-        vaultCardBackground,
-        other.vaultCardBackground,
-        t,
-      )!,
-      mountedVaultCardBackground: Color.lerp(
-        mountedVaultCardBackground,
-        other.mountedVaultCardBackground,
-        t,
-      )!,
+      areas: {
+        for (final area in SkinArea.values)
+          area: SkinAreaColors.lerp(areaColors(area), other.areaColors(area), t),
+      },
       manualFileManagerSkin: discrete.manualFileManagerSkin,
       fileManagerSkin: discrete.fileManagerSkin,
       editorBackground: Color.lerp(
@@ -337,8 +333,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
           appBarForeground == other.appBarForeground &&
           fabBackground == other.fabBackground &&
           fabForeground == other.fabForeground &&
-          vaultCardBackground == other.vaultCardBackground &&
-          mountedVaultCardBackground == other.mountedVaultCardBackground &&
+          mapEquals(areas, other.areas) &&
           manualFileManagerSkin == other.manualFileManagerSkin &&
           fileManagerSkin == other.fileManagerSkin &&
           editorBackground == other.editorBackground &&
@@ -361,8 +356,7 @@ class AppSkinTokens extends ThemeExtension<AppSkinTokens> {
     appBarForeground,
     fabBackground,
     fabForeground,
-    vaultCardBackground,
-    mountedVaultCardBackground,
+    Object.hashAll(areas.entries.map((e) => Object.hash(e.key, e.value))),
     manualFileManagerSkin,
     fileManagerSkin,
     editorBackground,

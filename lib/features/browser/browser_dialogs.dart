@@ -15,6 +15,8 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 abstract class BrowserDialogs {
   static void _blockedReadOnly(BuildContext context) {
@@ -167,14 +169,14 @@ abstract class BrowserDialogs {
     return Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AdvancedRenameScreen(
+        builder: (_) => SkinAreaScope(area: SkinArea.files, child: AdvancedRenameScreen(
           container: container,
           oldEntries: oldEntries,
           existingEntries: existingEntries,
           currentDirPath: currentDirPath,
           onSuccess: onSuccess,
           onEntryRenamed: onEntryRenamed,
-        ),
+        )),
       ),
     );
   }

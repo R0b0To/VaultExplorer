@@ -9,6 +9,8 @@ import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class StorageLocationsDrawer extends ConsumerWidget {
   final int activeVolId;
@@ -297,7 +299,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const FileManagerToolbarSettingsScreen(isLocalStorage: true),
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen(isLocalStorage: true)),
                         ),
                       );
                     },

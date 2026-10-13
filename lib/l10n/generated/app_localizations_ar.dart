@@ -10389,7 +10389,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'لون مخصص · اضغط للتغيير أو إعادة الضبط';
+      'لون مخصص — انقر للتغيير أو لإعادة التعيين إلى الافتراضي.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11359,4 +11359,235 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'لم يتم حفظ هذا التسجيل وسيتم حذفه نهائيًا.';
+
+  @override
+  String get skinAreaDashboard => 'لوحة التحكم';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'قائمة الخزائن الرئيسية التي تظهر لك، مع بطاقات الخزائن الخاصة بها.';
+
+  @override
+  String get skinAreaDrawer => 'القائمة الجانبية';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'القائمة المنزلقة التي تحتوي على خزائنك واختصاراتك.';
+
+  @override
+  String get skinAreaFilesDescription => 'متصفح الملفات داخل الخزينة المفتوحة.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'شريط أدوات محرر النصوص والبرمجة. يتم ضبط ألوان الخلفية وبناء الجملة في سمة المحرر أدناه.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'علامة تبويب الأدوات وجميع الأدوات المفتوحة منها.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'علامة تبويب الإعدادات وصفحاتها الفرعية.';
+
+  @override
+  String get skinSharedPaletteTitle => 'اللوحة المشتركة';
+
+  @override
+  String get skinSharedPaletteShort => 'مشتركة';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'الألوان التي ترثها كل صفحة ما لم تحدد ألوانها الخاصة. تستخدمها الشاشات التي ليس لها قسم خاص مثل إلغاء القفل والكاميرا مباشرة.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'الشريط العلوي لكل صفحة لا تحدد شريطها الخاص.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'زر الإضافة الدائري لكل صفحة لا تحدد زرها الخاص.';
+
+  @override
+  String get skinPagesTitle => 'ألوان الصفحات';
+
+  @override
+  String get skinPagesDescription =>
+      'تحتفظ كل صفحة بألوانها الخاصة. لا يؤثر تغيير صفحة واحدة على أي صفحة أخرى مطلقاً.';
+
+  @override
+  String get skinResetPageColors => 'إعادة ضبط ألوان الصفحة';
+
+  @override
+  String get skinTokenBackground => 'خلفية الصفحة';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'المساحة الخلفية لكل العناصر في هذه الصفحة.';
+
+  @override
+  String get skinTokenText => 'النص الرئيسي';
+
+  @override
+  String get skinTokenTextHint =>
+      'العناوين والأسماء والنصوص الأساسية في هذه الصفحة.';
+
+  @override
+  String get skinTokenTextSecondary => 'النص الثانوي والأيقونات';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'العناوين الفرعية والتفاصيل والتلميحات والأيقونات الهادئة.';
+
+  @override
+  String get skinTokenAppBar => 'الشريط العلوي';
+
+  @override
+  String get skinTokenAppBarHint => 'تعبئة الشريط العلوي في هذه الصفحة.';
+
+  @override
+  String get skinTokenOnAppBar => 'نص وأيقونات الشريط العلوي';
+
+  @override
+  String get skinTokenOnAppBarHint =>
+      'لون العنوان والأيقونات في الشريط العلوي.';
+
+  @override
+  String get skinTokenCard => 'البطاقات والصفوف';
+
+  @override
+  String get skinTokenCardHint => 'البطاقات وصفوف القوائم واللوحات المجمعة.';
+
+  @override
+  String get skinTokenCardActive => 'البطاقة النشطة';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'البطاقة المميزة، مثل الخزينة المفتوحة.';
+
+  @override
+  String get skinTokenRaised => 'العناصر وعناصر التحكم';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'حقول البحث والشرائح والمصغرات ومربعات الأيقونات.';
+
+  @override
+  String get skinTokenOverlay => 'القوائم ومربعات الحوار والصفائح';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'القوائم المنبثقة ومربعات الحوار والصفائح السفلية المفتوحة من هذه الصفحة.';
+
+  @override
+  String get skinTokenAccent => 'اللون المميز';
+
+  @override
+  String get skinTokenAccentHint =>
+      'الأزرار والروابط وأشرطة التقدم والأيقونات النشطة.';
+
+  @override
+  String get skinTokenOnAccent => 'النص فوق اللون المميز';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'التسميات والأيقونات المعروضة على الأزرار المعبأة باللون المميز.';
+
+  @override
+  String get skinTokenSelection => 'التحديد';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'الصفوف المحددة ومربعات الأيقونات البارزة.';
+
+  @override
+  String get skinTokenOnSelection => 'النص فوق التحديد';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'الأيقونات والنصوص المعروضة على العناصر المحددة.';
+
+  @override
+  String get skinTokenDivider => 'الفواصل';
+
+  @override
+  String get skinTokenDividerHint => 'خطوط الفصل الرفيعة والحدود الدقيقة.';
+
+  @override
+  String get skinTokenOutline => 'الإطارات';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'حدود أكثر وضوحاً على الأزرار والحقول المحددة بإطار.';
+
+  @override
+  String get skinTokenFab => 'زر الإضافة الدائري';
+
+  @override
+  String get skinTokenFabHint => 'تعبئة زر الإضافة الدائري.';
+
+  @override
+  String get skinTokenOnFab => 'أيقونة زر الإضافة الدائري';
+
+  @override
+  String get skinTokenOnFabHint => 'أيقونة الزائد على زر الإضافة الدائري.';
+
+  @override
+  String get skinPreviewConfirm => 'تأكيد';
+
+  @override
+  String get skinPreviewCancelButton => 'إلغاء';
+
+  @override
+  String get skinPreviewSaveButton => 'حفظ';
+
+  @override
+  String get skinPreviewRunButton => 'تشغيل';
+
+  @override
+  String get skinPreviewPasteButton => 'لصق هنا';
+
+  @override
+  String get skinPreviewUnlockButton => 'إلغاء القفل';
+
+  @override
+  String get skinPreviewSortChip => 'ترتيب: الاسم';
+
+  @override
+  String get skinPreviewSearchChip => 'بحث في الملفات';
+
+  @override
+  String get skinPreviewPinnedBadge => 'مثبت';
+
+  @override
+  String get skinPreviewVaultsHeader => 'الخزائن';
+
+  @override
+  String get skinPreviewToolsSection => 'تشفير الملفات';
+
+  @override
+  String get skinPreviewToolOne => 'مولد ملفات المفاتيح وعبارات المرور';
+
+  @override
+  String get skinPreviewToolOneHint => 'توليد كلمات المرور وملفات المفاتيح';
+
+  @override
+  String get skinPreviewToolTwo => 'مدقق المجموع الاختباري والتجزئة';
+
+  @override
+  String get skinPreviewToolTwoHint => 'التحقق من عدم تلف الملفات الكبيرة';
+
+  @override
+  String get skinPreviewSettingsSection => 'الأمان';
+
+  @override
+  String get skinPreviewSettingOne => 'قفل التطبيق';
+
+  @override
+  String get skinPreviewSettingOneHint => 'القياسات الحيوية والقفل التلقائي';
+
+  @override
+  String get skinPreviewSettingTwo => 'التخزين';
+
+  @override
+  String get skinPreviewSettingTwoHint => 'التخزين الخارجي والجسور السحابية';
 }

@@ -12,6 +12,8 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolb
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
@@ -302,9 +304,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => FileManagerSkinScreen(
+                                builder: (_) => SkinAreaScope(area: SkinArea.settings, child: FileManagerSkinScreen(
                                   containerUri: containerUri,
-                                ),
+                                )),
                               ),
                             ),
                           ),
@@ -828,7 +830,7 @@ SectionCard(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                      const MediaViewerToolbarSettingsScreen(),
+                                      SkinAreaScope(area: SkinArea.settings, child: const MediaViewerToolbarSettingsScreen()),
                                 ),
                               );
                             },

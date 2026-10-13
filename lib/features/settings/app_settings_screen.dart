@@ -34,6 +34,8 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class AppSettingsScreen extends ConsumerStatefulWidget {
   const AppSettingsScreen({super.key});
@@ -231,7 +233,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     return Navigator(
       key: ValueKey(_selectedSection),
       onGenerateRoute: (_) => MaterialPageRoute(
-        builder: (_) => switch (_selectedSection) {
+        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: switch (_selectedSection) {
           _SettingsSection.security => const SecuritySettingsScreen(
             embedded: true,
           ),
@@ -248,7 +250,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
             embedded: true,
           ),
           _SettingsSection.about => const AboutScreen(embedded: true),
-        },
+        }),
       ),
     );
   }
@@ -312,7 +314,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const SecuritySettingsScreen(),
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const SecuritySettingsScreen()),
                     ),
                   ),
                 ),
@@ -324,7 +326,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const StorageServicesSettingsScreen(),
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const StorageServicesSettingsScreen()),
                     ),
                   ),
                 ),
@@ -336,7 +338,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const FileHandlingSettingsScreen(),
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileHandlingSettingsScreen()),
                     ),
                   ),
                 ),
@@ -348,7 +350,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const AppearanceSettingsScreen(),
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppearanceSettingsScreen()),
                     ),
                   ),
                 ),
@@ -361,7 +363,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const AdvancedSettingsScreen(),
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AdvancedSettingsScreen()),
                     ),
                   ),
                 ),
@@ -410,7 +412,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   ),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AboutScreen())),
                   ),
                 ),
               ],
@@ -1309,7 +1311,7 @@ class _SecuritySettingsScreenState
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const EmergencySettingsScreen(),
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const EmergencySettingsScreen()),
                       ),
                     ),
                   ),
@@ -1341,7 +1343,7 @@ class _SecuritySettingsScreenState
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const QuickCaptureSettingsScreen(),
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const QuickCaptureSettingsScreen()),
                       ),
                     ),
                   ),
@@ -2034,7 +2036,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const AppSkinSettingsScreen(),
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppSkinSettingsScreen()),
                       ),
                     ),
                   ),
@@ -2406,7 +2408,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const LogcatScreen()),
+                      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const LogcatScreen())),
                     ),
                   ),
                 ],

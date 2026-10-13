@@ -10,7 +10,6 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
-import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
@@ -39,6 +38,8 @@ import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 const _kLogTag = 'VaultDashboardScreen';
 
@@ -387,7 +388,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
   Route<void> _buildBrowserRoute(MountedContainer container) {
     return MaterialPageRoute<void>(
-      builder: (_) => FileBrowserScreen(
+      builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
         container: container,
         resolveContainer: _resolveAnyContainer,
         drawer: _buildDrawer(currentVolId: container.volId),
@@ -395,19 +396,19 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         onUserActivity: () {
           ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
         },
-      ),
+      )),
     );
   }
 
   Route<void> _buildLocalStorageRoute(MountedContainer container) {
     return MaterialPageRoute<void>(
-      builder: (_) => FileBrowserScreen(
+      builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
         container: container,
         resolveContainer: _resolveAnyContainer,
         drawer: _buildDrawer(currentVolId: container.volId),
         showBackButton: true,
         onUserActivity: () {},
-      ),
+      )),
     );
   }
 
@@ -556,7 +557,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => UnlockSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UnlockSheet(
             onMounted: (container, {record}) {
               ref.read(vaultDashboardControllerProvider.notifier).onContainerMounted(container, record: record);
               newlyMountedContainer = container;
@@ -568,7 +569,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             documentProvider: docProvider,
             autoMountFolders: autoMountFolders,
             mountedUris: state.mounted.map((c) => c.uri).toList(),
-          ),
+          )),
         ),
       );
       if (mounted) {
@@ -599,7 +600,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => UsbUnlockSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UsbUnlockSheet(
             onMounted: (container, {record}) {
               ref.read(vaultDashboardControllerProvider.notifier).onContainerMounted(container, record: record);
               newlyMountedContainer = container;
@@ -617,7 +618,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
                 const <String>[],
             existingRecord: existingRecord,
             prefillPassword: rememberedPassword,
-          ),
+          )),
         ),
       );
       if (mounted) {
@@ -637,7 +638,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
+      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: const UsbCreateContainerSheet())),
     ).whenComplete(() {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
     });
@@ -651,7 +652,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const CreateContainerSheet()),
+        MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: const CreateContainerSheet())),
       );
       if (mounted) {
         await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
@@ -761,7 +762,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ContainerConfigScreen(
+        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: ContainerConfigScreen(
           uri: uri,
           currentLabel: currentLabel,
           existingRecord: existing,
@@ -769,7 +770,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           mountedContainer: mountedContainer,
           onSaved: (record) =>
               ref.read(vaultDashboardControllerProvider.notifier).updateContainerRecord(uri, record),
-        ),
+        )),
       ),
     );
   }
@@ -910,9 +911,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             builder: (ctx) => IconButton(
               icon: Icon(
                 Icons.menu_rounded,
-                color: Theme.of(ctx)
-                    .extension<AppSkinTokens>()
-                    ?.appBarForeground,
+                color: Theme.of(ctx).appBarTheme.foregroundColor,
               ),
               tooltip: context.l10n.storageLocationsTitle,
               onPressed: () => Scaffold.of(ctx).openDrawer(),

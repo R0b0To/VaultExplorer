@@ -16,6 +16,8 @@ import 'package:vaultexplorer/features/authenticator/widgets/qr_scanner_screen.d
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/password_interchange/password_interchange_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 IconData _iconForType(VaultItemType type) => switch (type) {
       VaultItemType.password => Icons.key_rounded,
@@ -182,7 +184,7 @@ class _ExportBodyState extends ConsumerState<_ExportBody> {
     final containers = widget.mountedContainers.value;
     if (containers.isEmpty) return;
     final result = await Navigator.of(context).push<CryptoDestination>(
-      MaterialPageRoute(builder: (_) => VaultFolderPickerSheet(mountedContainers: containers)),
+      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFolderPickerSheet(mountedContainers: containers))),
     );
     if (result == null || !mounted) return;
     ref.read(passwordInterchangeProvider.notifier).setExportSource(
@@ -509,7 +511,7 @@ class _ImportBodyState extends ConsumerState<_ImportBody> {
     final containers = widget.mountedContainers.value;
     if (containers.isEmpty) return;
     final result = await Navigator.of(context).push<CryptoDestination>(
-      MaterialPageRoute(builder: (_) => VaultFolderPickerSheet(mountedContainers: containers)),
+      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFolderPickerSheet(mountedContainers: containers))),
     );
     if (result == null || !mounted) return;
     ref.read(passwordInterchangeProvider.notifier).setImportDestination(

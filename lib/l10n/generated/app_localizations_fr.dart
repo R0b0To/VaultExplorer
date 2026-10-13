@@ -10432,7 +10432,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Couleur personnalisée · toucher pour modifier ou réinitialiser';
+      'Couleur personnalisée — appuyez pour modifier ou rétablir la valeur par défaut.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11437,4 +11437,243 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'Cet enregistrement n\'a pas été enregistré et sera supprimé définitivement.';
+
+  @override
+  String get skinAreaDashboard => 'Tableau de bord';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'La liste des coffres sur laquelle vous arrivez, avec ses cartes de coffre.';
+
+  @override
+  String get skinAreaDrawer => 'Menu latéral';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'Le menu coulissant avec vos coffres et raccourcis.';
+
+  @override
+  String get skinAreaFilesDescription =>
+      'Le navigateur de fichiers à l\'intérieur d\'un coffre déverrouillé.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'La barre d\'outils de l\'éditeur de texte et de code. Ses couleurs de fond et de syntaxe sont définies dans le thème de l\'éditeur ci-dessous.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'L\'onglet Outils et chaque outil ouvert depuis celui-ci.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'L\'onglet Paramètres et ses sous-pages.';
+
+  @override
+  String get skinSharedPaletteTitle => 'Palette partagée';
+
+  @override
+  String get skinSharedPaletteShort => 'Partagée';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'Couleurs héritées par chaque page tant qu\'elle ne définit pas les siennes. Les écrans sans section dédiée, comme le déverrouillage et l\'appareil photo, les utilisent directement.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'La barre supérieure de chaque page qui ne définit pas la sienne.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'Le bouton rond d\'ajout de chaque page qui ne définit pas le sien.';
+
+  @override
+  String get skinPagesTitle => 'Couleurs des pages';
+
+  @override
+  String get skinPagesDescription =>
+      'Chaque page conserve ses propres couleurs. Modifier une page ne modifie jamais les autres.';
+
+  @override
+  String get skinResetPageColors => 'Réinitialiser les couleurs de la page';
+
+  @override
+  String get skinTokenBackground => 'Arrière-plan de la page';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'L\'arrière-plan derrière tous les éléments de cette page.';
+
+  @override
+  String get skinTokenText => 'Texte principal';
+
+  @override
+  String get skinTokenTextHint =>
+      'Titres, noms et corps du texte sur cette page.';
+
+  @override
+  String get skinTokenTextSecondary => 'Texte secondaire et icônes';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'Sous-titres, détails, indications et icônes discrètes.';
+
+  @override
+  String get skinTokenAppBar => 'Barre supérieure';
+
+  @override
+  String get skinTokenAppBarHint =>
+      'Remplissage de la barre supérieure sur cette page.';
+
+  @override
+  String get skinTokenOnAppBar => 'Texte et icônes de la barre supérieure';
+
+  @override
+  String get skinTokenOnAppBarHint =>
+      'Couleur du titre et des icônes dans la barre supérieure.';
+
+  @override
+  String get skinTokenCard => 'Cartes et lignes';
+
+  @override
+  String get skinTokenCardHint =>
+      'Cartes, lignes de liste et panneaux groupés.';
+
+  @override
+  String get skinTokenCardActive => 'Carte active';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'La carte en surbrillance, comme un coffre déverrouillé.';
+
+  @override
+  String get skinTokenRaised => 'Puces et contrôles';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'Champs de recherche, puces, miniatures et tuiles d\'icônes.';
+
+  @override
+  String get skinTokenOverlay => 'Menus, dialogues et volets';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'Menus contextuels, fenêtres de dialogue et volets inférieurs ouverts depuis cette page.';
+
+  @override
+  String get skinTokenAccent => 'Accent';
+
+  @override
+  String get skinTokenAccentHint =>
+      'Boutons, liens, progressions et icônes actives.';
+
+  @override
+  String get skinTokenOnAccent => 'Texte sur couleur d\'accent';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'Libellés et icônes affichés sur les boutons de couleur d\'accent.';
+
+  @override
+  String get skinTokenSelection => 'Sélection';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'Lignes sélectionnées et tuiles d\'icônes en surbrillance.';
+
+  @override
+  String get skinTokenOnSelection => 'Texte sur sélection';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'Icônes et texte affichés sur les éléments sélectionnés.';
+
+  @override
+  String get skinTokenDivider => 'Séparateurs';
+
+  @override
+  String get skinTokenDividerHint =>
+      'Lignes de séparation fines et bordures discrètes.';
+
+  @override
+  String get skinTokenOutline => 'Contours';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'Bordures plus marquées sur les boutons avec contour et les champs.';
+
+  @override
+  String get skinTokenFab => 'Bouton rond d\'ajout';
+
+  @override
+  String get skinTokenFabHint => 'Remplissage du bouton rond d\'ajout.';
+
+  @override
+  String get skinTokenOnFab => 'Icône du bouton rond d\'ajout';
+
+  @override
+  String get skinTokenOnFabHint => 'L\'icône plus sur le bouton rond d\'ajout.';
+
+  @override
+  String get skinPreviewConfirm => 'Confirmer';
+
+  @override
+  String get skinPreviewCancelButton => 'Annuler';
+
+  @override
+  String get skinPreviewSaveButton => 'Enregistrer';
+
+  @override
+  String get skinPreviewRunButton => 'Exécuter';
+
+  @override
+  String get skinPreviewPasteButton => 'Coller ici';
+
+  @override
+  String get skinPreviewUnlockButton => 'Déverrouiller';
+
+  @override
+  String get skinPreviewSortChip => 'Trier : Nom';
+
+  @override
+  String get skinPreviewSearchChip => 'Rechercher des fichiers';
+
+  @override
+  String get skinPreviewPinnedBadge => 'Épinglé';
+
+  @override
+  String get skinPreviewVaultsHeader => 'COFFRES';
+
+  @override
+  String get skinPreviewToolsSection => 'Cryptographie de fichiers';
+
+  @override
+  String get skinPreviewToolOne => 'Générateur de fichier-clé et mot de passe';
+
+  @override
+  String get skinPreviewToolOneHint =>
+      'Générer des mots de passe et fichiers-clés';
+
+  @override
+  String get skinPreviewToolTwo =>
+      'Vérificateur de sommes de contrôle et hachages';
+
+  @override
+  String get skinPreviewToolTwoHint =>
+      'Vérifier que les gros fichiers ne sont pas corrompus';
+
+  @override
+  String get skinPreviewSettingsSection => 'Sécurité';
+
+  @override
+  String get skinPreviewSettingOne => 'Verrouillage de l\'application';
+
+  @override
+  String get skinPreviewSettingOneHint =>
+      'Biométrie et verrouillage automatique';
+
+  @override
+  String get skinPreviewSettingTwo => 'Stockage';
+
+  @override
+  String get skinPreviewSettingTwoHint => 'Stockage externe et ponts cloud';
 }

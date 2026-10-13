@@ -10350,7 +10350,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Colore personalizzato · tocca per modificare o reimpostare';
+      'Colore personalizzato — tocca per modificare o ripristinare il valore predefinito.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11331,4 +11331,243 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'Questa registrazione non è stata salvata e verrà eliminata definitivamente.';
+
+  @override
+  String get skinAreaDashboard => 'Dashboard';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'L\'elenco dei vault su cui atterri, con le relative schede dei vault.';
+
+  @override
+  String get skinAreaDrawer => 'Menu laterale';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'Il menu a scomparsa con i tuoi vault e le scorciatoie.';
+
+  @override
+  String get skinAreaFilesDescription =>
+      'Il browser dei file all\'interno di un vault sbloccato.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'La barra degli strumenti dell\'editor di testo e codice. I colori di sfondo e sintassi sono impostati nel tema dell\'editor sottostante.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'La scheda Strumenti e ogni strumento aperto da essa.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'La scheda Impostazioni e le sue sottopagine.';
+
+  @override
+  String get skinSharedPaletteTitle => 'Tavolozza condivisa';
+
+  @override
+  String get skinSharedPaletteShort => 'Condivisa';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'Colori ereditati da ogni pagina finché non ne imposta di propri. Le schermate prive di una sezione dedicata, come sblocco e fotocamera, usano direttamente questi.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'La barra superiore di ogni pagina che non ne imposta una propria.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'Il pulsante circolare di aggiunta di ogni pagina che non ne imposta uno proprio.';
+
+  @override
+  String get skinPagesTitle => 'Colori pagina';
+
+  @override
+  String get skinPagesDescription =>
+      'Ciascuna pagina mantiene i propri colori. La modifica di una pagina non influisce mai su un\'altra.';
+
+  @override
+  String get skinResetPageColors => 'Ripristina colori pagina';
+
+  @override
+  String get skinTokenBackground => 'Sfondo pagina';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'Lo sfondo dietro a ogni elemento di questa pagina.';
+
+  @override
+  String get skinTokenText => 'Testo principale';
+
+  @override
+  String get skinTokenTextHint =>
+      'Titoli, nomi e testo del corpo in questa pagina.';
+
+  @override
+  String get skinTokenTextSecondary => 'Testo secondario e icone';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'Sottotitoli, dettagli, suggerimenti e icone secondarie.';
+
+  @override
+  String get skinTokenAppBar => 'Barra superiore';
+
+  @override
+  String get skinTokenAppBarHint =>
+      'Riempimento della barra superiore in questa pagina.';
+
+  @override
+  String get skinTokenOnAppBar => 'Testo e icone della barra superiore';
+
+  @override
+  String get skinTokenOnAppBarHint =>
+      'Colore di titolo e icone nella barra superiore.';
+
+  @override
+  String get skinTokenCard => 'Schede e righe';
+
+  @override
+  String get skinTokenCardHint =>
+      'Schede, righe di elenchi e pannelli raggruppati.';
+
+  @override
+  String get skinTokenCardActive => 'Scheda attiva';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'La scheda evidenziata, come un vault sbloccato.';
+
+  @override
+  String get skinTokenRaised => 'Chip e controlli';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'Campi di ricerca, chip, anteprime e riquadri icona.';
+
+  @override
+  String get skinTokenOverlay => 'Menu, finestre di dialogo e fogli';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'Menu a comparsa, finestre di dialogo e fogli inferiori aperti da questa pagina.';
+
+  @override
+  String get skinTokenAccent => 'Accento';
+
+  @override
+  String get skinTokenAccentHint =>
+      'Pulsanti, link, barre di avanzamento e icone attive.';
+
+  @override
+  String get skinTokenOnAccent => 'Testo su accento';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'Etichette e icone mostrate sui pulsanti con colore accento.';
+
+  @override
+  String get skinTokenSelection => 'Selezione';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'Righe selezionate e riquadri icona evidenziati.';
+
+  @override
+  String get skinTokenOnSelection => 'Testo su selezione';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'Icone e testo mostrati sugli elementi selezionati.';
+
+  @override
+  String get skinTokenDivider => 'Divisori';
+
+  @override
+  String get skinTokenDividerHint =>
+      'Sottili linee divisorie e bordi discreti.';
+
+  @override
+  String get skinTokenOutline => 'Bordi';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'Bordi più marcati su campi e pulsanti con contorno.';
+
+  @override
+  String get skinTokenFab => 'Pulsante circolare di aggiunta';
+
+  @override
+  String get skinTokenFabHint =>
+      'Riempimento del pulsante circolare di aggiunta.';
+
+  @override
+  String get skinTokenOnFab => 'Icona pulsante circolare di aggiunta';
+
+  @override
+  String get skinTokenOnFabHint =>
+      'L\'icona più sul pulsante circolare di aggiunta.';
+
+  @override
+  String get skinPreviewConfirm => 'Conferma';
+
+  @override
+  String get skinPreviewCancelButton => 'Annulla';
+
+  @override
+  String get skinPreviewSaveButton => 'Salva';
+
+  @override
+  String get skinPreviewRunButton => 'Esegui';
+
+  @override
+  String get skinPreviewPasteButton => 'Incolla qui';
+
+  @override
+  String get skinPreviewUnlockButton => 'Sblocca';
+
+  @override
+  String get skinPreviewSortChip => 'Ordina: Nome';
+
+  @override
+  String get skinPreviewSearchChip => 'Cerca file';
+
+  @override
+  String get skinPreviewPinnedBadge => 'Fissato';
+
+  @override
+  String get skinPreviewVaultsHeader => 'VAULT';
+
+  @override
+  String get skinPreviewToolsSection => 'Crittografia dei file';
+
+  @override
+  String get skinPreviewToolOne => 'Generatore di file chiave e passphrase';
+
+  @override
+  String get skinPreviewToolOneHint => 'Genera password e file chiave';
+
+  @override
+  String get skinPreviewToolTwo => 'Verificatore di checksum e hash';
+
+  @override
+  String get skinPreviewToolTwoHint =>
+      'Verifica che i file di grandi dimensioni non siano danneggiati';
+
+  @override
+  String get skinPreviewSettingsSection => 'Sicurezza';
+
+  @override
+  String get skinPreviewSettingOne => 'Blocco app';
+
+  @override
+  String get skinPreviewSettingOneHint => 'Biometria e blocco automatico';
+
+  @override
+  String get skinPreviewSettingTwo => 'Archiviazione';
+
+  @override
+  String get skinPreviewSettingTwoHint =>
+      'Archiviazione esterna e bridge cloud';
 }

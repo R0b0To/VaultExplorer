@@ -6,6 +6,8 @@ import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/settings/custom_app_skin_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class AppSkinSettingsScreen extends ConsumerWidget {
   const AppSkinSettingsScreen({super.key});
@@ -76,7 +78,7 @@ class AppSkinSettingsScreen extends ConsumerWidget {
     await notifier.activateCustomSkin(skin);
     if (!context.mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const CustomAppSkinScreen()),
+      MaterialPageRoute<void>(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const CustomAppSkinScreen())),
     );
   }
 
@@ -179,7 +181,7 @@ class AppSkinSettingsScreen extends ConsumerWidget {
                     if (!context.mounted) return;
                     await Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const CustomAppSkinScreen(),
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const CustomAppSkinScreen()),
                       ),
                     );
                   },

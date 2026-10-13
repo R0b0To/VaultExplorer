@@ -10198,7 +10198,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Custom color · tap to change or reset';
+      'Custom color — tap to change or reset to default.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11169,4 +11169,234 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'This recording hasn\'t been saved and will be permanently deleted.';
+
+  @override
+  String get skinAreaDashboard => 'Dashboard';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'The vault list you land on, with its vault cards.';
+
+  @override
+  String get skinAreaDrawer => 'Side menu';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'The slide-out menu with your vaults and shortcuts.';
+
+  @override
+  String get skinAreaFilesDescription =>
+      'The file browser inside an unlocked vault.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'The toolbar of the text and code editor. Its canvas and syntax colors are set in the editor theme below.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'The Tools tab and every tool opened from it.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'The Settings tab and its sub-pages.';
+
+  @override
+  String get skinSharedPaletteTitle => 'Shared palette';
+
+  @override
+  String get skinSharedPaletteShort => 'Shared';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'Colors every page inherits until it sets its own. Screens without a section of their own, such as unlock and camera, use these directly.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'The top bar of every page that does not set its own.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'The round add button of every page that does not set its own.';
+
+  @override
+  String get skinPagesTitle => 'Page colors';
+
+  @override
+  String get skinPagesDescription =>
+      'Each page keeps its own colors. Changing one page never changes another.';
+
+  @override
+  String get skinResetPageColors => 'Reset page colors';
+
+  @override
+  String get skinTokenBackground => 'Page background';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'The canvas behind everything on this page.';
+
+  @override
+  String get skinTokenText => 'Main text';
+
+  @override
+  String get skinTokenTextHint => 'Titles, names and body text on this page.';
+
+  @override
+  String get skinTokenTextSecondary => 'Secondary text and icons';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'Subtitles, details, hints and quiet icons.';
+
+  @override
+  String get skinTokenAppBar => 'Top bar';
+
+  @override
+  String get skinTokenAppBarHint => 'Fill of the top bar on this page.';
+
+  @override
+  String get skinTokenOnAppBar => 'Top bar text and icons';
+
+  @override
+  String get skinTokenOnAppBarHint => 'Title and icon color on the top bar.';
+
+  @override
+  String get skinTokenCard => 'Cards and rows';
+
+  @override
+  String get skinTokenCardHint => 'Cards, list rows and grouped panels.';
+
+  @override
+  String get skinTokenCardActive => 'Active card';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'The highlighted card, such as an unlocked vault.';
+
+  @override
+  String get skinTokenRaised => 'Chips and controls';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'Search fields, chips, thumbnails and icon tiles.';
+
+  @override
+  String get skinTokenOverlay => 'Menus, dialogs and sheets';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'Popup menus, dialogs and bottom sheets opened from this page.';
+
+  @override
+  String get skinTokenAccent => 'Accent';
+
+  @override
+  String get skinTokenAccentHint =>
+      'Buttons, links, progress and active icons.';
+
+  @override
+  String get skinTokenOnAccent => 'Text on accent';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'Labels and icons drawn on accent-filled buttons.';
+
+  @override
+  String get skinTokenSelection => 'Selection';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'Selected rows and highlighted icon tiles.';
+
+  @override
+  String get skinTokenOnSelection => 'Text on selection';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'Icons and text drawn on selected items.';
+
+  @override
+  String get skinTokenDivider => 'Dividers';
+
+  @override
+  String get skinTokenDividerHint => 'Thin separator lines and subtle borders.';
+
+  @override
+  String get skinTokenOutline => 'Outlines';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'Stronger borders on outlined buttons and fields.';
+
+  @override
+  String get skinTokenFab => 'Round add button';
+
+  @override
+  String get skinTokenFabHint => 'Fill of the round add button.';
+
+  @override
+  String get skinTokenOnFab => 'Round add button icon';
+
+  @override
+  String get skinTokenOnFabHint => 'The plus icon on the round add button.';
+
+  @override
+  String get skinPreviewConfirm => 'Confirm';
+
+  @override
+  String get skinPreviewCancelButton => 'Cancel';
+
+  @override
+  String get skinPreviewSaveButton => 'Save';
+
+  @override
+  String get skinPreviewRunButton => 'Run';
+
+  @override
+  String get skinPreviewPasteButton => 'Paste here';
+
+  @override
+  String get skinPreviewUnlockButton => 'Unlock';
+
+  @override
+  String get skinPreviewSortChip => 'Sort: Name';
+
+  @override
+  String get skinPreviewSearchChip => 'Search files';
+
+  @override
+  String get skinPreviewPinnedBadge => 'Pinned';
+
+  @override
+  String get skinPreviewVaultsHeader => 'VAULTS';
+
+  @override
+  String get skinPreviewToolsSection => 'File cryptography';
+
+  @override
+  String get skinPreviewToolOne => 'Keyfile and passphrase generator';
+
+  @override
+  String get skinPreviewToolOneHint => 'Generate passwords and keyfiles';
+
+  @override
+  String get skinPreviewToolTwo => 'Checksum and hash verifier';
+
+  @override
+  String get skinPreviewToolTwoHint => 'Verify large files were not corrupted';
+
+  @override
+  String get skinPreviewSettingsSection => 'Security';
+
+  @override
+  String get skinPreviewSettingOne => 'App lock';
+
+  @override
+  String get skinPreviewSettingOneHint => 'Biometrics and auto-lock';
+
+  @override
+  String get skinPreviewSettingTwo => 'Storage';
+
+  @override
+  String get skinPreviewSettingTwoHint => 'External storage and cloud bridges';
 }

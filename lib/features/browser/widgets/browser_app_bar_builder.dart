@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -548,9 +547,7 @@ PreferredSizeWidget buildBrowserAppBar(
           return IconButton(
             icon: Icon(
               Icons.menu_rounded,
-              color: Theme.of(ctx)
-                  .extension<AppSkinTokens>()
-                  ?.appBarForeground,
+              color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
             tooltip: context.l10n.storageLocationsTitle,
             onPressed: () => scaffold!.openDrawer(),
@@ -561,9 +558,7 @@ PreferredSizeWidget buildBrowserAppBar(
           return IconButton(
             icon: Icon(
               Icons.arrow_back,
-              color: Theme.of(ctx)
-                  .extension<AppSkinTokens>()
-                  ?.appBarForeground,
+              color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
             tooltip: context.l10n.backToDashboardTooltip,
             onPressed: () {
@@ -580,9 +575,7 @@ PreferredSizeWidget buildBrowserAppBar(
           return IconButton(
             icon: Icon(
               Icons.menu_rounded,
-              color: Theme.of(ctx)
-                  .extension<AppSkinTokens>()
-                  ?.appBarForeground,
+              color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
             tooltip: context.l10n.storageLocationsTitle,
             onPressed: onOpenStorageSwitcher,

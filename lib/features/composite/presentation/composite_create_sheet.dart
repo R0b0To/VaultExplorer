@@ -15,6 +15,8 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/composite_container_controller.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 enum _CompositeWizStep { carriers, security, advanced, review }
 
@@ -113,7 +115,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
     MountedContainer? newlyMountedContainer;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => UnlockSheet(
+        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UnlockSheet(
           initialCompositeCarriers: picked,
           initialName: context.l10n.compositeDefaultContainerName(picked.length),
           onMounted: (container, {record}) {
@@ -122,7 +124,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                 .onContainerMounted(container, record: record);
             newlyMountedContainer = container;
           },
-        ),
+        )),
       ),
     );
     if (!mounted) return;

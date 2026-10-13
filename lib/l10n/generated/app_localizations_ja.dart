@@ -9782,7 +9782,8 @@ class AppLocalizationsJa extends AppLocalizations {
       'カスタムスキンはすぐに適用され、ファイルマネージャーとエディタはアプリスキンに従うよう設定されます。';
 
   @override
-  String get skinCustomColorTapToChangeOrReset => 'カスタムカラー・タップして変更またはリセット';
+  String get skinCustomColorTapToChangeOrReset =>
+      'カスタムカラー — タップして変更、またはデフォルトにリセット。';
 
   @override
   String get skinTapTheColorCircleToChooseAColor => 'カラーサークルをタップして色を選択してください。';
@@ -10725,4 +10726,217 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get audioRecordingDiscardMessage => 'この録音は保存されておらず、完全に削除されます。';
+
+  @override
+  String get skinAreaDashboard => 'ダッシュボード';
+
+  @override
+  String get skinAreaDashboardDescription => '最初に表示される、金庫カードが並ぶ金庫一覧です。';
+
+  @override
+  String get skinAreaDrawer => 'サイドメニュー';
+
+  @override
+  String get skinAreaDrawerDescription => '金庫やショートカットが配置されたスライド式メニューです。';
+
+  @override
+  String get skinAreaFilesDescription => 'ロック解除された金庫内のファイルブラウザです。';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'テキストおよびコードエディタのツールバーです。キャンバスや構文の色は下の「エディタのテーマ」で設定します。';
+
+  @override
+  String get skinAreaToolsDescription => '「ツール」タブおよびそこから開く各ツールです。';
+
+  @override
+  String get skinAreaSettingsDescription => '「設定」タブおよびそのサブページです。';
+
+  @override
+  String get skinSharedPaletteTitle => '共通パレット';
+
+  @override
+  String get skinSharedPaletteShort => '共通';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      '各ページが独自の色を設定するまで継承する基本色です。ロック解除やカメラなど固有セクションのない画面でそのまま使用されます。';
+
+  @override
+  String get skinSharedBarDescription => '独自の色を設定していない全ページのトップバーです。';
+
+  @override
+  String get skinSharedFabDescription => '独自の色を設定していない全ページの丸型追加ボタンです。';
+
+  @override
+  String get skinPagesTitle => 'ページごとの色';
+
+  @override
+  String get skinPagesDescription =>
+      '各ページは独自の色を保持します。1つのページを変更しても他のページには影響しません。';
+
+  @override
+  String get skinResetPageColors => 'ページの色をリセット';
+
+  @override
+  String get skinTokenBackground => 'ページの背景';
+
+  @override
+  String get skinTokenBackgroundHint => 'このページのすべての要素の背後にある背景です。';
+
+  @override
+  String get skinTokenText => 'メインテキスト';
+
+  @override
+  String get skinTokenTextHint => 'このページのタイトル、名前、本文テキストです。';
+
+  @override
+  String get skinTokenTextSecondary => 'サブテキストとアイコン';
+
+  @override
+  String get skinTokenTextSecondaryHint => '字幕、詳細、ヒント、控えめなアイコンです。';
+
+  @override
+  String get skinTokenAppBar => 'トップバー';
+
+  @override
+  String get skinTokenAppBarHint => 'このページのトップバーの塗りつぶし色です。';
+
+  @override
+  String get skinTokenOnAppBar => 'トップバーのテキストとアイコン';
+
+  @override
+  String get skinTokenOnAppBarHint => 'トップバーのタイトルとアイコンの色です。';
+
+  @override
+  String get skinTokenCard => 'カードと行';
+
+  @override
+  String get skinTokenCardHint => 'カード、リスト行、グループ化されたパネルです。';
+
+  @override
+  String get skinTokenCardActive => 'アクティブなカード';
+
+  @override
+  String get skinTokenCardActiveHint => 'ロック解除された金庫など、強調表示されているカードです。';
+
+  @override
+  String get skinTokenRaised => 'チップとコントロール';
+
+  @override
+  String get skinTokenRaisedHint => '検索フィールド、チップ、サムネイル、アイコンタイルです。';
+
+  @override
+  String get skinTokenOverlay => 'メニュー・ダイアログ・シート';
+
+  @override
+  String get skinTokenOverlayHint => 'このページから開くポップアップメニュー、ダイアログ、ボトムシートです。';
+
+  @override
+  String get skinTokenAccent => 'アクセント';
+
+  @override
+  String get skinTokenAccentHint => 'ボタン、リンク、進捗バー、アクティブアイコンです。';
+
+  @override
+  String get skinTokenOnAccent => 'アクセント上のテキスト';
+
+  @override
+  String get skinTokenOnAccentHint => 'アクセント色のボタン上に表示されるラベルとアイコンです。';
+
+  @override
+  String get skinTokenSelection => '選択項目';
+
+  @override
+  String get skinTokenSelectionHint => '選択された行や強調表示されたアイコンタイルです。';
+
+  @override
+  String get skinTokenOnSelection => '選択項目上のテキスト';
+
+  @override
+  String get skinTokenOnSelectionHint => '選択された項目上に表示されるアイコンとテキストです。';
+
+  @override
+  String get skinTokenDivider => '区切り線';
+
+  @override
+  String get skinTokenDividerHint => '細い区切り線と控えめな枠線です。';
+
+  @override
+  String get skinTokenOutline => '輪郭線';
+
+  @override
+  String get skinTokenOutlineHint => 'アウトラインボタンや入力欄の強調枠線です。';
+
+  @override
+  String get skinTokenFab => '丸型追加ボタン';
+
+  @override
+  String get skinTokenFabHint => '丸型追加ボタンの塗りつぶし色です。';
+
+  @override
+  String get skinTokenOnFab => '丸型追加ボタンのアイコン';
+
+  @override
+  String get skinTokenOnFabHint => '丸型追加ボタン上のプラスアイコンです。';
+
+  @override
+  String get skinPreviewConfirm => '確認';
+
+  @override
+  String get skinPreviewCancelButton => 'キャンセル';
+
+  @override
+  String get skinPreviewSaveButton => '保存';
+
+  @override
+  String get skinPreviewRunButton => '実行';
+
+  @override
+  String get skinPreviewPasteButton => 'ここに貼り付け';
+
+  @override
+  String get skinPreviewUnlockButton => 'ロック解除';
+
+  @override
+  String get skinPreviewSortChip => '並べ替え: 名前';
+
+  @override
+  String get skinPreviewSearchChip => 'ファイルを検索';
+
+  @override
+  String get skinPreviewPinnedBadge => '固定済み';
+
+  @override
+  String get skinPreviewVaultsHeader => '金庫';
+
+  @override
+  String get skinPreviewToolsSection => 'ファイル暗号化';
+
+  @override
+  String get skinPreviewToolOne => 'キーファイル・パスフレーズ生成';
+
+  @override
+  String get skinPreviewToolOneHint => 'パスワードとキーファイルを生成します';
+
+  @override
+  String get skinPreviewToolTwo => 'チェックサム・ハッシュ検証';
+
+  @override
+  String get skinPreviewToolTwoHint => '大きなファイルが破損していないかを検証します';
+
+  @override
+  String get skinPreviewSettingsSection => 'セキュリティ';
+
+  @override
+  String get skinPreviewSettingOne => 'アプリのロック';
+
+  @override
+  String get skinPreviewSettingOneHint => '生体認証と自動ロック';
+
+  @override
+  String get skinPreviewSettingTwo => 'ストレージ';
+
+  @override
+  String get skinPreviewSettingTwoHint => '外部ストレージとクラウドブリッジ';
 }

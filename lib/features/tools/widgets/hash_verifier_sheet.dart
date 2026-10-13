@@ -18,6 +18,8 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/hash_verifier_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 part 'hash_verifier_sheet_rows.dart';
 part 'hash_verifier_sheet_cards.dart';
@@ -47,7 +49,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
   Future<List<CryptoSourceItem>> _pickVaultSources(List<MountedContainer> vaults) async {
     final result = await Navigator.push<List<CryptoSourceItem>>(
       context,
-      MaterialPageRoute(builder: (_) => VaultFilePickerSheet(mountedContainers: vaults)),
+      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFilePickerSheet(mountedContainers: vaults))),
     );
     return result ?? [];
   }
@@ -138,7 +140,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     } else {
       final dest = await Navigator.push<CryptoDestination>(
         context,
-        MaterialPageRoute(builder: (_) => VaultFolderPickerSheet(mountedContainers: mountedVaults)),
+        MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFolderPickerSheet(mountedContainers: mountedVaults))),
       );
       if (dest == null || !mounted) return;
       try {

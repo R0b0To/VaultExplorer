@@ -14,10 +14,12 @@ import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
 import 'package:vaultexplorer/features/settings/widgets/app_skin_shortcut_tile.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 Future<void> showEditorAppearanceSheet(BuildContext context) {
   return Navigator.of(context).push(
-    MaterialPageRoute(builder: (context) => const EditorAppearanceScreen()),
+    MaterialPageRoute(builder: (context) => SkinAreaScope(area: SkinArea.settings, child: const EditorAppearanceScreen())),
   );
 }
 

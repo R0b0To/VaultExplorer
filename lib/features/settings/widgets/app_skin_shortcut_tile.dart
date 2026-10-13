@@ -3,6 +3,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/features/settings/app_skin_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/custom_app_skin_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 /// A contextual link from a component appearance page to app-wide skins.
 /// Custom skins open directly in their preview/editor; built-in skins open
@@ -37,9 +39,9 @@ class AppSkinShortcutTile extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => isCustom
+          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: isCustom
               ? const CustomAppSkinScreen()
-              : const AppSkinSettingsScreen(),
+              : const AppSkinSettingsScreen()),
         ),
       ),
     );

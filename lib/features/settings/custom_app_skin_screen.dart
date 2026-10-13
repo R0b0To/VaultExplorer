@@ -4,6 +4,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
+import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
@@ -11,6 +13,8 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 CustomAppSkin createCustomAppSkinFromCurrent(AppSkinSettings settings) {
   final light = buildLightTheme(
@@ -393,7 +397,7 @@ class CustomAppSkinScreen extends ConsumerStatefulWidget {
 class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   bool _darkColors = false;
   bool _didInitializeBrightness = false;
-  _PreviewPane _previewPane = _PreviewPane.app;
+  _PreviewPane _previewPane = _PreviewPane.dashboard;
   _PreviewSelection? _previewSelection;
   bool _showAppOverflowMenu = false;
   bool _showFileOverflowMenu = false;
@@ -645,15 +649,97 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   Color _storedColor(Map<String, int> colors, String role) =>
       Color(colors[role] ?? 0xFF808080);
 
+  // The preview is drawn with the very theme the app builds for this skin, so
+  // what you see here is what each page will look like.
+  ThemeData? _previewBaseCache;
+  CustomAppSkin? _previewBaseSkin;
+  bool? _previewBaseDark;
+
+  ThemeData _previewBase(CustomAppSkin skin) {
+    final cached = _previewBaseCache;
+    if (cached != null &&
+        identical(_previewBaseSkin, skin) &&
+        _previewBaseDark == _darkColors) {
+      return cached;
+    }
+    final built = _darkColors
+        ? buildDarkTheme(appSkin: AppSkinPreset.custom, customAppSkin: skin)
+        : buildLightTheme(appSkin: AppSkinPreset.custom, customAppSkin: skin);
+    _previewBaseCache = built;
+    _previewBaseSkin = skin;
+    _previewBaseDark = _darkColors;
+    return built;
+  }
+
+  SkinAreaColors _areaColors(CustomAppSkin skin, SkinArea area) =>
+      _previewBase(skin).extension<AppSkinTokens>()!.areaColors(area);
+
+  String _aid(SkinArea area, SkinToken token) => 'area:${area.id}.${token.id}';
+
+  (SkinArea, SkinToken)? _parseAreaId(String id) {
+    if (!id.startsWith('area:')) return null;
+    final parts = id.substring(5).split('.');
+    if (parts.length != 2) return null;
+    final area = SkinArea.tryParse(parts[0]);
+    final token = SkinToken.tryParse(parts[1]);
+    return area == null || token == null ? null : (area, token);
+  }
+
+  /// The editor's toolbar follows the editor theme unless the skin overrides
+  /// it, so its "inherited" value is derived from the editor's own colors.
+  Color _editorToolbarColor(SkinToken token) {
+    final custom = _skin.areaColorOrNull(
+      SkinArea.editor,
+      token,
+      dark: _darkColors,
+    );
+    if (custom != null) return custom;
+    final chrome = _editorColor('chromeForeground');
+    return token == SkinToken.appBar
+        ? Color.alphaBlend(
+            chrome.withValues(alpha: 0.04),
+            _editorColor('background'),
+          )
+        : chrome;
+  }
+
+  Color _areaTokenColor(SkinArea area, SkinToken token) =>
+      area == SkinArea.editor
+      ? _editorToolbarColor(token)
+      : _areaColors(_skin, area).color(token);
+
+  Future<void> _pickAreaColor(
+    SkinArea area,
+    SkinToken token, {
+    required String title,
+  }) => _pickColor(
+    title: title,
+    current: _areaTokenColor(area, token),
+    allowDefault: true,
+    onColor: (value) =>
+        _save(_skin.withAreaColor(area, token, value, dark: _darkColors)),
+    onDefault: () =>
+        _save(_skin.withAreaColor(area, token, null, dark: _darkColors)),
+  );
+
   void _selectPreview(String id, String title, String explanation) {
+    // For a page token the explanation always comes from the token itself
+    // ("<Token> on <Page>. <what it controls>"), never from the element.
+    final parsed = _parseAreaId(id);
+    final text = parsed == null
+        ? explanation
+        : '${parsed.$2.label(context.l10n)} · ${parsed.$1.label(context.l10n)}. '
+              '${parsed.$2.hint(context.l10n)}';
     setState(() {
-      _previewSelection = _PreviewSelection(id, title, explanation);
+      _previewSelection = _PreviewSelection(id, title, text);
     });
   }
 
   Color _previewSelectionColor(String id) {
     final cs = Theme.of(context).colorScheme;
     final appColors = _schemeColors();
+    final areaId = _parseAreaId(id);
+    if (areaId != null) return _areaTokenColor(areaId.$1, areaId.$2);
     if (id.startsWith('app:')) {
       final role = id.substring(4);
       return _storedColor(appColors, role);
@@ -697,6 +783,15 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     final selection = _previewSelection;
     if (selection == null) return;
     final id = selection.id;
+    final areaId = _parseAreaId(id);
+    if (areaId != null) {
+      return _pickAreaColor(
+        areaId.$1,
+        areaId.$2,
+        title: '${areaId.$2.label(context.l10n)} · '
+            '${areaId.$1.label(context.l10n)}',
+      );
+    }
     if (id.startsWith('app:')) {
       final role = id.substring(4);
       return _pickColor(
@@ -853,7 +948,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             borderRadius: borderRadius,
             border: Border.all(
               color: isSelected
-                  ? _storedColor(_schemeColors(), 'primary')
+                  ? Theme.of(context).colorScheme.primary
                   : Colors.transparent,
               width: 2,
             ),
@@ -943,10 +1038,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           tooltip: context.l10n.skinCustomizeSkin,
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => CustomAppSkinScreen(
+              builder: (_) => SkinAreaScope(area: SkinArea.settings, child: CustomAppSkinScreen(
                 showControls: true,
                 initialDarkColors: _darkColors,
-              ),
+              )),
             ),
           ),
           icon: const Icon(Icons.tune_rounded),
@@ -993,26 +1088,53 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _previewPaneChip(
-                  _PreviewPane.app,
-                  context.l10n.skinApp,
-                  Icons.dashboard_rounded,
-                ),
-                _previewPaneChip(
-                  _PreviewPane.fileManager,
-                  context.l10n.filesTabLabel,
-                  Icons.folder_copy_rounded,
-                ),
-                _previewPaneChip(
-                  _PreviewPane.editor,
-                  context.l10n.skinEditor,
-                  Icons.code_rounded,
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final (pane, label, icon) in [
+                    (
+                      _PreviewPane.dashboard,
+                      SkinArea.dashboard.label(context.l10n),
+                      Icons.dashboard_rounded,
+                    ),
+                    (
+                      _PreviewPane.drawer,
+                      SkinArea.drawer.label(context.l10n),
+                      Icons.menu_open_rounded,
+                    ),
+                    (
+                      _PreviewPane.files,
+                      SkinArea.files.label(context.l10n),
+                      Icons.folder_copy_rounded,
+                    ),
+                    (
+                      _PreviewPane.editor,
+                      SkinArea.editor.label(context.l10n),
+                      Icons.code_rounded,
+                    ),
+                    (
+                      _PreviewPane.tools,
+                      SkinArea.tools.label(context.l10n),
+                      Icons.build_rounded,
+                    ),
+                    (
+                      _PreviewPane.settings,
+                      SkinArea.settings.label(context.l10n),
+                      Icons.settings_rounded,
+                    ),
+                    (
+                      _PreviewPane.shared,
+                      context.l10n.skinSharedPaletteShort,
+                      Icons.palette_rounded,
+                    ),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _previewPaneChip(pane, label, icon),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 10),
             Expanded(child: _livePreview(skin)),
@@ -1112,6 +1234,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           ),
         ],
       ),
+      _groupHeader(
+        context.l10n.skinSharedPaletteTitle,
+        context.l10n.skinSharedPaletteDescription,
+      ),
       _colorRolesSection(
         title: context.l10n.skinPageAndActions,
         description: context.l10n.skinTheMainBackgroundTextAndActionColors,
@@ -1132,8 +1258,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       ),
       _componentColorsSection(
         title: context.l10n.skinAppBar,
-        subtitle:
-            context.l10n.skinTheTopNavigationBarIsIndependentFromCardsAndPages,
+        subtitle: context.l10n.skinSharedBarDescription,
         roles: [
           (
             'appBarBackground',
@@ -1149,8 +1274,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       ),
       _componentColorsSection(
         title: context.l10n.skinFloatingActionButton,
-        subtitle:
-            context.l10n.skinItsFillAndIconColorAreSeparateFromSelectionColors,
+        subtitle: context.l10n.skinSharedFabDescription,
         roles: [
           (
             'fabBackground',
@@ -1161,23 +1285,6 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             'fabForeground',
             context.l10n.skinButtonIcon,
             context.l10n.skinIconColorOnTheRoundButton,
-          ),
-        ],
-      ),
-      _componentColorsSection(
-        title: context.l10n.skinDashboardVaultCards,
-        subtitle:
-            context.l10n.skinSetTheBackgroundForLockedAndMountedVaultCards,
-        roles: [
-          (
-            'vaultCardBackground',
-            context.l10n.skinLockedVaultCard,
-            context.l10n.skinNeutralVaultCardFill,
-          ),
-          (
-            'mountedVaultCardBackground',
-            context.l10n.skinMountedVaultCard,
-            context.l10n.skinSeparateFillForAnUnlockedMountedVault,
           ),
         ],
       ),
@@ -1206,6 +1313,11 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           onColor: (value) => _setSemanticColor(role, value),
         ),
       ),
+      _groupHeader(
+        context.l10n.skinPagesTitle,
+        context.l10n.skinPagesDescription,
+      ),
+      for (final area in SkinArea.values) _areaSection(skin, area),
       _fileManagerSection(skin),
       _editorSection(skin),
       const SizedBox(height: 20),
@@ -1214,6 +1326,73 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         textAlign: TextAlign.center,
       ),
     ];
+  }
+
+  Widget _groupHeader(String title, String description) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          description,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// One page's colors. Every row edits only this page; "inherited" rows
+  /// follow the shared palette until you pick a color of your own.
+  Widget _areaSection(CustomAppSkin skin, SkinArea area) {
+    final l10n = context.l10n;
+    final overrides =
+        (_darkColors ? skin.darkAreaColors : skin.lightAreaColors)[area.id];
+    return _sectionCard(
+      title: area.label(l10n),
+      subtitle: area.description(l10n),
+      children: [
+        for (final token in area.tokens)
+          ListTile(
+            title: Text(token.label(l10n)),
+            subtitle: Text(
+              skin.areaColorOrNull(area, token, dark: _darkColors) != null
+                  ? l10n.skinCustomColorTapToChangeOrReset
+                  : token.hint(l10n),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: _ColorDot(color: _areaTokenColor(area, token)),
+            onTap: () => _pickAreaColor(
+              area,
+              token,
+              title: '${token.label(l10n)} · ${area.label(l10n)}',
+            ),
+          ),
+        if (overrides != null && overrides.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: TextButton.icon(
+                onPressed: () => _save(
+                  skin.withoutAreaColors(area, dark: _darkColors),
+                ),
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: Text(l10n.skinResetPageColors),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _componentColorsSection({
@@ -1285,159 +1464,334 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     onTap: () => onPick(role),
   );
 
+  // ---------------------------------------------------------------------------
+  // Page previews
+  //
+  // Every pane renders one page from that page's own tokens, built by the same
+  // theme code the real app uses, so the preview cannot drift from the app. A
+  // tappable element only ever selects a token of the page it is drawn on.
+  // ---------------------------------------------------------------------------
+
   Widget _livePreview(CustomAppSkin skin) {
-    final baseTheme = Theme.of(context);
-    final previewColorScheme = _editorColorScheme();
-    final baseSemantic =
-        baseTheme.extension<AppSemanticColors>() ??
-        (_darkColors ? AppSemanticColors.dark : AppSemanticColors.light);
-    Color semantic(String role, Color fallback) =>
-        Color(_semanticColors()[role] ?? fallback.toARGB32());
-    final previewSemantic = baseSemantic.copyWith(
-      success: semantic('success', baseSemantic.success),
-      onSuccess: semantic('onSuccess', baseSemantic.onSuccess),
-      successContainer: semantic(
-        'successContainer',
-        baseSemantic.successContainer,
-      ),
-      onSuccessContainer: semantic(
-        'onSuccessContainer',
-        baseSemantic.onSuccessContainer,
-      ),
-      warning: semantic('warning', baseSemantic.warning),
-      onWarning: semantic('onWarning', baseSemantic.onWarning),
-      warningContainer: semantic(
-        'warningContainer',
-        baseSemantic.warningContainer,
-      ),
-      onWarningContainer: semantic(
-        'onWarningContainer',
-        baseSemantic.onWarningContainer,
-      ),
-      bookmark: semantic('bookmark', baseSemantic.bookmark),
-    );
-    final previewTheme = baseTheme.copyWith(
-      colorScheme: previewColorScheme,
-      textTheme: baseTheme.textTheme.apply(
-        bodyColor: previewColorScheme.onSurface,
-        displayColor: previewColorScheme.onSurface,
-      ),
-      extensions: [
-        for (final extension in baseTheme.extensions.values)
-          if (extension is! AppSemanticColors) extension,
-        previewSemantic,
-      ],
-    );
-    final child = switch (_previewPane) {
-      _PreviewPane.app => _appShellPreview(previewColorScheme),
-      _PreviewPane.fileManager => _fileManagerPreview(
-        skin,
-        (role, fallback) => Color(_schemeColors()[role] ?? fallback.toARGB32()),
-        previewColorScheme,
-      ),
-      _PreviewPane.editor => _editorScreenPreview(
-        (role, fallback) => Color(_schemeColors()[role] ?? fallback.toARGB32()),
-        previewColorScheme,
-      ),
-    };
+    final previewBase = _previewBase(skin);
+    final area = _previewPane.area;
+    final Widget pane;
+    if (area == null) {
+      pane = Theme(
+        data: previewBase,
+        child: _sharedPreview(previewBase.colorScheme),
+      );
+    } else if (area == SkinArea.editor) {
+      pane = Theme(
+        data: previewBase,
+        child: _editorScreenPreview(
+          (role, fallback) =>
+              Color(_schemeColors()[role] ?? fallback.toARGB32()),
+          previewBase.colorScheme,
+        ),
+      );
+    } else {
+      final ac = _areaColors(skin, area);
+      pane = SkinAreaScope(
+        area: area,
+        baseTheme: previewBase,
+        child: Builder(
+          builder: (scoped) {
+            final cs = Theme.of(scoped).colorScheme;
+            return switch (area) {
+              SkinArea.dashboard => _dashboardPreview(cs, ac),
+              SkinArea.drawer => _drawerPreview(cs, ac),
+              SkinArea.files => _fileManagerPreview(skin, cs, ac),
+              SkinArea.tools => _toolsPreview(cs, ac),
+              SkinArea.settings => _settingsPreview(cs, ac),
+              SkinArea.editor => const SizedBox.shrink(),
+            };
+          },
+        ),
+      );
+    }
     return Theme(
-      data: previewTheme,
+      data: previewBase,
       child: Card(
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
-        child: child,
+        child: pane,
       ),
     );
   }
 
-  Widget _appShellPreview(ColorScheme cs) {
-    final page = cs.surface;
-    return _previewCanvas(
-      page,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  /// A tappable preview element that edits [token] on [area].
+  Widget _tt(
+    SkinArea area,
+    SkinToken token,
+    Widget child, {
+    BorderRadius radius = const BorderRadius.all(Radius.circular(12)),
+    VoidCallback? onTap,
+  }) => _previewTarget(
+    id: _aid(area, token),
+    title: token.label(context.l10n),
+    explanation: '',
+    borderRadius: radius,
+    onTap: onTap,
+    child: child,
+  );
+
+  Widget _mockAppBar(
+    SkinArea area,
+    SkinAreaColors ac,
+    String title, {
+    IconData leading = Icons.menu_rounded,
+    List<IconData> actions = const [],
+  }) {
+    final foreground = ac.color(SkinToken.onAppBar);
+    return _tt(
+      area,
+      SkinToken.appBar,
+      Container(
+        height: 60,
+        color: ac.color(SkinToken.appBar),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            _tt(area, SkinToken.onAppBar, Icon(leading, color: foreground)),
+            const SizedBox(width: 20),
+            Expanded(
+              child: _tt(
+                area,
+                SkinToken.onAppBar,
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            for (final icon in actions)
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Icon(icon, color: foreground),
+              ),
+          ],
+        ),
+      ),
+      radius: BorderRadius.zero,
+    );
+  }
+
+  Widget _mockDialog(SkinArea area, SkinAreaColors ac) => _tt(
+    area,
+    SkinToken.overlay,
+    Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+      decoration: BoxDecoration(
+        color: ac.color(SkinToken.overlay),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _previewTarget(
-            id: 'component:appBarBackground',
-            title: context.l10n.skinAppBarBackground,
-            explanation: context
-                .l10n
-                .skinTheDashboardAndOtherAppBarsUseThisIndependentColor,
-            child: Container(
-              height: 64,
-              color: _componentColor('appBarBackground'),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _previewTarget(
-                    id: 'component:appBarForeground',
-                    title: context.l10n.skinDashboardMenuIcon,
-                    explanation: context
-                        .l10n
-                        .skinTheHamburgerButtonUsesTheAppBarIconColor,
-                    child: Icon(
-                      Icons.menu_rounded,
-                      color: _componentColor('appBarForeground'),
-                    ),
+          Text(
+            SkinToken.overlay.label(context.l10n),
+            style: TextStyle(
+              color: ac.color(SkinToken.text),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            SkinToken.overlay.hint(context.l10n),
+            style: TextStyle(
+              color: ac.color(SkinToken.textSecondary),
+              fontSize: 13,
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _tt(
+              area,
+              SkinToken.accent,
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Text(
+                  context.l10n.skinPreviewConfirm,
+                  style: TextStyle(
+                    color: ac.color(SkinToken.accent),
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: 24),
-                  _previewTarget(
-                    id: 'component:appBarForeground',
-                    title: context.l10n.skinDashboardTitle,
-                    explanation: context
-                        .l10n
-                        .skinTheDashboardTitleUsesTheAppBarForegroundColor,
-                    child: Text(
-                      context.l10n.appNameVaultExplorer,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: _componentColor('appBarForeground'),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    ),
+  );
+
+  /// A chip-like control, drawn with the page's "Chips & controls" color.
+  Widget _mockChip(SkinArea area, SkinAreaColors ac, IconData icon, String text) =>
+      _tt(
+        area,
+        SkinToken.raised,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: ac.color(SkinToken.raised),
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: ac.color(SkinToken.textSecondary)),
+              const SizedBox(width: 6),
+              Text(
+                text,
+                style: TextStyle(
+                  color: ac.color(SkinToken.text),
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        radius: BorderRadius.circular(100),
+      );
+
+  /// A filled button, drawn with the page's accent / text-on-accent colors.
+  Widget _mockFilledButton(SkinArea area, SkinAreaColors ac, String text) =>
+      _tt(
+        area,
+        SkinToken.accent,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: ac.color(SkinToken.accent),
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: _tt(
+            area,
+            SkinToken.onAccent,
+            Text(
+              text,
+              style: TextStyle(
+                color: ac.color(SkinToken.onAccent),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        radius: BorderRadius.circular(100),
+      );
+
+  Widget _mockOutlinedButton(SkinArea area, SkinAreaColors ac, String text) =>
+      _tt(
+        area,
+        SkinToken.outline,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(color: ac.color(SkinToken.outline)),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: ac.color(SkinToken.accent),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        radius: BorderRadius.circular(100),
+      );
+
+  Widget _mockDivider(SkinArea area, SkinAreaColors ac) => _tt(
+    area,
+    SkinToken.divider,
+    Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Divider(height: 1, color: ac.color(SkinToken.divider)),
+    ),
+    radius: BorderRadius.zero,
+  );
+
+  Widget _dashboardPreview(ColorScheme cs, SkinAreaColors ac) {
+    const area = SkinArea.dashboard;
+    return _previewCanvas(
+      _aid(area, SkinToken.background),
+      SkinToken.background.label(context.l10n),
+      ac.color(SkinToken.background),
+      ac.color(SkinToken.text),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mockAppBar(area, ac, context.l10n.appNameVaultExplorer),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: _mountedVaultCardPreview(cs),
+                  child: _mountedVaultCardPreview(cs, ac),
                 ),
                 if (_showAppOverflowMenu)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: _dashboardOverflowMenu(cs),
+                      child: _dashboardOverflowMenu(cs, ac),
                     ),
                   ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: _lockedVaultCardPreview(cs),
+                  child: _lockedVaultCardPreview(cs, ac),
                 ),
+                _mockDivider(area, ac),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: _statusBannerExamples(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: _surfaceTokenExamples(cs),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _mockChip(
+                        area,
+                        ac,
+                        Icons.sort_rounded,
+                        context.l10n.skinPreviewSortChip,
+                      ),
+                      _mockFilledButton(
+                        area,
+                        ac,
+                        context.l10n.skinPreviewUnlockButton,
+                      ),
+                    ],
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _previewTarget(
-                        id: 'app:primary',
-                        title: context.l10n.skinActionLabelAndIcon,
-                        explanation:
-                            context.l10n.skinTheActionAccentColorsLabelsb08a63,
-                        child: Padding(
+                      _tt(
+                        area,
+                        SkinToken.accent,
+                        Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 8,
@@ -1445,12 +1799,15 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add_rounded, color: cs.primary),
+                              Icon(
+                                Icons.add_rounded,
+                                color: ac.color(SkinToken.accent),
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 context.l10n.addAVaultTitle,
                                 style: TextStyle(
-                                  color: cs.primary,
+                                  color: ac.color(SkinToken.accent),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1458,13 +1815,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                           ),
                         ),
                       ),
-                      _floatingActionPreview(
-                        title: context.l10n.skinDashboardAddButton,
-                        explanation: context
-                            .l10n
-                            .skinTheButtonFillAndPlusIconHaveSeparateSkinColors,
-                        size: 56,
-                      ),
+                      _floatingActionPreview(area, ac),
                     ],
                   ),
                 ),
@@ -1475,6 +1826,507 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       ),
     );
   }
+
+  Widget _drawerPreview(ColorScheme cs, SkinAreaColors ac) {
+    const area = SkinArea.drawer;
+    Widget destination(IconData icon, String label, {bool selected = false}) {
+      final color = selected
+          ? ac.color(SkinToken.accent)
+          : ac.color(SkinToken.textSecondary);
+      final row = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? ac.color(SkinToken.selection).withValues(alpha: 0.5)
+              : null,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? ac.color(SkinToken.accent)
+                    : ac.color(SkinToken.text),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+      return selected
+          ? _tt(
+              area,
+              SkinToken.selection,
+              row,
+              radius: BorderRadius.circular(28),
+            )
+          : row;
+    }
+
+    Widget vaultRow(String initials, String name, {bool mounted = false}) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _tt(
+            area,
+            SkinToken.card,
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: ac.color(SkinToken.card),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  _tt(
+                    area,
+                    SkinToken.raised,
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: ac.color(SkinToken.raised),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        initials,
+                        style: TextStyle(
+                          color: ac.color(SkinToken.textSecondary),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: ac.color(SkinToken.text),
+                        fontWeight: mounted ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    mounted ? Icons.lock_open_rounded : Icons.lock_rounded,
+                    size: 18,
+                    color: mounted
+                        ? ac.color(SkinToken.accent)
+                        : ac.color(SkinToken.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    return _previewCanvas(
+      _aid(area, SkinToken.background),
+      SkinToken.background.label(context.l10n),
+      ac.color(SkinToken.background),
+      ac.color(SkinToken.text),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            destination(
+              Icons.dashboard_rounded,
+              context.l10n.skinAreaDashboard,
+              selected: true,
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _tt(
+                area,
+                SkinToken.textSecondary,
+                Text(
+                  context.l10n.skinPreviewVaultsHeader,
+                  style: TextStyle(
+                    color: ac.color(SkinToken.textSecondary),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            vaultRow('VC', context.l10n.skinPreviewMountedVaultName, mounted: true),
+            vaultRow('CM', context.l10n.skinSharedArchive),
+            _mockDivider(area, ac),
+            destination(Icons.build_rounded, context.l10n.navBarToolsLabel),
+            destination(Icons.settings_rounded, context.l10n.settingsTooltip),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _toolsPreview(ColorScheme cs, SkinAreaColors ac) {
+    const area = SkinArea.tools;
+    Widget toolRow(IconData icon, String title, String subtitle) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          _tt(
+            area,
+            SkinToken.raised,
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: ac.color(SkinToken.raised),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: ac.color(SkinToken.accent)),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _tt(
+                  area,
+                  SkinToken.text,
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: ac.color(SkinToken.text),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                _tt(
+                  area,
+                  SkinToken.textSecondary,
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: ac.color(SkinToken.textSecondary),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: ac.color(SkinToken.textSecondary),
+          ),
+        ],
+      ),
+    );
+
+    return _previewCanvas(
+      _aid(area, SkinToken.background),
+      SkinToken.background.label(context.l10n),
+      ac.color(SkinToken.background),
+      ac.color(SkinToken.text),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mockAppBar(
+            area,
+            ac,
+            context.l10n.navBarToolsLabel,
+            leading: Icons.arrow_back_rounded,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _tt(
+                  area,
+                  SkinToken.accent,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    child: Text(
+                      context.l10n.skinPreviewToolsSection,
+                      style: TextStyle(
+                        color: ac.color(SkinToken.accent),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                _tt(
+                  area,
+                  SkinToken.card,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: ac.color(SkinToken.card),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        toolRow(
+                          Icons.key_rounded,
+                          context.l10n.skinPreviewToolOne,
+                          context.l10n.skinPreviewToolOneHint,
+                        ),
+                        _mockDivider(area, ac),
+                        toolRow(
+                          Icons.verified_rounded,
+                          context.l10n.skinPreviewToolTwo,
+                          context.l10n.skinPreviewToolTwoHint,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _mockFilledButton(
+                      area,
+                      ac,
+                      context.l10n.skinPreviewRunButton,
+                    ),
+                    _mockOutlinedButton(
+                      area,
+                      ac,
+                      context.l10n.skinPreviewCancelButton,
+                    ),
+                    _tt(
+                      area,
+                      SkinToken.selection,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ac.color(SkinToken.selection),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: _tt(
+                          area,
+                          SkinToken.onSelection,
+                          Text(
+                            context.l10n.skinPreviewPinnedBadge,
+                            style: TextStyle(
+                              color: ac.color(SkinToken.onSelection),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      radius: BorderRadius.circular(100),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _mockDialog(area, ac),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsPreview(ColorScheme cs, SkinAreaColors ac) {
+    const area = SkinArea.settings;
+    Widget section(IconData icon, String title, String subtitle, {bool selected = false}) {
+      final content = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected
+                  ? ac.color(SkinToken.onSelection)
+                  : ac.color(SkinToken.accent),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: selected
+                          ? ac.color(SkinToken.onSelection)
+                          : ac.color(SkinToken.text),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? ac.color(SkinToken.onSelection)
+                          : ac.color(SkinToken.textSecondary),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+      if (!selected) return content;
+      return _tt(
+        area,
+        SkinToken.selection,
+        Container(
+          decoration: BoxDecoration(
+            color: ac.color(SkinToken.selection),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: _tt(area, SkinToken.onSelection, content),
+        ),
+        radius: BorderRadius.circular(16),
+      );
+    }
+
+    return _previewCanvas(
+      _aid(area, SkinToken.background),
+      SkinToken.background.label(context.l10n),
+      ac.color(SkinToken.background),
+      ac.color(SkinToken.text),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mockAppBar(
+            area,
+            ac,
+            context.l10n.settingsTooltip,
+            leading: Icons.arrow_back_rounded,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _tt(
+                  area,
+                  SkinToken.accent,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    child: Text(
+                      context.l10n.skinPreviewSettingsSection,
+                      style: TextStyle(
+                        color: ac.color(SkinToken.accent),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                _tt(
+                  area,
+                  SkinToken.card,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: ac.color(SkinToken.card),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        section(
+                          Icons.lock_rounded,
+                          context.l10n.skinPreviewSettingOne,
+                          context.l10n.skinPreviewSettingOneHint,
+                          selected: true,
+                        ),
+                        _mockDivider(area, ac),
+                        section(
+                          Icons.storage_rounded,
+                          context.l10n.skinPreviewSettingTwo,
+                          context.l10n.skinPreviewSettingTwoHint,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _mockChip(
+                      area,
+                      ac,
+                      Icons.tune_rounded,
+                      context.l10n.skinPreviewSortChip,
+                    ),
+                    _mockFilledButton(
+                      area,
+                      ac,
+                      context.l10n.skinPreviewSaveButton,
+                    ),
+                    _mockOutlinedButton(
+                      area,
+                      ac,
+                      context.l10n.skinPreviewCancelButton,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _mockDialog(area, ac),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The shared palette: what pages inherit, and what screens without a
+  /// section of their own (unlock, camera, ...) are drawn with.
+  Widget _sharedPreview(ColorScheme cs) => _previewCanvas(
+    'app:surface',
+    context.l10n.skinPageBackground,
+    cs.surface,
+    cs.onSurface,
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              context.l10n.skinSharedPaletteDescription,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _statusBannerExamples(),
+          ),
+          _surfaceTokenExamples(cs),
+        ],
+      ),
+    ),
+  );
 
   Widget _statusBannerExamples() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1728,10 +2580,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
-  Widget _mountedVaultCardPreview(ColorScheme cs) {
+  Widget _mountedVaultCardPreview(ColorScheme cs, SkinAreaColors ac) {
     final isLight = !_darkColors;
     final usedFraction = 0.66;
-    final cardTint = _componentColor('mountedVaultCardBackground');
+    final cardTint = ac.color(SkinToken.cardActive);
     final progressColor = usedFraction > 0.90
         ? (isLight ? cs.error.withValues(alpha: 0.6) : cs.error)
         : usedFraction > 0.70
@@ -1741,7 +2593,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         ? cs.primary.withValues(alpha: 0.12)
         : cs.onPrimaryContainer.withValues(alpha: 0.15);
     final icon = _previewTarget(
-      id: 'app:primaryContainer',
+      id: 'area:dashboard.selection',
       title: context.l10n.skinVaultCardAndIconBackground,
       explanation: context.l10n.skinTheIconTileUsesPrimary5c2f93,
       child: Container(
@@ -1753,7 +2605,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         ),
         child: Center(
           child: _previewTarget(
-            id: 'app:onPrimaryContainer',
+            id: 'area:dashboard.onSelection',
             title: context.l10n.skinVaultFormatIconColor,
             explanation:
                 context.l10n.skinVaultFormatInitialsUseOnPrimaryContainer,
@@ -1771,7 +2623,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _previewTarget(
-          id: 'app:onSurfaceVariant',
+          id: 'area:dashboard.textSecondary',
           title: context.l10n.skinVaultStorageDetails,
           explanation:
               context.l10n.skinFreeSpaceAndCapacityUseTheSupportingTextColor,
@@ -1789,7 +2641,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         ),
         const SizedBox(height: 4),
         _previewTarget(
-          id: 'app:primary',
+          id: 'area:dashboard.accent',
           title: context.l10n.skinVaultStorageProgress,
           explanation: context.l10n.skinTheProgressBarUsesTheba7c98,
           child: ClipRRect(
@@ -1808,7 +2660,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _previewTarget(
-          id: 'app:primaryContainer',
+          id: 'area:dashboard.selection',
           title: context.l10n.skinLockActionBackground,
           explanation:
               context.l10n.skinTheMountedVaultLockButtonUsesPrimaryContainer,
@@ -1828,13 +2680,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         ),
         const SizedBox(width: 6),
         _previewTarget(
-          id: 'app:onSurfaceVariant',
+          id: 'area:dashboard.textSecondary',
           title: context.l10n.skinVaultActionsIconColor,
           explanation:
               context.l10n.skinTheOverflowMenuUsesTheSupportingIconColor,
           onTap: () {
             _selectPreview(
-              'app:onSurfaceVariant',
+              'area:dashboard.textSecondary',
               context.l10n.skinVaultActionsIconColor,
               context.l10n.skinTheOverflowMenuUsesTheSupportingIconColor,
             );
@@ -1855,7 +2707,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
 
     return BaseContainerCard(
       onTap: () => _selectPreview(
-        'component:mountedVaultCardBackground',
+        'area:dashboard.cardActive',
         context.l10n.skinMountedVaultCardBackground,
         context.l10n.skinThisIsTheBackgroundOfa8d0d3,
       ),
@@ -1864,7 +2716,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       avatarBadge: badge,
       title: context.l10n.skinPreviewMountedVaultName,
       titleContent: _previewTarget(
-        id: 'app:onSurface',
+        id: 'area:dashboard.text',
         title: context.l10n.skinPreviewVaultName,
         explanation: context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
         child: Text(
@@ -1885,14 +2737,15 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
-  Widget _lockedVaultCardPreview(ColorScheme cs) => BaseContainerCard(
+  Widget _lockedVaultCardPreview(ColorScheme cs, SkinAreaColors ac) =>
+      BaseContainerCard(
     onTap: () => _selectPreview(
-      'component:vaultCardBackground',
+      'area:dashboard.card',
       context.l10n.skinLockedVaultCardBackground,
       context.l10n.skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard,
     ),
     icon: _previewTarget(
-      id: 'app:onSurfaceVariant',
+      id: 'area:dashboard.textSecondary',
       title: context.l10n.skinLockedVaultFormatIcon,
       explanation:
           context.l10n.skinLockedVaultIconsUseTheSupportingTextAndIconColor,
@@ -1905,7 +2758,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     iconBackgroundColor: cs.surfaceContainerHighest,
     title: context.l10n.skinSharedArchive,
     titleContent: _previewTarget(
-      id: 'app:onSurface',
+      id: 'area:dashboard.text',
       title: context.l10n.skinPreviewVaultName,
       explanation: context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
       child: Text(
@@ -1921,7 +2774,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       ),
     ),
     subtitle: _previewTarget(
-      id: 'app:onSurfaceVariant',
+      id: 'area:dashboard.textSecondary',
       title: context.l10n.skinLockedVaultStatusText,
       explanation:
           context.l10n.skinTheLockedStatusLabelUsesTheSupportingTextColor,
@@ -1936,16 +2789,16 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       ),
     ),
     trailingAction: _previewTarget(
-      id: 'app:onSurfaceVariant',
+      id: 'area:dashboard.textSecondary',
       title: context.l10n.skinLockedVaultActionsIcon,
       explanation: context.l10n.skinTheOverflowMenuUsesTheSupportingIconColor,
       child: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
     ),
-    backgroundColor: _componentColor('vaultCardBackground'),
+    backgroundColor: ac.color(SkinToken.card),
   );
 
-  Widget _dashboardOverflowMenu(ColorScheme cs) => _previewTarget(
-    id: 'app:surfaceContainer',
+  Widget _dashboardOverflowMenu(ColorScheme cs, SkinAreaColors ac) => _previewTarget(
+    id: 'area:dashboard.overlay',
     title: context.l10n.skinVaultActionsMenuBackground,
     explanation: context.l10n.skinTheEditAndRemovePopupUsesTheMenuSurfaceColor,
     borderRadius: BorderRadius.circular(12),
@@ -1953,7 +2806,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       width: 190,
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: cs.surfaceContainer,
+        color: ac.color(SkinToken.overlay),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -1967,7 +2820,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _previewTarget(
-            id: 'app:onSurface',
+            id: 'area:dashboard.text',
             title: context.l10n.skinEditMenuItem,
             explanation:
                 context.l10n.skinMainTextColorAlsoColorsRegularMenuItems,
@@ -2001,50 +2854,53 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
 
   Widget _fileManagerPreview(
     CustomAppSkin skin,
-    Color Function(String, Color) color,
     ColorScheme cs,
+    SkinAreaColors ac,
   ) {
-    final page = color('surface', cs.surface);
-    final foreground = color('onSurface', cs.onSurface);
-    final secondaryText = color('onSurfaceVariant', cs.onSurfaceVariant);
-    final accent = color('primary', cs.primary);
+    final page = ac.color(SkinToken.background);
+    final foreground = ac.color(SkinToken.text);
+    final secondaryText = ac.color(SkinToken.textSecondary);
+    final accent = ac.color(SkinToken.accent);
     final details = skin.fileManagerSkin.detailsColor ?? secondaryText;
     return _previewCanvas(
+      _aid(SkinArea.files, SkinToken.background),
+      SkinToken.background.label(context.l10n),
       page,
+      foreground,
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _previewTarget(
-            id: 'component:appBarBackground',
+            id: 'area:files.appBar',
             title: context.l10n.skinFileManagerAppBar,
             explanation:
                 context.l10n.skinFileBrowserToolbarsUseTheSameAppBarBackground,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
-                color: _componentColor('appBarBackground'),
+                color: ac.color(SkinToken.appBar),
                 border: Border(
                   bottom: BorderSide(
-                    color: color('outlineVariant', cs.outlineVariant),
+                    color: ac.color(SkinToken.divider),
                   ),
                 ),
               ),
               child: Row(
                 children: [
                   _previewTarget(
-                    id: 'component:appBarForeground',
+                    id: 'area:files.onAppBar',
                     title: context.l10n.skinFileManagerBackButton,
                     explanation:
                         context.l10n.skinToolbarNavigationIconsUseThisColor,
                     child: Icon(
                       Icons.arrow_back_rounded,
-                      color: _componentColor('appBarForeground'),
+                      color: ac.color(SkinToken.onAppBar),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _previewTarget(
-                      id: 'component:appBarForeground',
+                      id: 'area:files.onAppBar',
                       title: context.l10n.skinFileManagerTitle,
                       explanation: context
                           .l10n
@@ -2052,26 +2908,26 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                       child: Text(
                         context.l10n.filesFilterDocuments,
                         style: TextStyle(
-                          color: _componentColor('appBarForeground'),
+                          color: ac.color(SkinToken.onAppBar),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
                   _previewTarget(
-                    id: 'component:appBarForeground',
+                    id: 'area:files.onAppBar',
                     title: context.l10n.skinFileManagerAppBarActions,
                     explanation:
                         context.l10n.skinToolbarActionsUseThisIconColor,
                     child: Icon(
                       Icons.search_rounded,
-                      color: _componentColor('appBarForeground'),
+                      color: ac.color(SkinToken.onAppBar),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Icon(
                     Icons.sort_rounded,
-                    color: _componentColor('appBarForeground'),
+                    color: ac.color(SkinToken.onAppBar),
                   ),
                 ],
               ),
@@ -2081,18 +2937,26 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
               children: [
-                Text(
-                  context.l10n.vaultLabel,
-                  style: TextStyle(color: secondaryText),
+                _tt(
+                  SkinArea.files,
+                  SkinToken.textSecondary,
+                  Text(
+                    context.l10n.vaultLabel,
+                    style: TextStyle(color: secondaryText),
+                  ),
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
                   color: secondaryText,
                   size: 18,
                 ),
-                Text(
-                  context.l10n.filesFilterDocuments,
-                  style: TextStyle(color: foreground),
+                _tt(
+                  SkinArea.files,
+                  SkinToken.text,
+                  Text(
+                    context.l10n.filesFilterDocuments,
+                    style: TextStyle(color: foreground),
+                  ),
                 ),
               ],
             ),
@@ -2120,7 +2984,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                 Divider(
                   height: 1,
                   indent: 58,
-                  color: color('outlineVariant', cs.outlineVariant),
+                  color: ac.color(SkinToken.divider),
                 ),
                 _filePreviewRow(
                   label: 'Notes.txt',
@@ -2141,7 +3005,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                 Divider(
                   height: 1,
                   indent: 58,
-                  color: color('outlineVariant', cs.outlineVariant),
+                  color: ac.color(SkinToken.divider),
                 ),
                 _filePreviewRow(
                   label: 'Archive.zip',
@@ -2164,30 +3028,32 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                     padding: const EdgeInsets.only(top: 8, right: 8),
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: _fileOverflowMenu(cs),
+                      child: _fileOverflowMenu(cs, ac),
                     ),
                   ),
               ],
             ),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _filesExtras(ac),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: accent, size: 18),
+                _tt(
+                  SkinArea.files,
+                  SkinToken.accent,
+                  Icon(Icons.check_circle_rounded, color: accent, size: 18),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   context.l10n.skin3Items,
                   style: TextStyle(color: secondaryText, fontSize: 12),
                 ),
                 const Spacer(),
-                _floatingActionPreview(
-                  title: context.l10n.skinFileManagerAddButton,
-                  explanation: context
-                      .l10n
-                      .skinTheButtonFillAndPlusIconHaveSeparateSkinColors,
-                  size: 56,
-                ),
+                _floatingActionPreview(SkinArea.files, ac),
               ],
             ),
           ),
@@ -2196,20 +3062,74 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
-  Widget _floatingActionPreview({
-    required String title,
-    required String explanation,
-    double size = 56,
-  }) => _previewTarget(
-    id: 'component:fabBackground',
-    title: title,
-    explanation: explanation,
-    borderRadius: BorderRadius.circular(18),
-    child: Container(
-      width: size,
-      height: size,
+  /// Grid cards, a search field and buttons: the parts of the file browser
+  /// that use the page's card, control, outline and text-on-accent colors.
+  Widget _filesExtras(SkinAreaColors ac) {
+    const area = SkinArea.files;
+    Widget gridCard(IconData icon, String label) => Expanded(
+      child: _tt(
+        area,
+        SkinToken.card,
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: ac.color(SkinToken.card),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: ac.color(SkinToken.accent)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ac.color(SkinToken.text),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            gridCard(Icons.image_rounded, 'Photos'),
+            const SizedBox(width: 8),
+            gridCard(Icons.movie_rounded, 'Videos'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _mockChip(area, ac, Icons.search_rounded, context.l10n.skinPreviewSearchChip),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _mockFilledButton(area, ac, context.l10n.skinPreviewPasteButton),
+            _mockOutlinedButton(area, ac, context.l10n.skinPreviewCancelButton),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _floatingActionPreview(SkinArea area, SkinAreaColors ac) => _tt(
+    area,
+    SkinToken.fab,
+    Container(
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
-        color: _componentColor('fabBackground'),
+        color: ac.color(SkinToken.fab),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -2220,17 +3140,14 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         ],
       ),
       child: Center(
-        child: _previewTarget(
-          id: 'component:fabForeground',
-          title: context.l10n.skinAddButtonIconColor,
-          explanation: context.l10n.skinThePlusIconUsesTheButtonForegroundColor,
-          child: Icon(
-            Icons.add_rounded,
-            color: _componentColor('fabForeground'),
-          ),
+        child: _tt(
+          area,
+          SkinToken.onFab,
+          Icon(Icons.add_rounded, color: ac.color(SkinToken.onFab)),
         ),
       ),
     ),
+    radius: BorderRadius.circular(18),
   );
 
   Widget _editorScreenPreview(
@@ -2245,13 +3162,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _previewTarget(
-          id: 'component:appBarBackground',
+          id: 'area:editor.appBar',
           title: context.l10n.skinAppBarBackground,
           explanation:
               context.l10n.skinFileBrowserToolbarsUseTheSameAppBarBackground,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            color: _componentColor('appBarBackground'),
+            color: _editorToolbarColor(SkinToken.appBar),
             child: Row(
               children: [
                 _previewTarget(
@@ -2370,9 +3287,15 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     ),
   );
 
-  Widget _previewCanvas(Color background, Widget child) => _previewTarget(
-    id: 'app:surface',
-    title: context.l10n.skinPageBackground,
+  Widget _previewCanvas(
+    String id,
+    String title,
+    Color background,
+    Color textColor,
+    Widget child,
+  ) => _previewTarget(
+    id: id,
+    title: title,
     explanation: context.l10n.skinTheMainBackgroundBehindThisScreen,
     borderRadius: BorderRadius.circular(12),
     child: Container(
@@ -2380,7 +3303,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 12),
         child: DefaultTextStyle(
-          style: TextStyle(color: _storedColor(_schemeColors(), 'onSurface')),
+          style: TextStyle(color: textColor),
           child: child,
         ),
       ),
@@ -2552,14 +3475,14 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             ),
           ),
           _previewTarget(
-            id: 'app:onSurfaceVariant',
+            id: 'area:files.textSecondary',
             title: context.l10n.skinFileActionOverflowIconColor,
             explanation: context
                 .l10n
                 .skinEachRowSThreeDotButtonUsesTheSupportingIconColor,
             onTap: () {
               _selectPreview(
-                'app:onSurfaceVariant',
+                'area:files.textSecondary',
                 context.l10n.skinFileActionOverflowIconColor,
                 context
                     .l10n
@@ -2574,7 +3497,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
     if (!selected) return row;
     return _previewTarget(
-      id: 'app:primaryContainer',
+      id: 'area:files.selection',
       title: context.l10n.skinSelectedFileRow,
       explanation: context.l10n.skinSelectedRowsUseATranslucente0ff21,
       child: Container(
@@ -2587,10 +3510,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
-  Widget _fileOverflowMenu(ColorScheme cs) => Theme(
+  Widget _fileOverflowMenu(ColorScheme cs, SkinAreaColors ac) => Theme(
     data: Theme.of(context).copyWith(colorScheme: cs),
     child: _previewTarget(
-      id: 'app:surfaceContainer',
+      id: 'area:files.overlay',
       title: context.l10n.skinFileActionsMenuBackground,
       explanation: context.l10n.skinTheFileActionsPopupUsesTheMenuSurfaceColor,
       borderRadius: BorderRadius.circular(12),
@@ -2598,7 +3521,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         width: 190,
         padding: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          color: cs.surfaceContainer,
+          color: ac.color(SkinToken.overlay),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -2612,7 +3535,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _previewTarget(
-              id: 'app:onSurface',
+              id: 'area:files.text',
               title: context.l10n.skinOpenFileMenuItem,
               explanation:
                   context.l10n.skinRegularFileActionsUseTheMainTextColor,
@@ -3217,7 +4140,20 @@ class _PreviewSelection {
   const _PreviewSelection(this.id, this.title, this.explanation);
 }
 
-enum _PreviewPane { app, fileManager, editor }
+enum _PreviewPane { dashboard, drawer, files, editor, tools, settings, shared }
+
+extension on _PreviewPane {
+  /// The page whose tokens this pane edits, or null for the shared palette.
+  SkinArea? get area => switch (this) {
+    _PreviewPane.dashboard => SkinArea.dashboard,
+    _PreviewPane.drawer => SkinArea.drawer,
+    _PreviewPane.files => SkinArea.files,
+    _PreviewPane.editor => SkinArea.editor,
+    _PreviewPane.tools => SkinArea.tools,
+    _PreviewPane.settings => SkinArea.settings,
+    _PreviewPane.shared => null,
+  };
+}
 
 String _roleLabel(String role) => role
     .replaceAllMapped(RegExp(r'([A-Z])'), (match) => ' ${match.group(1)}')

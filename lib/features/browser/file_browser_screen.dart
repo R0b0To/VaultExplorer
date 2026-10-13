@@ -96,6 +96,8 @@ import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.da
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -1784,10 +1786,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ArchiveFileViewer(
+                  builder: (_) => SkinAreaScope(area: SkinArea.files, child: ArchiveFileViewer(
                     bytes: extractResult!.data!,
                     fileName: entry.name,
-                  ),
+                  )),
                 ),
               );
             } else if (extractResult != null) {
@@ -3091,12 +3093,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SingleFileCryptoSheet(
+        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: SingleFileCryptoSheet(
           initialSources: sources,
           initialDestination: destination,
           initialDirection: direction,
           allowEditingSelection: false,
-        ),
+        )),
       ),
     );
     if (!mounted) return;

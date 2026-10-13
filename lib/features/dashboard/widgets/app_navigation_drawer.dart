@@ -5,6 +5,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
@@ -211,7 +213,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ContainerConfigScreen(
+        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: ContainerConfigScreen(
           uri: item.uri,
           currentLabel: item.name,
           existingRecord: existing,
@@ -219,7 +221,7 @@ class AppNavigationDrawer extends ConsumerWidget {
           mountedContainer: mountedC,
           onSaved: (record) =>
               ref.read(vaultDashboardControllerProvider.notifier).updateContainerRecord(item.uri, record),
-        ),
+        )),
       ),
     );
   }
@@ -245,6 +247,17 @@ class AppNavigationDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The side menu has its own colors; build its content inside that scope so
+    // it never picks up the page it happens to be opened from.
+    return SkinAreaScope(
+      area: SkinArea.drawer,
+      child: Consumer(
+        builder: (context, ref, _) => _buildDrawerContent(context, ref),
+      ),
+    );
+  }
+
+  Widget _buildDrawerContent(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
@@ -602,9 +615,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ToolsScreen(
+                          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: ToolsScreen(
                             mountedContainers: ValueNotifier(dashboardState.mounted),
-                          ),
+                          )),
                         ),
                       );
                     },
@@ -620,7 +633,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const FileManagerToolbarSettingsScreen(),
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
                         ),
                       );
                     },
@@ -646,7 +659,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AppSettingsScreen(),
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppSettingsScreen()),
                         ),
                       );
                     },

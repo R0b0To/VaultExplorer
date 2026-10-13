@@ -9640,7 +9640,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '自定义皮肤立即生效，同时文件管理器和编辑器已设置为沿用应用皮肤。';
 
   @override
-  String get skinCustomColorTapToChangeOrReset => '自定义颜色 · 点按以更改或重置';
+  String get skinCustomColorTapToChangeOrReset => '自定义颜色 — 点击可修改或重置为默认值。';
 
   @override
   String get skinTapTheColorCircleToChooseAColor => '点按色圈以选择颜色。';
@@ -10558,4 +10558,216 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get audioRecordingDiscardMessage => '此录音尚未保存，将被永久删除。';
+
+  @override
+  String get skinAreaDashboard => '仪表盘';
+
+  @override
+  String get skinAreaDashboardDescription => '打开应用后显示的保险库列表及其卡片。';
+
+  @override
+  String get skinAreaDrawer => '侧边菜单';
+
+  @override
+  String get skinAreaDrawerDescription => '包含保险库和快捷方式的侧滑菜单。';
+
+  @override
+  String get skinAreaFilesDescription => '已解锁保险库内的文件浏览器。';
+
+  @override
+  String get skinAreaEditorDescription =>
+      '文本和代码编辑器的工具栏。画布和语法高亮颜色可在下方的编辑器主题中设置。';
+
+  @override
+  String get skinAreaToolsDescription => '“工具”标签页以及从中打开的所有工具。';
+
+  @override
+  String get skinAreaSettingsDescription => '“设置”标签页及其子页面。';
+
+  @override
+  String get skinSharedPaletteTitle => '共享调色板';
+
+  @override
+  String get skinSharedPaletteShort => '共享';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      '每个页面在未单独设置时继承的颜色。没有独立设置的屏幕（例如解锁和相机）直接使用这些颜色。';
+
+  @override
+  String get skinSharedBarDescription => '未单独设置的每个页面的顶部栏。';
+
+  @override
+  String get skinSharedFabDescription => '未单独设置的每个页面的圆形添加按钮。';
+
+  @override
+  String get skinPagesTitle => '页面颜色';
+
+  @override
+  String get skinPagesDescription => '每个页面保留自己的颜色。修改一个页面绝不会影响其他页面。';
+
+  @override
+  String get skinResetPageColors => '重置页面颜色';
+
+  @override
+  String get skinTokenBackground => '页面背景';
+
+  @override
+  String get skinTokenBackgroundHint => '此页面所有元素背后的画布。';
+
+  @override
+  String get skinTokenText => '主要文本';
+
+  @override
+  String get skinTokenTextHint => '此页面上的标题、名称和正文文本。';
+
+  @override
+  String get skinTokenTextSecondary => '次要文本和图标';
+
+  @override
+  String get skinTokenTextSecondaryHint => '副标题、详细信息、提示和低对比度图标。';
+
+  @override
+  String get skinTokenAppBar => '顶部栏';
+
+  @override
+  String get skinTokenAppBarHint => '此页面顶部栏的填充颜色。';
+
+  @override
+  String get skinTokenOnAppBar => '顶部栏文本和图标';
+
+  @override
+  String get skinTokenOnAppBarHint => '顶部栏标题和图标的颜色。';
+
+  @override
+  String get skinTokenCard => '卡片和行';
+
+  @override
+  String get skinTokenCardHint => '卡片、列表行和分组面板。';
+
+  @override
+  String get skinTokenCardActive => '活动卡片';
+
+  @override
+  String get skinTokenCardActiveHint => '高亮显示的卡片，例如已解锁的保险库。';
+
+  @override
+  String get skinTokenRaised => '标签和控件';
+
+  @override
+  String get skinTokenRaisedHint => '搜索框、标签、缩略图和图标图块。';
+
+  @override
+  String get skinTokenOverlay => '菜单、对话框和面板';
+
+  @override
+  String get skinTokenOverlayHint => '从此页面打开的弹出菜单、对话框和底部面板。';
+
+  @override
+  String get skinTokenAccent => '强调色';
+
+  @override
+  String get skinTokenAccentHint => '按钮、链接、进度条和活动图标。';
+
+  @override
+  String get skinTokenOnAccent => '强调色上的文本';
+
+  @override
+  String get skinTokenOnAccentHint => '强调色填充按钮上的标签和图标。';
+
+  @override
+  String get skinTokenSelection => '选中项';
+
+  @override
+  String get skinTokenSelectionHint => '选中的行和高亮的图标图块。';
+
+  @override
+  String get skinTokenOnSelection => '选中项上的文本';
+
+  @override
+  String get skinTokenOnSelectionHint => '选中项目上显示的图标和文本。';
+
+  @override
+  String get skinTokenDivider => '分隔线';
+
+  @override
+  String get skinTokenDividerHint => '细分割线和微弱边框。';
+
+  @override
+  String get skinTokenOutline => '轮廓';
+
+  @override
+  String get skinTokenOutlineHint => '轮廓按钮和输入框上更清晰的边框。';
+
+  @override
+  String get skinTokenFab => '圆形添加按钮';
+
+  @override
+  String get skinTokenFabHint => '圆形添加按钮的填充颜色。';
+
+  @override
+  String get skinTokenOnFab => '圆形添加按钮图标';
+
+  @override
+  String get skinTokenOnFabHint => '圆形添加按钮上的加号图标。';
+
+  @override
+  String get skinPreviewConfirm => '确认';
+
+  @override
+  String get skinPreviewCancelButton => '取消';
+
+  @override
+  String get skinPreviewSaveButton => '保存';
+
+  @override
+  String get skinPreviewRunButton => '运行';
+
+  @override
+  String get skinPreviewPasteButton => '粘贴到此处';
+
+  @override
+  String get skinPreviewUnlockButton => '解锁';
+
+  @override
+  String get skinPreviewSortChip => '排序：名称';
+
+  @override
+  String get skinPreviewSearchChip => '搜索文件';
+
+  @override
+  String get skinPreviewPinnedBadge => '已置顶';
+
+  @override
+  String get skinPreviewVaultsHeader => '保险库';
+
+  @override
+  String get skinPreviewToolsSection => '文件密码学';
+
+  @override
+  String get skinPreviewToolOne => '密钥文件与密码短语生成器';
+
+  @override
+  String get skinPreviewToolOneHint => '生成密码和密钥文件';
+
+  @override
+  String get skinPreviewToolTwo => '校验和与哈希验证器';
+
+  @override
+  String get skinPreviewToolTwoHint => '验证大文件是否损坏';
+
+  @override
+  String get skinPreviewSettingsSection => '安全';
+
+  @override
+  String get skinPreviewSettingOne => '应用锁';
+
+  @override
+  String get skinPreviewSettingOneHint => '生物识别与自动锁定';
+
+  @override
+  String get skinPreviewSettingTwo => '存储';
+
+  @override
+  String get skinPreviewSettingTwoHint => '外部存储与云桥接';
 }

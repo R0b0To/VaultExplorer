@@ -17218,7 +17218,7 @@ abstract class AppLocalizations {
   /// No description provided for @skinCustomColorTapToChangeOrReset.
   ///
   /// In en, this message translates to:
-  /// **'Custom color · tap to change or reset'**
+  /// **'Custom color — tap to change or reset to default.'**
   String get skinCustomColorTapToChangeOrReset;
 
   /// No description provided for @skinTapTheColorCircleToChooseAColor.
@@ -18918,6 +18918,426 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This recording hasn\'t been saved and will be permanently deleted.'**
   String get audioRecordingDiscardMessage;
+
+  /// No description provided for @skinAreaDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get skinAreaDashboard;
+
+  /// No description provided for @skinAreaDashboardDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The vault list you land on, with its vault cards.'**
+  String get skinAreaDashboardDescription;
+
+  /// No description provided for @skinAreaDrawer.
+  ///
+  /// In en, this message translates to:
+  /// **'Side menu'**
+  String get skinAreaDrawer;
+
+  /// No description provided for @skinAreaDrawerDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The slide-out menu with your vaults and shortcuts.'**
+  String get skinAreaDrawerDescription;
+
+  /// No description provided for @skinAreaFilesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The file browser inside an unlocked vault.'**
+  String get skinAreaFilesDescription;
+
+  /// No description provided for @skinAreaEditorDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The toolbar of the text and code editor. Its canvas and syntax colors are set in the editor theme below.'**
+  String get skinAreaEditorDescription;
+
+  /// No description provided for @skinAreaToolsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The Tools tab and every tool opened from it.'**
+  String get skinAreaToolsDescription;
+
+  /// No description provided for @skinAreaSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The Settings tab and its sub-pages.'**
+  String get skinAreaSettingsDescription;
+
+  /// No description provided for @skinSharedPaletteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared palette'**
+  String get skinSharedPaletteTitle;
+
+  /// No description provided for @skinSharedPaletteShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get skinSharedPaletteShort;
+
+  /// No description provided for @skinSharedPaletteDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors every page inherits until it sets its own. Screens without a section of their own, such as unlock and camera, use these directly.'**
+  String get skinSharedPaletteDescription;
+
+  /// No description provided for @skinSharedBarDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The top bar of every page that does not set its own.'**
+  String get skinSharedBarDescription;
+
+  /// No description provided for @skinSharedFabDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The round add button of every page that does not set its own.'**
+  String get skinSharedFabDescription;
+
+  /// No description provided for @skinPagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Page colors'**
+  String get skinPagesTitle;
+
+  /// No description provided for @skinPagesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Each page keeps its own colors. Changing one page never changes another.'**
+  String get skinPagesDescription;
+
+  /// No description provided for @skinResetPageColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset page colors'**
+  String get skinResetPageColors;
+
+  /// No description provided for @skinTokenBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Page background'**
+  String get skinTokenBackground;
+
+  /// No description provided for @skinTokenBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The canvas behind everything on this page.'**
+  String get skinTokenBackgroundHint;
+
+  /// No description provided for @skinTokenText.
+  ///
+  /// In en, this message translates to:
+  /// **'Main text'**
+  String get skinTokenText;
+
+  /// No description provided for @skinTokenTextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Titles, names and body text on this page.'**
+  String get skinTokenTextHint;
+
+  /// No description provided for @skinTokenTextSecondary.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary text and icons'**
+  String get skinTokenTextSecondary;
+
+  /// No description provided for @skinTokenTextSecondaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles, details, hints and quiet icons.'**
+  String get skinTokenTextSecondaryHint;
+
+  /// No description provided for @skinTokenAppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar'**
+  String get skinTokenAppBar;
+
+  /// No description provided for @skinTokenAppBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the top bar on this page.'**
+  String get skinTokenAppBarHint;
+
+  /// No description provided for @skinTokenOnAppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar text and icons'**
+  String get skinTokenOnAppBar;
+
+  /// No description provided for @skinTokenOnAppBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title and icon color on the top bar.'**
+  String get skinTokenOnAppBarHint;
+
+  /// No description provided for @skinTokenCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards and rows'**
+  String get skinTokenCard;
+
+  /// No description provided for @skinTokenCardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards, list rows and grouped panels.'**
+  String get skinTokenCardHint;
+
+  /// No description provided for @skinTokenCardActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active card'**
+  String get skinTokenCardActive;
+
+  /// No description provided for @skinTokenCardActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The highlighted card, such as an unlocked vault.'**
+  String get skinTokenCardActiveHint;
+
+  /// No description provided for @skinTokenRaised.
+  ///
+  /// In en, this message translates to:
+  /// **'Chips and controls'**
+  String get skinTokenRaised;
+
+  /// No description provided for @skinTokenRaisedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search fields, chips, thumbnails and icon tiles.'**
+  String get skinTokenRaisedHint;
+
+  /// No description provided for @skinTokenOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Menus, dialogs and sheets'**
+  String get skinTokenOverlay;
+
+  /// No description provided for @skinTokenOverlayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Popup menus, dialogs and bottom sheets opened from this page.'**
+  String get skinTokenOverlayHint;
+
+  /// No description provided for @skinTokenAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent'**
+  String get skinTokenAccent;
+
+  /// No description provided for @skinTokenAccentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttons, links, progress and active icons.'**
+  String get skinTokenAccentHint;
+
+  /// No description provided for @skinTokenOnAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on accent'**
+  String get skinTokenOnAccent;
+
+  /// No description provided for @skinTokenOnAccentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels and icons drawn on accent-filled buttons.'**
+  String get skinTokenOnAccentHint;
+
+  /// No description provided for @skinTokenSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection'**
+  String get skinTokenSelection;
+
+  /// No description provided for @skinTokenSelectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected rows and highlighted icon tiles.'**
+  String get skinTokenSelectionHint;
+
+  /// No description provided for @skinTokenOnSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on selection'**
+  String get skinTokenOnSelection;
+
+  /// No description provided for @skinTokenOnSelectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Icons and text drawn on selected items.'**
+  String get skinTokenOnSelectionHint;
+
+  /// No description provided for @skinTokenDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'Dividers'**
+  String get skinTokenDivider;
+
+  /// No description provided for @skinTokenDividerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Thin separator lines and subtle borders.'**
+  String get skinTokenDividerHint;
+
+  /// No description provided for @skinTokenOutline.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlines'**
+  String get skinTokenOutline;
+
+  /// No description provided for @skinTokenOutlineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stronger borders on outlined buttons and fields.'**
+  String get skinTokenOutlineHint;
+
+  /// No description provided for @skinTokenFab.
+  ///
+  /// In en, this message translates to:
+  /// **'Round add button'**
+  String get skinTokenFab;
+
+  /// No description provided for @skinTokenFabHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the round add button.'**
+  String get skinTokenFabHint;
+
+  /// No description provided for @skinTokenOnFab.
+  ///
+  /// In en, this message translates to:
+  /// **'Round add button icon'**
+  String get skinTokenOnFab;
+
+  /// No description provided for @skinTokenOnFabHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The plus icon on the round add button.'**
+  String get skinTokenOnFabHint;
+
+  /// No description provided for @skinPreviewConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get skinPreviewConfirm;
+
+  /// No description provided for @skinPreviewCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get skinPreviewCancelButton;
+
+  /// No description provided for @skinPreviewSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get skinPreviewSaveButton;
+
+  /// No description provided for @skinPreviewRunButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Run'**
+  String get skinPreviewRunButton;
+
+  /// No description provided for @skinPreviewPasteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste here'**
+  String get skinPreviewPasteButton;
+
+  /// No description provided for @skinPreviewUnlockButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get skinPreviewUnlockButton;
+
+  /// No description provided for @skinPreviewSortChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort: Name'**
+  String get skinPreviewSortChip;
+
+  /// No description provided for @skinPreviewSearchChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Search files'**
+  String get skinPreviewSearchChip;
+
+  /// No description provided for @skinPreviewPinnedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get skinPreviewPinnedBadge;
+
+  /// No description provided for @skinPreviewVaultsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'VAULTS'**
+  String get skinPreviewVaultsHeader;
+
+  /// No description provided for @skinPreviewToolsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'File cryptography'**
+  String get skinPreviewToolsSection;
+
+  /// No description provided for @skinPreviewToolOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfile and passphrase generator'**
+  String get skinPreviewToolOne;
+
+  /// No description provided for @skinPreviewToolOneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate passwords and keyfiles'**
+  String get skinPreviewToolOneHint;
+
+  /// No description provided for @skinPreviewToolTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Checksum and hash verifier'**
+  String get skinPreviewToolTwo;
+
+  /// No description provided for @skinPreviewToolTwoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify large files were not corrupted'**
+  String get skinPreviewToolTwoHint;
+
+  /// No description provided for @skinPreviewSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get skinPreviewSettingsSection;
+
+  /// No description provided for @skinPreviewSettingOne.
+  ///
+  /// In en, this message translates to:
+  /// **'App lock'**
+  String get skinPreviewSettingOne;
+
+  /// No description provided for @skinPreviewSettingOneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometrics and auto-lock'**
+  String get skinPreviewSettingOneHint;
+
+  /// No description provided for @skinPreviewSettingTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get skinPreviewSettingTwo;
+
+  /// No description provided for @skinPreviewSettingTwoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'External storage and cloud bridges'**
+  String get skinPreviewSettingTwoHint;
 }
 
 class _AppLocalizationsDelegate

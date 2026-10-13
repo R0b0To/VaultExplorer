@@ -13,6 +13,8 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class SingleFileCryptoSheet extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>>? mountedContainers;
@@ -78,7 +80,7 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     final result = await Navigator.push<List<CryptoSourceItem>>(
       context,
       MaterialPageRoute(
-        builder: (_) => VaultFilePickerSheet(mountedContainers: mountedVaults),
+        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFilePickerSheet(mountedContainers: mountedVaults)),
       ),
     );
     if (result != null && result.isNotEmpty && mounted) {
@@ -132,7 +134,7 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     final result = await Navigator.push<CryptoDestination>(
       context,
       MaterialPageRoute(
-        builder: (_) => VaultFolderPickerSheet(mountedContainers: mountedVaults),
+        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultFolderPickerSheet(mountedContainers: mountedVaults)),
       ),
     );
     if (result != null && mounted) {

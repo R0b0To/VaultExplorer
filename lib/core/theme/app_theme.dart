@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -440,7 +442,31 @@ ThemeData buildTheme() => buildDarkTheme();
 ThemeData buildThemeFromColorScheme(
   ColorScheme scheme, {
   AppSkinTokens? appSkinTokens,
-}) => _buildTheme(scheme, scheme.brightness, skinTokens: appSkinTokens);
+  SkinAreaColors? area,
+}) => _buildTheme(
+  scheme,
+  scheme.brightness,
+  skinTokens: appSkinTokens,
+  area: area,
+);
+
+/// The theme a single page (a [SkinArea]) is built with.
+///
+/// [base] is the app's normal theme. The page's tokens are mapped onto the
+/// Material roles (see [applySkinAreaToScheme]) and every component theme --
+/// app bar, buttons, menus, dialogs, sheets, drawer -- is rebuilt from that
+/// scheme, so a page and everything it opens share one set of colors and
+/// nothing leaks in from another page.
+ThemeData buildSkinAreaTheme(ThemeData base, SkinAreaColors area) {
+  final scheme = applySkinAreaToScheme(base.colorScheme, area);
+  return _buildTheme(
+    scheme,
+    scheme.brightness,
+    skinTokens: base.extension<AppSkinTokens>(),
+    semanticColors: base.extension<AppSemanticColors>(),
+    area: area,
+  );
+}
 
 AppSemanticColors _semanticColors(
   bool isDark,
@@ -475,6 +501,8 @@ ThemeData _buildTheme(
   bool fileManagerFollowsAppSkin = true,
   bool editorFollowsAppSkin = true,
   AppSkinTokens? skinTokens,
+  AppSemanticColors? semanticColors,
+  SkinAreaColors? area,
 }) {
   final isDark = brightness == Brightness.dark;
   final resolvedSkinTokens =
@@ -488,6 +516,20 @@ ThemeData _buildTheme(
         fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
         editorFollowsAppSkin: editorFollowsAppSkin,
       );
+  // A page's own top bar / round button / overlay colors win over the shared
+  // ones; `overlay` is only applied when the skin actually set it, so the
+  // default menu, dialog and sheet surfaces are unchanged.
+  final appBarBackground =
+      area?.color(SkinToken.appBar) ?? resolvedSkinTokens.appBarBackground;
+  final appBarForeground =
+      area?.color(SkinToken.onAppBar) ?? resolvedSkinTokens.appBarForeground;
+  final fabBackground =
+      area?.color(SkinToken.fab) ?? resolvedSkinTokens.fabBackground;
+  final fabForeground =
+      area?.color(SkinToken.onFab) ?? resolvedSkinTokens.fabForeground;
+  final customOverlay = area != null && area.isCustom(SkinToken.overlay)
+      ? area.color(SkinToken.overlay)
+      : null;
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
@@ -499,12 +541,12 @@ ThemeData _buildTheme(
       builders: {TargetPlatform.android: CrossfadePageTransitionsBuilder()},
     ),
     extensions: [
-      _semanticColors(isDark, appSkin, customAppSkin),
+      semanticColors ?? _semanticColors(isDark, appSkin, customAppSkin),
       resolvedSkinTokens,
     ],
     appBarTheme: AppBarTheme(
-      backgroundColor: resolvedSkinTokens.appBarBackground,
-      foregroundColor: resolvedSkinTokens.appBarForeground,
+      backgroundColor: appBarBackground,
+      foregroundColor: appBarForeground,
       elevation: 0,
       scrolledUnderElevation: 3,
       surfaceTintColor: cs.surfaceTint,
@@ -512,15 +554,10 @@ ThemeData _buildTheme(
       titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w400,
-        color: resolvedSkinTokens.appBarForeground,
+        color: appBarForeground,
       ),
-      iconTheme: IconThemeData(
-        color: resolvedSkinTokens.appBarForeground,
-        size: AppIconSize.action,
-      ),
-      actionsIconTheme: IconThemeData(
-        color: resolvedSkinTokens.appBarForeground,
-      ),
+      iconTheme: IconThemeData(color: appBarForeground, size: AppIconSize.action),
+      actionsIconTheme: IconThemeData(color: appBarForeground),
       // Default for standard pages: matches cs.surface
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -673,8 +710,8 @@ ThemeData _buildTheme(
       style: IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: resolvedSkinTokens.fabBackground,
-      foregroundColor: resolvedSkinTokens.fabForeground,
+      backgroundColor: fabBackground,
+      foregroundColor: fabForeground,
       elevation: 1,
       focusElevation: 1,
       hoverElevation: 2,
@@ -711,6 +748,11 @@ ThemeData _buildTheme(
         side: BorderSide(color: cs.outlineVariant),
       ),
     ),
+    drawerTheme: DrawerThemeData(
+      backgroundColor: area?.area == SkinArea.drawer
+          ? area!.color(SkinToken.background)
+          : cs.surfaceContainerLow,
+    ),
     navigationBarTheme: NavigationBarThemeData(
       height: 80,
       elevation: 0,
@@ -737,7 +779,7 @@ ThemeData _buildTheme(
       }),
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: cs.surfaceContainer,
+      color: customOverlay ?? cs.surfaceContainer,
       elevation: 3,
       shadowColor: Colors.black,
       surfaceTintColor: Colors.transparent,
@@ -748,7 +790,9 @@ ThemeData _buildTheme(
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
-        backgroundColor: WidgetStateProperty.all(cs.surfaceContainer),
+        backgroundColor: WidgetStateProperty.all(
+          customOverlay ?? cs.surfaceContainer,
+        ),
         elevation: WidgetStateProperty.all(3),
         surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
         shape: WidgetStateProperty.all(
@@ -759,8 +803,8 @@ ThemeData _buildTheme(
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: cs.surfaceContainerLow,
-      modalBackgroundColor: cs.surfaceContainerLow,
+      backgroundColor: customOverlay ?? cs.surfaceContainerLow,
+      modalBackgroundColor: customOverlay ?? cs.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -784,7 +828,7 @@ ThemeData _buildTheme(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: cs.surfaceContainerHigh,
+      backgroundColor: customOverlay ?? cs.surfaceContainerHigh,
       surfaceTintColor: Colors.transparent,
       elevation: 6,
       shadowColor: Colors.black45,

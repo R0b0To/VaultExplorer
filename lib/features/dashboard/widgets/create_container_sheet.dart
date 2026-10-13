@@ -13,6 +13,8 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
 import 'package:vaultexplorer/features/composite/presentation/composite_create_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 enum _WizStep { basics, security, advanced, hiddenVolume, review }
 
@@ -408,14 +410,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => CompositeCreateSheet(
+            builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: CompositeCreateSheet(
               // This wizard was itself pushed on top of the dashboard, so
               // popping it here is enough to land back there — same as
               // creating a normal (non-composite) container.
               onCreated: () {
                 if (mounted) Navigator.of(context).pop();
               },
-            ),
+            )),
           ),
         ),
         child: Padding(

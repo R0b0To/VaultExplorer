@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -90,7 +89,6 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
     Color? backgroundColor,
     Color? foregroundColor,
   }) {
-    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     if (!widget.asFab) {
       return IconButton(
         icon: Icon(icon, size: 28, color: foregroundColor),
@@ -101,10 +99,15 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
     return FloatingActionButton(
       heroTag: 'file_manager_add_fab_${widget.container.volId}',
       tooltip: tooltip,
+      // The page's own round-button colors come from its (scoped) theme.
       backgroundColor:
-          backgroundColor ?? skinTokens?.fabBackground ?? cs.primaryContainer,
+          backgroundColor ??
+          Theme.of(context).floatingActionButtonTheme.backgroundColor ??
+          cs.primaryContainer,
       foregroundColor:
-          foregroundColor ?? skinTokens?.fabForeground ?? cs.onPrimaryContainer,
+          foregroundColor ??
+          Theme.of(context).floatingActionButtonTheme.foregroundColor ??
+          cs.onPrimaryContainer,
       onPressed: onPressed,
       child: Icon(icon, size: 26),
     );

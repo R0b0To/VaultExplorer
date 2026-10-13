@@ -74,6 +74,8 @@ export 'package:vaultexplorer/features/browser/viewer/media_viewer_session_contr
     show VideoPlaybackMode;
 import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class MediaViewerScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -2615,7 +2617,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const MediaViewerToolbarSettingsScreen(),
+        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const MediaViewerToolbarSettingsScreen()),
       ),
     );
     if (!mounted) return;

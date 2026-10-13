@@ -10427,7 +10427,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Власний колір · торкніться для зміни або скидання';
+      'Власний колір — торкніться, щоб змінити або скинути за замовчуванням.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11416,4 +11416,238 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'Цей запис не збережено, і його буде остаточно видалено.';
+
+  @override
+  String get skinAreaDashboard => 'Панель керування';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'Список сховищ, до якого ви потрапляєте, з їхніми картками.';
+
+  @override
+  String get skinAreaDrawer => 'Бічне меню';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'Висувне меню зі сховищами та ярликами.';
+
+  @override
+  String get skinAreaFilesDescription =>
+      'Файловий менеджер у розблокованому сховищі.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'Панель інструментів текстового редактора та редактора коду. Кольори полотна та підсвічування синтаксису задаються в темі редактора нижче.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'Вкладка «Інструменти» та всі інструменти, відкриті з неї.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'Вкладка «Налаштування» та її підсторінки.';
+
+  @override
+  String get skinSharedPaletteTitle => 'Спільна палітра';
+
+  @override
+  String get skinSharedPaletteShort => 'Спільна';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'Кольори, які кожна сторінка успадковує, доки не встановить власні. Екрани без власного розділу, як-от розблокування та камера, використовують їх безпосередньо.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'Верхня панель кожної сторінки, яка не встановлює власну.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'Кругла кнопка додавання кожної сторінки, яка не встановлює власну.';
+
+  @override
+  String get skinPagesTitle => 'Кольори сторінок';
+
+  @override
+  String get skinPagesDescription =>
+      'Кожна сторінка зберігає власні кольори. Зміна однієї сторінки ніколи не змінює іншу.';
+
+  @override
+  String get skinResetPageColors => 'Скинути кольори сторінки';
+
+  @override
+  String get skinTokenBackground => 'Фон сторінки';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'Полотно позаду всіх елементів на цій сторінці.';
+
+  @override
+  String get skinTokenText => 'Основний текст';
+
+  @override
+  String get skinTokenTextHint =>
+      'Заголовки, назви та основний текст на цій сторінці.';
+
+  @override
+  String get skinTokenTextSecondary => 'Вторинний текст та значки';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'Підзаголовки, деталі, підказки та другорядні значки.';
+
+  @override
+  String get skinTokenAppBar => 'Верхня панель';
+
+  @override
+  String get skinTokenAppBarHint => 'Заливка верхньої панелі на цій сторінці.';
+
+  @override
+  String get skinTokenOnAppBar => 'Текст та значки верхньої панелі';
+
+  @override
+  String get skinTokenOnAppBarHint =>
+      'Колір заголовка та значків на верхній панелі.';
+
+  @override
+  String get skinTokenCard => 'Картки та рядки';
+
+  @override
+  String get skinTokenCardHint => 'Картки, рядки списку та згруповані панелі.';
+
+  @override
+  String get skinTokenCardActive => 'Активна картка';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'Виділена картка, наприклад розблоковане сховище.';
+
+  @override
+  String get skinTokenRaised => 'Чіпи та елементи керування';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'Поля пошуку, чіпи, мініатюри та плитки значків.';
+
+  @override
+  String get skinTokenOverlay => 'Меню, діалоги та панелі';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'Спливаючі меню, діалоги та нижні панелі, відкриті з цієї сторінки.';
+
+  @override
+  String get skinTokenAccent => 'Акцент';
+
+  @override
+  String get skinTokenAccentHint =>
+      'Кнопки, посилання, індикатори прогресу та активні значки.';
+
+  @override
+  String get skinTokenOnAccent => 'Текст на акценті';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'Мітки та значки на кнопках з акцентною заливкою.';
+
+  @override
+  String get skinTokenSelection => 'Виділення';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'Вибрані рядки та виділені плитки значків.';
+
+  @override
+  String get skinTokenOnSelection => 'Текст на виділенні';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'Значки та текст на вибраних елементах.';
+
+  @override
+  String get skinTokenDivider => 'Роздільники';
+
+  @override
+  String get skinTokenDividerHint =>
+      'Тонкі розділові лінії та непомітні рамки.';
+
+  @override
+  String get skinTokenOutline => 'Контури';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'Помітніші контури на кнопках із рамкою та полях введення.';
+
+  @override
+  String get skinTokenFab => 'Кругла кнопка додавання';
+
+  @override
+  String get skinTokenFabHint => 'Заливка круглої кнопки додавання.';
+
+  @override
+  String get skinTokenOnFab => 'Значок круглої кнопки додавання';
+
+  @override
+  String get skinTokenOnFabHint => 'Значок «плюс» на круглій кнопці додавання.';
+
+  @override
+  String get skinPreviewConfirm => 'Підтвердити';
+
+  @override
+  String get skinPreviewCancelButton => 'Скасувати';
+
+  @override
+  String get skinPreviewSaveButton => 'Зберегти';
+
+  @override
+  String get skinPreviewRunButton => 'Запустити';
+
+  @override
+  String get skinPreviewPasteButton => 'Вставити сюди';
+
+  @override
+  String get skinPreviewUnlockButton => 'Розблокувати';
+
+  @override
+  String get skinPreviewSortChip => 'Сортування: Назва';
+
+  @override
+  String get skinPreviewSearchChip => 'Пошук файлів';
+
+  @override
+  String get skinPreviewPinnedBadge => 'Закріплено';
+
+  @override
+  String get skinPreviewVaultsHeader => 'СХОВИЩА';
+
+  @override
+  String get skinPreviewToolsSection => 'Криптографія файлів';
+
+  @override
+  String get skinPreviewToolOne => 'Генератор ключових файлів і парольних фраз';
+
+  @override
+  String get skinPreviewToolOneHint => 'Генерація паролів і ключових файлів';
+
+  @override
+  String get skinPreviewToolTwo => 'Перевірка контрольних сум і хешів';
+
+  @override
+  String get skinPreviewToolTwoHint =>
+      'Перевірка великих файлів на пошкодження';
+
+  @override
+  String get skinPreviewSettingsSection => 'Безпека';
+
+  @override
+  String get skinPreviewSettingOne => 'Блокування програми';
+
+  @override
+  String get skinPreviewSettingOneHint => 'Біометрія та автоблокування';
+
+  @override
+  String get skinPreviewSettingTwo => 'Сховище даних';
+
+  @override
+  String get skinPreviewSettingTwoHint => 'Зовнішні сховища та хмарні мости';
 }

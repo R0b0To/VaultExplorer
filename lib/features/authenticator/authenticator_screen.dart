@@ -26,6 +26,8 @@ import 'package:vaultexplorer/features/tools/widgets/password_interchange/passwo
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class AuthenticatorScreen extends ConsumerStatefulWidget {
   const AuthenticatorScreen({super.key});
@@ -212,9 +214,9 @@ class _AuthenticatorScreenState extends ConsumerState<AuthenticatorScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PasswordInterchangeScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: PasswordInterchangeScreen(
             mountedContainers: ValueNotifier(mounted),
-          ),
+          )),
         ),
       );
       await ref.read(authenticatorRegistryProvider.notifier).refreshContainer(target);

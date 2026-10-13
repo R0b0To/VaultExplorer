@@ -7,6 +7,8 @@ import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -19,6 +21,8 @@ import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final bool hideDashboardUntilShareHandled;
@@ -271,20 +275,30 @@ class _MainShellState extends ConsumerState<MainShell> {
     final body = IndexedStack(
       index: _index,
       children: [
-        VaultDashboard(
-          key: _dashboardKey,
-          mountedNotifier: _mountedNotifier,
-          onNavigateTab: _onTabTap,
+        // Each tab is its own page with its own colors; see SkinAreaScope.
+        SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: VaultDashboard(
+            key: _dashboardKey,
+            mountedNotifier: _mountedNotifier,
+            onNavigateTab: _onTabTap,
+          ),
         ),
         if (_builtTabs.contains(1))
-          ToolsScreen(
-            mountedContainers: _mountedNotifier,
-            onNavigateTab: _onTabTap,
+          SkinAreaScope(
+            area: SkinArea.tools,
+            child: ToolsScreen(
+              mountedContainers: _mountedNotifier,
+              onNavigateTab: _onTabTap,
+            ),
           )
         else
           const SizedBox.shrink(),
         if (_builtTabs.contains(2))
-          const AppSettingsScreen()
+          const SkinAreaScope(
+            area: SkinArea.settings,
+            child: AppSettingsScreen(),
+          )
         else
           const SizedBox.shrink(),
       ],
@@ -301,11 +315,11 @@ class _MainShellState extends ConsumerState<MainShell> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => FileBrowserScreen(
+              builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
                 container: container,
                 drawer: buildDrawer(currentVolId: container.volId),
                 showBackButton: true,
-              ),
+              )),
             ),
           );
         },

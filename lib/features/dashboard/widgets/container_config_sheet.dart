@@ -26,6 +26,8 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 part 'container_config_dialogs.dart';
 
@@ -1020,12 +1022,12 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ChangePasswordScreen(
+                        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: ChangePasswordScreen(
                           uri: widget.uri,
                           initialCipherId: widget.existingRecord!.cipherId,
                           initialHashId: widget.existingRecord!.hashId,
                           containerFormat: fmt ?? 'veracrypt',
-                        ),
+                        )),
                       ),
                     );
                     if (result is List<KeyfileRef> && mounted) {
@@ -1326,10 +1328,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => VaultInfoScreen(
+                  builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: VaultInfoScreen(
                     uri: widget.uri,
                     containerFormat: _containerFormat,
-                  ),
+                  )),
                 ),
               ),
             ),
@@ -1358,10 +1360,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AutomationSettingsScreen(
+                  builder: (_) => SkinAreaScope(area: SkinArea.settings, child: AutomationSettingsScreen(
                     uri: widget.uri,
                     containerFormat: _containerFormat,
-                  ),
+                  )),
                 ),
               ),
             ),

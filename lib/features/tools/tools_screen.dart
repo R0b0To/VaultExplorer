@@ -16,6 +16,8 @@ import 'package:vaultexplorer/features/tools/widgets/password_interchange/passwo
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -192,9 +194,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => KeyfilePassphraseGeneratorScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: KeyfilePassphraseGeneratorScreen(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -208,9 +210,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.secondary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => SingleFileCryptoSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: SingleFileCryptoSheet(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -224,9 +226,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.secondary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => HashVerifierSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: HashVerifierSheet(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -240,9 +242,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.tertiary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => VaultSyncScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultSyncScreen(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -256,9 +258,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.tertiary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => PasswordInterchangeScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: PasswordInterchangeScreen(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -272,9 +274,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.tertiary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => StorageAnalyzerScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: StorageAnalyzerScreen(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -288,9 +290,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => DuplicateFinderScreen(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: DuplicateFinderScreen(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -304,7 +306,7 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const ContainerSplitterSheet(),
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: const ContainerSplitterSheet()),
         ),
       ),
     );
@@ -319,9 +321,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.primary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => CompositeCreateSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: CompositeCreateSheet(
             onCreated: () => onNavigateTab?.call(0),
-          ),
+          )),
         ),
       ),
     );
@@ -335,9 +337,9 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.tertiary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ContainerRepairSheet(
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: ContainerRepairSheet(
             mountedContainers: mountedContainers,
-          ),
+          )),
         ),
       ),
     );
@@ -351,7 +353,7 @@ class ToolsScreen extends StatelessWidget {
       iconColor: cs.secondary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const HeaderBackupSheet(),
+          builder: (_) => SkinAreaScope(area: SkinArea.tools, child: const HeaderBackupSheet()),
         ),
       ),
     );

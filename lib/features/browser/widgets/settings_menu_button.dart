@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 /// App-bar settings button: directly opens the file manager settings screen.
 class SettingsMenuButton extends StatelessWidget {
@@ -33,10 +35,10 @@ class SettingsMenuButton extends StatelessWidget {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => FileManagerToolbarSettingsScreen(
+            builder: (_) => SkinAreaScope(area: SkinArea.settings, child: FileManagerToolbarSettingsScreen(
               containerUri: containerUri,
               isLocalStorage: isLocalStorage,
-            ),
+            )),
           ),
         );
         await onSettingsClosed();

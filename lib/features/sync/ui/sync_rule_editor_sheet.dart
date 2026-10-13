@@ -26,6 +26,8 @@ import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart'
     show VaultSyncSide;
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 /// Auto-sync settings for one folder of an unlocked vault: which folder it
 /// is kept in step with, in which direction, what happens when both sides
@@ -280,11 +282,11 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     final side = await Navigator.push<VaultSyncSide>(
       context,
       MaterialPageRoute(
-        builder: (_) => VaultSyncLocationPickerSheet(
+        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultSyncLocationPickerSheet(
           mountedContainers: containers,
           sideLabel: sideLabel,
           isLeft: false,
-        ),
+        )),
       ),
     );
     if (side == null || !mounted) return;
@@ -473,10 +475,10 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => AutomationSettingsScreen(
+        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: AutomationSettingsScreen(
           uri: widget.vault.uri,
           containerFormat: widget.vault.containerFormat,
-        ),
+        )),
       ),
     );
     if (!mounted) return;

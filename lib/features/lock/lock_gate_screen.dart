@@ -8,6 +8,8 @@ import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_controller.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 enum _LockGateCredential { biometric, pattern, pin, password }
 
@@ -46,13 +48,13 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   void _goToDecoyContainer(MountedContainer container) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => FileBrowserScreen(
+        builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
           container: container,
           resolveContainer: (volId) =>
               volId == container.volId ? container : null,
           onUserActivity: () {},
           showBackButton: false,
-        ),
+        )),
       ),
     );
   }

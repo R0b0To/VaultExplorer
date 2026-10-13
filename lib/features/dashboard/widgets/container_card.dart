@@ -9,7 +9,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
@@ -168,7 +169,6 @@ class ContainerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     final textTheme = Theme.of(context).textTheme;
     final isLight = cs.brightness == Brightness.light;
     final usedBytes = container.totalSpace - container.freeSpace;
@@ -264,7 +264,11 @@ class ContainerCard extends StatelessWidget {
           ),
         ],
       ),
-      backgroundColor: skinTokens?.mountedVaultCardBackground ?? cardBg,
+      backgroundColor: SkinAreaScope.colorOf(
+        context,
+        SkinToken.cardActive,
+        fallback: cardBg,
+      ),
       borderRadius: borderRadius,
     );
   }
@@ -291,7 +295,6 @@ class SavedContainerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
     final iconWidget = isUsb
@@ -335,8 +338,8 @@ class SavedContainerCard extends StatelessWidget {
         onDelete: onDelete,
         isMounted: false,
       ),
-      backgroundColor:
-          skinTokens?.vaultCardBackground ?? cs.surfaceContainerHigh,
+      // Inside the Dashboard scope this role *is* the page's card color.
+      backgroundColor: cs.surfaceContainerHigh,
       borderRadius: borderRadius,
     );
   }

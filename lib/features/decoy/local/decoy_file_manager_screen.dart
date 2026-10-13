@@ -23,6 +23,8 @@ import 'package:vaultexplorer/features/browser/widgets/storage_locations_drawer.
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_share_import_flow.dart';
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class DecoyFileManagerScreen extends ConsumerStatefulWidget {
   const DecoyFileManagerScreen({super.key});
@@ -226,7 +228,9 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
     if (container == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return FileBrowserScreen(
+    return SkinAreaScope(
+      area: SkinArea.files,
+      child: FileBrowserScreen(
       key: ValueKey(container.volId),
       container: container,
       resolveContainer: (volId) {
@@ -243,6 +247,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
           setState(() => _container = newContainer);
         },
       ),
+    ),
     );
   }
 }

@@ -10350,7 +10350,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Eigene Farbe · Tippen zum Ändern oder Zurücksetzen';
+      'Benutzerdefinierte Farbe – tippen zum Ändern oder Zurücksetzen auf Standard.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
@@ -11337,4 +11337,240 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get audioRecordingDiscardMessage =>
       'Diese Aufnahme wurde nicht gespeichert und wird endgültig gelöscht.';
+
+  @override
+  String get skinAreaDashboard => 'Dashboard';
+
+  @override
+  String get skinAreaDashboardDescription =>
+      'Die Tresorliste, auf der Sie landen, mit ihren Tresorkarten.';
+
+  @override
+  String get skinAreaDrawer => 'Seitenmenü';
+
+  @override
+  String get skinAreaDrawerDescription =>
+      'Das ausklappbare Menü mit Ihren Tresoren und Verknüpfungen.';
+
+  @override
+  String get skinAreaFilesDescription =>
+      'Der Dateibrowser innerhalb eines entsperrten Tresors.';
+
+  @override
+  String get skinAreaEditorDescription =>
+      'Die Symbolleiste des Text- und Code-Editors. Deren Hintergrund- und Syntaxfarben werden unten im Editor-Design festgelegt.';
+
+  @override
+  String get skinAreaToolsDescription =>
+      'Der Tab „Werkzeuge“ und jedes darin geöffnete Werkzeug.';
+
+  @override
+  String get skinAreaSettingsDescription =>
+      'Der Tab „Einstellungen“ und seine Unterseiten.';
+
+  @override
+  String get skinSharedPaletteTitle => 'Gemeinsame Palette';
+
+  @override
+  String get skinSharedPaletteShort => 'Geteilt';
+
+  @override
+  String get skinSharedPaletteDescription =>
+      'Farben, die jede Seite erbt, bis sie eigene festlegt. Seiten ohne eigenen Bereich wie Entsperren und Kamera verwenden diese direkt.';
+
+  @override
+  String get skinSharedBarDescription =>
+      'Die obere Leiste jeder Seite, die keine eigene festlegt.';
+
+  @override
+  String get skinSharedFabDescription =>
+      'Die runde Hinzufügen-Schaltfläche jeder Seite, die keine eigene festlegt.';
+
+  @override
+  String get skinPagesTitle => 'Seitenfarben';
+
+  @override
+  String get skinPagesDescription =>
+      'Jede Seite behält ihre eigenen Farben. Das Ändern einer Seite ändert niemals eine andere.';
+
+  @override
+  String get skinResetPageColors => 'Seitenfarben zurücksetzen';
+
+  @override
+  String get skinTokenBackground => 'Seitenhintergrund';
+
+  @override
+  String get skinTokenBackgroundHint =>
+      'Die Fläche hinter allen Elementen auf dieser Seite.';
+
+  @override
+  String get skinTokenText => 'Haupttext';
+
+  @override
+  String get skinTokenTextHint => 'Titel, Namen und Text auf dieser Seite.';
+
+  @override
+  String get skinTokenTextSecondary => 'Sekundärer Text und Symbole';
+
+  @override
+  String get skinTokenTextSecondaryHint =>
+      'Untertitel, Details, Hinweise und unaufdringliche Symbole.';
+
+  @override
+  String get skinTokenAppBar => 'Obere Leiste';
+
+  @override
+  String get skinTokenAppBarHint =>
+      'Füllung der oberen Leiste auf dieser Seite.';
+
+  @override
+  String get skinTokenOnAppBar => 'Text und Symbole der oberen Leiste';
+
+  @override
+  String get skinTokenOnAppBarHint =>
+      'Farbe von Titel und Symbolen in der oberen Leiste.';
+
+  @override
+  String get skinTokenCard => 'Karten und Zeilen';
+
+  @override
+  String get skinTokenCardHint =>
+      'Karten, Listenzeilen und gruppierte Bedienfelder.';
+
+  @override
+  String get skinTokenCardActive => 'Aktive Karte';
+
+  @override
+  String get skinTokenCardActiveHint =>
+      'Die hervorgehobene Karte, z. B. ein entsperrter Tresor.';
+
+  @override
+  String get skinTokenRaised => 'Chips und Steuerelemente';
+
+  @override
+  String get skinTokenRaisedHint =>
+      'Suchfelder, Chips, Miniaturbilder und Symbolkacheln.';
+
+  @override
+  String get skinTokenOverlay => 'Menüs, Dialoge und Sheets';
+
+  @override
+  String get skinTokenOverlayHint =>
+      'Kontextmenüs, Dialoge und Bottom-Sheets, die von dieser Seite geöffnet werden.';
+
+  @override
+  String get skinTokenAccent => 'Akzent';
+
+  @override
+  String get skinTokenAccentHint =>
+      'Schaltflächen, Links, Fortschrittsbalken und aktive Symbole.';
+
+  @override
+  String get skinTokenOnAccent => 'Text auf Akzent';
+
+  @override
+  String get skinTokenOnAccentHint =>
+      'Beschriftungen und Symbole auf akzentfarbenen Schaltflächen.';
+
+  @override
+  String get skinTokenSelection => 'Auswahl';
+
+  @override
+  String get skinTokenSelectionHint =>
+      'Ausgewählte Zeilen und hervorgehobene Symbolkacheln.';
+
+  @override
+  String get skinTokenOnSelection => 'Text auf Auswahl';
+
+  @override
+  String get skinTokenOnSelectionHint =>
+      'Symbole und Text auf ausgewählten Elementen.';
+
+  @override
+  String get skinTokenDivider => 'Trennlinien';
+
+  @override
+  String get skinTokenDividerHint => 'Dünne Trennlinien und dezente Ränder.';
+
+  @override
+  String get skinTokenOutline => 'Umrisse';
+
+  @override
+  String get skinTokenOutlineHint =>
+      'Stärkere Ränder für umrandete Schaltflächen und Felder.';
+
+  @override
+  String get skinTokenFab => 'Runde Hinzufügen-Schaltfläche';
+
+  @override
+  String get skinTokenFabHint => 'Füllung der runden Hinzufügen-Schaltfläche.';
+
+  @override
+  String get skinTokenOnFab => 'Symbol der runden Hinzufügen-Schaltfläche';
+
+  @override
+  String get skinTokenOnFabHint =>
+      'Das Plus-Symbol auf der runden Hinzufügen-Schaltfläche.';
+
+  @override
+  String get skinPreviewConfirm => 'Bestätigen';
+
+  @override
+  String get skinPreviewCancelButton => 'Abbrechen';
+
+  @override
+  String get skinPreviewSaveButton => 'Speichern';
+
+  @override
+  String get skinPreviewRunButton => 'Ausführen';
+
+  @override
+  String get skinPreviewPasteButton => 'Hier einfügen';
+
+  @override
+  String get skinPreviewUnlockButton => 'Entsperren';
+
+  @override
+  String get skinPreviewSortChip => 'Sortieren: Name';
+
+  @override
+  String get skinPreviewSearchChip => 'Dateien durchsuchen';
+
+  @override
+  String get skinPreviewPinnedBadge => 'Angeheftet';
+
+  @override
+  String get skinPreviewVaultsHeader => 'TRESORE';
+
+  @override
+  String get skinPreviewToolsSection => 'Dateikryptografie';
+
+  @override
+  String get skinPreviewToolOne => 'Schlüsseldatei- und Passphrasen-Generator';
+
+  @override
+  String get skinPreviewToolOneHint =>
+      'Passwörter und Schlüsseldateien generieren';
+
+  @override
+  String get skinPreviewToolTwo => 'Prüfsummen- und Hash-Prüfer';
+
+  @override
+  String get skinPreviewToolTwoHint =>
+      'Überprüfen, ob große Dateien unbeschädigt sind';
+
+  @override
+  String get skinPreviewSettingsSection => 'Sicherheit';
+
+  @override
+  String get skinPreviewSettingOne => 'App-Sperre';
+
+  @override
+  String get skinPreviewSettingOneHint => 'Biometrie und automatische Sperre';
+
+  @override
+  String get skinPreviewSettingTwo => 'Speicher';
+
+  @override
+  String get skinPreviewSettingTwoHint => 'Externer Speicher und Cloud-Brücken';
 }

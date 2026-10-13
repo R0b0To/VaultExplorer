@@ -13,6 +13,8 @@ import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class VaultSyncScreen extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -51,14 +53,14 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     final result = await Navigator.push<VaultSyncSide>(
       context,
       MaterialPageRoute(
-        builder: (_) => VaultSyncLocationPickerSheet(
+        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultSyncLocationPickerSheet(
           mountedContainers: containers,
           sideLabel: isLeft
               ? context.l10n.vaultSyncLeftLabel
               : context.l10n.vaultSyncRightLabel,
           initialSide: isLeft ? state.left : state.right,
           isLeft: isLeft,
-        ),
+        )),
       ),
     );
     if (result == null || !mounted) return;

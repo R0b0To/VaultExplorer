@@ -68,7 +68,12 @@ class VaultArchiveApi {
         );
       }
       return ArchiveEntryExtractResult.fromMap(res);
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      if (e.code == 'OUT_OF_MEMORY') {
+        return ArchiveEntryExtractResult.ioError(
+          'Archive entry is too large to load into memory',
+        );
+      }
       rethrow;
     } catch (e) {
       logSwallowed('extractVaultArchiveEntry', e);
@@ -172,7 +177,12 @@ class VaultArchiveApi {
         );
       }
       return ArchiveEntryExtractResult.fromMap(res);
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      if (e.code == 'OUT_OF_MEMORY') {
+        return ArchiveEntryExtractResult.ioError(
+          'Archive entry is too large to load into memory',
+        );
+      }
       rethrow;
     } catch (e) {
       logSwallowed('extractLocalArchiveEntry', e);

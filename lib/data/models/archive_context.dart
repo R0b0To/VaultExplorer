@@ -171,6 +171,15 @@ class ArchiveContext {
     return true;
   }
 
+  /// Largest entry [extractEntryResult] will load into memory.
+  ///
+  /// An extracted entry crosses the platform channel as one byte array, and
+  /// the channel codec then copies it into a buffer that doubles as it grows:
+  /// a ~100 MB entry needs a ~210 MB allocation against the app's 256 MB Java
+  /// heap limit, and the resulting `OutOfMemoryError` used to take the whole
+  /// app down. Anything bigger must be streamed with [stageEntryForBrowse].
+  static const int maxInMemoryEntryBytes = 16 * 1024 * 1024;
+
   /// Extracts the raw bytes of a single file entry from the archive on-demand.
   ///
   /// Convenience wrapper over [extractEntryResult] for callers that need a
@@ -199,6 +208,13 @@ class ArchiveContext {
         status: ArchiveOpenStatus.ioError,
         data: null,
         errorMessage: 'Entry not found',
+      );
+    }
+
+    if (info.uncompressedSize > maxInMemoryEntryBytes) {
+      return ArchiveEntryExtractResult.ioError(
+        'Entry is too large to load into memory '
+        '(${info.uncompressedSize} bytes); stream it with stageEntryForBrowse',
       );
     }
 

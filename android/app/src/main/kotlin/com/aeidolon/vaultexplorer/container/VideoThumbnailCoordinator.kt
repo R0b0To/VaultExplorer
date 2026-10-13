@@ -70,6 +70,12 @@ import com.aeidolon.vaultexplorer.VeLog
  *    could drift or disagree on what "bad" looks like.
  */
 object VideoThumbnailCoordinator {
+    /** Hard ceiling for a single decoded image thumbnail bitmap. At 4 bytes
+     *  per ARGB pixel this keeps one decode near 20 MiB, even when a small
+     *  compressed image expands to hundreds of megapixels. The edge-based
+     *  target alone is not enough for large, nearly-square source images. */
+    private const val MAX_IMAGE_THUMBNAIL_DECODE_PIXELS = 5L * 1024L * 1024L
+
     private const val TAG = "VideoThumbCoordinator"
 
     /** Serialises hardware video-decoder access across both thumbnail
@@ -207,11 +213,25 @@ object VideoThumbnailCoordinator {
      *  their long edge too; requiring both dimensions to exceed the target
      *  can otherwise decode a huge source bitmap before scaling it down. */
     fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
-        val sourceMaxEdge = maxOf(width, height)
-        if (sourceMaxEdge <= targetSize || targetSize <= 0) return 1
+        if (width <= 0 || height <= 0 || targetSize <= 0) return 1
 
+        val sourceMaxEdge = maxOf(width, height)
         var inSampleSize = 1
         while (sourceMaxEdge / inSampleSize / 2 >= targetSize) {
+            inSampleSize *= 2
+        }
+
+        // A long-edge bound still allows (for example) a 4096x4096 bitmap
+        // for a 2048px preview. Bound pixel area as well so wide and square
+        // high-resolution images cannot exhaust the app's native bitmap heap.
+        fun sampledDimension(dimension: Int): Long =
+            (dimension.toLong() + inSampleSize - 1L) / inSampleSize
+
+        while (
+            sampledDimension(width) * sampledDimension(height) >
+                MAX_IMAGE_THUMBNAIL_DECODE_PIXELS &&
+            inSampleSize <= (1 shl 29)
+        ) {
             inSampleSize *= 2
         }
         return inSampleSize

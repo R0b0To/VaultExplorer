@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
@@ -331,6 +332,48 @@ class VaultFileIoApi {
       return bytes;
     } catch (e) {
       logSwallowed('getImageThumbnail', e, expected: true);
+      return null;
+    }
+  }
+
+  /// Same native call as [getImageThumbnail], but for the two failures a
+  /// caller can do something about it reports them instead of folding them
+  /// into `null`: [ImagePreviewUnavailableReason.tooLarge] (the source is too
+  /// big to decode at all) and [ImagePreviewUnavailableReason.outOfMemory].
+  /// Every other failure still returns `null`, exactly like
+  /// [getImageThumbnail].
+  Future<Uint8List?> getImageThumbnailOrThrow(
+    MountedContainer container,
+    String fileName, {
+    int targetSize = 180,
+    int quality = 70,
+    bool preserveAlpha = false,
+  }) async {
+    try {
+      return await _channel
+          .invokeMethod<Uint8List>(ChannelMethods.getImageThumbnail, {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'targetSize': targetSize,
+            'quality': quality,
+            'preserveAlpha': preserveAlpha,
+            'isLocalStorage': container.isLocalStorage,
+          });
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'IMAGE_TOO_LARGE':
+          throw const ImagePreviewUnavailableException(
+            ImagePreviewUnavailableReason.tooLarge,
+          );
+        case 'OUT_OF_MEMORY':
+          throw const ImagePreviewUnavailableException(
+            ImagePreviewUnavailableReason.outOfMemory,
+          );
+      }
+      logSwallowed('getImageThumbnailOrThrow', e, expected: true);
+      return null;
+    } catch (e) {
+      logSwallowed('getImageThumbnailOrThrow', e, expected: true);
       return null;
     }
   }

@@ -296,6 +296,41 @@ class ArchiveHandlers(
         }
     }
 
+    /** Hands an extracted archive entry to Dart (on the main thread).
+     *
+     *  The whole entry travels as one `byte[]`, and the platform-channel
+     *  codec then copies it into a `ByteArrayOutputStream` that grows by
+     *  doubling -- so a ~100 MB entry needs a ~210 MB allocation on top of the
+     *  array itself, far beyond the app's 256 MB Java heap limit. That
+     *  `OutOfMemoryError` is thrown from inside `result.success()` on the main
+     *  thread and, being an Error, used to kill the app. Turn it into a normal
+     *  channel error instead. Large entries should go through
+     *  `handleArchiveStageBrowseEntry` (streams to a file) rather than here. */
+    private fun deliverExtractedEntry(
+        result: MethodChannel.Result,
+        entry: Map<String, Any>?,
+        failureMessage: String,
+    ) {
+        if (entry == null) {
+            result.error("EXTRACT_FAILED", failureMessage, null)
+            return
+        }
+        try {
+            result.success(entry)
+        } catch (e: OutOfMemoryError) {
+            VeLog.w(TAG) { "Archive entry too large to send over the platform channel" }
+            result.error("OUT_OF_MEMORY", "Archive entry is too large to load into memory", null)
+        }
+    }
+
+    /** Reports an `OutOfMemoryError` raised while extracting an entry. */
+    private fun reportEntryOutOfMemory(result: MethodChannel.Result) {
+        VeLog.w(TAG) { "Out of memory extracting archive entry" }
+        activity.runOnUiThread {
+            result.error("OUT_OF_MEMORY", "Archive entry is too large to load into memory", null)
+        }
+    }
+
     fun handleArchiveExtractVaultEntry(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val vaultPath = call.argument<String>("vaultPath")
@@ -326,10 +361,9 @@ class ArchiveHandlers(
                             return@execute
                         }
                         val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
-                        activity.runOnUiThread {
-                            if (bytes != null) result.success(bytes)
-                            else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
-                        }
+                        activity.runOnUiThread { deliverExtractedEntry(result, bytes, "Failed to extract archive entry") }
+                    } catch (e: OutOfMemoryError) {
+                        reportEntryOutOfMemory(result)
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
                     } finally {
@@ -346,10 +380,9 @@ class ArchiveHandlers(
                     try {
                         pfd = ParcelFileDescriptor.open(potentialFile, ParcelFileDescriptor.MODE_READ_ONLY)
                         val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
-                        activity.runOnUiThread {
-                            if (bytes != null) result.success(bytes)
-                            else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
-                        }
+                        activity.runOnUiThread { deliverExtractedEntry(result, bytes, "Failed to extract archive entry") }
+                    } catch (e: OutOfMemoryError) {
+                        reportEntryOutOfMemory(result)
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
                     } finally {
@@ -376,10 +409,9 @@ class ArchiveHandlers(
                     }
                     pfd = ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY)
                     val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
-                    activity.runOnUiThread {
-                        if (bytes != null) result.success(bytes)
-                        else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
-                    }
+                    activity.runOnUiThread { deliverExtractedEntry(result, bytes, "Failed to extract archive entry") }
+                } catch (e: OutOfMemoryError) {
+                    reportEntryOutOfMemory(result)
                 } catch (e: Exception) {
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
                 } finally {
@@ -389,10 +421,9 @@ class ArchiveHandlers(
             } else {
                 try {
                     val bytes = NativeEngine.archiveExtractVaultEntryNative(volId, vaultPath, targetIndex, passphrase)
-                    activity.runOnUiThread {
-                        if (bytes != null) result.success(bytes)
-                        else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
-                    }
+                    activity.runOnUiThread { deliverExtractedEntry(result, bytes, "Failed to extract archive entry") }
+                } catch (e: OutOfMemoryError) {
+                    reportEntryOutOfMemory(result)
                 } catch (e: Exception) {
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
                 }
@@ -677,10 +708,9 @@ class ArchiveHandlers(
                 }
 
                 val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
-                activity.runOnUiThread {
-                    if (bytes != null) result.success(bytes)
-                    else result.error("EXTRACT_FAILED", "Failed to extract local archive entry", null)
-                }
+                activity.runOnUiThread { deliverExtractedEntry(result, bytes, "Failed to extract local archive entry") }
+            } catch (e: OutOfMemoryError) {
+                reportEntryOutOfMemory(result)
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {

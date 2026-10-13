@@ -1,1 +1,51 @@
-{}
+{
+  "ar": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "de": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "es": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "fr": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "it": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "ja": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "ko": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "pt": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "uk": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ],
+
+  "zh": [
+    "imagePreviewTooLargeMessage",
+    "imagePreviewOutOfMemoryMessage"
+  ]
+}

@@ -5003,6 +5003,14 @@
       }
     }
   },
+  "imagePreviewTooLargeMessage": "This image is too large to preview",
+  "@imagePreviewTooLargeMessage": {
+    "description": "Shown in the media viewer when an image has too many pixels to decode for a preview"
+  },
+  "imagePreviewOutOfMemoryMessage": "Not enough free memory to preview this image. Close other apps and try again.",
+  "@imagePreviewOutOfMemoryMessage": {
+    "description": "Shown in the media viewer when there isn't enough free memory to decode a very large image right now"
+  },
   "invalidOrCorruptedImageMessage": "Invalid or corrupted image format.",
   "@invalidOrCorruptedImageMessage": {
     "description": "Error message shown when an image fails to decode/render"

@@ -17,6 +17,7 @@ import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import androidx.exifinterface.media.ExifInterface
+import com.aeidolon.vaultexplorer.ImageDecodeGuard
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
@@ -777,33 +778,48 @@ class SafStorageManager(private val context: Context) {
             val srcH = boundsOptions.outHeight
             if (srcW <= 0 || srcH <= 0) return null
 
-            val decodeOptions = BitmapFactory.Options().apply {
-                inSampleSize = calculateInSampleSize(srcW, srcH, targetSize)
-                inPreferredConfig = if (preserveAlpha) {
-                    Bitmap.Config.ARGB_8888
-                } else {
-                    Bitmap.Config.RGB_565
+            // See ImageDecodeGuard: inSampleSize doesn't bound decoder memory
+            // for a huge source, and OOM isn't an Exception.
+            val permit = try {
+                ImageDecodeGuard.admit(context, srcW, srcH)
+            } catch (e: ImageDecodeGuard.RefusedException) {
+                VeLog.w(TAG) { "getImageThumbnail refused for $relativePath: ${e.message}" }
+                return null
+            }
+            try {
+                val decodeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = calculateInSampleSize(srcW, srcH, targetSize)
+                    inPreferredConfig = if (preserveAlpha) {
+                        Bitmap.Config.ARGB_8888
+                    } else {
+                        Bitmap.Config.RGB_565
+                    }
                 }
+
+                val decoded = context.contentResolver.openInputStream(docUri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream, null, decodeOptions)
+                } ?: return null
+
+                val oriented = applyExifOrientation(decoded, exifOrientationMatrix(exifOrientation))
+                val scaled = scaledToFit(oriented, targetSize)
+                val stream = ByteArrayOutputStream()
+                val format = if (preserveAlpha) {
+                    Bitmap.CompressFormat.WEBP
+                } else {
+                    Bitmap.CompressFormat.JPEG
+                }
+                scaled.compress(format, quality.coerceIn(1, 100), stream)
+                val bytes = stream.toByteArray()
+                if (scaled != oriented) scaled.recycle()
+                oriented.recycle()
+
+                mapOf("bytes" to bytes, "width" to srcW, "height" to srcH)
+            } finally {
+                permit.close()
             }
-
-            val decoded = context.contentResolver.openInputStream(docUri)?.use { stream ->
-                BitmapFactory.decodeStream(stream, null, decodeOptions)
-            } ?: return null
-
-            val oriented = applyExifOrientation(decoded, exifOrientationMatrix(exifOrientation))
-            val scaled = scaledToFit(oriented, targetSize)
-            val stream = ByteArrayOutputStream()
-            val format = if (preserveAlpha) {
-                Bitmap.CompressFormat.WEBP
-            } else {
-                Bitmap.CompressFormat.JPEG
-            }
-            scaled.compress(format, quality.coerceIn(1, 100), stream)
-            val bytes = stream.toByteArray()
-            if (scaled != oriented) scaled.recycle()
-            oriented.recycle()
-
-            mapOf("bytes" to bytes, "width" to srcW, "height" to srcH)
+        } catch (e: OutOfMemoryError) {
+            VeLog.w(TAG) { "getImageThumbnail out of memory for $relativePath" }
+            null
         } catch (e: Exception) {
             VeLog.w(TAG) { "getImageThumbnail failed for $relativePath: ${e.message}" }
             null

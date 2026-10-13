@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
+import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart';
@@ -50,6 +51,14 @@ class FullResImageCache {
   // downsampled preview for the original file bytes.
   static final _largeImagePreviews = ByteBudgetCache(_largeImagePreviewBudget);
 
+  // Files native code has said it will never decode (see
+  // [ImagePreviewUnavailableReason.tooLarge]). Remembered for the session so
+  // the viewer, its neighbour prefetch and every widget rebuild fail fast
+  // instead of re-running a multi-second, memory-hungry decode that is
+  // certain to be refused again. Out-of-memory failures are deliberately NOT
+  // remembered: they depend on how much memory is free at the time.
+  static final _tooLarge = LruCache<String, bool>(64);
+
   static String _key(MountedContainer container, String filePath) =>
       '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
 
@@ -66,6 +75,11 @@ class FullResImageCache {
     _cache[key] = data;
   }
 
+  /// Whether [filePath] is already known to be too large to preview, so
+  /// callers (e.g. neighbour prefetch) can skip it without a native call.
+  static bool isKnownTooLarge(MountedContainer container, String filePath) =>
+      _tooLarge.containsKey(_key(container, filePath));
+
   static bool contains(MountedContainer container, String filePath) =>
       _cache.containsKey(_key(container, filePath)) ||
       _largeImagePreviews.containsKey(_key(container, filePath));
@@ -80,6 +94,7 @@ class FullResImageCache {
     final key = _key(container, filePath);
     _cache.remove(key);
     _largeImagePreviews.remove(key);
+    _tooLarge.remove(key);
   }
 
   /// Clears all cached full-resolution bytes. Call this on container
@@ -88,6 +103,7 @@ class FullResImageCache {
   static void clear() {
     _cache.clear();
     _largeImagePreviews.clear();
+    _tooLarge.clear();
   }
 
   /// Applies device-tier-scaled sizing (ADR-011) — see
@@ -177,6 +193,13 @@ class FullResImageCache {
     if (cachedPreview != null) return Future.value(cachedPreview);
 
     final key = _key(container, filePath);
+    if (_tooLarge.containsKey(key)) {
+      return Future.error(
+        const ImagePreviewUnavailableException(
+          ImagePreviewUnavailableReason.tooLarge,
+        ),
+      );
+    }
     final existing = _inFlight[key];
     if (existing != null) return existing;
 
@@ -225,13 +248,21 @@ class FullResImageCache {
           if (!isStillWanted()) throw _StaleRequestException();
 
           if (size >= _maxInlineImageBytes) {
-            final preview = await fileIoApi.getImageThumbnail(
-              container,
-              filePath,
-              targetSize: _largeImagePreviewSize,
-              quality: _largeImagePreviewQuality,
-              preserveAlpha: true,
-            );
+            Uint8List? preview;
+            try {
+              preview = await fileIoApi.getImageThumbnailOrThrow(
+                container,
+                filePath,
+                targetSize: _largeImagePreviewSize,
+                quality: _largeImagePreviewQuality,
+                preserveAlpha: true,
+              );
+            } on ImagePreviewUnavailableException catch (e) {
+              if (e.reason == ImagePreviewUnavailableReason.tooLarge) {
+                _tooLarge[key] = true;
+              }
+              rethrow;
+            }
             if (preview == null || preview.isEmpty) {
               throw Exception('Failed to decode large image');
             }
@@ -251,7 +282,13 @@ class FullResImageCache {
             throw Exception('File returned no content bytes');
           }
           return data;
-        }, retryIf: (e) => e is! _StaleRequestException);
+        },
+            // Neither a stale request nor a deliberate "too large / not
+            // enough memory" refusal is worth retrying: the same native
+            // decode would just be attempted (and refused) again.
+            retryIf: (e) =>
+                e is! _StaleRequestException &&
+                e is! ImagePreviewUnavailableException);
       } on _StaleRequestException {
         return null;
       }

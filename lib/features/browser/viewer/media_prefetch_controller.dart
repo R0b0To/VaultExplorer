@@ -323,6 +323,7 @@ class MediaPrefetchController {
   Future<void> _prefetchFullRes(String fileName, {required bool Function() isStillWanted}) async {
     if (!MediaViewerConstants.isImage(fileName)) return;
     if (FullResImageCache.contains(container, fileName)) return;
+    if (FullResImageCache.isKnownTooLarge(container, fileName)) return;
     if (_prefetchingFullRes.contains(fileName)) return;
 
     _prefetchingFullRes.add(fileName);

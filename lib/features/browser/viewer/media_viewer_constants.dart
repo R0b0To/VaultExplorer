@@ -22,6 +22,10 @@ class MediaViewerConstants {
   /// image visibly softens, without decoding at "whatever the source file
   /// happens to be."
   static const double fullResDecodeZoomHeadroom = 5.0;
+  /// Absolute decoded-bitmap cap for a single viewer image. Screen-relative
+  /// zoom headroom alone can still ask Skia for a 50+ megapixel bitmap on a
+  /// high-resolution phone, which exceeds the heap budget on some devices.
+  static const int maxImageDecodePixels = 8 * 1024 * 1024;
   static const double maxVideoZoom = 12.0;
 
   /// Lower bound offered by the "minimum zoom" setting -- how far below

@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/utils/image_dimensions.dart';
+import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -45,6 +46,10 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   Uint8List? _bytes;
   Uint8List? _thumbnailBytes;
   String? _error;
+  // Set when native code refused to decode this image (too large / not
+  // enough memory) -- see FullResImageCache.fetch. Distinct from [_error]:
+  // it is expected, explainable, and must not be retried automatically.
+  ImagePreviewUnavailableReason? _previewFailure;
   bool _isFullResLoaded = false;
   bool _isLargeImagePreview = false;
   String? _currentlyLoadingFile;
@@ -98,6 +103,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     if (widget.fileName != oldWidget.fileName) {
       _cancelPendingLoad();
       _error = null;
+      _previewFailure = null;
       _thumbnailBytes =
           widget.prefetchedBytes ??
           _thumbnailCache.peekMemory(
@@ -118,7 +124,9 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
         _bytes = null;
         _loadImage();
       }
-    } else if (!_isFullResLoaded && _currentlyLoadingFile == null) {
+    } else if (!_isFullResLoaded &&
+        _currentlyLoadingFile == null &&
+        _previewFailure == null) {
       _loadImage();
      } else if (!_isFullResLoaded &&
         widget.prefetchedBytes != null &&
@@ -204,6 +212,11 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
                 _isWebpImage(data));
       });
       _sniffAndNotifySize(data);
+    } on ImagePreviewUnavailableException catch (e) {
+      if (_limiterCompleter == completer) _limiterCompleter = null;
+      if (mounted && _currentlyLoadingFile == targetFile) {
+        _onPreviewUnavailable(e.reason);
+      }
     } catch (e) {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (mounted &&
@@ -220,6 +233,22 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       if (!_isFullResLoaded && _currentlyLoadingFile == targetFile) {
         _currentlyLoadingFile = null;
       }
+    }
+  }
+
+  String _previewFailureMessage(ImagePreviewUnavailableReason reason) =>
+      reason == ImagePreviewUnavailableReason.tooLarge
+      ? context.l10n.imagePreviewTooLargeMessage
+      : context.l10n.imagePreviewOutOfMemoryMessage;
+
+  void _onPreviewUnavailable(ImagePreviewUnavailableReason reason) {
+    setState(() => _previewFailure = reason);
+    // With a thumbnail already on screen build() has nowhere to put an
+    // error, so say why the picture is staying soft instead.
+    if (_thumbnailBytes != null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(_previewFailureMessage(reason))),
+      );
     }
   }
 
@@ -286,6 +315,41 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
                 ),
               ],
             ),
+          ),
+        ),
+      );
+    }
+
+    final previewFailure = _previewFailure;
+    if (previewFailure != null && _bytes == null && _thumbnailBytes == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.image_not_supported_outlined, color: cs.onSurface),
+              const SizedBox(height: 12),
+              Text(
+                _previewFailureMessage(previewFailure),
+                style: TextStyle(color: cs.onSurface, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              // "Too large" is permanent for this file; "out of memory" may
+              // well work after other apps have been closed.
+              if (previewFailure == ImagePreviewUnavailableReason.outOfMemory)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() => _previewFailure = null);
+                      _loadImage();
+                    },
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: Text(context.l10n.retryButton),
+                  ),
+                ),
+            ],
           ),
         ),
       );

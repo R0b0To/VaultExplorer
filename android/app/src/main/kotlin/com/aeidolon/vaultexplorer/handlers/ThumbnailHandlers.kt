@@ -45,6 +45,7 @@ import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.container.ContainerInputStream
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
+import com.aeidolon.vaultexplorer.ImageDecodeGuard
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
@@ -1015,54 +1016,93 @@ class ThumbnailHandlers(
             return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to read image bounds")
         }
 
-        val orientationMatrix = exifOrientationMatrix(exifOrientation)
-        val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
-            exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
-            exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
-            exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
-        val width = if (isSideways) rawHeight else rawWidth
-        val height = if (isSideways) rawWidth else rawHeight
-
-        val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
-        val decodeOptions = BitmapFactory.Options().apply {
-            this.inSampleSize = inSampleSize
-            this.inPreferredConfig = if (preserveAlpha) {
-                Bitmap.Config.ARGB_8888
-            } else {
-                Bitmap.Config.RGB_565
-            }
+        // Refuse (or serialize) decodes whose *source* is huge before touching
+        // the real decoder -- see ImageDecodeGuard for why inSampleSize alone
+        // doesn't bound the decoder's memory.
+        val permit = try {
+            ImageDecodeGuard.admit(activity, rawWidth, rawHeight)
+        } catch (e: ImageDecodeGuard.RefusedException) {
+            inputStream.close()
+            VeLog.w(TAG) { "Not decoding ${rawWidth}x$rawHeight image: ${e.message}" }
+            return ImageThumbnailOutcome.Failure(e.code, e.message ?: "Image is too large to decode")
         }
 
         try {
-            inputStream.reset()
-        } catch (e: Exception) {
-            inputStream.close()
-            inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+            val orientationMatrix = exifOrientationMatrix(exifOrientation)
+            val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+            val width = if (isSideways) rawHeight else rawWidth
+            val height = if (isSideways) rawWidth else rawHeight
+
+            val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
+            fun decodeOptionsFor(sampleSize: Int) = BitmapFactory.Options().apply {
+                this.inSampleSize = sampleSize
+                this.inPreferredConfig = if (preserveAlpha) {
+                    Bitmap.Config.ARGB_8888
+                } else {
+                    Bitmap.Config.RGB_565
+                }
+            }
+
+            try {
+                inputStream.reset()
+            } catch (e: Exception) {
+                inputStream.close()
+                inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+            }
+
+            val decodedBitmap: Bitmap? = try {
+                BitmapFactory.decodeStream(inputStream, null, decodeOptionsFor(inSampleSize))
+            } catch (e: OutOfMemoryError) {
+                // One coarser retry (half the linear resolution) before giving
+                // up; a fresh stream is needed since this one is mid-decode.
+                VeLog.w(TAG) { "OOM decoding ${rawWidth}x$rawHeight at sample $inSampleSize; retrying coarser" }
+                inputStream.close()
+                System.gc()
+                val retryStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                try {
+                    BitmapFactory.decodeStream(retryStream, null, decodeOptionsFor(inSampleSize * 2))
+                } finally {
+                    retryStream.close()
+                }
+            } finally {
+                inputStream.close()
+            }
+
+            if (decodedBitmap == null) {
+                return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
+            }
+
+            val rawBitmap = applyExifOrientation(decodedBitmap, orientationMatrix)
+
+            val scaledBitmap = scaledToFit(rawBitmap, targetSize)
+            if (scaledBitmap != rawBitmap) rawBitmap.recycle()
+
+            val stream = ByteArrayOutputStream()
+            val format = if (preserveAlpha) {
+                Bitmap.CompressFormat.WEBP
+            } else {
+                Bitmap.CompressFormat.JPEG
+            }
+            scaledBitmap.compress(format, quality.coerceIn(1, 100), stream)
+            val bytes = stream.toByteArray()
+            scaledBitmap.recycle()
+
+            return ImageThumbnailOutcome.Success(bytes, width, height)
+        } catch (e: OutOfMemoryError) {
+            // OutOfMemoryError is an Error, not an Exception: without this it
+            // sails past every `catch (e: Exception)` up the stack and kills
+            // the whole app instead of just failing this one decode.
+            VeLog.w(TAG) { "Out of memory decoding ${rawWidth}x$rawHeight image" }
+            return ImageThumbnailOutcome.Failure(
+                ImageDecodeGuard.CODE_OUT_OF_MEMORY,
+                "Not enough memory to decode image",
+            )
+        } finally {
+            permit.close()
         }
-
-        val decodedBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
-        inputStream.close()
-
-        if (decodedBitmap == null) {
-            return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
-        }
-
-        val rawBitmap = applyExifOrientation(decodedBitmap, orientationMatrix)
-
-        val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-        if (scaledBitmap != rawBitmap) rawBitmap.recycle()
-
-        val stream = ByteArrayOutputStream()
-        val format = if (preserveAlpha) {
-            Bitmap.CompressFormat.WEBP
-        } else {
-            Bitmap.CompressFormat.JPEG
-        }
-        scaledBitmap.compress(format, quality.coerceIn(1, 100), stream)
-        val bytes = stream.toByteArray()
-        scaledBitmap.recycle()
-
-        return ImageThumbnailOutcome.Success(bytes, width, height)
     }
 
     private fun runImageThumbnail(
@@ -1145,6 +1185,14 @@ class ThumbnailHandlers(
                         activity.runOnUiThread { result.success(onSuccess(outcome)) }
                     is ImageThumbnailOutcome.Failure ->
                         activity.runOnUiThread { result.error(outcome.code, outcome.message, null) }
+                }
+            } catch (e: OutOfMemoryError) {
+                // Backstop for anything outside extractImageThumbnail (EXIF
+                // read, the SAF thumbnail path, ...): fail this request, not
+                // the process.
+                VeLog.w(TAG) { "Image thumbnail request ran out of memory" }
+                activity.runOnUiThread {
+                    result.error(ImageDecodeGuard.CODE_OUT_OF_MEMORY, "Not enough memory to decode image", null)
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }

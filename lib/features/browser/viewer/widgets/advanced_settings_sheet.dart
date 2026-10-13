@@ -513,6 +513,36 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
             widget.onExecuteAction(MediaViewerAction.mute);
           },
         );
+      case MediaViewerAction.equalizer:
+        final equalizer = ref
+            .watch(fileManagerToolbarSettingsProvider(null))
+            .config
+            .mediaViewerToolbarConfig
+            .equalizer;
+        final equalizerStatus = !equalizer.enabled
+            ? context.l10n.offLabel
+            : (equalizer.matchingPreset?.getLocalizedLabel(context.l10n) ??
+                  context.l10n.equalizerPresetCustom);
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.equalizer_rounded),
+          title: Text(context.l10n.equalizerTitle),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                equalizerStatus,
+                style: TextStyle(color: cs.primary, fontSize: 13),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onExecuteAction(MediaViewerAction.equalizer);
+          },
+        );
       case MediaViewerAction.decoder:
         final toolbarConfig = ref
             .watch(fileManagerToolbarSettingsProvider(null))

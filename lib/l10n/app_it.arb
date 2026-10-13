@@ -3100,5 +3100,20 @@
   "encodingLabel": "Codifica",
   "skinEditorCodeTextColorDescription": "Colore predefinito del testo per il codice normale. Il testo evidenziato dalla sintassi mantiene i propri colori.",
   "skinEditorInterfaceText": "Testo dell’interfaccia dell’editor",
-  "skinEditorInterfaceTextDescription": "Testo e icone nella barra degli strumenti, nella barra laterale, nei menu e nella barra di stato dell’editor."
+  "skinEditorInterfaceTextDescription": "Testo e icone nella barra degli strumenti, nella barra laterale, nei menu e nella barra di stato dell’editor.",
+  "equalizerTitle": "Equalizzatore",
+  "equalizerPresetCustom": "Personalizzato",
+  "equalizerPreampLabel": "Preamplificazione",
+  "equalizerPreventClippingTitle": "Evita la distorsione",
+  "equalizerPreventClippingSubtitle": "Abbassa il volume complessivo quanto basta perché le bande potenziate non distorcano",
+  "equalizerPresetFlat": "Piatto",
+  "equalizerPresetBassBoost": "Bassi potenziati",
+  "equalizerPresetTrebleBoost": "Alti potenziati",
+  "equalizerPresetVoice": "Voce",
+  "equalizerPresetRock": "Rock",
+  "equalizerPresetPop": "Pop",
+  "equalizerPresetJazz": "Jazz",
+  "equalizerPresetClassical": "Classica",
+  "equalizerPresetElectronic": "Elettronica",
+  "equalizerPresetLoudness": "Loudness"
 }

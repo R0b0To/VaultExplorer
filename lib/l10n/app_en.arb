@@ -12852,5 +12852,65 @@
   "@skinEditorInterfaceText": {
     "description": "Color role for non-code text and icons in the text editor interface"
   },
-  "skinEditorInterfaceTextDescription": "Text and icons in the editor toolbar, sidebar, menus, and status bar."
+  "skinEditorInterfaceTextDescription": "Text and icons in the editor toolbar, sidebar, menus, and status bar.",
+  "equalizerTitle": "Equalizer",
+  "@equalizerTitle": {
+    "description": "Title of the media player equalizer (sheet header, toolbar action and Advanced settings entry)"
+  },
+  "equalizerPresetCustom": "Custom",
+  "@equalizerPresetCustom": {
+    "description": "Chip shown in the equalizer when the band sliders no longer match any built-in preset"
+  },
+  "equalizerPreampLabel": "Preamp",
+  "@equalizerPreampLabel": {
+    "description": "Label of the equalizer slider that raises or lowers the overall level before the bands (preamplifier)"
+  },
+  "equalizerPreventClippingTitle": "Prevent clipping",
+  "@equalizerPreventClippingTitle": {
+    "description": "Equalizer switch: automatically lower the volume so boosted bands cannot distort (clip)"
+  },
+  "equalizerPreventClippingSubtitle": "Lowers the overall volume just enough to keep boosted bands from distorting",
+  "@equalizerPreventClippingSubtitle": {
+    "description": "Subtitle under the \"Prevent clipping\" equalizer switch"
+  },
+  "equalizerPresetFlat": "Flat",
+  "@equalizerPresetFlat": {
+    "description": "Equalizer preset with every band at 0 dB (no change to the sound)"
+  },
+  "equalizerPresetBassBoost": "Bass boost",
+  "@equalizerPresetBassBoost": {
+    "description": "Equalizer preset that raises the low frequencies"
+  },
+  "equalizerPresetTrebleBoost": "Treble boost",
+  "@equalizerPresetTrebleBoost": {
+    "description": "Equalizer preset that raises the high frequencies"
+  },
+  "equalizerPresetVoice": "Voice",
+  "@equalizerPresetVoice": {
+    "description": "Equalizer preset that makes speech and vocals clearer"
+  },
+  "equalizerPresetRock": "Rock",
+  "@equalizerPresetRock": {
+    "description": "Equalizer preset tuned for rock music"
+  },
+  "equalizerPresetPop": "Pop",
+  "@equalizerPresetPop": {
+    "description": "Equalizer preset tuned for pop music"
+  },
+  "equalizerPresetJazz": "Jazz",
+  "@equalizerPresetJazz": {
+    "description": "Equalizer preset tuned for jazz"
+  },
+  "equalizerPresetClassical": "Classical",
+  "@equalizerPresetClassical": {
+    "description": "Equalizer preset tuned for classical music"
+  },
+  "equalizerPresetElectronic": "Electronic",
+  "@equalizerPresetElectronic": {
+    "description": "Equalizer preset tuned for electronic music"
+  },
+  "equalizerPresetLoudness": "Loudness",
+  "@equalizerPresetLoudness": {
+    "description": "Equalizer preset that boosts lows and highs to keep quiet playback sounding full"
+  }
 }

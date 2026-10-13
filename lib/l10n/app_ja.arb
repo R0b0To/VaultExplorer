@@ -3100,5 +3100,20 @@
   "encodingLabel": "エンコード",
   "skinEditorCodeTextColorDescription": "通常のコードに使う既定の文字色です。構文強調表示の文字は個別の色を保持します。",
   "skinEditorInterfaceText": "エディターインターフェースの文字色",
-  "skinEditorInterfaceTextDescription": "エディターのツールバー、サイドバー、メニュー、ステータスバーの文字とアイコンです。"
+  "skinEditorInterfaceTextDescription": "エディターのツールバー、サイドバー、メニュー、ステータスバーの文字とアイコンです。",
+  "equalizerTitle": "イコライザー",
+  "equalizerPresetCustom": "カスタム",
+  "equalizerPreampLabel": "プリアンプ",
+  "equalizerPreventClippingTitle": "クリッピングを防止",
+  "equalizerPreventClippingSubtitle": "強調した帯域が歪まないよう、全体の音量を必要な分だけ下げます",
+  "equalizerPresetFlat": "フラット",
+  "equalizerPresetBassBoost": "低音を強調",
+  "equalizerPresetTrebleBoost": "高音を強調",
+  "equalizerPresetVoice": "ボーカル",
+  "equalizerPresetRock": "ロック",
+  "equalizerPresetPop": "ポップ",
+  "equalizerPresetJazz": "ジャズ",
+  "equalizerPresetClassical": "クラシック",
+  "equalizerPresetElectronic": "エレクトロニック",
+  "equalizerPresetLoudness": "ラウドネス"
 }

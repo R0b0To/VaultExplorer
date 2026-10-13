@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
+import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
@@ -357,6 +358,13 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
         state.config.mediaViewerToolbarConfig.copyWith(
           volumeBoostGainMb: gainMb.clamp(0, 2000).toInt(),
         ),
+      );
+
+  /// Persists the media player's equalizer. Callers that stream many changes
+  /// (a slider drag) should call this once at the end, not per tick.
+  Future<void> setMediaViewerEqualizer(AudioEqualizerSettings equalizer) =>
+      updateMediaViewerConfig(
+        state.config.mediaViewerToolbarConfig.copyWith(equalizer: equalizer),
       );
 
   Future<void> setMediaViewerVideoDecoderMode(MediaDecoderMode mode) =>

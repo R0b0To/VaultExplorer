@@ -3100,5 +3100,20 @@
   "encodingLabel": "인코딩",
   "skinEditorCodeTextColorDescription": "일반 코드의 기본 텍스트 색상입니다. 구문 강조 텍스트는 자체 색상을 유지합니다.",
   "skinEditorInterfaceText": "편집기 인터페이스 텍스트",
-  "skinEditorInterfaceTextDescription": "편집기 도구 모음, 사이드바, 메뉴 및 상태 표시줄의 텍스트와 아이콘입니다."
+  "skinEditorInterfaceTextDescription": "편집기 도구 모음, 사이드바, 메뉴 및 상태 표시줄의 텍스트와 아이콘입니다.",
+  "equalizerTitle": "이퀄라이저",
+  "equalizerPresetCustom": "사용자 지정",
+  "equalizerPreampLabel": "프리앰프",
+  "equalizerPreventClippingTitle": "클리핑 방지",
+  "equalizerPreventClippingSubtitle": "증폭한 대역이 왜곡되지 않도록 전체 볼륨을 필요한 만큼만 낮춥니다",
+  "equalizerPresetFlat": "플랫",
+  "equalizerPresetBassBoost": "저음 강화",
+  "equalizerPresetTrebleBoost": "고음 강화",
+  "equalizerPresetVoice": "보컬",
+  "equalizerPresetRock": "록",
+  "equalizerPresetPop": "팝",
+  "equalizerPresetJazz": "재즈",
+  "equalizerPresetClassical": "클래식",
+  "equalizerPresetElectronic": "일렉트로닉",
+  "equalizerPresetLoudness": "라우드니스"
 }

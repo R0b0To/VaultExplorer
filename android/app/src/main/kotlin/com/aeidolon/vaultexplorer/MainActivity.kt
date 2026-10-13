@@ -663,6 +663,7 @@ open class MainActivity : FlutterFragmentActivity() {
                     val volumeBoostGainMb = call.argument<Int>("volumeBoostGainMb") ?: 2000
                     val initialPositionMs = (call.argument<Number>("initialPositionMs") ?: 0).toLong()
                     val mediaSession = call.argument<Boolean>("mediaSession") ?: false
+                    val equalizer = call.argument<Map<String, Any?>>("equalizer")
                     val textureId = nativePlayerManager.initialize(
                         volId,
                         filePath,
@@ -673,6 +674,7 @@ open class MainActivity : FlutterFragmentActivity() {
                         volumeBoostGainMb,
                         initialPositionMs,
                         mediaSession,
+                        equalizer,
                     )
                     result.success(mapOf("textureId" to textureId))
                 }
@@ -706,6 +708,10 @@ open class MainActivity : FlutterFragmentActivity() {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     val gainMb = call.argument<Int>("gainMb") ?: 2000
                     nativePlayerManager.setVolumeBoost(enabled, gainMb)
+                    result.success(null)
+                }
+                "setEqualizer" -> {
+                    nativePlayerManager.setEqualizer(call.argument<Map<String, Any?>>("settings"))
                     result.success(null)
                 }
                 "setDecoderModes" -> {

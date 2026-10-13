@@ -11335,4 +11335,50 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinEditorInterfaceTextDescription =>
       'Текст та значки на панелі інструментів, бічній панелі, у меню та рядку стану редактора.';
+
+  @override
+  String get equalizerTitle => 'Еквалайзер';
+
+  @override
+  String get equalizerPresetCustom => 'Власний';
+
+  @override
+  String get equalizerPreampLabel => 'Попереднє підсилення';
+
+  @override
+  String get equalizerPreventClippingTitle => 'Запобігати спотворенням';
+
+  @override
+  String get equalizerPreventClippingSubtitle =>
+      'Знижує загальну гучність рівно настільки, щоб підсилені смуги не спотворювалися';
+
+  @override
+  String get equalizerPresetFlat => 'Рівний';
+
+  @override
+  String get equalizerPresetBassBoost => 'Підсилення басів';
+
+  @override
+  String get equalizerPresetTrebleBoost => 'Підсилення високих частот';
+
+  @override
+  String get equalizerPresetVoice => 'Голос';
+
+  @override
+  String get equalizerPresetRock => 'Рок';
+
+  @override
+  String get equalizerPresetPop => 'Поп';
+
+  @override
+  String get equalizerPresetJazz => 'Джаз';
+
+  @override
+  String get equalizerPresetClassical => 'Класика';
+
+  @override
+  String get equalizerPresetElectronic => 'Електроніка';
+
+  @override
+  String get equalizerPresetLoudness => 'Тонкомпенсація';
 }

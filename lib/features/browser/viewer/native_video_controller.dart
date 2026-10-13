@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
+import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';
@@ -88,6 +89,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    AudioEqualizerSettings? equalizer,
     int initialPositionMs = 0,
     bool mediaSession = false,
   }) : _media3 = NativeMedia3Controller(
@@ -100,6 +102,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
          audioDecoderMode: audioDecoderMode,
          volumeBoostEnabled: volumeBoostEnabled,
          volumeBoostGainMb: volumeBoostGainMb,
+         equalizer: equalizer,
          initialPositionMs: initialPositionMs,
          mediaSession: mediaSession,
        ),
@@ -117,6 +120,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    AudioEqualizerSettings? equalizer,
     int initialPositionMs = 0,
     bool mediaSession = false,
   }) {
@@ -130,6 +134,7 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
       audioDecoderMode: audioDecoderMode,
       volumeBoostEnabled: volumeBoostEnabled,
       volumeBoostGainMb: volumeBoostGainMb,
+      equalizer: equalizer,
       initialPositionMs: initialPositionMs,
       mediaSession: mediaSession,
     );
@@ -188,6 +193,10 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
 
   Future<void> setVolumeBoost(bool enabled, int gainMb) async {
     await _media3.setVolumeBoost(enabled, gainMb);
+  }
+
+  Future<void> setEqualizer(AudioEqualizerSettings settings) async {
+    await _media3.setEqualizer(settings);
   }
 
   Future<void> setDecoderModes(

@@ -14,6 +14,7 @@ enum MediaViewerAction {
   thumbnailCarousel,
   subtitles,
   audioTrack,
+  equalizer,
   imageFit,
   adjustments,
   aspectRatio,
@@ -44,6 +45,7 @@ enum MediaViewerAction {
         MediaViewerAction.thumbnailCarousel => Icons.view_carousel_rounded,
         MediaViewerAction.subtitles => Icons.subtitles_rounded,
         MediaViewerAction.audioTrack => Icons.audiotrack_rounded,
+        MediaViewerAction.equalizer => Icons.equalizer_rounded,
         MediaViewerAction.imageFit => Icons.aspect_ratio_rounded,
         // tune_rounded is already advancedSettings.
         MediaViewerAction.adjustments => Icons.brightness_6_rounded,
@@ -76,6 +78,7 @@ enum MediaViewerAction {
         MediaViewerAction.thumbnailCarousel => l10n.thumbnailCarouselTooltip,
         MediaViewerAction.subtitles => l10n.subtitlesLabel,
         MediaViewerAction.audioTrack => l10n.audioTrackTitle,
+        MediaViewerAction.equalizer => l10n.equalizerTitle,
         MediaViewerAction.imageFit => l10n.imageFitModeLabel,
         MediaViewerAction.adjustments => l10n.mediaViewerActionAdjustments,
         MediaViewerAction.aspectRatio => l10n.aspectRatioModeLabel,
@@ -100,6 +103,7 @@ enum MediaViewerAction {
           this == MediaViewerAction.playbackSpeed ||
           this == MediaViewerAction.subtitles ||
           this == MediaViewerAction.audioTrack ||
+          this == MediaViewerAction.equalizer ||
           this == MediaViewerAction.aspectRatio ||
           this == MediaViewerAction.editVideo ||
           this == MediaViewerAction.editAudio ||

@@ -3100,5 +3100,20 @@
   "encodingLabel": "الترميز",
   "skinEditorCodeTextColorDescription": "لون النص الافتراضي للشيفرة العادية. تحتفظ النصوص المظللة حسب الصياغة بألوانها الخاصة.",
   "skinEditorInterfaceText": "نص واجهة المحرر",
-  "skinEditorInterfaceTextDescription": "النصوص والأيقونات في شريط أدوات المحرر والشريط الجانبي والقوائم وشريط الحالة."
+  "skinEditorInterfaceTextDescription": "النصوص والأيقونات في شريط أدوات المحرر والشريط الجانبي والقوائم وشريط الحالة.",
+  "equalizerTitle": "المعادل الصوتي",
+  "equalizerPresetCustom": "مخصص",
+  "equalizerPreampLabel": "التضخيم المسبق",
+  "equalizerPreventClippingTitle": "منع التشوّه",
+  "equalizerPreventClippingSubtitle": "يخفض مستوى الصوت العام بالقدر اللازم فقط حتى لا تتشوّه النطاقات المعزَّزة",
+  "equalizerPresetFlat": "مسطّح",
+  "equalizerPresetBassBoost": "تعزيز الجهير",
+  "equalizerPresetTrebleBoost": "تعزيز الطبقات العالية",
+  "equalizerPresetVoice": "الكلام",
+  "equalizerPresetRock": "روك",
+  "equalizerPresetPop": "بوب",
+  "equalizerPresetJazz": "جاز",
+  "equalizerPresetClassical": "كلاسيكي",
+  "equalizerPresetElectronic": "إلكتروني",
+  "equalizerPresetLoudness": "الجهارة"
 }

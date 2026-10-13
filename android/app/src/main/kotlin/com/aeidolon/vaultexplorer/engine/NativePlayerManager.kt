@@ -19,6 +19,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
@@ -29,6 +30,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.PlayerMessage
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -95,6 +98,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var volumeBoostGainMb = 2000
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var loudnessAudioSessionId = 0
+
+    // Software 10-band equalizer living inside the player's audio sink (see
+    // AudioEqualizerProcessor). One instance for the manager's lifetime: the
+    // ExoPlayer instance is reused across items, and the processor is reset by
+    // the sink whenever the stream changes. Settings are pushed per item from
+    // Dart (initialize) and live (setEqualizer); the default is "off", so other
+    // users of this single player (video editor, camera review) never hear it.
+    private val equalizerProcessor = AudioEqualizerProcessor()
     private var currentVolId: Int = -1
     private var currentFilePath: String = ""
     // True when currentFilePath is a real, already-plaintext absolute path
@@ -427,6 +438,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         volumeBoostGainMb: Int = 2000,
         initialPositionMs: Long = 0L,
         mediaSession: Boolean = false,
+        equalizer: Map<*, *>? = null,
     ): Long {
         // A scrub-preview session from the outgoing video (if the user
         // swiped to the next item mid-drag) is pinned to that video's
@@ -447,6 +459,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         requestedAudioDecoderMode = parseDecoderMode(audioDecoderModeName)
         this.volumeBoostEnabled = volumeBoostEnabled
         this.volumeBoostGainMb = volumeBoostGainMb.coerceIn(0, 2000)
+        equalizerProcessor.update(EqualizerSettings.fromMap(equalizer))
         isMirrorDownloading = false
         videoDecoderName = "Initializing..."
         audioDecoderName = "Initializing..."
@@ -494,7 +507,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             val loadControl = buildLoadControl(tier)
             val manager = DecoderManager(requestedVideoDecoderMode, requestedAudioDecoderMode)
             decoderManager = manager
-            val renderersFactory = HighPerformanceRenderersFactory(context, manager)
+            val renderersFactory = HighPerformanceRenderersFactory(context, manager, equalizerProcessor)
             exoPlayer = ExoPlayer.Builder(context, renderersFactory)
                 .setLoadControl(loadControl)
                 .setAudioAttributes(
@@ -609,6 +622,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         volumeBoostEnabled = enabled
         volumeBoostGainMb = gainMb.coerceIn(0, 2000)
         player?.let { applyVolumeBoost(it.audioSessionId) }
+    }
+
+    /** Live update from the equalizer sheet; takes effect on the next audio buffer. */
+    fun setEqualizer(settings: Map<*, *>?) {
+        equalizerProcessor.update(EqualizerSettings.fromMap(settings))
     }
 
     fun setDecoderModes(videoModeName: String, audioModeName: String) {
@@ -1021,6 +1039,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         mediaSessionEnabled = false
         player = null
         decoderManager = null
+        equalizerProcessor.update(EqualizerSettings.DISABLED)
         releaseVolumeBoost()
         surface?.release()
         surface = null
@@ -1272,12 +1291,33 @@ private class HighSpeedMediaCodecVideoRenderer(
 private class HighPerformanceRenderersFactory(
     context: Context,
     private val decoderManager: DecoderManager,
+    private val equalizerProcessor: AudioEqualizerProcessor,
 ) : NextRenderersFactory(context) {
     init {
         setDecoderManager(decoderManager)
         setEnableDecoderFallback(true)
         setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
         forceEnableMediaCodecAsynchronousQueueing()
+    }
+
+    /**
+     * One sink shared by every audio renderer (MediaCodec and FFmpeg), with
+     * the equalizer as its only custom processor.
+     *
+     * Float output stays off on purpose: DefaultAudioSink skips custom
+     * processors on its float path, so enabling it would silently bypass the
+     * equalizer. It is already off by default; this just pins it.
+     */
+    override fun buildAudioSink(
+        context: Context,
+        enableFloatOutput: Boolean,
+        enableAudioOutputPlaybackParams: Boolean,
+    ): AudioSink? {
+        return DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(false)
+            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+            .setAudioProcessors(arrayOf<AudioProcessor>(equalizerProcessor))
+            .build()
     }
 
     override fun buildVideoRenderers(

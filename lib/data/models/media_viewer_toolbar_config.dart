@@ -4,6 +4,7 @@ import 'video_aspect_ratio_mode.dart';
 import 'resume_playback_mode.dart';
 import 'thumbnail_generation_strategy.dart';
 import 'media_decoder_mode.dart';
+import 'audio_equalizer_settings.dart';
 
 class MediaViewerToolbarConfig {
   final List<MediaViewerAction> topBarActions;
@@ -45,6 +46,9 @@ class MediaViewerToolbarConfig {
   final MediaDecoderMode videoDecoderMode;
   final MediaDecoderMode audioDecoderMode;
 
+  /// The player's audio equalizer (global, not per file).
+  final AudioEqualizerSettings equalizer;
+
   const MediaViewerToolbarConfig({
     this.topBarActions = const [
       MediaViewerAction.bookmark,
@@ -78,6 +82,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.decoder,
       MediaViewerAction.subtitles,
       MediaViewerAction.audioTrack,
+      MediaViewerAction.equalizer,
       MediaViewerAction.slideshowDelay,
       MediaViewerAction.screenOrientation,
       MediaViewerAction.diagnostics,
@@ -112,6 +117,7 @@ class MediaViewerToolbarConfig {
     this.volumeBoostGainMb = 2000,
     this.videoDecoderMode = MediaDecoderMode.auto,
     this.audioDecoderMode = MediaDecoderMode.auto,
+    this.equalizer = AudioEqualizerSettings.defaults,
   });
 
   factory MediaViewerToolbarConfig.defaults() =>
@@ -152,6 +158,7 @@ class MediaViewerToolbarConfig {
     int? volumeBoostGainMb,
     MediaDecoderMode? videoDecoderMode,
     MediaDecoderMode? audioDecoderMode,
+    AudioEqualizerSettings? equalizer,
   }) => MediaViewerToolbarConfig(
     topBarActions: topBarActions ?? this.topBarActions,
     bottomBarActions: bottomBarActions ?? this.bottomBarActions,
@@ -200,6 +207,7 @@ class MediaViewerToolbarConfig {
     volumeBoostGainMb: volumeBoostGainMb ?? this.volumeBoostGainMb,
     videoDecoderMode: videoDecoderMode ?? this.videoDecoderMode,
     audioDecoderMode: audioDecoderMode ?? this.audioDecoderMode,
+    equalizer: equalizer ?? this.equalizer,
   );
 
   Map<String, dynamic> toJson() => {
@@ -239,6 +247,7 @@ class MediaViewerToolbarConfig {
     'volumeBoostGainMb': volumeBoostGainMb,
     'videoDecoderMode': videoDecoderMode.name,
     'audioDecoderMode': audioDecoderMode.name,
+    'equalizer': equalizer.toJson(),
   };
 
   factory MediaViewerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -325,11 +334,23 @@ class MediaViewerToolbarConfig {
         ? moreWithAudio
         : [...moreWithAudio, MediaViewerAction.abLoop];
 
+    // Same for `equalizer`: it joins the Advanced settings list.
+    final placed5 = {
+      ...top,
+      ...bottom,
+      ...moreWithAbLoop,
+      ...advancedWithNew,
+      ...hidden,
+    };
+    final advancedWithEqualizer = placed5.contains(MediaViewerAction.equalizer)
+        ? advancedWithNew
+        : [...advancedWithNew, MediaViewerAction.equalizer];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
       moreMenuActions: moreWithAbLoop,
-      advancedSettingsActions: advancedWithNew,
+      advancedSettingsActions: advancedWithEqualizer,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,
       showCenterTransport: j['showCenterTransport'] as bool? ?? true,
@@ -382,6 +403,7 @@ class MediaViewerToolbarConfig {
       audioDecoderMode: MediaDecoderMode.fromJson(
         j['audioDecoderMode'] as String?,
       ),
+      equalizer: AudioEqualizerSettings.fromJson(j['equalizer']),
     );
   }
 }

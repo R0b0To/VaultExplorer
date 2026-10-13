@@ -24,6 +24,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
+import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -51,6 +52,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widge
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_bar.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_bottom_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/audio_equalizer_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
@@ -379,6 +381,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     MediaViewerAction.abLoop,
     MediaViewerAction.subtitles,
     MediaViewerAction.audioTrack,
+    MediaViewerAction.equalizer,
     MediaViewerAction.aspectRatio,
     MediaViewerAction.advancedSettings,
     MediaViewerAction.diagnostics,
@@ -602,6 +605,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           audioDecoderMode: playbackSettings.audioDecoderMode,
           volumeBoostEnabled: playbackSettings.volumeBoostEnabled,
           volumeBoostGainMb: playbackSettings.volumeBoostGainMb,
+          equalizer: playbackSettings.equalizer,
           initialPosition: shouldPreSeek ? savedPosition : null,
           // Background playback + media notification / lock screen controls,
           // for vault items and plain local-storage items alike, but never
@@ -2063,6 +2067,49 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     ).whenComplete(_menuClosed);
   }
 
+  /// The audio equalizer. Changes reach the native audio pipeline on every
+  /// slider tick, but are only persisted once the person lets go (see
+  /// [AudioEqualizerSheet]), so dragging doesn't queue encrypted writes.
+  void _showEqualizerSheet(BuildContext context) {
+    _menuOpened();
+    final settings = ref.read(fileManagerToolbarSettingsProvider(null).notifier);
+    final initial = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig
+        .equalizer;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      // The band sliders are vertical, so a drag-to-dismiss sheet would fight
+      // them for the same gesture. Tap outside / back still closes it.
+      enableDrag: false,
+      constraints: const BoxConstraints(maxWidth: 640),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
+      ),
+      builder: (sheetContext) => AudioEqualizerSheet(
+        initial: initial,
+        onChanged: _applyEqualizerLive,
+        onCommit: (value) => unawaited(settings.setMediaViewerEqualizer(value)),
+      ),
+    ).whenComplete(_menuClosed);
+  }
+
+  void _applyEqualizerLive(AudioEqualizerSettings value) {
+    final controller = _playbackManager.activeController;
+    if (controller == null) return;
+    unawaited(
+      controller.setEqualizer(value).catchError((Object error) {
+        VeLog.w('MediaViewer', 'Could not apply the equalizer', error);
+      }),
+    );
+  }
+
   static String _decoderModeLabel(
     AppLocalizations l10n,
     MediaDecoderMode mode,
@@ -2401,6 +2448,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         break;
       case MediaViewerAction.decoder:
         _showDecoderPicker(context);
+        break;
+      case MediaViewerAction.equalizer:
+        _showEqualizerSheet(context);
         break;
       case MediaViewerAction.screenOrientation:
         _cycleScreenOrientation();

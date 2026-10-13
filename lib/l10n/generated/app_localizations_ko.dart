@@ -10645,4 +10645,50 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get skinEditorInterfaceTextDescription =>
       '편집기 도구 모음, 사이드바, 메뉴 및 상태 표시줄의 텍스트와 아이콘입니다.';
+
+  @override
+  String get equalizerTitle => '이퀄라이저';
+
+  @override
+  String get equalizerPresetCustom => '사용자 지정';
+
+  @override
+  String get equalizerPreampLabel => '프리앰프';
+
+  @override
+  String get equalizerPreventClippingTitle => '클리핑 방지';
+
+  @override
+  String get equalizerPreventClippingSubtitle =>
+      '증폭한 대역이 왜곡되지 않도록 전체 볼륨을 필요한 만큼만 낮춥니다';
+
+  @override
+  String get equalizerPresetFlat => '플랫';
+
+  @override
+  String get equalizerPresetBassBoost => '저음 강화';
+
+  @override
+  String get equalizerPresetTrebleBoost => '고음 강화';
+
+  @override
+  String get equalizerPresetVoice => '보컬';
+
+  @override
+  String get equalizerPresetRock => '록';
+
+  @override
+  String get equalizerPresetPop => '팝';
+
+  @override
+  String get equalizerPresetJazz => '재즈';
+
+  @override
+  String get equalizerPresetClassical => '클래식';
+
+  @override
+  String get equalizerPresetElectronic => '일렉트로닉';
+
+  @override
+  String get equalizerPresetLoudness => '라우드니스';
 }

@@ -10480,4 +10480,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinEditorInterfaceTextDescription => '编辑器工具栏、侧边栏、菜单和状态栏中的文字与图标。';
+
+  @override
+  String get equalizerTitle => '均衡器';
+
+  @override
+  String get equalizerPresetCustom => '自定义';
+
+  @override
+  String get equalizerPreampLabel => '前置放大';
+
+  @override
+  String get equalizerPreventClippingTitle => '防止削波';
+
+  @override
+  String get equalizerPreventClippingSubtitle => '仅在必要范围内降低整体音量，避免增强的频段失真';
+
+  @override
+  String get equalizerPresetFlat => '平坦';
+
+  @override
+  String get equalizerPresetBassBoost => '低音增强';
+
+  @override
+  String get equalizerPresetTrebleBoost => '高音增强';
+
+  @override
+  String get equalizerPresetVoice => '人声';
+
+  @override
+  String get equalizerPresetRock => '摇滚';
+
+  @override
+  String get equalizerPresetPop => '流行';
+
+  @override
+  String get equalizerPresetJazz => '爵士';
+
+  @override
+  String get equalizerPresetClassical => '古典';
+
+  @override
+  String get equalizerPresetElectronic => '电子';
+
+  @override
+  String get equalizerPresetLoudness => '响度';
 }

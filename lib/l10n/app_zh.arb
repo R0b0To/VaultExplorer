@@ -3100,5 +3100,20 @@
   "encodingLabel": "编码",
   "skinEditorCodeTextColorDescription": "普通代码的默认文本颜色。语法高亮文本保留各自的颜色。",
   "skinEditorInterfaceText": "编辑器界面文字",
-  "skinEditorInterfaceTextDescription": "编辑器工具栏、侧边栏、菜单和状态栏中的文字与图标。"
+  "skinEditorInterfaceTextDescription": "编辑器工具栏、侧边栏、菜单和状态栏中的文字与图标。",
+  "equalizerTitle": "均衡器",
+  "equalizerPresetCustom": "自定义",
+  "equalizerPreampLabel": "前置放大",
+  "equalizerPreventClippingTitle": "防止削波",
+  "equalizerPreventClippingSubtitle": "仅在必要范围内降低整体音量，避免增强的频段失真",
+  "equalizerPresetFlat": "平坦",
+  "equalizerPresetBassBoost": "低音增强",
+  "equalizerPresetTrebleBoost": "高音增强",
+  "equalizerPresetVoice": "人声",
+  "equalizerPresetRock": "摇滚",
+  "equalizerPresetPop": "流行",
+  "equalizerPresetJazz": "爵士",
+  "equalizerPresetClassical": "古典",
+  "equalizerPresetElectronic": "电子",
+  "equalizerPresetLoudness": "响度"
 }

@@ -18762,6 +18762,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text and icons in the editor toolbar, sidebar, menus, and status bar.'**
   String get skinEditorInterfaceTextDescription;
+
+  /// Title of the media player equalizer (sheet header, toolbar action and Advanced settings entry)
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer'**
+  String get equalizerTitle;
+
+  /// Chip shown in the equalizer when the band sliders no longer match any built-in preset
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get equalizerPresetCustom;
+
+  /// Label of the equalizer slider that raises or lowers the overall level before the bands (preamplifier)
+  ///
+  /// In en, this message translates to:
+  /// **'Preamp'**
+  String get equalizerPreampLabel;
+
+  /// Equalizer switch: automatically lower the volume so boosted bands cannot distort (clip)
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent clipping'**
+  String get equalizerPreventClippingTitle;
+
+  /// Subtitle under the "Prevent clipping" equalizer switch
+  ///
+  /// In en, this message translates to:
+  /// **'Lowers the overall volume just enough to keep boosted bands from distorting'**
+  String get equalizerPreventClippingSubtitle;
+
+  /// Equalizer preset with every band at 0 dB (no change to the sound)
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get equalizerPresetFlat;
+
+  /// Equalizer preset that raises the low frequencies
+  ///
+  /// In en, this message translates to:
+  /// **'Bass boost'**
+  String get equalizerPresetBassBoost;
+
+  /// Equalizer preset that raises the high frequencies
+  ///
+  /// In en, this message translates to:
+  /// **'Treble boost'**
+  String get equalizerPresetTrebleBoost;
+
+  /// Equalizer preset that makes speech and vocals clearer
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get equalizerPresetVoice;
+
+  /// Equalizer preset tuned for rock music
+  ///
+  /// In en, this message translates to:
+  /// **'Rock'**
+  String get equalizerPresetRock;
+
+  /// Equalizer preset tuned for pop music
+  ///
+  /// In en, this message translates to:
+  /// **'Pop'**
+  String get equalizerPresetPop;
+
+  /// Equalizer preset tuned for jazz
+  ///
+  /// In en, this message translates to:
+  /// **'Jazz'**
+  String get equalizerPresetJazz;
+
+  /// Equalizer preset tuned for classical music
+  ///
+  /// In en, this message translates to:
+  /// **'Classical'**
+  String get equalizerPresetClassical;
+
+  /// Equalizer preset tuned for electronic music
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic'**
+  String get equalizerPresetElectronic;
+
+  /// Equalizer preset that boosts lows and highs to keep quiet playback sounding full
+  ///
+  /// In en, this message translates to:
+  /// **'Loudness'**
+  String get equalizerPresetLoudness;
 }
 
 class _AppLocalizationsDelegate

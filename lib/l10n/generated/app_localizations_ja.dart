@@ -10646,4 +10646,50 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get skinEditorInterfaceTextDescription =>
       'エディターのツールバー、サイドバー、メニュー、ステータスバーの文字とアイコンです。';
+
+  @override
+  String get equalizerTitle => 'イコライザー';
+
+  @override
+  String get equalizerPresetCustom => 'カスタム';
+
+  @override
+  String get equalizerPreampLabel => 'プリアンプ';
+
+  @override
+  String get equalizerPreventClippingTitle => 'クリッピングを防止';
+
+  @override
+  String get equalizerPreventClippingSubtitle =>
+      '強調した帯域が歪まないよう、全体の音量を必要な分だけ下げます';
+
+  @override
+  String get equalizerPresetFlat => 'フラット';
+
+  @override
+  String get equalizerPresetBassBoost => '低音を強調';
+
+  @override
+  String get equalizerPresetTrebleBoost => '高音を強調';
+
+  @override
+  String get equalizerPresetVoice => 'ボーカル';
+
+  @override
+  String get equalizerPresetRock => 'ロック';
+
+  @override
+  String get equalizerPresetPop => 'ポップ';
+
+  @override
+  String get equalizerPresetJazz => 'ジャズ';
+
+  @override
+  String get equalizerPresetClassical => 'クラシック';
+
+  @override
+  String get equalizerPresetElectronic => 'エレクトロニック';
+
+  @override
+  String get equalizerPresetLoudness => 'ラウドネス';
 }

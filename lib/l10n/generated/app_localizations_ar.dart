@@ -11278,4 +11278,50 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get skinEditorInterfaceTextDescription =>
       'النصوص والأيقونات في شريط أدوات المحرر والشريط الجانبي والقوائم وشريط الحالة.';
+
+  @override
+  String get equalizerTitle => 'المعادل الصوتي';
+
+  @override
+  String get equalizerPresetCustom => 'مخصص';
+
+  @override
+  String get equalizerPreampLabel => 'التضخيم المسبق';
+
+  @override
+  String get equalizerPreventClippingTitle => 'منع التشوّه';
+
+  @override
+  String get equalizerPreventClippingSubtitle =>
+      'يخفض مستوى الصوت العام بالقدر اللازم فقط حتى لا تتشوّه النطاقات المعزَّزة';
+
+  @override
+  String get equalizerPresetFlat => 'مسطّح';
+
+  @override
+  String get equalizerPresetBassBoost => 'تعزيز الجهير';
+
+  @override
+  String get equalizerPresetTrebleBoost => 'تعزيز الطبقات العالية';
+
+  @override
+  String get equalizerPresetVoice => 'الكلام';
+
+  @override
+  String get equalizerPresetRock => 'روك';
+
+  @override
+  String get equalizerPresetPop => 'بوب';
+
+  @override
+  String get equalizerPresetJazz => 'جاز';
+
+  @override
+  String get equalizerPresetClassical => 'كلاسيكي';
+
+  @override
+  String get equalizerPresetElectronic => 'إلكتروني';
+
+  @override
+  String get equalizerPresetLoudness => 'الجهارة';
 }

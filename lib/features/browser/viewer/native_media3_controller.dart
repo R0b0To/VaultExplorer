@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
+import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
@@ -165,6 +166,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   MediaDecoderMode _audioDecoderMode;
   bool _volumeBoostEnabled;
   int _volumeBoostGainMb;
+  AudioEqualizerSettings _equalizer;
 
   /// The last volume level (0-100) applied via [setVolume]. Read by the
   /// edge-swipe volume gesture so a drag continues smoothly from wherever
@@ -197,6 +199,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    AudioEqualizerSettings? equalizer,
     this.initialPositionMs = 0,
     this.mediaSession = false,
   }) : _currentSpeed = initialSpeed,
@@ -204,6 +207,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
        _audioDecoderMode = audioDecoderMode,
        _volumeBoostEnabled = volumeBoostEnabled,
        _volumeBoostGainMb = volumeBoostGainMb,
+       _equalizer = equalizer ?? AudioEqualizerSettings.defaults,
        super(const NativeVideoValue());
 
   Future<void> initialize() async {
@@ -239,6 +243,9 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
             'audioDecoderMode': _audioDecoderMode.name,
             'volumeBoostEnabled': _volumeBoostEnabled,
             'volumeBoostGainMb': _volumeBoostGainMb,
+            // Only sent when it does something, so the native default
+            // ("off") also covers the editors that never set it.
+            if (_equalizer.enabled) 'equalizer': _equalizer.toChannelMap(),
             if (initialPositionMs > 0) 'initialPositionMs': initialPositionMs,
             if (mediaSession) 'mediaSession': true,
           });
@@ -437,6 +444,16 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
       await _cmdChannel.invokeMethod('setVolumeBoost', {
         'enabled': _volumeBoostEnabled,
         'gainMb': _volumeBoostGainMb,
+      });
+    }
+  }
+
+  /// Applies the equalizer live (takes effect within one audio buffer).
+  Future<void> setEqualizer(AudioEqualizerSettings settings) async {
+    _equalizer = settings;
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setEqualizer', {
+        'settings': settings.toChannelMap(),
       });
     }
   }

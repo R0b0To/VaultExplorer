@@ -11254,4 +11254,50 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get skinEditorInterfaceTextDescription =>
       'Texto e ícones na barra de ferramentas, barra lateral, menus e barra de status do editor.';
+
+  @override
+  String get equalizerTitle => 'Equalizador';
+
+  @override
+  String get equalizerPresetCustom => 'Personalizado';
+
+  @override
+  String get equalizerPreampLabel => 'Pré-amplificação';
+
+  @override
+  String get equalizerPreventClippingTitle => 'Evitar distorção';
+
+  @override
+  String get equalizerPreventClippingSubtitle =>
+      'Reduz o volume geral apenas o necessário para que as bandas realçadas não distorçam';
+
+  @override
+  String get equalizerPresetFlat => 'Plano';
+
+  @override
+  String get equalizerPresetBassBoost => 'Reforço de graves';
+
+  @override
+  String get equalizerPresetTrebleBoost => 'Reforço de agudos';
+
+  @override
+  String get equalizerPresetVoice => 'Voz';
+
+  @override
+  String get equalizerPresetRock => 'Rock';
+
+  @override
+  String get equalizerPresetPop => 'Pop';
+
+  @override
+  String get equalizerPresetJazz => 'Jazz';
+
+  @override
+  String get equalizerPresetClassical => 'Clássica';
+
+  @override
+  String get equalizerPresetElectronic => 'Eletrônica';
+
+  @override
+  String get equalizerPresetLoudness => 'Loudness';
 }

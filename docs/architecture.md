@@ -94,6 +94,23 @@ rather than Flutter plugins — video via AndroidX Media3/ExoPlayer, PDF via
 the AndroidX Jetpack PDF library (`androidx.pdf`) — both decode through the
 OS's own codec/renderer.
 
+The media viewer's player has a 10-band graphic equalizer (31 Hz–16 kHz,
+±12 dB per band, plus a preamp and a clipping guard) that applies to both
+video and audio. It is a software `AudioProcessor`
+(`AudioEqualizerProcessor`, filter maths in `EqualizerDsp.kt`) inside
+ExoPlayer's `DefaultAudioSink`, not Android's `android.media.audiofx.Equalizer`:
+the platform effect's band layout differs between devices (and some audio
+stacks ignore it), whereas this one sounds the same everywhere and also covers
+FFmpeg-decoded audio, because every audio renderer shares the one sink
+(`HighPerformanceRenderersFactory.buildAudioSink`). Float output is kept off
+there on purpose — `DefaultAudioSink` skips custom processors on its float
+path. The settings are global (`MediaViewerToolbarConfig.equalizer`), sent as an
+`equalizer` argument to the player channel's `initialize` and live through
+`setEqualizer`; the player defaults to *off* on every `initialize`, so the
+video/audio editors never apply it. The band layout is declared in both Dart
+(`kEqualizerBandFrequenciesHz`) and Kotlin (`EqualizerDsp.BAND_FREQUENCIES_HZ`);
+`audio_equalizer_settings_test.dart` fails if the two drift apart.
+
 ### 1.3 Feature areas outside the vault core
 
 These sit on top of the engine rather than inside it: each is a Flutter

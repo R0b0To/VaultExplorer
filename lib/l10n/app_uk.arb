@@ -3100,5 +3100,20 @@
   "encodingLabel": "Кодування",
   "skinEditorCodeTextColorDescription": "Стандартний колір тексту звичайного коду. Підсвічений синтаксисом текст зберігає власні кольори.",
   "skinEditorInterfaceText": "Текст інтерфейсу редактора",
-  "skinEditorInterfaceTextDescription": "Текст та значки на панелі інструментів, бічній панелі, у меню та рядку стану редактора."
+  "skinEditorInterfaceTextDescription": "Текст та значки на панелі інструментів, бічній панелі, у меню та рядку стану редактора.",
+  "equalizerTitle": "Еквалайзер",
+  "equalizerPresetCustom": "Власний",
+  "equalizerPreampLabel": "Попереднє підсилення",
+  "equalizerPreventClippingTitle": "Запобігати спотворенням",
+  "equalizerPreventClippingSubtitle": "Знижує загальну гучність рівно настільки, щоб підсилені смуги не спотворювалися",
+  "equalizerPresetFlat": "Рівний",
+  "equalizerPresetBassBoost": "Підсилення басів",
+  "equalizerPresetTrebleBoost": "Підсилення високих частот",
+  "equalizerPresetVoice": "Голос",
+  "equalizerPresetRock": "Рок",
+  "equalizerPresetPop": "Поп",
+  "equalizerPresetJazz": "Джаз",
+  "equalizerPresetClassical": "Класика",
+  "equalizerPresetElectronic": "Електроніка",
+  "equalizerPresetLoudness": "Тонкомпенсація"
 }

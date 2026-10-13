@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 
 class VideoPlaybackManager {
@@ -60,6 +61,7 @@ class VideoPlaybackManager {
     MediaDecoderMode audioDecoderMode = MediaDecoderMode.auto,
     bool volumeBoostEnabled = false,
     int volumeBoostGainMb = 2000,
+    AudioEqualizerSettings? equalizer,
     Duration? initialPosition,
     bool mediaSession = false,
   }) async {
@@ -87,6 +89,7 @@ class VideoPlaybackManager {
         if (!ctrl.isDisposed && !ctrl.value.hasError) {
           await ctrl.setDecoderModes(videoDecoderMode, audioDecoderMode);
           await ctrl.setVolumeBoost(volumeBoostEnabled, volumeBoostGainMb);
+          if (equalizer != null) await ctrl.setEqualizer(equalizer);
           await ctrl.setPlaybackSpeed(playbackSpeed);
           await ctrl.setLooping(looping);
           if (initialPosition != null && initialPosition > Duration.zero) {
@@ -119,6 +122,7 @@ class VideoPlaybackManager {
             audioDecoderMode: audioDecoderMode,
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
+            equalizer: equalizer,
             initialPositionMs: initialPositionMs,
             mediaSession: mediaSession,
           );
@@ -131,6 +135,7 @@ class VideoPlaybackManager {
             audioDecoderMode: audioDecoderMode,
             volumeBoostEnabled: volumeBoostEnabled,
             volumeBoostGainMb: volumeBoostGainMb,
+            equalizer: equalizer,
             initialPositionMs: initialPositionMs,
             mediaSession: mediaSession,
           );
@@ -161,6 +166,7 @@ class VideoPlaybackManager {
             volumeBoostEnabled,
             volumeBoostGainMb,
           );
+          if (equalizer != null) await controller.setEqualizer(equalizer);
           await controller.setLooping(looping);
           if (initialPosition != null && initialPosition > Duration.zero) {
             await controller.seekTo(initialPosition);

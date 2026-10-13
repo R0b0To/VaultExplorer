@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_audio_edit_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -12,9 +12,12 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
+import 'package:vaultexplorer/features/audio_editor/models/audio_waveform.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 import 'active_recording_registry.dart';
+import 'audio_waveform_trimmer.dart';
 import 'camera_capture_lock_controller.dart';
 import 'camera_vault_service.dart';
 import 'vault_audio_recorder_controller.dart';
@@ -73,6 +76,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   late final VaultEngineEvents _events;
   late final ActiveRecordingRegistry _registry;
   late final CameraVaultService _vaultService;
+  late final VaultAudioEditApi _audioEditApi;
 
   _Phase _phase = _Phase.preparing;
 
@@ -98,6 +102,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     0.0,
     growable: true,
   );
+  final List<double> _recordedLevels = [];
   DateTime? _startedAt;
 
   // --- Review ----------------------------------------------------------------
@@ -108,6 +113,8 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   bool _isDraggingTrim = false;
   NativeVideoController? _player;
   String? _playerPath;
+  AudioWaveform? _waveform;
+  int? _waveOpId;
 
   @override
   void initState() {
@@ -115,6 +122,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     _fileIo = ref.read(vaultFileIoApiProvider);
     _events = ref.read(vaultEngineEventsProvider);
     _registry = ref.read(activeRecordingRegistryProvider);
+    _audioEditApi = ref.read(vaultAudioEditApiProvider);
     _vaultService = CameraVaultService(
       container: widget.container,
       targetDirPath: widget.targetDirPath,
@@ -136,6 +144,9 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       _onBackgroundStopRequested,
     );
     _releaseRecordingResources();
+    final waveOp = _waveOpId;
+    if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
+    _waveOpId = null;
     // Whatever is still unsaved gets wiped rather than left in the cache.
     unawaited(_recorder.cancel());
     final leftover = _recordedPath;
@@ -221,7 +232,12 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       for (var i = 0; i < _levels.length; i++) {
         _levels[i] = 0.0;
       }
-      HapticFeedback.mediumImpact();
+      _recordedLevels.clear();
+      final waveOp = _waveOpId;
+      if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
+      _waveOpId = null;
+      _waveform = null;
+      unawaited(HapticFeedback.mediumImpact());
       _acquireRecordingResources();
       setState(() => _phase = _Phase.recording);
       _startTicker();
@@ -249,6 +265,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     final level = await _recorder.level();
     _pollInFlight = false;
     if (!mounted || _phase != _Phase.recording) return;
+    _recordedLevels.add(level);
     setState(() {
       _levels.removeAt(0);
       _levels.add(level);
@@ -262,7 +279,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       try {
         if (await _recorder.pause()) {
           _clock.stop();
-          HapticFeedback.lightImpact();
+          unawaited(HapticFeedback.lightImpact());
           if (mounted) setState(() => _phase = _Phase.paused);
         }
       } catch (e) {
@@ -275,7 +292,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       try {
         if (await _recorder.resume()) {
           _clock.start();
-          HapticFeedback.lightImpact();
+          unawaited(HapticFeedback.lightImpact());
           if (mounted) setState(() => _phase = _Phase.recording);
         }
       } catch (e) {
@@ -296,7 +313,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     setState(() => _phase = _Phase.stopping);
     String? orphanPath;
     try {
-      HapticFeedback.mediumImpact();
+      unawaited(HapticFeedback.mediumImpact());
       final res = await _recorder.stop();
       final path = res.path;
       if (!res.success || path == null) {
@@ -329,6 +346,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       await _initPlayer(path);
       if (!mounted) return; // dispose() wipes _recordedPath
       setState(() => _phase = _Phase.reviewing);
+      unawaited(_loadWaveform(path));
     } catch (e) {
       VeLog.w(_tag, 'stop failed', e);
       if (mounted) {
@@ -339,6 +357,29 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       _releaseRecordingResources();
       _busy = false;
       if (orphanPath != null) unawaited(_recorder.discard(orphanPath));
+    }
+  }
+
+  Future<void> _loadWaveform(String path) async {
+    final opId = DateTime.now().millisecondsSinceEpoch & 0x3fffffff;
+    _waveOpId = opId;
+    try {
+      final res = await _audioEditApi.waveform(
+        volId: -1,
+        filePath: path,
+        isLocalStorage: true,
+        opId: opId,
+      );
+      if (!mounted || _recordedPath != path) return;
+      setState(() {
+        _waveform = AudioWaveform(
+          peaks: res.peaks,
+          peaksPerSecond: res.peaksPerSecond,
+          complete: res.complete,
+        );
+      });
+    } catch (e) {
+      VeLog.w(_tag, 'waveform extraction failed', e);
     }
   }
 
@@ -514,6 +555,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     if (_busy || _phase != _Phase.reviewing) return;
     if (await _confirmDiscard() != true || !mounted) return;
     if (_busy || _phase != _Phase.reviewing) return;
+    final waveOp = _waveOpId;
+    if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
+    _waveOpId = null;
+    _waveform = null;
+    _recordedLevels.clear();
     await _disposePlayer();
     final path = _recordedPath;
     _recordedPath = null;
@@ -525,6 +571,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   Future<void> _abandon() async {
     _ticker?.cancel();
     _clock.stop();
+    final waveOp = _waveOpId;
+    if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
+    _waveOpId = null;
+    _waveform = null;
+    _recordedLevels.clear();
     await _disposePlayer();
     await _recorder.cancel();
     final path = _recordedPath;
@@ -808,6 +859,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
           0,
           selectedMs,
         );
+    final totalPlayerMs = playerValue?.position.inMilliseconds ?? 0;
 
     return _scrollableCentered(
       Padding(
@@ -815,7 +867,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.graphic_eq_rounded, size: 72, color: cs.primary),
+            Icon(Icons.graphic_eq_rounded, size: 64, color: cs.primary),
             const SizedBox(height: 8),
             Text(
               formatAudioDuration(selectedMs),
@@ -823,7 +875,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -847,48 +899,37 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  formatAudioDuration(_trimStartMs),
-                  style: textTheme.bodySmall?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                Text(
-                  formatAudioDuration(_trimEndMs),
-                  style: textTheme.bodySmall?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-            RangeSlider(
-              values: RangeValues(
-                _trimStartMs.toDouble(),
-                _trimEndMs.toDouble(),
-              ),
-              min: 0.0,
-              max: _durationMs.toDouble(),
-              onChangeStart: saving
+            const SizedBox(height: 24),
+            AudioWaveformTrimmer(
+              durationMs: _durationMs,
+              trimStartMs: _trimStartMs,
+              trimEndMs: _trimEndMs,
+              currentPositionMs: totalPlayerMs,
+              waveform: _waveform,
+              recordedLevels: _recordedLevels,
+              minTrimSpanMs: _minTrimSpanMs,
+              onTrimChangeStart: saving
                   ? null
-                  : (_) {
+                  : () {
                       _isDraggingTrim = true;
                       unawaited(_player?.pause());
                     },
-              onChanged: saving ? null : _onTrimChanged,
-              onChangeEnd: saving
+              onTrimChanged: saving ? (start, end) {} : _onTrimChanged,
+              onTrimChangeEnd: saving
                   ? null
-                  : (_) {
+                  : () {
                       _isDraggingTrim = false;
                       unawaited(
                         _player?.seekTo(Duration(milliseconds: _trimStartMs)),
                       );
                     },
+              onSeek: saving
+                  ? null
+                  : (posMs) {
+                      unawaited(_player?.seekTo(Duration(milliseconds: posMs)));
+                    },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             if (saving) ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 12),
@@ -897,17 +938,19 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: () => unawaited(_onDiscardPressed()),
-                    child: Text(l10n.discard),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: Text(l10n.discard),
                   ),
                   const SizedBox(width: 16),
-                FilledButton(
+                  FilledButton.icon(
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 48),
                     ),
                     onPressed: () => unawaited(_save()),
-                    child: Text(l10n.save),
+                    icon: const Icon(Icons.check_rounded),
+                    label: Text(l10n.save),
                   ),
                 ],
               ),
@@ -917,23 +960,22 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     );
   }
 
-  void _onTrimChanged(RangeValues values) {
+  void _onTrimChanged(int start, int end) {
     final total = _durationMs;
     final minSpan = math.min(_minTrimSpanMs, total);
-    var start = values.start.round().clamp(0, total);
-    var end = values.end.round().clamp(0, total);
-    if (end - start < minSpan) {
-      if (start + minSpan <= total) {
-        end = start + minSpan;
+    var s = start.clamp(0, total);
+    var e = end.clamp(0, total);
+    if (e - s < minSpan) {
+      if (s + minSpan <= total) {
+        e = s + minSpan;
       } else {
-        start = (end - minSpan).clamp(0, total);
+        s = (e - minSpan).clamp(0, total);
       }
     }
     setState(() {
-      _trimStartMs = start;
-      _trimEndMs = end;
+      _trimStartMs = s;
+      _trimEndMs = e;
     });
-    unawaited(_player?.seekTo(Duration(milliseconds: start)));
   }
 }
 

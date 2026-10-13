@@ -24,8 +24,9 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
 
 /**
  * Foreground service (type `mediaPlayback`) behind background playback of
- * media opened from an unlocked vault. It owns nothing but the notification
- * and the foreground state; the player and the `MediaSession` are owned by
+ * media opened from an unlocked vault or from local storage. It owns nothing
+ * but the notification and the foreground state; the player and the
+ * `MediaSession` are owned by
  * [com.aeidolon.vaultexplorer.engine.NativePlayerManager] /
  * [VaultPlaybackSession], which tell this service when something changed.
  *
@@ -62,6 +63,9 @@ class VaultMediaPlaybackService : Service() {
         private const val ACTION_PREVIOUS = "com.aeidolon.vaultexplorer.action.MEDIA_PREVIOUS"
         private const val ACTION_NEXT = "com.aeidolon.vaultexplorer.action.MEDIA_NEXT"
         private const val ACTION_STOP = "com.aeidolon.vaultexplorer.action.MEDIA_STOP"
+
+        /** The notification was swiped away. Unlike Stop, it leaves the viewer open. */
+        private const val ACTION_DISMISS = "com.aeidolon.vaultexplorer.action.MEDIA_DISMISS"
 
         @Volatile
         private var instance: VaultMediaPlaybackService? = null
@@ -139,6 +143,7 @@ class VaultMediaPlaybackService : Service() {
             ACTION_PREVIOUS -> VaultPlaybackSession.skipToPrevious()
             ACTION_NEXT -> VaultPlaybackSession.skipToNext()
             ACTION_STOP -> VaultPlaybackSession.stopByUser()
+            ACTION_DISMISS -> VaultPlaybackSession.dismissedByUser()
         }
         refreshNotification()
         return START_NOT_STICKY
@@ -291,7 +296,7 @@ class VaultMediaPlaybackService : Service() {
             .setContentTitle(snapshot?.title ?: genericTitle)
             .setContentText(snapshot?.playlistPosition)
             .setContentIntent(contentIntent())
-            .setDeleteIntent(actionIntent(ACTION_STOP))
+            .setDeleteIntent(actionIntent(ACTION_DISMISS))
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setShowWhen(false)

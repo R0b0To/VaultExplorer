@@ -19,9 +19,14 @@ void main() {
 
       MediaSessionBridge.dispatch('next');
       MediaSessionBridge.dispatch('previous');
+      MediaSessionBridge.dispatch('stop');
       await Future<void>.delayed(Duration.zero);
 
-      expect(received, [MediaSessionAction.next, MediaSessionAction.previous]);
+      expect(received, [
+        MediaSessionAction.next,
+        MediaSessionAction.previous,
+        MediaSessionAction.stop,
+      ]);
       await sub.cancel();
     });
 

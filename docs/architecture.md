@@ -562,19 +562,22 @@ OS, which tears down an unfocused app's camera/mic connection on Android 9+
 unless a matching foreground service is running. It is independent of
 `VaultKeepAliveService` and only runs while a recording is in progress.
 
-Background playback of vault media (audio/video continuing with the app
+Background playback of vault and local-storage media (audio/video continuing with the app
 minimized or the screen off, with a media notification and lock screen
 controls) is split three ways. `NativePlayerManager` still owns the single
 ExoPlayer; `VaultPlaybackSession` owns the Media3 `MediaSession` wrapped
 around it (`VaultSessionPlayer`) and the playback window; and
 `VaultMediaPlaybackService` (type `mediaPlayback`) owns only the notification
-and the foreground state. It applies to items opened from the media viewer out
-of an unlocked vault (the viewer opts in per `initialize` call); the video
-editor, camera review and local-storage (Mask Mode) playback are unchanged.
+and the foreground state. It applies to items opened from the media viewer,
+whether out of an unlocked vault or from local storage (including Mask Mode's
+file manager); the viewer opts in per `initialize` call, and the video editor,
+camera review and archive preview are unchanged.
 
-- **Lock coupling.** Playback is bound to a `volId`. `ContainerSessionRegistry`
+- **Lock coupling.** Vault playback is bound to a `volId`. `ContainerSessionRegistry`
   reports every session removal, so any path in §4.1 that moves that `volId`
-  to Locked stops the player and removes the notification. The foreground
+  to Locked stops the player and removes the notification. Local-storage items
+  have a negative `volId` that never appears in the registry and are not bound
+  to any vault, so no lock path ends them. The foreground
   service adds no lock trigger and does not delay one: the existing timers
   and screen-off policy apply as before. The one adjustment is in
   `SessionLockController`: media still playing when the app returns to the
@@ -588,7 +591,21 @@ editor, camera review and local-storage (Mask Mode) playback are unchanged.
   metadata, which may be shown by lock-screen and connected media controls.
   The notification's public version remains generic. In either mode,
   `VaultSessionPlayer` replaces the player's merged metadata, both as a getter
-  and in `onMediaMetadataChanged` events.
+  and in `onMediaMetadataChanged` events. The generic title says "vault" only
+  for vault items; local-storage items get a neutral "Playing media" line.
+- **Stop is a standard control.** The notification carries a Stop action
+  (Android 12 and below build their controls from it), and the `MediaSession`
+  publishes a Stop media button preference bound to `Player.COMMAND_STOP`
+  (Android 13+ builds the lock screen / quick settings controls from the
+  session and has no built-in Stop slot). It must be a *player* command: with
+  no `MediaSessionService` the platform session never learns about custom
+  session commands, so Media3 would drop a custom-command Stop button as
+  unavailable. Stop (from either surface, or a headset / car stop key) ends
+  playback natively and emits a `mediaSessionAction` `stop` event; the viewer
+  answers by closing itself, which is its normal exit (position saved, player
+  released), so the app never resumes on a dead player. Swiping the paused
+  notification away only ends the session (`ACTION_DISMISS`) and leaves the
+  viewer open.
 - **Foreground state is held explicitly.** The Dart viewer releases and
   recreates the player on every item change, which would drop a Media3-managed
   foreground state and make background auto-advance impossible on Android 12+

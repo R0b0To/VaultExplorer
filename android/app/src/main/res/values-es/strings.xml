@@ -7,8 +7,9 @@
     <string name="vault_keep_alive_lock_all_action">Bloquear todas las bóvedas</string><string name="vault_keep_alive_notification_text_decoy">Archive Explorer está en ejecución</string><string name="vault_keep_alive_close_action_decoy">Cerrar</string>
     <string name="camera_recording_channel_description">Estado de grabación continuo</string><string name="camera_recording_notification_title">Grabando vídeo</string><string name="camera_recording_notification_text">Guardando en %1$s</string><string name="camera_recording_stop_action">Detener y guardar</string><string name="camera_recording_notification_text_decoy">Archive Explorer está en ejecución</string><string name="camera_recording_stop_action_decoy">Cerrar</string>
     <string name="mirror_push_notification_title">Guardando cambios de la bóveda</string><string name="mirror_push_notification_text">Subiendo cambios al almacenamiento</string>
-    <string name="vault_media_channel_description">Controles de reproducción para medios de bóvedas desbloqueadas</string>
+    <string name="vault_media_channel_description">Controles de reproducción para medios de bóvedas desbloqueadas y del almacenamiento local</string>
     <string name="vault_media_notification_title">Reproduciendo desde la bóveda</string>
+    <string name="vault_media_notification_title_local">Reproduciendo contenido multimedia</string>
     <string name="vault_media_action_play">Reproducir</string>
     <string name="vault_media_action_pause">Pausar</string>
     <string name="vault_media_action_previous">Anterior</string>

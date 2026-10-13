@@ -496,7 +496,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// Previous / Next on the media notification and lock screen act on the
   /// playlist, so the native media session is told whether either exists.
   void _syncMediaSessionNavigation() {
-    if (widget.container.isLocalStorage || widget._isPreviewOnly) return;
+    if (widget._isPreviewOnly) return;
     final index = _playlistController.currentIndex;
     final count = _playlistController.playlist.length;
     final loop = _isPlaylistLoopEnabled;
@@ -517,7 +517,24 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         _navigateToNext();
       case MediaSessionAction.previous:
         _navigateToPrev();
+      case MediaSessionAction.stop:
+        _closeFromMediaSession();
     }
+  }
+
+  /// Stop on the media notification / lock screen / a headset: playback and
+  /// the notification are already ended natively, so close the viewer too
+  /// rather than leaving a dead player to come back to. Disposing it is the
+  /// normal exit (saves the position, releases the player). The archive
+  /// preview never has a media session, so it ignores this.
+  void _closeFromMediaSession() {
+    if (widget._isPreviewOnly) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(context);
+    // Dismiss anything opened on top of the viewer (a sheet, a dialog) first.
+    navigator.popUntil((r) => identical(r, route));
+    if (!route.isFirst) navigator.pop();
   }
 
   int _activateToken = 0;
@@ -586,11 +603,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           volumeBoostEnabled: playbackSettings.volumeBoostEnabled,
           volumeBoostGainMb: playbackSettings.volumeBoostGainMb,
           initialPosition: shouldPreSeek ? savedPosition : null,
-          // Background playback + media notification / lock screen controls:
-          // vault items only (plain local storage is the decoy's file
-          // manager), and never for the archive preview.
-          mediaSession:
-              !widget.container.isLocalStorage && !widget._isPreviewOnly,
+          // Background playback + media notification / lock screen controls,
+          // for vault items and plain local-storage items alike, but never
+          // for the archive preview.
+          mediaSession: !widget._isPreviewOnly,
         ),
       );
     } else {

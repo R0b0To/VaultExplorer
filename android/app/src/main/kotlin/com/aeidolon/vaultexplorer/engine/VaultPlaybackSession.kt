@@ -3,9 +3,11 @@ package com.aeidolon.vaultexplorer.engine
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.Player
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
@@ -16,17 +18,18 @@ import com.aeidolon.vaultexplorer.service.VaultMediaPlaybackService
 import com.aeidolon.vaultexplorer.util.NotificationLocale
 
 /**
- * Owns the system-facing side of playing media from an unlocked vault: the
- * `MediaSession` (lock screen controls, Bluetooth/headset buttons, the media
- * notification's token) and the hand-off to [VaultMediaPlaybackService],
- * which keeps playback alive in the background and posts the notification.
+ * Owns the system-facing side of playing media from an unlocked vault or from
+ * plain local storage: the `MediaSession` (lock screen controls,
+ * Bluetooth/headset buttons, the media notification's token) and the hand-off
+ * to [VaultMediaPlaybackService], which keeps playback alive in the
+ * background and posts the notification.
  *
  * The ExoPlayer itself stays owned by [NativePlayerManager]; this object only
  * ever *wraps* it ([VaultSessionPlayer]) while it is playing.
  *
  * ## Lifecycle
  * - A session is created the first time the player reports `isPlaying`
- *   ([onPlaying]) for a vault item opened from the media viewer, never merely
+ *   ([onPlaying]) for an item opened from the media viewer, never merely
  *   because a file was opened -- so browsing/previewing doesn't spawn a
  *   notification.
  * - The Dart viewer releases and recreates the native player on every item
@@ -40,10 +43,12 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
  *   nothing to advance to, or the vault was locked.
  *
  * ## Vault lock
- * Playback is bound to a volume. [ContainerSessionRegistry] reports every
- * session removal (manual lock, auto-lock, "lock all", panic, USB detach),
- * and a removal of the playing volume stops the player and tears the
+ * Vault playback is bound to a volume. [ContainerSessionRegistry] reports
+ * every session removal (manual lock, auto-lock, "lock all", panic, USB
+ * detach), and a removal of the playing volume stops the player and tears the
  * notification down -- nothing from a locked vault stays on the lock screen.
+ * Local-storage playback ([isLocalStorage]) is bound to no volume, so a vault
+ * lock never touches it.
  *
  * Main thread only, except [onVolumeRemoved] which hops to it.
  */
@@ -51,7 +56,6 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
 internal object VaultPlaybackSession {
     private const val TAG = "VaultPlaybackSession"
     private const val SESSION_ID = "vault_media_session"
-
     /** How long the playback window survives with no player (item change, viewer closing). */
     private const val RELEASE_GRACE_MS = 5_000L
 
@@ -78,6 +82,9 @@ internal object VaultPlaybackSession {
 
         /** The vault backing the current item was locked: stop reading from it. */
         fun stopForLock()
+
+        /** The user pressed Stop: have the viewer that owns the player close itself. */
+        fun closeViewer()
     }
 
     /** Point-in-time view of the session for [VaultMediaPlaybackService]. */
@@ -102,6 +109,9 @@ internal object VaultPlaybackSession {
     private var mediaSession: MediaSession? = null
 
     private var volId = -1
+
+    /** The current item is a plain local-storage file, not a vault item. */
+    private var isLocalStorage = false
     private var fileName: String? = null
     private var navigationHasPrevious = false
     private var navigationHasNext = false
@@ -148,12 +158,20 @@ internal object VaultPlaybackSession {
 
     // --- Called by NativePlayerManager ---
 
-    /** The player started playing a vault item opened from the media viewer. */
-    fun onPlaying(context: Context, player: Player, host: Host, volId: Int, filePath: String) {
+    /** The player started playing an item (vault or local storage) opened from the media viewer. */
+    fun onPlaying(
+        context: Context,
+        player: Player,
+        host: Host,
+        volId: Int,
+        filePath: String,
+        isLocalStorage: Boolean,
+    ) {
         appContext = context.applicationContext
         this.host = host
         this.volId = volId
-        this.fileName = filePath.substringAfterLast('/')
+        this.isLocalStorage = isLocalStorage
+        this.fileName = displayNameOf(filePath)
         registerLockListener()
         cancelGraceTimer()
 
@@ -180,9 +198,10 @@ internal object VaultPlaybackSession {
     }
 
     /** A new item was loaded into the player. */
-    fun onMediaChanged(volId: Int, filePath: String) {
+    fun onMediaChanged(volId: Int, filePath: String, isLocalStorage: Boolean) {
         this.volId = volId
-        this.fileName = filePath.substringAfterLast('/')
+        this.isLocalStorage = isLocalStorage
+        this.fileName = displayNameOf(filePath)
         sessionPlayer?.setMetadata(displayTitle(), playlistPosition())
         refreshService()
     }
@@ -242,9 +261,23 @@ internal object VaultPlaybackSession {
         if (navigationHasPrevious) host?.skipToPrevious()
     }
 
-    /** The user pressed Stop or swiped the notification away. */
-    fun stopByUser() {
+    /**
+     * The user pressed Stop (notification, lock screen controls, headset or
+     * car key): end playback and close the viewer, so the app doesn't come
+     * back to a dead player.
+     */
+    fun stopByUser() = endPlayback(closeViewer = true)
+
+    /**
+     * The user swiped the (paused) notification away: end the session but
+     * leave the viewer as it is -- dismissing a notification isn't a request
+     * to close what is on screen.
+     */
+    fun dismissedByUser() = endPlayback(closeViewer = false)
+
+    private fun endPlayback(closeViewer: Boolean) {
         host?.pause()
+        if (closeViewer) host?.closeViewer()
         // Posted, not run inline: this can be reached from inside a session
         // command callback, and a session must not be released while it is
         // still dispatching one.
@@ -301,7 +334,7 @@ internal object VaultPlaybackSession {
     /** Any thread: [ContainerSessionRegistry.removeSession] runs on I/O threads. */
     private fun onVolumeRemoved(removedVolId: Int) {
         mainHandler.post {
-            if (windowOpen && removedVolId == volId) {
+            if (windowOpen && !isLocalStorage && removedVolId == volId) {
                 VeLog.i(TAG) { "Vault $removedVolId locked during playback -> ending media session" }
                 host?.stopForLock()
                 end()
@@ -326,6 +359,7 @@ internal object VaultPlaybackSession {
             val session = MediaSession.Builder(context, wrapper)
                 .setId(SESSION_ID)
                 .setSessionActivity(contentIntent)
+                .setMediaButtonPreferences(listOf(stopButton(context)))
                 .build()
             player.addListener(playerListener)
             rawPlayer = player
@@ -366,6 +400,47 @@ internal object VaultPlaybackSession {
         rawPlayer = null
     }
 
+    /**
+     * The Stop button of the system media controls.
+     *
+     * Android 13+ draws the lock screen / quick settings controls from the
+     * session, not from the notification's actions, and has no built-in Stop
+     * slot, so Stop has to be published as a media button preference. It is
+     * bound to the standard player command (not a custom session command): a
+     * session built without a `MediaSessionService` never tells the platform
+     * session about custom commands, which makes Media3 drop such a button as
+     * unavailable. A player command is always available there, and a tap runs
+     * [VaultSessionPlayer.stop].
+     */
+    private fun stopButton(context: Context): CommandButton =
+        CommandButton.Builder(CommandButton.ICON_STOP)
+            .setPlayerCommand(Player.COMMAND_STOP)
+            .setDisplayName(
+                NotificationLocale.wrap(context).getString(R.string.vault_media_action_stop),
+            )
+            .build()
+
+    /**
+     * The file name to publish for [filePath]. Vault paths and raw local paths
+     * end in the name; a local SAF document URI instead carries it
+     * percent-encoded inside a document id (`primary%3AMusic%2Fsong.mp3`).
+     */
+    private fun displayNameOf(filePath: String): String {
+        if (filePath.startsWith("content://")) {
+            val documentId = filePath.substringAfterLast("/document/", "")
+            if (documentId.isNotEmpty()) {
+                val decoded = Uri.decode(documentId)
+                return if ('/' in decoded) {
+                    decoded.substringAfterLast('/')
+                } else {
+                    // A file at the volume root: "primary:song.mp3".
+                    decoded.substringAfter(':')
+                }
+            }
+        }
+        return filePath.substringAfterLast('/')
+    }
+
     private fun displayTitle(context: Context): CharSequence {
         if (showFileNames) {
             fileName?.takeIf { it.isNotBlank() }?.let { return it }
@@ -385,13 +460,17 @@ internal object VaultPlaybackSession {
             null
         }
 
-    /** The label shown instead of a file name: the decoy identity in Mask Mode. */
+    /**
+     * The label shown instead of a file name: the decoy identity in Mask Mode,
+     * otherwise a neutral line that says "vault" only for vault items.
+     */
     fun genericTitle(context: Context): String {
         val localized = NotificationLocale.wrap(context)
-        return if (DisguiseModeHandlers.isDecoyActive(context)) {
-            localized.getString(R.string.decoy_app_name)
-        } else {
-            localized.getString(R.string.vault_media_notification_title)
+        return when {
+            DisguiseModeHandlers.isDecoyActive(context) ->
+                localized.getString(R.string.decoy_app_name)
+            isLocalStorage -> localized.getString(R.string.vault_media_notification_title_local)
+            else -> localized.getString(R.string.vault_media_notification_title)
         }
     }
 
@@ -401,7 +480,6 @@ internal object VaultPlaybackSession {
 
     /** Whether decrypted names are currently allowed on external media surfaces. */
     fun areFileNamesVisible(): Boolean = showFileNames
-
     private fun scheduleGraceTimer() {
         cancelGraceTimer()
         val runnable = Runnable {

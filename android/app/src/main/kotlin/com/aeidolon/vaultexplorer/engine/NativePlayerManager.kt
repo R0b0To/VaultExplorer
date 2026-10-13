@@ -107,9 +107,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var currentIsLocalStorage: Boolean = false
 
     // True when the viewer that opened this item asked for background
-    // playback + a media notification (vault items only -- see initialize()).
-    // Other users of this single player (video editor, camera review) leave
-    // it off and never get a notification.
+    // playback + a media notification (vault or local-storage items -- see
+    // initialize()). Other users of this single player (video editor, camera
+    // review) leave it off and never get a notification.
     private var mediaSessionEnabled: Boolean = false
     // Mirrors the activity's started/stopped state (MainActivity.onStart/
     // onStop): while stopped nothing is on screen, so video decoding is
@@ -157,6 +157,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 it.stop()
                 it.clearMediaItems()
             }
+        }
+
+        override fun closeViewer() {
+            emitEvent("mediaSessionAction", mapOf("action" to "stop"))
         }
     }
 
@@ -431,11 +435,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         currentVolId = volId
         currentFilePath = filePath
         currentIsLocalStorage = isLocalStorage
-        // Background playback + notification are for items streamed out of an
-        // unlocked vault only; plain local-storage playback keeps behaving
-        // exactly as before.
-        mediaSessionEnabled = mediaSession && !isLocalStorage
-        if (mediaSessionEnabled) VaultPlaybackSession.onMediaChanged(volId, filePath)
+        // Background playback + notification apply to vault items and to
+        // plain local-storage items alike; the caller decides (it never asks
+        // for one on the archive preview). Local items are not bound to a
+        // vault, so locking a vault never ends their session.
+        mediaSessionEnabled = mediaSession
+        if (mediaSessionEnabled) {
+            VaultPlaybackSession.onMediaChanged(volId, filePath, isLocalStorage)
+        }
         requestedVideoDecoderMode = parseDecoderMode(videoDecoderModeName)
         requestedAudioDecoderMode = parseDecoderMode(audioDecoderModeName)
         this.volumeBoostEnabled = volumeBoostEnabled
@@ -1095,7 +1102,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("playingChanged", mapOf("isPlaying" to isPlaying))
         val p = player
         if (isPlaying && mediaSessionEnabled && p != null) {
-            VaultPlaybackSession.onPlaying(context, p, sessionHost, currentVolId, currentFilePath)
+            VaultPlaybackSession.onPlaying(
+                context,
+                p,
+                sessionHost,
+                currentVolId,
+                currentFilePath,
+                currentIsLocalStorage,
+            )
         }
         if (isPlaying) {
             mainHandler.post(positionUpdateRunnable)

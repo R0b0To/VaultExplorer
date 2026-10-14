@@ -364,7 +364,13 @@ class _MediaViewerInPlaceLayoutEditorState
               children: [
                 const Icon(Icons.vertical_align_top_rounded, size: 18),
                 const SizedBox(width: 8),
-                Text(context.inPlaceAddToTopLabel),
+                Expanded(
+                  child: Text(
+                    context.inPlaceAddToTopLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -375,7 +381,13 @@ class _MediaViewerInPlaceLayoutEditorState
               children: [
                 const Icon(Icons.vertical_align_bottom_rounded, size: 18),
                 const SizedBox(width: 8),
-                Text(context.inPlaceAddToBottomLabel),
+                Expanded(
+                  child: Text(
+                    context.inPlaceAddToBottomLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -386,7 +398,13 @@ class _MediaViewerInPlaceLayoutEditorState
               children: [
                 const Icon(Icons.more_horiz_rounded, size: 18),
                 const SizedBox(width: 8),
-                Text(context.inPlaceMoveToMoreLabel),
+                Expanded(
+                  child: Text(
+                    context.inPlaceMoveToMoreLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -397,7 +415,13 @@ class _MediaViewerInPlaceLayoutEditorState
               children: [
                 const Icon(Icons.tune_rounded, size: 18),
                 const SizedBox(width: 8),
-                Text(context.inPlaceMoveToAdvancedLabel),
+                Expanded(
+                  child: Text(
+                    context.inPlaceMoveToAdvancedLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -408,7 +432,13 @@ class _MediaViewerInPlaceLayoutEditorState
               children: [
                 const Icon(Icons.visibility_off_outlined, size: 18),
                 const SizedBox(width: 8),
-                Text(context.inPlaceHideActionLabel),
+                Expanded(
+                  child: Text(
+                    context.inPlaceHideActionLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),

@@ -97,7 +97,7 @@ void main() {
     });
   });
 
-  group('getImageThumbnailWithSizeOrThrow', () {
+   group('getImageThumbnailWithSize', () {
     const channel = MethodChannel('raw_thumbnail_fallback_test');
     final api = const VaultFileIoApi(channel);
     late Object Function() respond;
@@ -114,7 +114,7 @@ void main() {
     test('maps IMAGE_TOO_LARGE and OUT_OF_MEMORY to typed exceptions', () async {
       respond = () => throw PlatformException(code: 'IMAGE_TOO_LARGE');
       await expectLater(
-        api.getImageThumbnailWithSizeOrThrow(_container, 'x.png'),
+        api.getImageThumbnailWithSize(_container, 'x.png'),
         throwsA(
           isA<ImagePreviewUnavailableException>().having(
             (e) => e.reason,
@@ -126,7 +126,7 @@ void main() {
 
       respond = () => throw PlatformException(code: 'OUT_OF_MEMORY');
       await expectLater(
-        api.getImageThumbnailWithSizeOrThrow(_container, 'x.png'),
+        api.getImageThumbnailWithSize(_container, 'x.png'),
         throwsA(
           isA<ImagePreviewUnavailableException>().having(
             (e) => e.reason,
@@ -139,12 +139,12 @@ void main() {
 
     test('any other native failure is still just null', () async {
       respond = () => throw PlatformException(code: 'DECODE_FAILED');
-      expect(await api.getImageThumbnailWithSizeOrThrow(_container, 'x.png'), isNull);
+      expect(await api.getImageThumbnailWithSize(_container, 'x.png'), isNull);
     });
 
     test('a successful result is parsed', () async {
       respond = () => {'bytes': Uint8List.fromList([1, 2, 3]), 'width': 40, 'height': 30};
-      final out = await api.getImageThumbnailWithSizeOrThrow(_container, 'x.png');
+      final out = await api.getImageThumbnailWithSize(_container, 'x.png');
       expect(out?.bytes, Uint8List.fromList([1, 2, 3]));
       expect(out?.width, 40);
       expect(out?.height, 30);

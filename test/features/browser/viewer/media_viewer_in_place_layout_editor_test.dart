@@ -116,8 +116,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Initially on More Menu tab -> fileInfo should be visible
-    expect(find.text('File info'), findsOneWidget);
+     // Initially on More Menu tab -> fileInfo should be visible
+    expect(find.text('Info'), findsOneWidget);
     expect(find.text('Rotate 90°'), findsNothing);
 
     // Switch to Advanced tab
@@ -125,9 +125,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Rotate 90°'), findsOneWidget);
-    expect(find.text('File info'), findsNothing);
+    expect(find.text('Info'), findsNothing);
 
     // Switch to Hidden tab
+    await tester.ensureVisible(find.text('Hidden'));
     await tester.tap(find.text('Hidden'));
     await tester.pumpAndSettle();
 

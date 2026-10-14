@@ -21,8 +21,8 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
-import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
 
 class FileTile extends StatelessWidget {
   final RawEntry entry;

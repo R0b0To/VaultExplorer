@@ -18,7 +18,7 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
-import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
+import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
 class FileItemActionsSheet extends ConsumerWidget {
   final RawEntry entry;

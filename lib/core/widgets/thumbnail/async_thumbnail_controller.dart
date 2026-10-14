@@ -280,8 +280,8 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
         }
         return fetchFn(container, targetPath);
       },
-          // A deliberate "too large / not enough memory" refusal gets the
-          // same answer every time; retrying only repeats the native work.
+          // A deliberate "too large / not enough memory" refusal will just be
+          // refused again; don't re-run the native attempt three times.
           retryIf: (e) => e is! ImagePreviewUnavailableException);
     } finally {
       if (_limiterCompleter == completer) _limiterCompleter = null;

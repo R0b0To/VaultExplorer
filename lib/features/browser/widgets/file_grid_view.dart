@@ -28,7 +28,7 @@ import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
-import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
+import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
 class FileGridView extends StatefulWidget {
   final MountedContainer container;

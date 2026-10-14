@@ -923,6 +923,32 @@ class ThumbnailHandlers(
         return BufferedInputStream(raw, 65536)
     }
 
+    /** First [ImageDecodeGuard.HEADER_SNIFF_BYTES] of the image, from a stream
+     *  of its own, so [ImageDecodeGuard] can tell a cheap streaming decode
+     *  (baseline JPEG, non-interlaced PNG) from one that needs memory
+     *  proportional to the whole image. Null if it can't be read -- the guard
+     *  then falls back to its worst-case assumption. */
+    private fun readImageHeader(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): ByteArray? = try {
+        openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile).use { stream ->
+            val buffer = ByteArray(ImageDecodeGuard.HEADER_SNIFF_BYTES)
+            var filled = 0
+            while (filled < buffer.size) {
+                val n = stream.read(buffer, filled, buffer.size - filled)
+                if (n <= 0) break
+                filled += n
+            }
+            if (filled == buffer.size) buffer else buffer.copyOf(filled)
+        }
+    } catch (e: Exception) {
+        null
+    }
+
     /** Shared body for [handleGetImageThumbnail] and
      *  [handleGetImageThumbnailWithSize] (TD-15): decode bounds, pick a
      *  sample size, decode, scale, compress, recycle — previously
@@ -1019,8 +1045,19 @@ class ThumbnailHandlers(
         // Refuse (or serialize) decodes whose *source* is huge before touching
         // the real decoder -- see ImageDecodeGuard for why inSampleSize alone
         // doesn't bound the decoder's memory.
+        //
+        // The header is only worth a third stream (and up to 1 MB of
+        // decryption) when even the worst-case estimate would be heavy; every
+        // ordinary-sized image skips straight past it.
+        val worstCaseBytes = rawWidth.toLong() * rawHeight.toLong() *
+            ImageDecodeGuard.WORST_CASE_BYTES_PER_PIXEL
+        val header = if (worstCaseBytes >= ImageDecodeGuard.HEAVY_ESTIMATE_BYTES) {
+            readImageHeader(uriString, fileName, volId, isLocalStorage, localFile)
+        } else {
+            null
+        }
         val permit = try {
-            ImageDecodeGuard.admit(activity, rawWidth, rawHeight)
+            ImageDecodeGuard.admit(activity, rawWidth, rawHeight, header)
         } catch (e: ImageDecodeGuard.RefusedException) {
             inputStream.close()
             VeLog.w(TAG) { "Not decoding ${rawWidth}x$rawHeight image: ${e.message}" }

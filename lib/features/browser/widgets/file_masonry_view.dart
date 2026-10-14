@@ -31,7 +31,7 @@ import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
-import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
+import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
 class FileMasonryView extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -740,7 +740,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         return bytes;
       }
     }
-    final thumb = await fileIoApi.getImageThumbnailWithSizeOrThrow(
+    final thumb = await fileIoApi.getImageThumbnailWithSize(
       container,
       path,
       targetSize: quality.scaledSize(180),

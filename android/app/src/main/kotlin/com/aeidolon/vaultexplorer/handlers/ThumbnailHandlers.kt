@@ -46,6 +46,7 @@ import com.aeidolon.vaultexplorer.container.ContainerInputStream
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.ImageDecodeGuard
+import com.aeidolon.vaultexplorer.JpegDcPreview
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
@@ -1060,19 +1061,23 @@ class ThumbnailHandlers(
             ImageDecodeGuard.admit(activity, rawWidth, rawHeight, header)
         } catch (e: ImageDecodeGuard.RefusedException) {
             inputStream.close()
-            VeLog.w(TAG) { "Not decoding ${rawWidth}x$rawHeight image: ${e.message}" }
+            VeLog.w(TAG) { "Not fully decoding ${rawWidth}x$rawHeight image: ${e.message}" }
+            // A progressive JPEG too big to decode normally can still be
+            // previewed from its first (DC) scan alone: 1/8 scale, from a
+            // small slice of the file, in memory proportional to the output.
+            val dcPreview = decodeProgressiveJpegDcPreview(
+                header, targetSize, uriString, fileName, volId, isLocalStorage, localFile,
+            )
+            if (dcPreview != null) {
+                VeLog.w(TAG) { "Using DC-scan preview (${dcPreview.width}x${dcPreview.height}) instead" }
+                return finishThumbnail(
+                    dcPreview, exifOrientation, rawWidth, rawHeight, targetSize, quality, preserveAlpha,
+                )
+            }
             return ImageThumbnailOutcome.Failure(e.code, e.message ?: "Image is too large to decode")
         }
 
         try {
-            val orientationMatrix = exifOrientationMatrix(exifOrientation)
-            val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
-                exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
-                exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
-                exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
-            val width = if (isSideways) rawHeight else rawWidth
-            val height = if (isSideways) rawWidth else rawHeight
-
             val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
             fun decodeOptionsFor(sampleSize: Int) = BitmapFactory.Options().apply {
                 this.inSampleSize = sampleSize
@@ -1112,7 +1117,46 @@ class ThumbnailHandlers(
                 return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
             }
 
-            val rawBitmap = applyExifOrientation(decodedBitmap, orientationMatrix)
+            return finishThumbnail(
+                decodedBitmap, exifOrientation, rawWidth, rawHeight, targetSize, quality, preserveAlpha,
+            )
+        } catch (e: OutOfMemoryError) {
+            // OutOfMemoryError is an Error, not an Exception: without this it
+            // sails past every `catch (e: Exception)` up the stack and kills
+            // the whole app instead of just failing this one decode.
+            VeLog.w(TAG) { "Out of memory decoding ${rawWidth}x$rawHeight image" }
+            return ImageThumbnailOutcome.Failure(
+                ImageDecodeGuard.CODE_OUT_OF_MEMORY,
+                "Not enough memory to decode image",
+            )
+        } finally {
+            permit.close()
+        }
+    }
+
+    /** Orients, fits and compresses an already-decoded [decoded] bitmap into
+     *  the thumbnail result. [rawWidth]/[rawHeight] are the *source* image's
+     *  size (not [decoded]'s, which may be a reduced-scale decode); the
+     *  reported size has them swapped for sideways EXIF orientations. */
+    private fun finishThumbnail(
+        decoded: Bitmap,
+        exifOrientation: Int,
+        rawWidth: Int,
+        rawHeight: Int,
+        targetSize: Int,
+        quality: Int,
+        preserveAlpha: Boolean,
+    ): ImageThumbnailOutcome {
+        val orientationMatrix = exifOrientationMatrix(exifOrientation)
+        val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+            exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+            exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+            exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+        val width = if (isSideways) rawHeight else rawWidth
+        val height = if (isSideways) rawWidth else rawHeight
+
+        return try {
+            val rawBitmap = applyExifOrientation(decoded, orientationMatrix)
 
             val scaledBitmap = scaledToFit(rawBitmap, targetSize)
             if (scaledBitmap != rawBitmap) rawBitmap.recycle()
@@ -1127,18 +1171,41 @@ class ThumbnailHandlers(
             val bytes = stream.toByteArray()
             scaledBitmap.recycle()
 
-            return ImageThumbnailOutcome.Success(bytes, width, height)
+            ImageThumbnailOutcome.Success(bytes, width, height)
         } catch (e: OutOfMemoryError) {
-            // OutOfMemoryError is an Error, not an Exception: without this it
-            // sails past every `catch (e: Exception)` up the stack and kills
-            // the whole app instead of just failing this one decode.
-            VeLog.w(TAG) { "Out of memory decoding ${rawWidth}x$rawHeight image" }
-            return ImageThumbnailOutcome.Failure(
+            VeLog.w(TAG) { "Out of memory finishing ${rawWidth}x$rawHeight thumbnail" }
+            ImageThumbnailOutcome.Failure(
                 ImageDecodeGuard.CODE_OUT_OF_MEMORY,
                 "Not enough memory to decode image",
             )
-        } finally {
-            permit.close()
+        }
+    }
+
+    /** DC-scan-only preview of a progressive JPEG (see [JpegDcPreview]), as a
+     *  bitmap, or null if [header] isn't a progressive JPEG or the decoder
+     *  can't handle the file. */
+    private fun decodeProgressiveJpegDcPreview(
+        header: ByteArray?,
+        targetSize: Int,
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): Bitmap? {
+        if (header == null || ImageDecodeGuard.sniffJpeg(header)?.progressive != true) return null
+        return try {
+            openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile).use { stream ->
+                JpegDcPreview.decode(stream, targetSize)?.let { preview ->
+                    Bitmap.createBitmap(preview.argb, preview.width, preview.height, Bitmap.Config.ARGB_8888)
+                }
+            }
+        } catch (e: OutOfMemoryError) {
+            VeLog.w(TAG) { "Out of memory building DC-scan preview" }
+            null
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "DC-scan preview failed: ${e.message}" }
+            null
         }
     }
 

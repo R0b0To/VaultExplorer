@@ -920,6 +920,7 @@ class UnlockController extends _$UnlockController {
       }
 
       final savedPassword = await repo.getPassword(oldUri);
+      final savedPim = await repo.getPim(oldUri);
       final savedPatternHash = await repo.getPatternHash(oldUri);
       final savedPinHash = await repo.getPinHash(oldUri);
       await repo.remove(oldUri);
@@ -949,6 +950,8 @@ class UnlockController extends _$UnlockController {
       );
 
       await repo.save(migrated);
+      // The PIM is keyed by URI like the password, so it has to move too.
+      if (savedPim != null) await repo.setPim(migrated.uri, int.tryParse(savedPim));
       if (!ref.mounted) return;
       state = state._copy(
         selectedUri: migrated.uri,
@@ -1097,48 +1100,11 @@ class UnlockController extends _$UnlockController {
       );
       if (ok && ref.mounted) {
         final uri = params.initialUri!;
-        final records = await ref.read(containerRepositoryProvider).loadAll();
-        final record = records[uri];
-
-        final appSettings = await ref
-            .read(appSettingsServiceProvider)
-            .loadSettings();
-        final shouldCacheGoingForward =
-            (record?.cacheDerivedKey ?? false) ||
-            appSettings.defaultDerivedKeyCacheEnabled;
-        final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
-
-        final cachedKey = shouldPreloadCachedKey
-            ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(uri)
-            : null;
-
-        if (!ref.mounted) return;
-
-        if (cachedKey != null && cachedKey.isNotEmpty) {
-          await unlock(
-            l10n: l10n,
-            preservedKey: cachedKey,
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-          );
-          return;
-        }
-
-        final pw = await ref.read(containerRepositoryProvider).getPassword(uri);
-        final savedKeyfiles = record?.keyfiles ?? [];
-        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-        if (pw != null || savedKeyfilePaths.isNotEmpty) {
-          await unlock(
-            l10n: l10n,
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-            passwordOverride: pw ?? '',
-            keyfilePathsOverride: savedKeyfilePaths,
-          );
-        } else {
-          state = state._copy(
-            error: l10n.initSecureCredsBiometricMessage,
-            showPasswordFallback: true,
-          );
-        }
+        await _cachedKeyThenSavedCredentials(
+          uri: uri,
+          l10n: l10n,
+          noSavedCredentialsMessage: l10n.initSecureCredsBiometricMessage,
+        );
       }
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
@@ -1288,12 +1254,12 @@ class UnlockController extends _$UnlockController {
     }
   }
 
-  /// Shared by [onPatternComplete]/[onPinComplete]'s auth-success branch:
-  /// check for a cached derived key first, unlock with it if present,
-  /// otherwise fall back to a saved password/keyfiles, otherwise show
-  /// [noSavedCredentialsMessage]. Identical in shape to the equivalent
-  /// block in [tryBiometric] -- kept as its own helper here since it's the
-  /// same three-step sequence twice more, once per auth method.
+  /// Shared by [tryBiometric] and [onPatternComplete]/[onPinComplete]'s
+  /// auth-success branch: check for a cached derived key first, unlock with
+  /// it if present, otherwise fall back to the saved password + PIM +
+  /// keyfiles, otherwise show [noSavedCredentialsMessage]. One helper for
+  /// every custom-unlock method so a credential can't be replayed by one
+  /// method and forgotten by another.
   Future<void> _cachedKeyThenSavedCredentials({
     required String uri,
     required AppLocalizations l10n,
@@ -1325,14 +1291,22 @@ class UnlockController extends _$UnlockController {
       return;
     }
 
-    final pw = await ref.read(containerRepositoryProvider).getPassword(uri);
+    final repo = ref.read(containerRepositoryProvider);
+    final pw = await repo.getPassword(uri);
+    // The PIM is part of the credential set: without it a PIM-protected
+    // volume derives the wrong header key and the unlock fails, even though
+    // password and keyfiles are right. (A cached derived key skips the
+    // derivation, which is why only that path used to work.)
+    final savedPim = await repo.getPim(uri);
     final savedKeyfiles = record?.keyfiles ?? [];
     final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+    if (!ref.mounted) return;
     if (pw != null || savedKeyfilePaths.isNotEmpty) {
       await unlock(
         l10n: l10n,
         shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
         passwordOverride: pw ?? '',
+        pimText: savedPim,
         keyfilePathsOverride: savedKeyfilePaths,
       );
     } else {
@@ -1388,18 +1362,93 @@ class UnlockController extends _$UnlockController {
   }
 
 
+  /// Counterpart of [_restoreSavedPasswordIfMissing] for the PIM. A manual
+  /// unlock proves [pim] (the PIM that actually derived the key, 0 when none
+  /// was needed or a cached key was used), so a custom-unlock vault that has
+  /// no PIM saved gets it back and pattern/PIN/biometric unlock works again.
+  Future<void> _restoreSavedPimIfMissing(String uri, int pim) async {
+    if (params.initialUri == null || pim <= 0) return;
+    try {
+      final repo = ref.read(containerRepositoryProvider);
+      final record = (await repo.loadAll())[uri];
+      if (record == null ||
+          record.unlockMethod == ContainerUnlockMethod.password) {
+        return;
+      }
+      if (await repo.getPim(uri) != null) return;
+      await repo.setPim(uri, pim);
+      VeLog.i(
+        'UnlockController',
+        'Restored missing saved PIM for ${VeLog.censorUri(uri)} after manual unlock',
+      );
+    } catch (e) {
+      VeLog.w('UnlockController', '_restoreSavedPimIfMissing failed', e);
+    }
+  }
+
+  /// Counterpart of [_restoreSavedPasswordIfMissing] for keyfiles: a manual
+  /// unlock proves [keyfiles] (the ones the user picked), so a custom-unlock
+  /// vault that has none saved gets them back and pattern/PIN/biometric unlock
+  /// can replay them.
+  Future<void> _restoreSavedKeyfilesIfMissing(
+    String uri,
+    List<Map<String, String>> keyfiles,
+  ) async {
+    if (params.initialUri == null || keyfiles.isEmpty) return;
+    try {
+      final repo = ref.read(containerRepositoryProvider);
+      final record = (await repo.loadAll())[uri];
+      if (record == null ||
+          record.unlockMethod == ContainerUnlockMethod.password ||
+          record.keyfiles.isNotEmpty) {
+        return;
+      }
+      await repo.save(record.copyWith(keyfiles: keyfiles));
+      VeLog.i(
+        'UnlockController',
+        'Restored missing saved keyfiles for ${VeLog.censorUri(uri)} after manual unlock',
+      );
+    } catch (e) {
+      VeLog.w('UnlockController', '_restoreSavedKeyfilesIfMissing failed', e);
+    }
+  }
+
+  static bool _sameKeyfileUris(
+    List<Map<String, String>> a,
+    List<Map<String, String>> b,
+  ) {
+    final ua = a.map((k) => k['uri']).toSet();
+    final ub = b.map((k) => k['uri']).toSet();
+    return ua.length == ub.length && ua.containsAll(ub);
+  }
+
   Future<ContainerRecord> _keepExistingRecordOnReAdd(
     ContainerRecord existing,
-    String password,
-  ) async {
-    if (password.isEmpty ||
-        existing.unlockMethod == ContainerUnlockMethod.password) {
+    String password, {
+    int pim = 0,
+    List<Map<String, String>> keyfiles = const [],
+  }) async {
+    if (existing.unlockMethod == ContainerUnlockMethod.password ||
+        (password.isEmpty && pim <= 0 && keyfiles.isEmpty)) {
       return existing;
     }
     try {
       final repo = ref.read(containerRepositoryProvider);
-      if (await repo.getPassword(existing.uri) != password) {
-        await repo.save(existing.copyWith(pendingPassword: password));
+      final savePassword =
+          password.isNotEmpty &&
+          await repo.getPassword(existing.uri) != password;
+      final saveKeyfiles =
+          keyfiles.isNotEmpty && !_sameKeyfileUris(existing.keyfiles, keyfiles);
+      if (savePassword || saveKeyfiles) {
+        await repo.save(
+          existing.copyWith(
+            pendingPassword: savePassword ? password : null,
+            keyfiles: saveKeyfiles ? keyfiles : null,
+          ),
+        );
+      }
+      if (pim > 0 && await repo.getPim(existing.uri) != '$pim') {
+        await repo.setPim(existing.uri, pim);
       }
     } catch (e) {
       VeLog.w('UnlockController', '_keepExistingRecordOnReAdd failed', e);
@@ -1425,6 +1474,14 @@ class UnlockController extends _$UnlockController {
     var effectivePassword = (passwordOverride ?? passwordText ?? '').trim();
     final effectiveKeyfiles =
         keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
+    // Keyfiles the user picked for this unlock, as opposed to ones replayed
+    // from saved credentials (those are already on the record).
+    final typedKeyfiles = keyfilePathsOverride == null
+        ? [
+            for (final k in state.keyfiles)
+              {'uri': k.uri, 'name': k.displayName},
+          ]
+        : const <Map<String, String>>[];
 
     state = state._copy(
       loading: true,
@@ -1483,7 +1540,13 @@ class UnlockController extends _$UnlockController {
           key: 'temp_pw_$uri',
           value: effectivePassword,
         );
+        await ref.read(containerRepositoryProvider).setTempPim(uri, pim);
+        await ref
+            .read(containerRepositoryProvider)
+            .setTempKeyfiles(uri, typedKeyfiles);
         await _restoreSavedPasswordIfMissing(uri, effectivePassword);
+        await _restoreSavedPimIfMissing(uri, pim);
+        await _restoreSavedKeyfilesIfMissing(uri, typedKeyfiles);
         final mountedContainer = MountedContainer(
           uri: uri,
           displayName: name,
@@ -1504,6 +1567,8 @@ class UnlockController extends _$UnlockController {
           savedRecord = await _keepExistingRecordOnReAdd(
             savedRecord,
             effectivePassword,
+            pim: pim,
+            keyfiles: typedKeyfiles,
           );
         } else if (params.initialUri == null && state.remember) {
           savedRecord = ContainerRecord(
@@ -1789,21 +1854,36 @@ class UnlockController extends _$UnlockController {
               ),
             );
 
+      // The PIM that actually derived the key, as opposed to one that was
+      // merely passed along: a cached-key unlock never used it.
+      var credentialsPim = resolvedPreservedKey == null ? pim : 0;
+
       if (result == null && resolvedPreservedKey != null) {
         // Cached key was stale/invalid -- purge it and silently retry with
         // the real credentials before surfacing anything to the UI.
         await crypto.clearDerivedKey(uri);
+        var retryPim = pim;
+        var retryKeyfiles = effectiveKeyfiles;
         if (effectivePassword.isEmpty) {
-          effectivePassword =
-              (await ref.read(containerRepositoryProvider).getPassword(uri))
-                  ?.trim() ??
-              '';
+          // A cached-key unlock (pattern / PIN / biometrics) carries no
+          // credentials of its own, so replay everything that was saved with
+          // the password -- PIM and keyfiles included.
+          final repo = ref.read(containerRepositoryProvider);
+          effectivePassword = (await repo.getPassword(uri))?.trim() ?? '';
+          if (retryPim == 0) {
+            retryPim = clampPim(int.tryParse(await repo.getPim(uri) ?? '') ?? 0);
+          }
+          if (retryKeyfiles.isEmpty) {
+            retryKeyfiles = (record?.keyfiles ?? const <Map<String, String>>[])
+                .map((k) => k['uri']!)
+                .toList();
+          }
         }
-        if (effectivePassword.isNotEmpty || effectiveKeyfiles.isNotEmpty) {
+        if (effectivePassword.isNotEmpty || retryKeyfiles.isNotEmpty) {
           result = await lifecycle.unlockContainer(
             uri,
             effectivePassword,
-            pim,
+            retryPim,
             displayName: name,
             documentProvider: params.documentProvider,
             autoMountFolders: params.autoMountFolders,
@@ -1811,7 +1891,7 @@ class UnlockController extends _$UnlockController {
             hashId: state.hashId,
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
-            keyfilePaths: effectiveKeyfiles,
+            keyfilePaths: retryKeyfiles,
             readOnly: state.readOnly,
             protectHiddenVolume: state.protectHiddenVolume,
             hiddenVolumePassword: hiddenPasswordText,
@@ -1820,6 +1900,7 @@ class UnlockController extends _$UnlockController {
             hiddenVolumeHashId: state.hiddenHashId,
             hiddenVolumeKeyfilePaths: hiddenKeyfiles,
           );
+          credentialsPim = retryPim;
         }
       }
 
@@ -1837,7 +1918,20 @@ class UnlockController extends _$UnlockController {
         key: 'temp_pw_$uri',
         value: effectivePassword,
       );
+      // Like the PIM: only keyfiles that actually derived the key count, not
+      // ones carried along while a cached key did the unlocking.
+      final credentialsKeyfiles = resolvedPreservedKey == null
+          ? typedKeyfiles
+          : const <Map<String, String>>[];
+      await ref
+          .read(containerRepositoryProvider)
+          .setTempPim(uri, credentialsPim);
+      await ref
+          .read(containerRepositoryProvider)
+          .setTempKeyfiles(uri, credentialsKeyfiles);
       await _restoreSavedPasswordIfMissing(uri, effectivePassword);
+      await _restoreSavedPimIfMissing(uri, credentialsPim);
+      await _restoreSavedKeyfilesIfMissing(uri, credentialsKeyfiles);
       final mountedContainer = MountedContainer(
         uri: uri,
         displayName: name,
@@ -1855,6 +1949,8 @@ class UnlockController extends _$UnlockController {
         savedRecord = await _keepExistingRecordOnReAdd(
           savedRecord,
           effectivePassword,
+          pim: credentialsPim,
+          keyfiles: credentialsKeyfiles,
         );
       } else if (params.initialUri == null && state.remember) {
         savedRecord = ContainerRecord(

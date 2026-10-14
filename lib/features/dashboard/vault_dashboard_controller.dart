@@ -505,6 +505,18 @@ class VaultDashboardController extends _$VaultDashboardController {
       );
       unawaited(
         ref
+            .read(appSecureStorageProvider)
+            .delete(key: tempPimStorageKey(container.uri))
+            .catchError((_) {}),
+      );
+      unawaited(
+        ref
+            .read(appSecureStorageProvider)
+            .delete(key: tempKeyfilesStorageKey(container.uri))
+            .catchError((_) {}),
+      );
+      unawaited(
+        ref
             .read(thumbnailCacheServiceProvider)
             .clearAppCache(container)
             .catchError((_) {}),

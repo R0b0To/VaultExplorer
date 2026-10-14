@@ -117,6 +117,20 @@ ContainerRepository containerRepository(Ref ref) =>
 String derivedKeyPathForUri(String uri) =>
     uri.startsWith('usb:') ? uri.substring('usb:'.length) : uri;
 
+/// Secure-storage key under which a container's saved PIM is kept. The config
+/// flow writes it; [ContainerRepository.getPim] reads it.
+String pimStorageKey(String uri) => 'pim_$uri';
+
+/// Secure-storage key for the PIM of the volume's *current* manual unlock,
+/// next to `temp_pw_<uri>`. Lets the config screen offer the credentials that
+/// just worked; cleared when the container locks.
+String tempPimStorageKey(String uri) => 'temp_pim_$uri';
+
+/// Same idea for the keyfiles typed/picked for the current manual unlock
+/// (JSON list of `{uri, name}`), so the config screen can offer them when the
+/// user switches the vault to a remembered-credentials unlock method.
+String tempKeyfilesStorageKey(String uri) => 'temp_kf_$uri';
+
 class ContainerRepository {
   ContainerRepository._(this._clearDerivedKey, [AppSecureStorage? secure])
     : _secure = secure ?? AppSecureStorage.instance;
@@ -397,6 +411,13 @@ class ContainerRepository {
       _legacyCompositeCarriersKey,
     );
     try {
+      await _secure.delete(key: pimStorageKey(uri));
+      await _secure.delete(key: tempPimStorageKey(uri));
+      await _secure.delete(key: tempKeyfilesStorageKey(uri));
+    } catch (e) {
+      _logSwallowed('remove/deletePim', e);
+    }
+    try {
       await _clearDerivedKey(derivedKeyPathForUri(uri), removeExpiry: true);
     } catch (e) {
       _logSwallowed('remove/clearDerivedKey', e);
@@ -504,6 +525,82 @@ class ContainerRepository {
     _legacyPinHashKey(uri),
     _legacyPinHashKey,
   );
+
+  /// The saved VeraCrypt PIM for [uri], or null when none was saved (PIM 0 /
+  /// default iterations). Written by the container config flow under
+  /// [pimStorageKey]; the unlock flows that replay saved credentials
+  /// (pattern, PIN, biometrics) need it because a PIM changes the header key
+  /// derivation -- password + keyfiles alone derive the wrong key.
+  Future<String?> getPim(String uri) async {
+    try {
+      final pim = (await _secure.read(key: pimStorageKey(uri)))?.trim();
+      return (pim == null || pim.isEmpty) ? null : pim;
+    } catch (e) {
+      _logSwallowed('getPim', e);
+      return null;
+    }
+  }
+
+  /// Saves [pim] as [uri]'s remembered PIM, or clears it when [pim] is null or
+  /// 0 (default iterations, nothing to remember). Best-effort, like [getPim].
+  Future<void> setPim(String uri, int? pim) =>
+      _writeOrDeletePim(pimStorageKey(uri), pim, 'setPim');
+
+  /// Same for the temporary PIM of the current manual unlock.
+  Future<void> setTempPim(String uri, int? pim) =>
+      _writeOrDeletePim(tempPimStorageKey(uri), pim, 'setTempPim');
+
+  Future<void> _writeOrDeletePim(String key, int? pim, String method) async {
+    try {
+      if (pim != null && pim > 0) {
+        await _secure.write(key: key, value: '$pim');
+      } else {
+        await _secure.delete(key: key);
+      }
+    } catch (e) {
+      _logSwallowed(method, e);
+    }
+  }
+
+  /// Keyfiles of the current manual unlock, or empty when none were kept.
+  /// Entries are `{uri, name}` maps, the same shape as [ContainerRecord.keyfiles].
+  Future<List<Map<String, String>>> getTempKeyfiles(String uri) async {
+    try {
+      final raw = await _secure.read(key: tempKeyfilesStorageKey(uri));
+      if (raw == null || raw.isEmpty) return const [];
+      return [
+        for (final item in jsonDecode(raw) as List<dynamic>)
+          if (item is Map && item['uri'] is String)
+            {
+              'uri': item['uri'] as String,
+              'name': (item['name'] as String?) ?? '',
+            },
+      ];
+    } catch (e) {
+      _logSwallowed('getTempKeyfiles', e);
+      return const [];
+    }
+  }
+
+  /// Keeps [keyfiles] next to `temp_pw_<uri>` until the container locks, or
+  /// clears them when the list is empty. Best-effort, like [setTempPim].
+  Future<void> setTempKeyfiles(
+    String uri,
+    List<Map<String, String>> keyfiles,
+  ) async {
+    try {
+      if (keyfiles.isEmpty) {
+        await _secure.delete(key: tempKeyfilesStorageKey(uri));
+      } else {
+        await _secure.write(
+          key: tempKeyfilesStorageKey(uri),
+          value: jsonEncode(keyfiles),
+        );
+      }
+    } catch (e) {
+      _logSwallowed('setTempKeyfiles', e);
+    }
+  }
 
   void invalidate() => _cache = null;
 

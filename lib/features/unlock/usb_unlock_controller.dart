@@ -525,50 +525,7 @@ void selectDevice(UsbDeviceInfo device) {
         persistAcrossBackgrounding: true,
       );
       if (ok && ref.mounted) {
-        final record = params.existingRecord!;
-        final deviceName = _expectedDeviceName;
-
-        final appSettings = await ref
-            .read(appSettingsServiceProvider)
-            .loadSettings();
-        final shouldCacheGoingForward =
-            (record.cacheDerivedKey) ||
-            appSettings.defaultDerivedKeyCacheEnabled;
-        final shouldPreloadCachedKey = record.cacheDerivedKey;
-
-        final cachedKey = shouldPreloadCachedKey && deviceName != null
-            ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(deviceName)
-            : null;
-
-        if (!ref.mounted) return;
-
-        if (cachedKey != null && cachedKey.isNotEmpty) {
-          await unlock(
-            l10n: l10n,
-            preservedKey: cachedKey,
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-          );
-          return;
-        }
-
-        final pw = await ref
-            .read(containerRepositoryProvider)
-            .getPassword(record.uri);
-        final savedKeyfiles = record.keyfiles;
-        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-        if (pw != null || savedKeyfilePaths.isNotEmpty) {
-          await unlock(
-            l10n: l10n,
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-            passwordOverride: pw ?? '',
-            keyfilePathsOverride: savedKeyfilePaths,
-          );
-        } else {
-          state = state._copy(
-            error: l10n.usbNoSavedCredentialsMessage,
-            showPasswordFallback: true,
-          );
-        }
+        await _cachedKeyThenSavedCredentials(l10n: l10n);
       }
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
@@ -747,15 +704,20 @@ void selectDevice(UsbDeviceInfo device) {
       return;
     }
 
-    final pw = await ref
-        .read(containerRepositoryProvider)
-        .getPassword(record.uri);
+    final repo = ref.read(containerRepositoryProvider);
+    final pw = await repo.getPassword(record.uri);
+    // The PIM is part of the saved credential set: without it a PIM-protected
+    // volume derives the wrong header key (a cached derived key skips the
+    // derivation, which is why only that path used to work).
+    final savedPim = await repo.getPim(record.uri);
     final savedKeyfilePaths = record.keyfiles.map((k) => k['uri']!).toList();
+    if (!ref.mounted) return;
     if (pw != null || savedKeyfilePaths.isNotEmpty) {
       await unlock(
         l10n: l10n,
         shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
         passwordOverride: pw ?? '',
+        pimText: savedPim,
         keyfilePathsOverride: savedKeyfilePaths,
       );
     } else {
@@ -785,6 +747,14 @@ void selectDevice(UsbDeviceInfo device) {
     var effectivePassword = (passwordOverride ?? passwordText ?? '').trim();
     final effectiveKeyfiles =
         keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
+    // Keyfiles the user picked for this unlock, as opposed to ones replayed
+    // from saved credentials (those are already on the record).
+    final typedKeyfiles = keyfilePathsOverride == null
+        ? [
+            for (final k in state.keyfiles)
+              {'uri': k.uri, 'name': k.displayName},
+          ]
+        : const <Map<String, String>>[];
 
     state = state._copy(
       loading: true,
@@ -881,23 +851,35 @@ void selectDevice(UsbDeviceInfo device) {
               ),
             );
 
+      // The PIM that actually derived the key, as opposed to one that was
+      // merely passed along: a cached-key unlock never used it.
+      var credentialsPim = resolvedPreservedKey == null ? pim : 0;
+
       if (result == null && resolvedPreservedKey != null) {
         // Cached key was stale/invalid -- purge it and silently retry with
         // the real credentials before surfacing anything to the UI.
         await crypto.clearDerivedKey(device.deviceName);
-        if (effectivePassword.isEmpty && params.existingRecord != null) {
-          effectivePassword =
-              (await ref
-                      .read(containerRepositoryProvider)
-                      .getPassword(params.existingRecord!.uri))
-                  ?.trim() ??
-              '';
+        var retryPim = pim;
+        var retryKeyfiles = effectiveKeyfiles;
+        final existing = params.existingRecord;
+        if (effectivePassword.isEmpty && existing != null) {
+          // A cached-key unlock (pattern / PIN / biometrics) carries no
+          // credentials of its own, so replay everything that was saved with
+          // the password -- PIM and keyfiles included.
+          final repo = ref.read(containerRepositoryProvider);
+          effectivePassword = (await repo.getPassword(existing.uri))?.trim() ?? '';
+          if (retryPim == 0) {
+            retryPim = clampPim(int.tryParse(await repo.getPim(existing.uri) ?? '') ?? 0);
+          }
+          if (retryKeyfiles.isEmpty) {
+            retryKeyfiles = existing.keyfiles.map((k) => k['uri']!).toList();
+          }
         }
-        if (effectivePassword.isNotEmpty || effectiveKeyfiles.isNotEmpty) {
+        if (effectivePassword.isNotEmpty || retryKeyfiles.isNotEmpty) {
           result = await lifecycle.unlockUsbContainer(
             device.deviceName,
             effectivePassword,
-            pim,
+            retryPim,
             displayName: displayName,
             documentProvider: params.documentProvider,
             autoMountFolders: params.autoMountFolders,
@@ -905,7 +887,7 @@ void selectDevice(UsbDeviceInfo device) {
             hashId: state.hashId,
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
-            keyfilePaths: effectiveKeyfiles,
+            keyfilePaths: retryKeyfiles,
             readOnly: state.readOnly,
             protectHiddenVolume: state.protectHiddenVolume,
             hiddenVolumePassword: hiddenPasswordText,
@@ -914,6 +896,7 @@ void selectDevice(UsbDeviceInfo device) {
             hiddenVolumeHashId: state.hiddenHashId,
             hiddenVolumeKeyfilePaths: hiddenKeyfiles,
           );
+          credentialsPim = retryPim;
         }
       }
 
@@ -928,6 +911,17 @@ void selectDevice(UsbDeviceInfo device) {
         key: 'temp_pw_$newUri',
         value: effectivePassword,
       );
+      await ref
+          .read(containerRepositoryProvider)
+          .setTempPim(newUri, credentialsPim);
+      await ref
+          .read(containerRepositoryProvider)
+          .setTempKeyfiles(
+            newUri,
+            resolvedPreservedKey == null
+                ? typedKeyfiles
+                : const <Map<String, String>>[],
+          );
       final tempContainer = MountedContainer(
         uri: newUri,
         displayName: displayName,

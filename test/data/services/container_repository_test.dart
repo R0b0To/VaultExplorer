@@ -453,4 +453,129 @@ void main() {
       );
     });
   });
+
+  group('Saved PIM (custom unlock credentials)', () {
+    // Pattern / PIN / biometric unlock replays the saved credentials, so the
+    // PIM saved by the config flow has to be readable through the repository.
+    test('getPim returns null when no PIM was saved', () async {
+      expect(await repo.getPim(shortUri), isNull);
+    });
+
+    test('getPim reads the PIM the config flow stored', () async {
+      secureStorage.data[pimStorageKey(shortUri)] = ' 485 ';
+      expect(await repo.getPim(shortUri), '485');
+    });
+
+    test('getPim treats a blank stored value as no PIM', () async {
+      secureStorage.data[pimStorageKey(shortUri)] = '   ';
+      expect(await repo.getPim(shortUri), isNull);
+    });
+
+    test('getPim is keyed per container', () async {
+      secureStorage.data[pimStorageKey(uriA)] = '12';
+      expect(await repo.getPim(uriA), '12');
+      expect(await repo.getPim(uriB), isNull);
+    });
+
+    test('setPim saves a PIM that getPim reads back', () async {
+      await repo.setPim(shortUri, 485);
+      expect(secureStorage.data[pimStorageKey(shortUri)], '485');
+      expect(await repo.getPim(shortUri), '485');
+    });
+
+    test('setPim with null or 0 clears the saved PIM', () async {
+      await repo.setPim(shortUri, 485);
+      await repo.setPim(shortUri, 0);
+      expect(await repo.getPim(shortUri), isNull);
+
+      await repo.setPim(shortUri, 485);
+      await repo.setPim(shortUri, null);
+      expect(await repo.getPim(shortUri), isNull);
+    });
+
+    test('setTempPim is separate from the saved PIM and clears on 0', () async {
+      await repo.setPim(shortUri, 100);
+      await repo.setTempPim(shortUri, 485);
+      expect(secureStorage.data[tempPimStorageKey(shortUri)], '485');
+      expect(await repo.getPim(shortUri), '100');
+
+      await repo.setTempPim(shortUri, 0);
+      expect(secureStorage.data.containsKey(tempPimStorageKey(shortUri)), isFalse);
+      expect(await repo.getPim(shortUri), '100');
+    });
+
+    test('remove drops the saved PIM with the rest of the record', () async {
+      await repo.save(
+        ContainerRecord(
+          uri: shortUri,
+          label: 'Vault',
+          unlockMethod: ContainerUnlockMethod.pattern,
+          pendingPassword: 'pw',
+          pendingPatternHash: 'hash',
+        ),
+      );
+      secureStorage.data[pimStorageKey(shortUri)] = '485';
+
+      await repo.remove(shortUri);
+
+      expect(secureStorage.data.containsKey(pimStorageKey(shortUri)), isFalse);
+      expect(await repo.getPim(shortUri), isNull);
+    });
+  });
+
+  group('Temp keyfiles of the current manual unlock', () {
+    const kf = [
+      {'uri': 'content://keys/a.key', 'name': 'a.key'},
+      {'uri': 'content://keys/b.key', 'name': 'b.key'},
+    ];
+
+    test('getTempKeyfiles is empty when nothing was kept', () async {
+      expect(await repo.getTempKeyfiles(shortUri), isEmpty);
+    });
+
+    test('setTempKeyfiles round-trips uri and name in order', () async {
+      await repo.setTempKeyfiles(shortUri, kf);
+      expect(await repo.getTempKeyfiles(shortUri), kf);
+    });
+
+    test('setTempKeyfiles with an empty list clears them', () async {
+      await repo.setTempKeyfiles(shortUri, kf);
+      await repo.setTempKeyfiles(shortUri, const []);
+      expect(
+        secureStorage.data.containsKey(tempKeyfilesStorageKey(shortUri)),
+        isFalse,
+      );
+      expect(await repo.getTempKeyfiles(shortUri), isEmpty);
+    });
+
+    test('temp keyfiles are keyed per container', () async {
+      await repo.setTempKeyfiles(uriA, kf);
+      expect(await repo.getTempKeyfiles(uriA), kf);
+      expect(await repo.getTempKeyfiles(uriB), isEmpty);
+    });
+
+    test('malformed stored value reads back as no keyfiles', () async {
+      secureStorage.data[tempKeyfilesStorageKey(shortUri)] = 'not json';
+      expect(await repo.getTempKeyfiles(shortUri), isEmpty);
+    });
+
+    test('remove drops temp keyfiles and temp PIM with the record', () async {
+      await repo.save(
+        ContainerRecord(uri: shortUri, label: 'Vault', keyfiles: kf),
+      );
+      await repo.setTempKeyfiles(shortUri, kf);
+      await repo.setTempPim(shortUri, 485);
+
+      await repo.remove(shortUri);
+
+      expect(
+        secureStorage.data.containsKey(tempKeyfilesStorageKey(shortUri)),
+        isFalse,
+      );
+      expect(
+        secureStorage.data.containsKey(tempPimStorageKey(shortUri)),
+        isFalse,
+      );
+    });
+  });
 }

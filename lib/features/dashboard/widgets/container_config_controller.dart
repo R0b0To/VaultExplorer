@@ -91,6 +91,9 @@ class ContainerConfigState {
   final bool clearingCache;
   final String? tempPassword;
   final String? tempPim;
+  // Keyfiles of the current manual unlock (see tempKeyfilesStorageKey). Kept
+  // apart from [keyfiles] because the password method clears that list.
+  final List<KeyfileRef> tempKeyfiles;
   final bool isMounted;
 
   // Baseline initial state for change detection
@@ -134,6 +137,7 @@ class ContainerConfigState {
     this.clearingCache = false,
     this.tempPassword,
     this.tempPim,
+    this.tempKeyfiles = const [],
     this.isMounted = false,
     required this.initialLabel,
     required this.initialUnlockMethod,
@@ -255,6 +259,7 @@ class ContainerConfigState {
     bool? clearingCache,
     String? tempPassword,
     String? tempPim,
+    List<KeyfileRef>? tempKeyfiles,
     bool? isMounted,
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
@@ -292,6 +297,7 @@ class ContainerConfigState {
     clearingCache: clearingCache ?? this.clearingCache,
     tempPassword: tempPassword ?? this.tempPassword,
     tempPim: tempPim ?? this.tempPim,
+    tempKeyfiles: tempKeyfiles ?? this.tempKeyfiles,
     isMounted: isMounted ?? this.isMounted,
     initialLabel: initialLabel,
     initialUnlockMethod: initialUnlockMethod,
@@ -431,16 +437,22 @@ class ContainerConfigController extends _$ContainerConfigController {
   ) async {
     String? tempPw;
     String? tempPim;
+    var tempKeyfiles = <KeyfileRef>[];
     try {
       tempPw = await ref
           .read(appSecureStorageProvider)
           .read(key: 'temp_pw_${params.uri}');
       tempPim = await ref
           .read(appSecureStorageProvider)
-          .read(key: 'temp_pim_${params.uri}');
+          .read(key: tempPimStorageKey(params.uri));
       tempPim ??= await ref
           .read(appSecureStorageProvider)
-          .read(key: 'pim_${params.uri}');
+          .read(key: pimStorageKey(params.uri));
+      tempKeyfiles = (await ref
+              .read(containerRepositoryProvider)
+              .getTempKeyfiles(params.uri))
+          .map((k) => (uri: k['uri']!, displayName: k['name']!))
+          .toList();
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Temp credentials read failed', e);
     }
@@ -515,9 +527,18 @@ class ContainerConfigController extends _$ContainerConfigController {
     }
 
     if (!ref.mounted) return;
+    // A vault that is already on a remembered-credentials method but has no
+    // keyfiles saved (e.g. they were never stored) gets the ones that just
+    // unlocked it, so saving the settings completes the credential set.
+    final seedKeyfiles =
+        state.unlockMethod != ContainerUnlockMethod.password &&
+        state.keyfiles.isEmpty &&
+        tempKeyfiles.isNotEmpty;
     state = state._copy(
       tempPassword: tempPw,
       tempPim: tempPim,
+      tempKeyfiles: tempKeyfiles,
+      keyfiles: seedKeyfiles ? List.unmodifiable(tempKeyfiles) : null,
       biometricAvailable: biometricAvailable,
       thumbnailCacheMode: thumbMode,
       thumbnailQuality: thumbQuality,
@@ -538,12 +559,16 @@ class ContainerConfigController extends _$ContainerConfigController {
   void setLabel(String label) => state = state._copy(label: label);
 
   void setUnlockMethod(ContainerUnlockMethod method) {
-    state = state._copy(
-      unlockMethod: method,
-      keyfiles: method == ContainerUnlockMethod.password
-          ? const []
-          : state.keyfiles,
-    );
+    // Switching a manual-password vault to a remembered-credentials method:
+    // offer the keyfiles that were used for the current manual unlock, the
+    // same way the password and PIM are pre-filled.
+    final fromPassword = state.unlockMethod == ContainerUnlockMethod.password;
+    final keyfiles = method == ContainerUnlockMethod.password
+        ? const <KeyfileRef>[]
+        : (fromPassword && state.keyfiles.isEmpty
+              ? state.tempKeyfiles
+              : state.keyfiles);
+    state = state._copy(unlockMethod: method, keyfiles: keyfiles);
   }
 
   void setAutoCloseMins(int mins) => state = state._copy(autoCloseMins: mins);
@@ -704,14 +729,14 @@ class ContainerConfigController extends _$ContainerConfigController {
       if (trimmedPim.isNotEmpty && trimmedPim != '0') {
         await ref
             .read(appSecureStorageProvider)
-            .write(key: 'pim_${params.uri}', value: trimmedPim);
+            .write(key: pimStorageKey(params.uri), value: trimmedPim);
       } else {
         await ref
             .read(appSecureStorageProvider)
-            .delete(key: 'pim_${params.uri}');
+            .delete(key: pimStorageKey(params.uri));
       }
     } else if (!needsPassword) {
-      await ref.read(appSecureStorageProvider).delete(key: 'pim_${params.uri}');
+      await ref.read(appSecureStorageProvider).delete(key: pimStorageKey(params.uri));
     }
 
     final record = ContainerRecord(

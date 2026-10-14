@@ -245,7 +245,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               .getPassword(widget.uri);
           final savedPim = await ref
               .read(appSecureStorageProvider)
-              .read(key: 'pim_${widget.uri}');
+              .read(key: pimStorageKey(widget.uri));
           ref
               .read(containerConfigControllerProvider(_params).notifier)
               .unlockSettings();
@@ -282,7 +282,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
             .getPassword(widget.uri);
         final savedPim = await ref
             .read(appSecureStorageProvider)
-            .read(key: 'pim_${widget.uri}');
+            .read(key: pimStorageKey(widget.uri));
         ref
             .read(containerConfigControllerProvider(_params).notifier)
             .unlockSettings();
@@ -311,7 +311,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
             .getPassword(widget.uri);
         final savedPim = await ref
             .read(appSecureStorageProvider)
-            .read(key: 'pim_${widget.uri}');
+            .read(key: pimStorageKey(widget.uri));
         ref
             .read(containerConfigControllerProvider(_params).notifier)
             .unlockSettings();

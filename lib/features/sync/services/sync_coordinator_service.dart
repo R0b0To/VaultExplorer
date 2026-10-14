@@ -108,6 +108,9 @@ class SyncCoordinatorService {
   /// seconds (cloud providers), so they are checked less often.
   static const Duration _safPoll = Duration(minutes: 5);
 
+  /// How often native is asked again while a headless sync owns a vault.
+  static const Duration _headlessPoll = Duration(seconds: 2);
+
   final VaultFileIoApi _io;
   final VaultHashApi _hashApi;
   final VaultEngineEvents _events;
@@ -117,6 +120,7 @@ class SyncCoordinatorService {
   final SyncRuleRunner _runner;
   final LiveWatchService _liveWatch;
   final SyncNotificationBridge _notifier;
+  final Future<bool> Function(String vaultUri) _headlessSyncActive;
 
   final Map<String, _VaultSession> _sessions = {};
   final Map<String, MountedContainer> _unlocked = {};
@@ -136,6 +140,10 @@ class SyncCoordinatorService {
     required LiveWatchService liveWatch,
     required SyncNotificationBridge notifier,
     SyncRuleRunner? runner,
+
+    // Asks native whether a headless sync (its own Flutter engine, same
+    // sync ledger) currently owns a vault. Defaults to "never", for tests.
+    Future<bool> Function(String vaultUri)? headlessSyncActive,
   }) : _io = fileIo,
        _hashApi = hashApi,
        _events = events,
@@ -144,6 +152,7 @@ class SyncCoordinatorService {
        _bindings = bindings,
        _liveWatch = liveWatch,
        _notifier = notifier,
+       _headlessSyncActive = headlessSyncActive ?? ((_) async => false),
        _runner = runner ?? SyncRuleRunner() {
     _events.addContainerLockedListener(_onContainerLocked);
     _events.addPanicSessionPurgedListener(_onPanic);
@@ -392,6 +401,10 @@ class SyncCoordinatorService {
     try {
       if (after != null) await after;
       if (session.token.isCancelled) return;
+      // Read the config and ledger only once a headless sync of this vault
+      // has finished, so they include everything it did.
+      await _awaitHeadlessSync(session);
+      if (session.token.isCancelled) return;
       final config = await _loadConfig(session);
       if (config == null || session.token.isCancelled) return;
       await _applyConfig(session, config, initial: true);
@@ -489,10 +502,61 @@ class SyncCoordinatorService {
     );
   }
 
+  /// Waits until no headless sync -- a scheduled run, SYNC_VAULT, or the
+  /// sync after an automation unlock -- is working on [session]'s vault.
+  /// Returns true if it had to wait.
+  ///
+  /// Such a sync runs in its own Flutter engine, so the per-vault
+  /// scheduler can't serialise it against this one; native owns that lock
+  /// and is asked here instead. The lock is held until the headless run
+  /// ends, and it relocks the vault it opened, so this may end with the
+  /// session cancelled: callers re-check the token afterwards.
+  Future<bool> _awaitHeadlessSync(_VaultSession session) async {
+    var waited = false;
+    while (!session.token.isCancelled && !session.locked) {
+      if (!await _headlessSyncActive(session.vault.uri)) break;
+      if (!waited) {
+        waited = true;
+        VeLog.i(_tag, 'headless sync active on this vault; waiting for it');
+      }
+      // One poll's sleep, cut short the moment the vault is locked.
+      final woken = Completer<void>();
+      void wake() {
+        if (!woken.isCompleted) woken.complete();
+      }
+
+      session.token.bindOnCancel(wake);
+      try {
+        await Future.any([Future<void>.delayed(_headlessPoll), woken.future]);
+      } finally {
+        session.token.unbind(wake);
+      }
+    }
+    return waited;
+  }
+
   // ── one run (the scheduler calls this, one rule at a time) ───────────
 
   Future<void> _runOne(_VaultSession session, String ruleId) async {
     if (session.token.isCancelled || session.locked) return;
+    // A run requested while _start is still waiting out a headless sync
+    // arrives before any config is loaded; wait for it instead of dropping
+    // the request.
+    if (session.config == null) {
+      try {
+        await session.starting;
+      } catch (_) {
+        // _start logs its own failure; no config means nothing to run.
+      }
+      if (session.token.isCancelled || session.locked) return;
+    }
+    // A headless sync may have started since the ledger was read. Wait for
+    // it, then re-read: flushing a stale ledger over its results would
+    // make the next run misjudge every file it touched.
+    if (await _awaitHeadlessSync(session)) {
+      if (session.token.isCancelled || session.locked) return;
+      await session.ledger.open();
+    }
     final config = session.config;
     final rule = config?.rules.where((r) => r.id == ruleId).firstOrNull;
     if (config == null || rule == null) return;

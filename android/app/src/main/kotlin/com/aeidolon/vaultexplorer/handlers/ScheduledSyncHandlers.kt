@@ -14,6 +14,7 @@ import androidx.work.Data
 import androidx.work.WorkManager
 import com.aeidolon.vaultexplorer.automation.AutomationSettings
 import com.aeidolon.vaultexplorer.automation.ScheduledVaultSyncAlarmReceiver
+import com.aeidolon.vaultexplorer.automation.ScheduledVaultSyncRunner
 import com.aeidolon.vaultexplorer.automation.ScheduledVaultSyncWorker
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -445,6 +446,16 @@ class ScheduledSyncHandlers(context: Context) {
 
     fun handleRequestExactAlarmAccess(result: MethodChannel.Result) {
         result.success(requestExactAlarmAccess(appContext))
+    }
+
+    /** Whether a headless sync currently owns a vault; see [ScheduledVaultSyncRunner.isSyncActive]. */
+    fun handleIsHeadlessSyncActive(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri.isNullOrBlank()) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        result.success(ScheduledVaultSyncRunner.isSyncActive(vaultUri))
     }
 
     fun handleSchedule(call: MethodCall, result: MethodChannel.Result) {

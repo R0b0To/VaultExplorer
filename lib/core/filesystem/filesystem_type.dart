@@ -32,6 +32,16 @@ enum FilesystemType {
   /// restrictions that still apply.
   encryptedVault,
 
+  /// ext2/3/4 whose names must stay portable: the case-*sensitive* matching
+  /// of [ext] combined with the conservative character/trailing-dot/
+  /// reserved-name restrictions of [unknownConservative]. This is the type
+  /// an ext disk-image container resolves to once
+  /// `kAllowCaseDistinctNamesInExtContainers` is turned on (see
+  /// mounted_container_filesystem.dart), so that "Notes" and "notes" can
+  /// coexist without also letting through names that FAT/exFAT/NTFS or
+  /// Android shared storage cannot hold when the data is copied out.
+  extPortable,
+
   /// Used when the real target filesystem isn't known at the call site
   /// (see ADR-005) — a plain SAF-backed folder vault, or a native
   /// disk-image container whose exact FAT/exFAT/NTFS/ext kind hasn't been
@@ -52,6 +62,7 @@ enum FilesystemType {
         FilesystemType.exfat => 'exFAT',
         FilesystemType.ntfs => 'NTFS',
         FilesystemType.ext => 'ext2/3/4',
+        FilesystemType.extPortable => l10n.filesystemLabelThisContainer,
         FilesystemType.encryptedVault => l10n.filesystemLabelEncryptedVault,
         FilesystemType.unknownConservative => l10n.filesystemLabelThisContainer,
       };
@@ -199,6 +210,23 @@ class FilesystemRules {
     caseSensitive: true,
   );
 
+  /// ext2/3/4 with portable names: identical to [unknownConservative]
+  /// except that "Notes" and "notes" are different names, which is how
+  /// libext2fs really treats them. Everything else stays at the union of
+  /// the FAT/exFAT/NTFS restrictions so a name accepted here can still be
+  /// copied to any of them (or exported to Android shared storage)
+  /// without being rejected or silently rewritten.
+  static const extPortable = FilesystemRules(
+    illegalCharCodes: _windowsFamilyIllegal,
+    disallowControlChars: true,
+    disallowReservedDeviceNames: true,
+    disallowTrailingSpaceOrDot: true,
+    maxComponentLength: 255,
+    maxComponentLengthIsUtf8Bytes: true,
+    maxPathLength: 260,
+    caseSensitive: true,
+  );
+
   /// CryFS / Cryptomator / gocryptfs. The plaintext name is encrypted
   /// before it becomes a host filename, so real filesystem character
   /// rules don't apply to it. `/` is still rejected — not because the
@@ -238,6 +266,7 @@ class FilesystemRules {
         FilesystemType.exfat => exfat,
         FilesystemType.ntfs => ntfs,
         FilesystemType.ext => ext,
+        FilesystemType.extPortable => extPortable,
         FilesystemType.encryptedVault => encryptedVault,
         FilesystemType.unknownConservative => unknownConservative,
       };

@@ -35,6 +35,8 @@ final syncCoordinatorServiceProvider = Provider<SyncCoordinatorService>((ref) {
     events: ref.watch(vaultEngineEventsProvider),
     barrier: ref.watch(syncLockBarrierProvider),
     bindings: ref.watch(syncTargetBindingStoreProvider),
+    headlessSyncActive:
+        ref.watch(vaultAutomationApiProvider).isHeadlessSyncActive,
     liveWatch: LiveWatchService(fileOps: fileOps),
     notifier: SyncNotificationBridge(
       lifecycle: ref.watch(vaultLifecycleApiProvider),

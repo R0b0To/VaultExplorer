@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
@@ -1164,11 +1166,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final rawList = await ref
         .read(vaultFileIoApiProvider)
         .listDirectory(widget.container, parentDir);
+    final caseSensitive = FilesystemRules.of(
+      resolveFilesystemType(widget.container),
+    ).caseSensitive;
+    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
     final existingNames = RawEntry.parseAll(
       rawList ?? const [],
-    ).map((e) => e.name.toLowerCase()).toSet();
+    ).map((e) => foldName(e.name)).toSet();
 
-    if (existingNames.contains(result.toLowerCase()) && mounted) {
+    if (existingNames.contains(foldName(result)) && mounted) {
       showAppSnackBar(
         context,
         message: context.l10n.textEditorFileAlreadyExistsError,
@@ -1528,11 +1534,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final rawList = await ref
         .read(vaultFileIoApiProvider)
         .listDirectory(widget.container, parentDir);
+    final caseSensitive = FilesystemRules.of(
+      resolveFilesystemType(widget.container),
+    ).caseSensitive;
+    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
     final existingNames = RawEntry.parseAll(
       rawList ?? const [],
-    ).map((e) => e.name.toLowerCase()).toSet();
+    ).map((e) => foldName(e.name)).toSet();
 
-    if (existingNames.contains(result.toLowerCase()) && mounted) {
+    if (existingNames.contains(foldName(result)) && mounted) {
       final overwrite = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(

@@ -13,6 +13,7 @@ abstract final class ChannelMethods {
   static const scheduleVaultSync = 'scheduleVaultSync';
   static const canScheduleExactAlarms = 'canScheduleExactAlarms';
   static const requestExactAlarmAccess = 'requestExactAlarmAccess';
+  static const isHeadlessSyncActive = 'isHeadlessSyncActive';
   static const resolveRawStoragePath = 'resolveRawStoragePath';
   static const startBackgroundRecording = 'startBackgroundRecording';
   static const stopBackgroundRecording = 'stopBackgroundRecording';

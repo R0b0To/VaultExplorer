@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/volume_filesystem_registry.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -411,6 +413,7 @@ class VaultDashboardController extends _$VaultDashboardController {
     _syncSecureScreen();
     scheduleAutoClose(container);
     refreshContainerSpace(container.volId);
+    unawaited(_recordVolumeFilesystem(container));
     if (record != null) {
       ref.read(containerRepositoryProvider).saveOrder(newOrder);
     }
@@ -484,6 +487,7 @@ class VaultDashboardController extends _$VaultDashboardController {
 
     _syncSecureScreen();
     scheduleAutoClose(container);
+    unawaited(_recordVolumeFilesystem(container));
     ref.read(containerRepositoryProvider).saveOrder(newOrder);
     unawaited(ref.read(syncCoordinatorServiceProvider).onVaultUnlocked(container));
   }
@@ -531,6 +535,7 @@ class VaultDashboardController extends _$VaultDashboardController {
     FullResImageCache.clear();
     ref.read(vaultEngineEventsProvider).notifyContainerLocked(volId);
 
+    VolumeFilesystemRegistry.forget(volId);
     final newMounted = state.mounted.where((c) => c.volId != volId).toList();
     state = state._copy(mounted: List.unmodifiable(newMounted));
     VeLog.i(
@@ -539,6 +544,39 @@ class VaultDashboardController extends _$VaultDashboardController {
       '${newMounted.map((c) => c.volId).toList()}',
     );
     _syncSecureScreen();
+  }
+
+  /// Records which concrete filesystem (FAT/exFAT/NTFS/ext) a freshly
+  /// mounted disk-image volume has, so name rules and copy collision checks
+  /// can use the real answer instead of the conservative one. Local
+  /// storage and the encrypted folder-vault formats have no inner
+  /// filesystem to report and are skipped. Any failure leaves the volume
+  /// unrecorded, which every consumer treats as "unknown".
+  Future<void> _recordVolumeFilesystem(MountedContainer container) async {
+    final format = container.format;
+    if (container.volId < 0 ||
+        format.isCryfs ||
+        format.isCryptomator ||
+        format.isGocryptfs) {
+      return;
+    }
+    try {
+      final info = await ref
+          .read(vaultFileIoApiProvider)
+          .getVaultInfo(container.uri);
+      if (!ref.mounted) return;
+      if (!state.mounted.any((c) => c.volId == container.volId)) return;
+      final label = info?['fileSystem'];
+      final FilesystemType? type =
+          filesystemTypeFromLabel(label is String ? label : null);
+      VolumeFilesystemRegistry.record(container.volId, type);
+    } catch (e) {
+      VeLog.w(
+        _kLogTag,
+        'Filesystem detection failed for volId=${container.volId}',
+        e,
+      );
+    }
   }
 
   Future<void> refreshContainerSpace(int volId) async {

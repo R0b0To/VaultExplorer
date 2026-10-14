@@ -37,6 +37,26 @@ class ScheduledVaultSyncRunner(
         private const val TAG = "ScheduledVaultSyncRunner"
         private const val CONTROL_CHANNEL = "com.aeidolon.vaultexplorer/scheduled_sync"
         private val vaultSyncLocks = ConcurrentHashMap<String, Mutex>()
+
+        /**
+         * True while a headless sync owns [vaultUri]: a scheduled run,
+         * SYNC_VAULT, or the sync after UNLOCK_VAULT. A mutex that is
+         * locked has the holder running and any others queued behind it,
+         * so this stays true across a queued hand-over.
+         *
+         * Read-only and non-blocking, so the main thread may call it. The
+         * in-app sync coordinator asks this over the method channel before
+         * it loads the vault's sync ledger or starts a run: both engines
+         * share one whole-file ledger, and whichever flushes last would
+         * overwrite the other's results.
+         *
+         * Not airtight: the lock is taken when the sync starts, so the
+         * moment between an automation unlock and that point is not
+         * covered.
+         */
+        @JvmStatic
+        fun isSyncActive(vaultUri: String): Boolean =
+            vaultSyncLocks[vaultUri]?.isLocked == true
     }
 
     private var engine: FlutterEngine? = null

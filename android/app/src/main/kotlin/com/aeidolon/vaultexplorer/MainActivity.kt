@@ -97,6 +97,7 @@ private object ChannelMethods {
     const val SCHEDULE_VAULT_SYNC       = "scheduleVaultSync"
     const val CAN_SCHEDULE_EXACT_ALARMS = "canScheduleExactAlarms"
     const val REQUEST_EXACT_ALARM_ACCESS = "requestExactAlarmAccess"
+    const val IS_HEADLESS_SYNC_ACTIVE   = "isHeadlessSyncActive"
     const val RESOLVE_RAW_STORAGE_PATH  = "resolveRawStoragePath"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
     const val GET_MIRROR_PUSH_ACTIVITY = "getMirrorPushActivity"
@@ -1110,6 +1111,8 @@ open class MainActivity : FlutterFragmentActivity() {
                     scheduledSyncHandlers.handleCanScheduleExactAlarms(result)
                 ChannelMethods.REQUEST_EXACT_ALARM_ACCESS ->
                     scheduledSyncHandlers.handleRequestExactAlarmAccess(result)
+                ChannelMethods.IS_HEADLESS_SYNC_ACTIVE ->
+                    scheduledSyncHandlers.handleIsHeadlessSyncActive(call, result)
                 ChannelMethods.RESOLVE_RAW_STORAGE_PATH -> {
                     val rawUri = call.argument<String>("uri")
                     if (rawUri.isNullOrBlank()) {

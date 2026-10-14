@@ -1171,6 +1171,15 @@ class FileOperationService extends ChangeNotifier {
             })
           >[];
 
+      // On a destination that treats "Notes" and "notes" as one name, two
+      // selected items that differ only by case would land on the same
+      // entry -- and every copy deletes its destination before writing, so
+      // the later one would silently replace the earlier one. The second
+      // and later such items are failed up front instead of copied.
+      final destCaseSensitive = isDestinationCaseSensitive(dest);
+      final claimedDestLeaves = <String>{};
+      final collidingResolvedIdx = <int>{};
+
       for (final item in op.items) {
         final fileName = item.name;
         String destPath = op.destDirPath.isEmpty
@@ -1255,6 +1264,17 @@ class FileOperationService extends ChangeNotifier {
           }
         }
 
+        if (!destCaseSensitive &&
+            !claimedDestLeaves.add(destPath.split('/').last.toLowerCase())) {
+          collidingResolvedIdx.add(resolved.length);
+          VeLog.d(
+            'FileOperationService',
+            'CASE_COLLISION top-level item '
+                '${VeLog.censorName(destPath.split('/').last)} would replace '
+                'an earlier item on a case-insensitive destination; failing it',
+          );
+        }
+
         resolved.add((
           item: item,
           destPath: destPath,
@@ -1280,6 +1300,15 @@ class FileOperationService extends ChangeNotifier {
             await semaphore.acquire();
             try {
               if (op.cancelRequested) throw const _CancelledException();
+
+              if (collidingResolvedIdx.contains(idx)) {
+                op._recordItemResult(
+                  idx,
+                  FileItemResult.failed,
+                  errorMessage: op.l10n.fileOpCopyFailed,
+                );
+                return;
+              }
 
               if (r.skip) {
                 op._recordItemResult(idx, FileItemResult.skipped);
@@ -1772,10 +1801,28 @@ class FileOperationService extends ChangeNotifier {
       await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
     }
 
+    // Same guard as the top-level one in `_run`: siblings that differ only
+    // by case would land on one entry of a case-insensitive destination, and
+    // `_copyFile` deletes its destination before writing. Fail the later
+    // sibling (so the folder reports as not fully copied, and a move keeps
+    // its source) instead of letting it replace the earlier one.
+    final destCaseSensitive = isDestinationCaseSensitive(dest);
+    final claimedChildNames = <String>{};
+
     bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
+      if (!destCaseSensitive && !claimedChildNames.add(e.name.toLowerCase())) {
+        VeLog.d(
+          'FileOperationService',
+          'CASE_COLLISION child ${VeLog.censorName(e.name)} differs only by '
+              'case from an earlier sibling on a case-insensitive '
+              'destination; not copied',
+        );
+        allOk = false;
+        continue;
+      }
       final ok = await _copyEntry(
         src,
         dest,

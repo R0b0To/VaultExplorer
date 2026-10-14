@@ -453,9 +453,7 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
     final startNum = int.tryParse(_startNumCtrl.text.trim()) ?? 1;
     final padding = int.tryParse(_paddingCtrl.text.trim())?.clamp(1, 8) ?? 2;
     final separator = _separatorCtrl.text;
-    final isCaseSensitive =
-        _fsType == FilesystemType.ext ||
-        _fsType == FilesystemType.encryptedVault;
+    final isCaseSensitive = FilesystemRules.of(_fsType).caseSensitive;
 
     int counterIndex = 0;
     final Map<String, String> unselectedOriginals = {

@@ -273,4 +273,27 @@ class VaultAutomationApi {
       return const [];
     }
   }
+
+  /// True while a headless sync -- a scheduled run, the SYNC_VAULT action,
+  /// or the sync that follows an automation unlock -- is working on
+  /// [vaultUri]. Mirrors ScheduledVaultSyncRunner.isSyncActive natively.
+  ///
+  /// The headless run uses its own Flutter engine and the same whole-file
+  /// sync ledger as the app, so the app must not load that ledger or start
+  /// a run on the vault while this is true.
+  ///
+  /// Answers false when native can't be asked: a failed probe must never
+  /// block the app's own sync indefinitely.
+  Future<bool> isHeadlessSyncActive(String vaultUri) async {
+    try {
+      final active = await _channel.invokeMethod<bool>(
+        ChannelMethods.isHeadlessSyncActive,
+        {'vaultUri': vaultUri},
+      );
+      return active ?? false;
+    } catch (e) {
+      logSwallowed('isHeadlessSyncActive', e);
+      return false;
+    }
+  }
 }

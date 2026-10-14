@@ -19,7 +19,7 @@ void main() {
       expect(s.useMasterPassword, isFalse);
       expect(s.masterUnlockMethod, MasterUnlockMethod.password);
       expect(s.videoAutoPlay, isTrue);
-      expect(s.blockScreenshots, isFalse);
+      expect(s.blockScreenshots, isTrue);
       expect(s.lockContainersOnScreenLock, isTrue);
       expect(s.defaultDerivedKeyCacheEnabled, isFalse);
       expect(s.autoLockMins, 0);
@@ -55,7 +55,7 @@ void main() {
         masterUnlockMethod: MasterUnlockMethod.biometrics,
         defaultDocumentProvider: true,
         videoAutoPlay: false,
-        blockScreenshots: true,
+        blockScreenshots: false,
         keepVaultsRunningInBackground: true,
         lockContainersOnScreenLock: false,
         defaultDerivedKeyCacheEnabled: true,
@@ -193,10 +193,26 @@ void main() {
       });
     });
 
+    test('blockScreenshots is on when the key is absent, but an explicit '
+        'opt-out (false) is preserved', () {
+      expect(AppSettings.fromJson({}).blockScreenshots, isTrue);
+      expect(
+        AppSettings.fromJson({'blockScreenshots': false}).blockScreenshots,
+        isFalse,
+      );
+      expect(
+        AppSettings.fromJson(
+          AppSettings(blockScreenshots: false).toJson(),
+        ).blockScreenshots,
+        isFalse,
+      );
+    });
+
     test('fromJson({}) does not throw and produces sensible fallbacks', () {
       final s = AppSettings.fromJson({});
       expect(s.useMasterPassword, isFalse);
       expect(s.videoAutoPlay, isTrue);
+      expect(s.blockScreenshots, isTrue);
       expect(s.autoLockMins, 0);
       expect(s.autoLockScreenLockOnly, isFalse);
       expect(s.appLockScreenLockOnly, isFalse);

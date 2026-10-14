@@ -60,13 +60,13 @@ void main() {
 
       await controller.updateSettings((s) => s.copyWith(
             containerSortMode: ContainerSortMode.newest,
-            blockScreenshots: true,
+            blockScreenshots: false,
             autoLockMins: 15,
           ));
 
       final state = container.read(appSettingsControllerProvider);
       expect(state.settings.containerSortMode, ContainerSortMode.newest);
-      expect(state.settings.blockScreenshots, isTrue);
+      expect(state.settings.blockScreenshots, isFalse);
       expect(state.settings.autoLockMins, 15);
     });
 

@@ -186,7 +186,7 @@ class AppSettings {
     this.masterUnlockMethod = MasterUnlockMethod.password,
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
-    this.blockScreenshots = false,
+    this.blockScreenshots = true,
     this.keepVaultsRunningInBackground = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
@@ -455,7 +455,7 @@ class AppSettings {
         : MasterUnlockMethod.password,
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
-    blockScreenshots: j['blockScreenshots'] as bool? ?? false,
+    blockScreenshots: j['blockScreenshots'] as bool? ?? true,
     keepVaultsRunningInBackground:
         j['keepVaultsRunningInBackground'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled:

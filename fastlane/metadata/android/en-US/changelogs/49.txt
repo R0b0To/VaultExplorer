@@ -1,0 +1,23 @@
+# What's New
+
+### Media & Audio
+* **Media Notification Controls:** Added a dedicated "Stop" action to the media notification. Media playback controls are now fully enabled when playing files directly from local storage.
+* **Audio Equalizer:** Integrated an audio equalizer into the media viewer for customizable playback sound.
+* **Direct Audio Capture:** Added the ability to record audio directly as a new item saved straight into your vaults.
+
+### Text Editor
+* **Tab Reordering:** You can now long-press and drag tabs to easily reorder them.
+* **Large File Performance:** Optimized editor engine for smoother scrolling, editing, and reduced lag when opening large text files.
+
+### Image Viewer & Archive Handling
+* **Memory & Crash Prevention:** Optimized memory allocations for large images and archive operations to prevent out-of-memory (OOM) crashes.
+* **Adaptive Scaling:** Extremely large images now gracefully fall back to a 1/8-scale preview if the progressive JPEG guard rejects them (standard images remain untouched).
+* **Archive Viewer Experience:** Image viewing inside archives now opens full-screen over a clean black background, complete with full zoom controls and the 3.5× double-tap zoom behavior matching the main viewer.
+
+### Security & Vaults
+* **Authentication Fix:** Fixed an issue where custom credential unlock methods (such as pattern unlock) failed to work when combined with PIM or keyfiles.
+
+### Sync & System
+* **Automated Sync:** Improved the reliability of sync action automation whether executed in the foreground or background.
+* **Storage Permission Failsafes:** Added extra safeguards to gracefully handle cases where file access fails or is restricted after permissions were previously granted.
+* **UI/UX:** Miscellaneous visual polish, layout alignments, and user experience refinements throughout the app.

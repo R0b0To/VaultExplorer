@@ -1,0 +1,8 @@
+• Audio equalizer & stop control in media notification
+• Direct audio recording into vaults
+• Text editor: tab reordering & large file optimizations
+• Memory fixes for large images & archives (prevents OOM)
+• Fullscreen 3.5× zoom for archive images
+• Fixed custom unlock (pattern) with PIM/keyfiles
+• Improved foreground/background sync automation
+• File permission failsafes & UI polish

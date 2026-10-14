@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "詳細メニューに移動",
   "inPlaceEditMoveToAdvanced": "詳細設定に移動",
   "inPlaceEditHideAction": "アクションを非表示",
-  "inPlaceEditHidden": "非表示"
+  "inPlaceEditHidden": "非表示",
+  "textEditorAutoHideAppBarLabel": "アプリバーを自動的に非表示",
+  "textEditorAutoHideAppBarDescription": "編集中に上部バーを非表示にして垂直方向のスペースを最大化"
 }

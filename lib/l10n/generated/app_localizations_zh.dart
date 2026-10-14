@@ -10823,4 +10823,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => '已隐藏';
+
+  @override
+  String get textEditorAutoHideAppBarLabel => '自动隐藏应用栏';
+
+  @override
+  String get textEditorAutoHideAppBarDescription => '编辑时隐藏顶部栏以最大化垂直空间';
 }

@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "Sposta nel menu Altro",
   "inPlaceEditMoveToAdvanced": "Sposta in Impostazioni avanzate",
   "inPlaceEditHideAction": "Nascondi azione",
-  "inPlaceEditHidden": "Nascosto"
+  "inPlaceEditHidden": "Nascosto",
+  "textEditorAutoHideAppBarLabel": "Nascondi automaticamente barra superiore",
+  "textEditorAutoHideAppBarDescription": "Nascondi la barra superiore durante la modifica per massimizzare lo spazio verticale"
 }

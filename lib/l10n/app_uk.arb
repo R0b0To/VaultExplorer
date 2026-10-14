@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "Перемістити до меню «Більше»",
   "inPlaceEditMoveToAdvanced": "Перемістити до розширених налаштувань",
   "inPlaceEditHideAction": "Приховати дію",
-  "inPlaceEditHidden": "Приховано"
+  "inPlaceEditHidden": "Приховано",
+  "textEditorAutoHideAppBarLabel": "Автоматично приховувати панель програми",
+  "textEditorAutoHideAppBarDescription": "Приховувати верхню панель під час редагування для збільшення вертикального простору"
 }

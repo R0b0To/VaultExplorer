@@ -11643,4 +11643,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => 'مخفي';
+
+  @override
+  String get textEditorAutoHideAppBarLabel => 'إخفاء شريط التطبيق تلقائيًا';
+
+  @override
+  String get textEditorAutoHideAppBarDescription =>
+      'إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية';
 }

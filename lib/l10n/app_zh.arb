@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "移动至“更多”菜单",
   "inPlaceEditMoveToAdvanced": "移动至高级设置",
   "inPlaceEditHideAction": "隐藏操作",
-  "inPlaceEditHidden": "已隐藏"
+  "inPlaceEditHidden": "已隐藏",
+  "textEditorAutoHideAppBarLabel": "自动隐藏应用栏",
+  "textEditorAutoHideAppBarDescription": "编辑时隐藏顶部栏以最大化垂直空间"
 }

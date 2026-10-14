@@ -11628,4 +11628,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => 'Ausgeblendet';
+
+  @override
+  String get textEditorAutoHideAppBarLabel =>
+      'App-Leiste automatisch ausblenden';
+
+  @override
+  String get textEditorAutoHideAppBarDescription =>
+      'Obere Leiste beim Bearbeiten ausblenden, um vertikalen Platz zu maximieren';
 }

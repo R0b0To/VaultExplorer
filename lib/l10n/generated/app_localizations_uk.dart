@@ -11705,4 +11705,12 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => 'Приховано';
+
+  @override
+  String get textEditorAutoHideAppBarLabel =>
+      'Автоматично приховувати панель програми';
+
+  @override
+  String get textEditorAutoHideAppBarDescription =>
+      'Приховувати верхню панель під час редагування для збільшення вертикального простору';
 }

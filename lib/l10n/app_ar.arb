@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "نقل إلى قائمة المزيد",
   "inPlaceEditMoveToAdvanced": "نقل إلى الإعدادات المتقدمة",
   "inPlaceEditHideAction": "إخفاء الإجراء",
-  "inPlaceEditHidden": "مخفي"
+  "inPlaceEditHidden": "مخفي",
+  "textEditorAutoHideAppBarLabel": "إخفاء شريط التطبيق تلقائيًا",
+  "textEditorAutoHideAppBarDescription": "إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية"
 }

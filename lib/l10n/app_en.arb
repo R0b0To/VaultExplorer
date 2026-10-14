@@ -13094,5 +13094,13 @@
   "inPlaceEditHidden": "Hidden",
   "@inPlaceEditHidden": {
     "description": "Header and label for hidden / unused actions"
+  },
+  "textEditorAutoHideAppBarLabel": "Auto-hide app bar",
+  "@textEditorAutoHideAppBarLabel": {
+    "description": "Label for toggle in editor appearance settings to hide the app bar while typing"
+  },
+  "textEditorAutoHideAppBarDescription": "Hide the top bar while editing to maximize vertical space",
+  "@textEditorAutoHideAppBarDescription": {
+    "description": "Description for toggle in editor appearance settings to hide the app bar while typing"
   }
 }

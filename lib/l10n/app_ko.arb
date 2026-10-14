@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "더보기 메뉴로 이동",
   "inPlaceEditMoveToAdvanced": "고급 설정으로 이동",
   "inPlaceEditHideAction": "동작 숨기기",
-  "inPlaceEditHidden": "숨김"
+  "inPlaceEditHidden": "숨김",
+  "textEditorAutoHideAppBarLabel": "앱 바 자동 숨기기",
+  "textEditorAutoHideAppBarDescription": "세로 공간을 최대화하기 위해 편집 중 상단 바 숨기기"
 }

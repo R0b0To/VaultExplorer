@@ -10991,4 +10991,11 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => '숨김';
+
+  @override
+  String get textEditorAutoHideAppBarLabel => '앱 바 자동 숨기기';
+
+  @override
+  String get textEditorAutoHideAppBarDescription =>
+      '세로 공간을 최대화하기 위해 편집 중 상단 바 숨기기';
 }

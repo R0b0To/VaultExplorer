@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "Déplacer vers le menu Plus",
   "inPlaceEditMoveToAdvanced": "Déplacer vers Paramètres avancés",
   "inPlaceEditHideAction": "Masquer l'action",
-  "inPlaceEditHidden": "Masqué"
+  "inPlaceEditHidden": "Masqué",
+  "textEditorAutoHideAppBarLabel": "Masquer automatiquement la barre d'application",
+  "textEditorAutoHideAppBarDescription": "Masquer la barre supérieure lors de la modification pour maximiser l'espace vertical"
 }

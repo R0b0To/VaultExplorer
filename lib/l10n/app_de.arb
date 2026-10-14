@@ -3211,5 +3211,7 @@
   "inPlaceEditMoveToMore": "Ins Mehr-Menü verschieben",
   "inPlaceEditMoveToAdvanced": "Zu erweiterten Einstellungen verschieben",
   "inPlaceEditHideAction": "Aktion ausblenden",
-  "inPlaceEditHidden": "Ausgeblendet"
+  "inPlaceEditHidden": "Ausgeblendet",
+  "textEditorAutoHideAppBarLabel": "App-Leiste automatisch ausblenden",
+  "textEditorAutoHideAppBarDescription": "Obere Leiste beim Bearbeiten ausblenden, um vertikalen Platz zu maximieren"
 }

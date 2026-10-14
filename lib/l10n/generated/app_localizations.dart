@@ -19440,6 +19440,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hidden'**
   String get inPlaceEditHidden;
+
+  /// Label for toggle in editor appearance settings to hide the app bar while typing
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-hide app bar'**
+  String get textEditorAutoHideAppBarLabel;
+
+  /// Description for toggle in editor appearance settings to hide the app bar while typing
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the top bar while editing to maximize vertical space'**
+  String get textEditorAutoHideAppBarDescription;
 }
 
 class _AppLocalizationsDelegate

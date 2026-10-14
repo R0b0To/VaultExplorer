@@ -11452,4 +11452,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inPlaceEditHidden => 'Hidden';
+
+  @override
+  String get textEditorAutoHideAppBarLabel => 'Auto-hide app bar';
+
+  @override
+  String get textEditorAutoHideAppBarDescription =>
+      'Hide the top bar while editing to maximize vertical space';
 }

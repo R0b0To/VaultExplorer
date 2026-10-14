@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "보관함",
   "vaultStatusMounted": "마운트됨",
   "lockVaultTooltip": "보관함 잠금",
-  "lockAllVaultsTitle": "모든 보관함 잠금",
+  "lockAllVaultsTitle": "모두 잠그기",
   "safProviderLabel": "SAF 공급자",
   "singleFileCryptoTitle": "단일 파일 암호화",
   "singleFileCryptoSubtitle": "보관함 외부에서 암호화/복호화",

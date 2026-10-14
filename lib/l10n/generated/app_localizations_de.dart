@@ -8070,7 +8070,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get lockVaultTooltip => 'Tresor sperren';
 
   @override
-  String get lockAllVaultsTitle => 'Alle Tresore sperren';
+  String get lockAllVaultsTitle => 'Alle sperren';
 
   @override
   String get safProviderLabel => 'SAF-Anbieter';

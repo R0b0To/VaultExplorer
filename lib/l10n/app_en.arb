@@ -10125,9 +10125,9 @@
   "@lockVaultTooltip": {
     "description": "Tooltip for the lock button on an active vault row in the drawer"
   },
-  "lockAllVaultsTitle": "Lock all vaults",
+  "lockAllVaultsTitle": "Lock all",
   "@lockAllVaultsTitle": {
-    "description": "Quick action tile in the drawer to lock all mounted vaults at once"
+    "description": "Quick action in the drawer to lock all mounted vaults at once"
   },
   "safProviderLabel": "SAF Provider",
   "@safProviderLabel": {

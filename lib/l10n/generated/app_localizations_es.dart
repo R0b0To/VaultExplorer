@@ -8088,7 +8088,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get lockVaultTooltip => 'Bloquear bóveda';
 
   @override
-  String get lockAllVaultsTitle => 'Bloquear todas las bóvedas';
+  String get lockAllVaultsTitle => 'Bloquear todo';
 
   @override
   String get safProviderLabel => 'Proveedor SAF';

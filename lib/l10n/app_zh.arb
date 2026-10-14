@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "保险库",
   "vaultStatusMounted": "已挂载",
   "lockVaultTooltip": "锁定保险库",
-  "lockAllVaultsTitle": "锁定所有保险库",
+  "lockAllVaultsTitle": "全部锁定",
   "safProviderLabel": "SAF 提供程序",
   "singleFileCryptoTitle": "单文件加密",
   "singleFileCryptoSubtitle": "在保险库外加密或解密",

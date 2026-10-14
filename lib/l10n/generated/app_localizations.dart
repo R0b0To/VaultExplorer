@@ -13363,10 +13363,10 @@ abstract class AppLocalizations {
   /// **'Lock vault'**
   String get lockVaultTooltip;
 
-  /// Quick action tile in the drawer to lock all mounted vaults at once
+  /// Quick action in the drawer to lock all mounted vaults at once
   ///
   /// In en, this message translates to:
-  /// **'Lock all vaults'**
+  /// **'Lock all'**
   String get lockAllVaultsTitle;
 
   /// Subtitle for external storage locations mounted via Storage Access Framework

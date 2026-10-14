@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "Сховища",
   "vaultStatusMounted": "Змонтовано",
   "lockVaultTooltip": "Заблокувати сховище",
-  "lockAllVaultsTitle": "Заблокувати всі сховища",
+  "lockAllVaultsTitle": "Заблокувати все",
   "safProviderLabel": "Провайдер SAF",
   "singleFileCryptoTitle": "Шифрування окремого файлу",
   "singleFileCryptoSubtitle": "Шифрування або розшифрування за межами сховищ",

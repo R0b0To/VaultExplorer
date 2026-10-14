@@ -315,22 +315,16 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   ),
                                   const Spacer(),
                                   if (dashboardState.mounted.isNotEmpty)
-                                    TextButton.icon(
-                                      style: TextButton.styleFrom(
+                                    IconButton(
+                                      style: IconButton.styleFrom(
                                         foregroundColor: cs.error,
                                         visualDensity: VisualDensity.compact,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        minimumSize: Size.zero,
+                                        padding: const EdgeInsets.all(4),
+                                        minimumSize: const Size(28, 28),
                                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      icon: const Icon(Icons.lock_rounded, size: 14),
-                                      label: Text(
-                                        context.l10n.lockAllVaultsTitle,
-                                        style: textTheme.labelSmall?.copyWith(
-                                          color: cs.error,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      icon: const Icon(Icons.lock_rounded, size: 16),
+                                      tooltip: context.l10n.lockAllVaultsTitle,
                                       onPressed: () async {
                                         // Only close the drawer if the vault currently being
                                         // browsed is one of the ones about to be locked -- that

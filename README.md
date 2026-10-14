@@ -4,11 +4,9 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Donate](https://img.shields.io/badge/Ko--Fi-Support%20Project-FF5E5B?style=flat&logo=ko-fi)](https://ko-fi.com/K3K2ND3Y8)
 
-> Mount, browse, and manage encrypted containers and vaults on Android — no PC required.
+Mount, browse, and manage encrypted containers on Android without a PC.
 
-VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs, and CryFS volumes directly on your device. A native C++ engine decrypts and re-encrypts in memory wherever it can, and the app has no internet permission at all. The few operations that need a real scratch file (recording video, exporting, archive work) keep it briefly in the app's private cache and zero-wipe it afterwards.
-
----
+VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs, and CryFS volumes. A native C++ engine decrypts in memory where possible, and the app has no internet permission. Operations that need a scratch file (video recording, exports, archive work) use the app's private cache and zero-wipe it afterwards.
 
 ## Screenshots
 
@@ -20,77 +18,69 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
   <img width="250" alt="Built-in power tools" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" />
 </p>
 
----
-
 ## Supported formats
 
 | Format | Details |
 |---|---|
-| **VeraCrypt** | Standard & hidden volumes, custom PIM, keyfiles, every cipher/cascade (AES, Serpent, Twofish, Camellia, Kuznyechik), in-place password change |
+| **VeraCrypt** | Standard and hidden volumes, PIM, keyfiles, all ciphers and cascades (AES, Serpent, Twofish, Camellia, Kuznyechik), password change |
 | **LUKS1 / LUKS2** | `xts-plain64`, PBKDF2 or Argon2id/i, passphrase or keyfile |
 | **BitLocker** | Password or 48-digit recovery key, including BitLocker To Go |
-| **VHD / VHDX** | Fixed-size and dynamically expanding images that can hold a VeraCrypt, LUKS, or BitLocker volume, or a plain unencrypted filesystem |
-| **Cryptomator** | Vault formats 7 & 8 (SIV_GCM / SIV_CTRMAC) |
+| **VHD / VHDX** | Fixed and dynamic images containing a VeraCrypt, LUKS, or BitLocker volume, or an unencrypted filesystem |
+| **Cryptomator** | Vault formats 7 and 8 |
 | **gocryptfs** | Format v2, AES-256-GCM or XChaCha20-Poly1305 |
-| **CryFS** | On-disk format 0.10 (as used by CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
+| **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
 
-Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3/4.
-
----
+Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 
 ## Features
 
-- **File explorer** — detailed list, columned list, compact list, grid (square, landscape, or portrait), and masonry views with folder thumbnail previews, natural sort order, breadcrumbs, search, instant folder sizes, a per-container customizable toolbar, and file manager skins (pick a built-in look or set your own icon style, icon backgrounds, and name/detail text colors). A sidebar drawer gives quick access to your storage locations and vault actions, and the dashboard shows free/total storage on the card of each container while it is unlocked
-- **Built-in viewers** — photos, video/audio (embedded subtitle tracks plus same-named `.srt`/`.vtt` files stored next to the video, speed control, a 10-band equalizer, seek-bar scrub previews, brightness and volume swipe gestures), PDF (search is available on Android 12+ devices that ship the system PDF extension; other devices use a simpler viewer without it), HTML, Markdown, and a text/code editor — all streamed straight from the encrypted volume. APKs stored in a vault show their icon, and tapping one asks whether to hand it to the system installer or open it as a ZIP (the choice can be remembered)
-- **Image editor** — crop, rotate, freehand draw, add text labels, and a redaction/blackout box for photos inside a vault, without ever writing a plaintext temp file
-- **Archive browser** — open ZIP, 7-Zip, RAR (RAR4/RAR5), TAR, gzip, bzip2, xz, and zstd archives in place (including password-protected ZIP, 7-Zip and RAR5), extract individual entries or everything, and create new ZIP or 7-Zip archives (each with an optional AES-256 password), TAR (plain, gzip, xz, zstd, or lzma), ISO9660, or CPIO archives — with image thumbnails inside archives, powered by a native libarchive engine, both inside a vault and for archives on regular device storage; an `.apk` is a ZIP too, so it can be browsed and extracted the same way
-- **Vault camera** — shoot photos and video directly into a container, with optional background recording that keeps going after the screen turns off or the app is minimized. An optional Quick Settings tile and home screen shortcut open the camera in one tap (you still pick and unlock a vault before anything is saved); turn them on in Settings
-- **Item vault** — passwords, cards, bank accounts, notes, identities, licenses, and TOTP authenticator codes stored as encrypted entries, like a password manager built into the container. Import from or export to KeePass (.kdbx), Bitwarden (.json), Proton (.json), CSV (Bitwarden, LastPass, Chrome, 1Password, Dashlane, NordPass, Apple Passwords), or a plain `otpauth://` list, and import authenticator codes from Ente Auth, Aegis, 2FAS, andOTP, Raivo, LastPass Authenticator, and Google Authenticator, from the Tools tab — see [`docs/password-interchange.md`](docs/password-interchange.md)
-- **Cloud & external storage** — open containers straight from Google Drive (which the app handles specifically) or from any other Android document provider such as pCloud, or from any compatible bridge app (e.g. [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync)) for WebDAV, S3, Dropbox, and more — the app itself never touches the network. Local storage, SD cards, and other document providers can also be added as storage locations and browsed with the same file manager
-- **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly, or share files straight from the file manager through Android's Share menu; an optional background service keeps a vault mounted so this keeps working after you leave VaultExplorer
-- **Share Sheet Integration** — let other apps hand files to VaultExplorer through Android's Share menu, straight into a folder you pick inside a vault. Off by default; turn it on in Settings
-- **Automation (Beta)** — a local broadcast-intent API lets Tasker or MacroDroid unlock/lock a vault, sync configured folders, import or export individual files or whole folders (glob-filterable), securely wipe files, trigger the vault camera (photo or start/stop video) headlessly, and fire an emergency lock or purge — all with no UI interaction required. A cold automation unlock runs configured auto-sync rules with a foreground progress notification. Off by default; each vault opts in separately to a permission tier and is gated by an API token, and camera capture needs its own explicit opt-in on top of that. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md) for setup
-- **Auto-sync** — keep a vault or folder in sync with another folder on your device or on a document provider — when the vault unlocks and, optionally, while it stays open — as a one-way backup, a one-way import, or two-way. Rules live inside the vault (encrypted), conflicts keep both versions by default, and if you sync deletions they pause automatically when a folder looks unexpectedly empty or when a large share of the files would be deleted
-- **Emergency panic & duress** — three purge tiers (lock vaults and forget remembered passwords; also wipe credentials, master lock, and settings; or also shred the app's own storage and request uninstall) that never touch your container files. Trigger them from a Quick Settings tile, a PanicKit app such as Ripple or Wasted, an automation broadcast, an armed one-shot reboot trigger, or by entering a separate duress PIN, pattern, or password on the lock screen
+- **File explorer** — list, grid, and masonry views, search, breadcrumbs, folder sizes, a customizable toolbar, and file manager skins
+- **Built-in viewers** — photos, video/audio (subtitles, speed control, equalizer), PDF, HTML, Markdown, and a text/code editor, streamed from the encrypted volume. PDF search needs Android 12+ with the system PDF extension. APK files can be sent to the system installer or opened as ZIP
+- **Image editor** — crop, rotate, draw, text, and redaction boxes, with no plaintext temp file
+- **Archive browser** — open ZIP, 7-Zip, RAR4/RAR5, TAR, gzip, bzip2, xz, and zstd archives in place (including password-protected ZIP, 7-Zip, and RAR5), extract entries, and create ZIP, 7-Zip (optional AES-256), TAR, ISO9660, or CPIO archives. Works inside vaults and on regular device storage
+- **Vault camera** — save photos and video directly into a container, with optional background recording. Optional Quick Settings tile and home screen shortcut, enabled in Settings
+- **Item vault** — passwords, cards, bank accounts, notes, identities, licenses, and TOTP codes. Import and export KeePass (.kdbx), Bitwarden (.json), Proton (.json), CSV (Bitwarden, LastPass, Chrome, 1Password, Dashlane, NordPass, Apple Passwords), and `otpauth://` lists. Import authenticator codes from Ente Auth, Aegis, 2FAS, andOTP, Raivo, LastPass Authenticator, and Google Authenticator. See [`docs/password-interchange.md`](docs/password-interchange.md)
+- **Cloud and external storage** — open containers from Google Drive, other Android document providers (e.g. pCloud), or bridge apps such as [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync) for WebDAV, S3, Dropbox, and more. The app itself never uses the network. Local storage and SD cards can be added as locations
+- **Open in other apps** — expose an unlocked container or subfolder to other apps, or share files through the Android Share menu. An optional background service keeps a vault mounted
+- **Share sheet integration** — receive files from other apps into a vault folder you pick. Off by default
+- **Automation (beta)** — a local broadcast-intent API for Tasker or MacroDroid: unlock/lock, sync, import/export, secure wipe, camera capture, emergency lock and purge. Off by default. Each vault opts in to a permission tier and requires an API token; camera capture needs a separate opt-in. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md)
+- **Auto-sync** — one-way backup, one-way import, or two-way sync between a vault or folder and another folder, on unlock and optionally while open. Rules are stored encrypted in the vault. Conflicts keep both versions. Deletion sync pauses if a folder looks unexpectedly empty or too many files would be deleted
+- **Emergency panic and duress** — three purge tiers that never touch container files: (1) lock vaults and forget remembered passwords, (2) also wipe credentials, master lock, and settings, (3) also shred the app's storage and request uninstall. Triggered from a Quick Settings tile, a PanicKit app (e.g. Ripple, Wasted), an automation broadcast, an armed reboot trigger, or a duress PIN, pattern, or password
+- **Composite containers** — spread a VeraCrypt-format volume across several photo, video, audio, or document files. Data is appended to each file as extra "growth" (3–30%, default 10%), and all files are required to unlock
 - **USB OTG** — read and write USB drives without root
-- **Create & format** new volumes on device storage or a USB drive
-- **Composite containers** — spread a VeraCrypt-format volume across several ordinary photo/video/audio/document files instead of one container file. Each carrier's data is appended past its real content as high-entropy "growth" (adjustable from 3% to 30%, default 10% — your choice of stealth vs. capacity), indistinguishable from normal file noise, and every carrier has to be present to unlock. Create or unlock one from the dashboard like any other container, or from the Tools tab
+- **Create and format** new volumes on device storage or a USB drive
 - **Up to 8 volumes** mounted at once
-- **Themes & settings** — available in 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), coordinated Default, OLED app skins, Material You dynamic colors, independent file-manager/editor overrides, a categorized settings hub, and settings export/import (preferences and file manager layout only; never passwords, keys, or your container list)
+- **Themes and settings** — 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), Default and OLED skins, Material You colors, and settings export/import (preferences and file manager layout only; never passwords, keys, or the container list)
 
 ### Tools tab
 
-- **Keyfile & Passphrase Generator** — Diceware passphrases, custom passwords, high-entropy keyfiles
-- **Encrypt / Decrypt Files** — protect individual files without a full container
-- **Hash Verifier** — check large files against MD5/SHA checksums
-- **Vault Sync** — compare two folders — in vaults, on device storage, or on a document provider — and copy over what's missing or newer
-- **Import / Export Passwords** — move the Item Vault's logins, cards, identities, notes, bank accounts, software licenses, and authenticator codes to or from KeePass (.kdbx), Bitwarden (.json), Proton (.json), CSV, or an `otpauth://` list, or import from several authenticator apps' backups. Runs entirely on-device; see [`docs/password-interchange.md`](docs/password-interchange.md) for the exact field mapping and format support
-- **Storage Analyzer** & **Duplicate Finder** — see what's using space and clear out byte-identical duplicates
-- **Split & Join** — split a container into chunks, or rejoin them
-- **Composite Container** — embed and mount an encrypted vault across multiple media files (see Features above)
+- **Keyfile & Passphrase Generator** — Diceware passphrases, passwords, keyfiles
+- **Encrypt / Decrypt Files** — individual files, no container needed
+- **Hash Verifier** — check files against MD5/SHA checksums
+- **Vault Sync** — compare two folders and copy missing or newer files
+- **Import / Export Passwords** — see Item vault above
+- **Storage Analyzer** and **Duplicate Finder**
+- **Split & Join** — split a container into chunks or rejoin them
+- **Composite Container** — create or mount a composite container
 - **Check & Repair** — diagnose header or filesystem issues
-- **Header Backup** — back up a container's header (or a folder vault's config file) to an external file, and restore from it later
-
----
+- **Header Backup** — back up and restore a container's header (or a folder vault's config file)
 
 ## Security & privacy
 
-- No `INTERNET` permission — the app cannot make a network request, period
-- Decryption and re-encryption happen in memory; opened files are streamed straight to the built-in viewers. Where an operation genuinely needs a plaintext scratch file (video recording, exports, archives, the file encrypt/decrypt tool), it stays in the app's private cache, is overwritten with zeros and deleted when done, and anything a crash leaves behind is wiped at next launch
-- Master lock via password, PIN, pattern, or biometric, with an escalating lockout (30 seconds from the 5th failed attempt, 30 seconds longer for each further failure, capped at 5 minutes) that survives force-kills. Individual containers can also be unlocked by password, remembered password, biometrics, pattern, or PIN. Removing the master password requires the master password itself (biometrics can't bypass it), saved credentials can never be revealed in plain text, and PIM values are obfuscated during unlock
-- Optional key caching in the Android Keystore (AES-GCM, hardware-backed where the device supports it) for instant re-unlock
-- Task-switcher previews are blocked while the app is in the background, and the screen is blanked the instant the app is backgrounded so a stale unlocked frame can't flash on resume. Blocking screenshots (`FLAG_SECURE`) is enabled by default on a fresh install and can be turned off in Settings
-- Copying a password from the Item Vault marks the clipboard entry sensitive on Android 13+ and auto-clears it 30 seconds later if left untouched; the app also sanitizes corrupted clipboard data from other apps on window focus
-- Android backup is disabled for the app, so nothing it stores is copied to a cloud backup
-- **Mask Mode** — disguise the app as a genuinely usable local file manager for your device's real storage (browse, open, and edit files, including archives — none of it touches any vault or encryption code); hold the title for 2 seconds to reach your real vault
+- No `INTERNET` permission
+- Decryption and re-encryption happen in memory. Scratch files stay in the app's private cache, are zero-wiped and deleted when done, and leftovers from a crash are wiped at next launch
+- Master lock via password, PIN, pattern, or biometrics. After the 5th failed attempt the lockout starts at 30 seconds and grows by 30 seconds per further failure, up to 5 minutes, and survives force-kills. Individual containers can be unlocked by password, remembered password, biometrics, pattern, or PIN. Removing the master password requires the master password itself. Saved credentials are never shown in plain text, and PIM values are obfuscated during unlock
+- Optional key caching in the Android Keystore (AES-GCM, hardware-backed where supported)
+- Task-switcher previews are blocked and the screen is blanked when the app is backgrounded. Screenshot blocking (`FLAG_SECURE`) is on by default and can be turned off in Settings
+- Passwords copied from the Item Vault are marked sensitive on Android 13+ and cleared after 30 seconds if unchanged. Corrupted clipboard data from other apps is sanitized on window focus
+- Android backup is disabled
+- **Mask Mode** — disguises the app as a local file manager for device storage (browse, open, and edit files and archives, with no vault or encryption code involved). Hold the title for 2 seconds to reach the vault
 
-See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for exactly what the app accesses and what leaves your device only at your request.
-
----
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for what the app accesses and what leaves your device.
 
 ## Install
 
-Download the APK for your device's architecture (arm64, armeabi, or x64) from [Releases](https://github.com/R0b0To/VaultExplorer/releases). Requires Android 8.0 (API 26) or newer.
+Download the APK for your architecture (arm64, armeabi, or x64) from [Releases](https://github.com/R0b0To/VaultExplorer/releases). Requires Android 8.0 (API 26) or newer.
 
 ### Build from source
 
@@ -101,13 +91,11 @@ cd VaultExplorer
 .flutter/bin/flutter build apk --release
 ```
 
-Flutter itself is vendored as a pinned git submodule (`.flutter/`) rather than something you install separately — if you already cloned without `--recurse-submodules`, run `git submodule update --init` first. You'll also need the Android SDK (26+), Java 21, and CMake 3.18+; the NDK (pinned to r28c) is installed automatically via Gradle. CMake fetches and compiles all native C++ dependencies automatically — see [NOTICE.md](NOTICE.md) for exact versions and licenses.
-
----
+Flutter is vendored as a pinned git submodule (`.flutter/`). If you cloned without `--recurse-submodules`, run `git submodule update --init`. Requirements: Android SDK 26+, Java 21, and CMake 3.18+. Gradle installs the NDK (r28c), and CMake builds the native C++ dependencies. Versions and licenses: [NOTICE.md](NOTICE.md).
 
 ## Donate
 
-If you find VaultExplorer useful, consider supporting the project:
+Support the project:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K2ND3Y8)
 
@@ -115,8 +103,6 @@ If you find VaultExplorer useful, consider supporting the project:
 - **Lightning:** `aeidolon@cake.cash`
 - **Monero (XMR):** `88qPr4aY9B62c1LXoiX9YV58gKB2jFYRx9YijBgPK3h32HnF93aytJCPKu58fbpa8XNKbJWpFGnnGM81rBCdpUje1WvfHaY`
 
----
-
 ## License
 
-GPLv3 — see [LICENSE](LICENSE).
+GPLv3. See [LICENSE](LICENSE).

@@ -7631,7 +7631,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get lockVaultTooltip => '保管庫をロック';
 
   @override
-  String get lockAllVaultsTitle => 'すべての保管庫をロック';
+  String get lockAllVaultsTitle => 'すべてロック';
 
   @override
   String get safProviderLabel => 'SAF プロバイダー';

@@ -8139,7 +8139,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get lockVaultTooltip => 'Verrouiller le coffre';
 
   @override
-  String get lockAllVaultsTitle => 'Verrouiller tous les coffres';
+  String get lockAllVaultsTitle => 'Tout verrouiller';
 
   @override
   String get safProviderLabel => 'Fournisseur SAF';

@@ -8080,7 +8080,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get lockVaultTooltip => 'Bloquear cofre';
 
   @override
-  String get lockAllVaultsTitle => 'Bloquear todos os cofres';
+  String get lockAllVaultsTitle => 'Bloquear tudo';
 
   @override
   String get safProviderLabel => 'Provedor SAF';

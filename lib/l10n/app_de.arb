@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "Tresore",
   "vaultStatusMounted": "Eingebunden",
   "lockVaultTooltip": "Tresor sperren",
-  "lockAllVaultsTitle": "Alle Tresore sperren",
+  "lockAllVaultsTitle": "Alle sperren",
   "safProviderLabel": "SAF-Anbieter",
   "singleFileCryptoTitle": "Einzeldatei-Kryptografie",
   "singleFileCryptoSubtitle": "Dateien außerhalb von Tresoren ver- oder entschlüsseln",

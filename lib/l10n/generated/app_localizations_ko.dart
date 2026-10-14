@@ -7633,7 +7633,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get lockVaultTooltip => '보관함 잠금';
 
   @override
-  String get lockAllVaultsTitle => '모든 보관함 잠금';
+  String get lockAllVaultsTitle => '모두 잠그기';
 
   @override
   String get safProviderLabel => 'SAF 공급자';

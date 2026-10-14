@@ -7532,7 +7532,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lockVaultTooltip => '锁定保险库';
 
   @override
-  String get lockAllVaultsTitle => '锁定所有保险库';
+  String get lockAllVaultsTitle => '全部锁定';
 
   @override
   String get safProviderLabel => 'SAF 提供程序';

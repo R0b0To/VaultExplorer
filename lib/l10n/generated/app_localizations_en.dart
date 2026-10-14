@@ -7942,7 +7942,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lockVaultTooltip => 'Lock vault';
 
   @override
-  String get lockAllVaultsTitle => 'Lock all vaults';
+  String get lockAllVaultsTitle => 'Lock all';
 
   @override
   String get safProviderLabel => 'SAF Provider';

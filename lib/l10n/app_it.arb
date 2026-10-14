@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "Cassaforti",
   "vaultStatusMounted": "Montata",
   "lockVaultTooltip": "Blocca cassaforte",
-  "lockAllVaultsTitle": "Blocca tutte le cassaforti",
+  "lockAllVaultsTitle": "Blocca tutto",
   "safProviderLabel": "Provider SAF",
   "singleFileCryptoTitle": "Crittografia file singolo",
   "singleFileCryptoSubtitle": "Cifra o decifra all’esterno delle cassaforti",

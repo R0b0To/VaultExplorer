@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "保管庫",
   "vaultStatusMounted": "マウント済み",
   "lockVaultTooltip": "保管庫をロック",
-  "lockAllVaultsTitle": "すべての保管庫をロック",
+  "lockAllVaultsTitle": "すべてロック",
   "safProviderLabel": "SAF プロバイダー",
   "singleFileCryptoTitle": "単一ファイル暗号化",
   "singleFileCryptoSubtitle": "保管庫外で暗号化/復号",

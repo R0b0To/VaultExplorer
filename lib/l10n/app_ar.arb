@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "الخزائن",
   "vaultStatusMounted": "محمل",
   "lockVaultTooltip": "قفل الخزنة",
-  "lockAllVaultsTitle": "قفل جميع الخزائن",
+  "lockAllVaultsTitle": "قفل الكل",
   "safProviderLabel": "مزود SAF",
   "singleFileCryptoTitle": "تشفير ملف فردي",
   "singleFileCryptoSubtitle": "تشفير أو فك تشفير خارج الخزائن",

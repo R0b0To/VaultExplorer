@@ -2200,7 +2200,7 @@
   "vaultsSectionTitle": "Cofres",
   "vaultStatusMounted": "Montado",
   "lockVaultTooltip": "Bloquear cofre",
-  "lockAllVaultsTitle": "Bloquear todos os cofres",
+  "lockAllVaultsTitle": "Bloquear tudo",
   "safProviderLabel": "Provedor SAF",
   "singleFileCryptoTitle": "Criptografia de arquivo único",
   "singleFileCryptoSubtitle": "Criptografar ou descriptografar fora dos cofres",

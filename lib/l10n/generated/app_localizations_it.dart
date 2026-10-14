@@ -8067,7 +8067,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get lockVaultTooltip => 'Blocca cassaforte';
 
   @override
-  String get lockAllVaultsTitle => 'Blocca tutte le cassaforti';
+  String get lockAllVaultsTitle => 'Blocca tutto';
 
   @override
   String get safProviderLabel => 'Provider SAF';

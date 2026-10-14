@@ -8135,7 +8135,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lockVaultTooltip => 'قفل الخزنة';
 
   @override
-  String get lockAllVaultsTitle => 'قفل جميع الخزائن';
+  String get lockAllVaultsTitle => 'قفل الكل';
 
   @override
   String get safProviderLabel => 'مزود SAF';

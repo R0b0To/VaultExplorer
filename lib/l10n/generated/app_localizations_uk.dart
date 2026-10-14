@@ -8131,7 +8131,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get lockVaultTooltip => 'Заблокувати сховище';
 
   @override
-  String get lockAllVaultsTitle => 'Заблокувати всі сховища';
+  String get lockAllVaultsTitle => 'Заблокувати все';
 
   @override
   String get safProviderLabel => 'Провайдер SAF';

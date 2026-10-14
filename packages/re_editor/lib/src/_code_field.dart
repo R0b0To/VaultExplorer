@@ -1063,12 +1063,15 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
             _buildDisplayRenderParagraphs(startIndex, effectiveWidth),
           );
         }
-      } else if (target > _displayParagraphs.last.bottom) {
+       } else if (target > _displayParagraphs.last.bottom) {
         final int startIndex;
         if (target <= paddingTop) {
           startIndex = 0;
         } else {
-          startIndex = (target / _preferredLineHeight).floor();
+          startIndex = min(
+            (target / _preferredLineHeight).floor(),
+            _codes.length - 1,
+          );
         }
         _displayParagraphs.clear();
         _displayParagraphs.addAll(_buildDisplayRenderParagraphs(startIndex, effectiveWidth));
@@ -1093,7 +1096,18 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       _updateDisplayRenderParagraphs();
       return;
     }
-    final double totalHeight = _displayParagraphs.last.bottom + (_codes.length - (_displayParagraphs.last.index + 1)) * _preferredLineHeight + paddingBottom;
+    final double totalHeight;
+    if (_horizontalViewport == null && _displayParagraphs.isNotEmpty) {
+      final double renderedHeight = _displayParagraphs.last.bottom - _displayParagraphs.first.top;
+      final int renderedCount = _displayParagraphs.length;
+      final double avgLineHeight = renderedCount > 0
+          ? max(_preferredLineHeight, renderedHeight / renderedCount)
+          : _preferredLineHeight;
+      final int remainingLines = max(0, _codes.length - (_displayParagraphs.last.index + 1));
+      totalHeight = _displayParagraphs.last.bottom + remainingLines * avgLineHeight + paddingBottom;
+    } else {
+      totalHeight = _displayParagraphs.last.bottom + (_codes.length - (_displayParagraphs.last.index + 1)) * _preferredLineHeight + paddingBottom;
+    }
     _verticalViewportSize = max(0, totalHeight - size.height);
     if (_verticalViewport.pixels > _verticalViewportSize!) {
       _verticalViewport.correctBy(_verticalViewportSize! - _verticalViewport.pixels);

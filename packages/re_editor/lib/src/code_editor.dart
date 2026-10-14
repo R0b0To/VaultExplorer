@@ -502,7 +502,9 @@ class _CodeEditorState extends State<CodeEditor> {
     final bool readOnly = widget.readOnly ?? false;
     final bool autofocus = widget.autofocus ?? true;
     final bool wordWrap = widget.wordWrap ?? true;
-    final PreferredSizeWidget? find = widget.findBuilder?.call(context, _findController, readOnly);
+    final PreferredSizeWidget? find = _findController.value == null 
+        ? null 
+        : widget.findBuilder?.call(context, _findController, readOnly);
     final Widget editable = _CodeEditable(
       editorKey: _editorKey,
       hint: widget.hint,

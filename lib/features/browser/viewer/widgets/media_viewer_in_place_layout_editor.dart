@@ -13,7 +13,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditDone;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Done';
   }
 
@@ -21,7 +23,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditTitle;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return l10n.mediaViewerCustomizeControls;
   }
 
@@ -29,7 +33,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditHint;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Drag actions between docks or tap to organize';
   }
 
@@ -37,7 +43,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditTopDock;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return l10n.topBarActionsHeader;
   }
 
@@ -45,7 +53,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditBottomDock;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return l10n.bottomDockActionsHeader;
   }
 
@@ -53,7 +63,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditDragToRemove;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Drag here to remove';
   }
 
@@ -61,7 +73,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditAddToTop;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Add to Top Bar';
   }
 
@@ -69,7 +83,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditAddToBottom;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Add to Bottom Dock';
   }
 
@@ -77,7 +93,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditMoveToMore;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Move to More Menu';
   }
 
@@ -85,7 +103,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditMoveToAdvanced;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Move to Advanced Settings';
   }
 
@@ -93,7 +113,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditHideAction;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Hide Action';
   }
 
@@ -101,7 +123,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditHidden;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Hidden';
   }
 
@@ -109,7 +133,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditEmptyDock;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return 'Drop actions here';
   }
 
@@ -117,7 +143,9 @@ extension _InPlaceEditorL10n on BuildContext {
     try {
       final val = (l10n as dynamic).inPlaceEditPlayerSettings;
       if (val is String && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (_) {
+      // Safe: Fall back to default string if translation key is not yet present on l10n.
+    }
     return l10n.mediaPlayerControlsTitle;
   }
 }

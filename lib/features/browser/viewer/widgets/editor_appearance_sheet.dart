@@ -298,8 +298,9 @@ class _EditorAppearanceScreenState
               notifier.setShowLineNumbers(true);
               notifier.setRelativeLineNumbers(false);
               notifier.setShowStatusBar(true);
-              notifier.setShowTabBar(true);
+                 notifier.setShowTabBar(true);
               notifier.setAutoHideTabBar(true);
+              notifier.setAutoHideAppBar(false);
               notifier.setShowAccessoryBar(true);
               notifier.setShowAccessorySymbols(true);
               notifier.setShowAccessoryActions(true);
@@ -632,7 +633,7 @@ class _EditorAppearanceScreenState
                       ),
                       secondary: Icon(Icons.tab_rounded, color: cs.primary),
                     ),
-                    if (prefs.showTabBar)
+                   if (prefs.showTabBar)
                       SwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -656,6 +657,30 @@ class _EditorAppearanceScreenState
                           color: cs.primary,
                         ),
                       ),
+
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      value: prefs.autoHideAppBar,
+                      onChanged: notifier.setAutoHideAppBar,
+                      title: Text(
+                        context.l10n.textEditorAutoHideAppBarLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        context.l10n.textEditorAutoHideAppBarDescription,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      secondary: Icon(
+                        Icons.vertical_align_top_rounded,
+                        color: cs.primary,
+                      ),
+                    ),
 
                     // Show Line Numbers Switch
                     SwitchListTile(

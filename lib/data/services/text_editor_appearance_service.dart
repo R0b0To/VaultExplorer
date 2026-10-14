@@ -21,8 +21,9 @@ class TextEditorAppearancePrefs {
   final bool autoSave;
   final bool showLineNumbers;
   final bool showStatusBar;
-  final bool showTabBar;
+   final bool showTabBar;
   final bool autoHideTabBar;
+  final bool autoHideAppBar;
   final bool showAccessoryBar;
   final bool showAccessorySymbols;
   final bool showAccessoryActions;
@@ -101,6 +102,7 @@ class TextEditorAppearancePrefs {
     this.showStatusBar = true,
     this.showTabBar = true,
     this.autoHideTabBar = true,
+    this.autoHideAppBar = false,
     this.showAccessoryBar = true,
     this.showAccessorySymbols = true,
     this.showAccessoryActions = true,
@@ -123,8 +125,9 @@ class TextEditorAppearancePrefs {
     bool? autoSave,
     bool? showLineNumbers,
     bool? showStatusBar,
-    bool? showTabBar,
+  bool? showTabBar,
     bool? autoHideTabBar,
+    bool? autoHideAppBar,
     bool? showAccessoryBar,
     bool? showAccessorySymbols,
     bool? showAccessoryActions,
@@ -142,6 +145,7 @@ class TextEditorAppearancePrefs {
     showStatusBar: showStatusBar ?? this.showStatusBar,
     showTabBar: showTabBar ?? this.showTabBar,
     autoHideTabBar: autoHideTabBar ?? this.autoHideTabBar,
+    autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
     showAccessoryBar: showAccessoryBar ?? this.showAccessoryBar,
     showAccessorySymbols: showAccessorySymbols ?? this.showAccessorySymbols,
     showAccessoryActions: showAccessoryActions ?? this.showAccessoryActions,
@@ -159,8 +163,9 @@ class TextEditorAppearancePrefs {
     'autoSave': autoSave,
     'showLineNumbers': showLineNumbers,
     'showStatusBar': showStatusBar,
-    'showTabBar': showTabBar,
+  'showTabBar': showTabBar,
     'autoHideTabBar': autoHideTabBar,
+    'autoHideAppBar': autoHideAppBar,
     'showAccessoryBar': showAccessoryBar,
     'showAccessorySymbols': showAccessorySymbols,
     'showAccessoryActions': showAccessoryActions,
@@ -187,6 +192,7 @@ class TextEditorAppearancePrefs {
       showStatusBar: json['showStatusBar'] ?? true,
       showTabBar: json['showTabBar'] ?? true,
       autoHideTabBar: json['autoHideTabBar'] ?? true,
+      autoHideAppBar: json['autoHideAppBar'] == true,
       showAccessoryBar: json['showAccessoryBar'] ?? true,
       showAccessorySymbols: json['showAccessorySymbols'] ?? true,
       showAccessoryActions: json['showAccessoryActions'] ?? true,

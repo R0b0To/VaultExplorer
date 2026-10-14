@@ -119,8 +119,15 @@ class _FastScrollbarState extends State<FastScrollbar>
     }
   }
 
-  void _onControllerChange() {
-    if (!_isDragging && mounted && _canScroll) {
+void _onControllerChange() {
+    if (!mounted || !_canScroll) return;
+    if (_isDragging && _scrollFraction >= 0.999) {
+      if (widget.controller.position.pixels < widget.controller.position.maxScrollExtent) {
+        widget.controller.jumpTo(widget.controller.position.maxScrollExtent);
+      }
+      return;
+    }
+    if (!_isDragging) {
       final pos = widget.controller.position;
       if (pos.hasContentDimensions && pos.maxScrollExtent > 0) {
         final newFraction = (pos.pixels / pos.maxScrollExtent).clamp(0.0, 1.0);
@@ -330,10 +337,11 @@ class _FastScrollbarState extends State<FastScrollbar>
     final targetThumbStart = trackPosition - _dragTouchOffsetInThumb;
     final fraction = (targetThumbStart / travelDistance).clamp(0.0, 1.0);
 
-    if ((fraction - _scrollFraction).abs() > 0.0001) {
+   if ((fraction - _scrollFraction).abs() > 0.0001 || fraction >= 0.999) {
       _scrollFraction = fraction;
-      final targetOffset =
-          fraction * widget.controller.position.maxScrollExtent;
+      final targetOffset = fraction >= 0.999
+          ? widget.controller.position.maxScrollExtent
+          : fraction * widget.controller.position.maxScrollExtent;
       widget.controller.jumpTo(targetOffset);
       _popupBadge = _computePopupBadge(fraction);
       ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);

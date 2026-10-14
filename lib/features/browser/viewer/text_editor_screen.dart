@@ -204,9 +204,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   final List<EditorTab> _tabs = [];
   int _activeTabIndex = 0;
 
-  final ScrollController _tabScrollController = ScrollController();
+ final ScrollController _tabScrollController = ScrollController();
   final List<GlobalKey> _tabKeys = [];
   late final AnimationController _tabBarAnimationController;
+  late final AnimationController _appBarAnimationController;
 
   // Pinch-to-zoom state
   final Map<int, Offset> _pinchPointers = {};
@@ -271,11 +272,17 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   @override
   void initState() {
     super.initState();
-    _tabBarAnimationController = AnimationController(
+   _tabBarAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
       value: 1,
     )..addListener(_onTabBarAnimationTick);
+    _appBarAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+      value: 1,
+    )..addListener(_onAppBarAnimationTick);
+    _focusNode.addListener(_onEditorFocusChanged);
     _readOnly = widget.container.readOnly;
     WidgetsBinding.instance.addObserver(this);
     _toolbarController = MobileSelectionToolbarController(
@@ -564,6 +571,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _focusNode.removeListener(_onEditorFocusChanged);
+    _appBarAnimationController.dispose();
     _tabBarAnimationController.dispose();
     _tabScrollController.dispose();
     for (final tab in _tabs) {
@@ -576,6 +585,51 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   void _onTabBarAnimationTick() {
     if (mounted) setState(() {});
+  }
+
+  void _onAppBarAnimationTick() {
+    if (mounted) setState(() {});
+  }
+
+  void _onEditorFocusChanged() {
+    _updateAppBarVisibility();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateAppBarVisibility();
+    });
+  }
+
+  void _updateAppBarVisibility() {
+    final appearance = _effectiveAppearance(
+      ref.read(textEditorAppearanceProvider),
+    );
+    if (!appearance.autoHideAppBar || _readOnly) {
+      if (_appBarAnimationController.value != 1.0) {
+        _appBarAnimationController.animateTo(
+          1.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return;
+    }
+
+    final bottomInset = MediaQuery.maybeViewInsetsOf(context)?.bottom ?? 0;
+    final isKeyboardOpen = bottomInset > 0;
+    final isEditing = isKeyboardOpen && _focusNode.hasFocus;
+
+    final target = isEditing ? 0.0 : 1.0;
+    if (_appBarAnimationController.value != target) {
+      _appBarAnimationController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   void _animateTabBar(double value) {
@@ -1999,6 +2053,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
           _animateTabBar(1);
         }
       }
+
+      if (previous?.autoHideAppBar != next.autoHideAppBar) {
+        _updateAppBarVisibility();
+      }
     });
 
     final anyDirty = _tabs.any((t) => t.isDirty);
@@ -2092,352 +2150,384 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             child: Scaffold(
               key: _scaffoldKey,
               drawer: _buildProjectDrawer(cs),
-              appBar: AppBar(
-                systemOverlayStyle: chrome.overlayStyle,
-                leading: IconButton(
-                  icon: const Icon(Icons.menu_rounded),
-                  tooltip: context.l10n.textEditorProjectFilesTitle,
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              appBar: PreferredSize(
+                preferredSize: Size.fromHeight(
+                  (kToolbarHeight +
+                          ((appearance.showTabBar ||
+                                  _tabBarAnimationController.value > 0)
+                              ? 42.0 * _tabBarAnimationController.value
+                              : 0.0)) *
+                      _appBarAnimationController.value,
                 ),
-                title: Text(activeTab.fileName),
-                actions: [
-                  if (!activeTab.isLoading && activeTab.hasError)
-                    PopupMenuButton<String>(
-                      tooltip: context.l10n.textEditorMoreActionsTooltip,
-                      icon: const Icon(Icons.more_vert_rounded),
-                      onSelected: (value) {
-                        if (value == 'encoding') _showEncodingPicker(activeTab);
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'encoding',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.translate_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  context.l10n.textEditorEncodingTooltip,
-                                ),
-                              ),
-                              Text(activeTab.encoding.label),
-                            ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final topPadding = MediaQuery.paddingOf(context).top;
+                    final bottomHeight = (appearance.showTabBar ||
+                            _tabBarAnimationController.value > 0)
+                        ? 42.0 * _tabBarAnimationController.value
+                        : 0.0;
+                    final fullHeight =
+                        topPadding + kToolbarHeight + bottomHeight;
+
+                    return ClipRect(
+                      child: OverflowBox(
+                        minWidth: constraints.maxWidth,
+                        maxWidth: constraints.maxWidth,
+                        minHeight: fullHeight,
+                        maxHeight: fullHeight,
+                        alignment: Alignment.topCenter,
+                        child: AppBar(
+                          systemOverlayStyle: chrome.overlayStyle,
+                          leading: IconButton(
+                            icon: const Icon(Icons.menu_rounded),
+                            tooltip: context.l10n.textEditorProjectFilesTitle,
+                            onPressed: () =>
+                                _scaffoldKey.currentState?.openDrawer(),
                           ),
-                        ),
-                      ],
-                    ),
-                  if (!activeTab.isLoading && !activeTab.hasError) ...[
-                    if (activeTab.isMarkdownFile && !activeTab.isLargeFile) ...[
-                      if (!activeTab.showMarkdownPreview && !_readOnly)
-                        IconButton(
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          tooltip: context.l10n.addFile,
-                          onPressed: _insertImageTemplate,
-                        ),
-                      IconButton(
-                        icon: Icon(
-                          activeTab.showMarkdownPreview
-                              ? Icons.edit_note_rounded
-                              : Icons.visibility_outlined,
-                        ),
-                        tooltip: activeTab.showMarkdownPreview
-                            ? context.l10n.markdownViewerEditTooltip
-                            : context.l10n.markdownViewerPreviewTooltip,
-                        onPressed: _toggleMarkdownPreview,
-                      ),
-                    ],
-                    IconButton(
-                      icon: const Icon(Icons.search_rounded),
-                      tooltip: context.l10n.textEditorFindTooltip,
-                      onPressed: () {
-                        if (activeTab.showMarkdownPreview) {
-                          _toggleMarkdownPreview();
-                        }
-                        activeTab.findController.findMode();
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      tooltip: context.l10n.textEditorMoreActionsTooltip,
-                      icon: const Icon(Icons.more_vert_rounded),
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'save':
-                            _saveFile(activeTab);
-                            break;
-                          case 'saveAs':
-                            _showSaveAsDialog();
-                            break;
-                          case 'revert':
-                            _revertActiveTab();
-                            break;
-                          case 'readOnly':
-                            _toggleReadOnly();
-                            break;
-                          case 'wordWrap':
-                            _toggleWordWrap();
-                            break;
-                          case 'selectAll':
-                            _selectAll();
-                            break;
-                          case 'goToLine':
-                            _showGoToLineDialog();
-                            break;
-                          case 'goToStart':
-                            _goToStart();
-                            break;
-                          case 'goToEnd':
-                            _goToEnd();
-                            break;
-                          case 'format':
-                            final formatter = _formatter;
-                            if (formatter != null) _runFormatter(formatter);
-                            break;
-                          case 'minify':
-                            _runFormatter(minifyJson);
-                            break;
-                          case 'encoding':
-                            _showEncodingPicker(activeTab);
-                            break;
-                          case 'appearance':
-                            showEditorAppearanceSheet(context);
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'save',
-                          enabled:
-                              activeTab.isDirty &&
-                              !activeTab.isSaving &&
-                              !activeTab.isAutosaving,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.save_rounded,
-                                size: 20,
-                                color:
-                                    (activeTab.isDirty &&
-                                        !activeTab.isSaving &&
-                                        !activeTab.isAutosaving)
-                                    ? cs.primary
-                                    : cs.onSurface.withValues(alpha: 0.38),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.save),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'saveAs',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.save_as_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorSaveAsMenuItem),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'revert',
-                          enabled:
-                              activeTab.isDirty &&
-                              !activeTab.isSaving &&
-                              !activeTab.isAutosaving,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.restore_rounded,
-                                size: 20,
-                                color:
-                                    (activeTab.isDirty &&
-                                        !activeTab.isSaving &&
-                                        !activeTab.isAutosaving)
-                                    ? cs.error
-                                    : cs.onSurface.withValues(alpha: 0.38),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                context.l10n.textEditorRevertToSaved,
-                                style: TextStyle(
-                                  color:
-                                      (activeTab.isDirty &&
-                                          !activeTab.isSaving &&
-                                          !activeTab.isAutosaving)
-                                      ? cs.error
-                                      : null,
+                      title: Text(activeTab.fileName),
+                      actions: [
+                        if (!activeTab.isLoading && activeTab.hasError)
+                          PopupMenuButton<String>(
+                            tooltip: context.l10n.textEditorMoreActionsTooltip,
+                            icon: const Icon(Icons.more_vert_rounded),
+                            onSelected: (value) {
+                              if (value == 'encoding') _showEncodingPicker(activeTab);
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'encoding',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.translate_rounded, size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        context.l10n.textEditorEncodingTooltip,
+                                      ),
+                                    ),
+                                    Text(activeTab.encoding.label),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: 'encoding',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.translate_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  context.l10n.textEditorEncodingTooltip,
-                                ),
+                        if (!activeTab.isLoading && !activeTab.hasError) ...[
+                          if (activeTab.isMarkdownFile && !activeTab.isLargeFile) ...[
+                            if (!activeTab.showMarkdownPreview && !_readOnly)
+                              IconButton(
+                                icon: const Icon(Icons.add_photo_alternate_outlined),
+                                tooltip: context.l10n.addFile,
+                                onPressed: _insertImageTemplate,
                               ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'wordWrap',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.wrap_text_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(context.l10n.textEditorWordWrap),
+                            IconButton(
+                              icon: Icon(
+                                activeTab.showMarkdownPreview
+                                    ? Icons.edit_note_rounded
+                                    : Icons.visibility_outlined,
                               ),
-                              if (_wordWrap)
-                                Icon(
-                                  Icons.check_rounded,
-                                  size: 18,
-                                  color: cs.primary,
-                                ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'readOnly',
-                          child: Row(
-                            children: [
-                              Icon(
-                                _readOnly
-                                    ? Icons.lock_rounded
-                                    : Icons.lock_open_rounded,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(context.l10n.textEditorReadOnly),
-                              ),
-                              if (_readOnly)
-                                Icon(
-                                  Icons.check_rounded,
-                                  size: 18,
-                                  color: cs.primary,
-                                ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: 'selectAll',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.select_all_rounded, size: 20),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorSelectAllMenuItem),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'goToLine',
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.format_list_numbered_rounded,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorGoToLineMenuItem),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'goToStart',
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.vertical_align_top_rounded,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorGoToStartMenuItem),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'goToEnd',
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.vertical_align_bottom_rounded,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorGoToEndMenuItem),
-                            ],
-                          ),
-                        ),
-                        if (_formatter != null && !_readOnly) ...[
-                          const PopupMenuDivider(),
-                          PopupMenuItem(
-                            value: 'format',
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.auto_fix_high_rounded,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  context.l10n.textEditorFormatDocumentMenuItem,
-                                ),
-                              ],
+                              tooltip: activeTab.showMarkdownPreview
+                                  ? context.l10n.markdownViewerEditTooltip
+                                  : context.l10n.markdownViewerPreviewTooltip,
+                              onPressed: _toggleMarkdownPreview,
                             ),
+                          ],
+                          IconButton(
+                            icon: const Icon(Icons.search_rounded),
+                            tooltip: context.l10n.textEditorFindTooltip,
+                            onPressed: () {
+                              if (activeTab.showMarkdownPreview) {
+                                _toggleMarkdownPreview();
+                              }
+                              activeTab.findController.findMode();
+                            },
                           ),
-                          if (_isJsonFile)
-                            PopupMenuItem(
-                              value: 'minify',
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.compress_rounded, size: 20),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    context.l10n.textEditorMinifyJsonMenuItem,
+                          PopupMenuButton<String>(
+                            tooltip: context.l10n.textEditorMoreActionsTooltip,
+                            icon: const Icon(Icons.more_vert_rounded),
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'save':
+                                  _saveFile(activeTab);
+                                  break;
+                                case 'saveAs':
+                                  _showSaveAsDialog();
+                                  break;
+                                case 'revert':
+                                  _revertActiveTab();
+                                  break;
+                                case 'readOnly':
+                                  _toggleReadOnly();
+                                  break;
+                                case 'wordWrap':
+                                  _toggleWordWrap();
+                                  break;
+                                case 'selectAll':
+                                  _selectAll();
+                                  break;
+                                case 'goToLine':
+                                  _showGoToLineDialog();
+                                  break;
+                                case 'goToStart':
+                                  _goToStart();
+                                  break;
+                                case 'goToEnd':
+                                  _goToEnd();
+                                  break;
+                                case 'format':
+                                  final formatter = _formatter;
+                                  if (formatter != null) _runFormatter(formatter);
+                                  break;
+                                case 'minify':
+                                  _runFormatter(minifyJson);
+                                  break;
+                                case 'encoding':
+                                  _showEncodingPicker(activeTab);
+                                  break;
+                                case 'appearance':
+                                  showEditorAppearanceSheet(context);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'save',
+                                enabled:
+                                    activeTab.isDirty &&
+                                    !activeTab.isSaving &&
+                                    !activeTab.isAutosaving,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.save_rounded,
+                                      size: 20,
+                                      color:
+                                          (activeTab.isDirty &&
+                                              !activeTab.isSaving &&
+                                              !activeTab.isAutosaving)
+                                          ? cs.primary
+                                          : cs.onSurface.withValues(alpha: 0.38),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.save),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'saveAs',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.save_as_rounded, size: 20),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorSaveAsMenuItem),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'revert',
+                                enabled:
+                                    activeTab.isDirty &&
+                                    !activeTab.isSaving &&
+                                    !activeTab.isAutosaving,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.restore_rounded,
+                                      size: 20,
+                                      color:
+                                          (activeTab.isDirty &&
+                                              !activeTab.isSaving &&
+                                              !activeTab.isAutosaving)
+                                          ? cs.error
+                                          : cs.onSurface.withValues(alpha: 0.38),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      context.l10n.textEditorRevertToSaved,
+                                      style: TextStyle(
+                                        color:
+                                            (activeTab.isDirty &&
+                                                !activeTab.isSaving &&
+                                                !activeTab.isAutosaving)
+                                            ? cs.error
+                                            : null,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'encoding',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.translate_rounded, size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        context.l10n.textEditorEncodingTooltip,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'wordWrap',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.wrap_text_rounded, size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(context.l10n.textEditorWordWrap),
+                                    ),
+                                    if (_wordWrap)
+                                      Icon(
+                                        Icons.check_rounded,
+                                        size: 18,
+                                        color: cs.primary,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'readOnly',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _readOnly
+                                          ? Icons.lock_rounded
+                                          : Icons.lock_open_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(context.l10n.textEditorReadOnly),
+                                    ),
+                                    if (_readOnly)
+                                      Icon(
+                                        Icons.check_rounded,
+                                        size: 18,
+                                        color: cs.primary,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'selectAll',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.select_all_rounded, size: 20),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorSelectAllMenuItem),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'goToLine',
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.format_list_numbered_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorGoToLineMenuItem),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'goToStart',
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.vertical_align_top_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorGoToStartMenuItem),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'goToEnd',
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.vertical_align_bottom_rounded,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorGoToEndMenuItem),
+                                  ],
+                                ),
+                              ),
+                              if (_formatter != null && !_readOnly) ...[
+                                const PopupMenuDivider(),
+                                PopupMenuItem(
+                                  value: 'format',
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.auto_fix_high_rounded,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        context.l10n.textEditorFormatDocumentMenuItem,
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
+                                if (_isJsonFile)
+                                  PopupMenuItem(
+                                    value: 'minify',
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.compress_rounded, size: 20),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context.l10n.textEditorMinifyJsonMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                value: 'appearance',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.palette_outlined, size: 20),
+                                    const SizedBox(width: 12),
+                                    Text(context.l10n.textEditorThemeMenuItem),
+                                  ],
+                                ),
                               ),
-                            ),
-                        ],
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: 'appearance',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.palette_outlined, size: 20),
-                              const SizedBox(width: 12),
-                              Text(context.l10n.textEditorThemeMenuItem),
                             ],
                           ),
-                        ),
+                        ],
                       ],
-                    ),
-                  ],
-                ],
-                bottom:
-                    (appearance.showTabBar ||
-                        _tabBarAnimationController.value > 0)
-                    ? PreferredSize(
-                        preferredSize: Size.fromHeight(
-                          42 * _tabBarAnimationController.value,
+                       bottom:
+                          (appearance.showTabBar ||
+                              _tabBarAnimationController.value > 0)
+                          ? PreferredSize(
+                              preferredSize: Size.fromHeight(
+                                42 * _tabBarAnimationController.value,
+                              ),
+                              child: ClipRect(
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  heightFactor: _tabBarAnimationController.value,
+                                  child: _buildTabBar(cs, syntaxStyle.textColor),
+                                ),
+                              ),
+                            )
+                          : null,
                         ),
-                        child: ClipRect(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            heightFactor: _tabBarAnimationController.value,
-                            child: _buildTabBar(cs, syntaxStyle.textColor),
-                          ),
-                        ),
-                      )
-                    : null,
+                      ),
+                    );
+                  },
+                ),
               ),
               // Keeps the last lines clear of the gesture pill / display cutouts.
               // The Scaffold already strips the bottom inset from the body's
@@ -3370,10 +3460,11 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                               chunkController,
                               notifier,
                             ) {
-                              return Row(
+                            return Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   DefaultCodeLineNumber(
+                                    minNumberCount: 1,
                                     controller: editingController,
                                     notifier: notifier,
                                     textStyle: TextStyle(
@@ -3405,7 +3496,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                                   ),
                                   if (!activeTab.isLargeFile)
                                     DefaultCodeChunkIndicator(
-                                      width: 14,
+                                      width: 1,
                                       controller: chunkController,
                                       notifier: notifier,
                                       painter: DefaultCodeChunkIndicatorPainter(

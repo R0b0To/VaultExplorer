@@ -51,16 +51,25 @@ class CryfsBlockStore(
     // has no teardown() lifecycle to release a mirror directory through, so
     // it must never enable one.
     private val mirrorSync: MirrorSyncCoordinator? = null,
+    // False when raw-path access to blocksRoot looked permitted but failed a
+    // real read/write probe (see RawFileResolver.getVerifiedRawVaultRoot):
+    // then, with no mirror, every block goes through SAF rather than hitting
+    // EACCES on a raw path. Irrelevant while mirroring -- the mirror root is
+    // app-private and always raw-accessible. Defaulted true so the
+    // FolderVaultChecker call site keeps its existing behaviour.
+    allowRaw: Boolean = true,
 ) : CryfsBlockStorage {
     private val mirroredOps: MirroredSafDocumentOps? = mirrorSync?.let { MirroredSafDocumentOps(context, it) }
-    private val saf: VaultDocumentOps = mirroredOps ?: SafDocumentOps(context)
+    private val saf: VaultDocumentOps = mirroredOps ?: SafDocumentOps(context, allowRaw)
     // When mirroring, physical I/O happens against the local mirror root
     // instead of blocksRoot's real tree -- a plain java.io.File-backed
     // DocumentFile, always raw-accessible (it's under this app's own
     // filesDir). Falls back to a raw resolve of blocksRoot itself
     // otherwise, same as before mirroring existed.
     private val effectiveBlocksRoot: DocumentFile = mirroredOps?.root ?: blocksRoot
-    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, effectiveBlocksRoot)
+    private val rawRootFolder: File? =
+        if (mirroredOps == null && !allowRaw) null
+        else RawFileResolver.getRawFile(context, effectiveBlocksRoot)
     override val isRaw: Boolean get() = rawRootFolder != null
     private val decryptedCache = object : LruCache<String, ByteArray>(1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = 1

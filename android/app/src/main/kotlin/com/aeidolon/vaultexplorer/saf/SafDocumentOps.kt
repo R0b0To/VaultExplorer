@@ -114,7 +114,19 @@ interface VaultDocumentOps {
     fun deferContentWrite(file: DocumentFile) { pushContentWrite(file) }
 }
 
-class SafDocumentOps(private val context: Context) : VaultDocumentOps {
+/**
+ * @param allowRaw when false, every operation goes through SAF
+ *   ContentResolver/DocumentFile calls even where [RawFileResolver] would
+ *   resolve a raw `java.io.File`. Used for a vault whose raw-path access
+ *   looked permitted but failed a real read (see
+ *   [com.aeidolon.vaultexplorer.RawFileResolver.getVerifiedRawVaultRoot]),
+ *   so it is routed through SAF/the mirror consistently instead of hitting
+ *   `EACCES` on the raw path.
+ */
+class SafDocumentOps(
+    private val context: Context,
+    val allowRaw: Boolean = true,
+) : VaultDocumentOps {
     private val dirListingCache = ConcurrentHashMap<String, MutableMap<String, DocumentFile>>()
 
     private fun cacheKey(folder: DocumentFile): String = folder.uri.toString()
@@ -139,6 +151,7 @@ class SafDocumentOps(private val context: Context) : VaultDocumentOps {
     }
 
     private fun getRawFile(doc: DocumentFile): File? {
+        if (!allowRaw) return null
         return com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
     }
 

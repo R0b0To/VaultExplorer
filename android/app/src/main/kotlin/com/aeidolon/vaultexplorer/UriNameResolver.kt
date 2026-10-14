@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer
 
 import android.content.ContentResolver
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 
@@ -27,7 +28,7 @@ object UriNameResolver {
         if (resolver != null && uri.scheme == "content") {
             try {
                 resolver.query(
-                    uri,
+                    documentUriFor(uri),
                     arrayOf(OpenableColumns.DISPLAY_NAME),
                     null, null, null
                 )?.use { cursor ->
@@ -43,5 +44,30 @@ object UriNameResolver {
             }
         }
         return uri.lastPathSegment?.substringAfterLast('/') ?: fallback
+    }
+
+    /**
+     * A bare tree URI (`content://<authority>/tree/<treeDocId>`, what
+     * ACTION_OPEN_DOCUMENT_TREE hands back for a picked folder) is not itself
+     * a document URI, so querying it for DISPLAY_NAME is rejected by the
+     * provider (ExternalStorageProvider throws "Unsupported Uri"). That used
+     * to drop straight through to the last-path-segment fallback, which for
+     * a folder on internal storage decodes to the raw document id -- e.g. a
+     * folder called "test" came back labelled "primary:test". Resolve the
+     * tree's root document instead, which is what carries the real name.
+     * Anything that is not a bare tree URI is returned unchanged.
+     */
+    private fun documentUriFor(uri: Uri): Uri {
+        return try {
+            if (DocumentsContract.isTreeUri(uri) && uri.pathSegments.size == 2) {
+                DocumentsContract.buildDocumentUriUsingTree(
+                    uri, DocumentsContract.getTreeDocumentId(uri),
+                )
+            } else {
+                uri
+            }
+        } catch (_: Exception) {
+            uri
+        }
     }
 }

@@ -846,7 +846,14 @@ class MirrorSyncCoordinator(
                 // fix -- a real, currently-unaddressed gap for that
                 // specific provider shape, called out explicitly rather
                 // than silently carried forward.
-                val rawTarget = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, target)
+                // Skipped when realOps was told not to use raw paths (the vault
+                // failed its real-read probe): the staging write would hit the
+                // same EACCES the probe caught, so push through SAF instead.
+                val rawTarget = if (realOps.allowRaw) {
+                    com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, target)
+                } else {
+                    null
+                }
                 if (rawTarget != null && rawTarget.exists()) {
                     val stagingTmp = File(rawTarget.parentFile, rawTarget.name + ".pushing")
                     try {

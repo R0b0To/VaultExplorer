@@ -15,3 +15,15 @@ grew for every line visited while scrolling. `lib/src/code_lines.dart` caches
 segment offsets and uses binary search for line lookup. `lib/src/_code_field.dart`
 uses fixed-height positioning when scrolling backward in unwrapped mode, so it
 does not measure every skipped line.
+
+`lib/src/_code_field.dart` bounds the backward scroll in wrapped mode. Walking
+back measures one paragraph per line, which is exact but turned a scrollbar
+drag or jump-to-start on a large file into thousands of paragraph layouts in
+a single frame. It now walks at most `_kMaxExactBackwardLines` (in
+`_consts.dart`) lines and otherwise jumps with the same fixed-height estimate
+the forward jump already used.
+
+`lib/src/code_indicator.dart` and `lib/src/_code_indicator.dart` add an opt-in
+`DefaultCodeLineNumber.pinToViewportTop`. When a wrapped line starts above the
+viewport its number stays at the top of the gutter until the line's last row
+scrolls away, instead of disappearing with the line's first row.

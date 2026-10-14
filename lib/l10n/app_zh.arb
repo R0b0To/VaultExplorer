@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "自动隐藏应用栏",
   "textEditorAutoHideAppBarDescription": "编辑时隐藏顶部栏以最大化垂直空间",
   "imagePreviewTooLargeMessage": "此图片过大，无法预览",
-  "imagePreviewOutOfMemoryMessage": "可用内存不足，无法预览此图片。请关闭其他应用后重试。"
+  "imagePreviewOutOfMemoryMessage": "可用内存不足，无法预览此图片。请关闭其他应用后重试。",
+  "textEditorCopyToMenuItem": "复制到...",
+  "textEditorCopyToDialogTitle": "复制到文件夹",
+  "textEditorCopyHereButton": "复制到此处",
+  "textEditorDuplicateMenuItem": "创建副本",
+  "textEditorCopiedSuccessfully": "复制成功",
+  "textEditorSearchFilesHint": "筛选文件…"
 }

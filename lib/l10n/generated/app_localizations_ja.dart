@@ -10998,4 +10998,22 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       '編集中に上部バーを非表示にして垂直方向のスペースを最大化';
+
+  @override
+  String get textEditorCopyToMenuItem => 'コピー先...';
+
+  @override
+  String get textEditorCopyToDialogTitle => 'フォルダーにコピー';
+
+  @override
+  String get textEditorCopyHereButton => 'ここにコピー';
+
+  @override
+  String get textEditorDuplicateMenuItem => 'コピーを作成';
+
+  @override
+  String get textEditorCopiedSuccessfully => 'コピーしました';
+
+  @override
+  String get textEditorSearchFilesHint => 'ファイルを絞り込み…';
 }

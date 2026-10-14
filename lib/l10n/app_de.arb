@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "App-Leiste automatisch ausblenden",
   "textEditorAutoHideAppBarDescription": "Obere Leiste beim Bearbeiten ausblenden, um vertikalen Platz zu maximieren",
   "imagePreviewTooLargeMessage": "Dieses Bild ist zu groß für eine Vorschau",
-  "imagePreviewOutOfMemoryMessage": "Nicht genügend freier Speicher für die Vorschau dieses Bildes. Schließen Sie andere Apps und versuchen Sie es erneut."
+  "imagePreviewOutOfMemoryMessage": "Nicht genügend freier Speicher für die Vorschau dieses Bildes. Schließen Sie andere Apps und versuchen Sie es erneut.",
+  "textEditorCopyToMenuItem": "Kopieren nach...",
+  "textEditorCopyToDialogTitle": "In Ordner kopieren",
+  "textEditorCopyHereButton": "Hierher kopieren",
+  "textEditorDuplicateMenuItem": "Kopie erstellen",
+  "textEditorCopiedSuccessfully": "Erfolgreich kopiert",
+  "textEditorSearchFilesHint": "Dateien filtern…"
 }

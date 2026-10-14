@@ -1045,10 +1045,18 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
             _buildDisplayRenderParagraphs(startIndex, effectiveWidth),
           );
         } else {
-          int startIndex = 0;
+          // Wrapped lines have variable height, so walking back line by line
+          // is exact, but every step lays out a paragraph. A scrollbar drag or
+          // a jump to the start can ask for thousands of lines in one frame,
+          // which froze the editor. Walk a bounded number of lines and, if the
+          // target is still further up, jump with the same fixed-height
+          // estimate the forward jump below uses.
+          final int firstIndex = _displayParagraphs.first.index;
+          final int stopIndex = max(0, firstIndex - _kMaxExactBackwardLines);
+          int startIndex = -1;
           double delta = 0;
           double offset = _displayParagraphs.first.top;
-          for (int i = _displayParagraphs.first.index - 1; i >= 0; i--) {
+          for (int i = firstIndex - 1; i >= stopIndex; i--) {
             final IParagraph paragraph = _buildParagraph(i, effectiveWidth);
             delta += paragraph.height - _preferredLineHeight;
             offset -= paragraph.height;
@@ -1057,7 +1065,20 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
               break;
             }
           }
-          _verticalViewport.correctBy(delta);
+          if (startIndex >= 0 || stopIndex == 0) {
+            // Exact result (or the walk reached the first line).
+            _verticalViewport.correctBy(delta);
+            if (startIndex < 0) {
+              startIndex = 0;
+            }
+          } else if (target <= paddingTop) {
+            startIndex = 0;
+          } else {
+            startIndex = min(
+              max(((target - paddingTop) / _preferredLineHeight).floor(), 0),
+              _codes.length - 1,
+            );
+          }
           _displayParagraphs.clear();
           _displayParagraphs.addAll(
             _buildDisplayRenderParagraphs(startIndex, effectiveWidth),

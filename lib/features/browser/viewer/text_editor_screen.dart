@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -45,6 +46,8 @@ double _contrastRatio(Color first, Color second) {
       : firstLuminance;
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+enum _TabMenuAction { close, closeOthers, closeAll, rename }
 
 class _ParsedEditorText {
   final CodeLines codeLines;
@@ -154,6 +157,10 @@ class EditorTab {
   Timer? autosaveTimer;
   VoidCallback? textListener;
 
+  /// Context of this tab's widget in the tab bar, kept so the bar can scroll
+  /// it into view and anchor the tab menu to it.
+  BuildContext? tabContext;
+
   EditorTab({
     required this.filePath,
     String initialText = '',
@@ -206,8 +213,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   final List<EditorTab> _tabs = [];
   int _activeTabIndex = 0;
 
- final ScrollController _tabScrollController = ScrollController();
-  final List<GlobalKey> _tabKeys = [];
+  final ScrollController _tabScrollController = ScrollController();
   late final AnimationController _tabBarAnimationController;
   late final AnimationController _appBarAnimationController;
 
@@ -225,8 +231,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   late String _projectDirPath;
 
-  /// Last resolved whole-screen theme, reused until the editor colors or the
-  /// app scheme actually change (see [EditorChrome.matches]).
   EditorChrome? _chrome;
 
   EditorChrome _resolveChrome(
@@ -274,10 +278,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   @override
   void initState() {
     super.initState();
-   _tabBarAnimationController = AnimationController(
+    final initialShowTabBar =
+        ref.read(textEditorAppearanceProvider).showTabBar;
+    _tabBarAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
-      value: 1,
+      value: initialShowTabBar ? 1.0 : 0.0,
     )..addListener(_onTabBarAnimationTick);
     _appBarAnimationController = AnimationController(
       vsync: this,
@@ -287,6 +293,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     _focusNode.addListener(_onEditorFocusChanged);
     _readOnly = widget.container.readOnly;
     WidgetsBinding.instance.addObserver(this);
+
     _toolbarController = MobileSelectionToolbarController(
       builder:
           ({
@@ -338,7 +345,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             final appTheme = Theme.of(this.context);
             final cs = appTheme.colorScheme;
 
-            // Resolve current editor background to check for color collisions
             final appearance = _effectiveAppearance(
               ref.read(textEditorAppearanceProvider),
             );
@@ -359,11 +365,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             );
             final editorBg = editorStyle.backgroundColor;
 
-            // Base floating toolbar surface color
             Color surfaceColor = cs.surfaceContainerHigh;
 
-            // If the floating menu and editor background share almost the exact same darkness,
-            // boost the surface tone slightly so the card doesn't wash into the background.
             final lumDiff =
                 (surfaceColor.computeLuminance() - editorBg.computeLuminance())
                     .abs();
@@ -517,7 +520,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       } on FormatException {
         throw FormatException(l10n.textEditorInvalidTextFileMessage);
       }
-      // The editor now owns its line model, so the raw file buffer can go.
       bytes = Uint8List(0);
 
       if (!mounted) return;
@@ -557,9 +559,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      final appearance = _effectiveAppearance(
-        ref.read(textEditorAppearanceProvider),
-      );
+      final appearance = ref.read(textEditorAppearanceProvider);
       if (appearance.autoSave) {
         for (final tab in _tabs.where(
           (t) => t.isDirty && !t.isSaving && !t.isAutosaving,
@@ -606,9 +606,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   }
 
   void _updateAppBarVisibility() {
-    final appearance = _effectiveAppearance(
-      ref.read(textEditorAppearanceProvider),
-    );
+    final appearance = ref.read(textEditorAppearanceProvider);
     if (!appearance.autoHideAppBar || _readOnly) {
       if (_appBarAnimationController.value != 1.0) {
         _appBarAnimationController.animateTo(
@@ -640,9 +638,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   bool _handleTabBarScroll(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
-    final appearance = _effectiveAppearance(
-      ref.read(textEditorAppearanceProvider),
-    );
+    final appearance = ref.read(textEditorAppearanceProvider);
     if (!appearance.showTabBar || !appearance.autoHideTabBar) return false;
 
     final canScroll = notification.metrics.maxScrollExtent > 0;
@@ -708,8 +704,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             SchedulerPhase.persistentCallbacks ||
         (WidgetsBinding.instance.buildOwner?.debugBuilding ?? false);
 
-    // If codeLines didn't change, only the selection/cursor changed.
-    // Avoid serializing the whole document via tab.codeController.text!
     if (isSameCodeLines) {
       if (!cursorChanged) return;
 
@@ -728,7 +722,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
     tab.lastCodeLines = codeLines;
 
-    // Calculate charCount without allocating a new massive String for the entire document
     final updatedLineCount = lineCount;
     int totalChars = updatedLineCount > 0 ? updatedLineCount - 1 : 0;
     for (final segment in codeLines.segments) {
@@ -753,15 +746,11 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
 
     tab.autosaveTimer?.cancel();
-    final appearance = _effectiveAppearance(
-      ref.read(textEditorAppearanceProvider),
-    );
+    final appearance = ref.read(textEditorAppearanceProvider);
 
     if (appearance.autoSave && !tab.isLoading && !tab.hasError) {
       tab.autosaveTimer = Timer(const Duration(milliseconds: 2500), () {
-        final currentAppearance = _effectiveAppearance(
-          ref.read(textEditorAppearanceProvider),
-        );
+        final currentAppearance = ref.read(textEditorAppearanceProvider);
         if (mounted &&
             currentAppearance.autoSave &&
             tab.isDirty &&
@@ -786,8 +775,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       builder: (dialogContext) {
         final cs = Theme.of(dialogContext).colorScheme;
         if (!scrolledToActive) {
-          // The charset list is long, so bring the active row into view
-          // once the dialog has been laid out.
           scrolledToActive = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final activeContext = activeKey.currentContext;
@@ -919,9 +906,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final anyDirty = _tabs.any((t) => t.isDirty);
     if (!anyDirty) return true;
 
-    final appearance = _effectiveAppearance(
-      ref.read(textEditorAppearanceProvider),
-    );
+    final appearance = ref.read(textEditorAppearanceProvider);
     if (appearance.autoSave) {
       for (final tab in _tabs.where((t) => t.isDirty)) {
         await _saveFile(tab, isAutosave: true);
@@ -968,8 +953,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   void _openFileInTab(String filePath) {
     if (ref.read(textEditorAppearanceProvider).showTabBar) {
-      // A short file may not produce scroll notifications, so it cannot
-      // reveal a tab bar that was hidden while viewing a longer file.
       _animateTabBar(1);
     }
 
@@ -997,16 +980,17 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   void _scrollToActiveTab() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_activeTabIndex >= 0 && _activeTabIndex < _tabKeys.length) {
-        final keyContext = _tabKeys[_activeTabIndex].currentContext;
-        if (keyContext != null) {
-          Scrollable.ensureVisible(
-            keyContext,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            alignment: 0.5,
-          );
-        }
+      if (!mounted || _activeTabIndex < 0 || _activeTabIndex >= _tabs.length) {
+        return;
+      }
+      final tabContext = _tabs[_activeTabIndex].tabContext;
+      if (tabContext != null && tabContext.mounted) {
+        Scrollable.ensureVisible(
+          tabContext,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          alignment: 0.5,
+        );
       }
     });
   }
@@ -1028,41 +1012,153 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     }
   }
 
-  void _showTabContextMenu(int index) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  void _onTabTapped(EditorTab tab, BuildContext tabContext) {
+    final index = _tabs.indexOf(tab);
+    if (index < 0) return;
+    if (index == _activeTabIndex) {
+      _showTabMenu(tab, tabContext);
+    } else {
+      setState(() => _activeTabIndex = index);
+      _scrollToActiveTab();
+    }
+  }
+
+  void _reorderTabs(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex ||
+        oldIndex < 0 ||
+        oldIndex >= _tabs.length ||
+        newIndex < 0 ||
+        newIndex >= _tabs.length) {
+      return;
+    }
+    final active = _activeTab;
+    setState(() {
+      final moved = _tabs.removeAt(oldIndex);
+      _tabs.insert(newIndex, moved);
+      _activeTabIndex = _tabs.indexOf(active);
+    });
+  }
+
+  Future<void> _showTabMenu(EditorTab tab, BuildContext tabContext) async {
+    if (!tabContext.mounted) return;
+    final tabBox = tabContext.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(tabContext).context.findRenderObject() as RenderBox?;
+    if (tabBox == null ||
+        overlayBox == null ||
+        !tabBox.attached ||
+        !tabBox.hasSize) {
+      return;
+    }
+    final topLeft = tabBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final bottomRight = tabBox.localToGlobal(
+      tabBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+    final anchor = Rect.fromLTRB(
+      topLeft.dx,
+      bottomRight.dy,
+      bottomRight.dx,
+      bottomRight.dy,
+    );
+
+    PopupMenuItem<_TabMenuAction> item(
+      _TabMenuAction value,
+      IconData icon,
+      String label, {
+      bool enabled = true,
+    }) {
+      return PopupMenuItem<_TabMenuAction>(
+        value: value,
+        enabled: enabled,
+        child: Row(
           children: [
-            ListTile(
-              leading: const Icon(Icons.close_rounded),
-              title: Text(ctx.l10n.textEditorCloseTab),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _closeTab(index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.tab_unselected_rounded),
-              title: Text(ctx.l10n.textEditorCloseOtherTabs),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _closeOtherTabs(index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.clear_all_rounded),
-              title: Text(ctx.l10n.textEditorCloseAllTabs),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _closeAllTabs();
-              },
-            ),
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Text(label),
           ],
         ),
-      ),
+      );
+    }
+
+    final l10n = context.l10n;
+    final choice = await showMenu<_TabMenuAction>(
+      context: tabContext,
+      position: RelativeRect.fromRect(anchor, Offset.zero & overlayBox.size),
+      items: [
+        item(_TabMenuAction.close, Icons.close_rounded, l10n.textEditorCloseTab),
+        item(
+          _TabMenuAction.closeOthers,
+          Icons.tab_unselected_rounded,
+          l10n.textEditorCloseOtherTabs,
+          enabled: _tabs.length > 1,
+        ),
+        item(
+          _TabMenuAction.closeAll,
+          Icons.clear_all_rounded,
+          l10n.textEditorCloseAllTabs,
+        ),
+        const PopupMenuDivider(),
+        item(
+          _TabMenuAction.rename,
+          Icons.edit_outlined,
+          l10n.textEditorRenameMenuItem,
+        ),
+      ],
     );
+    if (!mounted || choice == null) return;
+
+    final index = _tabs.indexOf(tab);
+    if (index < 0) return;
+    switch (choice) {
+      case _TabMenuAction.close:
+        await _closeTab(index);
+      case _TabMenuAction.closeOthers:
+        await _closeOtherTabs(index);
+      case _TabMenuAction.closeAll:
+        await _closeAllTabs();
+      case _TabMenuAction.rename:
+        await _renameTab(tab);
+    }
+  }
+
+  Future<void> _renameTab(EditorTab tab) async {
+    final oldPath = tab.filePath;
+    final oldName = tab.fileName;
+    final slash = oldPath.lastIndexOf('/');
+    final parentDir = slash < 0 ? '' : oldPath.substring(0, slash);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _RenameTabDialog(initialName: oldName),
+    );
+
+    if (result == null || result == oldName || !mounted) return;
+    if (!_tabs.contains(tab)) return;
+    final newPath = parentDir.isEmpty ? result : '$parentDir/$result';
+
+    tab.autosaveTimer?.cancel();
+    for (var i = 0; i < 30 && (tab.isSaving || tab.isAutosaving); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+    }
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .renameFile(widget.container, oldPath, newPath);
+    if (!mounted) return;
+
+    if (ok) {
+      _syncRenamedPath(oldPath, newPath, false);
+      setState(() {});
+      _scrollToActiveTab();
+    } else {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
   }
 
   Future<void> _closeTab(int index) async {
@@ -1106,159 +1202,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
     setState(() {
       _tabs.removeAt(index);
+      if (index < _activeTabIndex) _activeTabIndex--;
       _activeTabIndex = _activeTabIndex.clamp(0, _tabs.length - 1);
     });
     _scrollToActiveTab();
-  }
-
-  Future<void> _createNewFileTab() async {
-    final parentDir = _projectDirPath;
-    final controller = TextEditingController.fromValue(
-      const TextEditingValue(
-        text: 'untitled.txt',
-        selection: TextSelection(baseOffset: 0, extentOffset: 8),
-      ),
-    );
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.textEditorNewFileTooltip),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: ctx.l10n.textEditorSaveAsFileNameLabel,
-            ),
-            validator: (val) {
-              final text = val?.trim() ?? '';
-              if (text.isEmpty) return ctx.l10n.validationEmptyName;
-              if (text.contains('/') || text.contains('\\')) {
-                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.of(ctx).pop(controller.text.trim());
-              }
-            },
-            child: Text(ctx.l10n.done),
-          ),
-        ],
-      ),
-    );
-
-    if (result == null || !mounted) return;
-    final newFilePath = parentDir.isEmpty ? result : '$parentDir/$result';
-
-    final rawList = await ref
-        .read(vaultFileIoApiProvider)
-        .listDirectory(widget.container, parentDir);
-    final caseSensitive = FilesystemRules.of(
-      resolveFilesystemType(widget.container),
-    ).caseSensitive;
-    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
-    final existingNames = RawEntry.parseAll(
-      rawList ?? const [],
-    ).map((e) => foldName(e.name)).toSet();
-
-    if (existingNames.contains(foldName(result)) && mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.textEditorFileAlreadyExistsError,
-        tone: AppBannerTone.error,
-      );
-      return;
-    }
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .createEmptyFile(widget.container, newFilePath);
-
-    if (ok && mounted) {
-      _openFileInTab(newFilePath);
-      _scrollToActiveTab();
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
-  }
-
-  Future<void> _createDrawerFolder() async {
-    final parentDir = _projectDirPath;
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.textEditorNewFolderDialogTitle),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: ctx.l10n.textEditorNewFolderFieldLabel,
-            ),
-            validator: (val) {
-              final text = val?.trim() ?? '';
-              if (text.isEmpty) return ctx.l10n.validationEmptyName;
-              if (text.contains('/') || text.contains('\\')) {
-                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.of(ctx).pop(controller.text.trim());
-              }
-            },
-            child: Text(ctx.l10n.done),
-          ),
-        ],
-      ),
-    );
-
-    if (result == null || !mounted) return;
-    final newDirPath = parentDir.isEmpty ? result : '$parentDir/$result';
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .createDirectory(widget.container, newDirPath);
-
-    if (ok && mounted) {
-      setState(() {});
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
   }
 
   void _syncRenamedPath(String oldPath, String newPath, bool isDir) {
@@ -1297,185 +1244,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       _tabs.add(newTab);
     }
     _activeTabIndex = _activeTabIndex.clamp(0, _tabs.length - 1);
-  }
-
-  Future<void> _renameDrawerItem(RawEntry entry, String fullPath) async {
-    final parentDir = _projectDirPath;
-    final controller = TextEditingController(text: entry.name);
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.textEditorRenameDialogTitle),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: entry.isDir
-                  ? ctx.l10n.textEditorNewFolderFieldLabel
-                  : ctx.l10n.textEditorSaveAsFileNameLabel,
-            ),
-            validator: (val) {
-              final text = val?.trim() ?? '';
-              if (text.isEmpty) return ctx.l10n.validationEmptyName;
-              if (text.contains('/') || text.contains('\\')) {
-                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.of(ctx).pop(controller.text.trim());
-              }
-            },
-            child: Text(ctx.l10n.done),
-          ),
-        ],
-      ),
-    );
-
-    if (result == null || result == entry.name || !mounted) return;
-    final newFullPath = parentDir.isEmpty ? result : '$parentDir/$result';
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .renameFile(widget.container, fullPath, newFullPath);
-
-    if (ok && mounted) {
-      _syncRenamedPath(fullPath, newFullPath, entry.isDir);
-      setState(() {});
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
-  }
-
-  Future<void> _moveDrawerItem(RawEntry entry, String fullPath) async {
-    final targetDir = await showDialog<String>(
-      context: context,
-      builder: (ctx) => _MoveToFolderDialog(
-        container: widget.container,
-        currentEntryPath: fullPath,
-        isDir: entry.isDir,
-      ),
-    );
-
-    if (targetDir == null || !mounted) return;
-    final newFullPath = targetDir.isEmpty
-        ? entry.name
-        : '$targetDir/${entry.name}';
-    if (newFullPath == fullPath) return;
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .renameFile(widget.container, fullPath, newFullPath);
-
-    if (ok && mounted) {
-      _syncRenamedPath(fullPath, newFullPath, entry.isDir);
-      setState(() {});
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
-  }
-
-  Future<void> _deleteDrawerItem(RawEntry entry, String fullPath) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.textEditorDeleteConfirmTitle(entry.name)),
-        content: Text(ctx.l10n.textEditorDeleteConfirmMessage(entry.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(ctx.l10n.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(ctx.l10n.textEditorDeleteMenuItem),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .deleteFile(widget.container, fullPath);
-
-    if (ok && mounted) {
-      _closeTabsForDeletedPath(fullPath, entry.isDir);
-      setState(() {});
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
-  }
-
-  void _showDrawerItemContextMenu(RawEntry entry, String fullPath) {
-    final cs = Theme.of(context).colorScheme;
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: Text(ctx.l10n.textEditorRenameMenuItem),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _renameDrawerItem(entry, fullPath);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.drive_file_move_outlined),
-              title: Text(ctx.l10n.textEditorMoveToMenuItem),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _moveDrawerItem(entry, fullPath);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_outline_rounded, color: cs.error),
-              title: Text(
-                ctx.l10n.textEditorDeleteMenuItem,
-                style: TextStyle(color: cs.error),
-              ),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _deleteDrawerItem(entry, fullPath);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _showSaveAsDialog() async {
@@ -2002,709 +1770,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     _activeTab.codeController.text = result;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_tabs.isEmpty) {
-      return const Scaffold(body: SizedBox.shrink());
-    }
-
-    final appTheme = Theme.of(context);
-    final appSkinTokens = appTheme.extension<AppSkinTokens>();
-    final activeTab = _activeTab;
-    final appearance = _effectiveAppearance(
-      ref.watch(textEditorAppearanceProvider),
-    );
-
-    // The editor's own background/syntax theme drives the colors of the whole
-    // screen (app bar, tabs, status bar, accessory bar, find panel, drawer,
-    // menus, system navigation bar), not just the text area. `cs` from here
-    // on is the editor-derived scheme; `appTheme` is only used to resolve the
-    // editor style itself, whose "auto" syntax theme follows the app.
-    final customColors = appSkinTokens?.editorFollowsAppSkin == true
-        ? null
-        : appearance.customColors.map((k, v) => MapEntry(k, Color(v)));
-    final syntaxStyle = applyAppSkinEditorTokens(
-      resolveEditorSyntaxStyle(
-        activeTab.filePath,
-        appTheme.brightness,
-        appTheme.colorScheme,
-        background: appearance.background,
-        syntaxTheme: appearance.syntaxTheme,
-        disableHighlight: activeTab.isLargeFile,
-        customColors: customColors,
-      ),
-      appSkinTokens,
-    );
-    final chrome = _resolveChrome(
-      syntaxStyle,
-      appTheme.colorScheme,
-      appSkinTokens,
-    );
-    final cs = chrome.colorScheme;
-
-    ref.listen<TextEditorAppearancePrefs>(textEditorAppearanceProvider, (
-      previous,
-      next,
-    ) {
-      if (!next.autoSave) {
-        for (final tab in _tabs) {
-          tab.autosaveTimer?.cancel();
-          tab.autosaveTimer = null;
-        }
-      }
-
-      if (previous?.showTabBar != next.showTabBar ||
-          previous?.autoHideTabBar != next.autoHideTabBar) {
-        if (!next.showTabBar) {
-          _animateTabBar(0);
-        } else if (!next.autoHideTabBar ||
-            previous?.showTabBar == false ||
-            previous?.autoHideTabBar == false) {
-          _animateTabBar(1);
-        }
-      }
-
-      if (previous?.autoHideAppBar != next.autoHideAppBar) {
-        _updateAppBarVisibility();
-      }
-    });
-
-    final anyDirty = _tabs.any((t) => t.isDirty);
-
-    return Theme(
-      data: chrome.theme,
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: chrome.overlayStyle,
-        child: PopScope(
-          canPop: !anyDirty,
-          onPopInvokedWithResult: (didPop, result) async {
-            if (didPop) return;
-            final shouldPop = await _onWillPop();
-            if (shouldPop && context.mounted) {
-              Navigator.of(context).pop();
-            }
-          },
-          child: CallbackShortcuts(
-            bindings: <ShortcutActivator, VoidCallback>{
-              const SingleActivator(LogicalKeyboardKey.keyA, control: true):
-                  _handleSelectAllShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyA, meta: true):
-                  _handleSelectAllShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyT, control: true):
-                  _createNewFileTab,
-              const SingleActivator(LogicalKeyboardKey.keyT, meta: true):
-                  _createNewFileTab,
-              const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-                  _handleSaveShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
-                  _handleSaveShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyF, control: true):
-                  _handleFindShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
-                  _handleFindShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyW, control: true):
-                  _handleCloseTabShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-                  _handleCloseTabShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyG, control: true):
-                  _handleGoToLineShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyG, meta: true):
-                  _handleGoToLineShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyZ, alt: true):
-                  _toggleWordWrap,
-              const SingleActivator(LogicalKeyboardKey.arrowUp, alt: true):
-                  _handleMoveLineUp,
-              const SingleActivator(LogicalKeyboardKey.arrowDown, alt: true):
-                  _handleMoveLineDown,
-              const SingleActivator(LogicalKeyboardKey.slash, control: true):
-                  _handleCommentShortcut,
-              const SingleActivator(LogicalKeyboardKey.slash, meta: true):
-                  _handleCommentShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
-                  _handleUndoShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
-                  _handleUndoShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyY, control: true):
-                  _handleRedoShortcut,
-              const SingleActivator(LogicalKeyboardKey.keyY, meta: true):
-                  _handleRedoShortcut,
-              const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                control: true,
-                shift: true,
-              ): _handleRedoShortcut,
-              const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                meta: true,
-                shift: true,
-              ): _handleRedoShortcut,
-              const SingleActivator(LogicalKeyboardKey.tab):
-                  _handleIndentShortcut,
-              const SingleActivator(LogicalKeyboardKey.tab, shift: true):
-                  _handleOutdentShortcut,
-              const SingleActivator(LogicalKeyboardKey.tab, control: true):
-                  _handleNextTabShortcut,
-              const SingleActivator(
-                LogicalKeyboardKey.tab,
-                control: true,
-                shift: true,
-              ): _handlePreviousTabShortcut,
-              const SingleActivator(LogicalKeyboardKey.tab, meta: true):
-                  _handleNextTabShortcut,
-              const SingleActivator(
-                LogicalKeyboardKey.tab,
-                meta: true,
-                shift: true,
-              ): _handlePreviousTabShortcut,
-            },
-            child: Scaffold(
-              key: _scaffoldKey,
-              drawer: _buildProjectDrawer(cs),
-              appBar: PreferredSize(
-                preferredSize: Size.fromHeight(
-                  (kToolbarHeight +
-                          ((appearance.showTabBar ||
-                                  _tabBarAnimationController.value > 0)
-                              ? 42.0 * _tabBarAnimationController.value
-                              : 0.0)) *
-                      _appBarAnimationController.value,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final topPadding = MediaQuery.paddingOf(context).top;
-                    final bottomHeight = (appearance.showTabBar ||
-                            _tabBarAnimationController.value > 0)
-                        ? 42.0 * _tabBarAnimationController.value
-                        : 0.0;
-                    final fullHeight =
-                        topPadding + kToolbarHeight + bottomHeight;
-
-                    return ClipRect(
-                      child: OverflowBox(
-                        minWidth: constraints.maxWidth,
-                        maxWidth: constraints.maxWidth,
-                        minHeight: fullHeight,
-                        maxHeight: fullHeight,
-                        alignment: Alignment.topCenter,
-                        child: AppBar(
-                          systemOverlayStyle: chrome.overlayStyle,
-                          leading: IconButton(
-                            icon: const Icon(Icons.menu_rounded),
-                            tooltip: context.l10n.textEditorProjectFilesTitle,
-                            onPressed: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                          ),
-                      title: Text(activeTab.fileName),
-                      actions: [
-                        if (!activeTab.isLoading && activeTab.hasError)
-                          PopupMenuButton<String>(
-                            tooltip: context.l10n.textEditorMoreActionsTooltip,
-                            icon: const Icon(Icons.more_vert_rounded),
-                            onSelected: (value) {
-                              if (value == 'encoding') _showEncodingPicker(activeTab);
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'encoding',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.translate_rounded, size: 20),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        context.l10n.textEditorEncodingTooltip,
-                                      ),
-                                    ),
-                                    Text(activeTab.encoding.label),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        if (!activeTab.isLoading && !activeTab.hasError) ...[
-                          if (activeTab.isMarkdownFile && !activeTab.isLargeFile) ...[
-                            if (!activeTab.showMarkdownPreview && !_readOnly)
-                              IconButton(
-                                icon: const Icon(Icons.add_photo_alternate_outlined),
-                                tooltip: context.l10n.addFile,
-                                onPressed: _insertImageTemplate,
-                              ),
-                            IconButton(
-                              icon: Icon(
-                                activeTab.showMarkdownPreview
-                                    ? Icons.edit_note_rounded
-                                    : Icons.visibility_outlined,
-                              ),
-                              tooltip: activeTab.showMarkdownPreview
-                                  ? context.l10n.markdownViewerEditTooltip
-                                  : context.l10n.markdownViewerPreviewTooltip,
-                              onPressed: _toggleMarkdownPreview,
-                            ),
-                          ],
-                          IconButton(
-                            icon: const Icon(Icons.search_rounded),
-                            tooltip: context.l10n.textEditorFindTooltip,
-                            onPressed: () {
-                              if (activeTab.showMarkdownPreview) {
-                                _toggleMarkdownPreview();
-                              }
-                              activeTab.findController.findMode();
-                            },
-                          ),
-                          PopupMenuButton<String>(
-                            tooltip: context.l10n.textEditorMoreActionsTooltip,
-                            icon: const Icon(Icons.more_vert_rounded),
-                            onSelected: (value) {
-                              switch (value) {
-                                case 'save':
-                                  _saveFile(activeTab);
-                                  break;
-                                case 'saveAs':
-                                  _showSaveAsDialog();
-                                  break;
-                                case 'revert':
-                                  _revertActiveTab();
-                                  break;
-                                case 'readOnly':
-                                  _toggleReadOnly();
-                                  break;
-                                case 'wordWrap':
-                                  _toggleWordWrap();
-                                  break;
-                                case 'selectAll':
-                                  _selectAll();
-                                  break;
-                                case 'goToLine':
-                                  _showGoToLineDialog();
-                                  break;
-                                case 'goToStart':
-                                  _goToStart();
-                                  break;
-                                case 'goToEnd':
-                                  _goToEnd();
-                                  break;
-                                case 'format':
-                                  final formatter = _formatter;
-                                  if (formatter != null) _runFormatter(formatter);
-                                  break;
-                                case 'minify':
-                                  _runFormatter(minifyJson);
-                                  break;
-                                case 'encoding':
-                                  _showEncodingPicker(activeTab);
-                                  break;
-                                case 'appearance':
-                                  showEditorAppearanceSheet(context);
-                                  break;
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'save',
-                                enabled:
-                                    activeTab.isDirty &&
-                                    !activeTab.isSaving &&
-                                    !activeTab.isAutosaving,
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.save_rounded,
-                                      size: 20,
-                                      color:
-                                          (activeTab.isDirty &&
-                                              !activeTab.isSaving &&
-                                              !activeTab.isAutosaving)
-                                          ? cs.primary
-                                          : cs.onSurface.withValues(alpha: 0.38),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.save),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'saveAs',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.save_as_rounded, size: 20),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorSaveAsMenuItem),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'revert',
-                                enabled:
-                                    activeTab.isDirty &&
-                                    !activeTab.isSaving &&
-                                    !activeTab.isAutosaving,
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.restore_rounded,
-                                      size: 20,
-                                      color:
-                                          (activeTab.isDirty &&
-                                              !activeTab.isSaving &&
-                                              !activeTab.isAutosaving)
-                                          ? cs.error
-                                          : cs.onSurface.withValues(alpha: 0.38),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      context.l10n.textEditorRevertToSaved,
-                                      style: TextStyle(
-                                        color:
-                                            (activeTab.isDirty &&
-                                                !activeTab.isSaving &&
-                                                !activeTab.isAutosaving)
-                                            ? cs.error
-                                            : null,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuDivider(),
-                              PopupMenuItem(
-                                value: 'encoding',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.translate_rounded, size: 20),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        context.l10n.textEditorEncodingTooltip,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'wordWrap',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.wrap_text_rounded, size: 20),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(context.l10n.textEditorWordWrap),
-                                    ),
-                                    if (_wordWrap)
-                                      Icon(
-                                        Icons.check_rounded,
-                                        size: 18,
-                                        color: cs.primary,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'readOnly',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _readOnly
-                                          ? Icons.lock_rounded
-                                          : Icons.lock_open_rounded,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(context.l10n.textEditorReadOnly),
-                                    ),
-                                    if (_readOnly)
-                                      Icon(
-                                        Icons.check_rounded,
-                                        size: 18,
-                                        color: cs.primary,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuDivider(),
-                              PopupMenuItem(
-                                value: 'selectAll',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.select_all_rounded, size: 20),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorSelectAllMenuItem),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'goToLine',
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.format_list_numbered_rounded,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorGoToLineMenuItem),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'goToStart',
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.vertical_align_top_rounded,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorGoToStartMenuItem),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'goToEnd',
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.vertical_align_bottom_rounded,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorGoToEndMenuItem),
-                                  ],
-                                ),
-                              ),
-                              if (_formatter != null && !_readOnly) ...[
-                                const PopupMenuDivider(),
-                                PopupMenuItem(
-                                  value: 'format',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.auto_fix_high_rounded,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        context.l10n.textEditorFormatDocumentMenuItem,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (_isJsonFile)
-                                  PopupMenuItem(
-                                    value: 'minify',
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.compress_rounded, size: 20),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          context.l10n.textEditorMinifyJsonMenuItem,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                              const PopupMenuDivider(),
-                              PopupMenuItem(
-                                value: 'appearance',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.palette_outlined, size: 20),
-                                    const SizedBox(width: 12),
-                                    Text(context.l10n.textEditorThemeMenuItem),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                       bottom:
-                          (appearance.showTabBar ||
-                              _tabBarAnimationController.value > 0)
-                          ? PreferredSize(
-                              preferredSize: Size.fromHeight(
-                                42 * _tabBarAnimationController.value,
-                              ),
-                              child: ClipRect(
-                                child: Align(
-                                  alignment: Alignment.bottomCenter,
-                                  heightFactor: _tabBarAnimationController.value,
-                                  child: _buildTabBar(cs, syntaxStyle.textColor),
-                                ),
-                              ),
-                            )
-                          : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              // Keeps the last lines clear of the gesture pill / display cutouts.
-              // The Scaffold already strips the bottom inset from the body's
-              // MediaQuery whenever the status bar is present (that bar handles its
-              // own), so this never double-pads.
-              body: SafeArea(
-                top: false,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _handleTabBarScroll,
-                  child: _buildBody(chrome.theme, syntaxStyle),
-                ),
-              ),
-              bottomNavigationBar:
-                  activeTab.isLoading ||
-                      activeTab.hasError ||
-                      !appearance.showStatusBar
-                  ? null
-                  : _buildBottomBar(cs),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar(ColorScheme cs, Color canvasForeground) {
-    while (_tabKeys.length < _tabs.length) {
-      _tabKeys.add(GlobalKey());
-    }
-    if (_tabKeys.length > _tabs.length) {
-      _tabKeys.removeRange(_tabs.length, _tabKeys.length);
-    }
-
-    final tabStripBackground = cs.surfaceContainer;
-    final activeTabBackground = cs.surfaceContainerHighest;
-
-    Color tabForeground(Color background, {double opacity = 1}) {
-      final preferred = Color.alphaBlend(
-        canvasForeground.withValues(alpha: opacity),
-        background,
-      );
-      if (_contrastRatio(preferred, background) >= 4.5) return preferred;
-
-      final blackContrast = _contrastRatio(Colors.black, background);
-      final whiteContrast = _contrastRatio(Colors.white, background);
-      return blackContrast >= whiteContrast ? Colors.black : Colors.white;
-    }
-
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: tabStripBackground,
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _tabScrollController,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              itemCount: _tabs.length,
-              itemBuilder: (context, index) {
-                final tab = _tabs[index];
-                final isActive = index == _activeTabIndex;
-                final tabBackground = isActive
-                    ? activeTabBackground
-                    : tabStripBackground;
-                final labelColor = tabForeground(tabBackground);
-                final closeColor = tabForeground(tabBackground, opacity: 0.78);
-
-                return Material(
-                  key: _tabKeys[index],
-                  color: isActive ? activeTabBackground : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setState(() => _activeTabIndex = index);
-                      _scrollToActiveTab();
-                    },
-                    onLongPress: () => _showTabContextMenu(index),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isActive
-                              ? cs.primary.withValues(alpha: 0.5)
-                              : Colors.transparent,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (tab.isDirty)
-                            Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.only(right: 6),
-                              decoration: BoxDecoration(
-                                color: cs.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          Text(
-                            tab.fileName,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isActive
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: labelColor,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () => _closeTab(index),
-                            child: Padding(
-                              padding: const EdgeInsets.all(2.0),
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 14,
-                                color: closeColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_rounded, size: 20),
-            visualDensity: VisualDensity.compact,
-            tooltip: context.l10n.textEditorNewFileTooltip,
-            onPressed: _createNewFileTab,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-    );
-  }
-
-  List<PathSegment> get _drawerPathStack {
-    final rootLabel = context.l10n.rootFolderLabel;
-    final stack = <PathSegment>[PathSegment(rootLabel, '')];
-    if (_projectDirPath.isEmpty) return stack;
-
-    final segments = _projectDirPath.split('/');
-    String accumulated = '';
-    for (final seg in segments) {
-      if (seg.isEmpty) continue;
-      accumulated = accumulated.isEmpty ? seg : '$accumulated/$seg';
-      stack.add(PathSegment(seg, accumulated));
-    }
-    return stack;
-  }
-
   static const _imageExtensions = {
     'png',
     'jpg',
@@ -2791,269 +1856,767 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     );
   }
 
-  Widget _buildProjectDrawer(ColorScheme cs) {
-    final settingsUri = widget.container.volId < 0
+  @override
+  Widget build(BuildContext context) {
+    if (_tabs.isEmpty) {
+      return const Scaffold(body: SizedBox.shrink());
+    }
+
+    final appTheme = Theme.of(context);
+    final appSkinTokens = appTheme.extension<AppSkinTokens>();
+    final activeTab = _activeTab;
+    final appearance = _effectiveAppearance(
+      ref.watch(textEditorAppearanceProvider),
+    );
+
+    final customColors = appSkinTokens?.editorFollowsAppSkin == true
         ? null
-        : widget.container.uri;
-    final skin = ref
-        .watch(fileManagerToolbarSettingsProvider(settingsUri))
-        .config
-        .skin;
-    return Drawer(
-      backgroundColor: _chrome?.panelBackground ?? cs.surfaceContainer,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              decoration: BoxDecoration(
-                color: _chrome?.panelBackground ?? cs.surfaceContainer,
+        : appearance.customColors.map((k, v) => MapEntry(k, Color(v)));
+    final syntaxStyle = applyAppSkinEditorTokens(
+      resolveEditorSyntaxStyle(
+        activeTab.filePath,
+        appTheme.brightness,
+        appTheme.colorScheme,
+        background: appearance.background,
+        syntaxTheme: appearance.syntaxTheme,
+        disableHighlight: activeTab.isLargeFile,
+        customColors: customColors,
+      ),
+      appSkinTokens,
+    );
+    final chrome = _resolveChrome(
+      syntaxStyle,
+      appTheme.colorScheme,
+      appSkinTokens,
+    );
+    final cs = chrome.colorScheme;
+
+    ref.listen<TextEditorAppearancePrefs>(textEditorAppearanceProvider, (
+      previous,
+      next,
+    ) {
+      if (!next.autoSave) {
+        for (final tab in _tabs) {
+          tab.autosaveTimer?.cancel();
+          tab.autosaveTimer = null;
+        }
+      }
+
+      if (previous?.showTabBar != next.showTabBar ||
+          previous?.autoHideTabBar != next.autoHideTabBar) {
+        if (!next.showTabBar) {
+          _animateTabBar(0);
+        } else if (!next.autoHideTabBar ||
+            previous?.showTabBar == false ||
+            previous?.autoHideTabBar == false) {
+          _animateTabBar(1);
+        }
+      }
+
+      if (previous?.autoHideAppBar != next.autoHideAppBar) {
+        _updateAppBarVisibility();
+      }
+    });
+
+    final anyDirty = _tabs.any((t) => t.isDirty);
+
+    return Theme(
+      data: chrome.theme,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: chrome.overlayStyle,
+        child: PopScope(
+          canPop: !anyDirty,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+            final shouldPop = await _onWillPop();
+            if (shouldPop && context.mounted) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.keyA, control: true):
+                  _handleSelectAllShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyA, meta: true):
+                  _handleSelectAllShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+                  _handleSaveShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
+                  _handleSaveShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                  _handleFindShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+                  _handleFindShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+                  _handleCloseTabShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+                  _handleCloseTabShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyG, control: true):
+                  _handleGoToLineShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyG, meta: true):
+                  _handleGoToLineShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyZ, alt: true):
+                  _toggleWordWrap,
+              const SingleActivator(LogicalKeyboardKey.arrowUp, alt: true):
+                  _handleMoveLineUp,
+              const SingleActivator(LogicalKeyboardKey.arrowDown, alt: true):
+                  _handleMoveLineDown,
+              const SingleActivator(LogicalKeyboardKey.slash, control: true):
+                  _handleCommentShortcut,
+              const SingleActivator(LogicalKeyboardKey.slash, meta: true):
+                  _handleCommentShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+                  _handleUndoShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
+                  _handleUndoShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyY, control: true):
+                  _handleRedoShortcut,
+              const SingleActivator(LogicalKeyboardKey.keyY, meta: true):
+                  _handleRedoShortcut,
+              const SingleActivator(
+                LogicalKeyboardKey.keyZ,
+                control: true,
+                shift: true,
+              ): _handleRedoShortcut,
+              const SingleActivator(
+                LogicalKeyboardKey.keyZ,
+                meta: true,
+                shift: true,
+              ): _handleRedoShortcut,
+              const SingleActivator(LogicalKeyboardKey.tab):
+                  _handleIndentShortcut,
+              const SingleActivator(LogicalKeyboardKey.tab, shift: true):
+                  _handleOutdentShortcut,
+              const SingleActivator(LogicalKeyboardKey.tab, control: true):
+                  _handleNextTabShortcut,
+              const SingleActivator(
+                LogicalKeyboardKey.tab,
+                control: true,
+                shift: true,
+              ): _handlePreviousTabShortcut,
+              const SingleActivator(LogicalKeyboardKey.tab, meta: true):
+                  _handleNextTabShortcut,
+              const SingleActivator(
+                LogicalKeyboardKey.tab,
+                meta: true,
+                shift: true,
+              ): _handlePreviousTabShortcut,
+            },
+            child: Scaffold(
+              key: _scaffoldKey,
+              drawer: _ProjectDrawer(
+                container: widget.container,
+                initialDirPath: _projectDirPath,
+                chrome: chrome,
+                activeFilePath: activeTab.filePath,
+                isTabOpen: (path) => _tabs.any((t) => t.filePath == path),
+                onOpenFile: _openFileInTab,
+                onSyncRenamedPath: _syncRenamedPath,
+                onCloseTabsForDeletedPath: _closeTabsForDeletedPath,
+                onShowImagePreview: _showImagePreviewDialog,
+                isImageFile: _isImageFile,
+                isUnsupportedBinaryFile: _isUnsupportedBinaryFile,
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.inventory_2_outlined, size: 20, color: cs.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.container.displayName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
+              appBar: PreferredSize(
+                preferredSize: Size.fromHeight(
+                  (kToolbarHeight +
+                          (appearance.showTabBar
+                              ? 42.0 * _tabBarAnimationController.value
+                              : 0.0)) *
+                      _appBarAnimationController.value,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final topPadding = MediaQuery.paddingOf(context).top;
+                    final bottomHeight = appearance.showTabBar
+                        ? 42.0 * _tabBarAnimationController.value
+                        : 0.0;
+                    final fullHeight =
+                        topPadding + kToolbarHeight + bottomHeight;
+
+                    return ClipRect(
+                      child: OverflowBox(
+                        minWidth: constraints.maxWidth,
+                        maxWidth: constraints.maxWidth,
+                        minHeight: fullHeight,
+                        maxHeight: fullHeight,
+                        alignment: Alignment.topCenter,
+                        child: AppBar(
+                          systemOverlayStyle: chrome.overlayStyle,
+                          leading: IconButton(
+                            icon: const Icon(Icons.menu_rounded),
+                            tooltip: context.l10n.textEditorProjectFilesTitle,
+                            onPressed: () =>
+                                _scaffoldKey.currentState?.openDrawer(),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          title: Text(activeTab.fileName),
+                          actions: [
+                            if (!activeTab.isLoading && activeTab.hasError)
+                              PopupMenuButton<String>(
+                                tooltip:
+                                    context.l10n.textEditorMoreActionsTooltip,
+                                icon: const Icon(Icons.more_vert_rounded),
+                                onSelected: (value) {
+                                  if (value == 'encoding') {
+                                    _showEncodingPicker(activeTab);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'encoding',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.translate_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            context
+                                                .l10n
+                                                .textEditorEncodingTooltip,
+                                          ),
+                                        ),
+                                        Text(activeTab.encoding.label),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            if (!activeTab.isLoading && !activeTab.hasError) ...[
+                              if (activeTab.isMarkdownFile &&
+                                  !activeTab.isLargeFile) ...[
+                                if (!activeTab.showMarkdownPreview &&
+                                    !_readOnly)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                    ),
+                                    tooltip: context.l10n.addFile,
+                                    onPressed: _insertImageTemplate,
+                                  ),
+                                IconButton(
+                                  icon: Icon(
+                                    activeTab.showMarkdownPreview
+                                        ? Icons.edit_note_rounded
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  tooltip: activeTab.showMarkdownPreview
+                                      ? context.l10n.markdownViewerEditTooltip
+                                      : context
+                                          .l10n
+                                          .markdownViewerPreviewTooltip,
+                                  onPressed: _toggleMarkdownPreview,
+                                ),
+                              ],
+                              IconButton(
+                                icon: const Icon(Icons.search_rounded),
+                                tooltip: context.l10n.textEditorFindTooltip,
+                                onPressed: () {
+                                  if (activeTab.showMarkdownPreview) {
+                                    _toggleMarkdownPreview();
+                                  }
+                                  activeTab.findController.findMode();
+                                },
+                              ),
+                              PopupMenuButton<String>(
+                                tooltip:
+                                    context.l10n.textEditorMoreActionsTooltip,
+                                icon: const Icon(Icons.more_vert_rounded),
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'save':
+                                      _saveFile(activeTab);
+                                      break;
+                                    case 'saveAs':
+                                      _showSaveAsDialog();
+                                      break;
+                                    case 'revert':
+                                      _revertActiveTab();
+                                      break;
+                                    case 'readOnly':
+                                      _toggleReadOnly();
+                                      break;
+                                    case 'wordWrap':
+                                      _toggleWordWrap();
+                                      break;
+                                    case 'selectAll':
+                                      _selectAll();
+                                      break;
+                                    case 'goToLine':
+                                      _showGoToLineDialog();
+                                      break;
+                                    case 'goToStart':
+                                      _goToStart();
+                                      break;
+                                    case 'goToEnd':
+                                      _goToEnd();
+                                      break;
+                                    case 'format':
+                                      final formatter = _formatter;
+                                      if (formatter != null) {
+                                        _runFormatter(formatter);
+                                      }
+                                      break;
+                                    case 'minify':
+                                      _runFormatter(minifyJson);
+                                      break;
+                                    case 'encoding':
+                                      _showEncodingPicker(activeTab);
+                                      break;
+                                    case 'appearance':
+                                      showEditorAppearanceSheet(context);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'save',
+                                    enabled:
+                                        activeTab.isDirty &&
+                                        !activeTab.isSaving &&
+                                        !activeTab.isAutosaving,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.save_rounded,
+                                          size: 20,
+                                          color:
+                                              (activeTab.isDirty &&
+                                                      !activeTab.isSaving &&
+                                                      !activeTab.isAutosaving)
+                                                  ? cs.primary
+                                                  : cs.onSurface.withValues(
+                                                      alpha: 0.38,
+                                                    ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(context.l10n.save),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'saveAs',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.save_as_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorSaveAsMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'revert',
+                                    enabled:
+                                        activeTab.isDirty &&
+                                        !activeTab.isSaving &&
+                                        !activeTab.isAutosaving,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.restore_rounded,
+                                          size: 20,
+                                          color:
+                                              (activeTab.isDirty &&
+                                                      !activeTab.isSaving &&
+                                                      !activeTab.isAutosaving)
+                                                  ? cs.error
+                                                  : cs.onSurface.withValues(
+                                                      alpha: 0.38,
+                                                    ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context.l10n.textEditorRevertToSaved,
+                                          style: TextStyle(
+                                            color:
+                                                (activeTab.isDirty &&
+                                                        !activeTab.isSaving &&
+                                                        !activeTab.isAutosaving)
+                                                    ? cs.error
+                                                    : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'encoding',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.translate_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            context
+                                                .l10n
+                                                .textEditorEncodingTooltip,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'wordWrap',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.wrap_text_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            context.l10n.textEditorWordWrap,
+                                          ),
+                                        ),
+                                        if (_wordWrap)
+                                          Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                            color: cs.primary,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'readOnly',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _readOnly
+                                              ? Icons.lock_rounded
+                                              : Icons.lock_open_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            context.l10n.textEditorReadOnly,
+                                          ),
+                                        ),
+                                        if (_readOnly)
+                                          Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                            color: cs.primary,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'selectAll',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.select_all_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorSelectAllMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'goToLine',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.format_list_numbered_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorGoToLineMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'goToStart',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_top_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorGoToStartMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'goToEnd',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_bottom_rounded,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorGoToEndMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_formatter != null && !_readOnly) ...[
+                                    const PopupMenuDivider(),
+                                    PopupMenuItem(
+                                      value: 'format',
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.auto_fix_high_rounded,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            context
+                                                .l10n
+                                                .textEditorFormatDocumentMenuItem,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (_isJsonFile)
+                                      PopupMenuItem(
+                                        value: 'minify',
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.compress_rounded,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              context
+                                                  .l10n
+                                                  .textEditorMinifyJsonMenuItem,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value: 'appearance',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.palette_outlined,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          context
+                                              .l10n
+                                              .textEditorThemeMenuItem,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                          bottom: (appearance.showTabBar &&
+                                  _tabBarAnimationController.value > 0)
+                              ? PreferredSize(
+                                  preferredSize: Size.fromHeight(
+                                    42 * _tabBarAnimationController.value,
+                                  ),
+                                  child: ClipRect(
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      heightFactor:
+                                          _tabBarAnimationController.value,
+                                      child: _buildTabBar(
+                                        cs,
+                                        syntaxStyle.textColor,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : null,
                         ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.note_add_outlined, size: 20),
-                    tooltip: context.l10n.textEditorNewFileTooltip,
-                    onPressed: _createNewFileTab,
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.create_new_folder_outlined,
-                      size: 20,
-                    ),
-                    tooltip: context.l10n.textEditorNewFolderTooltip,
-                    onPressed: _createDrawerFolder,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    tooltip: context.l10n.close,
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: _chrome?.panelBackground ?? cs.surfaceContainer,
-              ),
-              child: BreadcrumbBar(
-                stack: _drawerPathStack,
-                backgroundColor: Colors.transparent,
-                onTap: (index) {
-                  final target = _drawerPathStack[index];
-                  setState(() => _projectDirPath = target.fatPath);
-                },
-              ),
-            ),
-            Expanded(
-              child: FutureBuilder<List<String>?>(
-                future: ref
-                    .read(vaultFileIoApiProvider)
-                    .listDirectory(widget.container, _projectDirPath),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final rawEntries = snapshot.data ?? [];
-                  final entries = RawEntry.parseAll(rawEntries)
-                    ..sort((a, b) {
-                      if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
-                      return a.name.compareTo(b.name);
-                    });
-
-                  if (entries.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.folder_open_rounded,
-                            size: 40,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            context.l10n.filesEmptyMessage,
-                            style: TextStyle(color: cs.onSurfaceVariant),
-                          ),
-                        ],
                       ),
                     );
-                  }
+                  },
+                ),
+              ),
+              body: SafeArea(
+                top: false,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _handleTabBarScroll,
+                  child: _buildBody(chrome.theme, syntaxStyle),
+                ),
+              ),
+              bottomNavigationBar:
+                  activeTab.isLoading ||
+                      activeTab.hasError ||
+                      !appearance.showStatusBar
+                  ? null
+                  : _buildBottomBar(cs),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    itemCount: entries.length,
-                    itemBuilder: (context, index) {
-                      final entry = entries[index];
-                      final fullPath = _projectDirPath.isEmpty
-                          ? entry.name
-                          : '$_projectDirPath/${entry.name}';
-                      final isOpen = _tabs.any((t) => t.filePath == fullPath);
-                      final isCurrentActive = fullPath == _activeTab.filePath;
-                      final isUnsupported = _isUnsupportedBinaryFile(
-                        entry.name,
-                      );
-                      final (iconData, iconColor) = entry.isDir
-                          ? (skin.folderIcon, skin.folderIconColor(cs))
-                          : (
-                              skin.fileIcon(entry.name),
-                              skin.fileIconColor(cs, entry.name),
-                            );
-                      final itemStyle = skin.styleFor(isDir: entry.isDir);
+  Widget _buildTabBar(ColorScheme cs, Color canvasForeground) {
+    final tabStripBackground = cs.surfaceContainer;
+    final activeTabBackground = cs.surfaceContainerHighest;
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Material(
-                          color: isCurrentActive
-                              ? cs.secondaryContainer.withValues(alpha: 0.6)
-                              : Colors.transparent,
+    Color tabForeground(Color background, {double opacity = 1}) {
+      final preferred = Color.alphaBlend(
+        canvasForeground.withValues(alpha: opacity),
+        background,
+      );
+      if (_contrastRatio(preferred, background) >= 4.5) return preferred;
+
+      final blackContrast = _contrastRatio(Colors.black, background);
+      final whiteContrast = _contrastRatio(Colors.white, background);
+      return blackContrast >= whiteContrast ? Colors.black : Colors.white;
+    }
+
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: tabStripBackground,
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ReorderableListView.builder(
+              scrollController: _tabScrollController,
+              scrollDirection: Axis.horizontal,
+              buildDefaultDragHandles: false,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              itemCount: _tabs.length,
+              onReorderStart: (_) => HapticFeedback.mediumImpact(),
+              onReorderItem: _reorderTabs,
+              proxyDecorator: (child, index, animation) {
+                return AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, child) {
+                    final t = Curves.easeInOut.transform(animation.value);
+                    return Material(
+                      elevation: 6 * t,
+                      color: activeTabBackground,
+                      shadowColor: cs.shadow.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(8),
+                      child: child,
+                    );
+                  },
+                  child: child,
+                );
+              },
+              itemBuilder: (context, index) {
+                final tab = _tabs[index];
+                final isActive = index == _activeTabIndex;
+                final tabBackground = isActive
+                    ? activeTabBackground
+                    : tabStripBackground;
+                final labelColor = tabForeground(tabBackground);
+
+                return ReorderableDelayedDragStartListener(
+                  key: ObjectKey(tab),
+                  index: index,
+                  child: Builder(
+                    builder: (tabContext) {
+                      tab.tabContext = tabContext;
+                      return Material(
+                        color: isActive
+                            ? activeTabBackground
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          child: ListTile(
-                            shape: RoundedRectangleBorder(
+                          onTap: () => _onTabTapped(tab, tabContext),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 0,
-                            ),
-                            visualDensity: VisualDensity.compact,
-                            dense: true,
-                            onLongPress: () =>
-                                _showDrawerItemContextMenu(entry, fullPath),
-                            leading: Container(
-                              width: 32,
-                              height: 32,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: isCurrentActive
-                                    ? cs.primaryContainer
-                                    : switch (itemStyle.container) {
-                                        SkinContainerStyle.filled =>
-                                          entry.isDir
-                                              ? cs.secondaryContainer
-                                                    .withValues(alpha: 0.4)
-                                              : cs.surfaceContainerHighest,
-                                        SkinContainerStyle.outlined ||
-                                        SkinContainerStyle.none =>
-                                          Colors.transparent,
-                                      },
-                                borderRadius: BorderRadius.circular(10),
-                                border:
-                                    itemStyle.container ==
-                                        SkinContainerStyle.outlined
-                                    ? Border.all(
-                                        color: isCurrentActive
-                                            ? cs.primary
-                                            : cs.outlineVariant,
-                                        width: 1.2,
-                                      )
-                                    : null,
-                              ),
-                              child: Icon(
-                                iconData,
-                                color: isCurrentActive
-                                    ? cs.primary
-                                    : (isUnsupported
-                                          ? iconColor.withValues(alpha: 0.38)
-                                          : iconColor),
-                                size: 20,
+                              border: Border.all(
+                                color: isActive
+                                    ? cs.primary.withValues(alpha: 0.5)
+                                    : Colors.transparent,
+                                width: 1,
                               ),
                             ),
-                            title: Text(
-                              entry.name,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: (isCurrentActive || isOpen)
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: isCurrentActive
-                                    ? cs.onSecondaryContainer
-                                    : (isUnsupported
-                                          ? (itemStyle.nameColor ??
-                                                    cs.onSurface)
-                                                .withValues(alpha: 0.45)
-                                          : itemStyle.nameColor ??
-                                                cs.onSurface),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (tab.isDirty)
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                Text(
+                                  tab.fileName,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isActive
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: labelColor,
+                                  ),
+                                ),
+                              ],
                             ),
-                            trailing: entry.isDir
-                                ? Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  )
-                                : (isCurrentActive
-                                      ? Icon(
-                                          Icons.edit_note_rounded,
-                                          size: 18,
-                                          color: cs.primary,
-                                        )
-                                      : (isOpen
-                                            ? Container(
-                                                width: 6,
-                                                height: 6,
-                                                decoration: BoxDecoration(
-                                                  color: cs.primary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              )
-                                            : null)),
-                            onTap: () {
-                              if (entry.isDir) {
-                                setState(() => _projectDirPath = fullPath);
-                              } else if (_isImageFile(entry.name)) {
-                                Navigator.of(context).pop();
-                                _showImagePreviewDialog(fullPath, entry.name);
-                              } else if (isUnsupported) {
-                                Navigator.of(context).pop();
-                                showAppSnackBar(
-                                  context,
-                                  message: context
-                                      .l10n
-                                      .textEditorInvalidTextFileMessage,
-                                  tone: AppBannerTone.error,
-                                );
-                              } else {
-                                Navigator.of(context).pop();
-                                _openFileInTab(fullPath);
-                              }
-                            },
                           ),
                         ),
                       );
                     },
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_rounded, size: 20),
+            visualDensity: VisualDensity.compact,
+            tooltip: context.l10n.textEditorNewFileTooltip,
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
     );
   }
@@ -3166,7 +2729,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     );
     final softKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    // Calculate a high-contrast accent color for the cursor, selection, and teardrop handles
     final bgLuminance = syntaxStyle.backgroundColor.computeLuminance();
     final primaryLuminance = cs.primary.computeLuminance();
     final contrast = (primaryLuminance - bgLuminance).abs();
@@ -3329,8 +2891,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                         while (extLine >= 0) {
                           final text = lines[extLine].text;
                           while (extOffset > 0 &&
-                              whitespaceRe.hasMatch(text[extOffset - 1]))
+                              whitespaceRe.hasMatch(text[extOffset - 1])) {
                             extOffset--;
+                          }
                           if (extOffset > 0) {
                             bool isWord = wordRe.hasMatch(text[extOffset - 1]);
                             while (extOffset > 0 &&
@@ -3356,8 +2919,9 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                         while (extLine < lines.length) {
                           final text = lines[extLine].text;
                           while (extOffset < text.length &&
-                              whitespaceRe.hasMatch(text[extOffset]))
+                              whitespaceRe.hasMatch(text[extOffset])) {
                             extOffset++;
+                          }
                           if (extOffset < text.length) {
                             bool isWord = wordRe.hasMatch(text[extOffset]);
                             while (extOffset < text.length &&
@@ -3477,6 +3041,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                                     minNumberCount: 1,
                                     controller: editingController,
                                     notifier: notifier,
+                                    pinToViewportTop: _wordWrap,
                                     textStyle: TextStyle(
                                       color: gutterColor,
                                       fontFamily: 'JetBrains Mono',
@@ -3577,10 +3142,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
         ? '${context.l10n.textEditorCursorPosition(activeTab.cursorLine, activeTab.cursorCol)}  •  '
         : '';
 
-    // The fill is the outer DecoratedBox so it runs edge-to-edge behind the
-    // system gesture area; the SafeArea inside pushes the text up above the
-    // gesture pill (and in from display cutouts in landscape) instead of
-    // letting it sit underneath it.
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
@@ -3750,15 +3311,92 @@ class _GoToLineDialogState extends State<_GoToLineDialog> {
   }
 }
 
+class _RenameTabDialog extends StatefulWidget {
+  final String initialName;
+
+  const _RenameTabDialog({required this.initialName});
+
+  @override
+  State<_RenameTabDialog> createState() => _RenameTabDialogState();
+}
+
+class _RenameTabDialogState extends State<_RenameTabDialog> {
+  late final TextEditingController _controller;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    final name = widget.initialName;
+    final dot = name.lastIndexOf('.');
+    _controller = TextEditingController.fromValue(
+      TextEditingValue(
+        text: name,
+        selection: TextSelection(
+          baseOffset: 0,
+          extentOffset: dot > 0 ? dot : name.length,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.l10n.textEditorRenameDialogTitle),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: context.l10n.textEditorSaveAsFileNameLabel,
+          ),
+          validator: (val) {
+            final text = val?.trim() ?? '';
+            if (text.isEmpty) return context.l10n.validationEmptyName;
+            if (text.contains('/') || text.contains('\\')) {
+              return context.l10n.validationIllegalChar('/', 0, 'vault');
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(onPressed: _submit, child: Text(context.l10n.done)),
+      ],
+    );
+  }
+}
+
 class _MoveToFolderDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentEntryPath;
   final bool isDir;
+  final bool isCopy;
 
   const _MoveToFolderDialog({
     required this.container,
     required this.currentEntryPath,
     required this.isDir,
+    this.isCopy = false,
   });
 
   @override
@@ -3768,13 +3406,30 @@ class _MoveToFolderDialog extends ConsumerStatefulWidget {
 
 class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
   String _currentDir = '';
+  late Future<List<String>?> _dirFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDir();
+  }
+
+  void _loadDir() {
+    _dirFuture = ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, _currentDir);
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return AlertDialog(
-      title: Text(context.l10n.textEditorMoveToDialogTitle),
+      title: Text(
+        widget.isCopy
+            ? context.l10n.textEditorCopyToDialogTitle
+            : context.l10n.textEditorMoveToDialogTitle,
+      ),
       content: SizedBox(
         width: double.maxFinite,
         height: 350,
@@ -3798,6 +3453,7 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
                           _currentDir = lastSlash >= 0
                               ? _currentDir.substring(0, lastSlash)
                               : '';
+                          _loadDir();
                         });
                       },
                     ),
@@ -3819,9 +3475,7 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
             const SizedBox(height: 8),
             Expanded(
               child: FutureBuilder<List<String>?>(
-                future: ref
-                    .read(vaultFileIoApiProvider)
-                    .listDirectory(widget.container, _currentDir),
+                future: _dirFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -3831,7 +3485,11 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
                       RawEntry.parseAll(
                           snapshot.data ?? const [],
                         ).where((e) => e.isDir).toList()
-                        ..sort((a, b) => a.name.compareTo(b.name));
+                        ..sort(
+                          (a, b) => a.name
+                              .toLowerCase()
+                              .compareTo(b.name.toLowerCase()),
+                        );
 
                   if (folders.isEmpty) {
                     return Center(
@@ -3853,7 +3511,6 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
                           ? folder.name
                           : '$_currentDir/${folder.name}';
 
-                      // Disallow moving a directory into itself or a subfolder of itself
                       final isInvalidTarget =
                           widget.isDir &&
                           (folderFullPath == widget.currentEntryPath ||
@@ -3882,7 +3539,10 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
                         ),
                         enabled: !isInvalidTarget,
                         onTap: () {
-                          setState(() => _currentDir = folderFullPath);
+                          setState(() {
+                            _currentDir = folderFullPath;
+                            _loadDir();
+                          });
                         },
                       );
                     },
@@ -3900,10 +3560,984 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
         ),
         FilledButton.icon(
           icon: const Icon(Icons.check_rounded, size: 18),
-          label: Text(context.l10n.textEditorMoveHereButton),
+          label: Text(
+            widget.isCopy
+                ? context.l10n.textEditorCopyHereButton
+                : context.l10n.textEditorMoveHereButton,
+          ),
           onPressed: () => Navigator.of(context).pop(_currentDir),
         ),
       ],
+    );
+  }
+}
+
+class _ProjectDrawer extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  final String initialDirPath;
+  final EditorChrome? chrome;
+  final String activeFilePath;
+  final bool Function(String path) isTabOpen;
+  final ValueChanged<String> onOpenFile;
+  final void Function(String oldPath, String newPath, bool isDir)
+  onSyncRenamedPath;
+  final void Function(String deletedPath, bool isDir)
+  onCloseTabsForDeletedPath;
+  final void Function(String fullPath, String name) onShowImagePreview;
+  final bool Function(String name) isImageFile;
+  final bool Function(String name) isUnsupportedBinaryFile;
+
+  const _ProjectDrawer({
+    required this.container,
+    required this.initialDirPath,
+    required this.chrome,
+    required this.activeFilePath,
+    required this.isTabOpen,
+    required this.onOpenFile,
+    required this.onSyncRenamedPath,
+    required this.onCloseTabsForDeletedPath,
+    required this.onShowImagePreview,
+    required this.isImageFile,
+    required this.isUnsupportedBinaryFile,
+  });
+
+  @override
+  ConsumerState<_ProjectDrawer> createState() => _ProjectDrawerState();
+}
+
+class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
+  late String _projectDirPath;
+  late Future<List<String>?> _directoryFuture;
+
+  bool _drawerSearchOpen = false;
+  final TextEditingController _drawerSearchController =
+      TextEditingController();
+  String _drawerSearchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _projectDirPath = widget.initialDirPath;
+    _loadDirectory();
+    _drawerSearchController.addListener(() {
+      final q = _drawerSearchController.text.trim().toLowerCase();
+      if (q != _drawerSearchQuery) {
+        setState(() => _drawerSearchQuery = q);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _drawerSearchController.dispose();
+    super.dispose();
+  }
+
+  void _loadDirectory({bool refresh = false}) {
+    _directoryFuture = ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, _projectDirPath, refresh: refresh);
+  }
+
+  List<PathSegment> get _drawerPathStack {
+    final rootLabel = context.l10n.rootFolderLabel;
+    final stack = <PathSegment>[PathSegment(rootLabel, '')];
+    if (_projectDirPath.isEmpty) return stack;
+
+    final segments = _projectDirPath.split('/');
+    String accumulated = '';
+    for (final seg in segments) {
+      if (seg.isEmpty) continue;
+      accumulated = accumulated.isEmpty ? seg : '$accumulated/$seg';
+      stack.add(PathSegment(seg, accumulated));
+    }
+    return stack;
+  }
+
+  String _generateDuplicateName(
+    String fileName,
+    Set<String> existingNames,
+    bool caseSensitive,
+  ) {
+    String fold(String s) => caseSensitive ? s : s.toLowerCase();
+    final dotIdx = fileName.lastIndexOf('.');
+    final stem = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
+    final ext = dotIdx > 0 ? fileName.substring(dotIdx) : '';
+
+    for (int i = 1; i < 9999; i++) {
+      final candidate = '$stem ($i)$ext';
+      if (!existingNames.contains(fold(candidate))) {
+        return candidate;
+      }
+    }
+    return '$stem (copy)$ext';
+  }
+
+  Future<bool> _copySingleFile(String sourcePath, String destPath) async {
+    final api = ref.read(vaultFileIoApiProvider);
+    final directOk = await api.copyFile(
+      widget.container,
+      sourcePath,
+      widget.container,
+      destPath,
+    );
+    if (directOk) return true;
+
+    final bytes = await api.readWholeFile(widget.container, sourcePath);
+    if (bytes == null) return false;
+    return api.writeWholeFile(widget.container, destPath, bytes);
+  }
+
+  Future<bool> _copyRecursive(
+    String sourcePath,
+    String destPath,
+    bool isDir,
+  ) async {
+    final api = ref.read(vaultFileIoApiProvider);
+    if (!isDir) {
+      return _copySingleFile(sourcePath, destPath);
+    }
+
+    await api.createDirectory(widget.container, destPath);
+    final rawList = await api.listDirectory(widget.container, sourcePath);
+    final entries = RawEntry.parseAll(rawList ?? const []);
+    var allOk = true;
+    for (final child in entries) {
+      if (child.name.startsWith('System:')) continue;
+      final childSrc = '$sourcePath/${child.name}';
+      final childDest = '$destPath/${child.name}';
+      final ok = await _copyRecursive(childSrc, childDest, child.isDir);
+      if (!ok) allOk = false;
+    }
+    return allOk;
+  }
+
+  Future<void> _duplicateDrawerItem(RawEntry entry, String fullPath) async {
+    final parentDir = _projectDirPath;
+    final rawList = await ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, parentDir);
+    final caseSensitive = FilesystemRules.of(
+      resolveFilesystemType(widget.container),
+    ).caseSensitive;
+    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
+    final existingNames = RawEntry.parseAll(
+      rawList ?? const [],
+    ).map((e) => foldName(e.name)).toSet();
+
+    final uniqueName = _generateDuplicateName(
+      entry.name,
+      existingNames,
+      caseSensitive,
+    );
+    final newFullPath =
+        parentDir.isEmpty ? uniqueName : '$parentDir/$uniqueName';
+
+    final ok = await _copyRecursive(fullPath, newFullPath, entry.isDir);
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _loadDirectory(refresh: true));
+      showAppSnackBar(
+        context,
+        message: context.l10n.textEditorCopiedSuccessfully,
+        tone: AppBannerTone.success,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _copyDrawerItem(RawEntry entry, String fullPath) async {
+    final targetDir = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _MoveToFolderDialog(
+        container: widget.container,
+        currentEntryPath: fullPath,
+        isDir: entry.isDir,
+        isCopy: true,
+      ),
+    );
+
+    if (targetDir == null || !mounted) return;
+    var newFullPath =
+        targetDir.isEmpty ? entry.name : '$targetDir/${entry.name}';
+
+    final rawList = await ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, targetDir);
+    final caseSensitive = FilesystemRules.of(
+      resolveFilesystemType(widget.container),
+    ).caseSensitive;
+    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
+    final existingNames = RawEntry.parseAll(
+      rawList ?? const [],
+    ).map((e) => foldName(e.name)).toSet();
+
+    if (existingNames.contains(foldName(entry.name))) {
+      if (newFullPath == fullPath) {
+        final uniqueName = _generateDuplicateName(
+          entry.name,
+          existingNames,
+          caseSensitive,
+        );
+        newFullPath =
+            targetDir.isEmpty ? uniqueName : '$targetDir/$uniqueName';
+      } else {
+        final overwrite = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(ctx.l10n.conflictResolutionTitle),
+            content: Text(ctx.l10n.textEditorFileAlreadyExistsError),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(ctx.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(ctx.l10n.replaceExistingFile),
+              ),
+            ],
+          ),
+        );
+        if (overwrite != true || !mounted) return;
+      }
+    }
+
+    final ok = await _copyRecursive(fullPath, newFullPath, entry.isDir);
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _loadDirectory(refresh: true));
+      showAppSnackBar(
+        context,
+        message: context.l10n.textEditorCopiedSuccessfully,
+        tone: AppBannerTone.success,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _moveDrawerItem(RawEntry entry, String fullPath) async {
+    final targetDir = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _MoveToFolderDialog(
+        container: widget.container,
+        currentEntryPath: fullPath,
+        isDir: entry.isDir,
+        isCopy: false,
+      ),
+    );
+
+    if (targetDir == null || !mounted) return;
+    final newFullPath = targetDir.isEmpty
+        ? entry.name
+        : '$targetDir/${entry.name}';
+    if (newFullPath == fullPath) return;
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .renameFile(widget.container, fullPath, newFullPath);
+
+    if (ok && mounted) {
+      widget.onSyncRenamedPath(fullPath, newFullPath, entry.isDir);
+      setState(() => _loadDirectory(refresh: true));
+    } else if (mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _renameDrawerItem(RawEntry entry, String fullPath) async {
+    final parentDir = _projectDirPath;
+    final controller = TextEditingController(text: entry.name);
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.textEditorRenameDialogTitle),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: entry.isDir
+                  ? ctx.l10n.textEditorNewFolderFieldLabel
+                  : ctx.l10n.textEditorSaveAsFileNameLabel,
+            ),
+            validator: (val) {
+              final text = val?.trim() ?? '';
+              if (text.isEmpty) return ctx.l10n.validationEmptyName;
+              if (text.contains('/') || text.contains('\\')) {
+                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(controller.text.trim());
+              }
+            },
+            child: Text(ctx.l10n.done),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || result == entry.name || !mounted) return;
+    final newFullPath = parentDir.isEmpty ? result : '$parentDir/$result';
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .renameFile(widget.container, fullPath, newFullPath);
+
+    if (ok && mounted) {
+      widget.onSyncRenamedPath(fullPath, newFullPath, entry.isDir);
+      setState(() => _loadDirectory(refresh: true));
+    } else if (mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _deleteDrawerItem(RawEntry entry, String fullPath) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.textEditorDeleteConfirmTitle(entry.name)),
+        content: Text(ctx.l10n.textEditorDeleteConfirmMessage(entry.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(ctx.l10n.textEditorDeleteMenuItem),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .deleteFile(widget.container, fullPath);
+
+    if (ok && mounted) {
+      widget.onCloseTabsForDeletedPath(fullPath, entry.isDir);
+      setState(() => _loadDirectory(refresh: true));
+    } else if (mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  void _showDrawerItemContextMenu(RawEntry entry, String fullPath) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(ctx.l10n.textEditorRenameMenuItem),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _renameDrawerItem(entry, fullPath);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: Text(ctx.l10n.textEditorCopyToMenuItem),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _copyDrawerItem(entry, fullPath);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.control_point_duplicate_rounded),
+              title: Text(ctx.l10n.textEditorDuplicateMenuItem),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _duplicateDrawerItem(entry, fullPath);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outlined),
+              title: Text(ctx.l10n.textEditorMoveToMenuItem),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _moveDrawerItem(entry, fullPath);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline_rounded, color: cs.error),
+              title: Text(
+                ctx.l10n.textEditorDeleteMenuItem,
+                style: TextStyle(color: cs.error),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _deleteDrawerItem(entry, fullPath);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createNewFileTab() async {
+    final parentDir = _projectDirPath;
+    final controller = TextEditingController.fromValue(
+      const TextEditingValue(
+        text: 'untitled.txt',
+        selection: TextSelection(baseOffset: 0, extentOffset: 8),
+      ),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.textEditorNewFileTooltip),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: ctx.l10n.textEditorSaveAsFileNameLabel,
+            ),
+            validator: (val) {
+              final text = val?.trim() ?? '';
+              if (text.isEmpty) return ctx.l10n.validationEmptyName;
+              if (text.contains('/') || text.contains('\\')) {
+                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(controller.text.trim());
+              }
+            },
+            child: Text(ctx.l10n.done),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    final newFilePath = parentDir.isEmpty ? result : '$parentDir/$result';
+
+    final rawList = await ref
+        .read(vaultFileIoApiProvider)
+        .listDirectory(widget.container, parentDir);
+    final caseSensitive = FilesystemRules.of(
+      resolveFilesystemType(widget.container),
+    ).caseSensitive;
+    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
+    final existingNames = RawEntry.parseAll(
+      rawList ?? const [],
+    ).map((e) => foldName(e.name)).toSet();
+
+    if (existingNames.contains(foldName(result)) && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.textEditorFileAlreadyExistsError,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .createEmptyFile(widget.container, newFilePath);
+
+    if (ok && mounted) {
+      setState(() => _loadDirectory(refresh: true));
+      widget.onOpenFile(newFilePath);
+    } else if (mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _createDrawerFolder() async {
+    final parentDir = _projectDirPath;
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.textEditorNewFolderDialogTitle),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: ctx.l10n.textEditorNewFolderFieldLabel,
+            ),
+            validator: (val) {
+              final text = val?.trim() ?? '';
+              if (text.isEmpty) return ctx.l10n.validationEmptyName;
+              if (text.contains('/') || text.contains('\\')) {
+                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(controller.text.trim());
+              }
+            },
+            child: Text(ctx.l10n.done),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    final newDirPath = parentDir.isEmpty ? result : '$parentDir/$result';
+
+    final ok = await ref
+        .read(vaultFileIoApiProvider)
+        .createDirectory(widget.container, newDirPath);
+
+    if (ok && mounted) {
+      setState(() => _loadDirectory(refresh: true));
+    } else if (mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.saveFailedWithError(''),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final settingsUri =
+        widget.container.volId < 0 ? null : widget.container.uri;
+    final skin = ref
+        .watch(fileManagerToolbarSettingsProvider(settingsUri))
+        .config
+        .skin;
+
+    return Drawer(
+      backgroundColor: widget.chrome?.panelBackground ?? cs.surfaceContainer,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+              decoration: BoxDecoration(
+                color: widget.chrome?.panelBackground ?? cs.surfaceContainer,
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.inventory_2_outlined, size: 20, color: cs.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.container.displayName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _drawerSearchOpen
+                          ? Icons.search_off_rounded
+                          : Icons.search_rounded,
+                      size: 20,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: context.l10n.search,
+                    onPressed: () {
+                      setState(() {
+                        _drawerSearchOpen = !_drawerSearchOpen;
+                        if (!_drawerSearchOpen) {
+                          _drawerSearchController.clear();
+                          _drawerSearchQuery = '';
+                        }
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 20),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: context.l10n.refreshListButton,
+                    onPressed: () => setState(() => _loadDirectory(refresh: true)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.note_add_outlined, size: 20),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: context.l10n.textEditorNewFileTooltip,
+                    onPressed: _createNewFileTab,
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.create_new_folder_outlined,
+                      size: 20,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: context.l10n.textEditorNewFolderTooltip,
+                    onPressed: _createDrawerFolder,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: widget.chrome?.panelBackground ?? cs.surfaceContainer,
+              ),
+              child: BreadcrumbBar(
+                stack: _drawerPathStack,
+                backgroundColor: Colors.transparent,
+                onTap: (index) {
+                  final target = _drawerPathStack[index];
+                  setState(() {
+                    _projectDirPath = target.fatPath;
+                    _drawerSearchQuery = '';
+                    _drawerSearchController.clear();
+                    _loadDirectory();
+                  });
+                },
+              ),
+            ),
+            if (_drawerSearchOpen)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.search_rounded,
+                      size: 16,
+                      color: cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _drawerSearchController,
+                        autofocus: true,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: context.l10n.textEditorSearchFilesHint,
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                    if (_drawerSearchQuery.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 16),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          _drawerSearchController.clear();
+                          setState(() => _drawerSearchQuery = '');
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: FutureBuilder<List<String>?>(
+                future: _directoryFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final rawEntries = snapshot.data ?? [];
+                  var entries = RawEntry.parseAll(rawEntries)
+                    ..sort((a, b) {
+                      if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
+                      return a.name
+                          .toLowerCase()
+                          .compareTo(b.name.toLowerCase());
+                    });
+
+                  if (_drawerSearchQuery.isNotEmpty) {
+                    entries = entries
+                        .where(
+                          (e) => e.name.toLowerCase().contains(
+                                _drawerSearchQuery,
+                              ),
+                        )
+                        .toList();
+                  }
+
+                  if (entries.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.folder_open_rounded,
+                            size: 40,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _drawerSearchQuery.isNotEmpty
+                                ? context.l10n.noResultsTitle
+                                : context.l10n.filesEmptyMessage,
+                            style: TextStyle(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    itemCount: entries.length,
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final fullPath = _projectDirPath.isEmpty
+                          ? entry.name
+                          : '$_projectDirPath/${entry.name}';
+                      final isOpen = widget.isTabOpen(fullPath);
+                      final isCurrentActive = fullPath == widget.activeFilePath;
+                      final isUnsupported = widget.isUnsupportedBinaryFile(
+                        entry.name,
+                      );
+                      final (iconData, iconColor) = entry.isDir
+                          ? (skin.folderIcon, skin.folderIconColor(cs))
+                          : (
+                              skin.fileIcon(entry.name),
+                              skin.fileIconColor(cs, entry.name),
+                            );
+                      final itemStyle = skin.styleFor(isDir: entry.isDir);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Material(
+                          color: isCurrentActive
+                              ? cs.secondaryContainer.withValues(alpha: 0.6)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.only(
+                              left: 8,
+                              right: 2,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            dense: true,
+                            onLongPress: () =>
+                                _showDrawerItemContextMenu(entry, fullPath),
+                            leading: Container(
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isCurrentActive
+                                    ? cs.primaryContainer
+                                    : switch (itemStyle.container) {
+                                        SkinContainerStyle.filled =>
+                                          entry.isDir
+                                              ? cs.secondaryContainer
+                                                    .withValues(alpha: 0.4)
+                                              : cs.surfaceContainerHighest,
+                                        SkinContainerStyle.outlined ||
+                                        SkinContainerStyle.none =>
+                                          Colors.transparent,
+                                      },
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    itemStyle.container ==
+                                        SkinContainerStyle.outlined
+                                    ? Border.all(
+                                        color: isCurrentActive
+                                            ? cs.primary
+                                            : cs.outlineVariant,
+                                        width: 1.2,
+                                      )
+                                    : null,
+                              ),
+                              child: Icon(
+                                iconData,
+                                color: isCurrentActive
+                                    ? cs.primary
+                                    : (isUnsupported
+                                          ? iconColor.withValues(alpha: 0.38)
+                                          : iconColor),
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              entry.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: (isCurrentActive || isOpen)
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isCurrentActive
+                                    ? cs.onSecondaryContainer
+                                    : (isUnsupported
+                                          ? (itemStyle.nameColor ??
+                                                    cs.onSurface)
+                                                .withValues(alpha: 0.45)
+                                          : itemStyle.nameColor ??
+                                                cs.onSurface),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: !entry.isDir && entry.sizeBytes > 0
+                                ? Text(
+                                    formatBytes(entry.sizeBytes),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.onSurfaceVariant
+                                          .withValues(alpha: 0.8),
+                                    ),
+                                  )
+                                : null,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isCurrentActive)
+                                  Icon(
+                                    Icons.edit_note_rounded,
+                                    size: 18,
+                                    color: cs.primary,
+                                  )
+                                else if (isOpen)
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.only(right: 4),
+                                    decoration: BoxDecoration(
+                                      color: cs.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  )
+                                else if (entry.isDir)
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                              ],
+                            ),
+                            onTap: () {
+                              if (entry.isDir) {
+                                setState(() {
+                                  _projectDirPath = fullPath;
+                                  _drawerSearchQuery = '';
+                                  _drawerSearchController.clear();
+                                  _loadDirectory();
+                                });
+                              } else if (widget.isImageFile(entry.name)) {
+                                Navigator.of(context).pop();
+                                widget.onShowImagePreview(fullPath, entry.name);
+                              } else if (isUnsupported) {
+                                Navigator.of(context).pop();
+                                showAppSnackBar(
+                                  context,
+                                  message: context
+                                      .l10n
+                                      .textEditorInvalidTextFileMessage,
+                                  tone: AppBannerTone.error,
+                                );
+                              } else {
+                                Navigator.of(context).pop();
+                                widget.onOpenFile(fullPath);
+                              }
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

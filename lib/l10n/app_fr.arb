@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "Masquer automatiquement la barre d'application",
   "textEditorAutoHideAppBarDescription": "Masquer la barre supérieure lors de la modification pour maximiser l'espace vertical",
   "imagePreviewTooLargeMessage": "Cette image est trop grande pour être prévisualisée",
-  "imagePreviewOutOfMemoryMessage": "Mémoire libre insuffisante pour prévisualiser cette image. Fermez d'autres applications et réessayez."
+  "imagePreviewOutOfMemoryMessage": "Mémoire libre insuffisante pour prévisualiser cette image. Fermez d'autres applications et réessayez.",
+  "textEditorCopyToMenuItem": "Copier vers...",
+  "textEditorCopyToDialogTitle": "Copier dans le dossier",
+  "textEditorCopyHereButton": "Copier ici",
+  "textEditorDuplicateMenuItem": "Créer une copie",
+  "textEditorCopiedSuccessfully": "Copié avec succès",
+  "textEditorSearchFilesHint": "Filtrer les fichiers…"
 }

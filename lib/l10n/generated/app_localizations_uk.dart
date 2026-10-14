@@ -11713,4 +11713,22 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       'Приховувати верхню панель під час редагування для збільшення вертикального простору';
+
+  @override
+  String get textEditorCopyToMenuItem => 'Копіювати до...';
+
+  @override
+  String get textEditorCopyToDialogTitle => 'Копіювати в папку';
+
+  @override
+  String get textEditorCopyHereButton => 'Копіювати сюди';
+
+  @override
+  String get textEditorDuplicateMenuItem => 'Створити копію';
+
+  @override
+  String get textEditorCopiedSuccessfully => 'Успішно скопійовано';
+
+  @override
+  String get textEditorSearchFilesHint => 'Фільтрувати файли…';
 }

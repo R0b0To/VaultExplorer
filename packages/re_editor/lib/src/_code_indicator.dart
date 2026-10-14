@@ -8,6 +8,7 @@ class CodeLineNumberRenderObject extends RenderBox {
   TextStyle _focusedTextStyle;
   int _minNumberCount;
   int _allLineCount;
+  bool _pinToViewportTop;
 
   final String Function(int lineIndex)? _customLineIndex2Text;
   final TextPainter _textPainter;
@@ -19,11 +20,13 @@ class CodeLineNumberRenderObject extends RenderBox {
     required TextStyle focusedTextStyle,
     required int minNumberCount,
     String Function(int lineIndex)? custonLineIndex2Text,
+    bool pinToViewportTop = false,
   }) : _controller = controller,
     _notifier = notifier,
     _textStyle = textStyle,
     _focusedTextStyle = focusedTextStyle,
     _minNumberCount = minNumberCount,
+    _pinToViewportTop = pinToViewportTop,
     _allLineCount = controller.lineCount,
     _customLineIndex2Text = custonLineIndex2Text,
     _textPainter = TextPainter(
@@ -80,6 +83,14 @@ class CodeLineNumberRenderObject extends RenderBox {
     }
     _minNumberCount = value;
     markNeedsLayout();
+  }
+
+  set pinToViewportTop(bool value) {
+    if (_pinToViewportTop == value) {
+      return;
+    }
+    _pinToViewportTop = value;
+    markNeedsPaint();
   }
 
   @override
@@ -141,7 +152,14 @@ class CodeLineNumberRenderObject extends RenderBox {
         style: paragraph.index == value.focusedIndex ? _focusedTextStyle : _textStyle
       );
       _textPainter.layout();
-      _textPainter.paint(canvas, Offset(offset.dx + size.width - _textPainter.width, offset.dy + paragraph.offset.dy));
+      double dy = paragraph.offset.dy;
+      if (_pinToViewportTop && dy < 0) {
+        // The line starts above the viewport: keep its number at the top of
+        // the gutter until the line's last row scrolls out as well.
+        final double lastRowTop = dy + paragraph.height - paragraph.preferredLineHeight;
+        dy = min(0.0, lastRowTop);
+      }
+      _textPainter.paint(canvas, Offset(offset.dx + size.width - _textPainter.width, offset.dy + dy));
       firstLineIndex += _controller.codeLines[paragraph.index].lineCount;
     }
     canvas.restore();

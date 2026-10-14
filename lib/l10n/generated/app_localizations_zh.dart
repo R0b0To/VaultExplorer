@@ -10827,4 +10827,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorAutoHideAppBarDescription => '编辑时隐藏顶部栏以最大化垂直空间';
+
+  @override
+  String get textEditorCopyToMenuItem => '复制到...';
+
+  @override
+  String get textEditorCopyToDialogTitle => '复制到文件夹';
+
+  @override
+  String get textEditorCopyHereButton => '复制到此处';
+
+  @override
+  String get textEditorDuplicateMenuItem => '创建副本';
+
+  @override
+  String get textEditorCopiedSuccessfully => '复制成功';
+
+  @override
+  String get textEditorSearchFilesHint => '筛选文件…';
 }

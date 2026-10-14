@@ -11636,4 +11636,22 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       'Obere Leiste beim Bearbeiten ausblenden, um vertikalen Platz zu maximieren';
+
+  @override
+  String get textEditorCopyToMenuItem => 'Kopieren nach...';
+
+  @override
+  String get textEditorCopyToDialogTitle => 'In Ordner kopieren';
+
+  @override
+  String get textEditorCopyHereButton => 'Hierher kopieren';
+
+  @override
+  String get textEditorDuplicateMenuItem => 'Kopie erstellen';
+
+  @override
+  String get textEditorCopiedSuccessfully => 'Erfolgreich kopiert';
+
+  @override
+  String get textEditorSearchFilesHint => 'Dateien filtern…';
 }

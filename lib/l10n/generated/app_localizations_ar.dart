@@ -11650,4 +11650,22 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       'إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية';
+
+  @override
+  String get textEditorCopyToMenuItem => 'نسخ إلى...';
+
+  @override
+  String get textEditorCopyToDialogTitle => 'نسخ إلى مجلد';
+
+  @override
+  String get textEditorCopyHereButton => 'نسخ هنا';
+
+  @override
+  String get textEditorDuplicateMenuItem => 'إنشاء نسخة';
+
+  @override
+  String get textEditorCopiedSuccessfully => 'تم النسخ بنجاح';
+
+  @override
+  String get textEditorSearchFilesHint => 'تصفية الملفات…';
 }

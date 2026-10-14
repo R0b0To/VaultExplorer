@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "Ocultar automaticamente a barra superior",
   "textEditorAutoHideAppBarDescription": "Ocultar a barra superior durante a edição para maximizar o espaço vertical",
   "imagePreviewTooLargeMessage": "Esta imagem é muito grande para pré-visualização",
-  "imagePreviewOutOfMemoryMessage": "Memória livre insuficiente para pré-visualizar esta imagem. Feche outros aplicativos e tente novamente."
+  "imagePreviewOutOfMemoryMessage": "Memória livre insuficiente para pré-visualizar esta imagem. Feche outros aplicativos e tente novamente.",
+  "textEditorCopyToMenuItem": "Copiar para...",
+  "textEditorCopyToDialogTitle": "Copiar para a pasta",
+  "textEditorCopyHereButton": "Copiar aqui",
+  "textEditorDuplicateMenuItem": "Fazer uma cópia",
+  "textEditorCopiedSuccessfully": "Copiado com sucesso",
+  "textEditorSearchFilesHint": "Filtrar arquivos…"
 }

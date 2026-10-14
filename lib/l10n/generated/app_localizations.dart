@@ -19452,6 +19452,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide the top bar while editing to maximize vertical space'**
   String get textEditorAutoHideAppBarDescription;
+
+  /// Context menu item to copy a file or folder
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to...'**
+  String get textEditorCopyToMenuItem;
+
+  /// Dialog title for choosing destination directory to copy item
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to folder'**
+  String get textEditorCopyToDialogTitle;
+
+  /// Button in folder picker dialog to confirm destination directory for copy
+  ///
+  /// In en, this message translates to:
+  /// **'Copy here'**
+  String get textEditorCopyHereButton;
+
+  /// Context menu item to duplicate a file in the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Make a copy'**
+  String get textEditorDuplicateMenuItem;
+
+  /// Snackbar message after successfully copying a file
+  ///
+  /// In en, this message translates to:
+  /// **'Copied successfully'**
+  String get textEditorCopiedSuccessfully;
+
+  /// Hint text for filtering files in the project drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Filter files…'**
+  String get textEditorSearchFilesHint;
 }
 
 class _AppLocalizationsDelegate

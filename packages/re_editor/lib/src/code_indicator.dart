@@ -54,6 +54,13 @@ class DefaultCodeLineNumber extends LeafRenderObjectWidget {
   final int? minNumberCount;
   final String Function(int lineIndex)? customLineIndex2Text;
 
+  /// Keeps the number of a line that starts above the viewport pinned to the
+  /// top of the gutter while the line is still on screen. Without it a long
+  /// wrapped line loses its number as soon as its first row scrolls away. The
+  /// number is pushed out by the line's last row, so it never overlaps the
+  /// next line's number.
+  final bool pinToViewportTop;
+
   const DefaultCodeLineNumber({
     super.key,
     required this.notifier,
@@ -62,6 +69,7 @@ class DefaultCodeLineNumber extends LeafRenderObjectWidget {
     this.focusedTextStyle,
     this.minNumberCount,
     this.customLineIndex2Text,
+    this.pinToViewportTop = false,
   });
 
   @override
@@ -72,6 +80,7 @@ class DefaultCodeLineNumber extends LeafRenderObjectWidget {
     focusedTextStyle: focusedTextStyle ?? _useCodeTextStyle(context, true),
     minNumberCount: minNumberCount ?? _kDefaultMinNumberCount,
     custonLineIndex2Text: customLineIndex2Text,
+    pinToViewportTop: pinToViewportTop,
   );
 
   @override
@@ -81,7 +90,8 @@ class DefaultCodeLineNumber extends LeafRenderObjectWidget {
       ..notifier = notifier
       ..textStyle = textStyle ?? _useCodeTextStyle(context, false)
       ..focusedTextStyle = focusedTextStyle ?? _useCodeTextStyle(context, true)
-      ..minNumberCount = minNumberCount ?? _kDefaultMinNumberCount;
+      ..minNumberCount = minNumberCount ?? _kDefaultMinNumberCount
+      ..pinToViewportTop = pinToViewportTop;
     super.updateRenderObject(context, renderObject);
   }
 

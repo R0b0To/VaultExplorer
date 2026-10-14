@@ -13102,5 +13102,29 @@
   "textEditorAutoHideAppBarDescription": "Hide the top bar while editing to maximize vertical space",
   "@textEditorAutoHideAppBarDescription": {
     "description": "Description for toggle in editor appearance settings to hide the app bar while typing"
+  },
+  "textEditorCopyToMenuItem": "Copy to...",
+  "@textEditorCopyToMenuItem": {
+    "description": "Context menu item to copy a file or folder"
+  },
+  "textEditorCopyToDialogTitle": "Copy to folder",
+  "@textEditorCopyToDialogTitle": {
+    "description": "Dialog title for choosing destination directory to copy item"
+  },
+  "textEditorCopyHereButton": "Copy here",
+  "@textEditorCopyHereButton": {
+    "description": "Button in folder picker dialog to confirm destination directory for copy"
+  },
+  "textEditorDuplicateMenuItem": "Make a copy",
+  "@textEditorDuplicateMenuItem": {
+    "description": "Context menu item to duplicate a file in the current folder"
+  },
+  "textEditorCopiedSuccessfully": "Copied successfully",
+  "@textEditorCopiedSuccessfully": {
+    "description": "Snackbar message after successfully copying a file"
+  },
+  "textEditorSearchFilesHint": "Filter files…",
+  "@textEditorSearchFilesHint": {
+    "description": "Hint text for filtering files in the project drawer"
   }
 }

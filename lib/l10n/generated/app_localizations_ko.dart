@@ -10997,4 +10997,22 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       '세로 공간을 최대화하기 위해 편집 중 상단 바 숨기기';
+
+  @override
+  String get textEditorCopyToMenuItem => '다음으로 복사...';
+
+  @override
+  String get textEditorCopyToDialogTitle => '폴더로 복사';
+
+  @override
+  String get textEditorCopyHereButton => '여기에 복사';
+
+  @override
+  String get textEditorDuplicateMenuItem => '사본 만들기';
+
+  @override
+  String get textEditorCopiedSuccessfully => '성공적으로 복사됨';
+
+  @override
+  String get textEditorSearchFilesHint => '파일 필터링…';
 }

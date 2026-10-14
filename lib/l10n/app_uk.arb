@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "Автоматично приховувати панель програми",
   "textEditorAutoHideAppBarDescription": "Приховувати верхню панель під час редагування для збільшення вертикального простору",
   "imagePreviewTooLargeMessage": "Це зображення завелике для попереднього перегляду",
-  "imagePreviewOutOfMemoryMessage": "Недостатньо вільної пам'яті для попереднього перегляду цього зображення. Закрийте інші програми та спробуйте знову."
+  "imagePreviewOutOfMemoryMessage": "Недостатньо вільної пам'яті для попереднього перегляду цього зображення. Закрийте інші програми та спробуйте знову.",
+  "textEditorCopyToMenuItem": "Копіювати до...",
+  "textEditorCopyToDialogTitle": "Копіювати в папку",
+  "textEditorCopyHereButton": "Копіювати сюди",
+  "textEditorDuplicateMenuItem": "Створити копію",
+  "textEditorCopiedSuccessfully": "Успішно скопійовано",
+  "textEditorSearchFilesHint": "Фільтрувати файли…"
 }

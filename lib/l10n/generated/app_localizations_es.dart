@@ -11665,4 +11665,22 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get textEditorAutoHideAppBarDescription =>
       'Ocultar la barra superior al editar para maximizar el espacio vertical';
+
+  @override
+  String get textEditorCopyToMenuItem => 'Copiar a...';
+
+  @override
+  String get textEditorCopyToDialogTitle => 'Copiar a la carpeta';
+
+  @override
+  String get textEditorCopyHereButton => 'Copiar aquí';
+
+  @override
+  String get textEditorDuplicateMenuItem => 'Hacer una copia';
+
+  @override
+  String get textEditorCopiedSuccessfully => 'Copiado con éxito';
+
+  @override
+  String get textEditorSearchFilesHint => 'Filtrar archivos…';
 }

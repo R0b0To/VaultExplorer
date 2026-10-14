@@ -3215,5 +3215,11 @@
   "textEditorAutoHideAppBarLabel": "إخفاء شريط التطبيق تلقائيًا",
   "textEditorAutoHideAppBarDescription": "إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية",
   "imagePreviewTooLargeMessage": "هذه الصورة كبيرة جدًا بحيث يتعذر معاينتها",
-  "imagePreviewOutOfMemoryMessage": "لا توجد ذاكرة كافية لمعاينة هذه الصورة. أغلق التطبيقات الأخرى وحاول مرة أخرى."
+  "imagePreviewOutOfMemoryMessage": "لا توجد ذاكرة كافية لمعاينة هذه الصورة. أغلق التطبيقات الأخرى وحاول مرة أخرى.",
+  "textEditorCopyToMenuItem": "نسخ إلى...",
+  "textEditorCopyToDialogTitle": "نسخ إلى مجلد",
+  "textEditorCopyHereButton": "نسخ هنا",
+  "textEditorDuplicateMenuItem": "إنشاء نسخة",
+  "textEditorCopiedSuccessfully": "تم النسخ بنجاح",
+  "textEditorSearchFilesHint": "تصفية الملفات…"
 }

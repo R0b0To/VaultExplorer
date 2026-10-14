@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
 
 class FileItemActionsSheet extends ConsumerWidget {
   final RawEntry entry;
@@ -567,17 +568,14 @@ class _ItemImageThumbnail extends ConsumerWidget {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
-    final thumbBytes = await fileIoApi.getImageThumbnail(
+    final thumbBytes = await fileIoApi.getImageThumbnailOrThrow(
       container,
       path,
       targetSize: quality.scaledSize(180),
       quality: quality.jpegQuality,
     );
     if (thumbBytes == null || thumbBytes.isEmpty) {
-      final size = await fileIoApi.getFileSize(container, path);
-      if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await fileIoApi.readFileChunk(container, path, 0, size);
-      if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
+      final raw = await readRawThumbnailFallback(fileIoApi, container, path);
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
       }

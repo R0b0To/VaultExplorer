@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -278,7 +279,10 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
           throw Exception('Cancelled before retry attempt $attempt');
         }
         return fetchFn(container, targetPath);
-      });
+      },
+          // A deliberate "too large / not enough memory" refusal gets the
+          // same answer every time; retrying only repeats the native work.
+          retryIf: (e) => e is! ImagePreviewUnavailableException);
     } finally {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (acquired) limiter.release(completer);

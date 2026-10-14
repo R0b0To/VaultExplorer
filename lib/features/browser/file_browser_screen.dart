@@ -1913,6 +1913,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         readOnly: true,
       );
       final stagedFileName = p.basename(previewFile.path);
+
+      // A normal open reaches the viewer with the image's aspect ratio already
+      // cached (the grid's thumbnails put it there). An archive preview has no
+      // thumbnails -- they are disabled so nothing from the archive reaches a
+      // cache -- so the viewer would lay the image out blind and only settle
+      // once it had decoded the picture, in the middle of the first pinch.
+      // Read the size from the staged file's header and seed the cache so the
+      // preview starts from the same geometry as any other image.
+      if (MediaViewerConstants.isImage(fileName)) {
+        final size = await previewFile.readImageSize();
+        if (size != null) {
+          MediaAspectRatioCache.put(
+            previewContainer,
+            stagedFileName,
+            size.$1,
+            size.$2,
+          );
+        }
+      }
+      if (!mounted) return;
       _navNotifier.setLoading(false);
 
       if (fileName.toLowerCase().endsWith('.pdf')) {

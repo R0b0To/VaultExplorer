@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,6 +58,62 @@ class _RefusingFileIoApi extends VaultFileIoApi {
   }) async {
     previewRequests++;
     throw ImagePreviewUnavailableException(reason);
+  }
+}
+
+/// Minimal PNG prefix (signature + IHDR) declaring [width] x [height]; the
+/// file itself is tiny, which is exactly the shape of the crash: a few dozen
+/// bytes on disk, gigabytes once a codec expands it.
+Uint8List _pngHeader(int width, int height) {
+  final b = BytesBuilder();
+  b.add([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  b.add([0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  b.add([
+    (width >> 24) & 0xFF, (width >> 16) & 0xFF, (width >> 8) & 0xFF, width & 0xFF,
+    (height >> 24) & 0xFF, (height >> 16) & 0xFF, (height >> 8) & 0xFF, height & 0xFF,
+  ]);
+  b.add([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+  return b.toBytes();
+}
+
+/// A file far below the 8 MB inline limit whose header declares [bytes]'s
+/// pixel size. Records whether the raw bytes were ever handed out (i.e. would
+/// have been decoded by Flutter) versus the guarded native preview.
+class _SmallFileApi extends VaultFileIoApi {
+  final Uint8List bytes;
+  final ImagePreviewUnavailableReason? refuseWith;
+  int rawReads = 0;
+  int previewRequests = 0;
+
+  _SmallFileApi(this.bytes, {this.refuseWith})
+    : super(const MethodChannel('test'));
+
+  @override
+  Future<int> getMediaFileSize(MountedContainer container, String fileName) async =>
+      bytes.length;
+
+  @override
+  Future<Uint8List?> readMediaFileChunk(
+    MountedContainer container,
+    String fileName,
+    int offset,
+    int length,
+  ) async {
+    rawReads++;
+    return bytes;
+  }
+
+  @override
+  Future<Uint8List?> getImageThumbnailOrThrow(
+    MountedContainer container,
+    String fileName, {
+    int targetSize = 180,
+    int quality = 70,
+    bool preserveAlpha = false,
+  }) async {
+    previewRequests++;
+    if (refuseWith != null) throw ImagePreviewUnavailableException(refuseWith!);
+    return Uint8List.fromList([9, 9, 9]);
   }
 }
 
@@ -152,5 +209,68 @@ void main() {
     await expectLater(fetch(), throwsA(isA<ImagePreviewUnavailableException>()));
     // One native attempt per fetch -- never the 3x backoff retry.
     expect(fileIoApi.previewRequests, 2);
+  });
+
+  test(
+    'a tiny file declaring 857 MP is never decoded inline: refused natively, remembered',
+    () async {
+      // 47770 x 17949 is the image from the LMK crash report.
+      final api = _SmallFileApi(
+        _pngHeader(47770, 17949),
+        refuseWith: ImagePreviewUnavailableReason.tooLarge,
+      );
+      Future<Uint8List?> fetch() => FullResImageCache.fetch(
+        fileIoApi: api,
+        container: _container,
+        filePath: 'bomb.png',
+        completer: Completer<void>(),
+        isStillWanted: () => true,
+      );
+
+      await expectLater(fetch(), throwsA(isA<ImagePreviewUnavailableException>()));
+      expect(api.previewRequests, 1);
+      expect(FullResImageCache.isKnownTooLarge(_container, 'bomb.png'), isTrue);
+      // The raw bytes must never be cached, or the widget would hand them
+      // to Flutter's codec on the next build.
+      expect(FullResImageCache.get(_container, 'bomb.png'), isNull);
+    },
+  );
+
+  test(
+    'a small file declaring many megapixels gets the bounded native preview, not raw bytes',
+    () async {
+      // 10000 x 8000 = 80 MP: below the native 512 MP refusal, above the
+      // inline budget.
+      final api = _SmallFileApi(_pngHeader(10000, 8000));
+      final out = await FullResImageCache.fetch(
+        fileIoApi: api,
+        container: _container,
+        filePath: 'big.png',
+        completer: Completer<void>(),
+        isStillWanted: () => true,
+      );
+
+      expect(out, Uint8List.fromList([9, 9, 9]));
+      expect(api.previewRequests, 1);
+      expect(FullResImageCache.isLargeImagePreview(_container, 'big.png'), isTrue);
+      // Preview bytes live in the separate preview cache, never as "original".
+      expect(FullResImageCache.get(_container, 'big.png'), isNull);
+    },
+  );
+
+  test('an ordinary small image is still served inline from its raw bytes', () async {
+    final bytes = _pngHeader(1920, 1080); // ~2 MP
+    final api = _SmallFileApi(bytes);
+    final out = await FullResImageCache.fetch(
+      fileIoApi: api,
+      container: _container,
+      filePath: 'normal.png',
+      completer: Completer<void>(),
+      isStillWanted: () => true,
+    );
+
+    expect(out, bytes);
+    expect(api.previewRequests, 0);
+    expect(FullResImageCache.get(_container, 'normal.png'), bytes);
   });
 }

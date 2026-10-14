@@ -31,6 +31,7 @@ import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
+import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
 
 class FileMasonryView extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -739,7 +740,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         return bytes;
       }
     }
-    final thumb = await fileIoApi.getImageThumbnailWithSize(
+    final thumb = await fileIoApi.getImageThumbnailWithSizeOrThrow(
       container,
       path,
       targetSize: quality.scaledSize(180),
@@ -747,17 +748,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     );
     final thumbBytes = thumb?.bytes;
     if (thumbBytes == null || thumbBytes.isEmpty) {
-      final size = await fileIoApi.getFileSize(container, path);
-      if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await fileIoApi.readFileChunk(
-        container,
-        path,
-        0,
-        size,
-      );
-      if (raw == null || raw.isEmpty) {
-        throw Exception('File chunk read failed');
-      }
+      final raw = await readRawThumbnailFallback(fileIoApi, container, path);
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
         await _checkAndReportSizeFromBytes(container, path, raw, onSizeKnown);

@@ -428,6 +428,47 @@ class VaultFileIoApi {
     }
   }
 
+  /// [getImageThumbnailWithSize], but a native refusal to decode an image that
+  /// is too large ([ImagePreviewUnavailableReason.tooLarge]) or that wouldn't
+  /// fit in free memory right now ([ImagePreviewUnavailableReason.outOfMemory])
+  /// is thrown as an [ImagePreviewUnavailableException] instead of being folded
+  /// into `null`. Callers must not answer a refusal by decoding the same image
+  /// some other, unguarded way. Every other failure still returns `null`.
+  Future<ThumbnailWithSize?> getImageThumbnailWithSizeOrThrow(
+    MountedContainer container,
+    String fileName, {
+    int targetSize = 180,
+    int quality = 70,
+  }) async {
+    try {
+      final result = await _channel
+          .invokeMethod(ChannelMethods.getImageThumbnailWithSize, {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'targetSize': targetSize,
+            'quality': quality,
+            'isLocalStorage': container.isLocalStorage,
+          });
+      return ThumbnailWithSize.fromChannelResult(result);
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'IMAGE_TOO_LARGE':
+          throw const ImagePreviewUnavailableException(
+            ImagePreviewUnavailableReason.tooLarge,
+          );
+        case 'OUT_OF_MEMORY':
+          throw const ImagePreviewUnavailableException(
+            ImagePreviewUnavailableReason.outOfMemory,
+          );
+      }
+      logSwallowed('getImageThumbnailWithSizeOrThrow', e, expected: true);
+      return null;
+    } catch (e) {
+      logSwallowed('getImageThumbnailWithSizeOrThrow', e, expected: true);
+      return null;
+    }
+  }
+
   /// Extracts an APK's own launcher icon via `PackageManager` on the
   /// native side -- full adaptive-icon compositing included, since it's
   /// the OS's own icon-resolution code doing the work, not a hand-rolled

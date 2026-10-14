@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
+import 'package:vaultexplorer/core/utils/image_dimensions.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
@@ -39,6 +40,15 @@ class FullResImageCache {
   // Keep method-channel image transfers small even on devices with little
   // remaining heap; larger files are sampled by native code instead.
   static const int _maxInlineImageBytes = 8 * 1024 * 1024;
+  // A small *file* is not necessarily a small *image*: a flat-colour PNG of
+  // hundreds of megapixels is a few MB on disk yet needs ~4 bytes/pixel
+  // (gigabytes) once Flutter's codec expands it -- enough for Android's
+  // low-memory killer to SIGKILL the whole process. Anything above this many
+  // source pixels is therefore never decoded inline from raw bytes, however
+  // small the file; it goes through the native sampled path instead, which
+  // is guarded by ImageDecodeGuard (refuses > 512 MP, serialises and
+  // memory-checks heavy decodes). Mirrors ImageDecodeGuard.HEAVY_SOURCE_PIXELS.
+  static const int _maxInlineImagePixels = 48 * 1000 * 1000;
   static const int _largeImagePreviewSize = 2048;
   static const int _largeImagePreviewQuality = 95;
   static const int _largeImagePreviewBudget = 24 * 1024 * 1024;
@@ -79,6 +89,15 @@ class FullResImageCache {
   /// callers (e.g. neighbour prefetch) can skip it without a native call.
   static bool isKnownTooLarge(MountedContainer container, String filePath) =>
       _tooLarge.containsKey(_key(container, filePath));
+
+  /// Whether [bytes] declare (in their own header) more source pixels than
+  /// we are willing to hand to Flutter's codec. Unrecognised formats report
+  /// `false` and keep the previous behaviour.
+  static bool _exceedsInlinePixelBudget(Uint8List bytes) {
+    final dims = extractImageDimensionsFromBytes(bytes);
+    if (dims == null) return false;
+    return dims.$1 * dims.$2 > _maxInlineImagePixels;
+  }
 
   static bool contains(MountedContainer container, String filePath) =>
       _cache.containsKey(_key(container, filePath)) ||
@@ -240,6 +259,34 @@ class FullResImageCache {
       // being reported as a fetch error.
       Uint8List? result;
       var sampledLargeImage = false;
+
+      // Native, memory-guarded, downsampled preview (a bounded WebP). Used
+      // for big files and for small files that declare a huge pixel count.
+      Future<Uint8List> fetchSampledPreview() async {
+        Uint8List? preview;
+        try {
+          preview = await fileIoApi.getImageThumbnailOrThrow(
+            container,
+            filePath,
+            targetSize: _largeImagePreviewSize,
+            quality: _largeImagePreviewQuality,
+            preserveAlpha: true,
+          );
+        } on ImagePreviewUnavailableException catch (e) {
+          if (e.reason == ImagePreviewUnavailableReason.tooLarge) {
+            _tooLarge[key] = true;
+          }
+          rethrow;
+        }
+        if (preview == null || preview.isEmpty) {
+          throw Exception('Failed to decode large image');
+        }
+        if (!isStillWanted()) throw _StaleRequestException();
+        sampledLargeImage = true;
+        _largeImagePreviews[key] = preview;
+        return preview;
+      }
+
       try {
         result = await retryWithBackoff<Uint8List>((attempt) async {
           if (!isStillWanted()) throw _StaleRequestException();
@@ -247,30 +294,7 @@ class FullResImageCache {
           if (size <= 0) throw Exception('File size is empty');
           if (!isStillWanted()) throw _StaleRequestException();
 
-          if (size >= _maxInlineImageBytes) {
-            Uint8List? preview;
-            try {
-              preview = await fileIoApi.getImageThumbnailOrThrow(
-                container,
-                filePath,
-                targetSize: _largeImagePreviewSize,
-                quality: _largeImagePreviewQuality,
-                preserveAlpha: true,
-              );
-            } on ImagePreviewUnavailableException catch (e) {
-              if (e.reason == ImagePreviewUnavailableReason.tooLarge) {
-                _tooLarge[key] = true;
-              }
-              rethrow;
-            }
-            if (preview == null || preview.isEmpty) {
-              throw Exception('Failed to decode large image');
-            }
-            if (!isStillWanted()) throw _StaleRequestException();
-            sampledLargeImage = true;
-            _largeImagePreviews[key] = preview;
-            return preview;
-          }
+          if (size >= _maxInlineImageBytes) return fetchSampledPreview();
 
           final data = await fileIoApi.readMediaFileChunk(
             container,
@@ -281,6 +305,9 @@ class FullResImageCache {
           if (data == null || data.isEmpty) {
             throw Exception('File returned no content bytes');
           }
+          // The bytes are already in memory (< _maxInlineImageBytes), so
+          // reading the declared pixel size out of their header is free.
+          if (_exceedsInlinePixelBudget(data)) return fetchSampledPreview();
           return data;
         },
             // Neither a stale request nor a deliberate "too large / not

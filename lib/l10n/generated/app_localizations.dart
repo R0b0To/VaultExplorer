@@ -6504,6 +6504,18 @@ abstract class AppLocalizations {
   /// **'Failed to load encrypted image: {error}'**
   String encryptedImageLoadFailedWithReasonMessage(String error);
 
+  /// Shown in the media viewer when an image has too many pixels to decode for a preview
+  ///
+  /// In en, this message translates to:
+  /// **'This image is too large to preview'**
+  String get imagePreviewTooLargeMessage;
+
+  /// Shown in the media viewer when there isn't enough free memory to decode a very large image right now
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free memory to preview this image. Close other apps and try again.'**
+  String get imagePreviewOutOfMemoryMessage;
+
   /// Error message shown when an image fails to decode/render
   ///
   /// In en, this message translates to:

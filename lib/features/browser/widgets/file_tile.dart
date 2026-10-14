@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
+import 'package:vaultexplorer/data/services/raw_thumbnail_fallback.dart';
 
 class FileTile extends StatelessWidget {
   final RawEntry entry;
@@ -315,17 +316,14 @@ class _ListImageThumb extends ConsumerWidget {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
-    Uint8List? thumbBytes = await fileIoApi.getImageThumbnail(
+    Uint8List? thumbBytes = await fileIoApi.getImageThumbnailOrThrow(
       container,
       path,
       targetSize: quality.scaledSize(180),
       quality: quality.jpegQuality,
     );
     if (thumbBytes == null || thumbBytes.isEmpty) {
-      final size = await fileIoApi.getFileSize(container, path);
-      if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await fileIoApi.readFileChunk(container, path, 0, size);
-      if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
+      final raw = await readRawThumbnailFallback(fileIoApi, container, path);
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
       }

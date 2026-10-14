@@ -97,6 +97,8 @@ void main() {
           return true;
         case 'getActiveContainerSessions':
           return {'sessions': <Map<String, dynamic>>[]};
+        case 'isHeadlessSyncActive':
+          return false;
         default:
           return true;
       }

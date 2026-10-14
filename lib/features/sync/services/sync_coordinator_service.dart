@@ -521,14 +521,19 @@ class SyncCoordinatorService {
       }
       // One poll's sleep, cut short the moment the vault is locked.
       final woken = Completer<void>();
+      final timer = Timer(_headlessPoll, () {
+        if (!woken.isCompleted) woken.complete();
+      });
       void wake() {
+        timer.cancel();
         if (!woken.isCompleted) woken.complete();
       }
 
       session.token.bindOnCancel(wake);
       try {
-        await Future.any([Future<void>.delayed(_headlessPoll), woken.future]);
+        await woken.future;
       } finally {
+        timer.cancel();
         session.token.unbind(wake);
       }
     }

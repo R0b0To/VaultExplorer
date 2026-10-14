@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "Nascondi azione",
   "inPlaceEditHidden": "Nascosto",
   "textEditorAutoHideAppBarLabel": "Nascondi automaticamente barra superiore",
-  "textEditorAutoHideAppBarDescription": "Nascondi la barra superiore durante la modifica per massimizzare lo spazio verticale"
+  "textEditorAutoHideAppBarDescription": "Nascondi la barra superiore durante la modifica per massimizzare lo spazio verticale",
+  "imagePreviewTooLargeMessage": "Questa immagine è troppo grande per l'anteprima",
+  "imagePreviewOutOfMemoryMessage": "Memoria libera insufficiente per l'anteprima di questa immagine. Chiudi altre app e riprova."
 }

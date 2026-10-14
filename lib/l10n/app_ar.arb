@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "إخفاء الإجراء",
   "inPlaceEditHidden": "مخفي",
   "textEditorAutoHideAppBarLabel": "إخفاء شريط التطبيق تلقائيًا",
-  "textEditorAutoHideAppBarDescription": "إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية"
+  "textEditorAutoHideAppBarDescription": "إخفاء الشريط العلوي أثناء التحرير لزيادة المساحة الرأسية",
+  "imagePreviewTooLargeMessage": "هذه الصورة كبيرة جدًا بحيث يتعذر معاينتها",
+  "imagePreviewOutOfMemoryMessage": "لا توجد ذاكرة كافية لمعاينة هذه الصورة. أغلق التطبيقات الأخرى وحاول مرة أخرى."
 }

@@ -3878,11 +3878,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get imagePreviewTooLargeMessage =>
-      'This image is too large to preview';
+      'Dieses Bild ist zu groß für eine Vorschau';
 
   @override
   String get imagePreviewOutOfMemoryMessage =>
-      'Not enough free memory to preview this image. Close other apps and try again.';
+      'Nicht genügend freier Speicher für die Vorschau dieses Bildes. Schließen Sie andere Apps und versuchen Sie es erneut.';
 
   @override
   String get invalidOrCorruptedImageMessage =>

@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "隐藏操作",
   "inPlaceEditHidden": "已隐藏",
   "textEditorAutoHideAppBarLabel": "自动隐藏应用栏",
-  "textEditorAutoHideAppBarDescription": "编辑时隐藏顶部栏以最大化垂直空间"
+  "textEditorAutoHideAppBarDescription": "编辑时隐藏顶部栏以最大化垂直空间",
+  "imagePreviewTooLargeMessage": "此图片过大，无法预览",
+  "imagePreviewOutOfMemoryMessage": "可用内存不足，无法预览此图片。请关闭其他应用后重试。"
 }

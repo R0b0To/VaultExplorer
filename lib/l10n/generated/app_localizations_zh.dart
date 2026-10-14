@@ -3633,12 +3633,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get imagePreviewTooLargeMessage =>
-      'This image is too large to preview';
+  String get imagePreviewTooLargeMessage => '此图片过大，无法预览';
 
   @override
-  String get imagePreviewOutOfMemoryMessage =>
-      'Not enough free memory to preview this image. Close other apps and try again.';
+  String get imagePreviewOutOfMemoryMessage => '可用内存不足，无法预览此图片。请关闭其他应用后重试。';
 
   @override
   String get invalidOrCorruptedImageMessage => '图片格式无效或已损坏。';

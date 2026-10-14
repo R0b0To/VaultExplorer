@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "Ocultar ação",
   "inPlaceEditHidden": "Oculto",
   "textEditorAutoHideAppBarLabel": "Ocultar automaticamente a barra superior",
-  "textEditorAutoHideAppBarDescription": "Ocultar a barra superior durante a edição para maximizar o espaço vertical"
+  "textEditorAutoHideAppBarDescription": "Ocultar a barra superior durante a edição para maximizar o espaço vertical",
+  "imagePreviewTooLargeMessage": "Esta imagem é muito grande para pré-visualização",
+  "imagePreviewOutOfMemoryMessage": "Memória livre insuficiente para pré-visualizar esta imagem. Feche outros aplicativos e tente novamente."
 }

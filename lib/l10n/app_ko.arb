@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "동작 숨기기",
   "inPlaceEditHidden": "숨김",
   "textEditorAutoHideAppBarLabel": "앱 바 자동 숨기기",
-  "textEditorAutoHideAppBarDescription": "세로 공간을 최대화하기 위해 편집 중 상단 바 숨기기"
+  "textEditorAutoHideAppBarDescription": "세로 공간을 최대화하기 위해 편집 중 상단 바 숨기기",
+  "imagePreviewTooLargeMessage": "이 이미지는 너무 커서 미리 볼 수 없습니다",
+  "imagePreviewOutOfMemoryMessage": "이 이미지를 미리 볼 수 있는 여유 메모리가 부족합니다. 다른 앱을 닫고 다시 시도해 주세요."
 }

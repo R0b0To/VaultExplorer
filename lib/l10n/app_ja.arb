@@ -3213,5 +3213,7 @@
   "inPlaceEditHideAction": "アクションを非表示",
   "inPlaceEditHidden": "非表示",
   "textEditorAutoHideAppBarLabel": "アプリバーを自動的に非表示",
-  "textEditorAutoHideAppBarDescription": "編集中に上部バーを非表示にして垂直方向のスペースを最大化"
+  "textEditorAutoHideAppBarDescription": "編集中に上部バーを非表示にして垂直方向のスペースを最大化",
+  "imagePreviewTooLargeMessage": "この画像は大きすぎるためプレビューできません",
+  "imagePreviewOutOfMemoryMessage": "この画像をプレビューするための十分な空きメモリがありません。他のアプリを閉じてからもう一度お試しください。"
 }

@@ -3,6 +3,9 @@ package com.aeidolon.vaultexplorer.bridge
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Notifies Dart when a vault is unlocked from outside the normal
@@ -24,6 +27,10 @@ import io.flutter.plugin.common.MethodChannel
  *
  * VaultDashboardScreen is the intended listener (see
  * addVaultAutomationUnlockedListener in vault_explorer_api.dart).
+ *
+ * [channel] doubles as the receiver's "is the app open?" test, so
+ * MainActivity.onDestroy must clear it: a stale channel would make
+ * SYNC_VAULT hand its work to an engine that no longer exists.
  */
 object VaultAutomationUnlockedBridge {
     @Volatile
@@ -53,6 +60,57 @@ object VaultAutomationUnlockedBridge {
                     "files" to files,
                 ),
             )
+        }
+    }
+
+    /** The open app's answer to [requestSync]; [code] is an Outcome result code. */
+    data class SyncReply(val code: String, val message: String)
+
+    /**
+     * Asks the open app to run its sync rules for [uri] and waits for it to
+     * finish. Returns null when no app is listening, so the caller can fall
+     * back to a headless sync; a sync that is still running after
+     * [timeoutMs] answers BUSY (it keeps running -- only the wait ends).
+     *
+     * Blocks: never call from the main thread. The automation receiver's
+     * executor and WorkManager worker are both off it.
+     */
+    @JvmStatic
+    fun requestSync(uri: String, timeoutMs: Long): SyncReply? {
+        val ch = channel ?: return null
+        val reply = CompletableFuture<SyncReply>()
+        mainHandler.post {
+            ch.invokeMethod(
+                "onVaultAutomationSyncRequested",
+                mapOf("uri" to uri),
+                object : MethodChannel.Result {
+                    override fun success(result: Any?) {
+                        val payload = result as? Map<*, *>
+                        reply.complete(
+                            SyncReply(
+                                payload?.get("code") as? String ?: "ERROR",
+                                payload?.get("message") as? String
+                                    ?: "The open app returned no details",
+                            ),
+                        )
+                    }
+
+                    override fun error(code: String, message: String?, details: Any?) {
+                        reply.complete(SyncReply("ERROR", message ?: code))
+                    }
+
+                    override fun notImplemented() {
+                        reply.complete(SyncReply("ERROR", "The open app cannot run sync"))
+                    }
+                },
+            )
+        }
+        return try {
+            reply.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            SyncReply("BUSY", "Sync is still running in the open app")
+        } catch (e: Exception) {
+            SyncReply("ERROR", "Could not reach the open app (${e.javaClass.simpleName})")
         }
     }
 }

@@ -523,6 +523,13 @@ open class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        // The receiver treats a non-null channel as "the app is open". Without
+        // this, a destroyed engine keeps answering that question: SYNC_VAULT
+        // gets handed to nobody and the headless unlock sync is skipped.
+        // Identity check: a share/quick-capture activity has its own engine.
+        if (VaultAutomationUnlockedBridge.channel === methodChannel) {
+            VaultAutomationUnlockedBridge.channel = null
+        }
         MirrorPushBridge.detach(methodChannel)
         chooserReceiver?.let { unregisterReceiver(it) }
         usbPermissionReceiver?.let { unregisterReceiver(it) }

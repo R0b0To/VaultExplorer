@@ -74,6 +74,13 @@ class VaultEngineEvents {
     void Function(MountedContainer container) listener,
   ) => _vaultAutomationUnlockedRegistry.remove(listener);
 
+  /// Answers the native `SYNC_VAULT` automation action while this app is
+  /// open. Unlike the listener registries above this is a single handler
+  /// whose result is sent back to the native caller, which waits for it
+  /// ({'code': 'OK' | 'ERROR' | ..., 'message': ...}). Null until the sync
+  /// coordinator has registered itself.
+  Future<Map<String, Object?>> Function(String vaultUri)? automationSyncHandler;
+
   final ListenerRegistry<int> _containerLockedRegistry =
       ListenerRegistry<int>();
   void addContainerLockedListener(void Function(int volId) listener) =>
@@ -359,6 +366,25 @@ class VaultEngineEvents {
               readOnly: args['readOnly'] as bool? ?? false,
             ),
           );
+        }
+      } else if (call.method == 'onVaultAutomationSyncRequested') {
+        final args = call.arguments as Map<Object?, Object?>?;
+        final uri = args?['uri'] as String?;
+        final handler = automationSyncHandler;
+        if (uri == null || handler == null) {
+          return <String, Object?>{
+            'code': 'ERROR',
+            'message': 'The open app is not ready to run sync',
+          };
+        }
+        try {
+          return await handler(uri);
+        } catch (e) {
+          logSwallowed('onVaultAutomationSyncRequested', e);
+          return <String, Object?>{
+            'code': 'ERROR',
+            'message': 'Sync failed (${e.runtimeType})',
+          };
         }
       } else if (call.method == 'onBackgroundRecordingStopRequested') {
         final args = call.arguments as Map<Object?, Object?>;

@@ -147,12 +147,14 @@ class SyncCoordinatorService {
        _runner = runner ?? SyncRuleRunner() {
     _events.addContainerLockedListener(_onContainerLocked);
     _events.addPanicSessionPurgedListener(_onPanic);
+    _events.automationSyncHandler = _onAutomationSyncRequested;
   }
 
   void dispose() {
     _completedLingerTimer?.cancel();
     _events.removeContainerLockedListener(_onContainerLocked);
     _events.removePanicSessionPurgedListener(_onPanic);
+    _events.automationSyncHandler = null;
     _onPanic();
     _liveWatch.dispose();
     status.dispose();
@@ -235,6 +237,86 @@ class SyncCoordinatorService {
   /// The result of the latest run of [ruleId] in this session, if any.
   SyncRunReport? lastReportFor(MountedContainer vault, String ruleId) =>
       _sessions[vault.uri]?.lastReports[ruleId];
+
+  /// The native `SYNC_VAULT` automation action, received while the app is
+  /// open: queues every rule that syncs on unlock / live ([onVaultUnlocked]
+  /// queues the same set) and answers once they have all finished, so an
+  /// automation profile can chain a lock after it.
+  ///
+  /// Goes through the vault's [SyncRunScheduler] like every other trigger,
+  /// so it can never overlap a run that is already in progress: it waits
+  /// its turn behind it. A rule that is *running* is queued once more
+  /// (the scheduler's rule: the change may have landed after that run
+  /// scanned), which is also what the caller wants -- everything that
+  /// existed when the action fired is synced by the time it answers.
+  ///
+  /// Result codes mirror the headless path (`VaultAutomationReceiver`).
+  Future<Map<String, Object?>> _onAutomationSyncRequested(
+    String vaultUri,
+  ) async {
+    Map<String, Object?> reply(String code, String message) => {
+      'code': code,
+      'message': message,
+    };
+
+    final mounted = _unlocked[vaultUri];
+    if (mounted != null && mounted.readOnly) {
+      return reply('FORBIDDEN', 'Sync requires a writable vault');
+    }
+    final session = _sessions[vaultUri];
+    if (session == null || session.locked) {
+      return reply(
+        'NOT_MOUNTED',
+        'The open app is not managing this vault yet; unlock it first',
+      );
+    }
+
+    // The config is still being read right after an unlock.
+    try {
+      await session.starting;
+    } catch (_) {
+      // _start logs its own failure; a missing config is handled below.
+    }
+    final config = session.config;
+    if (session.locked || session.token.isCancelled || config == null) {
+      return reply('ERROR', 'The sync configuration is unavailable');
+    }
+
+    final rules = [
+      for (final r in config.rules)
+        if (r.autoSyncOnUnlock || r.liveWatch) r,
+    ];
+    if (rules.isEmpty) return reply('OK', 'No sync rules to run');
+
+    // Every run stores a fresh report, so a report that is still the same
+    // object afterwards means that rule did not run (target unavailable).
+    final before = {for (final r in rules) r.id: session.lastReports[r.id]};
+    for (final rule in rules) {
+      _explicitSyncRules.add(rule.id);
+      session.scheduler.request(rule.id);
+    }
+    await session.scheduler.idle;
+
+    if (session.locked || session.token.isCancelled) {
+      return reply('ERROR', 'The vault was locked during sync');
+    }
+    var failed = 0;
+    var unavailable = 0;
+    for (final rule in rules) {
+      final report = session.lastReports[rule.id];
+      if (report == null || identical(report, before[rule.id])) {
+        unavailable++;
+      } else if (!report.completedCleanly) {
+        failed++;
+      }
+    }
+    if (failed == 0 && unavailable == 0) return reply('OK', 'Sync completed');
+    return reply(
+      'ERROR',
+      'Some sync rules did not complete '
+          '($failed failed, $unavailable unavailable)',
+    );
+  }
 
   // ── lock / panic ─────────────────────────────────────────────────────
 

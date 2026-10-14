@@ -147,6 +147,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         //   CAMERA_UNAVAILABLE-- TAKE_PHOTO/START_RECORDING: camera busy (e.g. the in-app camera screen has
         //                        it open) or a hardware/driver error opening it
         //   BUSY              -- START_RECORDING: an automation recording is already in progress
+        //                        SYNC_VAULT: the open app is still syncing after the wait ended (it keeps going)
         //   NOT_RECORDING     -- STOP_RECORDING: nothing is currently recording (or it's for a different vault)
 
         // Automation actions must run in the order automation fires them --
@@ -167,6 +168,13 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         // file lands in the vault either way; only the result broadcast
         // would be a false-negative ERROR/timeout in that case, not the data.
         private const val STOP_RECORDING_TIMEOUT_MS = 60_000L
+
+        // How long SYNC_VAULT waits for the open app to finish before
+        // answering BUSY. Like the recording timeouts above, it bounds the
+        // wait, not the sync: a long sync keeps running in the app. The wait
+        // can't be unbounded because it occupies the strictly-serial
+        // automationExecutor, which would hold up a LOCK_VAULT queued behind.
+        private const val OPEN_APP_SYNC_WAIT_MS = 60_000L
 
         internal fun pickCameraId(context: Context, facing: String): String? {
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -449,11 +457,16 @@ class VaultAutomationReceiver : BroadcastReceiver() {
     }
 
     private fun handleSync(context: Context, vaultUri: String, progressId: Int): Outcome {
-        if (VaultAutomationUnlockedBridge.channel != null) {
-            return Outcome("BUSY", "Sync is managed by the open app session")
-        }
+        // The FULL opt-in applies on every path, including the hand-off below.
         if (!AutomationSettings.canImportExport(context, vaultUri)) {
             return Outcome("FORBIDDEN", "Background sync requires FULL automation opt-in")
+        }
+        // The app is open: its coordinator owns this vault's sync ledger and
+        // run queue, so hand the request to it rather than starting a second
+        // engine on the same vault. Null means nobody is listening (app
+        // closed, or its engine is gone): sync headlessly below.
+        VaultAutomationUnlockedBridge.requestSync(vaultUri, OPEN_APP_SYNC_WAIT_MS)?.let { reply ->
+            return Outcome(reply.code, reply.message)
         }
         val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
             ?: return Outcome("NOT_MOUNTED", "Unlock the vault before starting sync")

@@ -23,6 +23,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
@@ -594,7 +595,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           ),
         ),
       );
-    } else if (isVid && widget.archiveContext == null) {
+    } else if (isVid) {
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -605,6 +606,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             cacheMode: widget.thumbnailCacheMode,
             quality: widget.thumbnailQuality,
             onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            archiveContext: widget.archiveContext,
+            archiveRootPath: widget.archiveRootPath,
           ),
         ),
       );
@@ -856,6 +859,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
   final void Function(int width, int height) onSizeKnown;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
 
   const _VideoMasonryThumb({
     super.key,
@@ -864,6 +869,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
     required this.cacheMode,
     required this.quality,
     required this.onSizeKnown,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   static Future<void> _checkAndReportSizeFromBytes(
@@ -892,60 +899,23 @@ class _VideoMasonryThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
-  ) async {
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await thumbnailCache.fetchWithSize(
-        container: container,
-        filePath: path,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
+  ) =>
+      VideoThumbnailFetcher.fetchWithSize(
+        thumbnailCache,
+        fileIoApi,
+        container,
+        path,
         mode: mode,
         quality: quality,
+        targetSize: quality.scaledSize(180),
+        onSizeKnown: onSizeKnown,
+        onUnknownSize: (bytes) =>
+            _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown),
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       );
-      if (cached != null && cached.$1.isNotEmpty) {
-        final (bytes, width, height) = cached;
-        if (width != null && height != null) {
-          onSizeKnown(width, height);
-        } else {
-          await _checkAndReportSizeFromBytes(
-              container, path, bytes, onSizeKnown);
-        }
-        return bytes;
-      }
-    }
-    final thumb = await fileIoApi.getVideoThumbnailWithSize(
-      container,
-      path,
-      quality: quality.jpegQuality,
-      targetSize: quality.scaledSize(180),
-    );
-    final data = thumb?.bytes;
-    if (data == null || data.isEmpty) {
-      throw StateError('Video thumbnail unavailable');
-    }
-    onSizeKnown(thumb!.width, thumb.height);
-
-    thumbnailCache.cacheInMemory(
-      container,
-      path,
-      data,
-      quality,
-      thumb.width,
-      thumb.height,
-    );
-    if (mode != ThumbnailCacheMode.disabled) {
-      unawaited(
-        thumbnailCache.store(
-          container: container,
-          filePath: path,
-          data: data,
-          mode: mode,
-          quality: quality,
-          width: thumb.width,
-          height: thumb.height,
-        ),
-      );
-    }
-    return data;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -975,7 +945,16 @@ class _VideoMasonryThumb extends ConsumerWidget {
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
           fetchFn: (c, p) => _fetch(
-              thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
+            thumbnailCache,
+            fileIoApi,
+            c,
+            p,
+            cacheMode,
+            quality,
+            onSizeKnown,
+            archiveContext,
+            archiveRootPath,
+          ),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () => syncBytes,
           cacheHeight: quality.scaledSize(180),

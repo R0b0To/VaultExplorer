@@ -11,10 +11,10 @@ void main() {
       expect(MediaViewerConstants.hasRealThumbnail('clip.mp4'), isTrue);
     });
 
-    test('false for a video inside an open archive', () {
+    test('true for a video inside an open archive', () {
       expect(
         MediaViewerConstants.hasRealThumbnail('clip.mp4', insideArchive: true),
-        isFalse,
+        isTrue,
       );
     });
 

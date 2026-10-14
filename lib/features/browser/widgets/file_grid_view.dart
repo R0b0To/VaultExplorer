@@ -461,7 +461,7 @@ class _FileGridViewState extends State<FileGridView>
           ),
         ),
       );
-    } else if (isVid && widget.archiveContext == null) {
+    } else if (isVid) {
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -471,6 +471,8 @@ class _FileGridViewState extends State<FileGridView>
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
             quality: widget.thumbnailQuality,
+            archiveContext: widget.archiveContext,
+            archiveRootPath: widget.archiveRootPath,
           ),
         ),
       );
@@ -665,12 +667,16 @@ class _VideoThumb extends ConsumerWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
 
   const _VideoThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   static Future<Uint8List> _fetch(
@@ -680,6 +686,8 @@ class _VideoThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   ) =>
       VideoThumbnailFetcher.fetch(
         thumbnailCache,
@@ -689,6 +697,8 @@ class _VideoThumb extends ConsumerWidget {
         mode: mode,
         quality: quality,
         targetSize: quality.scaledSize(180),
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       );
 
   @override
@@ -707,8 +717,16 @@ class _VideoThumb extends ConsumerWidget {
           quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) =>
-              _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+          fetchFn: (c, p) => _fetch(
+            thumbnailCache,
+            fileIoApi,
+            c,
+            p,
+            cacheMode,
+            quality,
+            archiveContext,
+            archiveRootPath,
+          ),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),

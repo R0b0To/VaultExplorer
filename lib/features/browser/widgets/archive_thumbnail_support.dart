@@ -10,9 +10,11 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 /// failure -- [AsyncThumbnail] already falls back to the file-type icon on
 /// any thrown error, so no special handling is needed at the call site.
 class ArchiveThumbnailUnavailable implements Exception {
-  const ArchiveThumbnailUnavailable();
+  final String? message;
+  const ArchiveThumbnailUnavailable([this.message]);
   @override
   String toString() =>
+      message ??
       'Thumbnails are unavailable inside solid archives (would require '
       'decompressing every preceding entry for each visible tile)';
 }
@@ -28,6 +30,11 @@ String archiveRelativeSubPath(String fullPath, String archiveRootPath) {
   if (sub.startsWith('/')) sub = sub.substring(1);
   return sub;
 }
+
+/// Maximum uncompressed size of a video entry inside an archive eligible
+/// for thumbnail extraction (500 MB). Staging larger files would risk filling
+/// the device cache or causing multi-second I/O stalls just for a tile preview.
+const int kMaxArchiveVideoThumbnailEntryBytes = 500 * 1024 * 1024;
 
 /// Fetches a size-limited thumbnail of a file inside an open archive.
 ///
@@ -69,6 +76,92 @@ Future<Uint8List> fetchArchiveEntryForThumbnail({
       throw Exception('Failed to decode archive entry thumbnail');
     }
     return bytes;
+  } finally {
+    await archiveContext.discardStagedEntry(stagedPath);
+  }
+}
+
+/// Fetches a size-limited thumbnail of a video inside an open archive.
+Future<Uint8List> fetchArchiveVideoEntryForThumbnail({
+  required ArchiveContext archiveContext,
+  required String archiveRootPath,
+  required String fullPath,
+  required VaultFileIoApi fileIoApi,
+  required int targetSize,
+  required int quality,
+}) async {
+  if (archiveContext.isSolid && !archiveContext.isSevenZip) {
+    throw const ArchiveThumbnailUnavailable();
+  }
+  final subPath = archiveRelativeSubPath(fullPath, archiveRootPath);
+  final entryInfo = archiveContext.findEntry(subPath);
+  if (entryInfo != null &&
+      entryInfo.uncompressedSize > 0 &&
+      entryInfo.uncompressedSize > kMaxArchiveVideoThumbnailEntryBytes) {
+    throw const ArchiveThumbnailUnavailable(
+      'Video entry exceeds maximum size for archive thumbnail extraction',
+    );
+  }
+  final staged = await archiveContext.stageEntryForBrowse(subPath);
+  final stagedPath = staged.path;
+  if (staged.status != ArchiveOpenStatus.ok || stagedPath == null) {
+    throw Exception('Failed to stage archive video entry for thumbnail');
+  }
+
+  try {
+    final bytes = await fileIoApi.getVideoThumbnailFromLocalPath(
+      stagedPath,
+      targetSize: targetSize,
+      quality: quality,
+    );
+    if (bytes == null || bytes.isEmpty) {
+      throw Exception('Failed to decode archive entry video thumbnail');
+    }
+    return bytes;
+  } finally {
+    await archiveContext.discardStagedEntry(stagedPath);
+  }
+}
+
+/// Same as [fetchArchiveVideoEntryForThumbnail], but also returns the source
+/// frame's pre-downscale width/height for masonry layouts.
+Future<(Uint8List, int, int)> fetchArchiveVideoEntryForThumbnailWithSize({
+  required ArchiveContext archiveContext,
+  required String archiveRootPath,
+  required String fullPath,
+  required VaultFileIoApi fileIoApi,
+  required int targetSize,
+  required int quality,
+}) async {
+  if (archiveContext.isSolid && !archiveContext.isSevenZip) {
+    throw const ArchiveThumbnailUnavailable();
+  }
+  final subPath = archiveRelativeSubPath(fullPath, archiveRootPath);
+  final entryInfo = archiveContext.findEntry(subPath);
+  if (entryInfo != null &&
+      entryInfo.uncompressedSize > 0 &&
+      entryInfo.uncompressedSize > kMaxArchiveVideoThumbnailEntryBytes) {
+    throw const ArchiveThumbnailUnavailable(
+      'Video entry exceeds maximum size for archive thumbnail extraction',
+    );
+  }
+  final staged = await archiveContext.stageEntryForBrowse(subPath);
+  final stagedPath = staged.path;
+  if (staged.status != ArchiveOpenStatus.ok || stagedPath == null) {
+    throw Exception('Failed to stage archive video entry for thumbnail');
+  }
+
+  try {
+    final thumb = await fileIoApi.getVideoThumbnailFromLocalPathWithSize(
+      stagedPath,
+      targetSize: targetSize,
+      quality: quality,
+    );
+    final bytes = thumb?.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      throw Exception('Failed to decode archive entry video thumbnail');
+    }
+    return (bytes, thumb!.width, thumb.height);
   } finally {
     await archiveContext.discardStagedEntry(stagedPath);
   }

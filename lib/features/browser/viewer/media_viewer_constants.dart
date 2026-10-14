@@ -118,8 +118,8 @@ static const List<String> audioExtensions = [
   /// no way to tell it apart from another of the same type.
   ///
   /// Vault items (passwords, cards, etc.) always render as icons. Pass
-  /// [insideArchive] when browsing inside an open archive, since video
-  /// thumbnails aren't supported there. Pass [isPlaceholder] for an item
+  /// [insideArchive] when browsing inside an open archive (both image and
+  /// video thumbnails are supported). Pass [isPlaceholder] for an item
   /// still mid-transfer, since it renders as a generic icon regardless of
   /// its eventual type.
   ///
@@ -140,7 +140,6 @@ static const List<String> audioExtensions = [
     if (isPlaceholder) return false;
     final ext = fileName.contains('.') ? fileName.split('.').last : '';
     if (vaultIconForExt(ext) != null) return false;
-    if (insideArchive && isVideo(fileName)) return false;
     return isImage(fileName) || isVideo(fileName);
   }
 }

@@ -3,10 +3,12 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 
 /// Single choke point for "fetch a *video* thumbnail, caching it if it
 /// wasn't already." Every call site that does this should go through here
@@ -67,7 +69,22 @@ class VideoThumbnailFetcher {
     required ThumbnailCacheMode mode,
     required ThumbnailQuality quality,
     required int targetSize,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   }) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      final bytes = await fetchArchiveVideoEntryForThumbnail(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: filePath,
+        fileIoApi: fileIoApi,
+        targetSize: targetSize,
+        quality: quality.jpegQuality,
+      );
+      thumbnailCache.cacheInMemory(container, filePath, bytes, quality);
+      return bytes;
+    }
+
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
@@ -125,7 +142,35 @@ class VideoThumbnailFetcher {
     required int targetSize,
     required void Function(int width, int height) onSizeKnown,
     required Future<void> Function(Uint8List bytes) onUnknownSize,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   }) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      final (bytes, width, height) =
+          await fetchArchiveVideoEntryForThumbnailWithSize(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: filePath,
+        fileIoApi: fileIoApi,
+        targetSize: targetSize,
+        quality: quality.jpegQuality,
+      );
+      if (width > 0 && height > 0) {
+        onSizeKnown(width, height);
+      } else {
+        await onUnknownSize(bytes);
+      }
+      thumbnailCache.cacheInMemory(
+        container,
+        filePath,
+        bytes,
+        quality,
+        width > 0 ? width : null,
+        height > 0 ? height : null,
+      );
+      return bytes;
+    }
+
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetchWithSize(
         container: container,

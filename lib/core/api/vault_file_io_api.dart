@@ -402,6 +402,71 @@ class VaultFileIoApi {
     }
   }
 
+  /// Generates a size-limited video thumbnail from an app-private local file.
+  /// Used for archive entries after native extraction has streamed them to a
+  /// temporary file.
+  Future<Uint8List?> getVideoThumbnailFromLocalPath(
+    String sourcePath, {
+    int quality = 60,
+    int targetSize = 180,
+    int? timeUs,
+    String? strategy,
+    double? framePosition,
+  }) async {
+    try {
+      final Uint8List? bytes = await _channel
+          .invokeMethod<Uint8List>(ChannelMethods.getVideoThumbnail, {
+            'filePath': sourcePath,
+            'fileName': sourcePath,
+            'quality': quality,
+            'targetSize': targetSize,
+            'isLocalStorage': true,
+            'strategy':
+                strategy ??
+                ThumbnailCacheService.videoThumbnailStrategy.name,
+            'framePosition':
+                framePosition ??
+                ThumbnailCacheService.videoThumbnailFramePosition,
+            if (timeUs != null) 'timeUs': timeUs,
+          });
+      return bytes;
+    } catch (e) {
+      logSwallowed('getVideoThumbnailFromLocalPath', e, expected: true);
+      return null;
+    }
+  }
+
+  /// Same as [getVideoThumbnailFromLocalPath], but also returns the source
+  /// frame's pre-downscale width/height.
+  Future<ThumbnailWithSize?> getVideoThumbnailFromLocalPathWithSize(
+    String sourcePath, {
+    int quality = 60,
+    int targetSize = 180,
+    String? strategy,
+    double? framePosition,
+  }) async {
+    try {
+      final result = await _channel
+          .invokeMethod(ChannelMethods.getVideoThumbnailWithSize, {
+            'filePath': sourcePath,
+            'fileName': sourcePath,
+            'quality': quality,
+            'targetSize': targetSize,
+            'isLocalStorage': true,
+            'strategy':
+                strategy ??
+                ThumbnailCacheService.videoThumbnailStrategy.name,
+            'framePosition':
+                framePosition ??
+                ThumbnailCacheService.videoThumbnailFramePosition,
+          });
+      return ThumbnailWithSize.fromChannelResult(result);
+    } catch (e) {
+      logSwallowed('getVideoThumbnailFromLocalPathWithSize', e, expected: true);
+      return null;
+    }
+  }
+
   /// See [getImageThumbnail]'s doc comment re: the `isLocalStorage`
   /// bypass. Still reports the real decoded pixel size for local storage,
   /// same as it always has for vault content, so masonry-layout tiles

@@ -158,13 +158,7 @@ class FileTile extends StatelessWidget {
             ),
           ),
         );
-      } else if (isVid && archiveContext == null) {
-        // Video thumbnails inside an archive aren't supported -- unlike
-        // images, generating one needs a real seekable data source for the
-        // platform decoder, which an in-memory extracted entry isn't. Fall
-        // through to the plain file-type icon rather than attempting (and
-        // failing) a native video thumbnail against a path that was never
-        // real to begin with.
+      } else if (isVid) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
           child: Material(
@@ -177,6 +171,8 @@ class FileTile extends StatelessWidget {
               fallbackIcon: displayIcon,
               fallbackColor: iconColor,
               zoomLevel: zoomLevel,
+              archiveContext: archiveContext,
+              archiveRootPath: archiveRootPath,
             ),
           ),
         );
@@ -414,6 +410,8 @@ class _ListVideoThumb extends ConsumerWidget {
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double zoomLevel;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
   const _ListVideoThumb({
     required this.container,
     required this.filePath,
@@ -422,6 +420,8 @@ class _ListVideoThumb extends ConsumerWidget {
     required this.fallbackIcon,
     required this.fallbackColor,
     this.zoomLevel = 1.0,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   static Future<Uint8List> _fetch(
@@ -431,6 +431,8 @@ class _ListVideoThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   ) => VideoThumbnailFetcher.fetch(
     thumbnailCache,
     fileIoApi,
@@ -439,6 +441,8 @@ class _ListVideoThumb extends ConsumerWidget {
     mode: mode,
     quality: quality,
     targetSize: quality.scaledSize(180),
+    archiveContext: archiveContext,
+    archiveRootPath: archiveRootPath,
   );
 
   @override
@@ -455,8 +459,16 @@ class _ListVideoThumb extends ConsumerWidget {
           quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) =>
-              _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+          fetchFn: (c, p) => _fetch(
+            thumbnailCache,
+            fileIoApi,
+            c,
+            p,
+            cacheMode,
+            quality,
+            archiveContext,
+            archiveRootPath,
+          ),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),

@@ -207,7 +207,7 @@ class FileItemActionsSheet extends ConsumerWidget {
       );
     }
 
-    if (isVid && archiveContext == null) {
+    if (isVid) {
       return _ItemVideoThumbnail(
         container: container,
         filePath: fullPath,
@@ -215,6 +215,8 @@ class FileItemActionsSheet extends ConsumerWidget {
         quality: thumbnailQuality,
         fallbackIcon: fallbackIcon,
         fallbackIconColor: fallbackIconColor,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       );
     }
 
@@ -658,6 +660,8 @@ class _ItemVideoThumbnail extends ConsumerWidget {
   final ThumbnailQuality quality;
   final IconData fallbackIcon;
   final Color fallbackIconColor;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
 
   const _ItemVideoThumbnail({
     required this.container,
@@ -666,6 +670,8 @@ class _ItemVideoThumbnail extends ConsumerWidget {
     required this.quality,
     required this.fallbackIcon,
     required this.fallbackIconColor,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   @override
@@ -692,6 +698,8 @@ class _ItemVideoThumbnail extends ConsumerWidget {
             mode: cacheMode,
             quality: quality,
             targetSize: quality.scaledSize(180),
+            archiveContext: archiveContext,
+            archiveRootPath: archiveRootPath,
           ),
           debounce: const Duration(milliseconds: 50),
           syncLookup: () =>

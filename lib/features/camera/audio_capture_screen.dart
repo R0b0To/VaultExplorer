@@ -876,14 +876,26 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
               ),
             ),
             const SizedBox(height: 16),
-            Row(
+           Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton.filled(
                   tooltip: l10n.mediaViewerActionPlayPause,
                   iconSize: 32,
+                  style: IconButton.styleFrom(
+                    backgroundColor: cs.primary,
+                    foregroundColor: cs.onPrimary,
+                    disabledBackgroundColor: cs.surfaceContainerHighest,
+                    disabledForegroundColor:
+                        cs.onSurfaceVariant.withValues(alpha: 0.38),
+                    minimumSize: const Size(56, 56),
+                  ),
                   icon: Icon(
                     isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: (playerReady && !saving)
+                        ? cs.onPrimary
+                        : cs.onSurfaceVariant.withValues(alpha: 0.38),
+                    size: 32,
                   ),
                   onPressed: playerReady && !saving
                       ? () => unawaited(_togglePlay())

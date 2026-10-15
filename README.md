@@ -81,6 +81,7 @@ See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for what the app accesses and what le
 ## Install
 
 Download the APK for your architecture (arm64, armeabi, or x64) from [Releases](https://github.com/R0b0To/VaultExplorer/releases). Requires Android 8.0 (API 26) or newer.
+The published APKs are signed using a certificate with the following SHA-256 fingerprint `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`
 
 ### Build from source
 

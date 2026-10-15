@@ -4340,6 +4340,18 @@ class AppLocalizationsAr extends AppLocalizations {
       'يتم عرض أول 50,000 عنصر — يحتوي هذا المجلد على ملفات أكثر.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'مطابقة حجم خلية الشبكة';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'يتم إنشاء الصور المصغرة للشبكة والفسيفساء بالحجم الفعلي لكل خلية على الشاشة، لذا فإن عدد أعمدة أقل يمنح صورًا مصغرة أكثر وضوحًا. يُستخدم الحجم الموضح أدناه في كل مكان آخر.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'حجم تلقائي · جودة $quality٪';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size بكسل · جودة $quality%';
   }

@@ -34,10 +34,12 @@ class ThumbnailQualityTile extends StatelessWidget {
         label,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
-subtitle: Padding(
+      subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          context.l10n.thumbnailQualitySummary(value.size, value.quality),
+          value.auto
+              ? context.l10n.thumbnailQualityAutoSummary(value.quality)
+              : context.l10n.thumbnailQualitySummary(value.size, value.quality),
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
             height: 1.25,
@@ -81,16 +83,20 @@ class _ThumbnailQualityDialog extends StatefulWidget {
 class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
   late int _size;
   late int _quality;
+  late bool _auto;
 
   @override
   void initState() {
     super.initState();
-    _size = widget.initialValue.size;
-    _quality = widget.initialValue.quality;
+    _size = widget.initialValue.size.clamp(100, ThumbnailQuality.maxManualSize);
+    _quality = widget.initialValue.quality.clamp(10, 100);
+    _auto = widget.initialValue.auto;
   }
 
   void _update() {
-    widget.onChanged(ThumbnailQuality(size: _size, quality: _quality));
+    widget.onChanged(
+      ThumbnailQuality(size: _size, quality: _quality, auto: _auto),
+    );
   }
 
   @override
@@ -119,70 +125,108 @@ class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
               ),
               const SizedBox(height: 20),
 
-              // ── Thumbnail Size (Resolution) ──
-              Text(
-                context.l10n.thumbnailSizeResolutionLabel,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+              // ── Auto size (match grid cell) ──
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  context.l10n.thumbnailAutoSizeLabel,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton.filledTonal(
-                    icon: const Icon(Icons.remove_rounded),
-                    onPressed: _size > 100
-                        ? () {
-                            setState(() {
-                              _size = (_size - 20).clamp(100, 500);
-                              _update();
-                            });
-                          }
-                        : null,
+                subtitle: Text(
+                  context.l10n.thumbnailAutoSizeDescription,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    height: 1.25,
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Text(
-                      '$_size px',
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    icon: const Icon(Icons.add_rounded),
-                    onPressed: _size < 500
-                        ? () {
-                            setState(() {
-                              _size = (_size + 20).clamp(100, 500);
-                              _update();
-                            });
-                          }
-                        : null,
-                  ),
-                ],
-              ),
-              Slider(
-                value: _size.toDouble(),
-                min: 100.0,
-                max: 500.0,
-                divisions: 20,
-                label: '$_size px',
-                onChanged: (val) {
+                ),
+                value: _auto,
+                onChanged: (v) {
                   setState(() {
-                    _size = val.round();
+                    _auto = v;
                     _update();
                   });
                 },
+              ),
+              const SizedBox(height: 8),
+
+              // ── Thumbnail Size (Resolution) ──
+              IgnorePointer(
+                ignoring: _auto,
+                child: Opacity(
+                  opacity: _auto ? 0.4 : 1.0,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.l10n.thumbnailSizeResolutionLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.remove_rounded),
+                            onPressed: _size > 100
+                                ? () {
+                                    setState(() {
+                                      _size = (_size - 20).clamp(100, ThumbnailQuality.maxManualSize);
+                                      _update();
+                                    });
+                                  }
+                                : null,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: Text(
+                              '$_size px',
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.add_rounded),
+                            onPressed: _size < ThumbnailQuality.maxManualSize
+                                ? () {
+                                    setState(() {
+                                      _size = (_size + 20).clamp(100, ThumbnailQuality.maxManualSize);
+                                      _update();
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: _size.clamp(100, ThumbnailQuality.maxManualSize).toDouble(),
+                        min: 100.0,
+                        max: ThumbnailQuality.maxManualSize.toDouble(),
+                        // 20px steps from 100 to maxManualSize.
+                        divisions: (ThumbnailQuality.maxManualSize - 100) ~/ 20,
+                        label: '$_size px',
+                        onChanged: (val) {
+                          setState(() {
+                            _size = val.round();
+                            _update();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
               const SizedBox(height: 16),
@@ -240,7 +284,7 @@ class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
                 ],
               ),
               Slider(
-                value: _quality.toDouble(),
+                value: _quality.clamp(10, 100).toDouble(),
                 min: 10.0,
                 max: 100.0,
                 divisions: 18,

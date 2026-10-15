@@ -27,6 +27,73 @@ void main() {
     });
   });
 
+  group('auto sizing', () {
+    const auto = ThumbnailQuality(quality: 80, size: 180, auto: true);
+
+    test('non-auto quality is returned unchanged by resolveForCell', () {
+      const manual = ThumbnailQuality(size: 300);
+      expect(
+        manual.resolveForCell(logicalWidth: 400, devicePixelRatio: 3),
+        same(manual),
+      );
+    });
+
+    test('resolves to the cell pixel width (with 4:3 oversample), bucketed to 64', () {
+      // 108 logical px * 3 dpr * 4/3 = 432 px -> next multiple of 64 = 448.
+      final r = auto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
+      expect(r.size, 448);
+      expect(r.quality, 80);
+      expect(r.auto, isTrue);
+    });
+
+    test('a single full-width column asks for a near-screen-width thumbnail', () {
+      // 340 logical px * 3 dpr * 4/3 = 1360 px -> 1408.
+      final r = auto.resolveForCell(logicalWidth: 340, devicePixelRatio: 3);
+      expect(r.size, 1408);
+    });
+
+    test('is clamped to [128, maxAutoSize]', () {
+      expect(
+        auto.resolveForCell(logicalWidth: 10, devicePixelRatio: 1).size,
+        128,
+      );
+      expect(
+        auto.resolveForCell(logicalWidth: 1000, devicePixelRatio: 3).size,
+        ThumbnailQuality.maxAutoSize,
+      );
+    });
+
+    test('ignores nonsensical geometry', () {
+      expect(
+        auto.resolveForCell(logicalWidth: 0, devicePixelRatio: 3),
+        same(auto),
+      );
+      expect(
+        auto.resolveForCell(logicalWidth: 100, devicePixelRatio: double.nan),
+        same(auto),
+      );
+    });
+
+    test('scaledSize allows the auto ceiling but manual stays at 1000', () {
+      const resolved = ThumbnailQuality(size: 1408, auto: true);
+      expect(resolved.scaledSize(180), 1408);
+      const manual = ThumbnailQuality(size: 1408);
+      expect(manual.scaledSize(180), 1000);
+    });
+
+    test('auto participates in equality and survives a JSON round trip', () {
+      expect(auto == const ThumbnailQuality(quality: 80, size: 180), isFalse);
+      expect(ThumbnailQuality.fromJson(auto.toJson()), auto);
+    });
+
+    test('auto is omitted from JSON when false (stored settings unchanged)', () {
+      expect(
+        const ThumbnailQuality(quality: 70, size: 200).toJson(),
+        {'quality': 70, 'size': 200},
+      );
+    });
+  });
+
   group('scaledSize', () {
     test('scales proportionally to the 180px baseline', () {
       // size=360 is double the 180 baseline, so a 100px base scales to 200.
@@ -77,11 +144,12 @@ void main() {
       expect(q.copyWith(quality: 999).quality, 100);
     });
 
-    test('copyWith clamps size to 80..600 — a narrower floor than the '
-        'unclamped constructor allows', () {
+    test('copyWith clamps size to 80..maxManualSize (1000) — a narrower '
+        'floor than the unclamped constructor allows', () {
       const q = ThumbnailQuality();
       expect(q.copyWith(size: 1).size, 80);
-      expect(q.copyWith(size: 9999).size, 600);
+      expect(q.copyWith(size: 9999).size, 1000);
+      expect(q.copyWith(size: 1000).size, 1000);
     });
   });
 

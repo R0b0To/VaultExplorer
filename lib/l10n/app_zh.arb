@@ -3273,5 +3273,8 @@
   "automationPermMicrophoneDescription": "用于录音和视频伴音。拍照和录像捕获时也会进行检查。",
   "automationPermOverlayDescription": "仅在 Android 14+ 上自动化应用通过广播（Broadcast）启动照片或视频捕获时才需要。若直接针对捕获 Activity，则不需要。",
   "automationPermSetupNeededMessage": "{count, plural, other{缺少 {count} 项必需权限。在授予权限之前，部分自动化操作将会失败。}}",
-  "automationPermAlmostReadyMessage": "{count, plural, other{仍有 {count} 项推荐设置未开启。自动化仍可运行，但可能不够稳定。}}"
+  "automationPermAlmostReadyMessage": "{count, plural, other{仍有 {count} 项推荐设置未开启。自动化仍可运行，但可能不够稳定。}}",
+  "thumbnailAutoSizeLabel": "匹配网格单元格大小",
+  "thumbnailAutoSizeDescription": "网格和瀑布流缩略图会按照各单元格的屏幕实际大小生成，因此列数越少，缩略图越清晰。下方设置的尺寸将用于其他所有位置。",
+  "thumbnailQualityAutoSummary": "自动尺寸 · {quality}% 质量"
 }

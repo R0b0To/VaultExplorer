@@ -161,13 +161,23 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     _restart();
   }
 
+  /// Key of this tile's entry in the shared in-flight map. Auto-sized
+  /// requests include their size so a sharper re-request (after a zoom
+  /// change) never joins an older, smaller fetch of the same file and ends
+  /// up showing its bytes. Fixed-size requests keep the original key, which
+  /// is also what the viewer prefetch uses to coalesce with tiles.
+  String _inFlightKey(MountedContainer container) {
+    final base =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+    return quality.auto ? '$base|${quality.size}' : base;
+  }
+
   void _restart() {
     if (!_started) return;
     final container = _container;
     if (container == null) return;
     _cancel();
-    final cacheKey =
-        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+    final cacheKey = _inFlightKey(container);
     _cache?.remove(cacheKey);
     _cancellationRetries = 0;
     state = const AsyncThumbnailState();
@@ -183,7 +193,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
       final container = _container;
       if (container == null) return;
       final cache = _cache;
-      final cacheKey = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+      final cacheKey = _inFlightKey(container);
       cache?.remove(cacheKey);
       state = const AsyncThumbnailState();
       _load();
@@ -204,7 +214,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     final limiter = _limiter;
     if (container == null || fetchFn == null || cache == null || limiter == null) return;
 
-    final cacheKey = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+    final cacheKey = _inFlightKey(container);
     var future = cache[cacheKey];
 
     if (future == null) {

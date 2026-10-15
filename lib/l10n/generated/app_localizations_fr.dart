@@ -4337,6 +4337,18 @@ class AppLocalizationsFr extends AppLocalizations {
       'Affichage des 50 000 premiers éléments — ce dossier en contient davantage.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'Adapter à la taille des cellules';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'Les miniatures en grille et en mosaïque sont générées à la taille d\'affichage de chaque cellule, de sorte que moins de colonnes offrent des miniatures plus nettes. La taille ci-dessous est utilisée partout ailleurs.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'Taille auto · qualité $quality %';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · qualité $quality%';
   }

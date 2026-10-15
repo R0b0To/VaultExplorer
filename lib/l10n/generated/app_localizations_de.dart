@@ -4307,6 +4307,18 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die ersten 50.000 Elemente werden angezeigt — dieser Ordner enthält weitere Dateien.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'An Rasterzellengröße anpassen';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'Raster- und Masonry-Miniaturansichten werden in der Bildschirmgröße der jeweiligen Zelle erstellt, sodass weniger Spalten schärfere Miniaturansichten liefern. Die unten angegebene Größe wird überall sonst verwendet.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'Automatische Größe · $quality % Qualität';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · $quality% Qualität';
   }

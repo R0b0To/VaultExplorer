@@ -3273,5 +3273,8 @@
   "automationPermMicrophoneDescription": "Grabaciones de audio y sonido de vídeo. La captura de fotos y vídeos también lo comprueba.",
   "automationPermOverlayDescription": "Solo es necesario si tu aplicación de automatización inicia la captura de fotos o vídeos mediante Broadcast en Android 14+. No es necesario si apunta directamente a la actividad de captura.",
   "automationPermSetupNeededMessage": "{count, plural, =1{Falta 1 permiso requerido. Algunas acciones de automatización fallarán hasta que se conceda.} other{Faltan {count} permisos requeridos. Algunas acciones de automatización fallarán hasta que se concedan.}}",
-  "automationPermAlmostReadyMessage": "{count, plural, =1{1 ajuste recomendado sigue desactivado. La automatización funciona, pero podría ser menos confiable.} other{{count} ajustes recomendados siguen desactivados. La automatización funciona, pero podría ser menos confiable.}}"
+  "automationPermAlmostReadyMessage": "{count, plural, =1{1 ajuste recomendado sigue desactivado. La automatización funciona, pero podría ser menos confiable.} other{{count} ajustes recomendados siguen desactivados. La automatización funciona, pero podría ser menos confiable.}}",
+  "thumbnailAutoSizeLabel": "Ajustar al tamaño de celda",
+  "thumbnailAutoSizeDescription": "Las miniaturas en cuadrícula y mosaico se generan según el tamaño en pantalla de cada celda, por lo que menos columnas ofrecen miniaturas más nítidas. El tamaño inferior se usará en los demás lugares.",
+  "thumbnailQualityAutoSummary": "Tamaño automático · {quality} % de calidad"
 }

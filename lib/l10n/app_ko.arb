@@ -3273,5 +3273,8 @@
   "automationPermMicrophoneDescription": "오디오 녹음 및 동영상 소리. 사진 및 동영상 캡처 시에도 확인합니다.",
   "automationPermOverlayDescription": "Android 14 이상에서 자동화 앱이 브로드캐스트로 사진 또는 동영상 캡처를 시작할 때만 필요합니다. 캡처 액티비티를 직접 실행하는 경우에는 필요하지 않습니다.",
   "automationPermSetupNeededMessage": "{count, plural, other{필수 권한이 {count}개 누락되었습니다. 권한을 허용할 때까지 일부 자동화 작업이 실패합니다.}}",
-  "automationPermAlmostReadyMessage": "{count, plural, other{권장 설정 {count}개가 꺼져 있습니다. 자동화는 작동하지만 안정성이 떨어질 수 있습니다.}}"
+  "automationPermAlmostReadyMessage": "{count, plural, other{권장 설정 {count}개가 꺼져 있습니다. 자동화는 작동하지만 안정성이 떨어질 수 있습니다.}}",
+  "thumbnailAutoSizeLabel": "그리드 셀 크기에 맞춤",
+  "thumbnailAutoSizeDescription": "그리드 및 메이슨리 썸네일은 각 셀의 화면 크기에 맞게 생성되므로 열 수가 적을수록 더 선명한 썸네일이 제공됩니다. 아래 크기는 그 외 모든 곳에 사용됩니다.",
+  "thumbnailQualityAutoSummary": "자동 크기 · 품질 {quality}%"
 }

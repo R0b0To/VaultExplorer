@@ -4026,6 +4026,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get truncatedListingWarning => '正在显示前50,000个项目——此文件夹中还有更多文件。';
 
   @override
+  String get thumbnailAutoSizeLabel => '匹配网格单元格大小';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      '网格和瀑布流缩略图会按照各单元格的屏幕实际大小生成，因此列数越少，缩略图越清晰。下方设置的尺寸将用于其他所有位置。';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return '自动尺寸 · $quality% 质量';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size像素 · $quality%质量';
   }

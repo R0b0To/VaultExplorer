@@ -240,6 +240,21 @@ class ThumbnailCacheService {
     return null;
   }
 
+  /// Whether the resident entry under [residentKey] may stand in for a
+  /// request at [quality] when no exact-size entry exists. Fixed-size
+  /// requests accept any resident thumbnail (as before). Auto-sized requests
+  /// only accept one generated at least as large, otherwise zooming from many
+  /// columns to few would keep showing the small, already-cached thumbnail
+  /// instead of fetching a sharp one. The size is read back from the key
+  /// layout produced by [_qualifiedPath]: `...|<size>|<quality>`.
+  static bool _residentSatisfies(String residentKey, ThumbnailQuality quality) {
+    if (!quality.auto) return true;
+    final parts = residentKey.split('|');
+    if (parts.length < 3) return true;
+    final residentSize = int.tryParse(parts[parts.length - 2]);
+    return residentSize == null || residentSize >= quality.size;
+  }
+
   static void _pruneKeyIndex() {
     _latestKeyByFile.removeWhere((_, key) => !_memoryCache.containsKey(key));
   }
@@ -346,7 +361,7 @@ class ThumbnailCacheService {
     }
 
     final matchedKey = _findResidentKeyForFile(container, filePath);
-    if (matchedKey != null) {
+    if (matchedKey != null && _residentSatisfies(matchedKey, quality)) {
       final alt = _memoryCache[matchedKey];
       if (alt != null) {
         if (_looksLikeValidImage(alt)) return alt;
@@ -372,7 +387,7 @@ class ThumbnailCacheService {
     }
 
     final matchedKey = _findResidentKeyForFile(container, filePath);
-    if (matchedKey != null) {
+    if (matchedKey != null && _residentSatisfies(matchedKey, quality)) {
       final alt = _memoryCache[matchedKey];
       if (alt != null) {
         if (_looksLikeValidImage(alt)) {

@@ -282,12 +282,16 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await _updateConfig(def);
   }
 
-  void applyImportedConfig(FileManagerToolbarConfig newConfig) {
+void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     ThumbnailCacheService.setVideoThumbnailSettings(
       newConfig.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
       newConfig.mediaViewerToolbarConfig.thumbnailFramePosition,
     );
-    state = state._copy(config: newConfig);
+    Future.microtask(() {
+      if (ref.mounted) {
+        state = state._copy(config: newConfig);
+      }
+    });
   }
 
   // Media Viewer Controls Customization

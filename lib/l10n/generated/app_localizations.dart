@@ -7218,6 +7218,24 @@ abstract class AppLocalizations {
   /// **'Showing first 50,000 items — this folder has more files.'**
   String get truncatedListingWarning;
 
+  /// Switch title: generate grid and masonry thumbnails at the on-screen pixel size of each cell
+  ///
+  /// In en, this message translates to:
+  /// **'Match grid cell size'**
+  String get thumbnailAutoSizeLabel;
+
+  /// Switch subtitle explaining automatic thumbnail sizing
+  ///
+  /// In en, this message translates to:
+  /// **'Grid and masonry thumbnails are generated at the on-screen size of each cell, so fewer columns give sharper thumbnails. The size below is used everywhere else.'**
+  String get thumbnailAutoSizeDescription;
+
+  /// Summary line when thumbnail size follows the grid cell size instead of a fixed value
+  ///
+  /// In en, this message translates to:
+  /// **'Auto size · {quality}% quality'**
+  String thumbnailQualityAutoSummary(int quality);
+
   /// Summary line showing the configured thumbnail size and JPEG compression quality
   ///
   /// In en, this message translates to:

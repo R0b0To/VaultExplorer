@@ -150,7 +150,7 @@ class _FileGridViewState extends State<FileGridView>
     if (oldWidget.initialColumns != widget.initialColumns) {
       final newCols = widget.initialColumns.clamp(_minColumns, _maxColumns);
       if (newCols != _crossAxisCount) {
-        _changeColumns(newCols, 1.0);
+        _crossAxisCount = newCols;
       }
     }
     if (oldWidget.items != widget.items) {
@@ -181,6 +181,22 @@ class _FileGridViewState extends State<FileGridView>
     final previewHeight = tileWidth / previewRatio;
     final totalHeight = previewHeight + labelHeight;
     return tileWidth / totalHeight;
+  }
+
+  /// The thumbnail quality to request for the current grid. For an auto
+  /// quality this is derived from the real pixel width of a cell (same
+  /// geometry as the grid delegate below), so fewer columns => sharper
+  /// thumbnails, matching how Fossify Gallery sizes them.
+  ThumbnailQuality get _effectiveQuality {
+    final q = widget.thumbnailQuality;
+    if (!q.auto) return q;
+    final width = MediaQuery.sizeOf(context).width;
+    final tileWidth =
+        (width - 20 - (_crossAxisCount - 1) * 8) / _crossAxisCount;
+    return q.resolveForCell(
+      logicalWidth: tileWidth,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
   }
 
   double _getTileHeight(int columns) {
@@ -397,7 +413,7 @@ class _FileGridViewState extends State<FileGridView>
               container: widget.container,
               folderPath: fullPath,
               cacheMode: widget.thumbnailCacheMode,
-              quality: widget.thumbnailQuality,
+              quality: _effectiveQuality,
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -455,7 +471,7 @@ class _FileGridViewState extends State<FileGridView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -470,7 +486,7 @@ class _FileGridViewState extends State<FileGridView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -485,7 +501,7 @@ class _FileGridViewState extends State<FileGridView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,

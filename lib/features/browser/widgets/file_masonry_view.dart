@@ -159,6 +159,20 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     }
   }
 
+  /// Auto-aware quality for cells built in [build]; see the grid view's
+  /// equivalent. A masonry column is as wide as a grid tile, and items keep
+  /// their own aspect ratio, so the same cell-width rule applies.
+  ThumbnailQuality get _effectiveQuality {
+    final q = widget.thumbnailQuality;
+    if (!q.auto) return q;
+    final width = MediaQuery.sizeOf(context).width;
+    final colWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
+    return q.resolveForCell(
+      logicalWidth: colWidth,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+  }
+
   int get _minColumns {
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
@@ -532,7 +546,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
               container: widget.container,
               folderPath: fullPath,
               cacheMode: widget.thumbnailCacheMode,
-              quality: widget.thumbnailQuality,
+              quality: _effectiveQuality,
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -588,7 +602,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
@@ -604,7 +618,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
@@ -620,7 +634,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             container: widget.container,
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
-            quality: widget.thumbnailQuality,
+            quality: _effectiveQuality,
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,

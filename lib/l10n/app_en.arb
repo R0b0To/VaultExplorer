@@ -5550,6 +5550,23 @@
   "@truncatedListingWarning": {
     "description": "Warning banner shown above the file list when a folder's listing was capped at the max item count"
   },
+  "thumbnailAutoSizeLabel": "Match grid cell size",
+  "@thumbnailAutoSizeLabel": {
+    "description": "Switch title: generate grid and masonry thumbnails at the on-screen pixel size of each cell"
+  },
+  "thumbnailAutoSizeDescription": "Grid and masonry thumbnails are generated at the on-screen size of each cell, so fewer columns give sharper thumbnails. The size below is used everywhere else.",
+  "@thumbnailAutoSizeDescription": {
+    "description": "Switch subtitle explaining automatic thumbnail sizing"
+  },
+  "thumbnailQualityAutoSummary": "Auto size · {quality}% quality",
+  "@thumbnailQualityAutoSummary": {
+    "description": "Summary line when thumbnail size follows the grid cell size instead of a fixed value",
+    "placeholders": {
+      "quality": {
+        "type": "int"
+      }
+    }
+  },
   "thumbnailQualitySummary": "{size} px · {quality}% quality",
   "@thumbnailQualitySummary": {
     "description": "Summary line showing the configured thumbnail size and JPEG compression quality",

@@ -4081,6 +4081,18 @@ class AppLocalizationsKo extends AppLocalizations {
       '처음 50,000개 항목을 표시 중입니다 — 이 폴더에는 더 많은 파일이 있습니다.';
 
   @override
+  String get thumbnailAutoSizeLabel => '그리드 셀 크기에 맞춤';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      '그리드 및 메이슨리 썸네일은 각 셀의 화면 크기에 맞게 생성되므로 열 수가 적을수록 더 선명한 썸네일이 제공됩니다. 아래 크기는 그 외 모든 곳에 사용됩니다.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return '자동 크기 · 품질 $quality%';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '${size}px · 품질 $quality%';
   }

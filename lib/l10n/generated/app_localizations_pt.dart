@@ -4308,6 +4308,18 @@ class AppLocalizationsPt extends AppLocalizations {
       'Mostrando os primeiros 50.000 itens — esta pasta tem mais arquivos.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'Ajustar ao tamanho da célula';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'As miniaturas em grade e mosaico são geradas no tamanho de exibição de cada célula, portanto, menos colunas resultam em miniaturas mais nítidas. O tamanho abaixo é usado em todos os outros locais.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'Tamanho automático · $quality% de qualidade';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · qualidade $quality%';
   }

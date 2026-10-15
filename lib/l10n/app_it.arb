@@ -3273,5 +3273,8 @@
   "automationPermMicrophoneDescription": "Registrazioni audio e audio dei video. Verificato anche per l'acquisizione di foto e video.",
   "automationPermOverlayDescription": "Necessario solo se la tua app di automazione avvia l'acquisizione di foto o video tramite un Broadcast su Android 14+. Non necessario quando punta direttamente all'attività di acquisizione.",
   "automationPermSetupNeededMessage": "{count, plural, =1{Manca 1 autorizzazione richiesta. Alcune azioni di automazione non funzioneranno finché non verrà concessa.} other{Mancano {count} autorizzazioni richieste. Alcune azioni di automazione non funzioneranno finché non verranno concesse.}}",
-  "automationPermAlmostReadyMessage": "{count, plural, =1{1 impostazione consigliata è ancora disattivata. L'automazione funziona, ma potrebbe essere meno affidabile.} other{{count} impostazioni consigliate sono ancora disattivate. L'automazione funziona, ma potrebbe essere meno affidabile.}}"
+  "automationPermAlmostReadyMessage": "{count, plural, =1{1 impostazione consigliata è ancora disattivata. L'automazione funziona, ma potrebbe essere meno affidabile.} other{{count} impostazioni consigliate sono ancora disattivate. L'automazione funziona, ma potrebbe essere meno affidabile.}}",
+  "thumbnailAutoSizeLabel": "Adatta alla dimensione delle celle",
+  "thumbnailAutoSizeDescription": "Le miniature per griglia e layout a mosaico vengono generate in base alle dimensioni su schermo di ciascuna cella, quindi un minor numero di colonne offre miniature più nitide. La dimensione indicata sotto verrà utilizzata per tutto il resto.",
+  "thumbnailQualityAutoSummary": "Dimensione automatica · qualità {quality}%"
 }

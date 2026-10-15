@@ -4322,6 +4322,18 @@ class AppLocalizationsUk extends AppLocalizations {
       'Показано перші 50 000 елементів — у цій папці більше файлів.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'Підлаштовувати під розмір клітинки';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'Мініатюри для сітки та мозаїки створюються за екранним розміром кожної клітинки, тому менша кількість стовпців забезпечує чіткіші мініатюри. Розмір, указаний нижче, використовується скрізь в інших місцях.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'Авторозмір · якість $quality%';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size пкс · $quality% якості';
   }

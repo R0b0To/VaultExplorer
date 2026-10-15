@@ -4080,6 +4080,18 @@ class AppLocalizationsJa extends AppLocalizations {
       '最初の50,000件を表示しています — このフォルダにはさらに多くのファイルがあります。';
 
   @override
+  String get thumbnailAutoSizeLabel => 'グリッドのセルサイズに合わせる';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'グリッドおよびメイソンリー表示のサムネイルは各セルの画面表示サイズに合わせて生成されるため、列数を減らすとより鮮明なサムネイルになります。それ以外の場所では以下のサイズが使用されます。';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return '自動サイズ · 品質 $quality%';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '${size}px・画質$quality%';
   }

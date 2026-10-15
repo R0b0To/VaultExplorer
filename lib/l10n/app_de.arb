@@ -3273,5 +3273,8 @@
   "automationPermMicrophoneDescription": "Audioaufnahmen und Videoton. Wird auch bei der Foto- und Videoaufnahme überprüft.",
   "automationPermOverlayDescription": "Nur erforderlich, wenn deine Automatisierungs-App Foto- oder Videoaufnahmen unter Android 14+ per Broadcast startet. Nicht erforderlich, wenn sie direkt auf die Aufnahme-Aktivität zugreift.",
   "automationPermSetupNeededMessage": "{count, plural, =1{1 erforderliche Berechtigung fehlt. Einige Automatisierungsaktionen schlagen fehl, bis sie gewährt wird.} other{{count} erforderliche Berechtigungen fehlen. Einige Automatisierungsaktionen schlagen fehl, bis sie gewährt werden.}}",
-  "automationPermAlmostReadyMessage": "{count, plural, =1{1 empfohlene Einstellung ist noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.} other{{count} empfohlene Einstellungen sind noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.}}"
+  "automationPermAlmostReadyMessage": "{count, plural, =1{1 empfohlene Einstellung ist noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.} other{{count} empfohlene Einstellungen sind noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.}}",
+  "thumbnailAutoSizeLabel": "An Rasterzellengröße anpassen",
+  "thumbnailAutoSizeDescription": "Raster- und Masonry-Miniaturansichten werden in der Bildschirmgröße der jeweiligen Zelle erstellt, sodass weniger Spalten schärfere Miniaturansichten liefern. Die unten angegebene Größe wird überall sonst verwendet.",
+  "thumbnailQualityAutoSummary": "Automatische Größe · {quality} % Qualität"
 }

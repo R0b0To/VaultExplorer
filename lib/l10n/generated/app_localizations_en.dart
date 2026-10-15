@@ -4231,6 +4231,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Showing first 50,000 items — this folder has more files.';
 
   @override
+  String get thumbnailAutoSizeLabel => 'Match grid cell size';
+
+  @override
+  String get thumbnailAutoSizeDescription =>
+      'Grid and masonry thumbnails are generated at the on-screen size of each cell, so fewer columns give sharper thumbnails. The size below is used everywhere else.';
+
+  @override
+  String thumbnailQualityAutoSummary(int quality) {
+    return 'Auto size · $quality% quality';
+  }
+
+  @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · $quality% quality';
   }

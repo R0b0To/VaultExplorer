@@ -35,8 +35,8 @@ enum FilesystemType {
   /// ext2/3/4 whose names must stay portable: the case-*sensitive* matching
   /// of [ext] combined with the conservative character/trailing-dot/
   /// reserved-name restrictions of [unknownConservative]. This is the type
-  /// an ext disk-image container resolves to once
-  /// `kAllowCaseDistinctNamesInExtContainers` is turned on (see
+  /// an ext disk-image container resolves to while
+  /// `kAllowCaseDistinctNamesInExtContainers` is on (see
   /// mounted_container_filesystem.dart), so that "Notes" and "notes" can
   /// coexist without also letting through names that FAT/exFAT/NTFS or
   /// Android shared storage cannot hold when the data is copied out.

@@ -332,6 +332,29 @@ new code must not violate. Each is traceable to specific enforcement code.
     unlock reaches a narrower credential surface than an interactive
     biometric unlock does.
 
+12. **Case-sensitivity is a policy when comparing names and a fact when
+    deciding whether a write is safe — and the policy is never more
+    permissive than the fact.** `namesAreCaseSensitive()` (in
+    `mounted_container_filesystem.dart`) says how conflict detection,
+    conflict-plan keys, unique-name generation and the name dialogs compare
+    names in a container; it follows `resolveFilesystemType()` and so the
+    `kAllowCaseDistinctNamesInExtContainers` switch. `isDestinationCaseSensitive()`
+    (Dart) and `FilesystemNameValidator.destinationIsCaseSensitive()` (Kotlin)
+    say what the destination filesystem *really* does with "Notes" and "notes":
+    true for ext volumes and the encrypted folder-vault formats, false for
+    FAT/exFAT/NTFS, device storage, and anything unknown. Every path that
+    writes names to a destination guards on the fact, never the policy:
+    `FileOperationService._run` / `_copyEntry`, the Kotlin import recursion,
+    both export paths, and the archive-extract pre-flight all refuse or skip a
+    later entry that would replace an earlier one on a case-insensitive
+    destination, so a case-distinct name that is legal in the source can never
+    silently overwrite a file in the destination. The real filesystem of a
+    disk-image volume is read from `getVaultInfo()["fileSystem"]` once at mount
+    (`VolumeFilesystemRegistry`, filled in `onContainerMounted` /
+    `onUsbContainerReconnected`, cleared in `onContainerLocked`); an unrecorded
+    volume is treated as unknown, i.e. case-insensitive. Dart decides the
+    policy and sends it with each import pick; Kotlin does not re-derive it.
+
 ---
 
 ## 3. Concurrency & threading model

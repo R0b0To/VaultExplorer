@@ -6,24 +6,25 @@ import 'volume_filesystem_registry.dart';
 /// Whether an ext2/3/4 disk-image container is allowed to hold names that
 /// differ only by capitalization ("Notes" and "notes" side by side).
 ///
-/// Turning this on changes [resolveFilesystemType] to return
-/// [FilesystemType.extPortable] for ext containers, which makes the
-/// create / rename / save-as dialogs and the advanced-rename preview treat
-/// those two names as different. It deliberately does NOT relax the
-/// character, trailing-dot or reserved-name rules (see
-/// [FilesystemType.extPortable]).
+/// When `true`, [resolveFilesystemType] returns
+/// [FilesystemType.extPortable] for an ext volume, so the create / rename /
+/// save-as dialogs, the advanced-rename preview, paste conflict detection,
+/// conflict-plan keys and import planning all treat those two names as
+/// different. It deliberately does NOT relax the character, trailing-dot or
+/// reserved-name rules (see [FilesystemType.extPortable]).
 ///
-/// Leave this `false` until every path that moves names *out of* an ext
-/// container compares them the way the destination does. Done: the
-/// folder/sibling copy guard in `FileOperationService`, paste conflict
-/// detection and the `ConflictPlan` keys (all folded with
-/// [namesAreCaseSensitive]), Kotlin import planning (the policy is sent
-/// with each pick), the import child-collision guard, the export guards
-/// (`ImportExportHandlers` multi-export and the automation `exportFolder`)
-/// and the archive-extract pre-flight (`ArchiveService.findExtractCaseCollisions`).
-/// Not covered: the native archive engine itself (it is only ever reached
-/// after that pre-flight).
-const bool kAllowCaseDistinctNamesInExtContainers = false;
+/// This is only safe because every path that moves names *out of* an ext
+/// container checks them against what the destination really does (see
+/// [isDestinationCaseSensitive] and docs/architecture.md §2 rule 12): the
+/// folder/sibling copy guard in `FileOperationService`, the import
+/// child-collision guard, the export guards (`ImportExportHandlers`
+/// multi-export and the automation `exportFolder`) and the archive-extract
+/// pre-flight (`ArchiveService.findExtractCaseCollisions`). Those guards do
+/// not depend on this switch.
+///
+/// Setting it back to `false` is a complete rollback: ext volumes go back to
+/// the conservative case-insensitive name rules, and nothing else changes.
+const bool kAllowCaseDistinctNamesInExtContainers = true;
 
 /// The concrete filesystem recorded for a natively mounted disk-image
 /// [container] (FAT32 / exFAT / NTFS / ext), or `null` when it is unknown:
@@ -44,11 +45,11 @@ FilesystemType? detectedFilesystemType(MountedContainer container) {
 ///   don't apply to the plaintext name the user types.
 /// - A native disk-image container (VeraCrypt/LUKS/BitLocker/VHD/VHDX) is
 ///   mounted as FAT, exFAT, NTFS, or ext2/3/4. The concrete kind is read
-///   from the mounted volume (see [VolumeFilesystemRegistry]); today every
-///   one of them still resolves to [FilesystemType.unknownConservative]
-///   for *name rules*, except an ext volume when
-///   [kAllowCaseDistinctNamesInExtContainers] is on, which resolves to
-///   [FilesystemType.extPortable].
+///   from the mounted volume (see [VolumeFilesystemRegistry]). For *name
+///   rules* an ext volume resolves to [FilesystemType.extPortable] while
+///   [kAllowCaseDistinctNamesInExtContainers] is on; every other disk-image
+///   volume, and an ext volume whose filesystem hasn't been recorded yet,
+///   resolves to [FilesystemType.unknownConservative].
 /// - A plain folder vault (SAF-backed) could be backed by *any* real host
 ///   filesystem, which isn't knowable from here, so it also resolves to
 ///   [FilesystemType.unknownConservative].

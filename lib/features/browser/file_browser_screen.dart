@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
@@ -2753,7 +2754,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           isCrossContainer: isCrossContainer,
           resolveConflicts: (conflicts) async {
             if (!mounted) return null;
-            return ConflictResolutionSheet.show(context, conflicts: conflicts);
+            return ConflictResolutionSheet.show(
+              context,
+              conflicts: conflicts,
+              caseSensitive: namesAreCaseSensitive(widget.container),
+            );
           },
           l10n: context.l10n,
         );
@@ -2805,7 +2810,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   Future<void> _finishBatchDelete(FileOperation op) async {
     final deletedNames = op.itemStatuses
         .where((s) => s.result == FileItemResult.success)
-        .map((s) => s.item.name.toLowerCase())
+        .map((s) => s.item.name)
         .toSet();
     final deletedPaths = op.itemStatuses
         .where((s) => s.result == FileItemResult.success)
@@ -3144,6 +3149,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       context,
       conflicts: entries,
       cancelLabel: context.l10n.cancelImportButton,
+      caseSensitive: namesAreCaseSensitive(widget.container),
     );
     if (result == null) {
       await ref.read(vaultFileIoApiProvider).cancelPickedImport(pick.pickToken);
@@ -3473,6 +3479,19 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       _archiveContext!,
     );
     if (verifiedArchive == null || !mounted) return;
+    // Same pre-flight as FileOperationService._runArchiveExtract: refuse
+    // before writing anything if two entries would replace one another on
+    // this (case-insensitive) destination.
+    if (!isDestinationCaseSensitive(widget.container) &&
+        ArchiveService.findExtractCaseCollisions(verifiedArchive).isNotEmpty) {
+      _setStatus(
+        context.l10n.failedToExtractGeneric(
+          context.l10n.advancedRenameNameCollisionWithinBatch,
+        ),
+        error: true,
+      );
+      return;
+    }
     _navNotifier.updateArchiveContext(verifiedArchive);
     _navNotifier.setLoading(true);
     try {
@@ -3763,7 +3782,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
 
     final visibleCurrentItems = _currentItems.where(
-      (e) => !pendingDeletedNames.contains(e.lowercaseName),
+      (e) => !pendingDeletedNames.contains(e.name),
     );
     final existingNamesLower = visibleCurrentItems
         .map((e) => e.lowercaseName)

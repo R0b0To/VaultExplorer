@@ -9,7 +9,7 @@ import org.junit.Test
  * at the destination (see its own doc comment in ImportExportHandlers.kt).
  * It was extracted from a private method into an internal companion
  * function specifically so it's testable without a live container session
- * (which existingNamesLowercase, the caller supplying its `existing` set,
+ * (which existingNamesFolded, the caller supplying its `existing` set,
  * actually needs) -- same pattern as isMissingContainerUri in the same
  * companion object.
  */
@@ -71,5 +71,63 @@ class ImportExportHandlersUniqueNameTest {
     fun `empty existing set never triggers a rename`() {
         val result = ImportExportHandlers.uniqueNameAgainst(emptySet(), "anything.txt")
         assertEquals("anything.txt", result)
+    }
+
+    // ── Case-sensitive destinations (policy sent from Dart with each pick) ──
+
+    @Test
+    fun `foldName lowercases unless case-sensitive`() {
+        assertEquals("notes", ImportExportHandlers.foldName("Notes", caseSensitive = false))
+        assertEquals("Notes", ImportExportHandlers.foldName("Notes", caseSensitive = true))
+    }
+
+    @Test
+    fun `case-sensitive destination keeps a name that differs only by case`() {
+        val result = ImportExportHandlers.uniqueNameAgainst(
+            setOf("notes.txt"), "Notes.txt", caseSensitive = true,
+        )
+        assertEquals("Notes.txt", result)
+    }
+
+    @Test
+    fun `case-sensitive destination still renames an exact match`() {
+        val result = ImportExportHandlers.uniqueNameAgainst(
+            setOf("Notes.txt"), "Notes.txt", caseSensitive = true,
+        )
+        assertEquals("Notes (1).txt", result)
+    }
+
+    @Test
+    fun `case-sensitive candidate search compares exact names`() {
+        val existing = setOf("Notes.txt", "Notes (1).txt", "notes (2).txt")
+        val result = ImportExportHandlers.uniqueNameAgainst(existing, "Notes.txt", caseSensitive = true)
+        // "Notes (2).txt" is free: only "notes (2).txt" exists, which is a different name here.
+        assertEquals("Notes (2).txt", result)
+    }
+
+    @Test
+    fun `default stays case-insensitive`() {
+        val result = ImportExportHandlers.uniqueNameAgainst(setOf("notes.txt"), "Notes.txt")
+        assertEquals("Notes (1).txt", result)
+    }
+
+    // ── Export: siblings that differ only by case ──────────────────────────
+
+    @Test
+    fun `caseCollisionLaterIndexes flags only the later of two names that differ by case`() {
+        val later = ImportExportHandlers.caseCollisionLaterIndexes(listOf("Notes.txt", "a.txt", "notes.txt"))
+        assertEquals(setOf(2), later)
+    }
+
+    @Test
+    fun `caseCollisionLaterIndexes flags every extra spelling`() {
+        val later = ImportExportHandlers.caseCollisionLaterIndexes(listOf("README", "readme", "ReadMe", "other"))
+        assertEquals(setOf(1, 2), later)
+    }
+
+    @Test
+    fun `caseCollisionLaterIndexes is empty when every name is distinct`() {
+        assertEquals(emptySet<Int>(), ImportExportHandlers.caseCollisionLaterIndexes(listOf("a", "b", "c.txt")))
+        assertEquals(emptySet<Int>(), ImportExportHandlers.caseCollisionLaterIndexes(emptyList()))
     }
 }

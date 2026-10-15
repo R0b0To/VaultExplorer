@@ -45,6 +45,35 @@ void main() {
       expect(result, hasLength(1));
     });
 
+    test('caseSensitive: a name that differs only by case is not a conflict', () {
+      final result = detectPasteConflicts(
+        items: [const ClipboardItem(path: 'Downloads/Report.PDF', isDir: false)],
+        existingNamesLower: {'report.pdf'},
+        existingDirsLower: {},
+        isCrossContainer: false,
+        isCutOperation: false,
+        currentDirPath: '',
+        caseSensitive: true,
+      );
+
+      expect(result, isEmpty);
+    });
+
+    test('caseSensitive: an exact-name match is still a conflict', () {
+      final result = detectPasteConflicts(
+        items: [const ClipboardItem(path: 'Downloads/Report.PDF', isDir: true)],
+        existingNamesLower: {'Report.PDF'},
+        existingDirsLower: {'Report.PDF'},
+        isCrossContainer: false,
+        isCutOperation: false,
+        currentDirPath: '',
+        caseSensitive: true,
+      );
+
+      expect(result, hasLength(1));
+      expect(result.single.destIsDir, isTrue);
+    });
+
     test('destIsDir reflects whether the colliding destination entry is a directory', () {
       final result = detectPasteConflicts(
         items: [const ClipboardItem(path: 'Backup/Photos', isDir: true)],

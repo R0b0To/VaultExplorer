@@ -111,21 +111,51 @@ class ImportExportHandlers(
             containerUri == null || sourcePath == null
 
         /**
-         * Returns [desiredName] unchanged if its lowercased form isn't in
-         * [existingLowercase], otherwise appends " (1)", " (2)", etc.
+         * Folds [name] for comparison: unchanged when [caseSensitive],
+         * otherwise lowercased. Mirrors `foldEntryName` in
+         * `mounted_container_filesystem.dart`; the policy itself is decided
+         * on the Dart side and sent with each pick, so Kotlin never has to
+         * re-derive it.
+         */
+        internal fun foldName(name: String, caseSensitive: Boolean): String =
+            if (caseSensitive) name else name.lowercase()
+
+        /**
+         * Positions in [names] that are NOT the first to claim their
+         * case-insensitive form -- i.e. the entries that would land on the
+         * same destination entry as an earlier one and replace it. Export
+         * writes to device storage (SAF / raw external paths), which this
+         * app always treats as case-insensitive, so a later sibling that
+         * differs only by case must be skipped rather than written.
+         * Pure, so it is unit-testable without a live container.
+         */
+        internal fun caseCollisionLaterIndexes(names: List<String>): Set<Int> {
+            val claimed = HashSet<String>()
+            val later = HashSet<Int>()
+            names.forEachIndexed { i, n -> if (!claimed.add(n.lowercase())) later.add(i) }
+            return later
+        }
+
+        /**
+         * Returns [desiredName] unchanged if its folded form isn't in
+         * [existingFolded], otherwise appends " (1)", " (2)", etc.
          * (preserving the file extension, if any) until it finds a free
          * name. Extracted out of [uniqueImportName] as a pure function of
          * an already-fetched name set -- same motivation as
          * [isMissingContainerUri] above -- so the naming algorithm itself
          * is testable without a live container session; the fetch itself
-         * ([existingNamesLowercase]) is not tested here.
+         * ([existingNamesFolded]) is not tested here.
          *
          * Import previously wrote straight to the sanitized source name, so
          * a file/folder already at the destination was silently
          * overwritten. Every import target now goes through this first.
          */
-        internal fun uniqueNameAgainst(existingLowercase: Set<String>, desiredName: String): String {
-            if (desiredName.lowercase() !in existingLowercase) return desiredName
+        internal fun uniqueNameAgainst(
+            existingFolded: Set<String>,
+            desiredName: String,
+            caseSensitive: Boolean = false,
+        ): String {
+            if (foldName(desiredName, caseSensitive) !in existingFolded) return desiredName
 
             val dot = desiredName.lastIndexOf('.')
             val hasExt = dot > 0 && dot < desiredName.length - 1
@@ -135,7 +165,7 @@ class ImportExportHandlers(
             var n = 1
             while (true) {
                 val candidate = "$base ($n)$ext"
-                if (candidate.lowercase() !in existingLowercase) return candidate
+                if (foldName(candidate, caseSensitive) !in existingFolded) return candidate
                 n++
             }
         }
@@ -163,59 +193,68 @@ class ImportExportHandlers(
     /** One file the multi-file picker returned, before any conflict is resolved. */
     private data class PickedFileEntry(val doc: DocumentFile, val raw: File?, val name: String)
 
-    private data class PendingPickFiles(val containerUri: String, val targetDir: String, val volId: Int)
+    private data class PendingPickFiles(
+        val containerUri: String, val targetDir: String, val volId: Int, val caseSensitive: Boolean = false,
+    )
     private var pendingPickFiles: PendingPickFiles? = null
 
     private data class PickedImportFiles(
         val containerUri: String, val targetDir: String, val volId: Int, val entries: List<PickedFileEntry>,
+        val caseSensitive: Boolean = false,
     )
     private val pickedFilesByToken = java.util.concurrent.ConcurrentHashMap<Int, PickedImportFiles>()
 
-    private data class PendingPickFolder(val containerUri: String, val targetDir: String, val volId: Int)
+    private data class PendingPickFolder(
+        val containerUri: String, val targetDir: String, val volId: Int, val caseSensitive: Boolean = false,
+    )
     private var pendingPickFolder: PendingPickFolder? = null
 
     private data class PickedImportFolder(
         val containerUri: String, val targetDir: String, val volId: Int,
         val treeUri: Uri, val srcRoot: DocumentFile, val rawRoot: File?, val folderName: String,
+        val caseSensitive: Boolean = false,
     )
     private val pickedFolderByToken = java.util.concurrent.ConcurrentHashMap<Int, PickedImportFolder>()
 
     private val nextPickToken = java.util.concurrent.atomic.AtomicInteger(1)
 
-    private fun existingNamesLowercase(volId: Int, dirPath: String): Set<String> {
+    /** Names already in [dirPath], folded per [caseSensitive] (see [foldName]). */
+    private fun existingNamesFolded(volId: Int, dirPath: String, caseSensitive: Boolean): Set<String> {
         val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
         return entries.mapNotNull { entry ->
             if (entry.startsWith("System:")) return@mapNotNull null
-            DirEntryWire.parse(entry)?.name?.lowercase()
+            DirEntryWire.parse(entry)?.name?.let { foldName(it, caseSensitive) }
         }.toSet()
     }
 
     /**
      * Returns [desiredName] unchanged if nothing in [dirPath] already has
-     * that name (case-insensitively), otherwise appends " (1)", " (2)", etc.
+     * that name (case-insensitively unless [caseSensitive]), otherwise appends " (1)", " (2)", etc.
      * (preserving the file extension, if any) until it finds a free name.
      *
      * Import previously wrote straight to the sanitized source name, so a
      * file/folder already at the destination was silently overwritten.
      * Every import target now goes through this first.
      */
-    private fun uniqueImportName(volId: Int, dirPath: String, desiredName: String): String =
-        uniqueNameAgainst(existingNamesLowercase(volId, dirPath), desiredName)
+    private fun uniqueImportName(
+        volId: Int, dirPath: String, desiredName: String, caseSensitive: Boolean,
+    ): String =
+        uniqueNameAgainst(existingNamesFolded(volId, dirPath, caseSensitive), desiredName, caseSensitive)
 
     /**
-     * Same idea as [existingNamesLowercase] but only the subset that are
+     * Same idea as [existingNamesFolded] but only the subset that are
      * folders -- lets the import conflict pre-check report whether a
      * colliding destination entry is a file or a folder (see
      * `ImportPickConflict.destIsDir` on the Dart side), so the sheet can
      * show "Overwrite folder" instead of a generic "Overwrite", exactly
      * like `ConflictEntry.destIsDir` already does for paste.
      */
-    private fun existingDirsLowercase(volId: Int, dirPath: String): Set<String> {
+    private fun existingDirsFolded(volId: Int, dirPath: String, caseSensitive: Boolean): Set<String> {
         val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
         return entries.mapNotNull { entry ->
             if (entry.startsWith("System:")) return@mapNotNull null
             val parsed = DirEntryWire.parse(entry) ?: return@mapNotNull null
-            if (parsed.isDir) parsed.name.lowercase() else null
+            if (parsed.isDir) foldName(parsed.name, caseSensitive) else null
         }.toSet()
     }
 
@@ -244,8 +283,9 @@ class ImportExportHandlers(
     /**
      * Decides the final on-disk name for one top-level picked entry named
      * [pickedName] against [dirPath], honoring the conflict [plan] the
-     * Dart side resolved (lowercased picked name -> "skip" / "overwrite" /
-     * "keepBoth", as sent by `VaultExplorerApi.importFiles`/`importFolder`).
+     * Dart side resolved (folded picked name -> "skip" / "overwrite" /
+     * "keepBoth", as sent by `VaultExplorerApi.importFiles`/`importFolder`;
+     * folded per [caseSensitive], the policy sent with the pick).
      * Returns `null` if this entry should be skipped entirely.
      *
      * A name absent from [plan] didn't collide with anything at pick time
@@ -257,19 +297,20 @@ class ImportExportHandlers(
      */
     private fun resolveImportName(
         volId: Int, dirPath: String, pickedName: String, plan: Map<String, String>,
+        caseSensitive: Boolean,
     ): String? {
-        return when (plan[pickedName.lowercase()]) {
+        val key = foldName(pickedName, caseSensitive)
+        return when (plan[key]) {
             "skip" -> null
             "overwrite" -> {
-                val key = pickedName.lowercase()
-                if (existingNamesLowercase(volId, dirPath).contains(key)) {
-                    val isDir = existingDirsLowercase(volId, dirPath).contains(key)
+                if (existingNamesFolded(volId, dirPath, caseSensitive).contains(key)) {
+                    val isDir = existingDirsFolded(volId, dirPath, caseSensitive).contains(key)
                     val existingPath = if (dirPath.isEmpty()) pickedName else "$dirPath/$pickedName"
                     deleteExistingRecursive(volId, existingPath, isDir)
                 }
                 pickedName
             }
-            else -> uniqueImportName(volId, dirPath, pickedName)
+            else -> uniqueImportName(volId, dirPath, pickedName, caseSensitive)
         }
     }
 
@@ -421,6 +462,7 @@ class ImportExportHandlers(
         dest: ExportDestination, fatPath: String, isDir: Boolean, volId: Int,
         opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
+        skippedCounter: java.util.concurrent.atomic.AtomicInteger? = null,
     ): Int {
         if (opId > 0 && ExportCancellation.isCancelled(opId)) {
             throw ExportCancelledException("Export cancelled")
@@ -431,13 +473,27 @@ class ImportExportHandlers(
         }
         val destDir = dest.childDirectory(name) ?: return 0
         val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
+        val parsedChildren = children.mapNotNull { entry ->
+            if (entry.startsWith("System:")) null else DirEntryWire.parse(entry)
+        }
+        // A vault folder can hold "Notes" and "notes" (ext volumes,
+        // encrypted folder vaults), but the destination can't -- the later
+        // one would delete and replace the earlier. Skip it and let the
+        // caller report the item as not fully exported.
+        val collidingLater = caseCollisionLaterIndexes(parsedChildren.map { it.name })
         var count = 0
-        for (entry in children) {
-            if (entry.startsWith("System:")) continue
-            val parsed = DirEntryWire.parse(entry) ?: continue
+        for ((i, parsed) in parsedChildren.withIndex()) {
+            if (i in collidingLater) {
+                skippedCounter?.incrementAndGet()
+                VeLog.w("VaultExplorer_Export") {
+                    "EXPORT_CASE_COLLISION skipping an entry that differs only by case from an " +
+                        "earlier entry in the same folder"
+                }
+                continue
+            }
             count += exportEntryRecursive(
                 destDir, "$fatPath/${parsed.name}", parsed.isDir, volId,
-                opId, total, doneCounter, totalBytes, transferredCounter,
+                opId, total, doneCounter, totalBytes, transferredCounter, skippedCounter,
             )
         }
         return count
@@ -791,6 +847,7 @@ class ImportExportHandlers(
         opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong? = null,
         verifications: MutableList<ImportVerification>,
+        destCaseSensitive: Boolean = false,
     ): Int {
         if (ImportCancellation.isCancelled(opId)) {
             throw ImportCancelledException("Import cancelled")
@@ -806,6 +863,13 @@ class ImportExportHandlers(
             }
             var count = 0
             val fsKind = FilesystemNameValidator.kindFor(volId)
+            // On a destination that treats "Notes" and "notes" as one name,
+            // two source siblings that differ only by case would land on the
+            // same entry and the later write would replace the earlier one.
+            // The later sibling is skipped and reported instead (same
+            // channel as an invalid name). Mirrors the guard in
+            // FileOperationService._copyEntry on the Dart side.
+            val claimedChildNames = HashSet<String>()
             for (child in src.children()) {
                 val childName = child.name
                 val issues = FilesystemNameValidator.validate(childName, fsKind)
@@ -813,10 +877,17 @@ class ImportExportHandlers(
                     ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
                     continue
                 }
+                if (!destCaseSensitive && !claimedChildNames.add(childName.lowercase())) {
+                    ImportProgressBridge.reportSkippedInvalidName(
+                        opId, childName,
+                        listOf("differs only by capitalization from another item in the same folder and would overwrite it on this filesystem"),
+                    )
+                    continue
+                }
                 count += importEntryRecursive(
                     child, "$targetFatPath/$childName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
-                    verifications,
+                    verifications, destCaseSensitive,
                 )
             }
             return count
@@ -857,6 +928,7 @@ class ImportExportHandlers(
      */
     private fun buildPickedImportFiles(
         uris: List<Uri>, containerUri: String, targetDir: String, volId: Int,
+        caseSensitive: Boolean = false,
     ): Map<String, Any?>? {
         val entries = uris.mapNotNull { uri ->
             val doc = DocumentFile.fromSingleUri(activity, uri) ?: return@mapNotNull null
@@ -875,20 +947,21 @@ class ImportExportHandlers(
         if (entries.isEmpty()) return null
 
         val token = nextPickToken.getAndIncrement()
-        pickedFilesByToken[token] = PickedImportFiles(containerUri, targetDir, volId, entries)
+        pickedFilesByToken[token] = PickedImportFiles(containerUri, targetDir, volId, entries, caseSensitive)
         // Invalid names are excluded here (they'll never be written, so
         // there's no point asking about a conflict for one) but stay in
         // `entries` -- the actual validate-and-skip-and-report step still
         // happens in handleImportFile once a real opId exists to report
         // against.
         val fsKind = FilesystemNameValidator.kindFor(volId)
-        val existingNames = existingNamesLowercase(volId, targetDir)
-        val existingDirs = existingDirsLowercase(volId, targetDir)
+        val existingNames = existingNamesFolded(volId, targetDir, caseSensitive)
+        val existingDirs = existingDirsFolded(volId, targetDir, caseSensitive)
         val conflicts = entries.mapNotNull {
+            val key = foldName(it.name, caseSensitive)
             if (FilesystemNameValidator.validate(it.name, fsKind).isEmpty() &&
-                existingNames.contains(it.name.lowercase())
+                existingNames.contains(key)
             ) {
-                val destIsDir = existingDirs.contains(it.name.lowercase())
+                val destIsDir = existingDirs.contains(key)
                 mapOf("name" to it.name, "destIsDir" to destIsDir)
             } else {
                 null
@@ -921,6 +994,7 @@ class ImportExportHandlers(
                     try {
                         val response = buildPickedImportFiles(
                             uris, pending.containerUri, pending.targetDir, pending.volId,
+                            pending.caseSensitive,
                         )
                         activity.runOnUiThread { res.success(response) }
                     } catch (e: Exception) {
@@ -972,8 +1046,26 @@ class ImportExportHandlers(
                     }
                     try {
                         val rawDestTree = rawFileFor(treeUri)
-                        for ((path, isDir) in validItems) {
+                        // Selected items that differ only by case would all
+                        // write to the same destination entry; only the
+                        // first of each such group is exported.
+                        val collidingLater = caseCollisionLaterIndexes(
+                            validItems.map { (path, _) -> path.substringAfterLast("/") },
+                        )
+                        for ((itemIndex, item) in validItems.withIndex()) {
+                            val (path, isDir) = item
                             val name = path.substringAfterLast("/")
+                            if (itemIndex in collidingLater) {
+                                VeLog.w("VaultExplorer_Export") {
+                                    "EXPORT_CASE_COLLISION skipping a top-level item that differs only " +
+                                        "by case from an earlier selected item"
+                                }
+                                if (opId > 0) {
+                                    ExportProgressBridge.reportItemFinished(opId, name, isDir, false)
+                                }
+                                continue
+                            }
+                            val itemSkipped = java.util.concurrent.atomic.AtomicInteger(0)
                             val dest = if (rawDestTree != null) {
                                 ExportDestination.Raw(rawDestTree)
                             } else {
@@ -982,11 +1074,15 @@ class ImportExportHandlers(
                             }
                             val count = exportEntryRecursive(
                                 dest, path, isDir, pending.volId,
-                                opId, total, doneCounter, totalBytes, transferredCounter,
+                                opId, total, doneCounter, totalBytes, transferredCounter, itemSkipped,
                             )
                             successCount += count
                             if (opId > 0) {
-                                ExportProgressBridge.reportItemFinished(opId, name, isDir, count > 0)
+                                // A folder with skipped (case-colliding) children is
+                                // reported as failed so the operation shows errors.
+                                ExportProgressBridge.reportItemFinished(
+                                    opId, name, isDir, count > 0 && itemSkipped.get() == 0,
+                                )
                             }
                         }
                     } finally {
@@ -1041,7 +1137,7 @@ class ImportExportHandlers(
                 val token = nextPickToken.getAndIncrement()
                 pickedFolderByToken[token] = PickedImportFolder(
                     pending.containerUri, pending.targetDir, pending.volId,
-                    treeUri, srcRoot, rawRoot, folderName,
+                    treeUri, srcRoot, rawRoot, folderName, pending.caseSensitive,
                 )
                 // Same reasoning as pickImportFilesLauncher: an invalid
                 // name is excluded from the conflict list (it's getting
@@ -1049,11 +1145,12 @@ class ImportExportHandlers(
                 // the real validate-and-skip-and-report once it has a
                 // real opId.
                 val fsKind = FilesystemNameValidator.kindFor(pending.volId)
+                val folderKey = foldName(folderName, pending.caseSensitive)
                 val conflicts = if (FilesystemNameValidator.validate(folderName, fsKind).isEmpty() &&
-                    existingNamesLowercase(pending.volId, pending.targetDir).contains(folderName.lowercase())
+                    existingNamesFolded(pending.volId, pending.targetDir, pending.caseSensitive).contains(folderKey)
                 ) {
-                    val destIsDir = existingDirsLowercase(pending.volId, pending.targetDir)
-                        .contains(folderName.lowercase())
+                    val destIsDir = existingDirsFolded(pending.volId, pending.targetDir, pending.caseSensitive)
+                        .contains(folderKey)
                     listOf(mapOf("name" to folderName, "destIsDir" to destIsDir))
                 } else {
                     emptyList()
@@ -1199,7 +1296,10 @@ class ImportExportHandlers(
             result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
-        pendingPickFiles = PendingPickFiles(containerUri, call.argument<String>("targetPath") ?: "", volId)
+        pendingPickFiles = PendingPickFiles(
+            containerUri, call.argument<String>("targetPath") ?: "", volId,
+            call.argument<Boolean>("caseSensitive") ?: false,
+        )
         pendingResult.stash(result)
         pickImportFilesLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -1241,6 +1341,7 @@ class ImportExportHandlers(
             return
         }
         val targetDir = call.argument<String>("targetPath") ?: ""
+        val caseSensitive = call.argument<Boolean>("caseSensitive") ?: false
         val uris = IncomingShareBridge.takePendingUris()
         if (uris.isNullOrEmpty()) {
             result.success(null)
@@ -1248,7 +1349,7 @@ class ImportExportHandlers(
         }
         ioExecutor.execute {
             try {
-                val response = buildPickedImportFiles(uris, containerUri, targetDir, volId)
+                val response = buildPickedImportFiles(uris, containerUri, targetDir, volId, caseSensitive)
                 activity.runOnUiThread { result.success(response) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
@@ -1309,6 +1410,7 @@ class ImportExportHandlers(
                 var successCount = 0
                 val itemReports = mutableListOf<ImportedItemReport>()
                 val fsKind = FilesystemNameValidator.kindFor(picked.volId)
+                val destCaseSensitive = FilesystemNameValidator.destinationIsCaseSensitive(picked.volId)
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 try {
                     for ((entryIndex, entry) in picked.entries.withIndex()) {
@@ -1321,7 +1423,9 @@ class ImportExportHandlers(
                             )
                             continue
                         }
-                        val name = resolveImportName(picked.volId, picked.targetDir, entry.name, conflictPlan)
+                        val name = resolveImportName(
+                            picked.volId, picked.targetDir, entry.name, conflictPlan, picked.caseSensitive,
+                        )
                         if (name == null) {
                             itemReports.add(
                                 ImportedItemReport(entry.name, entry.name, isDir, false)
@@ -1337,7 +1441,7 @@ class ImportExportHandlers(
                         val count = importEntryRecursive(
                             src, targetFatPath, picked.volId,
                             opId, total, doneCounter, totalBytes, transferredCounter,
-                            verifications,
+                            verifications, destCaseSensitive,
                         )
                         successCount += count
                         itemReports.add(
@@ -1435,7 +1539,10 @@ class ImportExportHandlers(
             result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
-        pendingPickFolder = PendingPickFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
+        pendingPickFolder = PendingPickFolder(
+            containerUri, call.argument<String>("targetPath") ?: "", volId,
+            call.argument<Boolean>("caseSensitive") ?: false,
+        )
         pendingResult.stash(result)
         pickImportFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
     }
@@ -1478,7 +1585,9 @@ class ImportExportHandlers(
                     activity.runOnUiThread { result.success(0) }
                     return@execute
                 }
-                val folderName = resolveImportName(picked.volId, picked.targetDir, picked.folderName, conflictPlan)
+                val folderName = resolveImportName(
+                    picked.volId, picked.targetDir, picked.folderName, conflictPlan, picked.caseSensitive,
+                )
                 if (folderName == null) {
                     activity.runOnUiThread { result.success(0) }
                     return@execute
@@ -1496,6 +1605,7 @@ class ImportExportHandlers(
                 }
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
+                val destCaseSensitive = FilesystemNameValidator.destinationIsCaseSensitive(picked.volId)
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 val count = try {
                     val src = if (picked.rawRoot != null) {
@@ -1506,7 +1616,7 @@ class ImportExportHandlers(
                     importEntryRecursive(
                         src, targetFatPath, picked.volId,
                         opId, total, doneCounter, totalBytes, transferredCounter,
-                        verifications,
+                        verifications, destCaseSensitive,
                     )
                 } finally {
                     val commitStart = System.currentTimeMillis()

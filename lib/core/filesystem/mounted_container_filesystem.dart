@@ -14,12 +14,15 @@ import 'volume_filesystem_registry.dart';
 /// [FilesystemType.extPortable]).
 ///
 /// Leave this `false` until every path that moves names *out of* an ext
-/// container compares them the way the destination does. Currently done:
-/// the folder/sibling copy guard in `FileOperationService`. Still to do:
-/// paste conflict detection and the `ConflictPlan` keys (both lowercase the
-/// name), the Kotlin import/paste planning in `ImportExportHandlers.kt`
-/// (`existingNamesLowercase`, `uniqueNameAgainst`), and export / archive
-/// extract / scheduled sync.
+/// container compares them the way the destination does. Done: the
+/// folder/sibling copy guard in `FileOperationService`, paste conflict
+/// detection and the `ConflictPlan` keys (all folded with
+/// [namesAreCaseSensitive]), Kotlin import planning (the policy is sent
+/// with each pick), the import child-collision guard, the export guards
+/// (`ImportExportHandlers` multi-export and the automation `exportFolder`)
+/// and the archive-extract pre-flight (`ArchiveService.findExtractCaseCollisions`).
+/// Not covered: the native archive engine itself (it is only ever reached
+/// after that pre-flight).
 const bool kAllowCaseDistinctNamesInExtContainers = false;
 
 /// The concrete filesystem recorded for a natively mounted disk-image
@@ -65,6 +68,21 @@ FilesystemType resolveFilesystemType(MountedContainer container) {
   }
   return FilesystemType.unknownConservative;
 }
+
+/// Whether name comparisons for [container] (conflict detection, conflict
+/// plan keys, unique-name generation) should be case-sensitive. This is the
+/// *policy* answer -- `FilesystemRules.of(resolveFilesystemType(...))` --
+/// so it follows [kAllowCaseDistinctNamesInExtContainers]; contrast
+/// [isDestinationCaseSensitive], which is what the destination really does.
+bool namesAreCaseSensitive(MountedContainer container) =>
+    FilesystemRules.of(resolveFilesystemType(container)).caseSensitive;
+
+/// Folds [name] for comparison: unchanged when [caseSensitive], otherwise
+/// lowercased. Every set of existing names and every `ConflictPlan` key
+/// that is compared against another must be folded with the same
+/// [caseSensitive] value.
+String foldEntryName(String name, {required bool caseSensitive}) =>
+    caseSensitive ? name : name.toLowerCase();
 
 /// Whether [container] really treats "Notes" and "notes" as different names
 /// -- a fact about the destination filesystem, NOT a naming policy.

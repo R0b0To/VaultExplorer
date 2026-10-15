@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
@@ -91,6 +92,7 @@ Future<void> presentIncomingShareImport(
       context,
       conflicts: entries,
       cancelLabel: context.l10n.cancelImportButton,
+      caseSensitive: namesAreCaseSensitive(container),
     );
     if (resolved == null) {
       await vaultFileIoApi.cancelPickedImport(pick.pickToken);

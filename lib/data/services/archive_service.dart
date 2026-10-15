@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/filesystem/case_collision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
@@ -321,6 +322,60 @@ class ArchiveService {
     }
     return count;
   }
+
+  /// The file paths (relative to the extraction target) that extracting
+  /// [archiveContext] would write -- the same selection and `subPath`
+  /// stripping [extractSelectedToContainer] / [extractAllToContainer] apply,
+  /// so a case-collision pre-flight checks exactly what will land on disk.
+  static List<String> extractFilePaths(
+    ArchiveContext archiveContext, {
+    List<String>? selectedEntryPaths,
+    String subPath = '',
+  }) {
+    String clean(String path) {
+      final slashed = path.replaceAll('\\', '/');
+      return slashed.startsWith('/') ? slashed.substring(1) : slashed;
+    }
+
+    final files = archiveContext.allEntries
+        .where((e) => !e.isDirectory)
+        .map((e) => clean(e.path))
+        .toList();
+
+    if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
+      final selected = selectedEntryPaths.map(clean).toList();
+      final picked = <String>{
+        for (final f in files)
+          if (selected.any((s) => f == s || f.startsWith('$s/'))) f,
+      };
+      // Same fallback as extractSelectedToContainer: nothing matched, so the
+      // selection itself is what gets extracted.
+      return picked.isEmpty ? selected : picked.toList();
+    }
+
+    if (subPath.isEmpty) return files;
+    return [
+      for (final f in files)
+        if (f.startsWith('$subPath/')) f.substring(subPath.length + 1),
+    ];
+  }
+
+  /// Groups of entries that would replace one another when extracted onto a
+  /// case-insensitive destination (see [findCaseCollisions]). Empty means
+  /// the extraction is safe there. Callers check
+  /// `isDestinationCaseSensitive(destination)` first -- on a case-sensitive
+  /// destination those entries are legitimately different files.
+  static List<List<String>> findExtractCaseCollisions(
+    ArchiveContext archiveContext, {
+    List<String>? selectedEntryPaths,
+    String subPath = '',
+  }) => findCaseCollisions(
+    extractFilePaths(
+      archiveContext,
+      selectedEntryPaths: selectedEntryPaths,
+      subPath: subPath,
+    ),
+  );
 
   static Future<bool> _extractEntryToContainer({
     required MountedContainer container,

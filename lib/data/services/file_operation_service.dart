@@ -202,7 +202,7 @@ class FileOperationService extends ChangeNotifier {
             : cleanItemPath;
 
         if (itemParent == cleanDir) {
-          deletedNames.add(itemName.toLowerCase());
+          deletedNames.add(itemName);
         }
       }
     }
@@ -704,14 +704,21 @@ class FileOperationService extends ChangeNotifier {
 
   // ── Unique-name helper ────────────────────────────────────────────────────
 
-  static String makeUniqueName(String fileName, Set<String> existingNames) {
-    if (!existingNames.contains(fileName.toLowerCase())) return fileName;
+  /// [existingNames] must already be folded the same way as [caseSensitive]:
+  /// lowercased when `false` (the default), exact when `true`.
+  static String makeUniqueName(
+    String fileName,
+    Set<String> existingNames, {
+    bool caseSensitive = false,
+  }) {
+    String fold(String n) => foldEntryName(n, caseSensitive: caseSensitive);
+    if (!existingNames.contains(fold(fileName))) return fileName;
     final dotIdx = fileName.lastIndexOf('.');
     final stem = dotIdx != -1 ? fileName.substring(0, dotIdx) : fileName;
     final ext = dotIdx != -1 ? fileName.substring(dotIdx) : '';
     for (int i = 1; i < 9999; i++) {
       final candidate = '$stem ($i)$ext';
-      if (!existingNames.contains(candidate.toLowerCase())) return candidate;
+      if (!existingNames.contains(fold(candidate))) return candidate;
     }
     return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
   }
@@ -880,6 +887,33 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
 
     try {
+      // Extraction goes through the native archive engine entry by entry
+      // and, on a case-insensitive destination, an entry whose name differs
+      // only by case from an earlier one would silently replace it. Refuse
+      // up front -- before anything is written -- rather than extract part
+      // of the archive and lose files.
+      if (!isDestinationCaseSensitive(dest)) {
+        final collisions = ArchiveService.findExtractCaseCollisions(
+          archiveContext,
+          selectedEntryPaths: selectedEntryPaths,
+          subPath: subPath,
+        );
+        if (collisions.isNotEmpty) {
+          VeLog.d(
+            'FileOperationService',
+            'CASE_COLLISION archive extract refused: '
+                '${collisions.length} name group(s) differ only by case',
+          );
+          op._setError(
+            op.l10n.failedToExtractGeneric(
+              op.l10n.advancedRenameNameCollisionWithinBatch,
+            ),
+          );
+          op._setStatus(FileOperationStatus.failed);
+          return;
+        }
+      }
+
       final int count;
       if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
         count = await ArchiveService.extractSelectedToContainer(
@@ -1115,22 +1149,28 @@ class FileOperationService extends ChangeNotifier {
           await _fileIoApi.listDirectory(dest, op.destDirPath) ?? [];
       if (op.cancelRequested) throw const _CancelledException();
 
+      // Names are compared the way the destination's policy says (see
+      // namesAreCaseSensitive); the same fold is used for the existing-name
+      // sets, the lookups and the ConflictPlan keys the sheet produced.
+      final namesCaseSensitive = namesAreCaseSensitive(dest);
+      String fold(String n) =>
+          foldEntryName(n, caseSensitive: namesCaseSensitive);
       final existingNames = <String>{};
       final existingDirs = <String>{};
       for (final raw in existingRaw) {
         if (raw.startsWith('System:')) continue;
         final e = RawEntry.parse(raw);
-        existingNames.add(e.name.toLowerCase());
-        if (e.isDir) existingDirs.add(e.name.toLowerCase());
+        existingNames.add(fold(e.name));
+        if (e.isDir) existingDirs.add(fold(e.name));
       }
 
       bool needsRealCopy(ClipboardItem item) {
         if (!(op.isCut && src.volId == dest.volId)) return true;
         if (!item.isDir) return false;
-        if (!existingNames.contains(item.name.toLowerCase())) return false;
-        if (!existingDirs.contains(item.name.toLowerCase())) return false;
+        if (!existingNames.contains(fold(item.name))) return false;
+        if (!existingDirs.contains(fold(item.name))) return false;
         final resolution =
-            conflictPlan[item.name.toLowerCase()] ??
+            conflictPlan[fold(item.name)] ??
             ConflictResolution.keepBoth;
         return resolution == ConflictResolution.overwrite;
       }
@@ -1217,11 +1257,11 @@ class FileOperationService extends ChangeNotifier {
         }
 
         bool mergeOverwrite = false;
-        if (existingNames.contains(fileName.toLowerCase())) {
+        if (existingNames.contains(fold(fileName))) {
           final resolution =
-              conflictPlan[fileName.toLowerCase()] ??
+              conflictPlan[fold(fileName)] ??
               ConflictResolution.keepBoth;
-          final destIsDir = existingDirs.contains(fileName.toLowerCase());
+          final destIsDir = existingDirs.contains(fold(fileName));
 
           switch (resolution) {
             case ConflictResolution.skip:
@@ -1256,8 +1296,12 @@ class FileOperationService extends ChangeNotifier {
                 await _deleteEntryRecursive(dest, destPath, destIsDir);
               }
             case ConflictResolution.keepBoth:
-              final unique = makeUniqueName(fileName, existingNames);
-              existingNames.add(unique.toLowerCase());
+              final unique = makeUniqueName(
+                fileName,
+                existingNames,
+                caseSensitive: namesCaseSensitive,
+              );
+              existingNames.add(fold(unique));
               destPath = op.destDirPath.isEmpty
                   ? unique
                   : '${op.destDirPath}/$unique';

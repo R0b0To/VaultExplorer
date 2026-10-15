@@ -25,9 +25,10 @@ class ConflictEntry {
 ///   - Set a resolution per item (skip / overwrite / keep both), or
 ///   - Tap one of the three "Apply to all" chips to resolve everything at once.
 ///
-/// Returns a [ConflictPlan] (lowercased-name → [ConflictResolution]) ready to
-/// pass straight into [FileOperationService.enqueue], or `null` if the user
-/// cancelled the whole paste.
+/// Returns a [ConflictPlan] (folded-name → [ConflictResolution], lowercased
+/// unless [caseSensitive]) ready to pass straight into
+/// [FileOperationService.enqueue], or `null` if the user cancelled the whole
+/// paste.
 class ConflictResolutionSheet extends StatefulWidget {
   final List<ConflictEntry> conflicts;
 
@@ -37,10 +38,16 @@ class ConflictResolutionSheet extends StatefulWidget {
   /// (e.g. import) should pass their own wording instead.
   final String? cancelLabel;
 
+  /// Whether the destination compares names case-sensitively; decides how
+  /// the plan's keys are folded. Must match what the consumer of the plan
+  /// folds with -- pass `namesAreCaseSensitive(destinationContainer)`.
+  final bool caseSensitive;
+
   const ConflictResolutionSheet({
     super.key,
     required this.conflicts,
     this.cancelLabel,
+    this.caseSensitive = false,
   });
 
   /// Shows the sheet and returns the resolved [ConflictPlan], or `null` if
@@ -49,6 +56,7 @@ class ConflictResolutionSheet extends StatefulWidget {
     BuildContext context, {
     required List<ConflictEntry> conflicts,
     String? cancelLabel,
+    bool caseSensitive = false,
   }) {
     return showModalBottomSheet<ConflictPlan>(
       context: context,
@@ -58,6 +66,7 @@ class ConflictResolutionSheet extends StatefulWidget {
       builder: (_) => ConflictResolutionSheet(
         conflicts: conflicts,
         cancelLabel: cancelLabel,
+        caseSensitive: caseSensitive,
       ),
     );
   }
@@ -76,9 +85,12 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
     // Default every item to "keep both" — the safest non-destructive choice.
     _resolutions = {
       for (final c in widget.conflicts)
-        c.item.name.toLowerCase(): ConflictResolution.keepBoth,
+        _keyFor(c): ConflictResolution.keepBoth,
     };
   }
+
+  String _keyFor(ConflictEntry c) =>
+      widget.caseSensitive ? c.item.name : c.item.name.toLowerCase();
 
   void _applyToAll(ConflictResolution resolution) {
     setState(() {
@@ -191,7 +203,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                     const Divider(height: 1, indent: 56),
                 itemBuilder: (_, i) {
                   final conflict = widget.conflicts[i];
-                  final key = conflict.item.name.toLowerCase();
+                  final key = _keyFor(conflict);
                   return _ConflictRow(
                     conflict: conflict,
                     resolution: _resolutions[key]!,

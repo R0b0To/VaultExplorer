@@ -149,6 +149,57 @@ void main() {
     });
   });
 
+  group('foldEntryName / namesAreCaseSensitive', () {
+    test('foldEntryName lowercases unless case-sensitive', () {
+      expect(foldEntryName('Notes.TXT', caseSensitive: false), 'notes.txt');
+      expect(foldEntryName('Notes.TXT', caseSensitive: true), 'Notes.TXT');
+    });
+
+    test('encrypted vaults compare names case-sensitively', () {
+      expect(
+        namesAreCaseSensitive(
+          _container(volId: 7, format: ContainerFormat.cryptomator.wire),
+        ),
+        isTrue,
+      );
+    });
+
+    test('disk-image volumes follow the ext policy switch', () {
+      VolumeFilesystemRegistry.record(1, FilesystemType.ext);
+      VolumeFilesystemRegistry.record(2, FilesystemType.ntfs);
+      expect(
+        namesAreCaseSensitive(_container(volId: 1)),
+        kAllowCaseDistinctNamesInExtContainers,
+      );
+      expect(namesAreCaseSensitive(_container(volId: 2)), isFalse);
+      expect(namesAreCaseSensitive(_container(volId: 99)), isFalse);
+    });
+
+    test('policy is never more permissive than the real filesystem', () {
+      // If the policy says "case-sensitive" the destination must really be:
+      // otherwise a name the app accepts could silently overwrite another.
+      VolumeFilesystemRegistry.record(1, FilesystemType.ext);
+      VolumeFilesystemRegistry.record(2, FilesystemType.fat32);
+      VolumeFilesystemRegistry.record(3, FilesystemType.exfat);
+      VolumeFilesystemRegistry.record(4, FilesystemType.ntfs);
+      final containers = [
+        for (final id in [1, 2, 3, 4, 99])
+          _container(volId: id),
+        for (final f in [
+          ContainerFormat.cryptomator,
+          ContainerFormat.gocryptfs,
+          ContainerFormat.cryfs,
+        ])
+          _container(volId: 7, format: f.wire),
+      ];
+      for (final c in containers) {
+        if (namesAreCaseSensitive(c)) {
+          expect(isDestinationCaseSensitive(c), isTrue, reason: '${c.volId}');
+        }
+      }
+    });
+  });
+
   group('FilesystemType.extPortable', () {
     test('is unknownConservative with only case sensitivity relaxed', () {
       final portable = FilesystemRules.extPortable;

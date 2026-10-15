@@ -243,9 +243,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   }
 
   void removeItemsByName(Set<String> deletedNames) {
-    final lowerNames = deletedNames.map((n) => n.toLowerCase()).toSet();
+    // Exact names: `deletedNames` come from the entries that were actually
+    // deleted, and on a case-sensitive destination "Notes" and "notes" are
+    // different entries -- deleting one must not hide the other.
     final updated = state.currentItems
-        .where((e) => !lowerNames.contains(e.name.toLowerCase()))
+        .where((e) => !deletedNames.contains(e.name))
         .toList();
     state = state.copyWith(currentItems: updated);
     if (state.pathStack.isNotEmpty) {

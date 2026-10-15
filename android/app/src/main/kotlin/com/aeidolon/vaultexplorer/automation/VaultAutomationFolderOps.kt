@@ -312,12 +312,23 @@ object VaultAutomationFolderOps {
 
         fun walk(dirPath: String, relPrefix: String) {
             val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return
+            // The destination (device storage) can't hold two names that
+            // differ only by case; a later sibling would delete and replace
+            // the earlier one. Skip it and count it as failed.
+            val claimedNames = HashSet<String>()
             for (raw in entries) {
                 if (raw.startsWith("System:")) {
                     truncated = true
                     continue
                 }
                 val entry = parseDirEntry(raw) ?: continue
+                if (!claimedNames.add(entry.name.lowercase())) {
+                    failed++
+                    VeLog.w(TAG) {
+                        "exportFolder: skipping an entry that differs only by case from an earlier entry in the same folder"
+                    }
+                    continue
+                }
                 val childRel = if (relPrefix.isEmpty()) entry.name else "$relPrefix/${entry.name}"
                 val childVaultPath = VaultPathUtils.joinPath(dirPath, entry.name)
                 if (entry.isDir) {

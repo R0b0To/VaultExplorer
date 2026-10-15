@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
@@ -69,13 +70,15 @@ class FileBrowserOperationsController {
     required AppLocalizations l10n,
   }) async {
     final existingRaw = await _fileIoApi.listDirectory(destContainer, destDirPath) ?? [];
+    final caseSensitive = namesAreCaseSensitive(destContainer);
     final existingNames = <String>{};
     final existingDirs = <String>{};
     for (final raw in existingRaw) {
       if (raw.startsWith('System:')) continue;
       final e = RawEntry.parse(raw);
-      existingNames.add(e.name.toLowerCase());
-      if (e.isDir) existingDirs.add(e.name.toLowerCase());
+      final key = foldEntryName(e.name, caseSensitive: caseSensitive);
+      existingNames.add(key);
+      if (e.isDir) existingDirs.add(key);
     }
     final conflicts = detectPasteConflicts(
       items: items,
@@ -84,6 +87,7 @@ class FileBrowserOperationsController {
       isCrossContainer: isCrossContainer,
       isCutOperation: isCut,
       currentDirPath: destDirPath,
+      caseSensitive: caseSensitive,
     );
     ConflictPlan conflictPlan = const {};
     if (conflicts.isNotEmpty) {

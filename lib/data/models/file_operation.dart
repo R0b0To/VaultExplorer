@@ -437,9 +437,16 @@ class FileOperation extends ChangeNotifier {
     required String sourceName,
     required bool success,
   }) {
-    final idx = _itemStatuses.indexWhere(
-      (s) => s.item.name.toLowerCase() == sourceName.toLowerCase(),
-    );
+    // Exact name first: with case-distinct siblings ("Notes" and "notes")
+    // a case-insensitive match would always land on the first of the two.
+    // The case-insensitive fallback keeps the old behaviour for events whose
+    // name was normalised on the way back from native.
+    var idx = _itemStatuses.indexWhere((s) => s.item.name == sourceName);
+    if (idx == -1) {
+      idx = _itemStatuses.indexWhere(
+        (s) => s.item.name.toLowerCase() == sourceName.toLowerCase(),
+      );
+    }
     if (idx != -1) {
       _recordItemResult(
         idx,

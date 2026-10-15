@@ -9,9 +9,12 @@ import 'file_browser_predicates.dart';
 /// this kind of logic gets pulled out into its own file).
 ///
 /// [existingNamesLower]/[existingDirsLower] are the destination
-/// directory's current entries, already lowercased by the caller (name
-/// matching here is case-insensitive, matching how the underlying
-/// filesystems this app supports treat names).
+/// directory's current entries, already folded by the caller with the same
+/// rule as [caseSensitive]: lowercased when `false` (the default -- how
+/// FAT/exFAT/NTFS treat names), left exactly as-is when `true` (a
+/// destination whose names are case-sensitive; see `namesAreCaseSensitive`
+/// in mounted_container_filesystem.dart). The `Lower` in the parameter names
+/// is historical.
 ///
 /// A name match is *not* automatically a conflict: pasting a **cut**
 /// item back onto its own current location (same container, same path)
@@ -37,11 +40,13 @@ List<ConflictEntry> detectPasteConflicts({
   required bool isCrossContainer,
   required bool isCutOperation,
   required String currentDirPath,
+  bool caseSensitive = false,
 }) {
   final conflicts = <ConflictEntry>[];
   for (final item in items) {
     final fileName = item.name;
-    if (!existingNamesLower.contains(fileName.toLowerCase())) continue;
+    final key = caseSensitive ? fileName : fileName.toLowerCase();
+    if (!existingNamesLower.contains(key)) continue;
     final wouldBeSamePath = isCutOperation &&
         !isCrossContainer &&
         item.path == joinPath(fileName, currentDirPath);
@@ -49,7 +54,7 @@ List<ConflictEntry> detectPasteConflicts({
     conflicts.add(
       ConflictEntry(
         item: item,
-        destIsDir: existingDirsLower.contains(fileName.toLowerCase()),
+        destIsDir: existingDirsLower.contains(key),
       ),
     );
   }

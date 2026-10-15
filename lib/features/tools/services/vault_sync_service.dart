@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -487,9 +488,11 @@ class VaultSyncService {
         );
       }).toList();
 
+      final destCaseSensitive = namesAreCaseSensitive(dest.container);
       final conflictPlan = <String, ConflictResolution>{
         for (final e in group.value)
-          e.name.toLowerCase(): ConflictResolution.overwrite,
+          foldEntryName(e.name, caseSensitive: destCaseSensitive):
+              ConflictResolution.overwrite,
       };
 
       ops.add(

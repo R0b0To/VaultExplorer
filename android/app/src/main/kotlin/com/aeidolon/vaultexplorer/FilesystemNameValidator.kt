@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer
 import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 
@@ -71,6 +72,32 @@ object FilesystemNameValidator {
         } else {
             Kind.UNKNOWN_CONSERVATIVE
         }
+    }
+
+    /**
+     * Whether [volId] *really* treats "Notes" and "notes" as different names
+     * -- a fact about the destination, not a naming policy. Mirrors
+     * `isDestinationCaseSensitive()` in `mounted_container_filesystem.dart`:
+     * true for the encrypted folder-vault formats and for a volume whose
+     * native filesystem label (`getVaultInfo()["fileSystem"]`, e.g. "ext4")
+     * says ext; false for FAT/exFAT/NTFS and whenever it can't be told.
+     * Assuming case-insensitive can only make an import skip a colliding
+     * sibling, never overwrite one.
+     *
+     * One native/JNI round trip -- call it once per import, not per entry.
+     */
+    fun destinationIsCaseSensitive(volId: Int): Boolean {
+        val format = VaultBackendRegistry.get(volId)?.format
+        if (format == ContainerFormat.CRYFS || format == ContainerFormat.CRYPTOMATOR || format == ContainerFormat.GOCRYPTFS) {
+            return true
+        }
+        val label = try {
+            ContainerFileSystem.getVaultInfo(volId)?.get("fileSystem") as? String
+        } catch (e: Exception) {
+            null
+        } ?: return false
+        // "ext2" / "ext3" / "ext4" (see fsGetFilesystemLabel); "exFAT" does not match.
+        return label.trim().lowercase().startsWith("ext")
     }
 
     private fun isReservedDeviceName(name: String): Boolean {

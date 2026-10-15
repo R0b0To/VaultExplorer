@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -1152,7 +1153,11 @@ class VaultFileIoApi {
   ) async {
     final result = await _channel.invokeMapMethod<String, dynamic>(
       ChannelMethods.pickImportFiles,
-      {'filePath': container.uri, 'targetPath': targetPath},
+      {
+        'filePath': container.uri,
+        'targetPath': targetPath,
+        'caseSensitive': namesAreCaseSensitive(container),
+      },
     );
     return _importPickResultFromChannel(result);
   }
@@ -1166,7 +1171,11 @@ class VaultFileIoApi {
   ) async {
     final result = await _channel.invokeMapMethod<String, dynamic>(
       ChannelMethods.pickImportFolder,
-      {'filePath': container.uri, 'targetPath': targetPath},
+      {
+        'filePath': container.uri,
+        'targetPath': targetPath,
+        'caseSensitive': namesAreCaseSensitive(container),
+      },
     );
     return _importPickResultFromChannel(result);
   }
@@ -1214,7 +1223,8 @@ class VaultFileIoApi {
 
   /// Copies the files picked by an earlier [pickFilesForImport] call
   /// (identified by [pickToken]) into [targetPath]. [conflictPlan] maps
-  /// each lowercased colliding name (as reported in that call's
+  /// each folded colliding name (lowercased unless the pick was made with
+  /// `caseSensitive`; as reported in that call's
   /// [ImportPickResult.conflicts]) to "skip" / "overwrite" / "keepBoth";
   /// any picked name *not* in [conflictPlan] didn't collide with
   /// anything and is imported as-is (auto-uniquified only if it
@@ -1409,7 +1419,11 @@ class VaultFileIoApi {
     try {
       final result = await _channel.invokeMapMethod<String, dynamic>(
         ChannelMethods.prepareShareImport,
-        {'filePath': container.uri, 'targetPath': targetPath},
+        {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'caseSensitive': namesAreCaseSensitive(container),
+        },
       );
       return _importPickResultFromChannel(result);
     } catch (e) {

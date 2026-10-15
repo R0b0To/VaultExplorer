@@ -11516,4 +11516,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'The audio is re-encoded to AAC at a lower bitrate, so the file is smaller but quality is reduced. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.';
+
+  @override
+  String get entropyStepTitle => 'Add randomness';
+
+  @override
+  String get entropyIntro =>
+      'Drag your finger around the pad in unpredictable, varied strokes. Your movements are stirred into the encryption keys and salts in addition to the device’s secure random generator, never instead of it.';
+
+  @override
+  String get entropyPadHint => 'Draw here with your finger';
+
+  @override
+  String get entropyPadSemantics =>
+      'Randomness pad. Drag your finger over it to collect random movement.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Collecting randomness… $percent%';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Enough randomness collected. Keep moving to add more, or continue.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Skipped. Only the device’s secure random generator will be used. Draw on the pad to add randomness again.';
+
+  @override
+  String get entropyPoolLabel => 'Random pool';
+
+  @override
+  String get entropySkip => 'Skip and use the device generator only';
+
+  @override
+  String get entropyReviewLabel => 'Randomness';
+
+  @override
+  String get entropyReviewUserAdded => 'Touch movement + device generator';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Device generator only';
 }

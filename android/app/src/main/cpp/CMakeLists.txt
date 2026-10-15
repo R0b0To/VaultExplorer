@@ -442,6 +442,7 @@ add_library(
         crypto/scrypt.cpp
         crypto/cryfs_block_cipher.cpp
         crypto/single_file_crypto.cpp
+        crypto/user_entropy.cpp
         crypto/xchacha20poly1305.cpp
         crypto/eme.cpp
         crypto/siv.cpp
@@ -582,6 +583,16 @@ if(NOT ANDROID)
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${mbedtls_SOURCE_DIR}/include)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)
+    # User-collected entropy mixing (crypto/user_entropy.cpp): known-answer
+    # vectors shared with the JVM-side util/UserEntropy.kt test, plus scoping
+    # (nesting, per-thread) behavior.
+    add_executable(user_entropy_test
+            crypto/test/user_entropy_test.cpp
+            crypto/user_entropy.cpp)
+    target_include_directories(user_entropy_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(user_entropy_test mbedcrypto)
     # Header-only (crypto/utf16le_password.h is all `static inline`), so no
     # extra .cpp sources or link libraries needed. Regression coverage for
     # the OOB read fixed in dislocker/encoding.c::toutf16() and for the
@@ -629,6 +640,7 @@ if(NOT ANDROID)
             kdf_table_test
             decrypted_block_cache_test
             cryfs_block_cipher_test
+            user_entropy_test
             utf16le_password_test
             container_header_test
             container_utils_crc32_test
@@ -651,6 +663,7 @@ if(NOT ANDROID)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
+    add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
     add_test(NAME container_header_test COMMAND container_header_test)
     add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)

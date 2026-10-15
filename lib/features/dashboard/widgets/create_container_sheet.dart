@@ -2,10 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/entropy_pool.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/entropy_collector.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -16,7 +18,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generato
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
-enum _WizStep { basics, security, advanced, hiddenVolume, review }
+enum _WizStep { basics, security, advanced, hiddenVolume, randomness, review }
 
 class CreateContainerSheet extends ConsumerStatefulWidget {
   const CreateContainerSheet({super.key});
@@ -52,8 +54,30 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
   bool _folderVaultObscure = true;
   bool _folderVaultConfirmObscure = true;
 
+  /// Touch-movement randomness gathered by the "Add randomness" step. Owned
+  /// here (not by the step widget) so it survives stepping back and forth.
+  final _entropyPool = EntropyPool();
+  bool _entropySatisfied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _entropyPool.addListener(_onEntropyChanged);
+  }
+
+  // The pool notifies on every sample; only a change of "may continue" needs
+  // the wizard (its Next button) to rebuild.
+  void _onEntropyChanged() {
+    final satisfied = _entropyPool.isSatisfied;
+    if (satisfied != _entropySatisfied && mounted) {
+      setState(() => _entropySatisfied = satisfied);
+    }
+  }
+
   @override
   void dispose() {
+    _entropyPool.removeListener(_onEntropyChanged);
+    _entropyPool.dispose();
     _nameCtrl.dispose();
     _sizeCtrl.dispose();
     _passwordCtrl.dispose();
@@ -106,26 +130,37 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
 
    Future<void> _create(CreateContainerState state) async {
     final l10n = context.l10n;
-    final ok = await _suppressLock(
-      () => state.isFolderVault
-          ? ref.read(createContainerProvider.notifier).createFolderVault(
-                password: _folderVaultPasswordCtrl.text,
-                confirmPassword: _folderVaultConfirmCtrl.text,
-                l10n: l10n,
-              )
-          : ref.read(createContainerProvider.notifier).createContainerFile(
-                nameText: _nameCtrl.text,
-                sizeText: _sizeCtrl.text,
-                passwordText: _passwordCtrl.text,
-                confirmPasswordText: _confirmPasswordCtrl.text,
-                pimText: _pimCtrl.text,
-                hiddenPasswordText: _hiddenPasswordCtrl.text,
-                hiddenConfirmPasswordText: _hiddenConfirmPasswordCtrl.text,
-                hiddenPimText: _hiddenPimCtrl.text,
-                hiddenSizeText: _hiddenSizeCtrl.text,
-                l10n: l10n,
-              ),
-    );
+    // A copy of the pool's bytes for this attempt; wiped as soon as the call
+    // returns. The pool itself is kept so a retry after a failure doesn't
+    // make the user move their finger again.
+    final userEntropy = _entropyPool.takeBytes();
+    final bool ok;
+    try {
+      ok = await _suppressLock(
+        () => state.isFolderVault
+            ? ref.read(createContainerProvider.notifier).createFolderVault(
+                  password: _folderVaultPasswordCtrl.text,
+                  confirmPassword: _folderVaultConfirmCtrl.text,
+                  l10n: l10n,
+                  userEntropy: userEntropy,
+                )
+            : ref.read(createContainerProvider.notifier).createContainerFile(
+                  nameText: _nameCtrl.text,
+                  sizeText: _sizeCtrl.text,
+                  passwordText: _passwordCtrl.text,
+                  confirmPasswordText: _confirmPasswordCtrl.text,
+                  pimText: _pimCtrl.text,
+                  hiddenPasswordText: _hiddenPasswordCtrl.text,
+                  hiddenConfirmPasswordText: _hiddenConfirmPasswordCtrl.text,
+                  hiddenPimText: _hiddenPimCtrl.text,
+                  hiddenSizeText: _hiddenSizeCtrl.text,
+                  l10n: l10n,
+                  userEntropy: userEntropy,
+                ),
+      );
+    } finally {
+      userEntropy.fillRange(0, userEntropy.length, 0);
+    }
 
     if (ok && mounted) {
       Navigator.pop(context);
@@ -189,6 +224,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _WizStep.security,
         if (_hasAdvancedOptions(state)) _WizStep.advanced,
         if (_hasHiddenVolumeStep(state)) _WizStep.hiddenVolume,
+        _WizStep.randomness,
         _WizStep.review,
       ];
 
@@ -232,6 +268,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _WizStep.security => _canProceedSecurity(state),
         _WizStep.advanced => true,
         _WizStep.hiddenVolume => _canProceedHiddenVolume(state),
+        _WizStep.randomness => _entropyPool.isSatisfied,
         _WizStep.review => true,
       };
 
@@ -240,6 +277,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _WizStep.security => context.l10n.securityCredentialsSectionHeader,
         _WizStep.advanced => context.l10n.compositeEncryptionAndFilesystemHeader,
         _WizStep.hiddenVolume => context.l10n.hiddenVolumeHeader,
+        _WizStep.randomness => context.l10n.entropyStepTitle,
         _WizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
@@ -332,6 +370,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _WizStep.security => _buildSecurityStep(state, cs, textTheme, isShortScreen),
         _WizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
         _WizStep.hiddenVolume => _buildHiddenVolumeStep(state, cs, textTheme, isShortScreen),
+        _WizStep.randomness => EntropyCollector(pool: _entropyPool),
         _WizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
@@ -1326,6 +1365,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       value: (state.isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
           ? l10n.wizardPasswordSetValue
           : l10n.wizardPasswordNotSetValue,
+    ));
+
+    rows.add(WizardSummaryRow(
+      icon: Icons.shuffle_rounded,
+      label: l10n.entropyReviewLabel,
+      value: _entropyPool.hasUserEntropy
+          ? l10n.entropyReviewUserAdded
+          : l10n.entropyReviewDeviceOnly,
     ));
 
     rows.add(WizardSummaryRow(

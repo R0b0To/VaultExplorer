@@ -146,9 +146,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createCompositeContainerNative(
     jint hashId,
     jintArray keyfileFds,
     jboolean quickFormat,
-    jstring operationId // Exactly 15 parameters, matching NativeEngine.kt
+    jstring operationId,
+    jbyteArray userEntropy // Exactly 16 parameters, matching NativeEngine.kt
 ) {
     JNI_TRY
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
     if (carriers.empty()) return JNI_FALSE;
 

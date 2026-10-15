@@ -11054,4 +11054,44 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'オーディオはより低いビットレートで AAC に再エンコードされます。ファイルは小さくなりますが、音質は低下します。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。';
+
+  @override
+  String get entropyStepTitle => 'ランダム性を追加';
+
+  @override
+  String get entropyIntro =>
+      'パッドの上で指を不規則にいろいろな方向へ動かしてください。動きは、端末の安全な乱数生成器に加えて（置き換えではなく）、暗号鍵とソルトに混ぜ合わされます。';
+
+  @override
+  String get entropyPadHint => 'ここを指でなぞってください';
+
+  @override
+  String get entropyPadSemantics => 'ランダム性パッド。指でなぞってランダムな動きを集めます。';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'ランダム性を収集中… $percent%';
+  }
+
+  @override
+  String get entropyComplete => '十分なランダム性を収集しました。さらに動かして追加するか、次へ進めます。';
+
+  @override
+  String get entropySkippedStatus =>
+      'スキップしました。端末の安全な乱数生成器のみを使用します。もう一度パッドをなぞると、ランダム性を追加できます。';
+
+  @override
+  String get entropyPoolLabel => 'ランダムプール';
+
+  @override
+  String get entropySkip => 'スキップして端末の生成器のみ使う';
+
+  @override
+  String get entropyReviewLabel => 'ランダム性';
+
+  @override
+  String get entropyReviewUserAdded => 'タッチ操作 + 端末の生成器';
+
+  @override
+  String get entropyReviewDeviceOnly => '端末の生成器のみ';
 }

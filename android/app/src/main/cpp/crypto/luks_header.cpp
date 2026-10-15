@@ -1,6 +1,7 @@
 #include "luks_header.h"
 #include "cipher_shim.h"
 #include "cascade.h"
+#include "user_entropy.h"
 #include <cstring>
 #include <algorithm>
 #include <atomic>
@@ -951,12 +952,12 @@ bool luksRecoverMasterKey(int fd,
 
 // ── Small helpers shared by both LUKS1 and LUKS2 creation ──────────────
 
+// /dev/urandom, enriched with user-collected entropy when the JNI entry point
+// installed some for this thread (crypto/user_entropy.h). Covers the master
+// key, the digest/keyslot salts, the anti-forensic split material and the
+// UUID of a new LUKS container.
 static bool randomBytes(uint8_t* buf, size_t len) {
-    FILE* urnd = fopen("/dev/urandom", "rb");
-    if (!urnd) return false;
-    bool ok = (fread(buf, 1, len, urnd) == len);
-    fclose(urnd);
-    return ok;
+    return userentropy::fillRandom(buf, len);
 }
 
 static std::string generateUuidV4() {

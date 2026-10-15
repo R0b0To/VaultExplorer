@@ -8,6 +8,7 @@ import com.aeidolon.vaultexplorer.RawFileResolver
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafIOException
+import com.aeidolon.vaultexplorer.util.UserEntropy
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
@@ -183,12 +184,18 @@ object GocryptfsVault {
         return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
     }
 
+    /**
+     * [userEntropy]: touch-movement bytes collected by the creation wizard, mixed into the
+     * masterkey and scrypt salt (see [UserEntropy]); null/empty = system RNG only. The caller
+     * keeps ownership of the array.
+     */
     fun create(
         context: Context,
         vaultRootUri: Uri,
         password: CharArray,
         cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
         plaintextNames: Boolean = false,
+        userEntropy: ByteArray? = null,
     ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -196,7 +203,7 @@ object GocryptfsVault {
         if (saf.listChildren(root).isNotEmpty()) {
             return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Selected folder is not empty.")
         }
-        val random = SecureRandom()
+        val random = UserEntropy.secureRandomFor(userEntropy)
         val masterkey = ByteArray(MASTERKEY_LEN).also { random.nextBytes(it) }
         var mirrorSync: com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? = null
 

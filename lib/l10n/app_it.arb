@@ -3232,5 +3232,17 @@
   "audioEditorCompressTitle": "Dimensione del file",
   "audioEditorCompressOriginal": "Originale",
   "audioEditorCompressEstimate": "Dimensione stimata: circa {size}",
-  "audioEditorCompressNote": "L'audio viene ricodificato in AAC con un bitrate inferiore: il file è più piccolo, ma la qualità diminuisce. I tagli cadono esattamente dove li imposti. Tag e copertina non vengono mantenuti."
+  "audioEditorCompressNote": "L'audio viene ricodificato in AAC con un bitrate inferiore: il file è più piccolo, ma la qualità diminuisce. I tagli cadono esattamente dove li imposti. Tag e copertina non vengono mantenuti.",
+  "entropyStepTitle": "Aggiungi casualità",
+  "entropyIntro": "Trascina il dito sull’area con movimenti vari e imprevedibili. I tuoi movimenti vengono mescolati alle chiavi di cifratura e ai salt, in aggiunta al generatore casuale sicuro del dispositivo, mai al suo posto.",
+  "entropyPadHint": "Disegna qui con il dito",
+  "entropyPadSemantics": "Area di casualità. Trascina il dito sopra per raccogliere movimento casuale.",
+  "entropyProgress": "Raccolta della casualità… {percent}%",
+  "entropyComplete": "Casualità sufficiente. Continua a muoverti per aggiungerne altra, oppure prosegui.",
+  "entropySkippedStatus": "Saltato. Verrà usato solo il generatore casuale sicuro del dispositivo. Disegna sull’area per aggiungere di nuovo casualità.",
+  "entropyPoolLabel": "Pool casuale",
+  "entropySkip": "Salta e usa solo il generatore del dispositivo",
+  "entropyReviewLabel": "Casualità",
+  "entropyReviewUserAdded": "Movimento touch + generatore del dispositivo",
+  "entropyReviewDeviceOnly": "Solo generatore del dispositivo"
 }

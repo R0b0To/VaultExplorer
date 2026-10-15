@@ -10883,4 +10883,43 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       '音频会以更低的码率重新编码为 AAC，文件更小，但音质会有所下降。剪辑点会精确落在你设置的位置。标签和封面不会保留。';
+
+  @override
+  String get entropyStepTitle => '添加随机性';
+
+  @override
+  String get entropyIntro =>
+      '请在面板上以不规则、多样的方式滑动手指。你的滑动会与设备自带的安全随机数生成器一同混入加密密钥和盐值，而不是取代它。';
+
+  @override
+  String get entropyPadHint => '在此用手指涂画';
+
+  @override
+  String get entropyPadSemantics => '随机性面板。用手指在上面滑动以收集随机动作。';
+
+  @override
+  String entropyProgress(int percent) {
+    return '正在收集随机性… $percent%';
+  }
+
+  @override
+  String get entropyComplete => '已收集足够的随机性。可继续滑动以增加更多，或直接继续。';
+
+  @override
+  String get entropySkippedStatus => '已跳过。仅使用设备的安全随机数生成器。再次在面板上涂画即可重新添加随机性。';
+
+  @override
+  String get entropyPoolLabel => '随机池';
+
+  @override
+  String get entropySkip => '跳过，仅使用设备生成器';
+
+  @override
+  String get entropyReviewLabel => '随机性';
+
+  @override
+  String get entropyReviewUserAdded => '触摸动作 + 设备生成器';
+
+  @override
+  String get entropyReviewDeviceOnly => '仅设备生成器';
 }

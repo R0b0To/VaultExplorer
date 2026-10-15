@@ -11796,4 +11796,48 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'L\'audio est réencodé en AAC avec un débit plus faible : le fichier est plus petit, mais la qualité diminue. Les coupes tombent exactement là où vous les placez. Les balises et la pochette ne sont pas conservées.';
+
+  @override
+  String get entropyStepTitle => 'Ajouter de l’aléatoire';
+
+  @override
+  String get entropyIntro =>
+      'Faites glisser votre doigt sur la zone par des mouvements variés et imprévisibles. Vos mouvements sont mélangés aux clés de chiffrement et aux sels, en plus du générateur aléatoire sécurisé de l’appareil, jamais à sa place.';
+
+  @override
+  String get entropyPadHint => 'Dessinez ici avec le doigt';
+
+  @override
+  String get entropyPadSemantics =>
+      'Zone d’aléatoire. Faites glisser le doigt dessus pour collecter des mouvements aléatoires.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Collecte de l’aléatoire… $percent %';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Assez d’aléatoire collecté. Continuez à bouger pour en ajouter, ou poursuivez.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Ignoré. Seul le générateur aléatoire sécurisé de l’appareil sera utilisé. Dessinez sur la zone pour ajouter à nouveau de l’aléatoire.';
+
+  @override
+  String get entropyPoolLabel => 'Réserve d’aléatoire';
+
+  @override
+  String get entropySkip =>
+      'Ignorer et utiliser uniquement le générateur de l’appareil';
+
+  @override
+  String get entropyReviewLabel => 'Aléatoire';
+
+  @override
+  String get entropyReviewUserAdded =>
+      'Mouvement tactile + générateur de l’appareil';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Générateur de l’appareil uniquement';
 }

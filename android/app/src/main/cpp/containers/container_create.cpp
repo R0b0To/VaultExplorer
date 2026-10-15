@@ -17,6 +17,7 @@
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
+#include "crypto/user_entropy.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
 #include "ext_backend.h"
@@ -85,12 +86,11 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         VolumeState& v = volumes[volId];
 
         {
-            FILE* urnd = fopen("/dev/urandom", "rb");
-            if (!urnd) { LOGI("createContainer: cannot open /dev/urandom"); break; }
-            bool ok = (fread(salt,              1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                      (fread(combinedMasterKey, 1, static_cast<size_t>(masterKeyLen), urnd) == static_cast<size_t>(masterKeyLen));
-            fclose(urnd);
-            if (!ok) { LOGI("createContainer: urandom read failed"); break; }
+            // /dev/urandom, enriched with the user-collected entropy the JNI
+            // entry point installed for this thread (crypto/user_entropy.h).
+            bool ok = userentropy::fillRandom(salt, VC_SALT_SIZE) &&
+                      userentropy::fillRandom(combinedMasterKey, static_cast<size_t>(masterKeyLen));
+            if (!ok) { LOGI("createContainer: random generation failed"); break; }
         }
 
         const int safePim = clampPim(pim);
@@ -613,11 +613,13 @@ bool createContainerWithHidden(int fd,
         if (volId < 0) break;
 
         VolumeState& v = volumes[volId];
-        FILE* urandom = fopen("/dev/urandom", "rb");
-        if (!urandom) break;
-        fread(hiddenSalt, 1, sizeof(hiddenSalt), urandom);
-        fread(hiddenCombinedMasterKey, 1, masterKeyLen, urandom);
-        fclose(urandom);
+        // Own keystream bytes (the stream never rewinds), so the hidden
+        // volume's salt/key share nothing with the outer volume's.
+        if (!userentropy::fillRandom(hiddenSalt, sizeof(hiddenSalt)) ||
+            !userentropy::fillRandom(hiddenCombinedMasterKey, static_cast<size_t>(masterKeyLen))) {
+            LOGI("createContainerWithHidden: random generation failed");
+            break;
+        }
 
         int clampedPim = clampPim(hiddenPim);
         unsigned char hiddenHeaderKey[192] = {0};

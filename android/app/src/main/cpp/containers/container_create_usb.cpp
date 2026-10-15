@@ -18,6 +18,7 @@
 #include "filesystem_paths.h"
 #include <cstdio>
 #include "crypto/luks_header.h"
+#include "crypto/user_entropy.h"
 #include <unistd.h>
 #undef min
 #undef max
@@ -96,14 +97,10 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         }
 
         {
-            FILE* urnd = fopen("/dev/urandom", "rb");
-            if (!urnd) {
-                result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_SOURCE_FAILED", "Failed to open random source");
-                break;
-            }
-            bool ok = (fread(salt, 1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                      (fread(combinedMasterKey, 1, static_cast<size_t>(masterKeyLen), urnd) == static_cast<size_t>(masterKeyLen));
-            fclose(urnd);
+            // /dev/urandom, enriched with user-collected entropy when the JNI
+            // entry point installed some (crypto/user_entropy.h).
+            bool ok = userentropy::fillRandom(salt, VC_SALT_SIZE) &&
+                      userentropy::fillRandom(combinedMasterKey, static_cast<size_t>(masterKeyLen));
             if (!ok) {
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_READ_FAILED", "Failed to read enough random bytes");
                 break;
@@ -598,16 +595,10 @@ UsbCreateResult createUsbContainerWithHidden(
         }
 
         {
-            FILE* urnd = fopen("/dev/urandom", "rb");
-            if (!urnd) {
-                result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_SOURCE_FAILED", "Failed to open random source");
-                break;
-            }
-            bool ok = (fread(oSalt, 1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                      (fread(oMasterKey, 1, oMasterKeyLen, urnd) == static_cast<size_t>(oMasterKeyLen)) &&
-                      (fread(hSalt, 1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                      (fread(hMasterKey, 1, hMasterKeyLen, urnd) == static_cast<size_t>(hMasterKeyLen));
-            fclose(urnd);
+            bool ok = userentropy::fillRandom(oSalt, VC_SALT_SIZE) &&
+                      userentropy::fillRandom(oMasterKey, static_cast<size_t>(oMasterKeyLen)) &&
+                      userentropy::fillRandom(hSalt, VC_SALT_SIZE) &&
+                      userentropy::fillRandom(hMasterKey, static_cast<size_t>(hMasterKeyLen));
             if (!ok) {
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_READ_FAILED", "Failed to read enough random bytes");
                 break;

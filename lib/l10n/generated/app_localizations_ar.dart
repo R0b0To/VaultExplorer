@@ -11706,4 +11706,46 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'يُعاد ترميز الصوت إلى AAC بمعدل بت أقل، فيصغر حجم الملف لكن تقل الجودة. يقع القص عند النقطة التي حددتها بالضبط. لا تُنقل الوسوم وصورة الغلاف.';
+
+  @override
+  String get entropyStepTitle => 'إضافة العشوائية';
+
+  @override
+  String get entropyIntro =>
+      'حرّك إصبعك على اللوحة بحركات متنوعة وغير متوقعة. تُدمج حركاتك في مفاتيح التشفير وقيم الملح (salt) إضافةً إلى مولّد الأرقام العشوائية الآمن في الجهاز، وليس بدلاً منه.';
+
+  @override
+  String get entropyPadHint => 'ارسم هنا بإصبعك';
+
+  @override
+  String get entropyPadSemantics =>
+      'لوحة العشوائية. مرّر إصبعك عليها لجمع حركات عشوائية.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'جارٍ جمع العشوائية… $percent%';
+  }
+
+  @override
+  String get entropyComplete =>
+      'تم جمع عشوائية كافية. تابع التحريك لإضافة المزيد أو واصل.';
+
+  @override
+  String get entropySkippedStatus =>
+      'تم التخطي. سيُستخدم مولّد الأرقام العشوائية الآمن في الجهاز فقط. ارسم على اللوحة لإضافة العشوائية مجددًا.';
+
+  @override
+  String get entropyPoolLabel => 'مجمّع العشوائية';
+
+  @override
+  String get entropySkip => 'تخطَّ واستخدم مولّد الجهاز فقط';
+
+  @override
+  String get entropyReviewLabel => 'العشوائية';
+
+  @override
+  String get entropyReviewUserAdded => 'حركة اللمس + مولّد الجهاز';
+
+  @override
+  String get entropyReviewDeviceOnly => 'مولّد الجهاز فقط';
 }

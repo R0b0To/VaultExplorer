@@ -4,9 +4,11 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/entropy_pool.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/entropy_collector.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -18,7 +20,7 @@ import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
-enum _CompositeWizStep { carriers, security, advanced, review }
+enum _CompositeWizStep { carriers, security, advanced, randomness, review }
 
 /// Linear multi-step wizard for creating a new distributed composite VeraCrypt volume
 /// across multiple carrier files.
@@ -51,16 +53,23 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
   bool _obscureConfirmPassword = true;
   bool _obscurePim = true;
 
+  /// Touch-movement randomness gathered by the "Add randomness" step. Owned
+  /// here (not by the step widget) so it survives stepping back and forth.
+  final _entropyPool = EntropyPool();
+  bool _entropySatisfied = false;
+
   static const _steps = [
     _CompositeWizStep.carriers,
     _CompositeWizStep.security,
     _CompositeWizStep.advanced,
+    _CompositeWizStep.randomness,
     _CompositeWizStep.review,
   ];
 
   @override
   void initState() {
     super.initState();
+    _entropyPool.addListener(_onEntropyChanged);
     Future.microtask(() {
       if (mounted) {
         ref.read(compositeContainerProvider.notifier).setMode(true);
@@ -68,8 +77,19 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
     });
   }
 
+  // The pool notifies on every sample; only a change of "may continue" needs
+  // the wizard (its Next button) to rebuild.
+  void _onEntropyChanged() {
+    final satisfied = _entropyPool.isSatisfied;
+    if (satisfied != _entropySatisfied && mounted) {
+      setState(() => _entropySatisfied = satisfied);
+    }
+  }
+
    @override
   void dispose() {
+    _entropyPool.removeListener(_onEntropyChanged);
+    _entropyPool.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _pimController.dispose();
@@ -150,6 +170,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               (_passwordController.text.isEmpty ||
                   _passwordController.text == _confirmPasswordController.text),
         _CompositeWizStep.advanced => true,
+        _CompositeWizStep.randomness => _entropyPool.isSatisfied,
         _CompositeWizStep.review => true,
       };
 
@@ -160,6 +181,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
             : context.l10n.compositeCarrierFilesCountHeader(state.pickedCarriers.length),
         _CompositeWizStep.security => context.l10n.securityCredentialsSectionHeader,
         _CompositeWizStep.advanced => context.l10n.compositeEncryptionAndFilesystemHeader,
+        _CompositeWizStep.randomness => context.l10n.entropyStepTitle,
         _CompositeWizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
@@ -181,10 +203,20 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
 
   Future<void> _create() async {
     final ctrl = ref.read(compositeContainerProvider.notifier);
-    final ok = await ctrl.createContainer(
-      password: _passwordController.text,
-      confirmPassword: _confirmPasswordController.text,
-    );
+    // A copy of the pool's bytes for this attempt; wiped as soon as the call
+    // returns. The pool itself is kept so a retry after a failure doesn't
+    // make the user move their finger again.
+    final userEntropy = _entropyPool.takeBytes();
+    final bool ok;
+    try {
+      ok = await ctrl.createContainer(
+        password: _passwordController.text,
+        confirmPassword: _confirmPasswordController.text,
+        userEntropy: userEntropy,
+      );
+    } finally {
+      userEntropy.fillRange(0, userEntropy.length, 0);
+    }
     if (ok && mounted) {
       await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
       if (!mounted) return;
@@ -265,6 +297,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
         _CompositeWizStep.security =>
           _buildSecurityStep(state, cs, textTheme, isShortScreen),
         _CompositeWizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
+        _CompositeWizStep.randomness => EntropyCollector(pool: _entropyPool),
         _CompositeWizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
@@ -662,7 +695,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
     );
   }
 
-  // ── Step 4: Review Summary ────────────────────────────────────────────────
+  // ── Step 5: Review Summary (step 4 is the shared EntropyCollector) ────────
   Widget _buildReviewStep(
     CompositeContainerState state,
     ColorScheme cs,
@@ -735,6 +768,13 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
         value: state.keyfiles.isEmpty
             ? l10n.noKeyfilesAttached
             : '${state.keyfiles.length}',
+      ),
+      WizardSummaryRow(
+        icon: Icons.shuffle_rounded,
+        label: l10n.entropyReviewLabel,
+        value: _entropyPool.hasUserEntropy
+            ? l10n.entropyReviewUserAdded
+            : l10n.entropyReviewDeviceOnly,
       ),
       WizardSummaryRow(
         icon: Icons.push_pin_outlined,

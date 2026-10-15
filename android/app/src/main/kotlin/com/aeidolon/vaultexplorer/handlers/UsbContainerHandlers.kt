@@ -359,6 +359,11 @@ class UsbContainerHandlers(
         val operationId = java.util.UUID.randomUUID().toString().take(8)
         VeLog.i("VaultExplorer_C++") { "createUsbContainer[$operationId]: requested deviceName=$deviceName sizeBytes=$sizeBytes volId=$volId" }
 
+        // Touch-movement entropy from the wizard (null = skipped), mixed into the
+        // new volume's salt/master key by the native layer and wiped in the
+        // finally below once the create call has returned.
+        val userEntropy = call.argument<ByteArray>("userEntropy")
+
         ioExecutor.execute {
             var msd: UsbMassStorageDevice? = null
             try {
@@ -431,6 +436,7 @@ class UsbContainerHandlers(
                         hiddenCipherId, hiddenHashId,
                         keyfileFds, hiddenKeyfileFds, quickFormat,
                         deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        userEntropy = userEntropy,
                     )
                 } else {
                     ContainerEngine.createUsb(
@@ -443,6 +449,7 @@ class UsbContainerHandlers(
                         call.argument<Number>("hashId")?.toInt() ?: 255,
                         keyfileFds, quickFormat,
                         deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        userEntropy = userEntropy,
                     )
                 }
 
@@ -482,6 +489,7 @@ class UsbContainerHandlers(
                 VeLog.e("VaultExplorer_C++", e) { "createUsbContainer[$operationId]: exception" }
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {
+                userEntropy?.fill(0)
                 UsbBlockBridge.unregister(volId)
                 deviceLock.unlock()
             }

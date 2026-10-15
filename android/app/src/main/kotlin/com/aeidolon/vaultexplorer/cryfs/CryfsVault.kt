@@ -8,6 +8,7 @@ import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafIOException
+import com.aeidolon.vaultexplorer.util.UserEntropy
 import java.io.File
 import java.security.SecureRandom
 
@@ -170,12 +171,18 @@ object CryfsVault {
         }
     }
 
+    /**
+     * [userEntropy]: touch-movement bytes collected by the creation wizard, mixed into the
+     * vault's encryption key and scrypt salt (see [UserEntropy]); null/empty = system RNG
+     * only. The caller keeps ownership of the array.
+     */
     fun create(
         context: Context,
         vaultRootUri: Uri,
         password: CharArray,
         cipher: String = CryfsConfigFile.DEFAULT_BLOCK_CIPHER,
         blocksizeBytes: Int = CryfsConfigFile.DEFAULT_BLOCKSIZE,
+        userEntropy: ByteArray? = null,
     ): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -183,7 +190,7 @@ object CryfsVault {
         if (saf.listChildren(root).isNotEmpty()) {
             return VaultOpenResult.InvalidVault("Selected folder is not empty.")
         }
-        val random = SecureRandom()
+        val random = UserEntropy.secureRandomFor(userEntropy)
         return try {
             val config = CryfsConfigFile.newVaultConfig(random, cipher, blocksizeBytes)
             val configBytes = CryfsConfigFile.build(config, password, random)

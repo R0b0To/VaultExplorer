@@ -15,6 +15,7 @@
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
 #include "crypto/luks_header.h"
+#include "crypto/user_entropy.h"
 #include "session/volume_state.h"
 #include "session/session_prepare.h"
 #include "filesystems/ext_backend.h"
@@ -176,11 +177,10 @@ CompositeCreateResult createCompositeContainer(
     unsigned char salt[VC_SALT_SIZE] = {0};
     unsigned char combinedMasterKey[192] = {0};
     {
-        FILE* urnd = fopen("/dev/urandom", "rb");
-        if (!urnd) return {false, "URANDOM_FAILED", "Cannot open /dev/urandom", 0};
-        bool ok = (fread(salt, 1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                  (fread(combinedMasterKey, 1, masterKeyLen, urnd) == static_cast<size_t>(masterKeyLen));
-        fclose(urnd);
+        // /dev/urandom, enriched with user-collected entropy when the JNI
+        // entry point installed some (crypto/user_entropy.h).
+        bool ok = userentropy::fillRandom(salt, VC_SALT_SIZE) &&
+                  userentropy::fillRandom(combinedMasterKey, static_cast<size_t>(masterKeyLen));
         if (!ok) return {false, "URANDOM_READ_FAILED", "Failed reading random bytes", 0};
     }
 

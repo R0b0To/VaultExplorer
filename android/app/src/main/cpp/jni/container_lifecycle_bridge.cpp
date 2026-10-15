@@ -17,9 +17,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds,
-        jboolean quickFormat) {
+        jboolean quickFormat, jbyteArray userEntropy) {
     JNI_TRY
-
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
@@ -58,9 +58,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
         jint outerCipherId, jint outerHashId,
         jint hiddenCipherId, jint hiddenHashId,
         jintArray outerKeyfileFds, jintArray hiddenKeyfileFds,
-        jboolean quickFormat) {
+        jboolean quickFormat, jbyteArray userEntropy) {
     JNI_TRY
-
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
 
     std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
@@ -162,8 +162,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
         JNIEnv* env, jobject,
         jint volId, jstring partitionScheme, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds, jboolean quickFormat,
-        jlong deviceSectorCount, jstring operationId) {
+        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy) {
     JNI_TRY
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
 
     if (volId < 0 || volId >= MAX_VOLUMES) {
         return buildUsbCreateResultMap(env, UsbCreateResult::Fail(
@@ -224,8 +225,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
         jstring outerFileSystem, jstring hiddenFileSystem, jlong hiddenSizeBytes,
         jint outerCipherId, jint outerHashId, jint hiddenCipherId, jint hiddenHashId,
         jintArray outerKeyfileFds, jintArray hiddenKeyfileFds, jboolean quickFormat,
-        jlong deviceSectorCount, jstring operationId) {
+        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy) {
     JNI_TRY
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
 
     if (volId < 0 || volId >= MAX_VOLUMES) {
         return buildUsbCreateResultMap(env, UsbCreateResult::Fail(

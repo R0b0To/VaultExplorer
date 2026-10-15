@@ -49,11 +49,17 @@ internal object NativeEngine {
     @JvmStatic external fun decodeAvifFrameNative(avifBytes: ByteArray, frameIndex: Int): Map<String, Any>?
     @JvmStatic external fun decodeAvifNative(avifBytes: ByteArray): Map<String, Any>?
 
+    // userEntropy (all create*Native functions below): bytes collected from the
+    // user's touch movement by the creation wizards, or null/empty for none.
+    // Native installs it for the duration of the call and XORs a SHA-512
+    // keystream derived from it into every salt/master key drawn from
+    // /dev/urandom (crypto/user_entropy.h) -- so it can only add entropy.
     @JvmStatic
     external fun createContainerNative(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
-        keyfileFds: IntArray? = null, quickFormat: Boolean = false
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false,
+        userEntropy: ByteArray? = null
     ): Boolean
 
     @JvmStatic
@@ -65,7 +71,8 @@ internal object NativeEngine {
         outerCipherId: Int = 255, outerHashId: Int = 255,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
-        quickFormat: Boolean = false
+        quickFormat: Boolean = false,
+        userEntropy: ByteArray? = null
     ): Boolean
 
     @JvmStatic
@@ -187,6 +194,7 @@ internal object NativeEngine {
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
+        userEntropy: ByteArray? = null,
     ): Map<String, Any?>?
 
     /** PBKDF2-HMAC over raw password bytes. [hashKind]: 1 = SHA-1, 2 = SHA-256. */
@@ -244,6 +252,7 @@ internal object NativeEngine {
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
         quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
+        userEntropy: ByteArray? = null,
     ): Map<String, Any?>?
 
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
@@ -341,7 +350,8 @@ internal object NativeEngine {
         hashId: Int = 255,
         keyfileFds: IntArray? = null,
         quickFormat: Boolean = false,
-        operationId: String? = null
+        operationId: String? = null,
+        userEntropy: ByteArray? = null
     ): Boolean
 
     /**

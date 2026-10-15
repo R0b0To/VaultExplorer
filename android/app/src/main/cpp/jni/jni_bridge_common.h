@@ -11,9 +11,12 @@
 // vaultexplorer.cpp.
 
 #include <jni.h>
+#include <memory>
 #include <vector>
 #include <exception>
 #include <android/log.h>
+
+#include "crypto/user_entropy.h"
 
 #include "ff.h" // FF_VOLUMES
 
@@ -90,3 +93,26 @@
 // unlockUsbAndListNative (session_bridge.cpp), and every container-creation /
 // password-change entry point (container_lifecycle_bridge.cpp).
 std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr);
+
+// Installs the user-collected entropy that Kotlin passes to the volume-creation
+// entry points (a `ByteArray?` -- null or empty means "none") for the calling
+// thread, for the lifetime of this object. While it lives, every salt / master
+// key drawn through userentropy::fillRandom() is /dev/urandom XOR a keystream
+// derived from these bytes -- see crypto/user_entropy.h for the construction
+// and why mixing can only add entropy.
+//
+// Declare it as the FIRST statement after JNI_TRY in each create entry point:
+// the volume is created entirely on this thread, and the RAII destructor
+// removes the entropy again on every return path. The bytes are copied (never
+// pinned), reduced to a 64-byte seed immediately, and the local copy is wiped.
+// Wiping the Kotlin-side array is the caller's job (see VaultCreationHandlers).
+class ScopedJniUserEntropy {
+public:
+    ScopedJniUserEntropy(JNIEnv* env, jbyteArray entropy);
+    ~ScopedJniUserEntropy();
+    ScopedJniUserEntropy(const ScopedJniUserEntropy&) = delete;
+    ScopedJniUserEntropy& operator=(const ScopedJniUserEntropy&) = delete;
+
+private:
+    std::unique_ptr<userentropy::Scope> scope_;
+};

@@ -51,6 +51,10 @@ class VaultCompositeApi {
   }
 
   /// Creates a distributed container across the given carrier files.
+  ///
+  /// [userEntropy]: bytes collected from the user's touch movement by the
+  /// wizard's "Add randomness" step; native mixes them into the generated
+  /// salts and keys on top of the OS random generator. Null/empty = OS only.
   Future<bool> createCompositeContainer({
     required List<String> carrierUris,
     required List<int> payloadOffsets,
@@ -65,6 +69,7 @@ class VaultCompositeApi {
     List<String>? keyfilePaths,
     bool quickFormat = false,
     String operationId = '',
+    Uint8List? userEntropy,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -83,6 +88,7 @@ class VaultCompositeApi {
           'keyfilePaths': keyfilePaths ?? [],
           'quickFormat': quickFormat,
           'operationId': operationId,
+          'userEntropy': userEntropy,
         },
       );
       return success ?? false;

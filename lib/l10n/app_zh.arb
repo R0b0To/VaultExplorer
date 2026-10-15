@@ -3232,5 +3232,17 @@
   "audioEditorCompressTitle": "文件大小",
   "audioEditorCompressOriginal": "原始",
   "audioEditorCompressEstimate": "预计大小：约 {size}",
-  "audioEditorCompressNote": "音频会以更低的码率重新编码为 AAC，文件更小，但音质会有所下降。剪辑点会精确落在你设置的位置。标签和封面不会保留。"
+  "audioEditorCompressNote": "音频会以更低的码率重新编码为 AAC，文件更小，但音质会有所下降。剪辑点会精确落在你设置的位置。标签和封面不会保留。",
+  "entropyStepTitle": "添加随机性",
+  "entropyIntro": "请在面板上以不规则、多样的方式滑动手指。你的滑动会与设备自带的安全随机数生成器一同混入加密密钥和盐值，而不是取代它。",
+  "entropyPadHint": "在此用手指涂画",
+  "entropyPadSemantics": "随机性面板。用手指在上面滑动以收集随机动作。",
+  "entropyProgress": "正在收集随机性… {percent}%",
+  "entropyComplete": "已收集足够的随机性。可继续滑动以增加更多，或直接继续。",
+  "entropySkippedStatus": "已跳过。仅使用设备的安全随机数生成器。再次在面板上涂画即可重新添加随机性。",
+  "entropyPoolLabel": "随机池",
+  "entropySkip": "跳过，仅使用设备生成器",
+  "entropyReviewLabel": "随机性",
+  "entropyReviewUserAdded": "触摸动作 + 设备生成器",
+  "entropyReviewDeviceOnly": "仅设备生成器"
 }

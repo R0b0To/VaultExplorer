@@ -11693,4 +11693,47 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'Das Audio wird mit niedrigerer Bitrate in AAC neu kodiert. Die Datei wird kleiner, die Qualität sinkt aber. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen.';
+
+  @override
+  String get entropyStepTitle => 'Zufall hinzufügen';
+
+  @override
+  String get entropyIntro =>
+      'Ziehe deinen Finger in unregelmäßigen, abwechslungsreichen Bewegungen über das Feld. Deine Bewegungen werden zusätzlich zum sicheren Zufallsgenerator des Geräts in Schlüssel und Salts eingemischt – nie anstelle davon.';
+
+  @override
+  String get entropyPadHint => 'Hier mit dem Finger zeichnen';
+
+  @override
+  String get entropyPadSemantics =>
+      'Zufallsfeld. Ziehe den Finger darüber, um zufällige Bewegungen zu sammeln.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Zufall wird gesammelt … $percent %';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Genug Zufall gesammelt. Bewege den Finger weiter, um mehr hinzuzufügen, oder fahre fort.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Übersprungen. Es wird nur der sichere Zufallsgenerator des Geräts verwendet. Zeichne auf dem Feld, um wieder Zufall hinzuzufügen.';
+
+  @override
+  String get entropyPoolLabel => 'Zufallspool';
+
+  @override
+  String get entropySkip =>
+      'Überspringen und nur den Geräte-Generator verwenden';
+
+  @override
+  String get entropyReviewLabel => 'Zufall';
+
+  @override
+  String get entropyReviewUserAdded => 'Fingerbewegung + Geräte-Generator';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Nur Geräte-Generator';
 }

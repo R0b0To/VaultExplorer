@@ -73,6 +73,8 @@ class VaultCreationHandlers(
         val hiddenPim: Int = 0,
         val hiddenCipherId: Int = 255,
         val hiddenHashId: Int = 255,
+        /** Touch-movement entropy from the wizard (null = skipped); wiped once the create call returns. */
+        val userEntropy: ByteArray? = null,
     )
     private class InsufficientSpaceException(
         val neededBytes: Long,
@@ -117,13 +119,13 @@ class VaultCreationHandlers(
                             create.cipherId, create.hashId,
                             create.hiddenCipherId, create.hiddenHashId,
                             keyfileFds, hiddenKeyfileFds,
-                            create.quickFormat
+                            create.quickFormat, create.userEntropy
                         )
                     } else {
                         ContainerEngine.create(
                             pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
                             create.containerFormat, create.cipherId, create.hashId, keyfileFds,
-                            create.quickFormat
+                            create.quickFormat, create.userEntropy
                         )
                     }
                 }
@@ -194,9 +196,11 @@ class VaultCreationHandlers(
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
                 } finally {
                     stagingFile?.delete()
+                    create.userEntropy?.fill(0)
                 }
             }
         } else {
+            create?.userEntropy?.fill(0)
             res.success(mapOf("success" to false, "uri" to null))
         }
     }
@@ -229,6 +233,7 @@ class VaultCreationHandlers(
             hiddenPim = call.argument<Number>("hiddenPim")?.toInt() ?: 0,
             hiddenCipherId = call.argument<Number>("hiddenCipherId")?.toInt() ?: 255,
             hiddenHashId = call.argument<Number>("hiddenHashId")?.toInt() ?: 255,
+            userEntropy = call.argument<ByteArray>("userEntropy"),
         )
         pendingResult.stash(result)
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -242,7 +247,9 @@ class VaultCreationHandlers(
     fun handleCreateCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password") ?: ""
+        val userEntropy = call.argument<ByteArray>("userEntropy")
         if (uriString == null || password.isEmpty()) {
+            userEntropy?.fill(0)
             result.error("INVALID_ARGS", "filePath and password required", null)
             return
         }
@@ -251,9 +258,12 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.create(activity, uri, passwordChars)
+                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.create(
+                        activity, uri, passwordChars, userEntropy
+                    )
                 } finally {
                     passwordChars.fill('\u0000')
+                    userEntropy?.fill(0)
                 }
                 activity.runOnUiThread {
                     when (createResult) {
@@ -285,7 +295,9 @@ class VaultCreationHandlers(
         } else {
             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.AES_256_GCM
         }
+        val userEntropy = call.argument<ByteArray>("userEntropy")
         if (uriString == null || password.isEmpty()) {
+            userEntropy?.fill(0)
             result.error("INVALID_ARGS", "filePath and password required", null)
             return
         }
@@ -294,9 +306,12 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(activity, uri, passwordChars, cipher)
+                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
+                        activity, uri, passwordChars, cipher, userEntropy = userEntropy
+                    )
                 } finally {
                     passwordChars.fill('\u0000')
+                    userEntropy?.fill(0)
                 }
                 activity.runOnUiThread {
                     when (createResult) {
@@ -339,7 +354,9 @@ class VaultCreationHandlers(
         } else {
             com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile.DEFAULT_BLOCKSIZE
         }
+        val userEntropy = call.argument<ByteArray>("userEntropy")
         if (uriString == null || password.isEmpty()) {
+            userEntropy?.fill(0)
             result.error("INVALID_ARGS", "filePath and password required", null)
             return
         }
@@ -348,9 +365,12 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(activity, uri, passwordChars, cipher, blockSize)
+                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(
+                        activity, uri, passwordChars, cipher, blockSize, userEntropy
+                    )
                 } finally {
                     passwordChars.fill('\u0000')
+                    userEntropy?.fill(0)
                 }
                 activity.runOnUiThread {
                     when (createResult) {

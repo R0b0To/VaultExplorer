@@ -30,6 +30,11 @@ class VaultLifecycleApi {
   /// callers can offer to remember/pin the newly created container without
   /// making the user go find it again via a separate unlock+browse step.
   /// `uri` is only ever non-null when `success` is true.
+  ///
+  /// [userEntropy]: bytes collected from the user's touch movement by the
+  /// wizard's "Add randomness" step (see `EntropyPool`). Native mixes them into
+  /// the salts and master keys it generates (always on top of the OS random
+  /// generator, never instead of it). Null or empty means "OS generator only".
   Future<({bool success, String? uri})> createContainer({
     required String displayName,
     required int sizeBytes,
@@ -49,6 +54,7 @@ class VaultLifecycleApi {
     int? hiddenPim,
     int? hiddenCipherId,
     int? hiddenHashId,
+    Uint8List? userEntropy,
   }) async {
     try {
       final result = await _channel
@@ -71,6 +77,7 @@ class VaultLifecycleApi {
             'hiddenPim': hiddenPim,
             'hiddenCipherId': hiddenCipherId,
             'hiddenHashId': hiddenHashId,
+            'userEntropy': userEntropy,
           });
       final success = result?['success'] as bool? ?? false;
       return (
@@ -368,6 +375,7 @@ class VaultLifecycleApi {
     int? hiddenPim,
     int? hiddenCipherId,
     int? hiddenHashId,
+    Uint8List? userEntropy,
   }) async {
     try {
       final success = await _channel
@@ -391,6 +399,7 @@ class VaultLifecycleApi {
             'hiddenPim': hiddenPim,
             'hiddenCipherId': hiddenCipherId,
             'hiddenHashId': hiddenHashId,
+            'userEntropy': userEntropy,
           });
       return success ?? false;
     } catch (e) {
@@ -628,11 +637,20 @@ class VaultLifecycleApi {
     );
   }
 
-  Future<bool> createCryptomatorVault(String folderUri, String password) async {
+  /// [userEntropy]: see [createContainer].
+  Future<bool> createCryptomatorVault(
+    String folderUri,
+    String password, {
+    Uint8List? userEntropy,
+  }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.createCryptomatorVault,
-        {'filePath': folderUri, 'password': password},
+        {
+          'filePath': folderUri,
+          'password': password,
+          'userEntropy': userEntropy,
+        },
       );
       return success ?? false;
     } catch (e) {
@@ -742,15 +760,23 @@ class VaultLifecycleApi {
   /// (gocryptfs v2.2+, XChaCha20Poly1305) -- selects the FeatureFlags this
   /// new vault's gocryptfs.conf is written with. Unrecognized values fall
   /// back to 'aes-256-gcm' on the native side.
+  ///
+  /// [userEntropy]: see [createContainer].
   Future<bool> createGocryptfsVault(
     String folderUri,
     String password, {
     String cipher = 'aes-256-gcm',
+    Uint8List? userEntropy,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.createGocryptfsVault,
-        {'filePath': folderUri, 'password': password, 'cipher': cipher},
+        {
+          'filePath': folderUri,
+          'password': password,
+          'cipher': cipher,
+          'userEntropy': userEntropy,
+        },
       );
       return success ?? false;
     } catch (e) {
@@ -862,11 +888,14 @@ class VaultLifecycleApi {
   /// [blockSize]: on-disk block size in bytes, mirroring CryFS CLI's
   /// `--blocksize` option. Defaults to 32768 (32 KiB), CryFS's own default.
   /// Non-positive values fall back to the default on the native side.
+  ///
+  /// [userEntropy]: see [createContainer].
   Future<bool> createCryfsVault(
     String folderUri,
     String password, {
     String cipher = 'xchacha20-poly1305',
     int blockSize = 32 * 1024,
+    Uint8List? userEntropy,
   }) async {
     try {
       final success = await _channel
@@ -875,6 +904,7 @@ class VaultLifecycleApi {
             'password': password,
             'cipher': cipher,
             'blockSize': blockSize,
+            'userEntropy': userEntropy,
           });
       return success ?? false;
     } catch (e) {

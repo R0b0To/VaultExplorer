@@ -3232,5 +3232,17 @@
   "audioEditorCompressTitle": "Dateigröße",
   "audioEditorCompressOriginal": "Original",
   "audioEditorCompressEstimate": "Geschätzte Größe: etwa {size}",
-  "audioEditorCompressNote": "Das Audio wird mit niedrigerer Bitrate in AAC neu kodiert. Die Datei wird kleiner, die Qualität sinkt aber. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen."
+  "audioEditorCompressNote": "Das Audio wird mit niedrigerer Bitrate in AAC neu kodiert. Die Datei wird kleiner, die Qualität sinkt aber. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen.",
+  "entropyStepTitle": "Zufall hinzufügen",
+  "entropyIntro": "Ziehe deinen Finger in unregelmäßigen, abwechslungsreichen Bewegungen über das Feld. Deine Bewegungen werden zusätzlich zum sicheren Zufallsgenerator des Geräts in Schlüssel und Salts eingemischt – nie anstelle davon.",
+  "entropyPadHint": "Hier mit dem Finger zeichnen",
+  "entropyPadSemantics": "Zufallsfeld. Ziehe den Finger darüber, um zufällige Bewegungen zu sammeln.",
+  "entropyProgress": "Zufall wird gesammelt … {percent} %",
+  "entropyComplete": "Genug Zufall gesammelt. Bewege den Finger weiter, um mehr hinzuzufügen, oder fahre fort.",
+  "entropySkippedStatus": "Übersprungen. Es wird nur der sichere Zufallsgenerator des Geräts verwendet. Zeichne auf dem Feld, um wieder Zufall hinzuzufügen.",
+  "entropyPoolLabel": "Zufallspool",
+  "entropySkip": "Überspringen und nur den Geräte-Generator verwenden",
+  "entropyReviewLabel": "Zufall",
+  "entropyReviewUserAdded": "Fingerbewegung + Geräte-Generator",
+  "entropyReviewDeviceOnly": "Nur Geräte-Generator"
 }

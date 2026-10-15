@@ -11723,4 +11723,47 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'El audio se recodifica a AAC con una tasa de bits menor, así que el archivo es más pequeño pero la calidad baja. Los cortes caen justo donde los marcas. Las etiquetas y la carátula no se conservan.';
+
+  @override
+  String get entropyStepTitle => 'Añadir aleatoriedad';
+
+  @override
+  String get entropyIntro =>
+      'Desliza el dedo por el panel con trazos variados e impredecibles. Tus movimientos se mezclan en las claves de cifrado y en los valores salt, además del generador aleatorio seguro del dispositivo, nunca en su lugar.';
+
+  @override
+  String get entropyPadHint => 'Dibuja aquí con el dedo';
+
+  @override
+  String get entropyPadSemantics =>
+      'Panel de aleatoriedad. Desliza el dedo sobre él para recoger movimiento aleatorio.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Recogiendo aleatoriedad… $percent %';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Aleatoriedad suficiente. Sigue moviendo el dedo para añadir más o continúa.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Omitido. Solo se usará el generador aleatorio seguro del dispositivo. Dibuja en el panel para volver a añadir aleatoriedad.';
+
+  @override
+  String get entropyPoolLabel => 'Reserva aleatoria';
+
+  @override
+  String get entropySkip => 'Omitir y usar solo el generador del dispositivo';
+
+  @override
+  String get entropyReviewLabel => 'Aleatoriedad';
+
+  @override
+  String get entropyReviewUserAdded =>
+      'Movimiento táctil + generador del dispositivo';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Solo generador del dispositivo';
 }

@@ -294,6 +294,9 @@ class UsbCreateContainer extends _$UsbCreateContainer {
     state = state._copy(hiddenKeyfiles: removeKeyfileByValue(state.hiddenKeyfiles, keyfile));
   }
 
+  /// [userEntropy]: bytes from the wizard's "Add randomness" step (see
+  /// `EntropyPool.takeBytes`); null/empty means the OS generator alone. The
+  /// caller owns the array and should wipe it once this returns.
   Future<bool> createUsbContainer({
     required String sizeText,
     required String passwordText,
@@ -304,6 +307,7 @@ class UsbCreateContainer extends _$UsbCreateContainer {
     required String hiddenPimText,
     required String hiddenSizeText,
     required AppLocalizations l10n,
+    Uint8List? userEntropy,
   }) async {
     final device = state.selected;
     if (device == null) {
@@ -404,6 +408,7 @@ class UsbCreateContainer extends _$UsbCreateContainer {
             (state.enableHiddenVolume && state.format == CreateFormat.veracrypt) ? state.hiddenCipherId : 255,
         hiddenHashId:
             (state.enableHiddenVolume && state.format == CreateFormat.veracrypt) ? state.hiddenHashId : 255,
+        userEntropy: userEntropy,
       );
 
       if (!ref.mounted) return false;

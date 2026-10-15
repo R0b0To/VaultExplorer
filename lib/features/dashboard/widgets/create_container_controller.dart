@@ -273,10 +273,14 @@ class CreateContainer extends _$CreateContainer {
     state = state._copy(hiddenKeyfiles: removeKeyfileByValue(state.hiddenKeyfiles, keyfile));
   }
 
+  /// [userEntropy]: bytes from the wizard's "Add randomness" step (see
+  /// `EntropyPool.takeBytes`); null/empty means the OS generator alone. The
+  /// caller owns the array and should wipe it once this returns.
   Future<bool> createFolderVault({
     required String password,
     required String confirmPassword,
     required AppLocalizations l10n,
+    Uint8List? userEntropy,
   }) async {
     if (state.folderVaultUri == null) {
       state = state._copy(error: l10n.selectEmptyDestinationFolderFirst);
@@ -296,18 +300,24 @@ class CreateContainer extends _$CreateContainer {
 
     try {
       final success = state.folderVaultFormat == 'cryptomator'
-          ? await lifecycle.createCryptomatorVault(state.folderVaultUri!, password)
+          ? await lifecycle.createCryptomatorVault(
+              state.folderVaultUri!,
+              password,
+              userEntropy: userEntropy,
+            )
           : state.folderVaultFormat == 'gocryptfs'
               ? await lifecycle.createGocryptfsVault(
                   state.folderVaultUri!,
                   password,
                   cipher: state.gocryptfsCipher,
+                  userEntropy: userEntropy,
                 )
               : await lifecycle.createCryfsVault(
                   state.folderVaultUri!,
                   password,
                   cipher: state.cryfsCipher,
                   blockSize: state.cryfsBlockSize,
+                  userEntropy: userEntropy,
                 );
 
       if (!ref.mounted) return false;
@@ -341,6 +351,7 @@ class CreateContainer extends _$CreateContainer {
     }
   }
 
+  /// [userEntropy]: see [createFolderVault].
   Future<bool> createContainerFile({
     required String nameText,
     required String sizeText,
@@ -352,6 +363,7 @@ class CreateContainer extends _$CreateContainer {
     required String hiddenPimText,
     required String hiddenSizeText,
     required AppLocalizations l10n,
+    Uint8List? userEntropy,
   }) async {
     if (nameText.isEmpty) {
       state = state._copy(error: l10n.containerNameRequired);
@@ -438,6 +450,7 @@ class CreateContainer extends _$CreateContainer {
             : 0,
         hiddenCipherId: state.enableHiddenVolume ? state.hiddenCipherId : 255,
         hiddenHashId: state.enableHiddenVolume ? state.hiddenHashId : 255,
+        userEntropy: userEntropy,
       );
 
       if (!ref.mounted) return false;

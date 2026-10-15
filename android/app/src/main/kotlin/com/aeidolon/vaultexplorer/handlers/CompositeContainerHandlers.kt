@@ -88,14 +88,19 @@ class CompositeContainerHandlers(
         val keyfilePaths = call.argument<List<String>>("keyfilePaths")
         val quickFormat = call.argument<Boolean>("quickFormat") ?: false
         val operationId = call.argument<String>("operationId") ?: ""
+        // Touch-movement entropy from the wizard (null = skipped); mixed into the
+        // new volume's salt/master key natively and wiped once the call returns.
+        val userEntropy = call.argument<ByteArray>("userEntropy")
 
         if (carrierUris.isNullOrEmpty() || payloadOffsets == null || extentLengths == null) {
+            userEntropy?.fill(0)
             result.error("INVALID_ARGS", "carrierUris, payloadOffsets, and extentLengths required", null)
             return
         }
 
         val targetVolId = ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
+            userEntropy?.fill(0)
             result.error("MAX_CONTAINERS", "No free volume slots available", null)
             return
         }
@@ -108,11 +113,13 @@ class CompositeContainerHandlers(
                     targetVolId, opened.paths, opened.fds, payloadOffsets, extentLengths,
                     call.argument<Number>("safetyMarginPct")?.toInt() ?: 10,
                     password, pim, fileSystem, containerFormat, cipherId, hashId,
-                    keyfileFds, quickFormat, operationId
+                    keyfileFds, quickFormat, operationId, userEntropy
                 )
                 activity.runOnUiThread { result.success(ok) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } finally {
+                userEntropy?.fill(0)
             }
         }
     }

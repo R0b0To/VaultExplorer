@@ -7,6 +7,7 @@ import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafIOException
+import com.aeidolon.vaultexplorer.util.UserEntropy
 import java.security.SecureRandom
 import java.util.UUID
 
@@ -194,7 +195,17 @@ object CryptomatorVault {
         }
     }
 
-    fun create(context: Context, vaultRootUri: Uri, passphrase: CharArray): VaultOpenResult<CryptomatorSession> {
+    /**
+     * [userEntropy]: touch-movement bytes collected by the creation wizard, mixed into
+     * the masterkey and scrypt salt (see [UserEntropy]); null/empty = system RNG only.
+     * The caller keeps ownership of the array.
+     */
+    fun create(
+        context: Context,
+        vaultRootUri: Uri,
+        passphrase: CharArray,
+        userEntropy: ByteArray? = null,
+    ): VaultOpenResult<CryptomatorSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
 
@@ -202,7 +213,7 @@ object CryptomatorVault {
             return VaultOpenResult.InvalidVault("Selected folder is not empty.")
         }
 
-        val random = SecureRandom()
+        val random = UserEntropy.secureRandomFor(userEntropy)
         val masterkey = CryptomatorMasterkey.generate(random)
 
         val masterkeyJson = CryptomatorMasterkeyFile.lock(masterkey, passphrase, random, vaultVersion = 999)

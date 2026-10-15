@@ -3232,5 +3232,17 @@
   "audioEditorCompressTitle": "Tamanho do arquivo",
   "audioEditorCompressOriginal": "Original",
   "audioEditorCompressEstimate": "Tamanho estimado: cerca de {size}",
-  "audioEditorCompressNote": "O áudio é recodificado para AAC com uma taxa de bits menor, então o arquivo fica menor, mas a qualidade diminui. Os cortes caem exatamente onde você os definiu. Tags e capa não são mantidas."
+  "audioEditorCompressNote": "O áudio é recodificado para AAC com uma taxa de bits menor, então o arquivo fica menor, mas a qualidade diminui. Os cortes caem exatamente onde você os definiu. Tags e capa não são mantidas.",
+  "entropyStepTitle": "Adicionar Aleatoriedade",
+  "entropyIntro": "Deslize o dedo pela área com movimentos variados e imprevisíveis. Seus movimentos são misturados às chaves de criptografia e aos salts, além do gerador aleatório seguro do dispositivo, nunca no lugar dele.",
+  "entropyPadHint": "Desenhe aqui com o dedo",
+  "entropyPadSemantics": "Área de aleatoriedade. Deslize o dedo sobre ela para coletar movimento aleatório.",
+  "entropyProgress": "Coletando aleatoriedade… {percent}%",
+  "entropyComplete": "Aleatoriedade suficiente. Continue se movendo para adicionar mais ou prossiga.",
+  "entropySkippedStatus": "Ignorado. Somente o gerador aleatório seguro do dispositivo será usado. Desenhe na área para adicionar aleatoriedade novamente.",
+  "entropyPoolLabel": "Pool Aleatório",
+  "entropySkip": "Ignorar e usar somente o gerador do dispositivo",
+  "entropyReviewLabel": "Aleatoriedade",
+  "entropyReviewUserAdded": "Movimento do toque + gerador do dispositivo",
+  "entropyReviewDeviceOnly": "Somente gerador do dispositivo"
 }

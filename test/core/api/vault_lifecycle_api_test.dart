@@ -83,6 +83,36 @@ void main() {
       expect(result.uri, 'content://new-container');
     });
 
+    test('forwards the user entropy bytes, or null when there are none', () async {
+      nextResult = {'success': true, 'uri': 'content://c'};
+      final entropy = Uint8List.fromList(List.generate(64, (i) => i));
+      await api.createContainer(
+        displayName: 'V',
+        sizeBytes: 1,
+        password: 'pw',
+        pim: 0,
+        fileSystem: 'fat32',
+        cipherId: 1,
+        hashId: 2,
+        keyfilePaths: const [],
+        userEntropy: entropy,
+      );
+      expect(calls.last.arguments['userEntropy'], entropy);
+
+      await api.createContainer(
+        displayName: 'V',
+        sizeBytes: 1,
+        password: 'pw',
+        pim: 0,
+        fileSystem: 'fat32',
+        cipherId: 1,
+        hashId: 2,
+        keyfilePaths: const [],
+      );
+      expect(calls.last.arguments.containsKey('userEntropy'), isTrue);
+      expect(calls.last.arguments['userEntropy'], isNull);
+    });
+
     test('null result defaults to failure with no uri', () async {
       nextResult = null;
       final result = await api.createContainer(

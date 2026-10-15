@@ -19554,6 +19554,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The audio is re-encoded to AAC at a lower bitrate, so the file is smaller but quality is reduced. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.'**
   String get audioEditorCompressNote;
+
+  /// Title of the wizard step where the user moves a finger over a pad to add randomness to the new volume's keys
+  ///
+  /// In en, this message translates to:
+  /// **'Add randomness'**
+  String get entropyStepTitle;
+
+  /// Explanation at the top of the randomness step: finger movement is mixed into the keys and salts in addition to (never instead of) the device's secure random generator
+  ///
+  /// In en, this message translates to:
+  /// **'Drag your finger around the pad in unpredictable, varied strokes. Your movements are stirred into the encryption keys and salts in addition to the device’s secure random generator, never instead of it.'**
+  String get entropyIntro;
+
+  /// Hint shown inside the empty touch pad of the randomness step
+  ///
+  /// In en, this message translates to:
+  /// **'Draw here with your finger'**
+  String get entropyPadHint;
+
+  /// Accessibility label of the touch pad of the randomness step
+  ///
+  /// In en, this message translates to:
+  /// **'Randomness pad. Drag your finger over it to collect random movement.'**
+  String get entropyPadSemantics;
+
+  /// Progress text of the randomness step while movement is being collected
+  ///
+  /// In en, this message translates to:
+  /// **'Collecting randomness… {percent}%'**
+  String entropyProgress(int percent);
+
+  /// Status text of the randomness step once enough movement was collected
+  ///
+  /// In en, this message translates to:
+  /// **'Enough randomness collected. Keep moving to add more, or continue.'**
+  String get entropyComplete;
+
+  /// Status text of the randomness step after the user skipped it
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped. Only the device’s secure random generator will be used. Draw on the pad to add randomness again.'**
+  String get entropySkippedStatus;
+
+  /// Caption above the live hex display of the random pool in the randomness step
+  ///
+  /// In en, this message translates to:
+  /// **'Random pool'**
+  String get entropyPoolLabel;
+
+  /// Button that skips the randomness step and uses only the device's secure random generator
+  ///
+  /// In en, this message translates to:
+  /// **'Skip and use the device generator only'**
+  String get entropySkip;
+
+  /// Row label in the wizard review summary for the randomness setting
+  ///
+  /// In en, this message translates to:
+  /// **'Randomness'**
+  String get entropyReviewLabel;
+
+  /// Review summary value: finger movement was mixed in on top of the device's generator
+  ///
+  /// In en, this message translates to:
+  /// **'Touch movement + device generator'**
+  String get entropyReviewUserAdded;
+
+  /// Review summary value: only the device's secure random generator is used
+  ///
+  /// In en, this message translates to:
+  /// **'Device generator only'**
+  String get entropyReviewDeviceOnly;
 }
 
 class _AppLocalizationsDelegate

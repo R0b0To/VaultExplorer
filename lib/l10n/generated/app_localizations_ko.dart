@@ -11053,4 +11053,44 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       '오디오가 더 낮은 비트레이트의 AAC로 다시 인코딩되어 파일은 작아지지만 음질은 낮아집니다. 컷은 지정한 위치 그대로 적용됩니다. 태그와 커버 아트는 유지되지 않습니다.';
+
+  @override
+  String get entropyStepTitle => '무작위성 추가';
+
+  @override
+  String get entropyIntro =>
+      '패드 위에서 손가락을 예측할 수 없게 다양한 방향으로 움직이세요. 움직임은 기기의 보안 난수 생성기에 더해(대체가 아님) 암호화 키와 솔트에 섞입니다.';
+
+  @override
+  String get entropyPadHint => '여기에 손가락으로 그리세요';
+
+  @override
+  String get entropyPadSemantics => '무작위성 패드. 손가락으로 문질러 무작위 움직임을 수집합니다.';
+
+  @override
+  String entropyProgress(int percent) {
+    return '무작위성 수집 중… $percent%';
+  }
+
+  @override
+  String get entropyComplete => '충분한 무작위성이 수집되었습니다. 계속 움직여 더 추가하거나 다음으로 진행하세요.';
+
+  @override
+  String get entropySkippedStatus =>
+      '건너뛰었습니다. 기기의 보안 난수 생성기만 사용합니다. 패드에 다시 그리면 무작위성을 추가할 수 있습니다.';
+
+  @override
+  String get entropyPoolLabel => '난수 풀';
+
+  @override
+  String get entropySkip => '건너뛰고 기기 생성기만 사용';
+
+  @override
+  String get entropyReviewLabel => '무작위성';
+
+  @override
+  String get entropyReviewUserAdded => '터치 움직임 + 기기 생성기';
+
+  @override
+  String get entropyReviewDeviceOnly => '기기 생성기만 사용';
 }

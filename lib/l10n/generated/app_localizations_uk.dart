@@ -11769,4 +11769,46 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'Аудіо перекодовується в AAC із нижчим бітрейтом, тож файл стає меншим, але якість знижується. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться.';
+
+  @override
+  String get entropyStepTitle => 'Додати випадковість';
+
+  @override
+  String get entropyIntro =>
+      'Проведіть пальцем по полю різними непередбачуваними рухами. Ваші рухи домішуються до ключів шифрування та солей на додачу до захищеного генератора випадкових чисел пристрою, а не замість нього.';
+
+  @override
+  String get entropyPadHint => 'Малюйте тут пальцем';
+
+  @override
+  String get entropyPadSemantics =>
+      'Поле випадковості. Водіть по ньому пальцем, щоб зібрати випадкові рухи.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Збираємо випадковість… $percent%';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Випадковості достатньо. Продовжуйте рухатися, щоб додати більше, або переходьте далі.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Пропущено. Буде використано лише захищений генератор випадкових чисел пристрою. Малюйте на полі, щоб знову додати випадковість.';
+
+  @override
+  String get entropyPoolLabel => 'Пул випадковості';
+
+  @override
+  String get entropySkip => 'Пропустити й використати лише генератор пристрою';
+
+  @override
+  String get entropyReviewLabel => 'Випадковість';
+
+  @override
+  String get entropyReviewUserAdded => 'Рух пальця + генератор пристрою';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Лише генератор пристрою';
 }

@@ -11690,4 +11690,47 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get audioEditorCompressNote =>
       'L\'audio viene ricodificato in AAC con un bitrate inferiore: il file è più piccolo, ma la qualità diminuisce. I tagli cadono esattamente dove li imposti. Tag e copertina non vengono mantenuti.';
+
+  @override
+  String get entropyStepTitle => 'Aggiungi casualità';
+
+  @override
+  String get entropyIntro =>
+      'Trascina il dito sull’area con movimenti vari e imprevedibili. I tuoi movimenti vengono mescolati alle chiavi di cifratura e ai salt, in aggiunta al generatore casuale sicuro del dispositivo, mai al suo posto.';
+
+  @override
+  String get entropyPadHint => 'Disegna qui con il dito';
+
+  @override
+  String get entropyPadSemantics =>
+      'Area di casualità. Trascina il dito sopra per raccogliere movimento casuale.';
+
+  @override
+  String entropyProgress(int percent) {
+    return 'Raccolta della casualità… $percent%';
+  }
+
+  @override
+  String get entropyComplete =>
+      'Casualità sufficiente. Continua a muoverti per aggiungerne altra, oppure prosegui.';
+
+  @override
+  String get entropySkippedStatus =>
+      'Saltato. Verrà usato solo il generatore casuale sicuro del dispositivo. Disegna sull’area per aggiungere di nuovo casualità.';
+
+  @override
+  String get entropyPoolLabel => 'Pool casuale';
+
+  @override
+  String get entropySkip => 'Salta e usa solo il generatore del dispositivo';
+
+  @override
+  String get entropyReviewLabel => 'Casualità';
+
+  @override
+  String get entropyReviewUserAdded =>
+      'Movimento touch + generatore del dispositivo';
+
+  @override
+  String get entropyReviewDeviceOnly => 'Solo generatore del dispositivo';
 }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -218,10 +220,14 @@ class CompositeContainer extends _$CompositeContainer {
     );
   }
 
+  /// [userEntropy]: bytes from the wizard's "Add randomness" step (see
+  /// `EntropyPool.takeBytes`); null/empty means the OS generator alone. The
+  /// caller owns the array and should wipe it once this returns.
   Future<bool> createContainer({
     required String password,
     required String confirmPassword,
     AppLocalizations? l10n,
+    Uint8List? userEntropy,
   }) async {
     if (state.hasUnsupportedArchiveCarrier) return false;
     final profile = state.profile;
@@ -263,6 +269,7 @@ class CompositeContainer extends _$CompositeContainer {
       hashId: state.hashId,
       keyfilePaths: state.keyfiles.map((k) => k.uri).toList(),
       quickFormat: state.quickFormat,
+      userEntropy: userEntropy,
     );
 
     if (!ref.mounted) return false;

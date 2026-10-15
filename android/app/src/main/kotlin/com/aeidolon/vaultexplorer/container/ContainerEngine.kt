@@ -58,8 +58,10 @@ object ContainerEngine {
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
+        userEntropy: ByteArray? = null,
     ): Boolean = NativeEngine.createContainerNative(
-        fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds, quickFormat
+        fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds, quickFormat,
+        userEntropy
     )
 
     // Returns the structured {"success", "phase", "errorCode",
@@ -71,9 +73,10 @@ object ContainerEngine {
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
+        userEntropy: ByteArray? = null,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerNative(
         volId, partitionScheme, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId,
-        keyfileFds, quickFormat, deviceSectorCount, operationId,
+        keyfileFds, quickFormat, deviceSectorCount, operationId, userEntropy,
     )
 
     fun createWithHidden(
@@ -85,11 +88,12 @@ object ContainerEngine {
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
         quickFormat: Boolean = false,
+        userEntropy: ByteArray? = null,
     ): Boolean = NativeEngine.createContainerWithHiddenNative(
         fd, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes,
         outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
-        outerKeyfileFds, hiddenKeyfileFds, quickFormat
+        outerKeyfileFds, hiddenKeyfileFds, quickFormat, userEntropy
     )
     
     // See createUsb's doc comment above -- same structured result map.
@@ -104,11 +108,12 @@ object ContainerEngine {
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
         quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
+        userEntropy: ByteArray? = null,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerWithHiddenNative(
         volId, partitionScheme, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes, outerCipherId, outerHashId,
         hiddenCipherId, hiddenHashId, outerKeyfileFds, hiddenKeyfileFds, quickFormat,
-        deviceSectorCount, operationId,
+        deviceSectorCount, operationId, userEntropy,
     )
 
     fun changePassword(

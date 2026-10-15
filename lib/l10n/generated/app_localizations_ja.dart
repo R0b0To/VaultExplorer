@@ -4080,6 +4080,26 @@ class AppLocalizationsJa extends AppLocalizations {
       '最初の50,000件を表示しています — このフォルダにはさらに多くのファイルがあります。';
 
   @override
+  String get gridCornerStyleLabel => 'サムネイルの角';
+
+  @override
+  String get gridCornerRoundedLabel => '角丸';
+
+  @override
+  String get gridCornerSquareLabel => '四角';
+
+  @override
+  String get gridSpacingLabel => 'サムネイルの間隔';
+
+  @override
+  String get gridSpacingNone => 'なし';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'グリッドのセルサイズに合わせる';
 
   @override

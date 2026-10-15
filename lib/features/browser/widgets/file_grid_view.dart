@@ -38,6 +38,11 @@ class FileGridView extends StatefulWidget {
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
+
+  /// Card corner radius and the gap between cards, from the user's grid
+  /// appearance settings. Defaults are the original look.
+  final double cornerRadius;
+  final double spacing;
   final bool showFileNames;
   final LongFileNameDisplayMode longFileNameMode;
   final GridAspectRatio gridAspectRatio;
@@ -68,6 +73,8 @@ class FileGridView extends StatefulWidget {
     required this.currentDirPath,
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
+    this.cornerRadius = 12.0,
+    this.spacing = 8.0,
     this.showFileNames = true,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.gridAspectRatio = GridAspectRatio.square,
@@ -176,7 +183,7 @@ class _FileGridViewState extends State<FileGridView>
       return previewRatio;
     }
     final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
+    final tileWidth = (width - 20 - (columns - 1) * widget.spacing) / columns;
     const labelHeight = 36.0;
     final previewHeight = tileWidth / previewRatio;
     final totalHeight = previewHeight + labelHeight;
@@ -192,7 +199,7 @@ class _FileGridViewState extends State<FileGridView>
     if (!q.auto) return q;
     final width = MediaQuery.sizeOf(context).width;
     final tileWidth =
-        (width - 20 - (_crossAxisCount - 1) * 8) / _crossAxisCount;
+        (width - 20 - (_crossAxisCount - 1) * widget.spacing) / _crossAxisCount;
     return q.resolveForCell(
       logicalWidth: tileWidth,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
@@ -201,7 +208,7 @@ class _FileGridViewState extends State<FileGridView>
 
   double _getTileHeight(int columns) {
     final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
+    final tileWidth = (width - 20 - (columns - 1) * widget.spacing) / columns;
     final previewRatio = widget.gridAspectRatio.ratio;
     final labelHeight = widget.showFileNames ? 36.0 : 0.0;
     return (tileWidth / previewRatio) + labelHeight;
@@ -213,7 +220,7 @@ class _FileGridViewState extends State<FileGridView>
     final controller = widget.scrollController;
     if (controller != null && controller.hasClients) {
       final currentTileHeight = _getTileHeight(_crossAxisCount);
-      final rowHeight = currentTileHeight + 8.0;
+      final rowHeight = currentTileHeight + widget.spacing;
       final viewport = controller.position.viewportDimension;
       final viewportCenter = controller.offset + (viewport / 2.0);
       final centerRow = math.max(0, ((viewportCenter - 12.0) / rowHeight).round());
@@ -247,7 +254,7 @@ class _FileGridViewState extends State<FileGridView>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!controller.hasClients) return;
         final newTileHeight = _getTileHeight(newColumns);
-        final newRowHeight = newTileHeight + 8.0;
+        final newRowHeight = newTileHeight + widget.spacing;
         final targetRow = anchor ~/ newColumns;
         final targetRowCenter = 12.0 + (targetRow * newRowHeight) + (newTileHeight / 2.0);
         final viewport = controller.position.viewportDimension;
@@ -321,8 +328,8 @@ class _FileGridViewState extends State<FileGridView>
         ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+          crossAxisSpacing: widget.spacing,
+          mainAxisSpacing: widget.spacing,
           childAspectRatio: _getAspectRatio(_crossAxisCount),
         ),
         itemCount: total,
@@ -382,7 +389,11 @@ class _FileGridViewState extends State<FileGridView>
         : '${widget.currentDirPath}/${entry.name}';
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
-    final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
+    final iconSize = GridCardUtils.calculateIconSize(
+      context,
+      _crossAxisCount,
+      spacing: widget.spacing,
+    );
     final skin = FileManagerSkinScope.of(context);
     final folderIcon = Icon(
       skin.folderIcon,
@@ -391,6 +402,7 @@ class _FileGridViewState extends State<FileGridView>
     );
 
     return GridCardShell(
+      cornerRadius: widget.cornerRadius,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -452,7 +464,11 @@ class _FileGridViewState extends State<FileGridView>
     );
 
     Widget previewWidget;
-    final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
+    final iconSize = GridCardUtils.calculateIconSize(
+      context,
+      _crossAxisCount,
+      spacing: widget.spacing,
+    );
 
     if (vaultIcon != null) {
       previewWidget = Center(
@@ -519,6 +535,7 @@ class _FileGridViewState extends State<FileGridView>
     }
 
     return GridCardShell(
+      cornerRadius: widget.cornerRadius,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,

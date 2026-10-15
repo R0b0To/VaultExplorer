@@ -100,6 +100,8 @@ Widget buildBrowserBody(
         thumbnailCacheMode: thumbnailCacheMode,
         thumbnailQuality: thumbnailQuality,
         showFileNames: toolbarConfig.showGridFileNames,
+        cornerRadius: toolbarConfig.gridCornerStyle.radius,
+        spacing: toolbarConfig.gridSpacing.toDouble(),
         longFileNameMode: toolbarConfig.longFileNameDisplayMode,
         gridAspectRatio: toolbarConfig.getGridAspectRatioForFolder(
           container.uri,
@@ -132,6 +134,8 @@ Widget buildBrowserBody(
         thumbnailCacheMode: thumbnailCacheMode,
         thumbnailQuality: thumbnailQuality,
         showFileNames: toolbarConfig.showGridFileNames,
+        cornerRadius: toolbarConfig.gridCornerStyle.radius,
+        spacing: toolbarConfig.gridSpacing.toDouble(),
         longFileNameMode: toolbarConfig.longFileNameDisplayMode,
         initialColumns: isLandscape
             ? toolbarConfig.masonryColumnsLandscape

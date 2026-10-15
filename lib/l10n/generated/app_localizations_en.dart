@@ -4231,6 +4231,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Showing first 50,000 items — this folder has more files.';
 
   @override
+  String get gridCornerStyleLabel => 'Thumbnail Corners';
+
+  @override
+  String get gridCornerRoundedLabel => 'Rounded';
+
+  @override
+  String get gridCornerSquareLabel => 'Square';
+
+  @override
+  String get gridSpacingLabel => 'Thumbnail Spacing';
+
+  @override
+  String get gridSpacingNone => 'None';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Match grid cell size';
 
   @override

@@ -7218,6 +7218,42 @@ abstract class AppLocalizations {
   /// **'Showing first 50,000 items — this folder has more files.'**
   String get truncatedListingWarning;
 
+  /// Settings row label for choosing rounded or square corners on grid and masonry thumbnails
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Corners'**
+  String get gridCornerStyleLabel;
+
+  /// Option: grid and masonry thumbnails have rounded corners
+  ///
+  /// In en, this message translates to:
+  /// **'Rounded'**
+  String get gridCornerRoundedLabel;
+
+  /// Option: grid and masonry thumbnails have square corners
+  ///
+  /// In en, this message translates to:
+  /// **'Square'**
+  String get gridCornerSquareLabel;
+
+  /// Settings slider label for the gap between thumbnails in the grid and masonry views
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Spacing'**
+  String get gridSpacingLabel;
+
+  /// Slider value shown when there is no gap between grid and masonry thumbnails
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get gridSpacingNone;
+
+  /// Slider value showing the gap between grid and masonry thumbnails in density-independent pixels
+  ///
+  /// In en, this message translates to:
+  /// **'{value} dp'**
+  String gridSpacingValue(int value);
+
   /// Switch title: generate grid and masonry thumbnails at the on-screen pixel size of each cell
   ///
   /// In en, this message translates to:

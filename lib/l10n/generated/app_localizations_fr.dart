@@ -4337,6 +4337,26 @@ class AppLocalizationsFr extends AppLocalizations {
       'Affichage des 50 000 premiers éléments — ce dossier en contient davantage.';
 
   @override
+  String get gridCornerStyleLabel => 'Coins des miniatures';
+
+  @override
+  String get gridCornerRoundedLabel => 'Arrondis';
+
+  @override
+  String get gridCornerSquareLabel => 'Carrés';
+
+  @override
+  String get gridSpacingLabel => 'Espacement des miniatures';
+
+  @override
+  String get gridSpacingNone => 'Aucun';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Adapter à la taille des cellules';
 
   @override

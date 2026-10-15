@@ -5,6 +5,9 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
+import 'package:vaultexplorer/data/models/grid_corner_style.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/core/widgets/inputs/slider_setting_tile.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -796,6 +799,35 @@ SectionCard(
                             onChanged: (v) => ref
                                 .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
                                 .setGridAspectRatio(v),
+                          ),
+                          OptionPickerTile<GridCornerStyle>(
+                            label: context.l10n.gridCornerStyleLabel,
+                            value: state.config.gridCornerStyle,
+                            options: GridCornerStyle.values.map((style) {
+                              return SelectOption(
+                                value: style,
+                                label: style.getLocalizedLabel(context.l10n),
+                              );
+                            }).toList(),
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setGridCornerStyle(v),
+                          ),
+                          SliderSettingTile(
+                            label: context.l10n.gridSpacingLabel,
+                            prefixIcon: Icons.space_bar_rounded,
+                            value: state.config.gridSpacing,
+                            min: FileManagerToolbarConfig.minGridSpacing,
+                            max: FileManagerToolbarConfig.maxGridSpacing,
+                            divisions: (FileManagerToolbarConfig.maxGridSpacing -
+                                    FileManagerToolbarConfig.minGridSpacing) ~/
+                                2,
+                            valueLabel: (v) => v == 0
+                                ? context.l10n.gridSpacingNone
+                                : context.l10n.gridSpacingValue(v),
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setGridSpacing(v),
                           ),
                         ],
                       ),

@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, =1{1 configuração recomendada ainda está desativada. A automação funciona, mas pode ser menos estável.} other{{count} configurações recomendadas ainda estão desativadas. A automação funciona, mas pode ser menos estável.}}",
   "thumbnailAutoSizeLabel": "Ajustar ao tamanho da célula",
   "thumbnailAutoSizeDescription": "As miniaturas em grade e mosaico são geradas no tamanho de exibição de cada célula, portanto, menos colunas resultam em miniaturas mais nítidas. O tamanho abaixo é usado em todos os outros locais.",
-  "thumbnailQualityAutoSummary": "Tamanho automático · {quality}% de qualidade"
+  "thumbnailQualityAutoSummary": "Tamanho automático · {quality}% de qualidade",
+  "gridCornerStyleLabel": "Cantos das miniaturas",
+  "gridCornerRoundedLabel": "Arredondados",
+  "gridCornerSquareLabel": "Quadrados",
+  "gridSpacingLabel": "Espaçamento das miniaturas",
+  "gridSpacingNone": "Nenhum",
+  "gridSpacingValue": "{value} dp"
 }

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
+import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -62,6 +63,17 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
   final GridAspectRatio gridAspectRatio;
+
+  /// Corner shape of grid/masonry cards (applies to both views).
+  final GridCornerStyle gridCornerStyle;
+
+  /// Gap between grid/masonry cards in logical px (0 = touching). Applies to
+  /// both views.
+  final int gridSpacing;
+  static const int defaultGridSpacing = 8;
+  static const int minGridSpacing = 0;
+  static const int maxGridSpacing = 24;
+
   final bool showListThumbnails;
   final bool showItemActionsMenu;
   final LongFileNameDisplayMode longFileNameDisplayMode;
@@ -103,6 +115,8 @@ class FileManagerToolbarConfig {
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.showGridFileNames = true,
     this.gridAspectRatio = GridAspectRatio.square,
+    this.gridCornerStyle = GridCornerStyle.rounded,
+    this.gridSpacing = defaultGridSpacing,
     this.showListThumbnails = true,
     this.showItemActionsMenu = true,
     this.longFileNameDisplayMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -149,6 +163,8 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: {FileDetailColumn.type},
         showGridFileNames: true,
         gridAspectRatio: GridAspectRatio.square,
+        gridCornerStyle: GridCornerStyle.rounded,
+        gridSpacing: defaultGridSpacing,
         showListThumbnails: true,
         showItemActionsMenu: true,
         longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
@@ -221,6 +237,8 @@ class FileManagerToolbarConfig {
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
     GridAspectRatio? gridAspectRatio,
+    GridCornerStyle? gridCornerStyle,
+    int? gridSpacing,
     bool? showListThumbnails,
     bool? showItemActionsMenu,
     LongFileNameDisplayMode? longFileNameDisplayMode,
@@ -258,6 +276,9 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
+        gridCornerStyle: gridCornerStyle ?? this.gridCornerStyle,
+        gridSpacing: (gridSpacing ?? this.gridSpacing)
+            .clamp(minGridSpacing, maxGridSpacing),
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
         showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
         longFileNameDisplayMode:
@@ -303,6 +324,8 @@ class FileManagerToolbarConfig {
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
         'gridAspectRatio': gridAspectRatio.toJson(),
+        'gridCornerStyle': gridCornerStyle.toJson(),
+        'gridSpacing': gridSpacing,
         'showListThumbnails': showListThumbnails,
         'showItemActionsMenu': showItemActionsMenu,
         'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
@@ -402,6 +425,12 @@ class FileManagerToolbarConfig {
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       gridAspectRatio:
           GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),
+      // Absent in configs saved before these options existed -> the
+      // original look (rounded, 8px gaps).
+      gridCornerStyle:
+          GridCornerStyle.fromJson(j['gridCornerStyle'] as String?),
+      gridSpacing: ((j['gridSpacing'] as num?)?.toInt() ?? defaultGridSpacing)
+          .clamp(minGridSpacing, maxGridSpacing),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
       showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,

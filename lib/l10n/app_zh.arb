@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, other{仍有 {count} 项推荐设置未开启。自动化仍可运行，但可能不够稳定。}}",
   "thumbnailAutoSizeLabel": "匹配网格单元格大小",
   "thumbnailAutoSizeDescription": "网格和瀑布流缩略图会按照各单元格的屏幕实际大小生成，因此列数越少，缩略图越清晰。下方设置的尺寸将用于其他所有位置。",
-  "thumbnailQualityAutoSummary": "自动尺寸 · {quality}% 质量"
+  "thumbnailQualityAutoSummary": "自动尺寸 · {quality}% 质量",
+  "gridCornerStyleLabel": "缩略图边角",
+  "gridCornerRoundedLabel": "圆角",
+  "gridCornerSquareLabel": "直角",
+  "gridSpacingLabel": "缩略图间距",
+  "gridSpacingNone": "无",
+  "gridSpacingValue": "{value} dp"
 }

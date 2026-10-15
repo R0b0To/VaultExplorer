@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, =1{1 impostazione consigliata è ancora disattivata. L'automazione funziona, ma potrebbe essere meno affidabile.} other{{count} impostazioni consigliate sono ancora disattivate. L'automazione funziona, ma potrebbe essere meno affidabile.}}",
   "thumbnailAutoSizeLabel": "Adatta alla dimensione delle celle",
   "thumbnailAutoSizeDescription": "Le miniature per griglia e layout a mosaico vengono generate in base alle dimensioni su schermo di ciascuna cella, quindi un minor numero di colonne offre miniature più nitide. La dimensione indicata sotto verrà utilizzata per tutto il resto.",
-  "thumbnailQualityAutoSummary": "Dimensione automatica · qualità {quality}%"
+  "thumbnailQualityAutoSummary": "Dimensione automatica · qualità {quality}%",
+  "gridCornerStyleLabel": "Angoli delle miniature",
+  "gridCornerRoundedLabel": "Arrotondati",
+  "gridCornerSquareLabel": "Squadrati",
+  "gridSpacingLabel": "Spaziatura miniature",
+  "gridSpacingNone": "Nessuno",
+  "gridSpacingValue": "{value} dp"
 }

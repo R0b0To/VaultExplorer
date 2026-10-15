@@ -35,6 +35,44 @@ Widget buildShell({
   );
 }
 
+  group('GridCardShell corner radius', () {
+    Widget shell({double? cornerRadius}) {
+      return MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 200,
+            height: 200,
+            child: GridCardShell(
+              preview: const ColoredBox(color: Colors.blue),
+              label: 'Item',
+              isSelected: false,
+              isSelectionMode: false,
+              onTap: () {},
+              onLongPress: () {},
+              cornerRadius: cornerRadius ?? 12.0,
+            ),
+          ),
+        ),
+      );
+    }
+
+    BorderRadius radiusOf(WidgetTester tester) {
+      final card = tester.widget<Card>(find.byType(Card));
+      return (card.shape! as RoundedRectangleBorder).borderRadius
+          as BorderRadius;
+    }
+
+    testWidgets('defaults to the rounded 12px look', (tester) async {
+      await tester.pumpWidget(shell());
+      expect(radiusOf(tester), BorderRadius.circular(12));
+    });
+
+    testWidgets('a zero radius gives square corners', (tester) async {
+      await tester.pumpWidget(shell(cornerRadius: 0));
+      expect(radiusOf(tester), BorderRadius.zero);
+    });
+  });
+
   group('GridCardShell label visibility', () {
     testWidgets('renders the label when showFileName is true', (
       tester,

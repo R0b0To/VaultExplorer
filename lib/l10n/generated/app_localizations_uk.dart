@@ -4322,6 +4322,26 @@ class AppLocalizationsUk extends AppLocalizations {
       'Показано перші 50 000 елементів — у цій папці більше файлів.';
 
   @override
+  String get gridCornerStyleLabel => 'Кути мініатюр';
+
+  @override
+  String get gridCornerRoundedLabel => 'Заокруглені';
+
+  @override
+  String get gridCornerSquareLabel => 'Прямі';
+
+  @override
+  String get gridSpacingLabel => 'Відстань між мініатюрами';
+
+  @override
+  String get gridSpacingNone => 'Немає';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Підлаштовувати під розмір клітинки';
 
   @override

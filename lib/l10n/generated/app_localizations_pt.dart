@@ -4308,6 +4308,26 @@ class AppLocalizationsPt extends AppLocalizations {
       'Mostrando os primeiros 50.000 itens — esta pasta tem mais arquivos.';
 
   @override
+  String get gridCornerStyleLabel => 'Cantos das miniaturas';
+
+  @override
+  String get gridCornerRoundedLabel => 'Arredondados';
+
+  @override
+  String get gridCornerSquareLabel => 'Quadrados';
+
+  @override
+  String get gridSpacingLabel => 'Espaçamento das miniaturas';
+
+  @override
+  String get gridSpacingNone => 'Nenhum';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Ajustar ao tamanho da célula';
 
   @override

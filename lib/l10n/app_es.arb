@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, =1{1 ajuste recomendado sigue desactivado. La automatización funciona, pero podría ser menos confiable.} other{{count} ajustes recomendados siguen desactivados. La automatización funciona, pero podría ser menos confiable.}}",
   "thumbnailAutoSizeLabel": "Ajustar al tamaño de celda",
   "thumbnailAutoSizeDescription": "Las miniaturas en cuadrícula y mosaico se generan según el tamaño en pantalla de cada celda, por lo que menos columnas ofrecen miniaturas más nítidas. El tamaño inferior se usará en los demás lugares.",
-  "thumbnailQualityAutoSummary": "Tamaño automático · {quality} % de calidad"
+  "thumbnailQualityAutoSummary": "Tamaño automático · {quality} % de calidad",
+  "gridCornerStyleLabel": "Esquinas de las miniaturas",
+  "gridCornerRoundedLabel": "Redondeadas",
+  "gridCornerSquareLabel": "Cuadradas",
+  "gridSpacingLabel": "Espaciado de miniaturas",
+  "gridSpacingNone": "Ninguno",
+  "gridSpacingValue": "{value} dp"
 }

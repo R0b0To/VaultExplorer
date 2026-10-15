@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, =1{1 empfohlene Einstellung ist noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.} other{{count} empfohlene Einstellungen sind noch deaktiviert. Die Automatisierung funktioniert, ist jedoch möglicherweise weniger zuverlässig.}}",
   "thumbnailAutoSizeLabel": "An Rasterzellengröße anpassen",
   "thumbnailAutoSizeDescription": "Raster- und Masonry-Miniaturansichten werden in der Bildschirmgröße der jeweiligen Zelle erstellt, sodass weniger Spalten schärfere Miniaturansichten liefern. Die unten angegebene Größe wird überall sonst verwendet.",
-  "thumbnailQualityAutoSummary": "Automatische Größe · {quality} % Qualität"
+  "thumbnailQualityAutoSummary": "Automatische Größe · {quality} % Qualität",
+  "gridCornerStyleLabel": "Ecken der Miniaturansichten",
+  "gridCornerRoundedLabel": "Abgerundet",
+  "gridCornerSquareLabel": "Eckig",
+  "gridSpacingLabel": "Abstand der Miniaturansichten",
+  "gridSpacingNone": "Keiner",
+  "gridSpacingValue": "{value} dp"
 }

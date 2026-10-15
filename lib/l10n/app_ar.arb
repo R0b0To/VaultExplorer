@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, zero{لا توجد إعدادات موصى بها معطلة.} one{إعداد موصى به واحد ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.} two{إعدادان موصى بهما ما زالا معطلين. تعمل الأتمتة، لكنهما قد يجعلانها أقل موثوقية.} few{{count} إعدادات موصى بها ما زالت معطلة. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.} many{{count} إعدادًا موصى به ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.} other{{count} إعداد موصى به ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.}}",
   "thumbnailAutoSizeLabel": "مطابقة حجم خلية الشبكة",
   "thumbnailAutoSizeDescription": "يتم إنشاء الصور المصغرة للشبكة والفسيفساء بالحجم الفعلي لكل خلية على الشاشة، لذا فإن عدد أعمدة أقل يمنح صورًا مصغرة أكثر وضوحًا. يُستخدم الحجم الموضح أدناه في كل مكان آخر.",
-  "thumbnailQualityAutoSummary": "حجم تلقائي · جودة {quality}٪"
+  "thumbnailQualityAutoSummary": "حجم تلقائي · جودة {quality}٪",
+  "gridCornerStyleLabel": "زوايا الصور المصغرة",
+  "gridCornerRoundedLabel": "مستديرة",
+  "gridCornerSquareLabel": "مربعة",
+  "gridSpacingLabel": "تباعد الصور المصغرة",
+  "gridSpacingNone": "بلا",
+  "gridSpacingValue": "{value} dp"
 }

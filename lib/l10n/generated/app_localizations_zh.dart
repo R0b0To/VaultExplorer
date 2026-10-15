@@ -4026,6 +4026,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get truncatedListingWarning => '正在显示前50,000个项目——此文件夹中还有更多文件。';
 
   @override
+  String get gridCornerStyleLabel => '缩略图边角';
+
+  @override
+  String get gridCornerRoundedLabel => '圆角';
+
+  @override
+  String get gridCornerSquareLabel => '直角';
+
+  @override
+  String get gridSpacingLabel => '缩略图间距';
+
+  @override
+  String get gridSpacingNone => '无';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => '匹配网格单元格大小';
 
   @override

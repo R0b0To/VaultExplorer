@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, other{권장 설정 {count}개가 꺼져 있습니다. 자동화는 작동하지만 안정성이 떨어질 수 있습니다.}}",
   "thumbnailAutoSizeLabel": "그리드 셀 크기에 맞춤",
   "thumbnailAutoSizeDescription": "그리드 및 메이슨리 썸네일은 각 셀의 화면 크기에 맞게 생성되므로 열 수가 적을수록 더 선명한 썸네일이 제공됩니다. 아래 크기는 그 외 모든 곳에 사용됩니다.",
-  "thumbnailQualityAutoSummary": "자동 크기 · 품질 {quality}%"
+  "thumbnailQualityAutoSummary": "자동 크기 · 품질 {quality}%",
+  "gridCornerStyleLabel": "썸네일 모서리",
+  "gridCornerRoundedLabel": "둥글게",
+  "gridCornerSquareLabel": "직각",
+  "gridSpacingLabel": "썸네일 간격",
+  "gridSpacingNone": "없음",
+  "gridSpacingValue": "{value} dp"
 }

@@ -4307,6 +4307,26 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die ersten 50.000 Elemente werden angezeigt — dieser Ordner enthält weitere Dateien.';
 
   @override
+  String get gridCornerStyleLabel => 'Ecken der Miniaturansichten';
+
+  @override
+  String get gridCornerRoundedLabel => 'Abgerundet';
+
+  @override
+  String get gridCornerSquareLabel => 'Eckig';
+
+  @override
+  String get gridSpacingLabel => 'Abstand der Miniaturansichten';
+
+  @override
+  String get gridSpacingNone => 'Keiner';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'An Rasterzellengröße anpassen';
 
   @override

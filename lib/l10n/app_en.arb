@@ -5550,6 +5550,35 @@
   "@truncatedListingWarning": {
     "description": "Warning banner shown above the file list when a folder's listing was capped at the max item count"
   },
+  "gridCornerStyleLabel": "Thumbnail Corners",
+  "@gridCornerStyleLabel": {
+    "description": "Settings row label for choosing rounded or square corners on grid and masonry thumbnails"
+  },
+  "gridCornerRoundedLabel": "Rounded",
+  "@gridCornerRoundedLabel": {
+    "description": "Option: grid and masonry thumbnails have rounded corners"
+  },
+  "gridCornerSquareLabel": "Square",
+  "@gridCornerSquareLabel": {
+    "description": "Option: grid and masonry thumbnails have square corners"
+  },
+  "gridSpacingLabel": "Thumbnail Spacing",
+  "@gridSpacingLabel": {
+    "description": "Settings slider label for the gap between thumbnails in the grid and masonry views"
+  },
+  "gridSpacingNone": "None",
+  "@gridSpacingNone": {
+    "description": "Slider value shown when there is no gap between grid and masonry thumbnails"
+  },
+  "gridSpacingValue": "{value} dp",
+  "@gridSpacingValue": {
+    "description": "Slider value showing the gap between grid and masonry thumbnails in density-independent pixels",
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "thumbnailAutoSizeLabel": "Match grid cell size",
   "@thumbnailAutoSizeLabel": {
     "description": "Switch title: generate grid and masonry thumbnails at the on-screen pixel size of each cell"

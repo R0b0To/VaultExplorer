@@ -8,9 +8,13 @@ import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 /// Shared utility methods for grid and masonry views.
 abstract final class GridCardUtils {
   /// Dynamically computes responsive icon size based on tile width and column count.
-  static double calculateIconSize(BuildContext context, int columns) {
+  static double calculateIconSize(
+    BuildContext context,
+    int columns, {
+    double spacing = 8,
+  }) {
     final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
+    final tileWidth = (width - 20 - (columns - 1) * spacing) / columns;
 
     final factor = switch (columns) {
       1 => 0.85,
@@ -98,6 +102,10 @@ class GridCardShell extends StatelessWidget {
   /// Pass [aspectRatio] for Masonry items. Leave null for standard GridView items.
   final double? aspectRatio;
 
+  /// Corner radius of the card (and so of the clipped preview). 12 is the
+  /// default rounded look; 0 gives square cards.
+  final double cornerRadius;
+
   const GridCardShell({
     super.key,
     required this.preview,
@@ -118,6 +126,7 @@ class GridCardShell extends StatelessWidget {
     this.cardColor,
     this.isFolder = false,
     this.aspectRatio,
+    this.cornerRadius = 12.0,
   });
 
   @override
@@ -277,7 +286,7 @@ class GridCardShell extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(cornerRadius),
         side: side,
       ),
       color: fill,

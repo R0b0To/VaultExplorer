@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
+import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -180,6 +181,12 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   Future<void> setGridAspectRatio(GridAspectRatio ratio) =>
       _updateConfig(state.config.copyWith(gridAspectRatio: ratio));
+
+  Future<void> setGridCornerStyle(GridCornerStyle style) =>
+      _updateConfig(state.config.copyWith(gridCornerStyle: style));
+
+  Future<void> setGridSpacing(int spacing) =>
+      _updateConfig(state.config.copyWith(gridSpacing: spacing));
 
   Future<void> setLongFileNameDisplayMode(LongFileNameDisplayMode mode) =>
       _updateConfig(state.config.copyWith(longFileNameDisplayMode: mode));

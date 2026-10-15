@@ -4081,6 +4081,26 @@ class AppLocalizationsKo extends AppLocalizations {
       '처음 50,000개 항목을 표시 중입니다 — 이 폴더에는 더 많은 파일이 있습니다.';
 
   @override
+  String get gridCornerStyleLabel => '썸네일 모서리';
+
+  @override
+  String get gridCornerRoundedLabel => '둥글게';
+
+  @override
+  String get gridCornerSquareLabel => '직각';
+
+  @override
+  String get gridSpacingLabel => '썸네일 간격';
+
+  @override
+  String get gridSpacingNone => '없음';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => '그리드 셀 크기에 맞춤';
 
   @override

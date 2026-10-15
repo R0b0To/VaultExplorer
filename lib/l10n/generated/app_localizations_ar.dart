@@ -4340,6 +4340,26 @@ class AppLocalizationsAr extends AppLocalizations {
       'يتم عرض أول 50,000 عنصر — يحتوي هذا المجلد على ملفات أكثر.';
 
   @override
+  String get gridCornerStyleLabel => 'زوايا الصور المصغرة';
+
+  @override
+  String get gridCornerRoundedLabel => 'مستديرة';
+
+  @override
+  String get gridCornerSquareLabel => 'مربعة';
+
+  @override
+  String get gridSpacingLabel => 'تباعد الصور المصغرة';
+
+  @override
+  String get gridSpacingNone => 'بلا';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'مطابقة حجم خلية الشبكة';
 
   @override

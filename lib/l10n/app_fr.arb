@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, =1{1 paramètre recommandé est toujours désactivé. L'automatisation fonctionne, mais peut être moins fiable.} other{{count} paramètres recommandés sont toujours désactivés. L'automatisation fonctionne, mais peut être moins fiable.}}",
   "thumbnailAutoSizeLabel": "Adapter à la taille des cellules",
   "thumbnailAutoSizeDescription": "Les miniatures en grille et en mosaïque sont générées à la taille d'affichage de chaque cellule, de sorte que moins de colonnes offrent des miniatures plus nettes. La taille ci-dessous est utilisée partout ailleurs.",
-  "thumbnailQualityAutoSummary": "Taille auto · qualité {quality} %"
+  "thumbnailQualityAutoSummary": "Taille auto · qualité {quality} %",
+  "gridCornerStyleLabel": "Coins des miniatures",
+  "gridCornerRoundedLabel": "Arrondis",
+  "gridCornerSquareLabel": "Carrés",
+  "gridSpacingLabel": "Espacement des miniatures",
+  "gridSpacingNone": "Aucun",
+  "gridSpacingValue": "{value} dp"
 }

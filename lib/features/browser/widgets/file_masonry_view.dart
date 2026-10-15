@@ -42,6 +42,11 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
+
+  /// Card corner radius and the gap between cards, from the user's grid
+  /// appearance settings. Defaults are the original look.
+  final double cornerRadius;
+  final double spacing;
   final bool showFileNames;
   final LongFileNameDisplayMode longFileNameMode;
   final int initialColumns;
@@ -71,6 +76,8 @@ class FileMasonryView extends ConsumerStatefulWidget {
     required this.currentDirPath,
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
+    this.cornerRadius = 12.0,
+    this.spacing = 8.0,
     this.showFileNames = true,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.initialColumns = 2,
@@ -166,7 +173,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     final q = widget.thumbnailQuality;
     if (!q.auto) return q;
     final width = MediaQuery.sizeOf(context).width;
-    final colWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
+    final colWidth = (width - 20 - (_columnCount - 1) * widget.spacing) / _columnCount;
     return q.resolveForCell(
       logicalWidth: colWidth,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
@@ -191,7 +198,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     final controller = widget.scrollController;
     if (controller != null && controller.hasClients) {
       final width = MediaQuery.sizeOf(context).width;
-      final colWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
+      final colWidth = (width - 20 - (_columnCount - 1) * widget.spacing) / _columnCount;
       final avgRowHeight = colWidth + 44.0;
       final viewport = controller.position.viewportDimension;
       final viewportCenter = controller.offset + (viewport / 2.0);
@@ -226,7 +233,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!controller.hasClients) return;
         final width = MediaQuery.sizeOf(context).width;
-        final newColWidth = (width - 20 - (newColumns - 1) * 8) / newColumns;
+        final newColWidth = (width - 20 - (newColumns - 1) * widget.spacing) / newColumns;
         final newAvgRowHeight = newColWidth + 44.0;
         final targetRow = anchor ~/ newColumns;
         final targetRowCenter = 12.0 + (targetRow * newAvgRowHeight) + (newAvgRowHeight / 2.0);
@@ -422,8 +429,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         controller: controller,
         crossAxisCount: _columnCount,
         physics: const AlwaysScrollableScrollPhysics(), // Native physics that cannot freeze
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+        mainAxisSpacing: widget.spacing,
+        crossAxisSpacing: widget.spacing,
         cacheExtent: 800,
         padding: EdgeInsets.fromLTRB(
           10,
@@ -512,7 +519,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
-    final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
+    final iconSize = GridCardUtils.calculateIconSize(
+      context,
+      _columnCount,
+      spacing: widget.spacing,
+    );
     final skin = FileManagerSkinScope.of(context);
     final folderIcon = Icon(
       skin.folderIcon,
@@ -521,6 +532,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     );
 
     return GridCardShell(
+      cornerRadius: widget.cornerRadius,
       key: ValueKey(
           'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}:$isMounted'),
       aspectRatio: ratio,
@@ -583,7 +595,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     );
 
     Widget previewWidget;
-    final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
+    final iconSize = GridCardUtils.calculateIconSize(
+      context,
+      _columnCount,
+      spacing: widget.spacing,
+    );
 
     if (vaultIcon != null) {
       previewWidget = Center(
@@ -652,6 +668,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     }
 
     return GridCardShell(
+      cornerRadius: widget.cornerRadius,
       key: ValueKey(
           'file:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}'),
       aspectRatio: ratio,

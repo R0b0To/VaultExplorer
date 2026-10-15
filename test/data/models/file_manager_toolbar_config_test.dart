@@ -4,6 +4,7 @@ import 'dart:ui' show Color;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 
@@ -92,6 +93,61 @@ void main() {
       final config = FileManagerToolbarConfig.fromJson({});
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
       expect(config.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
+    });
+  });
+
+  group('FileManagerToolbarConfig grid appearance', () {
+    test('defaults to the original look: rounded corners, 8px gaps', () {
+      final def = FileManagerToolbarConfig.defaults();
+      expect(def.gridCornerStyle, GridCornerStyle.rounded);
+      expect(def.gridSpacing, 8);
+
+      const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
+      expect(unassigned.gridCornerStyle, GridCornerStyle.rounded);
+      expect(unassigned.gridSpacing, 8);
+    });
+
+    test('copyWith updates the options and clamps spacing to 0..24', () {
+      final config = FileManagerToolbarConfig.defaults();
+      final updated = config.copyWith(
+        gridCornerStyle: GridCornerStyle.square,
+        gridSpacing: 0,
+      );
+      expect(updated.gridCornerStyle, GridCornerStyle.square);
+      expect(updated.gridSpacing, 0);
+      expect(config.copyWith(gridSpacing: 99).gridSpacing, 24);
+      expect(config.copyWith(gridSpacing: -5).gridSpacing, 0);
+    });
+
+    test('round-trips through JSON', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        gridCornerStyle: GridCornerStyle.square,
+        gridSpacing: 14,
+      );
+      final json = config.toJson();
+      expect(json['gridCornerStyle'], 'square');
+      expect(json['gridSpacing'], 14);
+
+      final restored = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
+      );
+      expect(restored.gridCornerStyle, GridCornerStyle.square);
+      expect(restored.gridSpacing, 14);
+    });
+
+    test('configs saved before these options existed keep the old look', () {
+      final legacy = FileManagerToolbarConfig.defaults().toJson()
+        ..remove('gridCornerStyle')
+        ..remove('gridSpacing');
+      final restored = FileManagerToolbarConfig.fromJson(legacy);
+      expect(restored.gridCornerStyle, GridCornerStyle.rounded);
+      expect(restored.gridSpacing, 8);
+    });
+
+    test('an out-of-range stored spacing is clamped on load', () {
+      final json = FileManagerToolbarConfig.defaults().toJson()
+        ..['gridSpacing'] = 500;
+      expect(FileManagerToolbarConfig.fromJson(json).gridSpacing, 24);
     });
   });
 

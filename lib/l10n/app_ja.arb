@@ -3276,5 +3276,11 @@
   "automationPermAlmostReadyMessage": "{count, plural, other{推奨設定が{count}個オフのままです。自動化は動作しますが、信頼性が低下する可能性があります。}}",
   "thumbnailAutoSizeLabel": "グリッドのセルサイズに合わせる",
   "thumbnailAutoSizeDescription": "グリッドおよびメイソンリー表示のサムネイルは各セルの画面表示サイズに合わせて生成されるため、列数を減らすとより鮮明なサムネイルになります。それ以外の場所では以下のサイズが使用されます。",
-  "thumbnailQualityAutoSummary": "自動サイズ · 品質 {quality}%"
+  "thumbnailQualityAutoSummary": "自動サイズ · 品質 {quality}%",
+  "gridCornerStyleLabel": "サムネイルの角",
+  "gridCornerRoundedLabel": "角丸",
+  "gridCornerSquareLabel": "四角",
+  "gridSpacingLabel": "サムネイルの間隔",
+  "gridSpacingNone": "なし",
+  "gridSpacingValue": "{value} dp"
 }

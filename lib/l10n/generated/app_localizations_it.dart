@@ -4297,6 +4297,26 @@ class AppLocalizationsIt extends AppLocalizations {
       'Vengono mostrati i primi 50.000 elementi — questa cartella ne contiene altri.';
 
   @override
+  String get gridCornerStyleLabel => 'Angoli delle miniature';
+
+  @override
+  String get gridCornerRoundedLabel => 'Arrotondati';
+
+  @override
+  String get gridCornerSquareLabel => 'Squadrati';
+
+  @override
+  String get gridSpacingLabel => 'Spaziatura miniature';
+
+  @override
+  String get gridSpacingNone => 'Nessuno';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Adatta alla dimensione delle celle';
 
   @override

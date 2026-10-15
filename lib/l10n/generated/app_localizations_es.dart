@@ -4308,6 +4308,26 @@ class AppLocalizationsEs extends AppLocalizations {
       'Mostrando los primeros 50 000 elementos — esta carpeta tiene más archivos.';
 
   @override
+  String get gridCornerStyleLabel => 'Esquinas de las miniaturas';
+
+  @override
+  String get gridCornerRoundedLabel => 'Redondeadas';
+
+  @override
+  String get gridCornerSquareLabel => 'Cuadradas';
+
+  @override
+  String get gridSpacingLabel => 'Espaciado de miniaturas';
+
+  @override
+  String get gridSpacingNone => 'Ninguno';
+
+  @override
+  String gridSpacingValue(int value) {
+    return '$value dp';
+  }
+
+  @override
   String get thumbnailAutoSizeLabel => 'Ajustar al tamaño de celda';
 
   @override

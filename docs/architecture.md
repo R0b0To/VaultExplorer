@@ -345,10 +345,12 @@ new code must not violate. Each is traceable to specific enforcement code.
     FAT/exFAT/NTFS, device storage, and anything unknown. Every path that
     writes names to a destination guards on the fact, never the policy:
     `FileOperationService._run` / `_copyEntry`, the Kotlin import recursion,
-    both export paths, and the archive-extract pre-flight all refuse or skip a
-    later entry that would replace an earlier one on a case-insensitive
-    destination, so a case-distinct name that is legal in the source can never
-    silently overwrite a file in the destination. The real filesystem of a
+    both export paths, and the archive-extract plan
+    (`ArchiveService.caseSafeExtractPlan`) all give a later entry that would
+    replace an earlier one on a case-insensitive destination a unique name
+    ("notes (1)", the same result as choosing "keep both" on a conflict), so
+    a case-distinct name that is legal in the source can never silently
+    overwrite a file in the destination and nothing is dropped or refused. The real filesystem of a
     disk-image volume is read from `getVaultInfo()["fileSystem"]` once at mount
     (`VolumeFilesystemRegistry`, filled in `onContainerMounted` /
     `onUsbContainerReconnected`, cleared in `onContainerLocked`); an unrecorded

@@ -3479,27 +3479,28 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       _archiveContext!,
     );
     if (verifiedArchive == null || !mounted) return;
-    // Same pre-flight as FileOperationService._runArchiveExtract: refuse
-    // before writing anything if two entries would replace one another on
-    // this (case-insensitive) destination.
-    if (!isDestinationCaseSensitive(widget.container) &&
-        ArchiveService.findExtractCaseCollisions(verifiedArchive).isNotEmpty) {
-      _setStatus(
-        context.l10n.failedToExtractGeneric(
-          context.l10n.advancedRenameNameCollisionWithinBatch,
-        ),
-        error: true,
-      );
-      return;
-    }
     _navNotifier.updateArchiveContext(verifiedArchive);
     _navNotifier.setLoading(true);
     try {
-      final count = await ArchiveService.extractAllToContainer(
-        container: widget.container,
-        archiveContext: verifiedArchive,
-        targetDirInContainer: parentDir,
-      );
+      // Same handling as FileOperationService._runArchiveExtract: entries
+      // that differ only by case would replace one another on a
+      // case-insensitive destination, so they are extracted one by one under
+      // unique names ("notes (1).txt") instead of the bulk route.
+      final caseSafePlan = isDestinationCaseSensitive(widget.container)
+          ? null
+          : ArchiveService.caseSafeExtractPlan(verifiedArchive);
+      final count = caseSafePlan != null
+          ? await ArchiveService.extractMappedToContainer(
+              container: widget.container,
+              archiveContext: verifiedArchive,
+              destRelByEntryPath: caseSafePlan,
+              targetDirInContainer: parentDir,
+            )
+          : await ArchiveService.extractAllToContainer(
+              container: widget.container,
+              archiveContext: verifiedArchive,
+              targetDirInContainer: parentDir,
+            );
       if (mounted) {
         _setStatus(
           context.l10n.extractedCount(count),

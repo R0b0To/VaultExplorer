@@ -121,19 +121,29 @@ class ImportExportHandlers(
             if (caseSensitive) name else name.lowercase()
 
         /**
-         * Positions in [names] that are NOT the first to claim their
-         * case-insensitive form -- i.e. the entries that would land on the
-         * same destination entry as an earlier one and replace it. Export
-         * writes to device storage (SAF / raw external paths), which this
-         * app always treats as case-insensitive, so a later sibling that
-         * differs only by case must be skipped rather than written.
-         * Pure, so it is unit-testable without a live container.
+         * Destination names for [names] when they are written side by side
+         * into one folder of a case-insensitive destination (device storage
+         * for export). The first claimant of each lowercased name keeps it;
+         * every later one that differs only by case gets a unique
+         * "name (1)" that also avoids every other name in the list, so no
+         * entry replaces another and nothing is dropped. The result has the
+         * same size and order as [names]. Pure, so it is unit-testable
+         * without a live container.
          */
-        internal fun caseCollisionLaterIndexes(names: List<String>): Set<Int> {
+        internal fun resolveCaseCollisions(names: List<String>): List<String> {
             val claimed = HashSet<String>()
-            val later = HashSet<Int>()
-            names.forEachIndexed { i, n -> if (!claimed.add(n.lowercase())) later.add(i) }
-            return later
+            val taken = HashSet<String>()
+            names.forEach { taken.add(it.lowercase()) }
+            return names.map { n ->
+                if (claimed.add(n.lowercase())) {
+                    n
+                } else {
+                    val unique = uniqueNameAgainst(taken, n, caseSensitive = false)
+                    taken.add(unique.lowercase())
+                    claimed.add(unique.lowercase())
+                    unique
+                }
+            }
         }
 
         /**
@@ -236,6 +246,18 @@ class ImportExportHandlers(
      * file/folder already at the destination was silently overwritten.
      * Every import target now goes through this first.
      */
+    /**
+     * Lowercased names a case-colliding import child must not be renamed to:
+     * every name among the source folder's own [children] (they will all be
+     * written into [dirPath]) plus whatever [dirPath] already holds.
+     */
+    private fun takenChildNames(volId: Int, dirPath: String, children: List<ImportSource>): HashSet<String> {
+        val taken = HashSet<String>()
+        for (c in children) taken.add(c.name.lowercase())
+        taken.addAll(existingNamesFolded(volId, dirPath, caseSensitive = false))
+        return taken
+    }
+
     private fun uniqueImportName(
         volId: Int, dirPath: String, desiredName: String, caseSensitive: Boolean,
     ): String =
@@ -462,12 +484,14 @@ class ImportExportHandlers(
         dest: ExportDestination, fatPath: String, isDir: Boolean, volId: Int,
         opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
-        skippedCounter: java.util.concurrent.atomic.AtomicInteger? = null,
+        destName: String? = null,
     ): Int {
         if (opId > 0 && ExportCancellation.isCancelled(opId)) {
             throw ExportCancelledException("Export cancelled")
         }
-        val name = fatPath.substringAfterLast("/")
+        // The name the entry gets in the destination: normally the vault name,
+        // but a case-colliding sibling is exported under a unique one.
+        val name = destName ?: fatPath.substringAfterLast("/")
         if (!isDir) {
             return dest.writeLeaf(volId, fatPath, name, opId, total, doneCounter, totalBytes, transferredCounter)
         }
@@ -478,22 +502,21 @@ class ImportExportHandlers(
         }
         // A vault folder can hold "Notes" and "notes" (ext volumes,
         // encrypted folder vaults), but the destination can't -- the later
-        // one would delete and replace the earlier. Skip it and let the
-        // caller report the item as not fully exported.
-        val collidingLater = caseCollisionLaterIndexes(parsedChildren.map { it.name })
+        // one would delete and replace the earlier. The later one is
+        // exported under a unique name ("notes (1)") instead.
+        val childNames = parsedChildren.map { it.name }
+        val destNames = resolveCaseCollisions(childNames)
         var count = 0
         for ((i, parsed) in parsedChildren.withIndex()) {
-            if (i in collidingLater) {
-                skippedCounter?.incrementAndGet()
+            if (destNames[i] != parsed.name) {
                 VeLog.w("VaultExplorer_Export") {
-                    "EXPORT_CASE_COLLISION skipping an entry that differs only by case from an " +
-                        "earlier entry in the same folder"
+                    "EXPORT_CASE_COLLISION an entry differs only by case from an earlier " +
+                        "entry in the same folder; exporting it under a unique name"
                 }
-                continue
             }
             count += exportEntryRecursive(
                 destDir, "$fatPath/${parsed.name}", parsed.isDir, volId,
-                opId, total, doneCounter, totalBytes, transferredCounter, skippedCounter,
+                opId, total, doneCounter, totalBytes, transferredCounter, destNames[i],
             )
         }
         return count
@@ -866,26 +889,33 @@ class ImportExportHandlers(
             // On a destination that treats "Notes" and "notes" as one name,
             // two source siblings that differ only by case would land on the
             // same entry and the later write would replace the earlier one.
-            // The later sibling is skipped and reported instead (same
-            // channel as an invalid name). Mirrors the guard in
-            // FileOperationService._copyEntry on the Dart side.
+            // The later sibling is imported under a unique name ("notes (1)")
+            // instead. Mirrors FileOperationService._copyEntry on the Dart
+            // side.
+            val childList = src.children()
             val claimedChildNames = HashSet<String>()
-            for (child in src.children()) {
+            var takenNames: HashSet<String>? = null
+            for (child in childList) {
                 val childName = child.name
                 val issues = FilesystemNameValidator.validate(childName, fsKind)
                 if (issues.isNotEmpty()) {
                     ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
                     continue
                 }
+                var destName = childName
                 if (!destCaseSensitive && !claimedChildNames.add(childName.lowercase())) {
-                    ImportProgressBridge.reportSkippedInvalidName(
-                        opId, childName,
-                        listOf("differs only by capitalization from another item in the same folder and would overwrite it on this filesystem"),
-                    )
-                    continue
+                    val taken = takenNames
+                        ?: takenChildNames(volId, targetFatPath, childList).also { takenNames = it }
+                    destName = uniqueNameAgainst(taken, childName, caseSensitive = false)
+                    taken.add(destName.lowercase())
+                    claimedChildNames.add(destName.lowercase())
+                    VeLog.w("VaultExplorer_Import") {
+                        "IMPORT_CASE_COLLISION an entry differs only by case from an earlier " +
+                            "sibling; importing it under a unique name"
+                    }
                 }
                 count += importEntryRecursive(
-                    child, "$targetFatPath/$childName", volId,
+                    child, "$targetFatPath/$destName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
                     verifications, destCaseSensitive,
                 )
@@ -1047,25 +1077,13 @@ class ImportExportHandlers(
                     try {
                         val rawDestTree = rawFileFor(treeUri)
                         // Selected items that differ only by case would all
-                        // write to the same destination entry; only the
-                        // first of each such group is exported.
-                        val collidingLater = caseCollisionLaterIndexes(
-                            validItems.map { (path, _) -> path.substringAfterLast("/") },
-                        )
+                        // write to the same destination entry; the later
+                        // ones are exported under a unique name instead.
+                        val itemNames = validItems.map { (path, _) -> path.substringAfterLast("/") }
+                        val itemDestNames = resolveCaseCollisions(itemNames)
                         for ((itemIndex, item) in validItems.withIndex()) {
                             val (path, isDir) = item
-                            val name = path.substringAfterLast("/")
-                            if (itemIndex in collidingLater) {
-                                VeLog.w("VaultExplorer_Export") {
-                                    "EXPORT_CASE_COLLISION skipping a top-level item that differs only " +
-                                        "by case from an earlier selected item"
-                                }
-                                if (opId > 0) {
-                                    ExportProgressBridge.reportItemFinished(opId, name, isDir, false)
-                                }
-                                continue
-                            }
-                            val itemSkipped = java.util.concurrent.atomic.AtomicInteger(0)
+                            val name = itemNames[itemIndex]
                             val dest = if (rawDestTree != null) {
                                 ExportDestination.Raw(rawDestTree)
                             } else {
@@ -1074,15 +1092,13 @@ class ImportExportHandlers(
                             }
                             val count = exportEntryRecursive(
                                 dest, path, isDir, pending.volId,
-                                opId, total, doneCounter, totalBytes, transferredCounter, itemSkipped,
+                                opId, total, doneCounter, totalBytes, transferredCounter,
+                                itemDestNames[itemIndex],
                             )
                             successCount += count
                             if (opId > 0) {
-                                // A folder with skipped (case-colliding) children is
-                                // reported as failed so the operation shows errors.
-                                ExportProgressBridge.reportItemFinished(
-                                    opId, name, isDir, count > 0 && itemSkipped.get() == 0,
-                                )
+                                // Reported by the *source* name: that is what Dart matches on.
+                                ExportProgressBridge.reportItemFinished(opId, name, isDir, count > 0)
                             }
                         }
                     } finally {

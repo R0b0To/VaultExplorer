@@ -887,35 +887,42 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
 
     try {
-      // Extraction goes through the native archive engine entry by entry
-      // and, on a case-insensitive destination, an entry whose name differs
-      // only by case from an earlier one would silently replace it. Refuse
-      // up front -- before anything is written -- rather than extract part
-      // of the archive and lose files.
-      if (!isDestinationCaseSensitive(dest)) {
-        final collisions = ArchiveService.findExtractCaseCollisions(
-          archiveContext,
-          selectedEntryPaths: selectedEntryPaths,
-          subPath: subPath,
+      // On a case-insensitive destination, entries whose names differ only
+      // by case ("Notes.txt" / "notes.txt") would replace one another. When
+      // that would happen, extract file by file under the renamed paths
+      // (the later one becomes "notes (1).txt") instead of the bulk route.
+      final caseSafePlan = isDestinationCaseSensitive(dest)
+          ? null
+          : ArchiveService.caseSafeExtractPlan(
+              archiveContext,
+              selectedEntryPaths: selectedEntryPaths,
+              subPath: subPath,
+            );
+      if (caseSafePlan != null) {
+        VeLog.d(
+          'FileOperationService',
+          'CASE_COLLISION archive extract: renaming colliding entries '
+              '(${caseSafePlan.length} files extracted one by one)',
         );
-        if (collisions.isNotEmpty) {
-          VeLog.d(
-            'FileOperationService',
-            'CASE_COLLISION archive extract refused: '
-                '${collisions.length} name group(s) differ only by case',
-          );
-          op._setError(
-            op.l10n.failedToExtractGeneric(
-              op.l10n.advancedRenameNameCollisionWithinBatch,
-            ),
-          );
-          op._setStatus(FileOperationStatus.failed);
-          return;
-        }
       }
 
       final int count;
-      if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
+      if (caseSafePlan != null) {
+        count = await ArchiveService.extractMappedToContainer(
+          container: dest,
+          archiveContext: archiveContext,
+          destRelByEntryPath: caseSafePlan,
+          targetDirInContainer: destDirPath,
+          onProgress: (doneCount, currentPath) {
+            op._setImportProgress(
+              done: doneCount,
+              total: totalEntries > 0 ? totalEntries : doneCount,
+              currentName: currentPath,
+            );
+          },
+          opId: op.id,
+        );
+      } else if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
         count = await ArchiveService.extractSelectedToContainer(
           container: dest,
           archiveContext: archiveContext,
@@ -1215,10 +1222,10 @@ class FileOperationService extends ChangeNotifier {
       // selected items that differ only by case would land on the same
       // entry -- and every copy deletes its destination before writing, so
       // the later one would silently replace the earlier one. The second
-      // and later such items are failed up front instead of copied.
+      // and later such items are kept under a unique name instead
+      // ("notes (1)"), the same outcome as choosing "keep both".
       final destCaseSensitive = isDestinationCaseSensitive(dest);
       final claimedDestLeaves = <String>{};
-      final collidingResolvedIdx = <int>{};
 
       for (final item in op.items) {
         final fileName = item.name;
@@ -1308,15 +1315,27 @@ class FileOperationService extends ChangeNotifier {
           }
         }
 
-        if (!destCaseSensitive &&
-            !claimedDestLeaves.add(destPath.split('/').last.toLowerCase())) {
-          collidingResolvedIdx.add(resolved.length);
-          VeLog.d(
-            'FileOperationService',
-            'CASE_COLLISION top-level item '
-                '${VeLog.censorName(destPath.split('/').last)} would replace '
-                'an earlier item on a case-insensitive destination; failing it',
-          );
+        if (!destCaseSensitive) {
+          final leaf = destPath.split('/').last;
+          if (!claimedDestLeaves.add(leaf.toLowerCase())) {
+            // Names here are all lowercased: a destination that is
+            // case-insensitive in fact is never case-sensitive by policy,
+            // so `existingNames` is folded the same way.
+            final taken = <String>{...existingNames, ...claimedDestLeaves};
+            final unique = makeUniqueName(leaf, taken, caseSensitive: false);
+            claimedDestLeaves.add(unique.toLowerCase());
+            existingNames.add(unique.toLowerCase());
+            destPath = op.destDirPath.isEmpty
+                ? unique
+                : '${op.destDirPath}/$unique';
+            VeLog.d(
+              'FileOperationService',
+              'CASE_COLLISION top-level item '
+                  '${VeLog.censorName(leaf)} differs only by case from an '
+                  'earlier item on a case-insensitive destination; kept '
+                  'under a unique name',
+            );
+          }
         }
 
         resolved.add((
@@ -1344,15 +1363,6 @@ class FileOperationService extends ChangeNotifier {
             await semaphore.acquire();
             try {
               if (op.cancelRequested) throw const _CancelledException();
-
-              if (collidingResolvedIdx.contains(idx)) {
-                op._recordItemResult(
-                  idx,
-                  FileItemResult.failed,
-                  errorMessage: op.l10n.fileOpCopyFailed,
-                );
-                return;
-              }
 
               if (r.skip) {
                 op._recordItemResult(idx, FileItemResult.skipped);
@@ -1845,33 +1855,37 @@ class FileOperationService extends ChangeNotifier {
       await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
     }
 
-    // Same guard as the top-level one in `_run`: siblings that differ only
+    // Same handling as the top-level one in `_run`: siblings that differ only
     // by case would land on one entry of a case-insensitive destination, and
-    // `_copyFile` deletes its destination before writing. Fail the later
-    // sibling (so the folder reports as not fully copied, and a move keeps
-    // its source) instead of letting it replace the earlier one.
+    // `_copyFile` deletes its destination before writing. The later sibling
+    // is copied under a unique name ("notes (1)") instead of replacing the
+    // earlier one.
     final destCaseSensitive = isDestinationCaseSensitive(dest);
     final claimedChildNames = <String>{};
+    Set<String>? takenNames; // built lazily, only if a collision happens
 
     bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
+      var destName = e.name;
       if (!destCaseSensitive && !claimedChildNames.add(e.name.toLowerCase())) {
+        takenNames ??= await _takenChildNames(dest, destPath, children);
+        destName = makeUniqueName(e.name, takenNames, caseSensitive: false);
+        takenNames.add(destName.toLowerCase());
+        claimedChildNames.add(destName.toLowerCase());
         VeLog.d(
           'FileOperationService',
           'CASE_COLLISION child ${VeLog.censorName(e.name)} differs only by '
               'case from an earlier sibling on a case-insensitive '
-              'destination; not copied',
+              'destination; copied under a unique name',
         );
-        allOk = false;
-        continue;
       }
       final ok = await _copyEntry(
         src,
         dest,
         '$srcPath/${e.name}',
-        '$destPath/${e.name}',
+        '$destPath/$destName',
         e.isDir,
         createdDestPaths,
         op,
@@ -1880,6 +1894,27 @@ class FileOperationService extends ChangeNotifier {
       if (!ok) allOk = false;
     }
     return allOk;
+  }
+
+  /// Lowercased names a case-colliding child must not be renamed to: every
+  /// name among the source folder's own children (they will all be written
+  /// here) plus whatever the destination folder already holds.
+  Future<Set<String>> _takenChildNames(
+    MountedContainer dest,
+    String destPath,
+    List<String> srcChildren,
+  ) async {
+    final taken = <String>{};
+    for (final raw in srcChildren) {
+      if (raw.startsWith('System:')) continue;
+      taken.add(RawEntry.parse(raw).name.toLowerCase());
+    }
+    final existing = await _fileIoApi.listDirectory(dest, destPath) ?? const [];
+    for (final raw in existing) {
+      if (raw.startsWith('System:')) continue;
+      taken.add(RawEntry.parse(raw).name.toLowerCase());
+    }
+    return taken;
   }
 
   Future<bool> _copyFile(

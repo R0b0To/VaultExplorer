@@ -114,20 +114,28 @@ class ImportExportHandlersUniqueNameTest {
     // ── Export: siblings that differ only by case ──────────────────────────
 
     @Test
-    fun `caseCollisionLaterIndexes flags only the later of two names that differ by case`() {
-        val later = ImportExportHandlers.caseCollisionLaterIndexes(listOf("Notes.txt", "a.txt", "notes.txt"))
-        assertEquals(setOf(2), later)
+    fun `resolveCaseCollisions keeps the first name and renames the later one`() {
+        val result = ImportExportHandlers.resolveCaseCollisions(listOf("Notes.txt", "a.txt", "notes.txt"))
+        assertEquals(listOf("Notes.txt", "a.txt", "notes (1).txt"), result)
     }
 
     @Test
-    fun `caseCollisionLaterIndexes flags every extra spelling`() {
-        val later = ImportExportHandlers.caseCollisionLaterIndexes(listOf("README", "readme", "ReadMe", "other"))
-        assertEquals(setOf(1, 2), later)
+    fun `resolveCaseCollisions gives every extra spelling its own unique name`() {
+        val result = ImportExportHandlers.resolveCaseCollisions(listOf("README", "readme", "ReadMe", "other"))
+        assertEquals(listOf("README", "readme (1)", "ReadMe (2)", "other"), result)
     }
 
     @Test
-    fun `caseCollisionLaterIndexes is empty when every name is distinct`() {
-        assertEquals(emptySet<Int>(), ImportExportHandlers.caseCollisionLaterIndexes(listOf("a", "b", "c.txt")))
-        assertEquals(emptySet<Int>(), ImportExportHandlers.caseCollisionLaterIndexes(emptyList()))
+    fun `resolveCaseCollisions never picks a name another entry already has`() {
+        // "a (1)" is a real sibling, so the renamed "A" must skip to "(2)".
+        val result = ImportExportHandlers.resolveCaseCollisions(listOf("a", "A", "a (1)"))
+        assertEquals(listOf("a", "A (2)", "a (1)"), result)
+    }
+
+    @Test
+    fun `resolveCaseCollisions leaves distinct names untouched`() {
+        val names = listOf("a", "b", "c.txt")
+        assertEquals(names, ImportExportHandlers.resolveCaseCollisions(names))
+        assertEquals(emptyList<String>(), ImportExportHandlers.resolveCaseCollisions(emptyList()))
     }
 }

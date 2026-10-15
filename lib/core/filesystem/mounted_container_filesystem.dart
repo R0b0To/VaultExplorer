@@ -17,10 +17,11 @@ import 'volume_filesystem_registry.dart';
 /// container checks them against what the destination really does (see
 /// [isDestinationCaseSensitive] and docs/architecture.md §2 rule 12): the
 /// folder/sibling copy guard in `FileOperationService`, the import
-/// child-collision guard, the export guards (`ImportExportHandlers`
+/// child-collision handling, the export handling (`ImportExportHandlers`
 /// multi-export and the automation `exportFolder`) and the archive-extract
-/// pre-flight (`ArchiveService.findExtractCaseCollisions`). Those guards do
-/// not depend on this switch.
+/// plan (`ArchiveService.caseSafeExtractPlan`). Each keeps both colliding
+/// entries by giving the later one a unique name ("notes (1)"), and none of
+/// them depends on this switch.
 ///
 /// Setting it back to `false` is a complete rollback: ext volumes go back to
 /// the conservative case-insensitive name rules, and nothing else changes.

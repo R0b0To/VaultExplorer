@@ -14,6 +14,7 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.ScopedStorageUtils
 import com.aeidolon.vaultexplorer.saf.VaultPathUtils
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -314,22 +315,24 @@ object VaultAutomationFolderOps {
             val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return
             // The destination (device storage) can't hold two names that
             // differ only by case; a later sibling would delete and replace
-            // the earlier one. Skip it and count it as failed.
-            val claimedNames = HashSet<String>()
-            for (raw in entries) {
+            // the earlier one. Each later one is exported under a unique name
+            // ("notes (1)") instead.
+            val parsed = entries.mapNotNull { raw ->
                 if (raw.startsWith("System:")) {
                     truncated = true
-                    continue
+                    null
+                } else {
+                    parseDirEntry(raw)
                 }
-                val entry = parseDirEntry(raw) ?: continue
-                if (!claimedNames.add(entry.name.lowercase())) {
-                    failed++
+            }
+            val destNames = ImportExportHandlers.resolveCaseCollisions(parsed.map { it.name })
+            for ((i, entry) in parsed.withIndex()) {
+                if (destNames[i] != entry.name) {
                     VeLog.w(TAG) {
-                        "exportFolder: skipping an entry that differs only by case from an earlier entry in the same folder"
+                        "exportFolder: an entry differs only by case from an earlier entry in the same folder; exporting it under a unique name"
                     }
-                    continue
                 }
-                val childRel = if (relPrefix.isEmpty()) entry.name else "$relPrefix/${entry.name}"
+                val childRel = if (relPrefix.isEmpty()) destNames[i] else "$relPrefix/${destNames[i]}"
                 val childVaultPath = VaultPathUtils.joinPath(dirPath, entry.name)
                 if (entry.isDir) {
                     if (recursive) walk(childVaultPath, childRel)

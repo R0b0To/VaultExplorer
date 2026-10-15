@@ -323,11 +323,12 @@ class ArchiveService {
     return count;
   }
 
-  /// The file paths (relative to the extraction target) that extracting
-  /// [archiveContext] would write -- the same selection and `subPath`
-  /// stripping [extractSelectedToContainer] / [extractAllToContainer] apply,
-  /// so a case-collision pre-flight checks exactly what will land on disk.
-  static List<String> extractFilePaths(
+  /// Where extracting [archiveContext] would write each file: archive entry
+  /// path -> destination path relative to the target folder. It applies the
+  /// same selection and `subPath` stripping [extractSelectedToContainer] /
+  /// [extractAllToContainer] do, so a case-collision plan covers exactly
+  /// what would land on disk.
+  static Map<String, String> extractDestinations(
     ArchiveContext archiveContext, {
     List<String>? selectedEntryPaths,
     String subPath = '',
@@ -350,32 +351,88 @@ class ArchiveService {
       };
       // Same fallback as extractSelectedToContainer: nothing matched, so the
       // selection itself is what gets extracted.
-      return picked.isEmpty ? selected : picked.toList();
+      final chosen = picked.isEmpty ? selected : picked.toList();
+      return {for (final f in chosen) f: f};
     }
 
-    if (subPath.isEmpty) return files;
-    return [
+    if (subPath.isEmpty) return {for (final f in files) f: f};
+    return {
       for (final f in files)
-        if (f.startsWith('$subPath/')) f.substring(subPath.length + 1),
-    ];
+        if (f.startsWith('$subPath/')) f: f.substring(subPath.length + 1),
+    };
   }
 
-  /// Groups of entries that would replace one another when extracted onto a
-  /// case-insensitive destination (see [findCaseCollisions]). Empty means
-  /// the extraction is safe there. Callers check
+  /// The destinations for extracting [archiveContext] onto a
+  /// case-insensitive filesystem when some of them would replace one
+  /// another ("Notes.txt" and "notes.txt"): archive entry path -> the
+  /// destination path to use, with the later of each colliding group renamed
+  /// to a unique "name (1).ext". Returns `null` when nothing collides, in
+  /// which case the extraction can go ahead unchanged (including the fast
+  /// native bulk route). Callers check
   /// `isDestinationCaseSensitive(destination)` first -- on a case-sensitive
   /// destination those entries are legitimately different files.
-  static List<List<String>> findExtractCaseCollisions(
+  static Map<String, String>? caseSafeExtractPlan(
     ArchiveContext archiveContext, {
     List<String>? selectedEntryPaths,
     String subPath = '',
-  }) => findCaseCollisions(
-    extractFilePaths(
+  }) {
+    final destinations = extractDestinations(
       archiveContext,
       selectedEntryPaths: selectedEntryPaths,
       subPath: subPath,
-    ),
-  );
+    );
+    final original = destinations.values.toList();
+    final resolved = resolveCaseCollisionPaths(original);
+    var changed = false;
+    for (var i = 0; i < original.length; i++) {
+      if (resolved[i] != original[i]) {
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) return null;
+    final keys = destinations.keys.toList();
+    return {for (var i = 0; i < keys.length; i++) keys[i]: resolved[i]};
+  }
+
+  /// Extracts exactly the files in [destRelByEntryPath] (archive entry path
+  /// -> destination path relative to [targetDirInContainer]) one at a time.
+  /// Used instead of the bulk native route when destination names have to
+  /// differ from the archive's, i.e. for a [caseSafeExtractPlan]. Empty
+  /// folders that the archive lists are not recreated on this route.
+  static Future<int> extractMappedToContainer({
+    required MountedContainer container,
+    required ArchiveContext archiveContext,
+    required Map<String, String> destRelByEntryPath,
+    required String targetDirInContainer,
+    void Function(int count, String currentPath)? onProgress,
+    int? opId,
+  }) async {
+    int count = 0;
+    for (final mapping in destRelByEntryPath.entries) {
+      final destPath = targetDirInContainer.isEmpty
+          ? mapping.value
+          : '$targetDirInContainer/${mapping.value}';
+
+      final parentDir = p.dirname(destPath);
+      if (parentDir.isNotEmpty && parentDir != '.') {
+        await _fileIo.createDirectory(container, parentDir);
+      }
+
+      final ok = await _extractEntryToContainer(
+        container: container,
+        archiveContext: archiveContext,
+        entryPath: mapping.key,
+        destPath: destPath,
+        opId: opId,
+      );
+      if (ok) {
+        count++;
+        onProgress?.call(count, p.basename(destPath));
+      }
+    }
+    return count;
+  }
 
   static Future<bool> _extractEntryToContainer({
     required MountedContainer container,

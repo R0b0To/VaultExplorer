@@ -23,6 +23,7 @@ class VaultEngineEvents {
   Completer<bool>? _cameraPermissionCompleter;
   Completer<bool>? _storagePermissionCompleter;
   Completer<bool>? _notificationPermissionCompleter;
+  Completer<bool>? _automationPermissionCompleter;
 
   Future<bool> awaitCameraPermissionResult() {
     final completer = Completer<bool>();
@@ -39,6 +40,12 @@ class VaultEngineEvents {
   Future<bool> awaitNotificationPermissionResult() {
     final completer = Completer<bool>();
     _notificationPermissionCompleter = completer;
+    return completer.future;
+  }
+
+  Future<bool> awaitAutomationPermissionResult() {
+    final completer = Completer<bool>();
+    _automationPermissionCompleter = completer;
     return completer.future;
   }
 
@@ -601,6 +608,10 @@ class VaultEngineEvents {
         final granted = call.arguments['granted'] as bool? ?? false;
         _notificationPermissionCompleter?.complete(granted);
         _notificationPermissionCompleter = null;
+      } else if (call.method == 'onAutomationPermissionResult') {
+        final granted = call.arguments['granted'] as bool? ?? false;
+        _automationPermissionCompleter?.complete(granted);
+        _automationPermissionCompleter = null;
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level =
             (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;

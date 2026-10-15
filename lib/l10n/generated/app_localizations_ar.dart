@@ -11748,4 +11748,133 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => 'مولّد الجهاز فقط';
+
+  @override
+  String get automationCaptureSectionHeader => 'الكاميرا والميكروفون';
+
+  @override
+  String get automationAllowCaptureTitle =>
+      'السماح بالالتقاط عبر الكاميرا والميكروفون';
+
+  @override
+  String get automationAllowCaptureSubtitle => 'تسجيل الصور والفيديو والصوت';
+
+  @override
+  String get automationPermissionsSectionHeader => 'الأذونات';
+
+  @override
+  String get automationPermissionsIntro =>
+      'هذه أذونات خاصة بنظام Android، لذا تنطبق على التطبيق بأكمله وليس على هذه الخزينة فقط. يتم عرض الأذونات التي يمكن لإعداد هذه الخزينة استخدامها فقط، مع بيان حالتها الحالية.';
+
+  @override
+  String get automationPermSetupNeededTitle => 'يلزم الإعداد';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'أوشكت على الانتهاء';
+
+  @override
+  String get automationPermReadyTitle => 'جاهز';
+
+  @override
+  String get automationPermReadyMessage =>
+      'كل ما تحتاجه أتمتة هذه الخزينة جاهز ومكتمل.';
+
+  @override
+  String get automationPermGrantButton => 'منح';
+
+  @override
+  String get automationPermGranted => 'تم المنح';
+
+  @override
+  String get automationPermTagRequired => 'مطلوب';
+
+  @override
+  String get automationPermTagRecommended => 'موصى به';
+
+  @override
+  String get automationPermTagOptional => 'اختياري';
+
+  @override
+  String get automationPermDeniedMessage =>
+      'لم يتم منح الإذن. إذا لم يطلب Android ذلك مرة أخرى، فقم بتفعيله من إعدادات التطبيق.';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'تعذر فتح إعدادات التطبيق. انتقل إلى الإعدادات > التطبيقات > VaultExplorer > الأذونات.';
+
+  @override
+  String get automationPermBatteryTitle => 'استخدام البطارية غير المقيد';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'يتيح للأتمتة إلغاء قفل هذه الخزينة أثناء إغلاق VaultExplorer تمامًا. بدون ذلك، قد يحظر Android هذا الإجراء.';
+
+  @override
+  String get automationPermNotificationsTitle => 'الإشعارات';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'يعرض تقدم عمليات الاستيراد والتصدير والمزامنة، والمؤشر أثناء تشغيل التسجيل.';
+
+  @override
+  String get automationPermAllFilesTitle => 'الوصول إلى جميع الملفات';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'يتيح لإجراءات الاستيراد والتصدير استخدام مسارات الملفات العادية مثل /storage/emulated/0/…. لا يلزم لروابط content://.';
+
+  @override
+  String get automationPermCameraTitle => 'الكاميرا';
+
+  @override
+  String get automationPermCameraDescription =>
+      'الصور ومقاطع الفيديو الملتقطة بواسطة الأتمتة.';
+
+  @override
+  String get automationPermMicrophoneTitle => 'الميكروفون';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      'التسجيلات الصوتية وصوت الفيديو. ويتم التحقق منه أيضًا عند التقاط الصور والفيديو.';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'مطلوب فقط إذا كان تطبيق الأتمتة يبدأ التقاط الصور أو الفيديو عبر Broadcast على Android 14 وما بعده. غير مطلوب عند استهداف نشاط الالتقاط مباشرة.';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count إذن مطلوب مفقود. ستفشل بعض إجراءات الأتمتة حتى يتم منحها.',
+      many:
+          '$count إذنًا مطلوبًا مفقودًا. ستفشل بعض إجراءات الأتمتة حتى يتم منحها.',
+      few:
+          '$count أذونات مطلوبة مفقودة. ستفشل بعض إجراءات الأتمتة حتى يتم منحها.',
+      two: 'إذنان مطلوبان مفقودان. ستفشل بعض إجراءات الأتمتة حتى يتم منحهما.',
+      one: 'إذن مطلوب واحد مفقود. ستفشل بعض إجراءات الأتمتة حتى يتم منحه.',
+      zero: 'لا توجد أذونات مطلوبة مفقودة.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count إعداد موصى به ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.',
+      many:
+          '$count إعدادًا موصى به ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.',
+      few:
+          '$count إعدادات موصى بها ما زالت معطلة. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.',
+      two:
+          'إعدادان موصى بهما ما زالا معطلين. تعمل الأتمتة، لكنهما قد يجعلانها أقل موثوقية.',
+      one:
+          'إعداد موصى به واحد ما زال معطلاً. تعمل الأتمتة، لكنها قد تكون أقل موثوقية.',
+      zero: 'لا توجد إعدادات موصى بها معطلة.',
+    );
+    return '$_temp0';
+  }
 }

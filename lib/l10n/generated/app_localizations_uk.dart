@@ -11811,4 +11811,130 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => 'Лише генератор пристрою';
+
+  @override
+  String get automationCaptureSectionHeader => 'Камера та мікрофон';
+
+  @override
+  String get automationAllowCaptureTitle =>
+      'Дозволити зйомку камерою та мікрофоном';
+
+  @override
+  String get automationAllowCaptureSubtitle => 'Запис фото, відео та аудіо';
+
+  @override
+  String get automationPermissionsSectionHeader => 'Дозволи';
+
+  @override
+  String get automationPermissionsIntro =>
+      'Це системні дозволи Android, тому вони діють для всієї програми, а не лише для цього сховища. Відображаються лише ті, які можуть використовуватися налаштуваннями цього сховища, разом із поточним статусом.';
+
+  @override
+  String get automationPermSetupNeededTitle => 'Потрібне налаштування';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'Майже готово';
+
+  @override
+  String get automationPermReadyTitle => 'Готово';
+
+  @override
+  String get automationPermReadyMessage =>
+      'Усе необхідне для автоматизації цього сховища налаштовано.';
+
+  @override
+  String get automationPermGrantButton => 'Надати';
+
+  @override
+  String get automationPermGranted => 'Надано';
+
+  @override
+  String get automationPermTagRequired => 'Обов\'язково';
+
+  @override
+  String get automationPermTagRecommended => 'Рекомендовано';
+
+  @override
+  String get automationPermTagOptional => 'Необов\'язково';
+
+  @override
+  String get automationPermDeniedMessage =>
+      'Дозвіл не надано. Якщо Android більше не запитує, увімкніть його в налаштуваннях програми.';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'Не вдалося відкрити налаштування програми. Перейдіть у Налаштування > Програми > VaultExplorer > Дозволи.';
+
+  @override
+  String get automationPermBatteryTitle => 'Необмежене використання батареї';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'Дозволяє автоматизації розблокувати це сховище, навіть коли VaultExplorer повністю закрито. Без цього Android може заблокувати дію.';
+
+  @override
+  String get automationPermNotificationsTitle => 'Сповіщення';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'Показує перебіг імпорту, експорту та синхронізації, а також індикатор під час виконання запису.';
+
+  @override
+  String get automationPermAllFilesTitle => 'Доступ до всіх файлів';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'Дозволяє діям імпорту та експорту використовувати звичайні шляхи до файлів, такі як /storage/emulated/0/…. Не потрібно для посилань content://.';
+
+  @override
+  String get automationPermCameraTitle => 'Камера';
+
+  @override
+  String get automationPermCameraDescription =>
+      'Фото та відео, зняті засобами автоматизації.';
+
+  @override
+  String get automationPermMicrophoneTitle => 'Мікрофон';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      'Аудіозаписи та звук відео. Також перевіряється під час зйомки фото та відео.';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'Потрібно лише якщо ваша програма автоматизації запускає зйомку фото чи відео через Broadcast на Android 14+. Не потрібно в разі прямого виклику активності зйомки.';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Відсутні $count обов\'язкових дозволів. Деякі дії автоматизації не працюватимуть, доки їх не буде надано.',
+      many:
+          'Відсутні $count обов\'язкових дозволів. Деякі дії автоматизації не працюватимуть, доки їх не буде надано.',
+      few:
+          'Відсутні $count обов\'язкові дозволи. Деякі дії автоматизації не працюватимуть, доки їх не буде надано.',
+      one:
+          'Відсутній $count обов\'язковий дозвіл. Деякі дії автоматизації не працюватимуть, доки його не буде надано.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Ще вимкнено $count рекомендованих налаштувань. Автоматизація працює, але може бути менш надійною.',
+      many:
+          'Ще вимкнено $count рекомендованих налаштувань. Автоматизація працює, але може бути менш надійною.',
+      few:
+          'Ще вимкнено $count рекомендовані налаштування. Автоматизація працює, але може бути менш надійною.',
+      one:
+          'Ще вимкнено $count рекомендоване налаштування. Автоматизація працює, але може бути менш надійною.',
+    );
+    return '$_temp0';
+  }
 }

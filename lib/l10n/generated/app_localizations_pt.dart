@@ -11733,4 +11733,123 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => 'Somente gerador do dispositivo';
+
+  @override
+  String get automationCaptureSectionHeader => 'Câmera e microfone';
+
+  @override
+  String get automationAllowCaptureTitle =>
+      'Permitir captura de câmera e microfone';
+
+  @override
+  String get automationAllowCaptureSubtitle =>
+      'Gravação de fotos, vídeos e áudio';
+
+  @override
+  String get automationPermissionsSectionHeader => 'Permissões';
+
+  @override
+  String get automationPermissionsIntro =>
+      'Estas são permissões do Android, portanto, aplicam-se a todo o aplicativo, não apenas a este cofre. Apenas as permissões que a configuração deste cofre pode usar são listadas, cada uma com seu status atual.';
+
+  @override
+  String get automationPermSetupNeededTitle => 'Configuração necessária';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'Quase pronto';
+
+  @override
+  String get automationPermReadyTitle => 'Pronto';
+
+  @override
+  String get automationPermReadyMessage =>
+      'Tudo o que a automação deste cofre precisa está configurado.';
+
+  @override
+  String get automationPermGrantButton => 'Conceder';
+
+  @override
+  String get automationPermGranted => 'Concedido';
+
+  @override
+  String get automationPermTagRequired => 'Obrigatório';
+
+  @override
+  String get automationPermTagRecommended => 'Recomendado';
+
+  @override
+  String get automationPermTagOptional => 'Opcional';
+
+  @override
+  String get automationPermDeniedMessage =>
+      'Permissão não concedida. Se o Android não perguntar novamente, ative-a nas configurações do aplicativo.';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'Não foi possível abrir as configurações do app. Abra Configurações > Apps > VaultExplorer > Permissões.';
+
+  @override
+  String get automationPermBatteryTitle => 'Uso irrestrito da bateria';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'Permite que a automação desbloqueie este cofre enquanto o VaultExplorer estiver totalmente fechado. Sem isso, o Android pode bloquear a ação.';
+
+  @override
+  String get automationPermNotificationsTitle => 'Notificações';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'Exibe o progresso de importações, exportações e sincronização, além do indicador enquanto uma gravação estiver em andamento.';
+
+  @override
+  String get automationPermAllFilesTitle => 'Acesso a todos os arquivos';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'Permite que ações de importação e exportação usem caminhos de arquivo simples como /storage/emulated/0/…. Não é necessário para links content://.';
+
+  @override
+  String get automationPermCameraTitle => 'Câmera';
+
+  @override
+  String get automationPermCameraDescription =>
+      'Fotos e vídeos capturados pela automação.';
+
+  @override
+  String get automationPermMicrophoneTitle => 'Microfone';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      'Gravações de áudio e som de vídeo. A captura de fotos e vídeos também verifica essa permissão.';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'Necessário apenas se o seu app de automação iniciar a captura de fotos ou vídeos por Broadcast no Android 14+. Não é necessário ao direcionar a atividade de captura diretamente.';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Faltam $count permissões obrigatórias. Algumas ações de automação falharão até que sejam concedidas.',
+      one:
+          'Falta 1 permissão obrigatória. Algumas ações de automação falharão até que ela seja concedida.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count configurações recomendadas ainda estão desativadas. A automação funciona, mas pode ser menos estável.',
+      one:
+          '1 configuração recomendada ainda está desativada. A automação funciona, mas pode ser menos estável.',
+    );
+    return '$_temp0';
+  }
 }

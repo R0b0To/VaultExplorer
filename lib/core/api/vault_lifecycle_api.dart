@@ -263,6 +263,69 @@ class VaultLifecycleApi {
     }
   }
 
+  /// Live state of every device-level permission the Automation screen
+  /// lists, in one call. Unknown/failed lookups fall back to "granted" so a
+  /// broken check never shows a warning the person can't resolve (same
+  /// policy as [hasUnrestrictedBattery]).
+  Future<AutomationPermissionStatus> getAutomationPermissionStatus() async {
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        ChannelMethods.getAutomationPermissionStatus,
+      );
+      bool read(String key) => result?[key] as bool? ?? true;
+      return AutomationPermissionStatus(
+        camera: read('camera'),
+        microphone: read('microphone'),
+        notifications: read('notifications'),
+        overlay: read('overlay'),
+        allFiles: read('allFiles'),
+        battery: read('battery'),
+      );
+    } catch (e) {
+      logSwallowed('getAutomationPermissionStatus', e);
+      return const AutomationPermissionStatus();
+    }
+  }
+
+  /// Shows the system prompt for exactly one runtime permission. Only
+  /// [AutomationRuntimePermission.camera] and
+  /// [AutomationRuntimePermission.microphone] go through here; notifications
+  /// already have [requestNotificationPermission]. Returns the grant result;
+  /// a denied result with no dialog shown (Android stops prompting after two
+  /// denials) is indistinguishable from the person tapping "Deny", so
+  /// callers fall back to [openAppSettings] on the next attempt.
+  Future<bool> requestAutomationPermission(
+    AutomationRuntimePermission permission,
+  ) async {
+    final resultFuture = _events.awaitAutomationPermissionResult();
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.requestAutomationPermission,
+        {'kind': permission.name},
+      );
+    } catch (e) {
+      return false;
+    }
+    try {
+      return await resultFuture.timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      return false;
+    }
+  }
+
+  /// Opens the app's system "App info" page. Callers should re-check
+  /// [getAutomationPermissionStatus] on resume.
+  Future<bool> openAppSettings() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.openAppSettings,
+      );
+      return result ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ── Android Share Sheet integration ─────────────────────────────────────
   // See ShareIntentHandlers.kt/IncomingShareBridge.kt and
   // lib/features/share_import/ for the Flutter-side flow these back. The

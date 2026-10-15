@@ -198,3 +198,31 @@ void logSwallowed(String method, Object error, {bool expected = false}) {
     level: expected ? 500 : 900,
   );
 }
+
+
+/// Live state of the device-level permissions the Automation screen lists.
+///
+/// Every field defaults to `true`: before the first check completes, and
+/// whenever a check fails, the screen shows nothing to fix rather than a
+/// warning the person cannot resolve.
+class AutomationPermissionStatus {
+  final bool camera;
+  final bool microphone;
+  final bool notifications;
+  final bool overlay;
+  final bool allFiles;
+  final bool battery;
+
+  const AutomationPermissionStatus({
+    this.camera = true,
+    this.microphone = true,
+    this.notifications = true,
+    this.overlay = true,
+    this.allFiles = true,
+    this.battery = true,
+  });
+}
+
+/// Runtime permissions that can be requested one at a time with the system
+/// prompt. The enum [name] is the wire value of the native `kind` argument.
+enum AutomationRuntimePermission { camera, microphone }

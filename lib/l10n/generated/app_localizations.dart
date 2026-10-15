@@ -19626,6 +19626,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device generator only'**
   String get entropyReviewDeviceOnly;
+
+  /// Section header above the per-vault switch that lets automation capture photos, video and audio
+  ///
+  /// In en, this message translates to:
+  /// **'Camera and microphone'**
+  String get automationCaptureSectionHeader;
+
+  /// Switch label: lets automation take photos and record video or audio into this vault
+  ///
+  /// In en, this message translates to:
+  /// **'Allow camera and microphone capture'**
+  String get automationAllowCaptureTitle;
+
+  /// Switch subtitle listing what the capture opt-in covers
+  ///
+  /// In en, this message translates to:
+  /// **'Photo, video and audio recording'**
+  String get automationAllowCaptureSubtitle;
+
+  /// Section header above the checklist of Android permissions automation needs
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get automationPermissionsSectionHeader;
+
+  /// Intro under the Permissions header on the vault Automation screen
+  ///
+  /// In en, this message translates to:
+  /// **'These are Android permissions, so they apply to the whole app, not just this vault. Only the ones this vault\'s setup can use are listed, each with its current status.'**
+  String get automationPermissionsIntro;
+
+  /// Title of the red summary banner when a required permission is missing
+  ///
+  /// In en, this message translates to:
+  /// **'Setup needed'**
+  String get automationPermSetupNeededTitle;
+
+  /// Title of the amber summary banner when only recommended settings are missing
+  ///
+  /// In en, this message translates to:
+  /// **'Almost ready'**
+  String get automationPermAlmostReadyTitle;
+
+  /// Title of the green summary banner when all needed permissions are granted
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get automationPermReadyTitle;
+
+  /// Message of the green summary banner when all needed permissions are granted
+  ///
+  /// In en, this message translates to:
+  /// **'Everything this vault\'s automation needs is in place.'**
+  String get automationPermReadyMessage;
+
+  /// Button on a permission row that asks Android for that permission
+  ///
+  /// In en, this message translates to:
+  /// **'Grant'**
+  String get automationPermGrantButton;
+
+  /// Small status tag on a permission row that is already granted
+  ///
+  /// In en, this message translates to:
+  /// **'Granted'**
+  String get automationPermGranted;
+
+  /// Small tag on a missing permission that automation cannot work without
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get automationPermTagRequired;
+
+  /// Small tag on a missing permission that makes automation more reliable
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get automationPermTagRecommended;
+
+  /// Small tag on a missing permission that only matters for one way of triggering automation
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get automationPermTagOptional;
+
+  /// Snackbar after the person refuses a permission prompt; the button then opens settings
+  ///
+  /// In en, this message translates to:
+  /// **'Permission not granted. If Android doesn\'t ask again, turn it on in the app\'s settings.'**
+  String get automationPermDeniedMessage;
+
+  /// Snackbar when the app's system settings page could not be opened
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Permissions.'**
+  String get automationPermSettingsOpenFailedMessage;
+
+  /// Permission row title for Android's Unrestricted battery setting
+  ///
+  /// In en, this message translates to:
+  /// **'Unrestricted battery usage'**
+  String get automationPermBatteryTitle;
+
+  /// Permission row description for Unrestricted battery usage
+  ///
+  /// In en, this message translates to:
+  /// **'Lets automation unlock this vault while VaultExplorer is fully closed. Without it, Android can block the action.'**
+  String get automationPermBatteryDescription;
+
+  /// Permission row title for notifications
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get automationPermNotificationsTitle;
+
+  /// Permission row description for notifications
+  ///
+  /// In en, this message translates to:
+  /// **'Shows progress for imports, exports and sync, and the indicator while a recording is running.'**
+  String get automationPermNotificationsDescription;
+
+  /// Permission row title for Android's All files access
+  ///
+  /// In en, this message translates to:
+  /// **'All files access'**
+  String get automationPermAllFilesTitle;
+
+  /// Permission row description for All files access
+  ///
+  /// In en, this message translates to:
+  /// **'Lets import and export actions use plain file paths such as /storage/emulated/0/…. Not needed for content:// links.'**
+  String get automationPermAllFilesDescription;
+
+  /// Permission row title for the camera
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get automationPermCameraTitle;
+
+  /// Permission row description for the camera
+  ///
+  /// In en, this message translates to:
+  /// **'Photos and video captured by automation.'**
+  String get automationPermCameraDescription;
+
+  /// Permission row title for the microphone
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get automationPermMicrophoneTitle;
+
+  /// Permission row description for the microphone
+  ///
+  /// In en, this message translates to:
+  /// **'Audio recordings and video sound. Photo and video capture check for it too.'**
+  String get automationPermMicrophoneDescription;
+
+  /// Permission row description for Display over other apps
+  ///
+  /// In en, this message translates to:
+  /// **'Only needed if your automation app starts photo or video capture with a Broadcast on Android 14+. Not needed when it targets the capture activity directly.'**
+  String get automationPermOverlayDescription;
+
+  /// Message of the red summary banner: how many required permissions are missing
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 required permission is missing. Some automation actions will fail until it\'s granted.} other{{count} required permissions are missing. Some automation actions will fail until they\'re granted.}}'**
+  String automationPermSetupNeededMessage(int count);
+
+  /// Message of the amber summary banner: how many recommended settings are still off
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 recommended setting is still off. Automation works, but may be less reliable.} other{{count} recommended settings are still off. Automation works, but may be less reliable.}}'**
+  String automationPermAlmostReadyMessage(int count);
 }
 
 class _AppLocalizationsDelegate

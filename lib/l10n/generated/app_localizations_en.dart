@@ -11558,4 +11558,123 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => 'Device generator only';
+
+  @override
+  String get automationCaptureSectionHeader => 'Camera and microphone';
+
+  @override
+  String get automationAllowCaptureTitle =>
+      'Allow camera and microphone capture';
+
+  @override
+  String get automationAllowCaptureSubtitle =>
+      'Photo, video and audio recording';
+
+  @override
+  String get automationPermissionsSectionHeader => 'Permissions';
+
+  @override
+  String get automationPermissionsIntro =>
+      'These are Android permissions, so they apply to the whole app, not just this vault. Only the ones this vault\'s setup can use are listed, each with its current status.';
+
+  @override
+  String get automationPermSetupNeededTitle => 'Setup needed';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'Almost ready';
+
+  @override
+  String get automationPermReadyTitle => 'Ready';
+
+  @override
+  String get automationPermReadyMessage =>
+      'Everything this vault\'s automation needs is in place.';
+
+  @override
+  String get automationPermGrantButton => 'Grant';
+
+  @override
+  String get automationPermGranted => 'Granted';
+
+  @override
+  String get automationPermTagRequired => 'Required';
+
+  @override
+  String get automationPermTagRecommended => 'Recommended';
+
+  @override
+  String get automationPermTagOptional => 'Optional';
+
+  @override
+  String get automationPermDeniedMessage =>
+      'Permission not granted. If Android doesn\'t ask again, turn it on in the app\'s settings.';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Permissions.';
+
+  @override
+  String get automationPermBatteryTitle => 'Unrestricted battery usage';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'Lets automation unlock this vault while VaultExplorer is fully closed. Without it, Android can block the action.';
+
+  @override
+  String get automationPermNotificationsTitle => 'Notifications';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'Shows progress for imports, exports and sync, and the indicator while a recording is running.';
+
+  @override
+  String get automationPermAllFilesTitle => 'All files access';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'Lets import and export actions use plain file paths such as /storage/emulated/0/…. Not needed for content:// links.';
+
+  @override
+  String get automationPermCameraTitle => 'Camera';
+
+  @override
+  String get automationPermCameraDescription =>
+      'Photos and video captured by automation.';
+
+  @override
+  String get automationPermMicrophoneTitle => 'Microphone';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      'Audio recordings and video sound. Photo and video capture check for it too.';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'Only needed if your automation app starts photo or video capture with a Broadcast on Android 14+. Not needed when it targets the capture activity directly.';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count required permissions are missing. Some automation actions will fail until they\'re granted.',
+      one:
+          '1 required permission is missing. Some automation actions will fail until it\'s granted.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count recommended settings are still off. Automation works, but may be less reliable.',
+      one:
+          '1 recommended setting is still off. Automation works, but may be less reliable.',
+    );
+    return '$_temp0';
+  }
 }

@@ -10922,4 +10922,112 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => '仅设备生成器';
+
+  @override
+  String get automationCaptureSectionHeader => '相机与麦克风';
+
+  @override
+  String get automationAllowCaptureTitle => '允许相机和麦克风捕获';
+
+  @override
+  String get automationAllowCaptureSubtitle => '照片、视频和音频录制';
+
+  @override
+  String get automationPermissionsSectionHeader => '权限';
+
+  @override
+  String get automationPermissionsIntro =>
+      '这些是 Android 系统权限，因此适用于整个应用，而不仅限于此保管库。此处仅列出此保管库配置所能使用的权限及其当前状态。';
+
+  @override
+  String get automationPermSetupNeededTitle => '需要设置';
+
+  @override
+  String get automationPermAlmostReadyTitle => '即将就绪';
+
+  @override
+  String get automationPermReadyTitle => '已就绪';
+
+  @override
+  String get automationPermReadyMessage => '此保管库自动化所需的所有设置均已就绪。';
+
+  @override
+  String get automationPermGrantButton => '授予';
+
+  @override
+  String get automationPermGranted => '已授予';
+
+  @override
+  String get automationPermTagRequired => '必需';
+
+  @override
+  String get automationPermTagRecommended => '推荐';
+
+  @override
+  String get automationPermTagOptional => '可选';
+
+  @override
+  String get automationPermDeniedMessage =>
+      '未授予权限。如果 Android 不再弹出提示，请在应用设置中开启。';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      '无法打开应用设置。请前往“设置 > 应用 > VaultExplorer > 权限”。';
+
+  @override
+  String get automationPermBatteryTitle => '无限制电池使用';
+
+  @override
+  String get automationPermBatteryDescription =>
+      '允许在 VaultExplorer 完全关闭时通过自动化解锁此保管库。若未开启，Android 可能会拦截该操作。';
+
+  @override
+  String get automationPermNotificationsTitle => '通知';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      '显示导入、导出和同步的进度，以及录制运行中的状态指示器。';
+
+  @override
+  String get automationPermAllFilesTitle => '所有文件访问权限';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      '允许导入和导出操作使用普通文件路径（例如 /storage/emulated/0/…）。content:// 链接无需此权限。';
+
+  @override
+  String get automationPermCameraTitle => '相机';
+
+  @override
+  String get automationPermCameraDescription => '用于自动化拍摄的照片和录制的视频。';
+
+  @override
+  String get automationPermMicrophoneTitle => '麦克风';
+
+  @override
+  String get automationPermMicrophoneDescription => '用于录音和视频伴音。拍照和录像捕获时也会进行检查。';
+
+  @override
+  String get automationPermOverlayDescription =>
+      '仅在 Android 14+ 上自动化应用通过广播（Broadcast）启动照片或视频捕获时才需要。若直接针对捕获 Activity，则不需要。';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '缺少 $count 项必需权限。在授予权限之前，部分自动化操作将会失败。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '仍有 $count 项推荐设置未开启。自动化仍可运行，但可能不够稳定。',
+    );
+    return '$_temp0';
+  }
 }

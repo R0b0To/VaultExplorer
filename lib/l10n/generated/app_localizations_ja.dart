@@ -11094,4 +11094,113 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => '端末の生成器のみ';
+
+  @override
+  String get automationCaptureSectionHeader => 'カメラとマイク';
+
+  @override
+  String get automationAllowCaptureTitle => 'カメラとマイクの撮影・録音を許可';
+
+  @override
+  String get automationAllowCaptureSubtitle => '写真、動画、音声の録音・録画';
+
+  @override
+  String get automationPermissionsSectionHeader => '権限';
+
+  @override
+  String get automationPermissionsIntro =>
+      'これらはAndroidの権限であるため、この保管庫だけでなくアプリ全体に適用されます。この保管庫の設定で使用できる権限のみが、現在のステータスとともに表示されます。';
+
+  @override
+  String get automationPermSetupNeededTitle => '設定が必要です';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'ほぼ完了';
+
+  @override
+  String get automationPermReadyTitle => '準備完了';
+
+  @override
+  String get automationPermReadyMessage => 'この保管庫の自動化に必要な設定はすべて整っています。';
+
+  @override
+  String get automationPermGrantButton => '許可する';
+
+  @override
+  String get automationPermGranted => '許可済み';
+
+  @override
+  String get automationPermTagRequired => '必須';
+
+  @override
+  String get automationPermTagRecommended => '推奨';
+
+  @override
+  String get automationPermTagOptional => '任意';
+
+  @override
+  String get automationPermDeniedMessage =>
+      '権限が許可されませんでした。今後Androidから確認ダイアログが表示されない場合は、アプリの設定で有効にしてください。';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'アプリの設定を開けませんでした。「設定 > アプリ > VaultExplorer > 権限」から開いてください。';
+
+  @override
+  String get automationPermBatteryTitle => 'バッテリー使用量の無制限';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'VaultExplorerが完全に終了している状態でも、自動化によってこの保管庫のロックを解除できるようにします。無効の場合、Androidがアクションをブロックすることがあります。';
+
+  @override
+  String get automationPermNotificationsTitle => '通知';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'インポート、エクスポート、同期の進行状況や、録音・録画実行中のインジケーターを表示します。';
+
+  @override
+  String get automationPermAllFilesTitle => 'すべてのファイルへのアクセス';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'インポートおよびエクスポートで /storage/emulated/0/… などの通常のファイルパスを使用できるようにします。content:// リンクの場合は不要です。';
+
+  @override
+  String get automationPermCameraTitle => 'カメラ';
+
+  @override
+  String get automationPermCameraDescription => '自動化によって撮影される写真および動画用。';
+
+  @override
+  String get automationPermMicrophoneTitle => 'マイク';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      '音声録音および動画の音声用。写真や動画の撮影時にも確認されます。';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'Android 14以降で、自動化アプリがブロードキャスト経由で写真や動画の撮影を開始する場合にのみ必要です。撮影アクティビティを直接起動する場合は不要です。';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '必要な権限が$count個不足しています。許可されるまで一部の自動化アクションは失敗します。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '推奨設定が$count個オフのままです。自動化は動作しますが、信頼性が低下する可能性があります。',
+    );
+    return '$_temp0';
+  }
 }

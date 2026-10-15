@@ -31,6 +31,7 @@ import com.aeidolon.vaultexplorer.R
 
 const val STORAGE_PERMISSION_REQUEST_CODE = 9822
 const val NOTIFICATION_PERMISSION_REQUEST_CODE = 9823
+const val AUTOMATION_PERMISSION_REQUEST_CODE = 9824
 
 class SystemPermissionHandlers(private val activity: MainActivity) {
     var userWantsSecureScreen = false
@@ -219,6 +220,86 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             data = Uri.parse("package:${activity.packageName}")
         }
         activity.startActivity(intent)
+    }
+
+    /**
+     * One snapshot of every device-level permission the Automation screen
+     * shows, so the screen can refresh the whole checklist with a single
+     * round trip each time the person comes back from a system dialog or
+     * Settings page. Each value is the *live* OS state -- unlike the
+     * per-vault opt-ins, nothing here is stored by the app.
+     *
+     * Keys: camera, microphone, notifications, overlay, allFiles, battery.
+     * Permissions that don't exist on the running API level (overlay below
+     * 23, ...) report true: "nothing to grant".
+     */
+    fun handleGetAutomationPermissionStatus(call: MethodCall, result: MethodChannel.Result) {
+        fun runtimeGranted(permission: String) =
+            ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
+
+        // areNotificationsEnabled() also covers notifications switched off
+        // for the app in Settings (the only way to block them below API 33)
+        // and a block done there on 33+, which the runtime-permission check
+        // alone would miss.
+        val notifications =
+            androidx.core.app.NotificationManagerCompat.from(activity).areNotificationsEnabled() &&
+                (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    runtimeGranted(Manifest.permission.POST_NOTIFICATIONS))
+        val overlay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(activity)
+        } else {
+            true
+        }
+        val battery = activity.getSystemService(PowerManager::class.java)
+            ?.isIgnoringBatteryOptimizations(activity.packageName) ?: true
+
+        result.success(
+            mapOf(
+                "camera" to runtimeGranted(Manifest.permission.CAMERA),
+                "microphone" to runtimeGranted(Manifest.permission.RECORD_AUDIO),
+                "notifications" to notifications,
+                "overlay" to overlay,
+                "allFiles" to com.aeidolon.vaultexplorer.RawFileResolver.hasExternalStoragePermission(activity),
+                "battery" to battery,
+            ),
+        )
+    }
+
+    /**
+     * Requests exactly one of CAMERA or RECORD_AUDIO. The in-app camera
+     * screen asks for both together (CAMERA_PERMISSION_REQUEST_CODE), which
+     * is right for a viewfinder with sound but wrong for automation: audio
+     * only recording needs the microphone and nothing else, so each gets its
+     * own request. The result arrives asynchronously as
+     * "onAutomationPermissionResult" -- see
+     * VaultEngineEvents.awaitAutomationPermissionResult().
+     *
+     * When Android has stopped showing the prompt for this permission (denied
+     * twice) the callback still arrives, immediately and denied; the caller
+     * is expected to fall back to [handleOpenAppSettings] in that case.
+     */
+    fun handleRequestAutomationPermission(call: MethodCall, result: MethodChannel.Result) {
+        val permission = when (call.argument<String>("kind")) {
+            "camera" -> Manifest.permission.CAMERA
+            "microphone" -> Manifest.permission.RECORD_AUDIO
+            else -> return result.error("INVALID_ARGUMENT", "Unknown permission kind", null)
+        }
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(permission),
+            AUTOMATION_PERMISSION_REQUEST_CODE,
+        )
+        result.success(true)
+    }
+
+    /** Opens this app's "App info" page, where Permissions lives. */
+    fun handleOpenAppSettings(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            openAppDetailsSettings()
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("APP_SETTINGS_ERROR", e.message, null)
+        }
     }
 
     fun handleSetSensitiveClipboardText(call: MethodCall, result: MethodChannel.Result) {

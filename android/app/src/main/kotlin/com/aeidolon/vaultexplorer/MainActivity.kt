@@ -78,6 +78,7 @@ import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
 import com.aeidolon.vaultexplorer.handlers.NOTIFICATION_PERMISSION_REQUEST_CODE
+import com.aeidolon.vaultexplorer.handlers.AUTOMATION_PERMISSION_REQUEST_CODE
 
 private object ChannelMethods {
     const val GET_LOCAL_FILE_URI        = "getLocalFileUri"
@@ -129,6 +130,9 @@ private object ChannelMethods {
     const val HAS_UNRESTRICTED_BATTERY  = "hasUnrestrictedBattery"
     const val OPEN_BATTERY_SETTINGS     = "openBatterySettings"
     const val REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
+    const val GET_AUTOMATION_PERMISSION_STATUS = "getAutomationPermissionStatus"
+    const val REQUEST_AUTOMATION_PERMISSION = "requestAutomationPermission"
+    const val OPEN_APP_SETTINGS         = "openAppSettings"
     const val READ_MEDIA_FILE_CHUNK     = "readMediaFileChunk"
     const val WRITE_BACK_FILE           = "writeBackFile"
     const val GET_SPACE_INFO            = "getSpaceInfo"
@@ -580,6 +584,9 @@ open class MainActivity : FlutterFragmentActivity() {
         } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
             methodChannel?.invokeMethod("onNotificationPermissionResult", mapOf("granted" to granted))
+        } else if (requestCode == AUTOMATION_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            methodChannel?.invokeMethod("onAutomationPermissionResult", mapOf("granted" to granted))
         }
     }
 
@@ -1031,6 +1038,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.HAS_UNRESTRICTED_BATTERY -> systemHandlers.handleHasUnrestrictedBattery(call, result)
                 ChannelMethods.OPEN_BATTERY_SETTINGS -> systemHandlers.handleOpenBatterySettings(call, result)
                 ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)
+                ChannelMethods.GET_AUTOMATION_PERMISSION_STATUS -> systemHandlers.handleGetAutomationPermissionStatus(call, result)
+                ChannelMethods.REQUEST_AUTOMATION_PERMISSION -> systemHandlers.handleRequestAutomationPermission(call, result)
+                ChannelMethods.OPEN_APP_SETTINGS -> systemHandlers.handleOpenAppSettings(call, result)
                 ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
                 ChannelMethods.GET_LOCAL_FILE_URI -> localFileHandlers.handleGetLocalFileUri(call, result)
                 ChannelMethods.SHARE_LOCAL_FILE -> localFileHandlers.handleShareLocalFile(call, result)

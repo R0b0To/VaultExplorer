@@ -11,6 +11,7 @@ void main() {
   const engineChannel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   const cameraChannel = MethodChannel('com.aeidolon.vaultexplorer/camera');
   late ProviderContainer container;
+  final cameraCalls = <String>[];
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -35,14 +36,17 @@ void main() {
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(cameraChannel, (call) async {
+      cameraCalls.add(call.method);
       switch (call.method) {
         case 'hasPermissions':
-          return true;
+          // Camera/microphone NOT granted: the opt-in must still persist.
+          return false;
         default:
           return null;
       }
     });
 
+    cameraCalls.clear();
     container = ProviderContainer();
   });
 
@@ -79,5 +83,20 @@ void main() {
       await controller.setTier(AutomationTier.none);
       expect(container.read(provider).tier, AutomationTier.none);
     });
+
+    test(
+      'setCaptureEnabled is a pure opt-in and never checks or requests '
+      'camera/microphone permissions',
+      () async {
+        final controller = container.read(provider.notifier);
+
+        await controller.setCaptureEnabled(true, AppLocalizationsEn());
+
+        // Device permissions are shown as live rows on the screen instead,
+        // so a missing one must not block (or be hidden behind) the switch.
+        expect(container.read(provider).captureEnabled, isTrue);
+        expect(cameraCalls, isEmpty);
+      },
+    );
   });
 }

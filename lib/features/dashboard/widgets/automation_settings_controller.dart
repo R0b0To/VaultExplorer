@@ -19,7 +19,6 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
-import 'package:vaultexplorer/features/camera/vault_camera_controller.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'automation_settings_controller.g.dart';
@@ -182,27 +181,17 @@ class AutomationSettings extends _$AutomationSettings {
     return ok;
   }
 
-  /// Turning this on lets a headless automation trigger open the camera
-  /// with no Activity/UI on screen -- unlike the in-app capture flow,
-  /// there's no later moment where CAMERA/RECORD_AUDIO would naturally get
-  /// requested, so this has to request permissions itself before the
-  /// opt-in is persisted. Returns an error message to show via snackbar,
-  /// or null on success.
+  /// Persists this vault's camera/microphone capture opt-in. It is a policy
+  /// decision about *this vault* only: it deliberately does not request or
+  /// check any device permission. Those are app-wide, can be revoked from
+  /// system settings at any time, and are therefore shown as live status
+  /// rows on the screen (see AutomationSettingsScreen) instead of being
+  /// folded into this switch -- which used to claim "on" even after camera
+  /// or microphone access had been taken away.
+  ///
+  /// Returns an error message to show via snackbar, or null on success.
   Future<String?> setCaptureEnabled(bool enabled, AppLocalizations l10n) async {
     state = state._copy(savingCapture: true);
-    if (enabled) {
-      final hasPerms = await VaultCameraController.hasPermissions();
-      if (!hasPerms) {
-        final granted = await VaultCameraController(
-          ref.read(vaultEngineEventsProvider),
-        ).requestPermissions();
-        if (!ref.mounted) return null;
-        if (!granted) {
-          state = state._copy(savingCapture: false);
-          return l10n.cameraPermissionsRequiredMessage;
-        }
-      }
-    }
     final ok = await ref
         .read(vaultAutomationApiProvider)
         .setAutomationCaptureEnabled(uri, enabled);

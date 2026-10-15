@@ -37,6 +37,9 @@ abstract final class ChannelMethods {
   static const hasUnrestrictedBattery = 'hasUnrestrictedBattery';
   static const openBatterySettings = 'openBatterySettings';
   static const requestNotificationPermission = 'requestNotificationPermission';
+  static const getAutomationPermissionStatus = 'getAutomationPermissionStatus';
+  static const requestAutomationPermission = 'requestAutomationPermission';
+  static const openAppSettings = 'openAppSettings';
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';

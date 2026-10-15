@@ -11840,4 +11840,123 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get entropyReviewDeviceOnly => 'Générateur de l’appareil uniquement';
+
+  @override
+  String get automationCaptureSectionHeader => 'Appareil photo et microphone';
+
+  @override
+  String get automationAllowCaptureTitle =>
+      'Autoriser la capture photo et micro';
+
+  @override
+  String get automationAllowCaptureSubtitle =>
+      'Enregistrement photo, vidéo et audio';
+
+  @override
+  String get automationPermissionsSectionHeader => 'Autorisations';
+
+  @override
+  String get automationPermissionsIntro =>
+      'Il s\'agit d\'autorisations Android ; elles s\'appliquent donc à l\'ensemble de l\'application et pas uniquement à ce coffre-fort. Seules celles utilisées par la configuration de ce coffre-fort sont listées, avec leur état actuel.';
+
+  @override
+  String get automationPermSetupNeededTitle => 'Configuration requise';
+
+  @override
+  String get automationPermAlmostReadyTitle => 'Presque prêt';
+
+  @override
+  String get automationPermReadyTitle => 'Prêt';
+
+  @override
+  String get automationPermReadyMessage =>
+      'Tout ce dont l\'automatisation de ce coffre-fort a besoin est configuré.';
+
+  @override
+  String get automationPermGrantButton => 'Accorder';
+
+  @override
+  String get automationPermGranted => 'Accordée';
+
+  @override
+  String get automationPermTagRequired => 'Requis';
+
+  @override
+  String get automationPermTagRecommended => 'Recommandé';
+
+  @override
+  String get automationPermTagOptional => 'Facultatif';
+
+  @override
+  String get automationPermDeniedMessage =>
+      'Autorisation refusée. Si Android ne vous le demande plus, activez-la dans les paramètres de l\'application.';
+
+  @override
+  String get automationPermSettingsOpenFailedMessage =>
+      'Impossible d\'ouvrir les paramètres de l\'application. Allez dans Paramètres > Applications > VaultExplorer > Autorisations.';
+
+  @override
+  String get automationPermBatteryTitle => 'Batterie sans restriction';
+
+  @override
+  String get automationPermBatteryDescription =>
+      'Permet à l\'automatisation de déverrouiller ce coffre-fort lorsque VaultExplorer est complètement fermé. Sans cela, Android risque de bloquer l\'action.';
+
+  @override
+  String get automationPermNotificationsTitle => 'Notifications';
+
+  @override
+  String get automationPermNotificationsDescription =>
+      'Affiche la progression des importations, exportations et synchronisations, ainsi que l\'indicateur lorsqu\'un enregistrement est en cours.';
+
+  @override
+  String get automationPermAllFilesTitle => 'Accès à tous les fichiers';
+
+  @override
+  String get automationPermAllFilesDescription =>
+      'Permet aux actions d\'importation et d\'exportation d\'utiliser des chemins de fichiers standards comme /storage/emulated/0/…. Inutile pour les liens content://.';
+
+  @override
+  String get automationPermCameraTitle => 'Appareil photo';
+
+  @override
+  String get automationPermCameraDescription =>
+      'Photos et vidéos prises par l\'automatisation.';
+
+  @override
+  String get automationPermMicrophoneTitle => 'Microphone';
+
+  @override
+  String get automationPermMicrophoneDescription =>
+      'Enregistrements audio et son des vidéos. Les captures photo et vidéo le vérifient également.';
+
+  @override
+  String get automationPermOverlayDescription =>
+      'Nécessaire uniquement si votre application d\'automatisation lance une capture photo ou vidéo par Broadcast sur Android 14+. Inutile si elle cible directement l\'activité de capture.';
+
+  @override
+  String automationPermSetupNeededMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Il manque $count autorisations requises. Certaines actions d\'automatisation échoueront tant qu\'elles ne seront pas accordées.',
+      one:
+          'Il manque 1 autorisation requise. Certaines actions d\'automatisation échoueront tant qu\'elle ne sera pas accordée.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String automationPermAlmostReadyMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count paramètres recommandés sont toujours désactivés. L\'automatisation fonctionne, mais peut être moins fiable.',
+      one:
+          '1 paramètre recommandé est toujours désactivé. L\'automatisation fonctionne, mais peut être moins fiable.',
+    );
+    return '$_temp0';
+  }
 }

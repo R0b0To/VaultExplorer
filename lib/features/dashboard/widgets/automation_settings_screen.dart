@@ -8,7 +8,13 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/automation_permissions_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_controller.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
+/// Device-level permissions listed in the checklist. Names are internal;
+/// what the person sees comes from the l10n keys in [_permissionItems].
+enum _Perm { battery, notifications, allFiles, camera, microphone, overlay }
 
 class AutomationSettingsScreen extends ConsumerStatefulWidget {
   final String uri;
@@ -63,9 +69,17 @@ class _AutomationSettingsScreenState
   final _automationPimCtrl = TextEditingController();
   bool _appliedLoadedPim = false;
 
-  // True until the check says otherwise, so the hint card never flashes in
-  // for a moment on a device that is already set up correctly.
-  bool _batteryUnrestricted = true;
+  // Live OS state of every permission in the checklist. Defaults to
+  // all-granted until the first check lands, so the checklist never flashes
+  // warnings on a device that is already set up correctly.
+  AutomationPermissionStatus _perm = const AutomationPermissionStatus();
+
+  // Runtime permissions whose system prompt was refused (or can't be shown
+  // any more): their button opens the app's settings instead of asking again.
+  final Set<_Perm> _needsSettings = {};
+
+  // The permission whose request is currently in flight, if any.
+  _Perm? _busyPerm;
 
   bool get _isUsbSource => widget.uri.startsWith('usb:');
 
@@ -80,13 +94,14 @@ class _AutomationSettingsScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _refreshBatteryStatus();
+    _refreshPermissions();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // The person comes back from the system settings page after changing it.
-    if (state == AppLifecycleState.resumed) _refreshBatteryStatus();
+    // The person comes back from a system dialog or settings page after
+    // changing a permission.
+    if (state == AppLifecycleState.resumed) _refreshPermissions();
   }
 
   @override
@@ -97,22 +112,174 @@ class _AutomationSettingsScreenState
     super.dispose();
   }
 
-  Future<void> _refreshBatteryStatus() async {
-    final unrestricted =
-        await ref.read(vaultLifecycleApiProvider).hasUnrestrictedBattery();
-    if (!mounted || unrestricted == _batteryUnrestricted) return;
-    setState(() => _batteryUnrestricted = unrestricted);
+  bool _isGranted(_Perm perm, AutomationPermissionStatus status) =>
+      switch (perm) {
+        _Perm.battery => status.battery,
+        _Perm.notifications => status.notifications,
+        _Perm.allFiles => status.allFiles,
+        _Perm.camera => status.camera,
+        _Perm.microphone => status.microphone,
+        _Perm.overlay => status.overlay,
+      };
+
+  Future<void> _refreshPermissions() async {
+    final status = await ref
+        .read(vaultLifecycleApiProvider)
+        .getAutomationPermissionStatus();
+    if (!mounted) return;
+    setState(() {
+      _perm = status;
+      // Granted from system settings in the meantime: no detour needed.
+      _needsSettings.removeWhere((p) => _isGranted(p, status));
+    });
   }
 
-  Future<void> _openBatterySettings() async {
-    final opened =
-        await ref.read(vaultLifecycleApiProvider).openBatterySettings();
-    if (!mounted || opened) return;
-    showAppSnackBar(
-      context,
-      message: context.l10n.automationBatterySettingsOpenFailedMessage,
-      tone: AppBannerTone.error,
+  /// The one button on every missing-permission row. Does whatever Android
+  /// allows for that permission: a system prompt for runtime permissions, the
+  /// right settings page for the special ones.
+  Future<void> _onPermissionAction(_Perm perm) async {
+    final api = ref.read(vaultLifecycleApiProvider);
+    final l10n = context.l10n;
+
+    if (_needsSettings.contains(perm)) {
+      final opened = await api.openAppSettings();
+      if (!mounted || opened) return;
+      showAppSnackBar(
+        context,
+        message: l10n.automationPermSettingsOpenFailedMessage,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+
+    setState(() => _busyPerm = perm);
+    var openFailed = false;
+    try {
+      switch (perm) {
+        case _Perm.battery:
+          openFailed = !await api.openBatterySettings();
+        case _Perm.overlay:
+          await api.requestOverlayPermission();
+        case _Perm.allFiles:
+          await api.requestAllFilesAccess();
+        case _Perm.notifications:
+          await api.requestNotificationPermission();
+        case _Perm.camera:
+          await api.requestAutomationPermission(
+            AutomationRuntimePermission.camera,
+          );
+        case _Perm.microphone:
+          await api.requestAutomationPermission(
+            AutomationRuntimePermission.microphone,
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _busyPerm = null);
+    }
+    if (!mounted) return;
+    await _refreshPermissions();
+    if (!mounted) return;
+
+    if (openFailed) {
+      showAppSnackBar(
+        context,
+        message: l10n.automationBatterySettingsOpenFailedMessage,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+    final isRuntime =
+        perm == _Perm.camera ||
+        perm == _Perm.microphone ||
+        perm == _Perm.notifications;
+    if (isRuntime && !_isGranted(perm, _perm)) {
+      // Refused, or Android won't show the prompt again: the next tap opens
+      // settings, and say so now instead of leaving a dead-looking button.
+      setState(() => _needsSettings.add(perm));
+      showAppSnackBar(
+        context,
+        message: l10n.automationPermDeniedMessage,
+        tone: AppBannerTone.warning,
+      );
+    }
+  }
+
+  List<AutomationPermissionItem> _permissionItems(
+    AutomationSettingsState state,
+    AppLocalizations l10n,
+  ) {
+    if (state.tier == AutomationTier.none) return const [];
+    final full = state.tier == AutomationTier.full;
+    final capture = full && state.captureEnabled;
+
+    AutomationPermissionItem item(
+      _Perm perm, {
+      required IconData icon,
+      required String title,
+      required String description,
+      required AutomationPermissionImportance importance,
+    }) => AutomationPermissionItem(
+      icon: icon,
+      title: title,
+      description: description,
+      importance: importance,
+      granted: _isGranted(perm, _perm),
+      needsSettings: _needsSettings.contains(perm),
+      busy: _busyPerm == perm,
+      onAction: () => _onPermissionAction(perm),
     );
+
+    // Only what this vault's current setup can actually use is listed, so
+    // the checklist never asks for a camera on a vault that can't take photos.
+    return [
+      item(
+        _Perm.battery,
+        icon: Icons.battery_charging_full_rounded,
+        title: l10n.automationPermBatteryTitle,
+        description: l10n.automationPermBatteryDescription,
+        importance: AutomationPermissionImportance.recommended,
+      ),
+      if (full)
+        item(
+          _Perm.notifications,
+          icon: Icons.notifications_active_outlined,
+          title: l10n.automationPermNotificationsTitle,
+          description: l10n.automationPermNotificationsDescription,
+          importance: AutomationPermissionImportance.recommended,
+        ),
+      if (full)
+        item(
+          _Perm.allFiles,
+          icon: Icons.folder_open_rounded,
+          title: l10n.automationPermAllFilesTitle,
+          description: l10n.automationPermAllFilesDescription,
+          importance: AutomationPermissionImportance.optional,
+        ),
+      if (capture)
+        item(
+          _Perm.camera,
+          icon: Icons.photo_camera_outlined,
+          title: l10n.automationPermCameraTitle,
+          description: l10n.automationPermCameraDescription,
+          importance: AutomationPermissionImportance.required,
+        ),
+      if (capture)
+        item(
+          _Perm.microphone,
+          icon: Icons.mic_none_rounded,
+          title: l10n.automationPermMicrophoneTitle,
+          description: l10n.automationPermMicrophoneDescription,
+          importance: AutomationPermissionImportance.required,
+        ),
+      if (capture)
+        item(
+          _Perm.overlay,
+          icon: Icons.layers_outlined,
+          title: l10n.automationOverlayPermissionTitle,
+          description: l10n.automationPermOverlayDescription,
+          importance: AutomationPermissionImportance.optional,
+        ),
+    ];
   }
 
   void _copy(String label, String value) {
@@ -140,28 +307,8 @@ class _AutomationSettingsScreenState
     final error = await ref
         .read(automationSettingsProvider(widget.uri, widget.containerFormat).notifier)
         .setCaptureEnabled(enabled, context.l10n);
-    if (!mounted) return;
-    if (error != null) {
-      showAppSnackBar(context, message: error, tone: AppBannerTone.error);
-      return;
-    }
-    if (enabled) {
-      final hasOverlay = await ref
-          .read(vaultLifecycleApiProvider)
-          .hasOverlayPermission();
-      if (!hasOverlay && mounted) {
-        final openSettings = await showAppConfirmDialog(
-          context,
-          title: context.l10n.automationOverlayPermissionTitle,
-          message: context.l10n.automationOverlayPermissionMessage,
-          confirmLabel: context.l10n.openSettings,
-          cancelLabel: context.l10n.cancel,
-        );
-        if (openSettings && mounted) {
-          await ref.read(vaultLifecycleApiProvider).requestOverlayPermission();
-        }
-      }
-    }
+    if (!mounted || error == null) return;
+    showAppSnackBar(context, message: error, tone: AppBannerTone.error);
   }
 
   Future<void> _savePassword() async {
@@ -281,49 +428,36 @@ class _AutomationSettingsScreenState
           ),
         ],
       ),
-      if (state.tier != AutomationTier.none && !_batteryUnrestricted) ...[
-        const SizedBox(height: 12),
+      // Flow: the access level above decides what automation may do; the
+      // capture switch below is a per-vault policy for camera/microphone use;
+      // the checklist after it lists the device permissions that the two
+      // together actually need, with live status.
+      if (state.tier == AutomationTier.full) ...[
+        const SizedBox(height: 24),
+        SectionHeader(l10n.automationCaptureSectionHeader),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            l10n.automationCameraDescription,
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         SectionCard(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.battery_alert_rounded, color: cs.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          l10n.automationBatteryHintTitle,
-                          style: textTheme.titleSmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.automationBatteryHintMessage,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton(
-                      onPressed: _openBatterySettings,
-                      child: Text(l10n.automationBatteryHintButton),
-                    ),
-                  ),
-                ],
-              ),
+            SwitchListTile(
+              title: Text(l10n.automationAllowCaptureTitle),
+              subtitle: Text(l10n.automationAllowCaptureSubtitle),
+              value: state.captureEnabled,
+              onChanged: state.savingCapture ? null : _setCaptureEnabled,
             ),
           ],
         ),
       ],
+      AutomationPermissionsSection(items: _permissionItems(state, l10n)),
       if (state.tier != AutomationTier.none) ...[
         const SizedBox(height: 24),
         SectionHeader(l10n.automationPasswordSectionHeader),
@@ -426,30 +560,6 @@ class _AutomationSettingsScreenState
             onPressed: state.savingAutomationPim ? null : _saveAutomationPim,
             child: Text(l10n.automationSavePimButton),
           ),
-        ),
-      ],
-      if (state.tier == AutomationTier.full) ...[
-        const SizedBox(height: 24),
-        SectionHeader(l10n.automationCameraSectionHeader),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            l10n.automationCameraDescription,
-            style: textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.4,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SectionCard(
-          children: [
-            SwitchListTile(
-              title: Text(l10n.automationAllowCameraCapture),
-              value: state.captureEnabled,
-              onChanged: state.savingCapture ? null : _setCaptureEnabled,
-            ),
-          ],
         ),
       ],
       const SizedBox(height: 24),

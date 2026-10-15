@@ -1,6 +1,6 @@
 # VaultExplorer Automation Setup Guide (Tasker & MacroDroid)
 
-VaultExplorer supports background automation via Android Broadcast Intents. You can unlock/lock vaults, import/export files and whole folders, take a photo or record video straight into a vault, stream decrypted files directly through memory without flash writes, and securely wipe plaintext source files -- all without opening the UI.
+VaultExplorer supports background automation via Android Broadcast Intents. You can unlock/lock vaults, import/export files and whole folders, take a photo or record video or audio straight into a vault, stream decrypted files directly through memory without flash writes, and securely wipe plaintext source files -- all without opening the UI.
 
 Every intent is sent as a **Broadcast** to VaultExplorer's receiver, which returns an `AUTOMATION_RESULT` broadcast with status and diagnostics.
 
@@ -15,7 +15,7 @@ Every intent is sent as a **Broadcast** to VaultExplorer's receiver, which retur
    - **Unlock / lock only (Lifecycle)**: Permits `UNLOCK_VAULT` and `LOCK_VAULT` actions.
    - **Unlock / lock + file import-export (Full)**: Permits file-level actions -- `IMPORT_FILE`, `EXPORT_FILE`, `IMPORT_FOLDER`, `EXPORT_FOLDER` -- and background sync (`SYNC_VAULT` and unlock-triggered auto-sync).
 4. *(Optional)* **Automation Password**: Set a password if you want `UNLOCK_VAULT` to mount unattended without requiring the automation task to supply the password in plaintext.
-5. *(Optional, only shown once the tier above is set to Full)* **Allow camera capture**: a separate switch that unlocks `TAKE_PHOTO`, `START_RECORDING`, and `STOP_RECORDING` for this vault. It's off by default even at Full tier -- a photo taken this way needs no on-screen indication at all, so it's a bigger trust decision than file import/export and gets its own explicit opt-in. Turning tier back down from Full and later back up to Full clears this switch again; you'll need to re-enable it.
+5. *(Optional, only shown once the tier above is set to Full)* **Allow camera capture**: a separate switch that unlocks `TAKE_PHOTO`, `START_RECORDING`, `STOP_RECORDING`, `START_AUDIO_RECORDING`, and `STOP_AUDIO_RECORDING` for this vault. It's off by default even at Full tier -- a photo taken this way needs no on-screen indication at all, so it's a bigger trust decision than file import/export and gets its own explicit opt-in. Audio-only recording is covered by this same switch rather than a second one: video recording already captures the microphone under it. Turning tier back down from Full and later back up to Full clears this switch again; you'll need to re-enable it.
 6. Copy your **API Token** and **Vault URI** displayed on the screen.
 
 ---
@@ -31,8 +31,8 @@ Every intent sent to VaultExplorer targets either the Broadcast Receiver or (for
 | **Class / Component** | `com.aeidolon.vaultexplorer.automation.VaultAutomationReceiver` |
 | **Target Type** | **Broadcast** *(Not Activity or Service!)* |
 
-#### Camera Actions (`TAKE_PHOTO`, `START_RECORDING`)
-On Android 14+ (API 34+), the OS enforces strict "while-in-use" restrictions on camera and microphone hardware. You can configure camera actions in two ways:
+#### Camera & Microphone Actions (`TAKE_PHOTO`, `START_RECORDING`, `START_AUDIO_RECORDING`)
+On Android 14+ (API 34+), the OS enforces strict "while-in-use" restrictions on camera and microphone hardware. This applies to audio-only recording as much as to video, so `START_AUDIO_RECORDING` is configured the same way. (`STOP_RECORDING` and `STOP_AUDIO_RECORDING` only stop a recording that already has the hardware, so they are ordinary **Broadcast** actions to `VaultAutomationReceiver`.) You can configure these actions in two ways:
 
 - **Option A (Recommended — Direct Activity)**: Set Target Type to **Activity** (or `am start`) targeting:
   - **Component**: `com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureActivity`
@@ -210,6 +210,39 @@ On success, the `AUTOMATION_RESULT` broadcast includes an extra `duration_ms` *(
 
 ---
 
+### `START_AUDIO_RECORDING`
+Starts recording audio only (microphone, no camera) directly into the vault, and keeps recording until a matching `STOP_AUDIO_RECORDING` arrives. Same tier/opt-in requirements as `TAKE_PHOTO` and `START_RECORDING`.
+
+- **Action**: `com.aeidolon.vaultexplorer.action.START_AUDIO_RECORDING`
+- **Extras**:
+  - `api_token` *(String, required)*
+  - `vault_uri` *(String, required)*
+  - `vault_path` *(String, optional)*: Destination path inside the vault. If omitted, a name like `AUD_20260823_153000.m4a` is generated at the vault root (matching the in-app audio recorder's own naming), with a numeric suffix added if that name is already taken. The recording is AAC audio in an M4A container, so a custom `vault_path` should end in `.m4a`.
+
+There are no `camera_facing`, `video_quality` or `record_audio` extras -- they don't apply. Only the microphone permission is needed (the camera permission is **not**); grant it once by recording from VaultExplorer's own audio recorder, since automation can't show the system prompt itself.
+
+There is one automation recording slot, shared with video: a `START_AUDIO_RECORDING` while a video (or audio) recording is in progress gets `BUSY`, and so does a `START_RECORDING` while an audio recording is in progress. Android requires a persistent notification while the microphone is in use in the background, so the recording shows a notification ("Recording audio") with its own **Stop & save** button, in case your task never gets to send `STOP_AUDIO_RECORDING`. As a backstop, an audio recording auto-stops and saves on its own after **3 hours** if nothing tells it to stop.
+
+While recording, the audio is held in an on-device temporary file that is zero-filled and deleted as soon as it has been saved into the vault (or if saving fails). It isn't encrypted until it lands in the vault, the same as video.
+
+The vault has to stay unlocked until the recording has been saved, because the audio is written into it when the recording stops. A `LOCK_VAULT` sent mid-recording makes that final save fail and the recording is discarded -- and so can VaultExplorer's own auto-lock (inactivity timeout, or lock on screen off) if the app is open while you record. The in-app audio recorder suppresses the screen-off lock while it runs; an automation recording does not. For long unattended recordings, keep the vault's auto-lock from firing, and send `LOCK_VAULT` only after `STOP_AUDIO_RECORDING` has replied.
+
+---
+
+### `STOP_AUDIO_RECORDING`
+Stops the in-progress automation recording started by `START_AUDIO_RECORDING` and finalizes it into the vault.
+
+- **Action**: `com.aeidolon.vaultexplorer.action.STOP_AUDIO_RECORDING`
+- **Extras**:
+  - `api_token` *(String, required)*
+  - `vault_uri` *(String, required)*: Must match the vault the current recording is writing into.
+
+On success, the `AUTOMATION_RESULT` broadcast includes an extra `duration_ms` *(Long)* with the recording's length. The same finalize-timeout caveat as `STOP_RECORDING` applies.
+
+Each STOP only stops its own kind of recording: `STOP_AUDIO_RECORDING` won't end a video recording and `STOP_RECORDING` won't end an audio one -- either gets `NOT_RECORDING` with a message naming the right action to send. If the save to the vault fails, the take is discarded and the result is `ERROR` (there is no UI to retry from).
+
+---
+
 ### `WIPE_FILE`
 Securely zeroes out and deletes any plaintext file on the device storage.
 
@@ -254,16 +287,17 @@ VaultExplorer broadcasts a response intent for every processed action:
     - `OK`: Action completed successfully.
     - `AUTH_FAIL`: Invalid credentials or decryption failure.
     - `NOT_MOUNTED`: The vault is locked and must be unlocked first.
-    - `FORBIDDEN`: Action not allowed by the vault's automation tier (or, for camera actions, the separate **Allow camera capture** switch isn't on).
+    - `FORBIDDEN`: Action not allowed by the vault's automation tier (or, for camera and audio-recording actions, the separate **Allow camera capture** switch isn't on).
     - `INVALID_ARGS`: Missing or malformed parameters/paths.
     - `ERROR`: General failure or I/O exception.
     - `PARTIAL` *(batch operations only)*: The folder or glob batch finished, but at least one file failed. Check `result_message` and the count extras below.
-    - `PERMISSION_DENIED` *(`TAKE_PHOTO` / `START_RECORDING` only)*: Camera/microphone permission isn't granted on-device. Automation can't trigger the system permission prompt itself -- open VaultExplorer's own camera screen once to grant it, then retry.
+    - `PERMISSION_DENIED` *(`TAKE_PHOTO` / `START_RECORDING` / `START_AUDIO_RECORDING` only)*: Camera/microphone permission isn't granted on-device (for `START_AUDIO_RECORDING`, just the microphone). Automation can't trigger the system permission prompt itself -- open VaultExplorer's own camera screen (or, for audio, its audio recorder) once to grant it, then retry.
     - `CAMERA_UNAVAILABLE` *(`TAKE_PHOTO` / `START_RECORDING` only)*: The camera couldn't be opened -- commonly because something else (e.g. VaultExplorer's own in-app camera screen) already has it open, or a hardware/driver error. Any other failure to open the camera -- including a device policy or MDM profile that has disabled it -- is also reported as `CAMERA_UNAVAILABLE`, with the underlying camera error code in the message; there is no separate `CAMERA_DISABLED` result code.
-    - `BUSY` *(`START_RECORDING` only)*: An automation recording is already in progress.
-    - `NOT_RECORDING` *(`STOP_RECORDING` only)*: Nothing is currently recording, or the in-progress recording belongs to a different vault than the one named in `vault_uri`.
+    - `MIC_UNAVAILABLE` *(`START_AUDIO_RECORDING` only)*: The microphone couldn't be opened -- commonly because another app is holding it (e.g. a call), or a device policy has blocked it. The underlying error is in `result_message`. Other failures (such as the temporary file not being writable) are reported as plain `ERROR`.
+    - `BUSY` *(`START_RECORDING` / `START_AUDIO_RECORDING` only)*: An automation recording (video or audio) is already in progress.
+    - `NOT_RECORDING` *(`STOP_RECORDING` / `STOP_AUDIO_RECORDING` only)*: Nothing is currently recording, the in-progress recording belongs to a different vault than the one named in `vault_uri`, or it is the other kind of recording (video vs. audio) -- the message says which STOP action to send instead.
   - `result_message` *(String)*: Human-readable message or error details.
-  - `duration_ms` *(Long, only present on a successful `STOP_RECORDING`)*: Length of the recording that was just saved, in milliseconds.
+  - `duration_ms` *(Long, only present on a successful `STOP_RECORDING` / `STOP_AUDIO_RECORDING`)*: Length of the recording that was just saved, in milliseconds.
   - `matched_count` *(Int, batch operations)*: Number of files matched by glob pattern (or total files traversed when no `pattern` is set).
   - `succeeded_count` *(Int, batch operations)*: Number of files successfully imported/exported.
   - `failed_count` *(Int, batch operations)*: Number of files that failed mid-operation (I/O error, permission denied, etc.).
@@ -304,6 +338,18 @@ Skips the OS camera / gallery step entirely -- VaultExplorer takes the photo or 
 ├─► Send Broadcast: UNLOCK_VAULT │ (Wait for AUTOMATION_RESULT: result_code ==
 "OK") │ ├─► Send Broadcast: TAKE_PHOTO (camera_facing=front) │ (Wait for
 AUTOMATION_RESULT) │ └─► Send Broadcast: LOCK_VAULT
+
+### Variant: Record audio for as long as a condition holds
+`START_AUDIO_RECORDING` and `STOP_AUDIO_RECORDING` bracket a recording, so
+pair them with the trigger's start and end (for example a Bluetooth device
+connecting and disconnecting, or entering and leaving a geofence). Unlock
+first and lock afterwards, but only lock *after* the stop has replied -- locking
+the vault mid-recording makes the final save fail:
+
+[Trigger start] ─► UNLOCK_VAULT ─► START_AUDIO_RECORDING (wait for `OK`)
+
+[Trigger end] ─► STOP_AUDIO_RECORDING (wait for `OK`, read `duration_ms`) ─►
+LOCK_VAULT
 
 
 ---
@@ -456,13 +502,15 @@ whenever the setting is not Unrestricted.
     path is simpler and always works.
   - Tiers: IMPORT_FILE, EXPORT_FILE, IMPORT_FOLDER, and EXPORT_FOLDER all
     require the Full automation tier. Lifecycle only permits UNLOCK_VAULT and
-    LOCK_VAULT. TAKE_PHOTO, START_RECORDING, and STOP_RECORDING require Full
-    tier and the separate Allow camera capture switch -- see Section 1.
+    LOCK_VAULT. TAKE_PHOTO, START_RECORDING, STOP_RECORDING,
+    START_AUDIO_RECORDING, and STOP_AUDIO_RECORDING require Full tier and the
+    separate Allow camera capture switch -- see Section 1.
   - Camera actions are genuinely silent: TAKE_PHOTO shows nothing on screen at
     all -- no notification, no shutter UI. START_RECORDING/STOP_RECORDING do
     show a persistent notification while recording (Android requires this for
     any app using the camera in the background), with its own manual Stop
-    button.
+    button. START_AUDIO_RECORDING/STOP_AUDIO_RECORDING behave the same way for
+    the microphone.
   - Folder syncs are best-effort: IMPORT_FOLDER/EXPORT_FOLDER don't abort on the
     first failed file -- check for result_code == "PARTIAL" if you need to know
     whether everything actually made it across.

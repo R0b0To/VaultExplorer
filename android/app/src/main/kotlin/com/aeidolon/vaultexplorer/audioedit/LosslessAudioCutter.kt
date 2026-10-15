@@ -67,6 +67,12 @@ object LosslessAudioCutter {
         /** True when the cut can't be a plain copy and will be re-encoded to AAC. */
         val reencode: Boolean,
         val unsupportedReason: String?,
+        /**
+         * True when this file can be decoded and re-encoded to AAC on this
+         * device, so the editor can offer a lower-bitrate ("compress") export
+         * even for a source that would otherwise be copied losslessly.
+         */
+        val canCompress: Boolean = false,
     )
 
     class Range(val startUs: Long, val endUs: Long)
@@ -212,7 +218,8 @@ object LosslessAudioCutter {
             val durationUs = durationUsOrMeasure(extractor, track, format)
 
             // A re-encode is only an option if the device can decode the source and encode AAC.
-            val reencodeProblem = if (plan is AudioCutPlan.Reencode) {
+            // Also worked out for a copyable source, which decides whether "compress" is offered.
+            val reencodeProblem = if (plan !is AudioCutPlan.Unsupported) {
                 AudioEditMath.reencodeIssue(sampleRate, channels)
                     ?: if (!hasDecoder(format)) "This device can't decode ${format.getString(MediaFormat.KEY_MIME)}"
                     else if (!hasAacEncoder()) "This device can't encode AAC audio"
@@ -235,7 +242,9 @@ object LosslessAudioCutter {
                 cutSupported = plan is AudioCutPlan.Supported ||
                     (plan is AudioCutPlan.Reencode && reencodeProblem == null),
                 reencode = plan is AudioCutPlan.Reencode,
-                unsupportedReason = (plan as? AudioCutPlan.Unsupported)?.reason ?: reencodeProblem,
+                unsupportedReason = (plan as? AudioCutPlan.Unsupported)?.reason
+                    ?: if (plan is AudioCutPlan.Reencode) reencodeProblem else null,
+                canCompress = plan !is AudioCutPlan.Unsupported && reencodeProblem == null,
             )
         } finally {
             runCatching { extractor.release() }
@@ -378,6 +387,11 @@ object LosslessAudioCutter {
      * Stream-copies [ranges] from the source into [outFile]. One range gives a
      * plain cut; several are joined in the order given. [onProgress] receives
      * 0..1 across the whole call.
+     *
+     * With [compressBitratePerChannel] set, even a source that could be copied
+     * is decoded and re-encoded to AAC at that bitrate per channel (an `.m4a`
+     * result), trading a little quality for a much smaller file. The editor
+     * only offers this when [Probe.canCompress] is true.
      */
     fun cut(
         newExtractor: () -> AudioSource,
@@ -386,6 +400,7 @@ object LosslessAudioCutter {
         outFile: File,
         isCancelled: () -> Boolean,
         onProgress: (Float) -> Unit,
+        compressBitratePerChannel: Int? = null,
     ): CutResult {
         require(ranges.isNotEmpty()) { "No ranges to cut" }
 
@@ -399,9 +414,19 @@ object LosslessAudioCutter {
             val durationUs = durationUsOf(format)
 
             val plan = planFor(format, sourceExtension)
-            if (plan is AudioCutPlan.Reencode) {
-                // Can't be copied: decode and encode to AAC instead (own extractor; this one is released below).
-                return AudioReencoder.reencode(newExtractor, ranges, outFile, isCancelled, onProgress)
+            if (plan is AudioCutPlan.Reencode ||
+                (compressBitratePerChannel != null && plan is AudioCutPlan.Supported)
+            ) {
+                // Can't be copied (or the caller asked for a smaller file): decode and encode to AAC
+                // instead (own extractor; this one is released below).
+                return AudioReencoder.reencode(
+                    newExtractor,
+                    ranges,
+                    outFile,
+                    isCancelled,
+                    onProgress,
+                    compressBitratePerChannel,
+                )
             }
             if (plan !is AudioCutPlan.Supported) {
                 throw UnsupportedCutException((plan as AudioCutPlan.Unsupported).reason)

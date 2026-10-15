@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Se almacena junto con la contraseña de automatización anterior y se usa igual para las llamadas UNLOCK_VAULT, para una bóveda VeraCrypt/LUKS que normalmente se desbloquea con un archivo clave y/o un PIM no predeterminado en lugar de solo una contraseña.",
   "automationSavePimButton": "Guardar PIM",
   "automationCameraSectionHeader": "Automatización de la cámara",
-  "automationCameraDescription": "Permite que la automatización active TAKE_PHOTO / START_RECORDING / STOP_RECORDING para esta bóveda. Desactivado de forma predeterminada incluso con acceso completo — a diferencia de la importación/exportación de archivos, una foto no necesita ninguna indicación en pantalla, por lo que es una activación explícita independiente.",
+  "automationCameraDescription": "Permite que la automatización active TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING para esta bóveda. Desactivado de forma predeterminada incluso con acceso completo — a diferencia de la importación/exportación de archivos, una foto no necesita ninguna indicación en pantalla, por lo que es una activación explícita independiente.",
   "automationAllowCameraCapture": "Permitir captura de cámara",
   "automationOverlayPermissionTitle": "Mostrar sobre otras aplicaciones",
   "automationOverlayPermissionMessage": "La captura de cámara en segundo plano requiere el permiso 'Mostrar sobre otras aplicaciones' en Android 14+. Conceda este permiso para permitir capturas automáticas mientras la pantalla está bloqueada o la aplicación está en segundo plano.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Tomar foto",
   "automationActionStartRecordingLabel": "Iniciar grabación",
   "automationActionStopRecordingLabel": "Detener grabación",
+  "automationActionStartAudioRecordingLabel": "Iniciar grabación de audio",
+  "automationActionStopAudioRecordingLabel": "Detener grabación de audio",
   "filePropertiesSectionHeader": "PROPIEDADES DEL ARCHIVO",
   "fullPathLabel": "Ruta completa",
   "sizeLabel": "Tamaño",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Copiar aquí",
   "textEditorDuplicateMenuItem": "Hacer una copia",
   "textEditorCopiedSuccessfully": "Copiado con éxito",
-  "textEditorSearchFilesHint": "Filtrar archivos…"
+  "textEditorSearchFilesHint": "Filtrar archivos…",
+  "audioRecordingQualityLabel": "Calidad de grabación de audio",
+  "audioRecordingQualityVoice": "Voz",
+  "audioRecordingQualityStandard": "Estándar",
+  "audioRecordingQualityHigh": "Alta",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · mono",
+  "audioEditorCompressTitle": "Tamaño del archivo",
+  "audioEditorCompressOriginal": "Original",
+  "audioEditorCompressEstimate": "Tamaño estimado: unos {size}",
+  "audioEditorCompressNote": "El audio se recodifica a AAC con una tasa de bits menor, así que el archivo es más pequeño pero la calidad baja. Los cortes caen justo donde los marcas. Las etiquetas y la carátula no se conservan."
 }

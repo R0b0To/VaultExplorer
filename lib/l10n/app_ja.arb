@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "上のオートメーションパスワードと一緒に保存され、UNLOCK_VAULT呼び出しで同様に使用されます。通常、パスワードだけでなくキーファイルや非デフォルトのPIMでアンロックするVeraCrypt/LUKSボールト向けです。",
   "automationSavePimButton": "PIMを保存",
   "automationCameraSectionHeader": "カメラの自動化",
-  "automationCameraDescription": "このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。",
+  "automationCameraDescription": "このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDING／START_AUDIO_RECORDING／STOP_AUDIO_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。",
   "automationAllowCameraCapture": "カメラ撮影を許可",
   "automationOverlayPermissionTitle": "他のアプリの上に重ねて表示",
   "automationOverlayPermissionMessage": "Android 14+ では、バックグラウンドでのカメラ撮影に「他のアプリの上に重ねて表示」の権限が必要です。画面ロック時やアプリがバックグラウンドにあるときの自動撮影を許可するには、この権限を付与してください。",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "写真を撮る",
   "automationActionStartRecordingLabel": "録画を開始",
   "automationActionStopRecordingLabel": "録画を停止",
+  "automationActionStartAudioRecordingLabel": "音声録音を開始",
+  "automationActionStopAudioRecordingLabel": "音声録音を停止",
   "filePropertiesSectionHeader": "ファイルのプロパティ",
   "fullPathLabel": "フルパス",
   "sizeLabel": "サイズ",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "ここにコピー",
   "textEditorDuplicateMenuItem": "コピーを作成",
   "textEditorCopiedSuccessfully": "コピーしました",
-  "textEditorSearchFilesHint": "ファイルを絞り込み…"
+  "textEditorSearchFilesHint": "ファイルを絞り込み…",
+  "audioRecordingQualityLabel": "音声録音の品質",
+  "audioRecordingQualityVoice": "音声",
+  "audioRecordingQualityStandard": "標準",
+  "audioRecordingQualityHigh": "高",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · モノラル",
+  "audioEditorCompressTitle": "ファイルサイズ",
+  "audioEditorCompressOriginal": "オリジナル",
+  "audioEditorCompressEstimate": "推定サイズ: 約 {size}",
+  "audioEditorCompressNote": "オーディオはより低いビットレートで AAC に再エンコードされます。ファイルは小さくなりますが、音質は低下します。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。"
 }

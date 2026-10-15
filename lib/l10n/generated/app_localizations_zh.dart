@@ -6340,7 +6340,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
+      '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
 
   @override
   String get automationAllowCameraCapture => '允许相机拍摄';
@@ -6369,6 +6369,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => '停止录制';
+
+  @override
+  String get automationActionStartAudioRecordingLabel => '开始录制音频';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => '停止录制音频';
 
   @override
   String get filePropertiesSectionHeader => '文件属性';
@@ -10845,4 +10851,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => '筛选文件…';
+
+  @override
+  String get audioRecordingQualityLabel => '音频录制质量';
+
+  @override
+  String get audioRecordingQualityVoice => '语音';
+
+  @override
+  String get audioRecordingQualityStandard => '标准';
+
+  @override
+  String get audioRecordingQualityHigh => '高';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · 单声道';
+  }
+
+  @override
+  String get audioEditorCompressTitle => '文件大小';
+
+  @override
+  String get audioEditorCompressOriginal => '原始';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return '预计大小：约 $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      '音频会以更低的码率重新编码为 AAC，文件更小，但音质会有所下降。剪辑点会精确落在你设置的位置。标签和封面不会保留。';
 }

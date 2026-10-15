@@ -1,10 +1,13 @@
 package com.aeidolon.vaultexplorer.audiocapture
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.SystemClock
+import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.camera.VaultVideoRecorder
 import java.io.File
@@ -39,6 +42,16 @@ class VaultAudioRecorder(private val context: Context) {
     enum class State { IDLE, RECORDING, PAUSED }
 
     companion object {
+        /**
+         * Whether RECORD_AUDIO is granted. Audio-only capture needs nothing
+         * else -- notably not CAMERA, which [com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession.hasPermissions]
+         * also demands and which someone who only records audio may never
+         * have granted.
+         */
+        fun hasMicPermission(context: Context): Boolean =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+
         /**
          * Wipes recording temp files left behind by a previous process
          * death -- same rationale and same startup call site as
@@ -76,9 +89,10 @@ class VaultAudioRecorder(private val context: Context) {
     var state: State = State.IDLE
         private set
 
-    /** Starts a new recording. Throws if one is already in progress, or if
-     *  the platform refuses to open the microphone. */
-    fun start() {
+    /** Starts a new recording with [params] (bitrate / sample rate, mono AAC).
+     *  Throws if one is already in progress, or if the platform refuses to
+     *  open the microphone. */
+    fun start(params: AudioRecordingParams = AudioRecordingParams.DEFAULT) {
         synchronized(lock) {
             check(state == State.IDLE) { "already recording" }
         }
@@ -89,8 +103,8 @@ class VaultAudioRecorder(private val context: Context) {
             rec.setAudioSource(MediaRecorder.AudioSource.MIC)
             rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            rec.setAudioEncodingBitRate(128_000)
-            rec.setAudioSamplingRate(44_100)
+            rec.setAudioEncodingBitRate(params.bitrate)
+            rec.setAudioSamplingRate(params.sampleRate)
             rec.setAudioChannels(1)
             rec.setOutputFile(temp.absolutePath)
             rec.setOnErrorListener { _, what, extra ->
@@ -115,7 +129,7 @@ class VaultAudioRecorder(private val context: Context) {
             segmentStartMs = SystemClock.elapsedRealtime()
             state = State.RECORDING
         }
-        VeLog.d(TAG) { "start: recording to temp file" }
+        VeLog.d(TAG) { "start: recording to temp file (${params.bitrate / 1000} kbps, ${params.sampleRate} Hz, mono)" }
     }
 
     fun pause() {

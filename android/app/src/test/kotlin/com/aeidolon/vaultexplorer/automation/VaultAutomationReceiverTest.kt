@@ -18,6 +18,9 @@ import org.robolectric.annotation.Config
  * that's hard to reach from a host-JVM test -- see the tech-debt audit that
  * flagged this file's zero coverage.
  *
+ * outcomeForAudioError is its audio-only counterpart and is covered the same
+ * way below.
+ *
  * outcomeForCameraError and the Outcome data class it returns are widened
  * from `private` to `internal` (visibility only, no logic touched) to make
  * this testable, same pattern as elsewhere in this pass.
@@ -83,5 +86,61 @@ class VaultAutomationReceiverTest {
 
         assertEquals("ERROR", outcome.code)
         assertEquals("some_new_error_code_this_app_has_never_seen", outcome.message)
+    }
+
+    // ── outcomeForAudioError (START_AUDIO_RECORDING / STOP_AUDIO_RECORDING) ──
+    //
+    // Same stakes as the camera cases above: a script branching on result_code
+    // must not be told "microphone problem" for a storage failure, or be sent
+    // to the camera screen to fix a missing microphone permission.
+
+    @Test
+    fun `audio null error becomes a generic ERROR outcome`() {
+        val outcome = receiver.outcomeForAudioError(null)
+
+        assertEquals(VaultAutomationReceiver.Outcome("ERROR", "Unknown audio recording error"), outcome)
+    }
+
+    @Test
+    fun `audio permission_denied names the microphone, not the camera`() {
+        val outcome = receiver.outcomeForAudioError("permission_denied")
+
+        assertEquals("PERMISSION_DENIED", outcome.code)
+        assertEquals(
+            "Microphone permission not granted -- grant it once from the app's own audio recorder first",
+            outcome.message,
+        )
+    }
+
+    @Test
+    fun `mic_unavailable prefix becomes MIC_UNAVAILABLE and echoes the original message`() {
+        val outcome = receiver.outcomeForAudioError("mic_unavailable: start failed: -38")
+
+        assertEquals("MIC_UNAVAILABLE", outcome.code)
+        assertEquals("mic_unavailable: start failed: -38", outcome.message)
+    }
+
+    @Test
+    fun `a camera error string is not classified as MIC_UNAVAILABLE`() {
+        // Camera failures must never surface as a microphone problem.
+        assertEquals("ERROR", receiver.outcomeForAudioError("camera_unavailable (4)").code)
+    }
+
+    @Test
+    fun `audio recorder setup and vault write failures stay a plain ERROR`() {
+        val setup = receiver.outcomeForAudioError("audio recorder setup failed: No space left on device")
+        val write = receiver.outcomeForAudioError("vault write failed")
+
+        assertEquals("ERROR", setup.code)
+        assertEquals("ERROR", write.code)
+        assertEquals("vault write failed", write.message)
+    }
+
+    @Test
+    fun `the companion and instance audio classifiers agree`() {
+        assertEquals(
+            VaultAutomationReceiver.outcomeForAudioError("mic_unavailable"),
+            receiver.outcomeForAudioError("mic_unavailable"),
+        )
     }
 }

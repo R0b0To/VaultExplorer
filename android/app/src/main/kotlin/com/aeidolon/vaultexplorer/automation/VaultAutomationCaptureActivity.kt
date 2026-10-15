@@ -11,6 +11,7 @@ import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder
 import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
 import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
@@ -26,6 +27,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Runs with [Theme.TransparentCapture], setShowWhenLocked(true), and no animations,
  * ensuring no visual disruption while bringing the process to the TOP / foreground
  * state.
+ *
+ * It also fronts START_AUDIO_RECORDING: the microphone has the same
+ * while-in-use restriction, and with no camera involved the Activity just
+ * needs to be visible long enough for the recording service to start.
  *
  * Can be launched:
  * 1. Indirectly via [VaultAutomationReceiver] (trampoline mode, finishes via [VaultAutomationActivityBridge]).
@@ -100,6 +105,14 @@ class VaultAutomationCaptureActivity : Activity() {
             return
         }
 
+        if (action == VaultAutomationReceiver.ACTION_START_AUDIO_RECORDING) {
+            // Audio needs no camera, so this must come before the camera
+            // lookup below -- a device with no matching lens (or with the
+            // camera disabled by policy) can still record audio.
+            handleStartAudioRecording(volId, vaultUri)
+            return
+        }
+
         val facing = intent.getStringExtra(VaultAutomationReceiver.EXTRA_CAMERA_FACING) ?: "back"
         val cameraId = try {
             VaultAutomationReceiver.pickCameraId(this, facing)
@@ -167,7 +180,6 @@ class VaultAutomationCaptureActivity : Activity() {
         val recordAudio = intent.getBooleanExtra(VaultAutomationReceiver.EXTRA_RECORD_AUDIO, true)
         val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
 
-        val latch = VaultAutomationCaptureBridge.arm()
         val serviceIntent = Intent(this, VaultAutomationRecordingService::class.java).apply {
             action = VaultAutomationRecordingService.ACTION_START
             putExtra(VaultAutomationRecordingService.EXTRA_VOL_ID, volId)
@@ -178,11 +190,69 @@ class VaultAutomationCaptureActivity : Activity() {
             putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra("vaultUri", vaultUri)
         }
+        startRecordingService(
+            serviceIntent = serviceIntent,
+            vaultPath = vaultPath,
+            startedMessage = "Recording started: $vaultPath",
+            waitTimeoutMessage = "Timed out waiting for the camera to start",
+            blockedCode = "CAMERA_UNAVAILABLE",
+            mapFailure = { VaultAutomationReceiver.outcomeForCameraError(it) },
+        )
+    }
 
+    private fun handleStartAudioRecording(volId: Int, vaultUri: String) {
+        // Microphone only: the camera permission is deliberately not
+        // checked here (VaultHeadlessCameraSession.hasPermissions would).
+        if (!VaultAudioRecorder.hasMicPermission(this)) {
+            finishWithOutcome(VaultAutomationReceiver.outcomeForAudioError("permission_denied"))
+            return
+        }
+        if (VaultAutomationRecordingService.isRecording) {
+            finishWithOutcome(VaultAutomationReceiver.Outcome("BUSY", "An automation recording is already in progress"))
+            return
+        }
+
+        val vaultPath = intent.getStringExtra(VaultAutomationReceiver.EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
+            ?: VaultAutomationReceiver.generateAudioCaptureName(volId)
+        val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
+
+        val serviceIntent = Intent(this, VaultAutomationRecordingService::class.java).apply {
+            action = VaultAutomationRecordingService.ACTION_START
+            putExtra(VaultAutomationRecordingService.EXTRA_VOL_ID, volId)
+            putExtra(VaultAutomationRecordingService.EXTRA_VAULT_PATH, vaultPath)
+            putExtra(VaultAutomationRecordingService.EXTRA_AUDIO_ONLY, true)
+            putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
+            putExtra("vaultUri", vaultUri)
+        }
+        startRecordingService(
+            serviceIntent = serviceIntent,
+            vaultPath = vaultPath,
+            startedMessage = "Audio recording started: $vaultPath",
+            waitTimeoutMessage = "Timed out waiting for the microphone to start",
+            blockedCode = "MIC_UNAVAILABLE",
+            mapFailure = { VaultAutomationReceiver.outcomeForAudioError(it) },
+        )
+    }
+
+    /**
+     * Starts [VaultAutomationRecordingService] and finishes this Activity
+     * with whatever the service reports through [VaultAutomationCaptureBridge]
+     * -- shared by video and audio, which differ only in the messages and in
+     * how a failure string is classified ([mapFailure]).
+     */
+    private fun startRecordingService(
+        serviceIntent: Intent,
+        vaultPath: String,
+        startedMessage: String,
+        waitTimeoutMessage: String,
+        blockedCode: String,
+        mapFailure: (String?) -> VaultAutomationReceiver.Outcome,
+    ) {
+        val latch = VaultAutomationCaptureBridge.arm()
         try {
             ContextCompat.startForegroundService(this, serviceIntent)
         } catch (e: SecurityException) {
-            finishWithOutcome(VaultAutomationReceiver.Outcome("CAMERA_UNAVAILABLE", "Recording service blocked by policy: ${e.message}"))
+            finishWithOutcome(VaultAutomationReceiver.Outcome(blockedCode, "Recording service blocked by policy: ${e.message}"))
             return
         } catch (e: Exception) {
             finishWithOutcome(VaultAutomationReceiver.Outcome("ERROR", "Failed to start recording service: ${e.message}"))
@@ -192,11 +262,11 @@ class VaultAutomationCaptureActivity : Activity() {
         activityExecutor.execute {
             val result = VaultAutomationCaptureBridge.await(latch, 10_000L)
             val outcome = if (result == null) {
-                VaultAutomationReceiver.Outcome("ERROR", "Timed out waiting for the camera to start")
+                VaultAutomationReceiver.Outcome("ERROR", waitTimeoutMessage)
             } else if (result.ok) {
-                VaultAutomationReceiver.Outcome("OK", "Recording started: $vaultPath")
+                VaultAutomationReceiver.Outcome("OK", startedMessage)
             } else {
-                VaultAutomationReceiver.outcomeForCameraError(result.message)
+                mapFailure(result.message)
             }
             runOnUiThread {
                 finishWithOutcome(outcome, vaultPath)

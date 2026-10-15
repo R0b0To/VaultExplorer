@@ -1,14 +1,30 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
+import 'package:vaultexplorer/features/audio_editor/models/audio_compression.dart';
 import 'package:vaultexplorer/features/video_editor/models/video_edit_math.dart';
-import 'package:vaultexplorer/features/video_editor/widgets/video_export_sheet.dart'
-    show VideoExportChoice;
+
+/// What the user picked in [AudioExportSheet]: the same merge / replace
+/// original / name choices as the video editor's export sheet, plus whether to
+/// re-encode at a lower bitrate to make the file smaller.
+class AudioExportChoice {
+  final bool merge;
+  final bool replaceOriginal;
+  final String? customName;
+  final AudioCompression compression;
+
+  const AudioExportChoice({
+    required this.merge,
+    required this.replaceOriginal,
+    this.customName,
+    this.compression = AudioCompression.off,
+  });
+}
 
 /// Bottom sheet shown when the user taps Export in the audio editor. Returns
-/// the video editor's [VideoExportChoice] (merge / replace original / name):
-/// the choices are the same, only the wording differs.
+/// an [AudioExportChoice], or null if it was dismissed.
 class AudioExportSheet extends StatefulWidget {
   final int clipCount;
   final int totalDurationUs;
@@ -20,6 +36,15 @@ class AudioExportSheet extends StatefulWidget {
   /// options says that instead of promising lossless output.
   final bool reencode;
 
+  /// The "reduce file size" choices on offer, [AudioCompression.off] first.
+  /// With only that one, the whole section is hidden.
+  final List<AudioCompression> compressionOptions;
+
+  /// Source channel count and bitrate (when known), for the size estimate and
+  /// to label each option with the bitrate it will really produce.
+  final int? sourceChannels;
+  final int? sourceBitrate;
+
   const AudioExportSheet({
     super.key,
     required this.clipCount,
@@ -28,9 +53,12 @@ class AudioExportSheet extends StatefulWidget {
     required this.extension,
     this.isReadOnly = false,
     this.reencode = false,
+    this.compressionOptions = const [AudioCompression.off],
+    this.sourceChannels,
+    this.sourceBitrate,
   });
 
-  static Future<VideoExportChoice?> show(
+  static Future<AudioExportChoice?> show(
     BuildContext context, {
     required int clipCount,
     required int totalDurationUs,
@@ -38,8 +66,11 @@ class AudioExportSheet extends StatefulWidget {
     required String extension,
     bool isReadOnly = false,
     bool reencode = false,
+    List<AudioCompression> compressionOptions = const [AudioCompression.off],
+    int? sourceChannels,
+    int? sourceBitrate,
   }) {
-    return showModalBottomSheet<VideoExportChoice>(
+    return showModalBottomSheet<AudioExportChoice>(
       context: context,
       isScrollControlled: true,
       builder: (_) => AudioExportSheet(
@@ -49,6 +80,9 @@ class AudioExportSheet extends StatefulWidget {
         extension: extension,
         isReadOnly: isReadOnly,
         reencode: reencode,
+        compressionOptions: compressionOptions,
+        sourceChannels: sourceChannels,
+        sourceBitrate: sourceBitrate,
       ),
     );
   }
@@ -60,6 +94,7 @@ class AudioExportSheet extends StatefulWidget {
 class _AudioExportSheetState extends State<AudioExportSheet> {
   late bool _merge = widget.clipCount > 1;
   bool _replaceOriginal = false;
+  AudioCompression _compression = AudioCompression.off;
   late final TextEditingController _nameController;
 
   @override
@@ -78,14 +113,42 @@ class _AudioExportSheetState extends State<AudioExportSheet> {
     final customName = _nameController.text.trim();
     Navigator.pop(
       context,
-      VideoExportChoice(
+      AudioExportChoice(
         merge: widget.clipCount <= 1 ? false : _merge,
         replaceOriginal: _replaceOriginal,
         customName: (_replaceOriginal || customName.isEmpty)
             ? null
             : customName,
+        compression: _compression,
       ),
     );
+  }
+
+  /// The extension the file will really get: a compressed export is always
+  /// an `.m4a`, whatever the source was.
+  String get _outputExtension =>
+      _compression.isOn ? AudioCompression.outputExtension : widget.extension;
+
+  /// "Estimated size: about 14 MB" for the current choice, or null when it
+  /// can't be told (a source with an unknown bitrate, or a format whose
+  /// re-encode bitrate isn't known up front).
+  int? get _estimatedBytes {
+    if (_compression.isOn) {
+      return _compression.estimatedBytes(
+        durationUs: widget.totalDurationUs,
+        sourceChannels: widget.sourceChannels,
+      );
+    }
+    final bitrate = widget.sourceBitrate;
+    if (widget.reencode || bitrate == null || bitrate <= 0) return null;
+    if (widget.totalDurationUs <= 0) return null;
+    return (bitrate * (widget.totalDurationUs / 1000000) / 8).round();
+  }
+
+  String _compressionLabel(AudioCompression c) {
+    final total = c.totalBitrate(widget.sourceChannels);
+    if (total == null) return context.l10n.audioEditorCompressOriginal;
+    return '${(total / 1000).round()} kbps';
   }
 
   @override
@@ -162,6 +225,46 @@ class _AudioExportSheetState extends State<AudioExportSheet> {
                 const SizedBox(height: 8),
               ],
 
+              // Smaller file: re-encode at a lower bitrate.
+              if (widget.compressionOptions.length > 1) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Text(
+                    l10n.audioEditorCompressTitle,
+                    style: text.titleSmall,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SegmentedButton<AudioCompression>(
+                    showSelectedIcon: false,
+                    segments: [
+                      for (final c in widget.compressionOptions)
+                        ButtonSegment(
+                          value: c,
+                          label: Text(_compressionLabel(c)),
+                        ),
+                    ],
+                    selected: {_compression},
+                    onSelectionChanged: (s) =>
+                        setState(() => _compression = s.first),
+                  ),
+                ),
+                if (_estimatedBytes != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                    child: Text(
+                      l10n.audioEditorCompressEstimate(
+                        formatBytes(_estimatedBytes!),
+                      ),
+                      style: text.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+              ],
+
               if (!_replaceOriginal) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -172,7 +275,7 @@ class _AudioExportSheetState extends State<AudioExportSheet> {
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: l10n.videoEditorCustomFileName,
-                      suffixText: '.${widget.extension}',
+                      suffixText: '.$_outputExtension',
                       border: const OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -184,7 +287,9 @@ class _AudioExportSheetState extends State<AudioExportSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Text(
-                  widget.reencode
+                  _compression.isOn
+                      ? l10n.audioEditorCompressNote
+                      : widget.reencode
                       ? l10n.audioEditorReencodeNote
                       : l10n.audioEditorLosslessNote,
                   style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),

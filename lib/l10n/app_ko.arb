@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "위의 자동화 비밀번호와 함께 저장되며 UNLOCK_VAULT 호출에 동일하게 사용됩니다. 비밀번호만이 아니라 키파일 및/또는 기본값이 아닌 PIM으로 잠금 해제하는 VeraCrypt/LUKS 볼트용입니다.",
   "automationSavePimButton": "PIM 저장",
   "automationCameraSectionHeader": "카메라 자동화",
-  "automationCameraDescription": "자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.",
+  "automationCameraDescription": "자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.",
   "automationAllowCameraCapture": "카메라 캡처 허용",
   "automationOverlayPermissionTitle": "다른 앱 위에 표시",
   "automationOverlayPermissionMessage": "Android 14+에서 백그라운드 카메라 캡처를 실행하려면 '다른 앱 위에 표시' 권한이 필요합니다. 화면이 잠겨 있거나 앱이 백그라운드에 있을 때 자동 캡처를 허용하려면 이 권한을 부여하세요.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "사진 촬영",
   "automationActionStartRecordingLabel": "녹화 시작",
   "automationActionStopRecordingLabel": "녹화 중지",
+  "automationActionStartAudioRecordingLabel": "오디오 녹음 시작",
+  "automationActionStopAudioRecordingLabel": "오디오 녹음 중지",
   "filePropertiesSectionHeader": "파일 속성",
   "fullPathLabel": "전체 경로",
   "sizeLabel": "크기",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "여기에 복사",
   "textEditorDuplicateMenuItem": "사본 만들기",
   "textEditorCopiedSuccessfully": "성공적으로 복사됨",
-  "textEditorSearchFilesHint": "파일 필터링…"
+  "textEditorSearchFilesHint": "파일 필터링…",
+  "audioRecordingQualityLabel": "오디오 녹음 품질",
+  "audioRecordingQualityVoice": "음성",
+  "audioRecordingQualityStandard": "표준",
+  "audioRecordingQualityHigh": "높음",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · 모노",
+  "audioEditorCompressTitle": "파일 크기",
+  "audioEditorCompressOriginal": "원본",
+  "audioEditorCompressEstimate": "예상 크기: 약 {size}",
+  "audioEditorCompressNote": "오디오가 더 낮은 비트레이트의 AAC로 다시 인코딩되어 파일은 작아지지만 음질은 낮아집니다. 컷은 지정한 위치 그대로 적용됩니다. 태그와 커버 아트는 유지되지 않습니다."
 }

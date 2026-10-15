@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart'
     show logSwallowed;
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 
 const String _tag = 'VaultAudioRecorder';
 
@@ -82,8 +83,16 @@ class VaultAudioRecorderController {
     return res ?? false;
   }
 
-  Future<({bool success, String? error})> start() async {
-    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('start');
+  /// Starts a recording at [quality] (bitrate + sample rate, mono AAC). The
+  /// native side clamps anything it can't use, so a bad value degrades to
+  /// its default rather than failing the start.
+  Future<({bool success, String? error})> start({
+    AudioRecordingQuality quality = AudioRecordingQuality.defaultQuality,
+  }) async {
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('start', {
+      'bitrate': quality.bitrate,
+      'sampleRate': quality.sampleRate,
+    });
     return (success: res?['success'] == true, error: res?['error'] as String?);
   }
 

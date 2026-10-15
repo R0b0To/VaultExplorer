@@ -6820,7 +6820,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      'تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.';
+      'تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.';
 
   @override
   String get automationAllowCameraCapture => 'السماح بالتقاط الصور بالكاميرا';
@@ -6849,6 +6849,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => 'إيقاف التسجيل';
+
+  @override
+  String get automationActionStartAudioRecordingLabel => 'بدء تسجيل الصوت';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => 'إيقاف تسجيل الصوت';
 
   @override
   String get filePropertiesSectionHeader => 'خصائص الملف';
@@ -11668,4 +11674,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => 'تصفية الملفات…';
+
+  @override
+  String get audioRecordingQualityLabel => 'جودة تسجيل الصوت';
+
+  @override
+  String get audioRecordingQualityVoice => 'كلام';
+
+  @override
+  String get audioRecordingQualityStandard => 'قياسية';
+
+  @override
+  String get audioRecordingQualityHigh => 'عالية';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · أحادي';
+  }
+
+  @override
+  String get audioEditorCompressTitle => 'حجم الملف';
+
+  @override
+  String get audioEditorCompressOriginal => 'الأصلي';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return 'الحجم المقدّر: حوالي $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      'يُعاد ترميز الصوت إلى AAC بمعدل بت أقل، فيصغر حجم الملف لكن تقل الجودة. يقع القص عند النقطة التي حددتها بالضبط. لا تُنقل الوسوم وصورة الغلاف.';
 }

@@ -135,6 +135,18 @@ class AudioEditMathTest {
         assertEquals(192_000, AudioEditMath.reencodeBitrate(null, 6))
     }
 
+    @Test
+    fun compressBitrateIsPerChannelAndIgnoresTheSource() {
+        assertEquals(32_000, AudioEditMath.compressBitrate(32_000, 1))
+        assertEquals(64_000, AudioEditMath.compressBitrate(32_000, 2))
+        assertEquals(128_000, AudioEditMath.compressBitrate(64_000, 2))
+        // Bounded to what the encoder handles well: 16..160 kbps per channel.
+        assertEquals(16_000, AudioEditMath.compressBitrate(4_000, 1))
+        assertEquals(320_000, AudioEditMath.compressBitrate(900_000, 2))
+        // Never counts more than the stereo pair a wide source is cut down to.
+        assertEquals(64_000, AudioEditMath.compressBitrate(32_000, 6))
+    }
+
     // ── bytesPerSample / usToFrame ───────────────────────────────────────
 
     @Test

@@ -6747,7 +6747,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      'Consente all\'automazione di attivare TAKE_PHOTO / START_RECORDING / STOP_RECORDING per questo vault. Disattivato per impostazione predefinita anche con accesso completo: a differenza dell\'importazione/esportazione di file, una foto non richiede alcuna indicazione a schermo, quindi è un\'attivazione esplicita separata.';
+      'Consente all\'automazione di attivare TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING per questo vault. Disattivato per impostazione predefinita anche con accesso completo: a differenza dell\'importazione/esportazione di file, una foto non richiede alcuna indicazione a schermo, quindi è un\'attivazione esplicita separata.';
 
   @override
   String get automationAllowCameraCapture =>
@@ -6777,6 +6777,14 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => 'Interrompi registrazione';
+
+  @override
+  String get automationActionStartAudioRecordingLabel =>
+      'Avvia registrazione audio';
+
+  @override
+  String get automationActionStopAudioRecordingLabel =>
+      'Interrompi registrazione audio';
 
   @override
   String get filePropertiesSectionHeader => 'PROPRIETÀ FILE';
@@ -11650,4 +11658,36 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => 'Filtra file…';
+
+  @override
+  String get audioRecordingQualityLabel => 'Qualità di registrazione audio';
+
+  @override
+  String get audioRecordingQualityVoice => 'Voce';
+
+  @override
+  String get audioRecordingQualityStandard => 'Standard';
+
+  @override
+  String get audioRecordingQualityHigh => 'Alta';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · mono';
+  }
+
+  @override
+  String get audioEditorCompressTitle => 'Dimensione del file';
+
+  @override
+  String get audioEditorCompressOriginal => 'Originale';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return 'Dimensione stimata: circa $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      'L\'audio viene ricodificato in AAC con un bitrate inferiore: il file è più piccolo, ma la qualità diminuisce. I tagli cadono esattamente dove li imposti. Tag e copertina non vengono mantenuti.';
 }

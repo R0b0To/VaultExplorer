@@ -69,7 +69,12 @@ class VaultAudioCapturePlugin(
                         return
                     }
                     try {
-                        recorder.start()
+                        val args = call.arguments as? Map<*, *>
+                        val params = AudioRecordingParams.sanitize(
+                            bitrate = (args?.get("bitrate") as? Number)?.toInt(),
+                            sampleRate = (args?.get("sampleRate") as? Number)?.toInt(),
+                        )
+                        recorder.start(params)
                         result.success(mapOf("success" to true))
                     } catch (e: Exception) {
                         VeLog.e(TAG, e) { "start failed" }

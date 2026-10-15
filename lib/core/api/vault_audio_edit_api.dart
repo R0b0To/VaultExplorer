@@ -31,6 +31,11 @@ class AudioProbe {
   /// diagnostics; the UI shows its own localized message.
   final String? unsupportedReason;
 
+  /// True when this device can decode the file and encode AAC, so the export
+  /// sheet can offer a lower-bitrate ("reduce file size") export even for a
+  /// format that would otherwise be copied losslessly.
+  final bool canCompress;
+
   const AudioProbe({
     required this.durationUs,
     required this.mime,
@@ -41,6 +46,7 @@ class AudioProbe {
     this.sampleRate,
     this.channels,
     this.unsupportedReason,
+    this.canCompress = false,
   });
 
   factory AudioProbe.fromMap(Map<Object?, Object?> m) => AudioProbe(
@@ -53,6 +59,7 @@ class AudioProbe {
     cutSupported: m['cutSupported'] as bool? ?? false,
     reencode: m['reencode'] as bool? ?? false,
     unsupportedReason: m['unsupportedReason'] as String?,
+    canCompress: m['canCompress'] as bool? ?? false,
   );
 }
 
@@ -161,6 +168,10 @@ class VaultAudioEditApi {
   /// Cuts [segmentsUs] (`[startUs, endUs]` pairs) out of the source. With
   /// [merge] they are joined into the single file [outputPaths] names;
   /// otherwise each becomes its own file, in order.
+  ///
+  /// With [compressBitratePerChannel] set, the audio is decoded and re-encoded
+  /// to AAC at that bitrate per channel instead of being copied, so the
+  /// outputs are much smaller (and always `.m4a`).
   Future<AudioExportResult> export({
     required int volId,
     required String filePath,
@@ -169,6 +180,7 @@ class VaultAudioEditApi {
     required bool merge,
     required List<String> outputPaths,
     required int opId,
+    int? compressBitratePerChannel,
   }) async {
     try {
       final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
@@ -183,6 +195,8 @@ class VaultAudioEditApi {
           'merge': merge,
           'outputPaths': outputPaths,
           'opId': opId,
+          if (compressBitratePerChannel != null)
+            'compressBitratePerChannel': compressBitratePerChannel,
         },
       );
       return AudioExportResult(

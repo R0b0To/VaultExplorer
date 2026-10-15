@@ -6799,7 +6799,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      'Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, знімання не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.';
+      'Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, знімання не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.';
 
   @override
   String get automationAllowCameraCapture => 'Дозволити знімання камерою';
@@ -6828,6 +6828,12 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => 'Зупинити запис';
+
+  @override
+  String get automationActionStartAudioRecordingLabel => 'Почати запис аудіо';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => 'Зупинити запис аудіо';
 
   @override
   String get filePropertiesSectionHeader => 'ВЛАСТИВОСТІ ФАЙЛУ';
@@ -11731,4 +11737,36 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => 'Фільтрувати файли…';
+
+  @override
+  String get audioRecordingQualityLabel => 'Якість запису аудіо';
+
+  @override
+  String get audioRecordingQualityVoice => 'Голос';
+
+  @override
+  String get audioRecordingQualityStandard => 'Стандартна';
+
+  @override
+  String get audioRecordingQualityHigh => 'Висока';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · моно';
+  }
+
+  @override
+  String get audioEditorCompressTitle => 'Розмір файлу';
+
+  @override
+  String get audioEditorCompressOriginal => 'Оригінал';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return 'Орієнтовний розмір: приблизно $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      'Аудіо перекодовується в AAC із нижчим бітрейтом, тож файл стає меншим, але якість знижується. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться.';
 }

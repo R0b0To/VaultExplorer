@@ -31,6 +31,7 @@ import 'package:vaultexplorer/features/video_editor/widgets/video_segments_sheet
 
 import 'audio_edit_providers.dart';
 import 'audio_editor_controller.dart';
+import 'models/audio_compression.dart';
 import 'models/audio_waveform.dart';
 import 'widgets/audio_export_sheet.dart';
 import 'widgets/audio_timeline.dart';
@@ -502,8 +503,16 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       extension: probe.outputExtension,
       isReadOnly: widget.container.readOnly,
       reencode: probe.reencode,
+      compressionOptions: AudioCompression.optionsFor(probe),
+      sourceChannels: probe.channels,
+      sourceBitrate: probe.bitrate,
     );
     if (choice == null || !mounted) return;
+
+    // A compressed export is always AAC in an .m4a, whatever the source was.
+    final outputExtension = choice.compression.isOn
+        ? AudioCompression.outputExtension
+        : probe.outputExtension;
 
     final ranges = editor.exportRanges(merge: choice.merge);
     final outputCount = choice.merge ? 1 : ranges.length;
@@ -530,12 +539,12 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     final fsType = resolveFilesystemType(container);
     final existingLowercase = {for (final e in existing) e.name.toLowerCase()};
     final baseSourceName = choice.customName != null
-        ? '${choice.customName}.${probe.outputExtension}'
+        ? '${choice.customName}.$outputExtension'
         : _fileName;
 
     final names = planOutputNames(
       sourceFileName: baseSourceName,
-      extension: probe.outputExtension,
+      extension: outputExtension,
       count: outputCount,
       existingLowercase: existingLowercase,
       unique: FileOperationService.makeUniqueName,
@@ -569,12 +578,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       merge: choice.merge,
       outputPaths: nativeOutputs,
       outputCount: outputCount,
+      compressBitratePerChannel: choice.compression.bitratePerChannel,
     );
 
     if (choice.replaceOriginal && result != null && relativePaths.isNotEmpty) {
       await _replaceOriginalWith(
         cutPath: relativePaths.first,
-        extension: probe.outputExtension,
+        extension: outputExtension,
         existingLowercase: existingLowercase,
       );
     }
@@ -622,6 +632,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     required bool merge,
     required List<String> outputPaths,
     required int outputCount,
+    int? compressBitratePerChannel,
   }) async {
     final fileIo = ref.read(vaultFileIoApiProvider);
     final lockController = ref.read(sessionLockControllerProvider);
@@ -665,6 +676,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           merge: merge,
           outputPaths: outputPaths,
           opId: opId,
+          compressBitratePerChannel: compressBitratePerChannel,
         );
       });
     } on AudioEditException catch (e) {

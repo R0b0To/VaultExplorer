@@ -418,8 +418,16 @@ open class MainActivity : FlutterFragmentActivity() {
         }
         privacyCurtain.install()
         ioExecutor.execute {
-            com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
-            com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder.sweepOrphanedTempFiles(cacheDir)
+            // An automation recording runs in a foreground service in this
+            // same process, so opening the app while one is in progress must
+            // not sweep its live temp file -- the sweep zero-fills before
+            // deleting, which would overwrite the recording with zeros while
+            // the encoder is still writing to it. A file is only an orphan
+            // when no recording owns it.
+            if (!com.aeidolon.vaultexplorer.service.VaultAutomationRecordingService.isRecording) {
+                com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
+                com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder.sweepOrphanedTempFiles(cacheDir)
+            }
             com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin.sweepOrphanedScratchpads(applicationContext)
             SecureFileWipe.sweepOrphanedFiles(
                 cacheDir,

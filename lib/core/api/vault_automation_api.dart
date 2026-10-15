@@ -117,8 +117,8 @@ class VaultAutomationApi {
 
   /// Only takes effect while the vault is at [AutomationTier.full] -- see
   /// AutomationSettings.canCapture (Kotlin) for why TAKE_PHOTO/
-  /// START_RECORDING need this *in addition to* full tier rather than
-  /// riding along with it. Moving the vault off full tier and back clears
+  /// START_RECORDING/START_AUDIO_RECORDING need this *in addition to* full
+  /// tier rather than riding along with it. Moving the vault off full tier and back clears
   /// this again server-side, so the UI should re-fetch
   /// [getAutomationVaultConfig] after any [setAutomationTier] call rather
   /// than assuming this stays set.

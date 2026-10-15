@@ -11118,7 +11118,7 @@ abstract class AppLocalizations {
   /// Description of the camera automation opt-in
   ///
   /// In en, this message translates to:
-  /// **'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.'**
+  /// **'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.'**
   String get automationCameraDescription;
 
   /// Switch label for allowing camera capture from automation
@@ -11174,6 +11174,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop recording'**
   String get automationActionStopRecordingLabel;
+
+  /// Automation action label for starting an audio-only recording
+  ///
+  /// In en, this message translates to:
+  /// **'Start audio recording'**
+  String get automationActionStartAudioRecordingLabel;
+
+  /// Automation action label for stopping an audio-only recording
+  ///
+  /// In en, this message translates to:
+  /// **'Stop audio recording'**
+  String get automationActionStopAudioRecordingLabel;
 
   /// Section header for basic file properties in the file info sheet
   ///
@@ -19488,6 +19500,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Filter files…'**
   String get textEditorSearchFilesHint;
+
+  /// Settings label for the picker that chooses how audio recordings made in a vault are encoded (bitrate / file size)
+  ///
+  /// In en, this message translates to:
+  /// **'Audio recording quality'**
+  String get audioRecordingQualityLabel;
+
+  /// Audio recording quality preset: lowest bitrate, smallest files, meant for speech
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get audioRecordingQualityVoice;
+
+  /// Audio recording quality preset: medium bitrate, the default
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get audioRecordingQualityStandard;
+
+  /// Audio recording quality preset: highest bitrate, for music and ambient sound
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get audioRecordingQualityHigh;
+
+  /// Technical description of an audio recording quality preset in the picker: codec, bitrate in kbps, sample rate in kHz and channel layout (always mono). Keep the unit symbols; translate only "mono".
+  ///
+  /// In en, this message translates to:
+  /// **'AAC · {bitrate} kbps · {sampleRate} kHz · mono'**
+  String audioRecordingQualityDetails(String bitrate, String sampleRate);
+
+  /// Heading above the file-size choices in the audio editor's export sheet
+  ///
+  /// In en, this message translates to:
+  /// **'File size'**
+  String get audioEditorCompressTitle;
+
+  /// Export-sheet choice meaning keep the original audio data (no re-encoding, no size reduction)
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get audioEditorCompressOriginal;
+
+  /// Estimated size of the exported audio shown under the file-size choices in the audio editor's export sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated size: about {size}'**
+  String audioEditorCompressEstimate(String size);
+
+  /// Explanation at the bottom of the audio editor's export sheet when a lower bitrate is chosen and the audio will be re-encoded to AAC
+  ///
+  /// In en, this message translates to:
+  /// **'The audio is re-encoded to AAC at a lower bitrate, so the file is smaller but quality is reduced. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.'**
+  String get audioEditorCompressNote;
 }
 
 class _AppLocalizationsDelegate

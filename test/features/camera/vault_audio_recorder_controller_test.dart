@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/features/camera/vault_audio_recorder_controller.dart';
 
 void main() {
@@ -81,6 +82,24 @@ void main() {
       final denied = await controller.start();
       expect(denied.success, isFalse);
       expect(denied.error, 'permission_denied');
+    });
+
+    test('start sends the chosen quality as bitrate and sample rate', () async {
+      handler = (_) async => {'success': true};
+
+      await controller.start(quality: AudioRecordingQuality.voice);
+      expect(calls.last.method, 'start');
+      expect(calls.last.arguments, {'bitrate': 32000, 'sampleRate': 22050});
+
+      await controller.start(quality: AudioRecordingQuality.high);
+      expect(calls.last.arguments, {'bitrate': 128000, 'sampleRate': 44100});
+
+      // No quality given: the default preset, not an unset value.
+      await controller.start();
+      expect(calls.last.arguments, {
+        'bitrate': AudioRecordingQuality.defaultQuality.bitrate,
+        'sampleRate': AudioRecordingQuality.defaultQuality.sampleRate,
+      });
     });
 
     test('stop maps a finished take', () async {

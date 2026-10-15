@@ -32,6 +32,7 @@ void main() {
       expect(s.defaultFileSortAscending, isTrue);
       expect(s.playlistScrollMode, PlaylistScrollMode.horizontal);
       expect(s.deleteAfterImportMode, DeleteAfterImportMode.ask);
+      expect(s.audioRecordingQuality, AudioRecordingQuality.standard);
       expect(s.languageCode, isNull);
       expect(s.extensionPreferences, isEmpty);
       expect(s.masterPasswordHash, isNull);
@@ -74,6 +75,7 @@ void main() {
         languageCode: 'de',
         debugLoggingEnabled: true,
         deleteAfterImportMode: DeleteAfterImportMode.delete,
+        audioRecordingQuality: AudioRecordingQuality.voice,
         extensionPreferences: {'txt': 'com.example.editor'},
       );
 
@@ -102,6 +104,7 @@ void main() {
       expect(roundTripped.languageCode, original.languageCode);
       expect(roundTripped.debugLoggingEnabled, original.debugLoggingEnabled);
       expect(roundTripped.deleteAfterImportMode, original.deleteAfterImportMode);
+      expect(roundTripped.audioRecordingQuality, original.audioRecordingQuality);
       expect(roundTripped.extensionPreferences, original.extensionPreferences);
     });
 
@@ -222,6 +225,7 @@ void main() {
       expect(s.defaultFileSortBy, SortBy.name);
       expect(s.playlistScrollMode, PlaylistScrollMode.horizontal);
       expect(s.deleteAfterImportMode, DeleteAfterImportMode.ask);
+      expect(s.audioRecordingQuality, AudioRecordingQuality.standard);
       expect(s.extensionPreferences, isEmpty);
     });
 

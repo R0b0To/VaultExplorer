@@ -1733,6 +1733,24 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
                           (s) => s.copyWith(deleteAfterImportMode: v),
                         ),
                   ),
+                  OptionPickerTile<AudioRecordingQuality>(
+                    label: context.l10n.audioRecordingQualityLabel,
+                    value: state.settings.audioRecordingQuality,
+                    subtitle: state.settings.audioRecordingQuality
+                        .getLocalizedSubtitle(context.l10n),
+                    options: AudioRecordingQuality.values.map((quality) {
+                      return SelectOption(
+                        value: quality,
+                        label: quality.getLocalizedLabel(context.l10n),
+                        subtitle: quality.getLocalizedSubtitle(context.l10n),
+                      );
+                    }).toList(),
+                    onChanged: (v) => ref
+                        .read(appSettingsControllerProvider.notifier)
+                        .updateSettings(
+                          (s) => s.copyWith(audioRecordingQuality: v),
+                        ),
+                  ),
                   OptionPickerTile<ThumbnailCacheMode>(
                     label: context.l10n.thumbnailCachingDefaultLabel,
                     value: fmSettingsState.config.defaultThumbnailCacheMode,

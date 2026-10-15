@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Stocké avec le mot de passe d'automatisation ci-dessus et utilisé de la même façon pour les appels UNLOCK_VAULT — pour un coffre VeraCrypt/LUKS normalement déverrouillé avec un fichier-clé et/ou un PIM non par défaut plutôt qu'un simple mot de passe.",
   "automationSavePimButton": "Enregistrer le PIM",
   "automationCameraSectionHeader": "Automatisation de l'appareil photo",
-  "automationCameraDescription": "Permet à l'automatisation de déclencher TAKE_PHOTO / START_RECORDING / STOP_RECORDING pour ce coffre. Désactivé par défaut même avec l'accès complet — contrairement à l'import/export de fichiers, une photo ne nécessite aucune indication à l'écran, il s'agit donc d'une activation explicite distincte.",
+  "automationCameraDescription": "Permet à l'automatisation de déclencher TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING pour ce coffre. Désactivé par défaut même avec l'accès complet — contrairement à l'import/export de fichiers, une photo ne nécessite aucune indication à l'écran, il s'agit donc d'une activation explicite distincte.",
   "automationAllowCameraCapture": "Autoriser la capture par l'appareil photo",
   "automationOverlayPermissionTitle": "Afficher sur d'autres applications",
   "automationOverlayPermissionMessage": "La capture de l'appareil photo en arrière-plan nécessite l'autorisation 'Afficher sur d'autres applications' sur Android 14+. Accordez cette autorisation pour autoriser les captures automatisées lorsque l'écran est verrouillé ou que l'application est en arrière-plan.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Prendre une photo",
   "automationActionStartRecordingLabel": "Démarrer l'enregistrement",
   "automationActionStopRecordingLabel": "Arrêter l'enregistrement",
+  "automationActionStartAudioRecordingLabel": "Démarrer l'enregistrement audio",
+  "automationActionStopAudioRecordingLabel": "Arrêter l'enregistrement audio",
   "filePropertiesSectionHeader": "PROPRIÉTÉS DU FICHIER",
   "fullPathLabel": "Chemin complet",
   "sizeLabel": "Taille",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Copier ici",
   "textEditorDuplicateMenuItem": "Créer une copie",
   "textEditorCopiedSuccessfully": "Copié avec succès",
-  "textEditorSearchFilesHint": "Filtrer les fichiers…"
+  "textEditorSearchFilesHint": "Filtrer les fichiers…",
+  "audioRecordingQualityLabel": "Qualité d'enregistrement audio",
+  "audioRecordingQualityVoice": "Voix",
+  "audioRecordingQualityStandard": "Standard",
+  "audioRecordingQualityHigh": "Élevée",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · mono",
+  "audioEditorCompressTitle": "Taille du fichier",
+  "audioEditorCompressOriginal": "Original",
+  "audioEditorCompressEstimate": "Taille estimée : environ {size}",
+  "audioEditorCompressNote": "L'audio est réencodé en AAC avec un débit plus faible : le fichier est plus petit, mais la qualité diminue. Les coupes tombent exactement là où vous les placez. Les balises et la pochette ne sont pas conservées."
 }

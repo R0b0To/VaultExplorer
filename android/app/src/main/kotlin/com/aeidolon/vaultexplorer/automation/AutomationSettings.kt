@@ -45,7 +45,7 @@ object AutomationSettings {
     private const val PREF_KEYFILE_PREFIX = "kf:"       // + container URI -> encrypted pipe-delimited keyfile paths
     private const val PREF_PIM_PREFIX = "pim:"          // + container URI -> encrypted PIM integer
     private const val PREF_FORMAT_PREFIX = "fmt:"       // + container URI -> DirectoryVaultFormat.name; absent = standard container
-    private const val PREF_CAPTURE_PREFIX = "cap:"      // + container URI -> "true" if TAKE_PHOTO/START_RECORDING are opted in
+    private const val PREF_CAPTURE_PREFIX = "cap:"      // + container URI -> "true" if TAKE_PHOTO/START_RECORDING/START_AUDIO_RECORDING are opted in
     private const val PREF_PENDING_ACTION_PREFIX = "pending_action:" // + random ID -> encrypted automation action payload
 
     enum class AutomationTier {
@@ -196,7 +196,7 @@ object AutomationSettings {
 
     // --- Per-vault camera-capture opt-in -----------------------------------
 
-    /** Whether TAKE_PHOTO / START_RECORDING are opted in for this vault. */
+    /** Whether TAKE_PHOTO / START_RECORDING / START_AUDIO_RECORDING are opted in for this vault. */
     fun getCaptureEnabled(context: Context, containerUri: String): Boolean =
         prefs(context).getBoolean(PREF_CAPTURE_PREFIX + containerUri, false)
 
@@ -206,8 +206,9 @@ object AutomationSettings {
 
     /**
      * FULL tier alone does not grant camera capture. IMPORT_FILE/EXPORT_FILE
-     * only ever touch a path the caller already named; TAKE_PHOTO and
-     * START_RECORDING *generate new content* from a live camera/mic with no
+     * only ever touch a path the caller already named; TAKE_PHOTO,
+     * START_RECORDING and START_AUDIO_RECORDING *generate new content* from a
+     * live camera/mic with no
      * on-screen indication at all for a still photo (no foreground-service
      * notification is needed for a capture that fast -- see
      * VaultAutomationReceiver.handleTakePhoto), which is a bigger silent-
@@ -215,6 +216,10 @@ object AutomationSettings {
      * needs FULL *and* this separate, explicit switch -- the same
      * "two opt-ins for a materially bigger trust jump" reasoning already
      * used to split LIFECYCLE from FULL itself.
+     *
+     * Audio-only recording is covered by this same switch rather than a new
+     * one: START_RECORDING already records the microphone under it, so a
+     * separate mic opt-in would not actually be a narrower grant.
      */
     fun canCapture(context: Context, containerUri: String): Boolean =
         getTier(context, containerUri) == AutomationTier.FULL && getCaptureEnabled(context, containerUri)

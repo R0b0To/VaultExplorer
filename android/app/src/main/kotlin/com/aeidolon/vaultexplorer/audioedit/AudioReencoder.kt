@@ -163,6 +163,11 @@ object AudioReencoder {
      * Decodes [ranges] of the source and writes them to [outFile] as one AAC
      * `.m4a` (several ranges are joined in the order given). [onProgress]
      * receives 0..1 across the whole call.
+     *
+     * By default the bitrate follows the source ([AudioEditMath.reencodeBitrate]).
+     * With [bitratePerChannel] set (the editor's "compress" export) that exact
+     * per-channel bitrate is used instead, so the result can be much smaller
+     * than the source; the sample rate and channel layout are unchanged.
      */
     fun reencode(
         newExtractor: () -> AudioSource,
@@ -170,6 +175,7 @@ object AudioReencoder {
         outFile: File,
         isCancelled: () -> Boolean,
         onProgress: (Float) -> Unit,
+        bitratePerChannel: Int? = null,
     ): LosslessAudioCutter.CutResult {
         require(ranges.isNotEmpty()) { "No ranges to cut" }
 
@@ -215,11 +221,17 @@ object AudioReencoder {
                 AudioEditMath.reencodeIssue(sampleRate, channels)?.let {
                     throw LosslessAudioCutter.UnsupportedCutException(it)
                 }
+                val outChannels = AudioEditMath.reencodeChannels(channels)
+                val bitrate = if (bitratePerChannel != null) {
+                    AudioEditMath.compressBitrate(bitratePerChannel, outChannels)
+                } else {
+                    AudioEditMath.reencodeBitrate(sourceBitrate, channels)
+                }
                 return EncodeSession(
                     outFile,
                     sampleRate,
-                    AudioEditMath.reencodeChannels(channels),
-                    AudioEditMath.reencodeBitrate(sourceBitrate, channels),
+                    outChannels,
+                    bitrate,
                 ).also { session = it }
             }
 

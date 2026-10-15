@@ -175,6 +175,18 @@ object AudioEditMath {
         return base.coerceIn(floor, ceil)
     }
 
+    /**
+     * AAC bitrate for an explicit "compress" export: [perChannel] bits per
+     * second for each of [outChannels] channels, kept within the same
+     * 16..160 kbps per channel the encoder handles well. Unlike
+     * [reencodeBitrate] it ignores the source's own bitrate -- the whole point
+     * is to go lower than the source.
+     */
+    fun compressBitrate(perChannel: Int, outChannels: Int): Int {
+        val ch = outChannels.coerceIn(1, 2)
+        return (perChannel.coerceIn(16_000, 160_000)) * ch
+    }
+
     /** Bytes per sample for [encoding] (null = the 16-bit default), or null when unsupported. */
     fun bytesPerSample(encoding: Int?): Int? = when (encoding ?: PCM_16BIT) {
         PCM_8BIT -> 1

@@ -169,6 +169,7 @@ class AudioEditHandlers(
                     "cutSupported" to probe.cutSupported,
                     "reencode" to probe.reencode,
                     "unsupportedReason" to probe.unsupportedReason,
+                    "canCompress" to probe.canCompress,
                 )
                 activity.runOnUiThread { result.success(map) }
             } catch (e: Exception) {
@@ -226,7 +227,9 @@ class AudioEditHandlers(
      * `[startUs, endUs]`), `merge` (one output holding every segment vs. one
      * output per segment), `outputPaths` (exactly 1 when merging, else one
      * per segment -- container-relative for a vault, absolute for local
-     * storage; Dart has already made them unique), `opId`.
+     * storage; Dart has already made them unique), `opId`, and optionally
+     * `compressBitratePerChannel` (re-encode to AAC at that bitrate per channel
+     * instead of copying; the output is then always `.m4a`).
      */
     fun handleExport(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()
@@ -236,6 +239,7 @@ class AudioEditHandlers(
         val opId = call.argument<Number>("opId")?.toInt() ?: 0
         val rawSegments = call.argument<List<List<Number>>>("segments")
         val outputPaths = call.argument<List<String>>("outputPaths")
+        val compressBitratePerChannel = call.argument<Number>("compressBitratePerChannel")?.toInt()
 
         if (volId == null || filePath.isNullOrEmpty() || rawSegments.isNullOrEmpty() || outputPaths.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "volId, filePath, segments and outputPaths are required", null)
@@ -256,7 +260,10 @@ class AudioEditHandlers(
         ioExecutor.execute {
             val powerManager = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
             val wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VaultExplorer:AudioExport")
-            wakeLock?.acquire(15 * 60 * 1000L) // 15 mins timeout
+            // A compress export decodes and re-encodes the whole selection, which for a multi-hour
+            // recording takes longer than a stream copy, so it gets a longer (still bounded) timeout.
+            val wakeLockMs = if (compressBitratePerChannel != null) 60 * 60 * 1000L else 15 * 60 * 1000L
+            wakeLock?.acquire(wakeLockMs)
             val tempFiles = ArrayList<File>()
             // Outputs created so far (successfully or not) -- rolled back if the export fails or is cancelled.
             val created = ArrayList<String>()
@@ -314,6 +321,7 @@ class AudioEditHandlers(
                         onProgress = { f ->
                             AudioEditProgressBridge.reportProgress(opId, i, groups.size, "cutting", f)
                         },
+                        compressBitratePerChannel = compressBitratePerChannel,
                     )
 
                     if (AudioEditCancellation.isCancelled(opId)) {

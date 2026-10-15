@@ -12,9 +12,11 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
 import 'package:vaultexplorer/features/audio_editor/models/audio_waveform.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 import 'active_recording_registry.dart';
 import 'audio_waveform_trimmer.dart';
@@ -79,6 +81,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   late final VaultAudioEditApi _audioEditApi;
 
   _Phase _phase = _Phase.preparing;
+
+  /// The quality the current take was started with. The encoder is fixed once
+  /// recording begins, so the app bar shows this (read-only) while recording
+  /// instead of the picker.
+  AudioRecordingQuality? _recordingQuality;
 
   /// True while an async transition (start/stop/save) is in flight, so a
   /// second tap can't start another one on top of it.
@@ -208,7 +215,14 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     if (_busy || _phase != _Phase.ready) return;
     _busy = true;
     try {
-      final res = await _recorder.start();
+      // Read at the moment recording starts, so a change made in the app bar
+      // or in Settings applies to this take and never to one already running.
+      final settingsState = ref.read(appSettingsControllerProvider);
+      final settings = settingsState.loading
+          ? await ref.read(appSettingsServiceProvider).loadSettings()
+          : settingsState.settings;
+      final quality = settings.audioRecordingQuality;
+      final res = await _recorder.start(quality: quality);
       if (!mounted) {
         await _recorder.cancel();
         return;
@@ -239,7 +253,10 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       _waveform = null;
       unawaited(HapticFeedback.mediumImpact());
       _acquireRecordingResources();
-      setState(() => _phase = _Phase.recording);
+      setState(() {
+        _phase = _Phase.recording;
+        _recordingQuality = quality;
+      });
       _startTicker();
     } catch (e) {
       VeLog.w(_tag, 'start failed', e);
@@ -651,6 +668,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     ref.listen<bool>(lockProvider, (previous, next) {
       if (next && previous != true) unawaited(_onContainerLocked());
     });
+    final selectedQuality = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.audioRecordingQuality,
+      ),
+    );
     if (isLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -668,9 +690,121 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         appBar: AppBar(
           leading: CloseButton(onPressed: () => unawaited(_requestClose())),
           title: Text(context.l10n.audioRecorder),
+          actions: [?_buildQualityAction(context, selectedQuality)],
         ),
         body: SafeArea(child: _buildBody(context)),
       ),
+    );
+  }
+
+  /// Picks the quality the next take is recorded at -- the audio counterpart
+  /// of the camera's resolution menu. The choice is saved as the default, so
+  /// it is still selected next time (and in Settings).
+  void _selectQuality(AudioRecordingQuality quality) {
+    if (_phase != _Phase.ready) return;
+    unawaited(
+      ref
+          .read(appSettingsControllerProvider.notifier)
+          .updateSettings((s) => s.copyWith(audioRecordingQuality: quality)),
+    );
+  }
+
+  /// The quality pill in the app bar: a menu before recording starts, and just
+  /// a label for the quality in use while a take is running (the encoder can't
+  /// change mid-recording). Null on screens that aren't the recorder.
+  Widget? _buildQualityAction(
+    BuildContext context,
+    AudioRecordingQuality selected,
+  ) {
+    final ready = _phase == _Phase.ready;
+    final recorderShown =
+        ready ||
+        _phase == _Phase.recording ||
+        _phase == _Phase.paused ||
+        _phase == _Phase.stopping;
+    if (!recorderShown) return null;
+
+    final l10n = context.l10n;
+    final cs = context.colors;
+    final textTheme = Theme.of(context).textTheme;
+    final shown = ready ? selected : (_recordingQuality ?? selected);
+
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ready ? cs.outline : cs.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            shown.getLocalizedLabel(l10n),
+            style: textTheme.labelLarge?.copyWith(
+              color: ready ? cs.onSurface : cs.onSurfaceVariant,
+            ),
+          ),
+          if (ready) ...[
+            const SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down_rounded, size: 20, color: cs.onSurface),
+          ],
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 12),
+      child: ready
+          ? PopupMenuButton<AudioRecordingQuality>(
+              tooltip: l10n.audioRecordingQualityLabel,
+              initialValue: selected,
+              onSelected: _selectQuality,
+              itemBuilder: (context) => [
+                for (final q in AudioRecordingQuality.values)
+                  PopupMenuItem<AudioRecordingQuality>(
+                    value: q,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          child: q == selected
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  size: 20,
+                                  color: cs.primary,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                q.getLocalizedLabel(l10n),
+                                style: textTheme.bodyLarge?.copyWith(
+                                  fontWeight: q == selected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              Text(
+                                q.getLocalizedSubtitle(l10n),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              child: pill,
+            )
+          : pill,
     );
   }
 

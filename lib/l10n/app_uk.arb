@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Зберігається разом із паролем автоматизації вище та використовується так само для UNLOCK_VAULT — для сховищ VeraCrypt/LUKS, які зазвичай розблоковуються за допомогою ключ. файлу та/або нестандартного PIM замість лише пароля.",
   "automationSavePimButton": "Зберегти PIM",
   "automationCameraSectionHeader": "Автоматизація камери",
-  "automationCameraDescription": "Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, знімання не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.",
+  "automationCameraDescription": "Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, знімання не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.",
   "automationAllowCameraCapture": "Дозволити знімання камерою",
   "automationOverlayPermissionTitle": "Показ поверх інших програм",
   "automationOverlayPermissionMessage": "Для знімання камерою у фоновому режимі на Android 14+ потрібен дозвіл «Показ поверх інших програм». Надайте цей дозвіл, щоб дозволити автоматичне знімання, коли екран заблоковано або програма працює у фоні.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Зробити фото",
   "automationActionStartRecordingLabel": "Почати запис",
   "automationActionStopRecordingLabel": "Зупинити запис",
+  "automationActionStartAudioRecordingLabel": "Почати запис аудіо",
+  "automationActionStopAudioRecordingLabel": "Зупинити запис аудіо",
   "filePropertiesSectionHeader": "ВЛАСТИВОСТІ ФАЙЛУ",
   "fullPathLabel": "Повний шлях",
   "sizeLabel": "Розмір",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Копіювати сюди",
   "textEditorDuplicateMenuItem": "Створити копію",
   "textEditorCopiedSuccessfully": "Успішно скопійовано",
-  "textEditorSearchFilesHint": "Фільтрувати файли…"
+  "textEditorSearchFilesHint": "Фільтрувати файли…",
+  "audioRecordingQualityLabel": "Якість запису аудіо",
+  "audioRecordingQualityVoice": "Голос",
+  "audioRecordingQualityStandard": "Стандартна",
+  "audioRecordingQualityHigh": "Висока",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · моно",
+  "audioEditorCompressTitle": "Розмір файлу",
+  "audioEditorCompressOriginal": "Оригінал",
+  "audioEditorCompressEstimate": "Орієнтовний розмір: приблизно {size}",
+  "audioEditorCompressNote": "Аудіо перекодовується в AAC із нижчим бітрейтом, тож файл стає меншим, але якість знижується. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться."
 }

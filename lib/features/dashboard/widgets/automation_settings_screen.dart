@@ -48,6 +48,10 @@ class _AutomationSettingsScreenState
       'com.aeidolon.vaultexplorer.action.START_RECORDING';
   static const _actionStopRecording =
       'com.aeidolon.vaultexplorer.action.STOP_RECORDING';
+  static const _actionStartAudioRecording =
+      'com.aeidolon.vaultexplorer.action.START_AUDIO_RECORDING';
+  static const _actionStopAudioRecording =
+      'com.aeidolon.vaultexplorer.action.STOP_AUDIO_RECORDING';
   static const _actionWipe = 'com.aeidolon.vaultexplorer.action.WIPE_FILE';
   static const _actionEmergencyLock =
       'com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK';
@@ -592,6 +596,16 @@ class _AutomationSettingsScreenState
             _CopyRow(
               label: l10n.automationActionStopRecordingLabel,
               value: _actionStopRecording,
+              onCopy: _copy,
+            ),
+            _CopyRow(
+              label: l10n.automationActionStartAudioRecordingLabel,
+              value: _actionStartAudioRecording,
+              onCopy: _copy,
+            ),
+            _CopyRow(
+              label: l10n.automationActionStopAudioRecordingLabel,
+              value: _actionStopAudioRecording,
               onCopy: _copy,
             ),
           ],

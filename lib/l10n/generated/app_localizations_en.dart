@@ -6650,7 +6650,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
 
   @override
   String get automationAllowCameraCapture => 'Allow camera capture';
@@ -6679,6 +6679,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => 'Stop recording';
+
+  @override
+  String get automationActionStartAudioRecordingLabel =>
+      'Start audio recording';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => 'Stop audio recording';
 
   @override
   String get filePropertiesSectionHeader => 'FILE PROPERTIES';
@@ -11477,4 +11484,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => 'Filter files…';
+
+  @override
+  String get audioRecordingQualityLabel => 'Audio recording quality';
+
+  @override
+  String get audioRecordingQualityVoice => 'Voice';
+
+  @override
+  String get audioRecordingQualityStandard => 'Standard';
+
+  @override
+  String get audioRecordingQualityHigh => 'High';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · mono';
+  }
+
+  @override
+  String get audioEditorCompressTitle => 'File size';
+
+  @override
+  String get audioEditorCompressOriginal => 'Original';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return 'Estimated size: about $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      'The audio is re-encoded to AAC at a lower bitrate, so the file is smaller but quality is reduced. Cuts land exactly where you set them. Tags and cover art aren\'t carried over.';
 }

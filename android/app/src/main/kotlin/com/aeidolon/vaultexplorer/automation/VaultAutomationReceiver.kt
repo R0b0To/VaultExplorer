@@ -59,10 +59,14 @@ import kotlinx.coroutines.runBlocking
  * IMPORT_FILE/EXPORT_FILE/IMPORT_FOLDER/EXPORT_FOLDER need FULL, since they
  * read or write files -- a materially bigger trust decision than lifecycle
  * control alone, hence two separate opt-in switches rather than one.
- * TAKE_PHOTO/START_RECORDING/STOP_RECORDING need FULL *and* the
+ * TAKE_PHOTO/START_RECORDING/STOP_RECORDING and
+ * START_AUDIO_RECORDING/STOP_AUDIO_RECORDING need FULL *and* the
  * separate AutomationSettings.canCapture opt-in -- see that function's doc
  * comment for why silent camera/mic capture gets its own switch on top of
- * FULL rather than riding along with file import/export.
+ * FULL rather than riding along with file import/export. Audio-only
+ * recording shares that one switch rather than adding a second: video
+ * recording already captures the microphone under it, so a separate mic
+ * switch would not be a narrower grant.
  *
  * No hidden-volume support and no keyfile support here, by design -- see
  * ContainerLifecycleCore.unlockContainer's doc comment. UNLOCK_VAULT
@@ -84,7 +88,7 @@ import kotlinx.coroutines.runBlocking
  * ordinary "Intent Received" event, not a special reply mechanism) can
  * branch a task chain on success/failure instead of assuming success.
  * RESULT_MESSAGE additionally carries EXTRA_DURATION_MS for a successful
- * STOP_RECORDING.
+ * STOP_RECORDING / STOP_AUDIO_RECORDING.
  */
 class VaultAutomationReceiver : BroadcastReceiver() {
 
@@ -101,6 +105,8 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val ACTION_TAKE_PHOTO = "com.aeidolon.vaultexplorer.action.TAKE_PHOTO"
         const val ACTION_START_RECORDING = "com.aeidolon.vaultexplorer.action.START_RECORDING"
         const val ACTION_STOP_RECORDING = "com.aeidolon.vaultexplorer.action.STOP_RECORDING"
+        const val ACTION_START_AUDIO_RECORDING = "com.aeidolon.vaultexplorer.action.START_AUDIO_RECORDING"
+        const val ACTION_STOP_AUDIO_RECORDING = "com.aeidolon.vaultexplorer.action.STOP_AUDIO_RECORDING"
         const val ACTION_WIPE_FILE = "com.aeidolon.vaultexplorer.action.WIPE_FILE"
         const val ACTION_EMERGENCY_LOCK = "com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK"
         const val ACTION_EMERGENCY_PURGE = "com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE"
@@ -117,7 +123,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_READ_ONLY = "read_only"
         const val EXTRA_SOURCE_PATH = "source_path"       // IMPORT_FILE/IMPORT_FOLDER/WIPE_FILE: real path or content:// Uri
         const val EXTRA_DEST_PATH = "dest_path"           // EXPORT_FILE/EXPORT_FOLDER: real path or content:// Uri to write to
-        const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault; optional for TAKE_PHOTO/START_RECORDING
+        const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault; optional for TAKE_PHOTO/START_RECORDING/START_AUDIO_RECORDING
         const val EXTRA_DELETE_SOURCE = "delete_source"   // IMPORT_FILE/IMPORT_FOLDER: wipe/delete source after import
         const val EXTRA_PATTERN = "pattern"               // glob wildcard pattern for batch import/export (e.g. *.xlsx, HOSPITAL_*)
         const val EXTRA_EXCLUDE_PATTERN = "exclude_pattern" // optional glob to skip matching files, folders, and folder contents
@@ -139,16 +145,25 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_FAILED_COUNT = "failed_count"
         const val EXTRA_SKIPPED_COUNT = "skipped_count"
 
+        // START_AUDIO_RECORDING takes no camera/quality extras: it only needs
+        // api_token, vault_uri and (optionally) vault_path.
+
         // Result codes across every action in this receiver:
         //   OK | AUTH_FAIL | NOT_MOUNTED | FORBIDDEN | INVALID_ARGS | ERROR
         //   PARTIAL           -- IMPORT_FOLDER/EXPORT_FOLDER: some files failed, see RESULT_MESSAGE
         //   PERMISSION_DENIED -- TAKE_PHOTO/START_RECORDING: camera/mic permission not granted; automation
         //                        can't request it, grant it once from the app's own camera screen first
+        //                        START_AUDIO_RECORDING: mic permission not granted (camera is not needed)
         //   CAMERA_UNAVAILABLE-- TAKE_PHOTO/START_RECORDING: camera busy (e.g. the in-app camera screen has
         //                        it open) or a hardware/driver error opening it
-        //   BUSY              -- START_RECORDING: an automation recording is already in progress
+        //   MIC_UNAVAILABLE   -- START_AUDIO_RECORDING: the microphone couldn't be opened (e.g. another app
+        //                        holds it, or a device policy blocks it); the message carries the detail
+        //   BUSY              -- START_RECORDING/START_AUDIO_RECORDING: an automation recording (video OR
+        //                        audio) is already in progress
         //                        SYNC_VAULT: the open app is still syncing after the wait ended (it keeps going)
-        //   NOT_RECORDING     -- STOP_RECORDING: nothing is currently recording (or it's for a different vault)
+        //   NOT_RECORDING     -- STOP_RECORDING/STOP_AUDIO_RECORDING: nothing is currently recording, it's for
+        //                        a different vault, or it's the other kind (STOP_RECORDING does not end an
+        //                        audio recording and vice versa -- the message says which STOP to send)
 
         // Automation actions must run in the order automation fires them --
         // unlock, then import, then lock is a common chain -- and this
@@ -182,10 +197,15 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             return lenses.firstOrNull { it.facing == facing }?.cameraId ?: lenses.firstOrNull()?.cameraId
         }
 
-        internal fun generateCaptureName(volId: Int, isPhoto: Boolean): String {
+        internal fun generateCaptureName(volId: Int, isPhoto: Boolean): String =
+            uniqueCaptureName(volId, if (isPhoto) "IMG_" else "VID_", if (isPhoto) ".jpg" else ".mp4")
+
+        /** `AUD_<timestamp>.m4a`, matching the name the in-app audio recorder gives its takes. */
+        internal fun generateAudioCaptureName(volId: Int): String =
+            uniqueCaptureName(volId, "AUD_", ".m4a")
+
+        private fun uniqueCaptureName(volId: Int, prefix: String, ext: String): String {
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val prefix = if (isPhoto) "IMG_" else "VID_"
-            val ext = if (isPhoto) ".jpg" else ".mp4"
             val existingNames = (ContainerFileSystem.listDirectory(volId, "") ?: emptyArray())
                 .mapNotNull { VaultAutomationFolderOps.parseDirEntry(it)?.name }
                 .toSet()
@@ -206,6 +226,21 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             )
             error.startsWith("camera_unavailable") || error == "camera disconnected" || error == "session configuration failed" ->
                 Outcome("CAMERA_UNAVAILABLE", error)
+            else -> Outcome("ERROR", error)
+        }
+
+        /**
+         * Audio counterpart of [outcomeForCameraError]. The strings come from
+         * [com.aeidolon.vaultexplorer.service.VaultAutomationRecordingService]'s
+         * audio start path and the capture activity's own permission check.
+         */
+        internal fun outcomeForAudioError(error: String?): Outcome = when {
+            error == null -> Outcome("ERROR", "Unknown audio recording error")
+            error == "permission_denied" -> Outcome(
+                "PERMISSION_DENIED",
+                "Microphone permission not granted -- grant it once from the app's own audio recorder first",
+            )
+            error.startsWith("mic_unavailable") -> Outcome("MIC_UNAVAILABLE", error)
             else -> Outcome("ERROR", error)
         }
 
@@ -293,6 +328,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ACTION_IMPORT_FILE, ACTION_EXPORT_FILE,
             ACTION_IMPORT_FOLDER, ACTION_EXPORT_FOLDER,
             ACTION_TAKE_PHOTO, ACTION_START_RECORDING, ACTION_STOP_RECORDING,
+            ACTION_START_AUDIO_RECORDING, ACTION_STOP_AUDIO_RECORDING,
             ACTION_WIPE_FILE,
             ACTION_EMERGENCY_LOCK, ACTION_EMERGENCY_PURGE,
         )
@@ -400,6 +436,8 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ACTION_TAKE_PHOTO -> handleTakePhoto(context, vaultUri!!, intent)
             ACTION_START_RECORDING -> handleStartRecording(context, vaultUri!!, intent)
             ACTION_STOP_RECORDING -> handleStopRecording(context, vaultUri!!)
+            ACTION_START_AUDIO_RECORDING -> handleStartAudioRecording(context, vaultUri!!, intent)
+            ACTION_STOP_AUDIO_RECORDING -> handleStopAudioRecording(context, vaultUri!!)
             else -> handleWipe(context, intent) // ACTION_WIPE_FILE; doesn't need vaultUri, see handleWipe
         }
         var automaticSyncOutcome: Outcome? = null
@@ -951,6 +989,9 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (VaultAutomationRecordingService.currentVaultUri != vaultUri) {
             return Outcome("NOT_RECORDING", "The in-progress automation recording is for a different vault")
         }
+        if (VaultAutomationRecordingService.currentIsAudioOnly) {
+            return Outcome("NOT_RECORDING", "The in-progress recording is audio-only -- send STOP_AUDIO_RECORDING to stop it")
+        }
         val latch = VaultAutomationCaptureBridge.arm()
         context.startService(
             Intent(context, VaultAutomationRecordingService::class.java)
@@ -965,7 +1006,73 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         }
     }
 
+    // ── Audio-only recording ─────────────────────────────────────────────
+
+    private fun handleStartAudioRecording(context: Context, vaultUri: String, intent: Intent): Outcome {
+        if (!AutomationSettings.canCapture(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation camera capture")
+        }
+        if (ContainerSessionRegistry.getVolumeIdByUri(vaultUri) == null) {
+            return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
+        }
+        // Covers a video recording too: there is one recording slot, shared.
+        if (VaultAutomationRecordingService.isRecording) {
+            return Outcome("BUSY", "An automation recording is already in progress")
+        }
+
+        // Android 14+ only lets an app use the microphone from a foreground
+        // service it started while visible, so this goes through the same
+        // invisible capture Activity as the camera actions -- see
+        // VaultAutomationCaptureActivity.
+        val latch = VaultAutomationActivityBridge.arm()
+        if (!launchCaptureActivity(context, ACTION_START_AUDIO_RECORDING, intent)) {
+            return Outcome("ERROR", "Failed to launch capture activity (Background Activity Launch blocked by OS)")
+        }
+
+        val result = VaultAutomationActivityBridge.await(latch, START_RECORDING_TIMEOUT_MS)
+            ?: return Outcome(
+                "ERROR",
+                "Timed out waiting for audio recording to start (on Android 14+, grant 'Display over other apps' to VaultExplorer or target Activity directly in Tasker)",
+            )
+        return if (result.ok) {
+            Outcome("OK", "Audio recording started: ${result.vaultPath ?: "vault"}")
+        } else {
+            outcomeForAudioError(result.message)
+        }
+    }
+
+    private fun handleStopAudioRecording(context: Context, vaultUri: String): Outcome {
+        if (!AutomationSettings.canCapture(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation camera capture")
+        }
+        if (!VaultAutomationRecordingService.isRecording) {
+            return Outcome("NOT_RECORDING", "No automation recording is in progress")
+        }
+        if (VaultAutomationRecordingService.currentVaultUri != vaultUri) {
+            return Outcome("NOT_RECORDING", "The in-progress automation recording is for a different vault")
+        }
+        if (!VaultAutomationRecordingService.currentIsAudioOnly) {
+            return Outcome("NOT_RECORDING", "The in-progress recording is video -- send STOP_RECORDING to stop it")
+        }
+        val latch = VaultAutomationCaptureBridge.arm()
+        context.startService(
+            Intent(context, VaultAutomationRecordingService::class.java)
+                .setAction(VaultAutomationRecordingService.ACTION_STOP)
+        )
+        val result = VaultAutomationCaptureBridge.await(latch, STOP_RECORDING_TIMEOUT_MS)
+            ?: return Outcome("ERROR", "Timed out waiting for the audio recording to finish saving (it may still complete in the background)")
+        return if (result.ok) {
+            Outcome("OK", "Audio recording saved (${result.durationMs}ms)", durationMs = result.durationMs)
+        } else {
+            // A finalize failure ("vault write failed", "no audio was captured")
+            // is not a mic problem, so it reports as a plain ERROR.
+            outcomeForAudioError(result.message)
+        }
+    }
+
     internal fun outcomeForCameraError(error: String?): Outcome = Companion.outcomeForCameraError(error)
+
+    internal fun outcomeForAudioError(error: String?): Outcome = Companion.outcomeForAudioError(error)
 
     /**
      * Not vault-gated: this only ever touches a plaintext staging file

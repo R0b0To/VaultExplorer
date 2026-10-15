@@ -15,12 +15,19 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
+import com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder
 import com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureBridge
+import com.aeidolon.vaultexplorer.camera.VaultChunkWriter
 import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
 import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
+import com.aeidolon.vaultexplorer.camera.VaultVideoRecorder
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.util.NotificationLocale
+import java.io.IOException
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "VaultAutomationRecordingService"
 
@@ -44,6 +51,23 @@ private const val TAG = "VaultAutomationRecordingService"
  * arrives -- an automation profile's trigger condition failing to fire is
  * exactly the kind of thing that shouldn't be able to leave a camera
  * recording indefinitely in the background.
+ *
+ * The same service also owns audio-only recording (START_AUDIO_RECORDING /
+ * STOP_AUDIO_RECORDING), selected by [EXTRA_AUDIO_ONLY]. It deliberately
+ * shares this class's single recording slot ([isRecording]) rather than
+ * getting a service of its own: "only one automation recording at a time"
+ * then holds across video *and* audio for free, with one notification, one
+ * safety cap and one wake lock. In that mode the service
+ *  - declares only the microphone foreground-service type -- claiming
+ *    camera without a camera in use would be wrong, and on Android 14+ it
+ *    throws when the camera permission was never granted, which is exactly
+ *    the situation of someone who only wants audio (same reasoning as
+ *    [VaultCameraRecordingService.EXTRA_AUDIO_ONLY]);
+ *  - records with [VaultAudioRecorder] instead of a camera session. All of
+ *    its blocking work (opening the mic, and streaming the finished take
+ *    into the vault, which for a long recording is the slow part) runs on
+ *    [audioExecutor], never on the main thread this service's callbacks
+ *    arrive on.
  */
 class VaultAutomationRecordingService : Service() {
 
@@ -62,6 +86,7 @@ class VaultAutomationRecordingService : Service() {
         const val EXTRA_VIDEO_QUALITY = "videoQuality"     // VaultVideoQuality.name, e.g. "FHD"
         const val EXTRA_RECORD_AUDIO = "recordAudio"
         const val EXTRA_CONTAINER_NAME = "containerName"   // for the notification only
+        const val EXTRA_AUDIO_ONLY = "audioOnly"            // true: mic-only recording, no camera session
 
         @Volatile
         var isRecording: Boolean = false
@@ -71,6 +96,13 @@ class VaultAutomationRecordingService : Service() {
          *  lets STOP_RECORDING confirm it's stopping the recording it thinks it is. */
         @Volatile
         var currentVaultUri: String? = null
+            private set
+
+        /** True when the recording in progress is audio-only. Meaningful only
+         *  while [isRecording]; lets STOP_RECORDING and STOP_AUDIO_RECORDING
+         *  each refuse to end the other kind of recording. */
+        @Volatile
+        var currentIsAudioOnly: Boolean = false
             private set
 
         @Volatile
@@ -89,6 +121,15 @@ class VaultAutomationRecordingService : Service() {
     private var session: VaultHeadlessCameraSession? = null
     private var containerName: String = ""
     private var safetyStopRunnable: Runnable? = null
+
+    // Audio-only mode state; unused (null / defaults) for a video recording.
+    private val audioExecutor = Executors.newSingleThreadExecutor()
+    private var audioRecorder: VaultAudioRecorder? = null
+    private var audioVolId = -1
+    private var audioVaultPath = ""
+    private val audioStopping = AtomicBoolean(false)
+    @Volatile private var audioStopResult: VaultAutomationCaptureBridge.Result? = null
+    @Volatile private var destroyed = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         instance = this
@@ -121,17 +162,24 @@ class VaultAutomationRecordingService : Service() {
             VaultVideoQuality.FHD
         }
         val recordAudio = intent.getBooleanExtra(EXTRA_RECORD_AUDIO, true)
+        val audioOnly = intent.getBooleanExtra(EXTRA_AUDIO_ONLY, false)
 
-        if (volId == -1 || vaultPath.isNullOrEmpty() || cameraId.isNullOrEmpty()) {
+        // An audio-only recording has no camera, so no camera id to require.
+        if (volId == -1 || vaultPath.isNullOrEmpty() || (!audioOnly && cameraId.isNullOrEmpty())) {
             VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, "missing required extras"))
             stopSelf()
             return
         }
 
         currentVaultUri = vaultUri
+        currentIsAudioOnly = audioOnly // before buildNotification(), which reads it
         try {
             val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                if (audioOnly) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                } else {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
             } else {
                 0
             }
@@ -144,9 +192,14 @@ class VaultAutomationRecordingService : Service() {
         }
         acquireWakeLock()
 
+        if (audioOnly) {
+            startAudioRecording(volId, vaultPath)
+            return
+        }
+
         val newSession = VaultHeadlessCameraSession(applicationContext)
         session = newSession
-        newSession.openForRecording(cameraId, quality, recordAudio) { openOk, openError ->
+        newSession.openForRecording(cameraId!!, quality, recordAudio) { openOk, openError ->
             if (!openOk) {
                 VeLog.e(TAG) { "handleStart: openForRecording failed: $openError" }
                 VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, openError ?: "open failed"))
@@ -168,6 +221,10 @@ class VaultAutomationRecordingService : Service() {
     }
 
     private fun handleStop() {
+        if (currentIsAudioOnly) {
+            stopAudioRecording()
+            return
+        }
         val current = session
         if (!isRecording || current == null) {
             VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, "not recording"))
@@ -178,6 +235,115 @@ class VaultAutomationRecordingService : Service() {
         current.stopRecordingAndClose { ok, durationMs, error ->
             VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(ok, error, durationMs))
             stopSelf()
+        }
+    }
+
+    // ── Audio-only recording ────────────────────────────────────────────
+
+    private fun startAudioRecording(volId: Int, vaultPath: String) {
+        val recorder = VaultAudioRecorder(applicationContext)
+        audioRecorder = recorder
+        audioVolId = volId
+        audioVaultPath = vaultPath
+        audioStopping.set(false)
+        audioStopResult = null
+        audioExecutor.execute {
+            try {
+                recorder.start()
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "startAudioRecording: recorder.start failed" }
+                VaultAutomationCaptureBridge.complete(
+                    VaultAutomationCaptureBridge.Result(false, audioStartError(e)),
+                )
+                mainHandler.post { stopSelf() }
+                return@execute
+            }
+            mainHandler.post {
+                if (destroyed) {
+                    // The service was torn down (panic purge, system) while the
+                    // mic was opening. onDestroy already queued a cancel, but
+                    // isRecording must not be left latched true by a recording
+                    // nobody owns any more -- it would answer every later
+                    // START with BUSY until the process died.
+                    VaultAutomationCaptureBridge.complete(
+                        VaultAutomationCaptureBridge.Result(false, "recording service stopped while starting"),
+                    )
+                    return@post
+                }
+                isRecording = true
+                scheduleSafetyStop()
+                VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(true, null))
+            }
+        }
+    }
+
+    /**
+     * Classifies a [VaultAudioRecorder.start] failure into the same string
+     * vocabulary the camera path reports (see
+     * VaultAutomationReceiver.outcomeForAudioError). An IOException means
+     * the temp file or encoder could not be prepared -- a storage problem,
+     * not the microphone being unavailable -- so it stays a plain error.
+     */
+    private fun audioStartError(e: Exception): String = when (e) {
+        is SecurityException -> "permission_denied"
+        is IOException -> "audio recorder setup failed: ${e.message}"
+        else -> "mic_unavailable: ${e.message}"
+    }
+
+    /**
+     * Ends an audio recording: finalizes the M4A, streams it into the vault
+     * and wipes the plaintext temp file, then reports the outcome and stops
+     * the service. Runs on [audioExecutor]; guarded so the safety cap, the
+     * notification's Stop button and a STOP_AUDIO_RECORDING arriving close
+     * together can't finalize the same take twice.
+     *
+     * A failed vault write wipes the take rather than leaving it behind, the
+     * same as the video path: there is no UI here to retry from, and a
+     * plaintext recording sitting in the cache indefinitely is exactly what
+     * this app exists to avoid.
+     */
+    private fun stopAudioRecording() {
+        val recorder = audioRecorder
+        if (!isRecording || recorder == null) {
+            VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, "not recording"))
+            stopSelf()
+            return
+        }
+        if (!audioStopping.compareAndSet(false, true)) {
+            // A stop is already finalizing (e.g. the notification's Stop button
+            // tapped during a STOP_AUDIO_RECORDING). The bridge is a single
+            // slot, so completing it here with a failure would answer the
+            // waiting broadcast "failed" even though the in-flight save is
+            // about to succeed. Stay quiet and let that stop report for
+            // itself; if it has already finished, repeat its real outcome.
+            audioStopResult?.let { VaultAutomationCaptureBridge.complete(it) }
+            return
+        }
+        cancelSafetyStop()
+        val volId = audioVolId
+        val vaultPath = audioVaultPath
+        audioExecutor.execute {
+            var ok = false
+            var durationMs = 0L
+            var error: String? = null
+            try {
+                val take = recorder.stop() // throws (and wipes) if nothing usable was captured
+                durationMs = take.durationMs
+                // streamFileToSinkAndWipe wipes the temp file whether or not
+                // the write succeeds. finishWrite is the commit step
+                // directory vaults (Cryptomator/gocryptfs/CryFS) need and the
+                // in-app path leaves to Dart -- there is no Dart layer here.
+                ok = VaultVideoRecorder.streamFileToSinkAndWipe(take.file, VaultChunkWriter(volId, vaultPath)) &&
+                    ContainerFileSystem.finishWrite(volId, vaultPath)
+                if (!ok) error = "vault write failed"
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "stopAudioRecording failed" }
+                error = e.message ?: "stop failed"
+            }
+            val result = VaultAutomationCaptureBridge.Result(ok, error, durationMs)
+            audioStopResult = result
+            VaultAutomationCaptureBridge.complete(result)
+            mainHandler.post { stopSelf() }
         }
     }
 
@@ -196,11 +362,22 @@ class VaultAutomationRecordingService : Service() {
     }
 
     override fun onDestroy() {
+        destroyed = true
         if (instance === this) instance = null
         cancelSafetyStop()
         session?.closeAll()
         session = null
+        audioRecorder?.let { recorder ->
+            // Wiping zero-fills the whole take, which for a long recording is
+            // too slow for the main thread. Queued behind any start/stop
+            // already running on audioExecutor, and a no-op when stop() has
+            // already detached the take. shutdown() still lets it run.
+            audioExecutor.execute { recorder.cancel() }
+        }
+        audioRecorder = null
+        audioExecutor.shutdown()
         isRecording = false
+        currentIsAudioOnly = false
         currentVaultUri = null
         releaseWakeLock()
         super.onDestroy()
@@ -264,7 +441,8 @@ class VaultAutomationRecordingService : Service() {
     // Reuses VaultCameraRecordingService's own notification strings/icons --
     // "a recording is in progress" reads the same to the user regardless of
     // what triggered it, so this deliberately doesn't add a second set of
-    // near-duplicate string resources across every supported locale.
+    // near-duplicate string resources across every supported locale. The
+    // audio-only title/icon are the ones its audio mode already uses.
     private fun buildNotification(): Notification {
         ensureChannel()
         val localized = NotificationLocale.wrap(this)
@@ -279,10 +457,14 @@ class VaultAutomationRecordingService : Service() {
             actionLabel = localized.getString(R.string.camera_recording_stop_action_decoy)
             smallIcon = R.drawable.ic_notification_folder
         } else {
-            contentTitle = localized.getString(R.string.camera_recording_notification_title)
+            val audioOnly = currentIsAudioOnly
+            contentTitle = localized.getString(
+                if (audioOnly) R.string.audio_recording_notification_title
+                else R.string.camera_recording_notification_title,
+            )
             contentText = localized.getString(R.string.camera_recording_notification_text, containerName)
             actionLabel = localized.getString(R.string.camera_recording_stop_action)
-            smallIcon = R.drawable.ic_notification_camera
+            smallIcon = if (audioOnly) R.drawable.ic_notification_mic else R.drawable.ic_notification_camera
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(smallIcon)

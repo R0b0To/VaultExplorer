@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Memorizzato insieme alla password di automazione sopra e usato allo stesso modo per le chiamate UNLOCK_VAULT — per un vault VeraCrypt/LUKS normalmente sbloccato con un file chiave e/o un PIM non predefinito anziché con la sola password.",
   "automationSavePimButton": "Salva PIM",
   "automationCameraSectionHeader": "Automazione fotocamera",
-  "automationCameraDescription": "Consente all'automazione di attivare TAKE_PHOTO / START_RECORDING / STOP_RECORDING per questo vault. Disattivato per impostazione predefinita anche con accesso completo: a differenza dell'importazione/esportazione di file, una foto non richiede alcuna indicazione a schermo, quindi è un'attivazione esplicita separata.",
+  "automationCameraDescription": "Consente all'automazione di attivare TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING per questo vault. Disattivato per impostazione predefinita anche con accesso completo: a differenza dell'importazione/esportazione di file, una foto non richiede alcuna indicazione a schermo, quindi è un'attivazione esplicita separata.",
   "automationAllowCameraCapture": "Consenti acquisizione dalla fotocamera",
   "automationOverlayPermissionTitle": "Mostra sopra altre app",
   "automationOverlayPermissionMessage": "L'acquisizione della fotocamera in background richiede l'autorizzazione 'Mostra sopra altre app' su Android 14+. Concedi questa autorizzazione per consentire acquisizioni automatiche mentre lo schermo è bloccato o l'app è in background.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Scatta foto",
   "automationActionStartRecordingLabel": "Avvia registrazione",
   "automationActionStopRecordingLabel": "Interrompi registrazione",
+  "automationActionStartAudioRecordingLabel": "Avvia registrazione audio",
+  "automationActionStopAudioRecordingLabel": "Interrompi registrazione audio",
   "filePropertiesSectionHeader": "PROPRIETÀ FILE",
   "fullPathLabel": "Percorso completo",
   "sizeLabel": "Dimensione",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Copia qui",
   "textEditorDuplicateMenuItem": "Crea una copia",
   "textEditorCopiedSuccessfully": "Copiato con successo",
-  "textEditorSearchFilesHint": "Filtra file…"
+  "textEditorSearchFilesHint": "Filtra file…",
+  "audioRecordingQualityLabel": "Qualità di registrazione audio",
+  "audioRecordingQualityVoice": "Voce",
+  "audioRecordingQualityStandard": "Standard",
+  "audioRecordingQualityHigh": "Alta",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · mono",
+  "audioEditorCompressTitle": "Dimensione del file",
+  "audioEditorCompressOriginal": "Originale",
+  "audioEditorCompressEstimate": "Dimensione stimata: circa {size}",
+  "audioEditorCompressNote": "L'audio viene ricodificato in AAC con un bitrate inferiore: il file è più piccolo, ma la qualità diminuisce. I tagli cadono esattamente dove li imposti. Tag e copertina non vengono mantenuti."
 }

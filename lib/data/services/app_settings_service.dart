@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
@@ -17,6 +18,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
+export 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 export 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 
 part 'app_settings_service.g.dart';
@@ -160,6 +162,7 @@ class AppSettings {
   String? languageCode;
   bool debugLoggingEnabled;
   DeleteAfterImportMode deleteAfterImportMode;
+  AudioRecordingQuality audioRecordingQuality;
   bool videoMuted;
   VideoPlaybackMode videoPlaybackMode;
   bool showStorageLocationsInDrawer;
@@ -208,6 +211,7 @@ class AppSettings {
     this.languageCode,
     this.debugLoggingEnabled = false,
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
+    this.audioRecordingQuality = AudioRecordingQuality.defaultQuality,
     this.videoMuted = false,
     this.videoPlaybackMode = VideoPlaybackMode.playOnce,
     this.showStorageLocationsInDrawer = true,
@@ -298,6 +302,7 @@ class AppSettings {
     bool clearLanguageCode = false,
     bool? debugLoggingEnabled,
     DeleteAfterImportMode? deleteAfterImportMode,
+    AudioRecordingQuality? audioRecordingQuality,
     bool? videoMuted,
     VideoPlaybackMode? videoPlaybackMode,
     bool? showStorageLocationsInDrawer,
@@ -363,6 +368,8 @@ class AppSettings {
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
       deleteAfterImportMode:
           deleteAfterImportMode ?? this.deleteAfterImportMode,
+      audioRecordingQuality:
+          audioRecordingQuality ?? this.audioRecordingQuality,
       videoMuted: videoMuted ?? this.videoMuted,
       videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
       showStorageLocationsInDrawer:
@@ -425,6 +432,7 @@ class AppSettings {
     'languageCode': languageCode,
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
+    'audioRecordingQuality': audioRecordingQuality.toJson(),
     'videoMuted': videoMuted,
     'videoPlaybackMode': videoPlaybackMode.name,
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
@@ -511,6 +519,9 @@ class AppSettings {
     debugLoggingEnabled: j['debugLoggingEnabled'] as bool? ?? false,
     deleteAfterImportMode: DeleteAfterImportMode.fromJson(
       j['deleteAfterImportMode'] as String?,
+    ),
+    audioRecordingQuality: AudioRecordingQuality.fromJson(
+      j['audioRecordingQuality'] as String?,
     ),
     videoMuted: j['videoMuted'] as bool? ?? false,
     videoPlaybackMode: VideoPlaybackMode.fromJson(

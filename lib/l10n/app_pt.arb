@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Armazenado junto com a senha de automação acima e usado da mesma forma para chamadas UNLOCK_VAULT — para um cofre VeraCrypt/LUKS normalmente desbloqueado com um arquivo-chave e/ou um PIM não padrão em vez de apenas uma senha.",
   "automationSavePimButton": "Salvar PIM",
   "automationCameraSectionHeader": "Automação da Câmera",
-  "automationCameraDescription": "Permite que a automação acione TAKE_PHOTO / START_RECORDING / STOP_RECORDING para este cofre. Desativado por padrão mesmo com acesso total — diferente da importação/exportação de arquivos, uma foto não precisa de nenhuma indicação na tela, por isso é uma opção explícita separada.",
+  "automationCameraDescription": "Permite que a automação acione TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING para este cofre. Desativado por padrão mesmo com acesso total — diferente da importação/exportação de arquivos, uma foto não precisa de nenhuma indicação na tela, por isso é uma opção explícita separada.",
   "automationAllowCameraCapture": "Permitir captura pela câmera",
   "automationOverlayPermissionTitle": "Sobrepor a outros apps",
   "automationOverlayPermissionMessage": "A captura da câmera em segundo plano requer permissão para sobrepor a outros apps no Android 14+. Conceda esta permissão para permitir capturas automatizadas enquanto a tela estiver bloqueada ou o app estiver em segundo plano.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Tirar foto",
   "automationActionStartRecordingLabel": "Iniciar gravação",
   "automationActionStopRecordingLabel": "Parar gravação",
+  "automationActionStartAudioRecordingLabel": "Iniciar gravação de áudio",
+  "automationActionStopAudioRecordingLabel": "Parar gravação de áudio",
   "filePropertiesSectionHeader": "PROPRIEDADES DO ARQUIVO",
   "fullPathLabel": "Caminho completo",
   "sizeLabel": "Tamanho",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Copiar aqui",
   "textEditorDuplicateMenuItem": "Fazer uma cópia",
   "textEditorCopiedSuccessfully": "Copiado com sucesso",
-  "textEditorSearchFilesHint": "Filtrar arquivos…"
+  "textEditorSearchFilesHint": "Filtrar arquivos…",
+  "audioRecordingQualityLabel": "Qualidade da gravação de áudio",
+  "audioRecordingQualityVoice": "Voz",
+  "audioRecordingQualityStandard": "Padrão",
+  "audioRecordingQualityHigh": "Alta",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · mono",
+  "audioEditorCompressTitle": "Tamanho do arquivo",
+  "audioEditorCompressOriginal": "Original",
+  "audioEditorCompressEstimate": "Tamanho estimado: cerca de {size}",
+  "audioEditorCompressNote": "O áudio é recodificado para AAC com uma taxa de bits menor, então o arquivo fica menor, mas a qualidade diminui. Os cortes caem exatamente onde você os definiu. Tags e capa não são mantidas."
 }

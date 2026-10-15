@@ -269,6 +269,8 @@
                 <action android:name="com.aeidolon.vaultexplorer.action.TAKE_PHOTO" />
                 <action android:name="com.aeidolon.vaultexplorer.action.START_RECORDING" />
                 <action android:name="com.aeidolon.vaultexplorer.action.STOP_RECORDING" />
+                <action android:name="com.aeidolon.vaultexplorer.action.START_AUDIO_RECORDING" />
+                <action android:name="com.aeidolon.vaultexplorer.action.STOP_AUDIO_RECORDING" />
                 <action android:name="com.aeidolon.vaultexplorer.action.WIPE_FILE" />
                 <action android:name="com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK" />
                 <action android:name="com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE" />
@@ -285,6 +287,7 @@
             <intent-filter>
                 <action android:name="com.aeidolon.vaultexplorer.action.TAKE_PHOTO" />
                 <action android:name="com.aeidolon.vaultexplorer.action.START_RECORDING" />
+                <action android:name="com.aeidolon.vaultexplorer.action.START_AUDIO_RECORDING" />
             </intent-filter>
         </activity>
         <activity

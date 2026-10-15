@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "Wird zusammen mit dem oben genannten Automatisierungspasswort gespeichert und für UNLOCK_VAULT genauso verwendet – für einen VeraCrypt-/LUKS-Tresor, der normalerweise mit einer Schlüsseldatei und/oder einem nicht standardmäßigen PIM statt nur mit einem Passwort entsperrt wird.",
   "automationSavePimButton": "PIM speichern",
   "automationCameraSectionHeader": "Kamera-Automatisierung",
-  "automationCameraDescription": "Ermöglicht der Automatisierung, TAKE_PHOTO / START_RECORDING / STOP_RECORDING für diesen Tresor auszulösen. Standardmäßig auch bei vollem Zugriff deaktiviert – anders als Datei-Import/-Export benötigt ein Foto überhaupt keine Anzeige auf dem Bildschirm, daher ist dies eine separate, ausdrückliche Freigabe.",
+  "automationCameraDescription": "Ermöglicht der Automatisierung, TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING für diesen Tresor auszulösen. Standardmäßig auch bei vollem Zugriff deaktiviert – anders als Datei-Import/-Export benötigt ein Foto überhaupt keine Anzeige auf dem Bildschirm, daher ist dies eine separate, ausdrückliche Freigabe.",
   "automationAllowCameraCapture": "Kameraaufnahme zulassen",
   "automationOverlayPermissionTitle": "Über anderen Apps anzeigen",
   "automationOverlayPermissionMessage": "Für die Kamera-Automatisierung im Hintergrund ist unter Android 14+ die Berechtigung 'Über anderen Apps anzeigen' erforderlich. Erteilen Sie diese Berechtigung, um automatische Aufnahmen bei gesperrtem Bildschirm oder im Hintergrund zu ermöglichen.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "Foto aufnehmen",
   "automationActionStartRecordingLabel": "Aufnahme starten",
   "automationActionStopRecordingLabel": "Aufnahme stoppen",
+  "automationActionStartAudioRecordingLabel": "Audioaufnahme starten",
+  "automationActionStopAudioRecordingLabel": "Audioaufnahme stoppen",
   "filePropertiesSectionHeader": "DATEIEIGENSCHAFTEN",
   "fullPathLabel": "Vollständiger Pfad",
   "sizeLabel": "Größe",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "Hierher kopieren",
   "textEditorDuplicateMenuItem": "Kopie erstellen",
   "textEditorCopiedSuccessfully": "Erfolgreich kopiert",
-  "textEditorSearchFilesHint": "Dateien filtern…"
+  "textEditorSearchFilesHint": "Dateien filtern…",
+  "audioRecordingQualityLabel": "Audioaufnahme-Qualität",
+  "audioRecordingQualityVoice": "Sprache",
+  "audioRecordingQualityStandard": "Standard",
+  "audioRecordingQualityHigh": "Hoch",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · Mono",
+  "audioEditorCompressTitle": "Dateigröße",
+  "audioEditorCompressOriginal": "Original",
+  "audioEditorCompressEstimate": "Geschätzte Größe: etwa {size}",
+  "audioEditorCompressNote": "Das Audio wird mit niedrigerer Bitrate in AAC neu kodiert. Die Datei wird kleiner, die Qualität sinkt aber. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen."
 }

@@ -6415,7 +6415,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      'このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。';
+      'このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDING／START_AUDIO_RECORDING／STOP_AUDIO_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。';
 
   @override
   String get automationAllowCameraCapture => 'カメラ撮影を許可';
@@ -6444,6 +6444,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => '録画を停止';
+
+  @override
+  String get automationActionStartAudioRecordingLabel => '音声録音を開始';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => '音声録音を停止';
 
   @override
   String get filePropertiesSectionHeader => 'ファイルのプロパティ';
@@ -11016,4 +11022,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => 'ファイルを絞り込み…';
+
+  @override
+  String get audioRecordingQualityLabel => '音声録音の品質';
+
+  @override
+  String get audioRecordingQualityVoice => '音声';
+
+  @override
+  String get audioRecordingQualityStandard => '標準';
+
+  @override
+  String get audioRecordingQualityHigh => '高';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · モノラル';
+  }
+
+  @override
+  String get audioEditorCompressTitle => 'ファイルサイズ';
+
+  @override
+  String get audioEditorCompressOriginal => 'オリジナル';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return '推定サイズ: 約 $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      'オーディオはより低いビットレートで AAC に再エンコードされます。ファイルは小さくなりますが、音質は低下します。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。';
 }

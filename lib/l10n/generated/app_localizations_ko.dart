@@ -6415,7 +6415,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get automationCameraDescription =>
-      '자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.';
+      '자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.';
 
   @override
   String get automationAllowCameraCapture => '카메라 캡처 허용';
@@ -6444,6 +6444,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => '녹화 중지';
+
+  @override
+  String get automationActionStartAudioRecordingLabel => '오디오 녹음 시작';
+
+  @override
+  String get automationActionStopAudioRecordingLabel => '오디오 녹음 중지';
 
   @override
   String get filePropertiesSectionHeader => '파일 속성';
@@ -11015,4 +11021,36 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get textEditorSearchFilesHint => '파일 필터링…';
+
+  @override
+  String get audioRecordingQualityLabel => '오디오 녹음 품질';
+
+  @override
+  String get audioRecordingQualityVoice => '음성';
+
+  @override
+  String get audioRecordingQualityStandard => '표준';
+
+  @override
+  String get audioRecordingQualityHigh => '높음';
+
+  @override
+  String audioRecordingQualityDetails(String bitrate, String sampleRate) {
+    return 'AAC · $bitrate kbps · $sampleRate kHz · 모노';
+  }
+
+  @override
+  String get audioEditorCompressTitle => '파일 크기';
+
+  @override
+  String get audioEditorCompressOriginal => '원본';
+
+  @override
+  String audioEditorCompressEstimate(String size) {
+    return '예상 크기: 약 $size';
+  }
+
+  @override
+  String get audioEditorCompressNote =>
+      '오디오가 더 낮은 비트레이트의 AAC로 다시 인코딩되어 파일은 작아지지만 음질은 낮아집니다. 컷은 지정한 위치 그대로 적용됩니다. 태그와 커버 아트는 유지되지 않습니다.';
 }

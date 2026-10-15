@@ -38,6 +38,23 @@ void main() {
       expect(probe.outputExtension, 'm4a');
     });
 
+    test('canCompress is read from the probe and defaults to false', () {
+      final yes = AudioProbe.fromMap({
+        'durationUs': 1000000,
+        'outputExtension': 'mp3',
+        'cutSupported': true,
+        'canCompress': true,
+      });
+      expect(yes.canCompress, isTrue);
+
+      final missing = AudioProbe.fromMap({
+        'durationUs': 1000000,
+        'outputExtension': 'mp3',
+        'cutSupported': true,
+      });
+      expect(missing.canCompress, isFalse);
+    });
+
     test('a file this device cannot decode is not editable', () {
       final probe = AudioProbe.fromMap({
         'durationUs': 1000000,

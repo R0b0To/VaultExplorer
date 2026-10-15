@@ -95,3 +95,4 @@ Before running unattended Tasker / MacroDroid / Termux automation chains:
 - [ ] App whitelisted from OEM "Sleeping Apps" or memory cleaners.
 - [ ] Stored automation password set in Vault Settings if unlocking headlessly.
 - [ ] For camera automation (`TAKE_PHOTO`, `START_RECORDING`), **Allow camera capture** enabled and camera permissions granted once in UI.
+- [ ] For audio automation (`START_AUDIO_RECORDING`), **Allow camera capture** enabled (it covers audio too) and the microphone permission granted once in UI (record once from the app's audio recorder). The camera permission is not needed.

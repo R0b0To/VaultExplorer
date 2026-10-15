@@ -1826,7 +1826,7 @@
   "automationKeyfilesPimDescription": "يُخزَّن إلى جانب كلمة مرور الأتمتة أعلاه ويُستخدم بنفس الطريقة لاستدعاءات UNLOCK_VAULT — لخزنة VeraCrypt/LUKS التي تُفتح عادةً بملف مفتاح و/أو قيمة PIM غير افتراضية بدلاً من كلمة مرور فقط.",
   "automationSavePimButton": "حفظ PIM",
   "automationCameraSectionHeader": "أتمتة الكاميرا",
-  "automationCameraDescription": "تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.",
+  "automationCameraDescription": "تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.",
   "automationAllowCameraCapture": "السماح بالتقاط الصور بالكاميرا",
   "automationOverlayPermissionTitle": "الظهور فوق التطبيقات الأخرى",
   "automationOverlayPermissionMessage": "يتطلب التقاط الكاميرا في الخلفية إذن 'الظهور فوق التطبيقات الأخرى' على نظام Android 14+. يُرجى منح هذا الإذن للسماح بالالتقاط التلقائي أثناء قفل الشاشة أو تشغيل التطبيق في الخلفية.",
@@ -1836,6 +1836,8 @@
   "automationActionTakePhotoLabel": "التقاط صورة",
   "automationActionStartRecordingLabel": "بدء التسجيل",
   "automationActionStopRecordingLabel": "إيقاف التسجيل",
+  "automationActionStartAudioRecordingLabel": "بدء تسجيل الصوت",
+  "automationActionStopAudioRecordingLabel": "إيقاف تسجيل الصوت",
   "filePropertiesSectionHeader": "خصائص الملف",
   "fullPathLabel": "المسار الكامل",
   "sizeLabel": "الحجم",
@@ -3221,5 +3223,14 @@
   "textEditorCopyHereButton": "نسخ هنا",
   "textEditorDuplicateMenuItem": "إنشاء نسخة",
   "textEditorCopiedSuccessfully": "تم النسخ بنجاح",
-  "textEditorSearchFilesHint": "تصفية الملفات…"
+  "textEditorSearchFilesHint": "تصفية الملفات…",
+  "audioRecordingQualityLabel": "جودة تسجيل الصوت",
+  "audioRecordingQualityVoice": "كلام",
+  "audioRecordingQualityStandard": "قياسية",
+  "audioRecordingQualityHigh": "عالية",
+  "audioRecordingQualityDetails": "AAC · {bitrate} kbps · {sampleRate} kHz · أحادي",
+  "audioEditorCompressTitle": "حجم الملف",
+  "audioEditorCompressOriginal": "الأصلي",
+  "audioEditorCompressEstimate": "الحجم المقدّر: حوالي {size}",
+  "audioEditorCompressNote": "يُعاد ترميز الصوت إلى AAC بمعدل بت أقل، فيصغر حجم الملف لكن تقل الجودة. يقع القص عند النقطة التي حددتها بالضبط. لا تُنقل الوسوم وصورة الغلاف."
 }

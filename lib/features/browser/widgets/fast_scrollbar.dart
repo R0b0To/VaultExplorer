@@ -18,6 +18,15 @@ class FastScrollbar extends StatefulWidget {
   final double touchWidth;
   final Axis axis;
 
+  /// Called with `true` when the handle is grabbed and `false` when it is
+  /// released (or the drag is cancelled).
+  ///
+  /// Dragging the handle scrolls with repeated `jumpTo` calls, which look
+  /// like fast user scrolling to any ancestor listening to scroll
+  /// notifications. Owners that react to scroll direction (auto-hiding bars,
+  /// for instance) can use this to ignore those jumps.
+  final ValueChanged<bool>? onDragStateChanged;
+
   const FastScrollbar({
     super.key,
     required this.controller,
@@ -27,6 +36,7 @@ class FastScrollbar extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.touchWidth = 28.0,
     this.axis = Axis.vertical,
+    this.onDragStateChanged,
   });
 
   @override
@@ -82,6 +92,11 @@ class _FastScrollbarState extends State<FastScrollbar>
   void dispose() {
     _autoHideTimer?.cancel();
     widget.controller.removeListener(_onControllerChange);
+    if (_isDragging) {
+      // Never leave an owner thinking the handle is still held.
+      _isDragging = false;
+      widget.onDragStateChanged?.call(false);
+    }
     _fadeController.dispose();
     super.dispose();
   }
@@ -279,6 +294,7 @@ void _onControllerChange() {
 
     _autoHideTimer?.cancel();
     _isDragging = true;
+    widget.onDragStateChanged?.call(true);
     _fadeController.value = 1.0;
 
     final currentThumbTop = _scrollFraction * travelDistance;
@@ -352,6 +368,7 @@ void _onControllerChange() {
   void _handleDragEnd(DragEndDetails details) {
     if (!_isDragging) return;
     _isDragging = false;
+    widget.onDragStateChanged?.call(false);
     _popupBadge = null;
     _startAutoHideTimer();
     setState(() {});
@@ -360,6 +377,7 @@ void _onControllerChange() {
   void _handleDragCancel() {
     if (!_isDragging) return;
     _isDragging = false;
+    widget.onDragStateChanged?.call(false);
     _popupBadge = null;
     _startAutoHideTimer();
     setState(() {});

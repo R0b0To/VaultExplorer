@@ -224,6 +224,13 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   bool _pinchFontSizeChanged = false;
   DateTime? _lastPinchFontSizeUpdate;
 
+  /// Height of the tab strip returned by [_buildTabBar].
+  static const double _kTabStripHeight = 40.0;
+
+  /// True while the fast-scroll handle is held. Its `jumpTo` calls must not
+  /// drive the tab strip (see [_handleTabBarScroll]).
+  bool _scrollbarDragging = false;
+
   bool _readOnly = false;
   bool _wordWrap = true;
   final EditorFocusNode _focusNode = EditorFocusNode();
@@ -641,25 +648,30 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final appearance = ref.read(textEditorAppearanceProvider);
     if (!appearance.showTabBar || !appearance.autoHideTabBar) return false;
 
+    // Dragging the fast-scroll handle scrolls with a stream of `jumpTo`
+    // calls. In word-wrap mode the scroll extent is only an estimate, so
+    // those jumps come back with alternating signs; read as scroll
+    // direction they made the strip flicker. The strip stays put until the
+    // handle is released (see _onScrollbarDragStateChanged).
+    if (_scrollbarDragging) return false;
+
     final canScroll = notification.metrics.maxScrollExtent > 0;
     if (notification is ScrollUpdateNotification) {
       final delta = notification.scrollDelta ?? 0.0;
       if (canScroll && notification.metrics.pixels <= 0 && delta <= 0) {
         _tabBarAnimationController.value = 1;
       } else if (delta != 0) {
-        final nextValue = (_tabBarAnimationController.value - delta / 42).clamp(
-          0.0,
-          1.0,
-        );
+        final nextValue =
+            (_tabBarAnimationController.value - delta / _kTabStripHeight)
+                .clamp(0.0, 1.0);
         _tabBarAnimationController.value = nextValue;
       }
     } else if (notification is OverscrollNotification) {
       final delta = notification.overscroll;
       if (delta != 0) {
-        final nextValue = (_tabBarAnimationController.value - delta / 42).clamp(
-          0.0,
-          1.0,
-        );
+        final nextValue =
+            (_tabBarAnimationController.value - delta / _kTabStripHeight)
+                .clamp(0.0, 1.0);
         _tabBarAnimationController.value = nextValue;
       }
     } else if (notification is ScrollEndNotification) {
@@ -675,6 +687,24 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       _animateTabBar(target);
     }
     return false;
+  }
+
+  void _onScrollbarDragStateChanged(bool dragging) {
+    _scrollbarDragging = dragging;
+    if (dragging || !mounted || _tabs.isEmpty) return;
+    final appearance = ref.read(textEditorAppearanceProvider);
+    if (!appearance.showTabBar || !appearance.autoHideTabBar) return;
+    // The handle was released: show the strip if the editor ended up at the
+    // top, otherwise leave it as it was but never stranded half-way.
+    double? atTop;
+    final controller = _activeTab.verticalScrollController;
+    if (controller.hasClients) {
+      final pos = controller.position;
+      if (pos.hasPixels && pos.pixels <= 0) atTop = 1;
+    }
+    final value = _tabBarAnimationController.value;
+    final target = atTop ?? (value >= 0.5 ? 1.0 : 0.0);
+    if (value != target) _animateTabBar(target);
   }
 
   void _onTabTextChanged(EditorTab tab) {
@@ -2019,20 +2049,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               ),
               appBar: PreferredSize(
                 preferredSize: Size.fromHeight(
-                  (kToolbarHeight +
-                          (appearance.showTabBar
-                              ? 42.0 * _tabBarAnimationController.value
-                              : 0.0)) *
-                      _appBarAnimationController.value,
+                  kToolbarHeight * _appBarAnimationController.value,
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final topPadding = MediaQuery.paddingOf(context).top;
-                    final bottomHeight = appearance.showTabBar
-                        ? 42.0 * _tabBarAnimationController.value
-                        : 0.0;
-                    final fullHeight =
-                        topPadding + kToolbarHeight + bottomHeight;
+                    final fullHeight = topPadding + kToolbarHeight;
 
                     return ClipRect(
                       child: OverflowBox(
@@ -2445,25 +2467,6 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                               ),
                             ],
                           ],
-                          bottom: (appearance.showTabBar &&
-                                  _tabBarAnimationController.value > 0)
-                              ? PreferredSize(
-                                  preferredSize: Size.fromHeight(
-                                    42 * _tabBarAnimationController.value,
-                                  ),
-                                  child: ClipRect(
-                                    child: Align(
-                                      alignment: Alignment.bottomCenter,
-                                      heightFactor:
-                                          _tabBarAnimationController.value,
-                                      child: _buildTabBar(
-                                        cs,
-                                        syntaxStyle.textColor,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : null,
                         ),
                       ),
                     );
@@ -2474,7 +2477,15 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                 top: false,
                 child: NotificationListener<ScrollNotification>(
                   onNotification: _handleTabBarScroll,
-                  child: _buildBody(chrome.theme, syntaxStyle),
+                  child: _buildBody(
+                    chrome.theme,
+                    syntaxStyle,
+                    tabBar:
+                        (appearance.showTabBar &&
+                            _tabBarAnimationController.value > 0)
+                        ? _buildTabBar(cs, syntaxStyle.textColor)
+                        : null,
+                  ),
                 ),
               ),
               bottomNavigationBar:
@@ -2621,53 +2632,121 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     );
   }
 
-  Widget _buildBody(ThemeData editorTheme, EditorSyntaxStyle syntaxStyle) {
+  /// Lays out the editor area together with the tab strip.
+  ///
+  /// The strip always takes its own space above the area, so the visible
+  /// result is unchanged. What changes is what the *editor* sees: with
+  /// auto-hide on, [builder] receives the full height of this host and is
+  /// expected to keep the editor laid out at exactly that height (see the
+  /// OverflowBox in [_buildBody]) while the strip slides in and out. A strip
+  /// that resizes the editor while the user is scrolling restarts the running
+  /// fling on every frame and, in word wrap mode, re-estimates the scroll
+  /// extent; that fed straight back into the scroll notifications driving
+  /// the strip (flicker with the scroll handle, scrolling up stopping short
+  /// of the first line).
+  Widget _tabSlideHost({
+    required Widget? tabBar,
+    required Widget Function(double fullHeight) builder,
+  }) {
+    final appearance = ref.watch(textEditorAppearanceProvider);
+    // While typing with the soft keyboard up, an auto-hiding strip steps
+    // aside: with the editor kept at full height, the caret could otherwise
+    // land in the band the strip covers.
+    final editing =
+        (MediaQuery.maybeViewInsetsOf(context)?.bottom ?? 0) > 0 &&
+        _focusNode.hasFocus;
+    final stripShown =
+        appearance.showTabBar && !(appearance.autoHideTabBar && editing);
+    final reveal = stripShown
+        ? _tabBarAnimationController.value * _appBarAnimationController.value
+        : 0.0;
+    final stripHeight = _kTabStripHeight * reveal;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRect(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                top: stripHeight,
+                child: builder(constraints.maxHeight),
+              ),
+              if (tabBar != null && stripHeight > 0)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      heightFactor: reveal,
+                      child: tabBar,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(
+    ThemeData editorTheme,
+    EditorSyntaxStyle syntaxStyle, {
+    Widget? tabBar,
+  }) {
     final cs = editorTheme.colorScheme;
     final textTheme = editorTheme.textTheme;
     final activeTab = _activeTab;
 
     if (activeTab.isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(strokeWidth: 2.5),
-            const SizedBox(height: 16),
-            Text(context.l10n.decryptingFileContent),
-          ],
+      return _tabSlideHost(
+        tabBar: tabBar,
+        builder: (_) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(strokeWidth: 2.5),
+              const SizedBox(height: 16),
+              Text(context.l10n.decryptingFileContent),
+            ],
+          ),
         ),
       );
     }
     if (activeTab.hasError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline_rounded, color: cs.error, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n.cannotOpenFile,
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+      return _tabSlideHost(
+        tabBar: tabBar,
+        builder: (_) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline_rounded, color: cs.error, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  context.l10n.cannotOpenFile,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                activeTab.errorMessage,
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
+                const SizedBox(height: 8),
+                Text(
+                  activeTab.errorMessage,
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () => _loadFileForTab(activeTab),
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(context.l10n.retryButton),
-              ),
-            ],
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () => _loadFileForTab(activeTab),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(context.l10n.retryButton),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -2700,27 +2779,30 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
           displayColor: canvasForeground,
         ),
       );
-      return Theme(
-        data: markdownTheme,
-        child: DefaultTextStyle(
-          style: markdownTheme.textTheme.bodyMedium!.copyWith(
-            color: canvasForeground,
-          ),
-          child: FastScrollbar(
-            controller: activeTab.previewScrollController,
-            child: SelectionArea(
-              child: MarkdownBodyView(
-                key: activeTab.previewKey,
-                source: activeTab.codeController.text,
-                container: widget.container,
-                currentFilePath: activeTab.filePath,
-                onLinkTap: _handleLinkTap,
-                scrollController: activeTab.previewScrollController,
-                onTaskToggled: _toggleMarkdownTask,
+      return _tabSlideHost(
+        tabBar: tabBar,
+        builder: (_) => Theme(
+            data: markdownTheme,
+            child: DefaultTextStyle(
+              style: markdownTheme.textTheme.bodyMedium!.copyWith(
+                color: canvasForeground,
+              ),
+              child: FastScrollbar(
+                controller: activeTab.previewScrollController,
+                child: SelectionArea(
+                  child: MarkdownBodyView(
+                    key: activeTab.previewKey,
+                    source: activeTab.codeController.text,
+                    container: widget.container,
+                    currentFilePath: activeTab.filePath,
+                    onLinkTap: _handleLinkTap,
+                    scrollController: activeTab.previewScrollController,
+                    onTaskToggled: _toggleMarkdownTask,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
       );
     }
 
@@ -2753,10 +2835,18 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final gutterColor =
         customGutter ?? syntaxStyle.textColor.withValues(alpha: 0.45);
 
+    // With auto-hide on, leave room at the bottom of the document for the
+    // band the tab strip pushes out of view (see _tabSlideHost).
+    final tabStripSlack = (appearance.showTabBar && appearance.autoHideTabBar)
+        ? _kTabStripHeight
+        : 0.0;
+
     return Column(
       children: [
         Expanded(
-          child: Listener(
+          child: _tabSlideHost(
+            tabBar: tabBar,
+            builder: (fullHeight) => Listener(
             behavior: HitTestBehavior.translucent,
             onPointerDown: (event) {
               _pinchPointers[event.pointer] = event.position;
@@ -2981,10 +3071,18 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               },
               child: FastScrollbar(
                 controller: activeTab.verticalScrollController,
+                onDragStateChanged: _onScrollbarDragStateChanged,
                 child: FastScrollbar(
                   controller: activeTab.horizontalScrollController,
                   axis: Axis.horizontal,
-                  child: TextSelectionTheme(
+                  // Both scrollbars sit in the visible area; the editor inside
+                  // keeps a constant height while the tab strip animates.
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.topCenter,
+                      minHeight: tabStripSlack > 0 ? fullHeight : null,
+                      maxHeight: tabStripSlack > 0 ? fullHeight : null,
+                      child: TextSelectionTheme(
                     data: TextSelectionThemeData(
                       selectionColor: selectionColor,
                       selectionHandleColor: safeAccentColor,
@@ -2999,6 +3097,8 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                       readOnly: _readOnly,
                       showCursorWhenReadOnly: true,
                       wordWrap: _wordWrap,
+                      // The editor's own default is EdgeInsets.all(5).
+                      padding: EdgeInsets.fromLTRB(5, 5, 5, 5 + tabStripSlack),
                       autofocus: false,
                       findController: activeTab.findController,
                       findBuilder: (context, controller, readOnly) =>
@@ -3089,9 +3189,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                             ) => const SizedBox(width: 12),
                     ),
                   ),
+                      ),
+                    ),
                 ),
               ),
             ),
+          ),
           ),
         ),
         if (!_readOnly &&

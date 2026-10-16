@@ -268,6 +268,22 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     }
   }
 
+  /// Puts the big timer and the level meter back to their idle look.
+  ///
+  /// The timer text is rendered straight from [_clock], so anything that
+  /// returns the screen to [_Phase.ready] without starting a new take
+  /// (discard, a too-short take, a failed stop) has to zero it explicitly --
+  /// otherwise the previous take's length stays on screen.
+  void _resetRecordingDisplay() {
+    _clock
+      ..stop()
+      ..reset();
+    for (var i = 0; i < _levels.length; i++) {
+      _levels[i] = 0.0;
+    }
+    _recordedLevels.clear();
+  }
+
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(_tickInterval, (_) => unawaited(_onTick()));
@@ -340,6 +356,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
               res.error ?? '',
             ),
           );
+          _resetRecordingDisplay();
           setState(() => _phase = _Phase.ready);
         }
         return;
@@ -352,6 +369,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         await _recorder.discard(path);
         if (mounted) {
           _showError(context.l10n.cameraRecordingTooShortMessage);
+          _resetRecordingDisplay();
           setState(() => _phase = _Phase.ready);
         }
         return;
@@ -368,6 +386,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       VeLog.w(_tag, 'stop failed', e);
       if (mounted) {
         _showError(context.l10n.cameraRecordingFailedWithReasonMessage('$e'));
+        _resetRecordingDisplay();
         setState(() => _phase = _Phase.ready);
       }
     } finally {
@@ -576,7 +595,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
     _waveOpId = null;
     _waveform = null;
-    _recordedLevels.clear();
+    _resetRecordingDisplay();
     await _disposePlayer();
     final path = _recordedPath;
     _recordedPath = null;

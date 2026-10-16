@@ -366,11 +366,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     String? passphrase,
     BrowserLayoutMode? layoutMode,
     VoidCallback? onActivity,
+    double currentScrollOffset = 0.0,
   }) async {
     onActivity?.call();
 
-    // Cache current directory items before entering archive
+    // Cache current directory items and scroll position before entering the
+    // archive, so leaving it lands back on the same spot (as for folders).
     if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.scrollOffset = currentScrollOffset;
       state.pathStack.last.items = List<RawEntry>.of(state.currentItems);
       state.pathStack.last.layoutMode = state.layoutMode;
     }

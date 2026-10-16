@@ -467,6 +467,49 @@ void main() {
         subscription.close();
       });
 
+      test('openArchive records the parent folder scroll offset on its segment', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+
+        await notifier.openArchive(
+          _testContainer(1),
+          'backup.zip',
+          'backup.zip',
+          currentScrollOffset: 420.0,
+        );
+
+        final stack = container.read(fileBrowserNavigationProvider(1)).pathStack;
+        expect(stack, hasLength(2));
+        expect(stack.first.scrollOffset, 420.0);
+        expect(stack.last.scrollOffset, 0.0);
+
+        subscription.close();
+      });
+
+      test('leaving an archive keeps the scroll offset of the folder it was opened from', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        await notifier.openArchive(
+          _testContainer(1),
+          'backup.zip',
+          'backup.zip',
+          currentScrollOffset: 420.0,
+        );
+
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(1));
+        expect(state.archiveContext, isNull);
+        expect(state.atRoot, isTrue);
+        expect(state.pathStack.single.scrollOffset, 420.0);
+
+        subscription.close();
+      });
+
       test('navigating into an archive subfolder lists that subfolder', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);

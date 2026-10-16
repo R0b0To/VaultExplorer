@@ -1328,6 +1328,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _openArchive(String fullPath, String archiveName) async {
+    // Remember where the containing folder is scrolled to, so that leaving the
+    // archive restores it exactly like leaving a sub-folder does. Read once,
+    // before the (possibly repeated) open attempts below.
+    final currentOffset = _browserScrollController.hasClients
+        ? _browserScrollController.offset
+        : 0.0;
     String? passphrase;
     try {
       while (true) {
@@ -1338,11 +1344,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           passphrase: passphrase,
           layoutMode: _getLayoutModeForFolder(fullPath),
           onActivity: _signalActivity,
+          currentScrollOffset: currentOffset,
         );
 
         if (ctx.status == ArchiveOpenStatus.ok) {
           final archiveSort = _getSortStateForFolder(fullPath);
           _sortNotifier.restore(archiveSort.sortBy, archiveSort.sortAscending);
+          // The archive root starts at the top, not at the parent's offset.
+          if (mounted) _resetBrowserScrollController(initialOffset: 0.0);
           _clearSearch();
           return;
         }

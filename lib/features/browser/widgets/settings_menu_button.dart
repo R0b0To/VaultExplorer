@@ -12,18 +12,10 @@ class SettingsMenuButton extends StatelessWidget {
   /// To pass to the settings screen for bookmark reordering.
   final String? containerUri;
 
-  /// Whether the file manager this button sits on top of is browsing real
-  /// device storage rather than an unlocked vault -- passed straight
-  /// through to [FileManagerToolbarSettingsScreen], which uses it to
-  /// decide whether to show the thumbnail-cache picker (see that screen's
-  /// `isLocalStorage` doc).
-  final bool isLocalStorage;
-
   const SettingsMenuButton({
     super.key,
     required this.onSettingsClosed,
     this.containerUri,
-    this.isLocalStorage = false,
   });
 
   @override
@@ -37,7 +29,6 @@ class SettingsMenuButton extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => SkinAreaScope(area: SkinArea.settings, child: FileManagerToolbarSettingsScreen(
               containerUri: containerUri,
-              isLocalStorage: isLocalStorage,
             )),
           ),
         );

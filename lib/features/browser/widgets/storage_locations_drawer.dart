@@ -299,7 +299,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen(isLocalStorage: true)),
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
                         ),
                       );
                     },

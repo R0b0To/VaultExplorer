@@ -4,7 +4,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -18,44 +17,11 @@ final vaultThumbnailOverrideCountProvider = FutureProvider.autoDispose<int>(
 /// The app-wide thumbnail default -- the value every vault set to "Use global
 /// default" follows -- plus the action that puts every vault back on it.
 ///
-/// One widget for every place that edits the default (App settings and File
-/// manager settings), so the two can never diverge: they were already
-/// editing the same stored value through two separate copies of these tiles.
+/// Only App settings shows this. Local Storage and the decoy file manager
+/// never read the default: they have their own slot, edited in File manager
+/// settings.
 class GlobalThumbnailDefaultsTiles extends ConsumerWidget {
   const GlobalThumbnailDefaultsTiles({super.key});
-
-  Future<void> _changeCacheMode(
-    BuildContext context,
-    WidgetRef ref,
-    ThumbnailCacheMode mode,
-  ) async {
-    final provider = fileManagerToolbarSettingsProvider(null);
-    final current = ref.read(provider).config.defaultThumbnailCacheMode;
-    if (mode == current) return;
-
-    // Unlike every other default, this one is live: it changes what every
-    // vault that follows it does, right now. Storing thumbnails inside a
-    // vault starts writing to all of them (and is not possible on read-only
-    // ones), so say how many are affected before doing it.
-    if (mode == ThumbnailCacheMode.inContainer) {
-      final following = await ref
-          .read(containerRepositoryProvider)
-          .countFollowingGlobalThumbnails();
-      if (!context.mounted) return;
-      if (following > 0) {
-        final confirmed = await showAppConfirmDialog(
-          context,
-          title: context.l10n.thumbnailCachingDefaultLabel,
-          message: context.l10n.thumbnailGlobalInContainerConfirmMessage(
-            following,
-          ),
-          confirmLabel: context.l10n.continueButton,
-        );
-        if (!confirmed || !context.mounted) return;
-      }
-    }
-    await ref.read(provider.notifier).setDefaultThumbnailCacheMode(mode);
-  }
 
   Future<void> _resetVaults(
     BuildContext context,
@@ -100,7 +66,7 @@ class GlobalThumbnailDefaultsTiles extends ConsumerWidget {
           quality: config.defaultThumbnailQuality,
           cacheModeLabel: context.l10n.thumbnailCachingDefaultLabel,
           qualityLabel: context.l10n.thumbnailQualityDefaultLabel,
-          onCacheModeChanged: (mode) => _changeCacheMode(context, ref, mode),
+          onCacheModeChanged: notifier.setDefaultThumbnailCacheMode,
           onQualityChanged: notifier.setDefaultThumbnailQuality,
         ),
         if (overrides > 0)

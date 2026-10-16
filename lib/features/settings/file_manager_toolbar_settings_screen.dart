@@ -14,7 +14,6 @@ import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
-import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -22,17 +21,12 @@ import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
 
-  /// Whether this screen was opened for Local Storage / the decoy file
-  /// manager. Those only see their own thumbnail slot (with wording that
-  /// never names an encrypted container); the app-wide vault default and the
-  /// "reset all vaults" action are hidden, so the decoy never exposes
-  /// anything about vaults.
-  final bool isLocalStorage;
-
+  /// Holds no vault-related options (the app-wide vault thumbnail default and
+  /// its "reset all vaults" action live in App settings), so the decoy file
+  /// manager can open this same screen without exposing anything about vaults.
   const FileManagerToolbarSettingsScreen({
     super.key,
     this.containerUri,
-    this.isLocalStorage = false,
   });
 
   static String _layoutModeLabel(BrowserLayoutMode mode, AppLocalizations l10n) {
@@ -332,30 +326,14 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
 
-                     // ==========================================
-                      // 4. THUMBNAILS & CACHE (GLOBAL)
                       // ==========================================
-                      SectionHeader(context.l10n.thumbnailCachingDefaultLabel),
+                      // 4. THUMBNAILS & CACHE (LOCAL STORAGE)
+                      // ==========================================
+                      // The one slot shared by Local Storage and the decoy file
+                      // manager. The vault default is edited in App settings.
+                      SectionHeader(context.l10n.localStorageCardTitle),
                       SectionCard(
                         children: [
-                          // Local Storage and the decoy file manager share one
-                          // slot of their own; the vault default (and the
-                          // action that resets vaults to it) is only offered
-                          // where vaults exist, i.e. never from the decoy's
-                          // local-only settings.
-                          if (!isLocalStorage) ...[
-                            const GlobalThumbnailDefaultsTiles(),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                              child: Text(
-                                context.l10n.localStorageCardTitle,
-                                style: textTheme.labelLarge?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
                           ThumbnailSettingsTiles(
                             cacheMode: state.config.localStorageThumbnailCacheMode,
                             quality: state.config.localStorageThumbnailQuality,

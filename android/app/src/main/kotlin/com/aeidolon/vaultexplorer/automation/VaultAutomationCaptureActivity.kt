@@ -214,6 +214,10 @@ class VaultAutomationCaptureActivity : Activity() {
 
         val vaultPath = intent.getStringExtra(VaultAutomationReceiver.EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
             ?: VaultAutomationReceiver.generateAudioCaptureName(volId)
+        // Unknown/missing values resolve to the default preset inside the
+        // service (AudioRecordingParams.fromQualityName), so pass the raw
+        // string through rather than validating it twice.
+        val audioQuality = intent.getStringExtra(VaultAutomationReceiver.EXTRA_AUDIO_QUALITY)
         val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
 
         val serviceIntent = Intent(this, VaultAutomationRecordingService::class.java).apply {
@@ -221,6 +225,7 @@ class VaultAutomationCaptureActivity : Activity() {
             putExtra(VaultAutomationRecordingService.EXTRA_VOL_ID, volId)
             putExtra(VaultAutomationRecordingService.EXTRA_VAULT_PATH, vaultPath)
             putExtra(VaultAutomationRecordingService.EXTRA_AUDIO_ONLY, true)
+            putExtra(VaultAutomationRecordingService.EXTRA_AUDIO_QUALITY, audioQuality)
             putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra("vaultUri", vaultUri)
         }

@@ -134,6 +134,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_CAMERA_FACING = "camera_facing"   // optional: "back" (default) | "front"
         const val EXTRA_VIDEO_QUALITY = "video_quality"   // START_RECORDING only, optional: "hd" | "fhd" (default) | "uhd"
         const val EXTRA_RECORD_AUDIO = "record_audio"     // START_RECORDING only, optional, default true
+        const val EXTRA_AUDIO_QUALITY = "audio_quality"   // START_AUDIO_RECORDING only, optional: "voice" | "standard" (default) | "high"
 
         const val EXTRA_ORIGINAL_ACTION = "original_action"
         const val RESULT_CODE = "result_code"       // see the full list in this class's own doc comment below
@@ -145,8 +146,11 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_FAILED_COUNT = "failed_count"
         const val EXTRA_SKIPPED_COUNT = "skipped_count"
 
-        // START_AUDIO_RECORDING takes no camera/quality extras: it only needs
-        // api_token, vault_uri and (optionally) vault_path.
+        // START_AUDIO_RECORDING takes no camera/video extras: it needs
+        // api_token, vault_uri and, optionally, vault_path and audio_quality
+        // (voice = 32 kbps/22.05 kHz, standard = 64 kbps/44.1 kHz, high =
+        // 128 kbps/44.1 kHz; mono AAC, matching the in-app recorder's presets).
+        // An unknown audio_quality value falls back to "standard".
 
         // Result codes across every action in this receiver:
         //   OK | AUTH_FAIL | NOT_MOUNTED | FORBIDDEN | INVALID_ARGS | ERROR

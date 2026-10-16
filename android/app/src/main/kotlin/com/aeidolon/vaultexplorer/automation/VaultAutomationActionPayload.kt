@@ -21,6 +21,7 @@ internal object VaultAutomationActionPayload {
         VaultAutomationReceiver.EXTRA_EXCLUDE_PATTERN,
         VaultAutomationReceiver.EXTRA_CAMERA_FACING,
         VaultAutomationReceiver.EXTRA_VIDEO_QUALITY,
+        VaultAutomationReceiver.EXTRA_AUDIO_QUALITY,
     )
     private val intKeys = setOf(
         VaultAutomationReceiver.EXTRA_TIER,

@@ -218,6 +218,7 @@ Starts recording audio only (microphone, no camera) directly into the vault, and
   - `api_token` *(String, required)*
   - `vault_uri` *(String, required)*
   - `vault_path` *(String, optional)*: Destination path inside the vault. If omitted, a name like `AUD_20260823_153000.m4a` is generated at the vault root (matching the in-app audio recorder's own naming), with a numeric suffix added if that name is already taken. The recording is AAC audio in an M4A container, so a custom `vault_path` should end in `.m4a`.
+  - `audio_quality` *(String, optional)*: `voice` / `standard` (default) / `high`. Mono AAC, the same presets as the in-app recorder's "Audio recording quality" setting: `voice` = 32 kbps / 22.05 kHz (smallest files, fine for speech), `standard` = 64 kbps / 44.1 kHz, `high` = 128 kbps / 44.1 kHz (music and ambient sound). Case-insensitive; a missing or unrecognised value records at `standard`. This is chosen per request -- the in-app setting isn't applied to automation recordings.
 
 There are no `camera_facing`, `video_quality` or `record_audio` extras -- they don't apply. Only the microphone permission is needed (the camera permission is **not**); grant it once by recording from VaultExplorer's own audio recorder, since automation can't show the system prompt itself.
 

@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
+import com.aeidolon.vaultexplorer.audiocapture.AudioRecordingParams
 import com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder
 import com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureBridge
 import com.aeidolon.vaultexplorer.camera.VaultChunkWriter
@@ -87,6 +88,7 @@ class VaultAutomationRecordingService : Service() {
         const val EXTRA_RECORD_AUDIO = "recordAudio"
         const val EXTRA_CONTAINER_NAME = "containerName"   // for the notification only
         const val EXTRA_AUDIO_ONLY = "audioOnly"            // true: mic-only recording, no camera session
+        const val EXTRA_AUDIO_QUALITY = "audioQuality"      // audio-only: "voice" | "standard" | "high"; absent/unknown = standard
 
         @Volatile
         var isRecording: Boolean = false
@@ -193,7 +195,11 @@ class VaultAutomationRecordingService : Service() {
         acquireWakeLock()
 
         if (audioOnly) {
-            startAudioRecording(volId, vaultPath)
+            startAudioRecording(
+                volId,
+                vaultPath,
+                AudioRecordingParams.fromQualityName(intent.getStringExtra(EXTRA_AUDIO_QUALITY)),
+            )
             return
         }
 
@@ -240,7 +246,7 @@ class VaultAutomationRecordingService : Service() {
 
     // ── Audio-only recording ────────────────────────────────────────────
 
-    private fun startAudioRecording(volId: Int, vaultPath: String) {
+    private fun startAudioRecording(volId: Int, vaultPath: String, params: AudioRecordingParams) {
         val recorder = VaultAudioRecorder(applicationContext)
         audioRecorder = recorder
         audioVolId = volId
@@ -249,7 +255,7 @@ class VaultAutomationRecordingService : Service() {
         audioStopResult = null
         audioExecutor.execute {
             try {
-                recorder.start()
+                recorder.start(params)
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "startAudioRecording: recorder.start failed" }
                 VaultAutomationCaptureBridge.complete(

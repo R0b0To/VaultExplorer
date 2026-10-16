@@ -25,6 +25,28 @@ data class AudioRecordingParams(val bitrate: Int, val sampleRate: Int) {
 
         val DEFAULT = AudioRecordingParams(DEFAULT_BITRATE, DEFAULT_SAMPLE_RATE)
 
+        /**
+         * The named presets, for callers that pick a quality by name rather
+         * than by raw numbers (the automation `audio_quality` extra). These
+         * mirror Dart's `AudioRecordingQuality` enum value-for-value -- keep
+         * the two in step.
+         */
+        val VOICE = AudioRecordingParams(bitrate = 32_000, sampleRate = 22_050)
+        val STANDARD = AudioRecordingParams(bitrate = 64_000, sampleRate = 44_100)
+        val HIGH = AudioRecordingParams(bitrate = 128_000, sampleRate = 44_100)
+
+        /**
+         * Resolves a preset name ("voice" | "standard" | "high", case-insensitive)
+         * to its params. Missing or unrecognised names read as [DEFAULT], the
+         * same "bad input degrades to the default" rule as [sanitize].
+         */
+        fun fromQualityName(name: String?): AudioRecordingParams = when (name?.trim()?.lowercase(java.util.Locale.US)) {
+            "voice" -> VOICE
+            "high" -> HIGH
+            "standard" -> STANDARD
+            else -> DEFAULT
+        }
+
         fun sanitize(bitrate: Int?, sampleRate: Int?): AudioRecordingParams = AudioRecordingParams(
             bitrate = (bitrate ?: DEFAULT_BITRATE).coerceIn(MIN_BITRATE, MAX_BITRATE),
             sampleRate = if (sampleRate != null && sampleRate in SAMPLE_RATES) sampleRate else DEFAULT_SAMPLE_RATE,

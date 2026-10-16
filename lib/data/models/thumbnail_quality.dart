@@ -11,10 +11,20 @@ class ThumbnailQuality {
   /// fallback for surfaces that don't resolve (list tiles, viewer, ...).
   final bool auto;
 
+  /// True only for the quality [resolveForCell] produces: [size] is then the
+  /// exact pixel size one grid/masonry cell needs, so a *smaller* resident
+  /// thumbnail is no substitute for it (see the cache service's resident
+  /// fallback). A raw [auto] setting, which is what the viewer, filmstrip
+  /// and carousel receive, leaves this false and so keeps accepting any
+  /// resident thumbnail as a stand-in while the real image loads. Never
+  /// persisted.
+  final bool cellSized;
+
   const ThumbnailQuality({
     this.quality = 80,
     this.size = 180,
     this.auto = false,
+    this.cellSized = false,
   });
 
   /// Largest size the manual picker offers (and that [copyWith] / a manual
@@ -38,7 +48,7 @@ class ThumbnailQuality {
   int get jpegQuality => quality.clamp(10, 100);
 
   int scaledSize(int base) {
-    final ceiling = auto ? maxAutoSize : maxManualSize;
+    final ceiling = (auto || cellSized) ? maxAutoSize : maxManualSize;
     return (base * (size / 180.0)).round().clamp(40, ceiling);
   }
 
@@ -46,8 +56,8 @@ class ThumbnailQuality {
   /// cell of [logicalWidth] (logical px) needs on a screen with
   /// [devicePixelRatio], rounded up to a multiple of 64 so cache keys don't
   /// change on every pixel of layout change. A non-auto quality is returned
-  /// unchanged. The result stays [auto] so the memory cache can tell it
-  /// must not be satisfied by a smaller resident thumbnail.
+  /// unchanged. The result is marked [cellSized] so the memory cache knows
+  /// it must not be satisfied by a smaller resident thumbnail.
   ThumbnailQuality resolveForCell({
     required double logicalWidth,
     required double devicePixelRatio,
@@ -66,6 +76,7 @@ class ThumbnailQuality {
       quality: quality,
       size: bucketed.clamp(_autoMinSize, maxAutoSize),
       auto: true,
+      cellSized: true,
     );
   }
 
@@ -122,8 +133,9 @@ class ThumbnailQuality {
       other is ThumbnailQuality &&
           other.quality == quality &&
           other.size == size &&
-          other.auto == auto;
+          other.auto == auto &&
+          other.cellSized == cellSized;
 
   @override
-  int get hashCode => Object.hash(quality, size, auto);
+  int get hashCode => Object.hash(quality, size, auto, cellSized);
 }

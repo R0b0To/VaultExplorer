@@ -53,6 +53,8 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   bool _isFullResLoaded = false;
   bool _isLargeImagePreview = false;
   String? _currentlyLoadingFile;
+  // File for which one silent retry has already been spent (see _loadImage).
+  String? _autoRetriedFile;
   Completer<void>? _limiterCompleter;
   late final ThumbnailCacheService _thumbnailCache;
 
@@ -194,6 +196,17 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (!mounted || _currentlyLoadingFile != targetFile) return;
       if (data == null) {
+        // fetch() only returns null for a request that went stale, and this
+        // one has not (checked above). Retry once quietly before showing an
+        // error the user would only clear by pressing Retry. Scheduled as a
+        // microtask so the `finally` below clears the loading marker first.
+        if (_autoRetriedFile != targetFile) {
+          _autoRetriedFile = targetFile;
+          scheduleMicrotask(() {
+            if (mounted) _loadImage();
+          });
+          return;
+        }
         if (_bytes == null && _thumbnailBytes == null) {
           setState(() => _error = context.l10n.encryptedImageLoadFailedMessage);
         }
@@ -254,11 +267,16 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
 
   Future<void> _loadThumbnailFromCache(String targetFile) async {
     try {
-      final thumb = await _thumbnailCache.fetch(
+      // Any already-generated size will do as a placeholder (see
+      // ThumbnailCacheService.getPlaceholder): grid thumbnails are written
+      // at the size of their cell, not at this widget's quality.
+      final thumb = await _thumbnailCache.fetchPlaceholder(
         container: widget.container,
         filePath: targetFile,
         mode: widget.thumbnailCacheMode,
         quality: widget.thumbnailQuality,
+        isStillWanted: () =>
+            mounted && _currentlyLoadingFile == targetFile && !_isFullResLoaded,
       );
         if (thumb != null &&
           mounted &&

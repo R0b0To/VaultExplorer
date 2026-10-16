@@ -208,7 +208,7 @@ class MediaPrefetchController {
     }
 
     if (_cacheMode != ThumbnailCacheMode.disabled) {
-      final cached = await _thumbnailCache.fetch(
+      final cached = await _thumbnailCache.fetchPlaceholder(
         container: container,
         filePath: fileName,
         mode: _cacheMode,
@@ -271,7 +271,7 @@ class MediaPrefetchController {
 
   Future<Uint8List> _fetchImageThumbnailForPrefetch(String fileName) async {
     if (_cacheMode != ThumbnailCacheMode.disabled) {
-      final cached = await _thumbnailCache.fetch(
+      final cached = await _thumbnailCache.fetchPlaceholder(
         container: container,
         filePath: fileName,
         mode: _cacheMode,

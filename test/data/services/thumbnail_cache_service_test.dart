@@ -798,4 +798,146 @@ void main() {
       isNull,
     );
   });
+
+  // ── Placeholders for the viewer (grid thumbnails are stored per cell size) ──
+
+  group('resident fallback by quality kind', () {
+    const rawAuto = ThumbnailQuality(quality: 80, size: 500, auto: true);
+    final cell448 = rawAuto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
+    final cell704 = rawAuto.resolveForCell(logicalWidth: 166, devicePixelRatio: 3);
+    final cell320 = rawAuto.resolveForCell(logicalWidth: 70, devicePixelRatio: 3);
+
+    test('sanity: the sizes used below', () {
+      expect(cell448.size, 448);
+      expect(cell704.size, 704);
+      expect(cell320.size, 320);
+    });
+
+    test(
+      'the viewer (a raw auto quality) still gets a smaller resident grid '
+      'thumbnail as its placeholder',
+      () {
+        final c = _container('gocryptfs', 'content://fallback-viewer');
+        ThumbnailCacheService.putInMemory(c, '/a.jpg', _thumb(1), cell448);
+
+        expect(
+          ThumbnailCacheService.getFromMemory(c, '/a.jpg', rawAuto),
+          equals(_thumb(1)),
+          reason: 'a placeholder only has to be *a* picture of the file',
+        );
+      },
+    );
+
+    test(
+      'a grid tile (cellSized) refuses a smaller resident thumbnail but '
+      'accepts an equal or larger one',
+      () {
+        final c = _container('gocryptfs', 'content://fallback-tile');
+        ThumbnailCacheService.putInMemory(c, '/b.jpg', _thumb(2), cell448);
+
+        expect(ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell704), isNull);
+        expect(
+          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell448),
+          equals(_thumb(2)),
+        );
+        expect(
+          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell320),
+          equals(_thumb(2)),
+        );
+      },
+    );
+  });
+
+  group('getPlaceholder', () {
+    const viewerQuality = ThumbnailQuality(quality: 80, size: 500, auto: true);
+    const mode = ThumbnailCacheMode.inContainer;
+
+    test('finds a thumbnail stored at the grid cell size', () async {
+      final first = _container('gocryptfs', 'content://placeholder-disk');
+      final cell = viewerQuality.resolveForCell(
+        logicalWidth: 340,
+        devicePixelRatio: 3,
+      );
+      expect(cell.size, 1408);
+      await ThumbnailCacheService.put(
+        container: first,
+        filePath: '/pics/a.jpg',
+        data: _thumb(7),
+        mode: mode,
+        quality: cell,
+      );
+      await ThumbnailCacheService.flushInContainerCache(first);
+      final second = await remount(first);
+
+      expect(
+        await ThumbnailCacheService.get(
+          container: second,
+          filePath: '/pics/a.jpg',
+          mode: mode,
+          quality: viewerQuality,
+        ),
+        isNull,
+        reason: 'the exact-size lookup the viewer used to rely on misses',
+      );
+      expect(
+        await ThumbnailCacheService.getPlaceholder(
+          container: second,
+          filePath: '/pics/a.jpg',
+          mode: mode,
+          quality: viewerQuality,
+        ),
+        equals(_thumb(7)),
+      );
+    });
+
+    test('returns null when the file has no thumbnail at any size', () async {
+      final c = _container('gocryptfs', 'content://placeholder-none');
+      expect(
+        await ThumbnailCacheService.getPlaceholder(
+          container: c,
+          filePath: '/pics/none.jpg',
+          mode: mode,
+          quality: viewerQuality,
+        ),
+        isNull,
+      );
+    });
+
+    test('a fixed-size quality keeps exact-size semantics', () async {
+      final first = _container('gocryptfs', 'content://placeholder-manual');
+      await ThumbnailCacheService.put(
+        container: first,
+        filePath: '/pics/m.jpg',
+        data: _thumb(8),
+        mode: mode,
+        quality: const ThumbnailQuality(quality: 80, size: 300),
+      );
+      await ThumbnailCacheService.flushInContainerCache(first);
+      final second = await remount(first);
+
+      expect(
+        await ThumbnailCacheService.getPlaceholder(
+          container: second,
+          filePath: '/pics/m.jpg',
+          mode: mode,
+          quality: const ThumbnailQuality(quality: 80, size: 180),
+        ),
+        isNull,
+      );
+    });
+
+    test('stops probing once the caller is no longer interested', () async {
+      final c = _container('gocryptfs', 'content://placeholder-stale');
+      var calls = 0;
+      final out = await ThumbnailCacheService.getPlaceholder(
+        container: c,
+        filePath: '/pics/s.jpg',
+        mode: mode,
+        quality: viewerQuality,
+        isStillWanted: () => ++calls < 2,
+      );
+      expect(out, isNull);
+      expect(calls, 2);
+    });
+  });
 }

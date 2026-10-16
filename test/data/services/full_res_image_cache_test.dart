@@ -117,6 +117,25 @@ class _SmallFileApi extends VaultFileIoApi {
   }
 }
 
+/// Holds the first getMediaFileSize call until [firstSizeGate] completes, so a
+/// test can change the world while the first fetch is mid-flight.
+class _GatedSizeApi extends _FakeFileIoApi {
+  final Completer<void> firstSizeGate = Completer<void>();
+
+  _GatedSizeApi(super.bytes);
+
+  @override
+  Future<int> getMediaFileSize(
+    MountedContainer container,
+    String fileName,
+  ) async {
+    final first = sizeRequests == 0;
+    sizeRequests++;
+    if (first) await firstSizeGate.future;
+    return bytes.length;
+  }
+}
+
 final _container = MountedContainer(
   uri: 'test-vault',
   displayName: 'Test vault',
@@ -273,4 +292,86 @@ void main() {
     expect(api.previewRequests, 0);
     expect(FullResImageCache.get(_container, 'normal.png'), bytes);
   });
+
+  test(
+    'a request that joined an in-flight fetch still gets the image when the '
+    "fetch's original caller goes stale",
+    () async {
+      final bytes = Uint8List.fromList(List<int>.filled(32, 7));
+      final api = _GatedSizeApi(bytes);
+      var ownerWanted = true;
+
+      final owner = FullResImageCache.fetch(
+        fileIoApi: api,
+        container: _container,
+        filePath: 'joined.png',
+        completer: Completer<void>(),
+        isStillWanted: () => ownerWanted,
+      );
+      await Future<void>.delayed(Duration.zero); // owner is now mid-flight
+      final joiner = FullResImageCache.fetch(
+        fileIoApi: api,
+        container: _container,
+        filePath: 'joined.png',
+        completer: Completer<void>(),
+        isStillWanted: () => true,
+      );
+
+      // The owner's widget is disposed / scrolled away while the file size
+      // is still being read.
+      ownerWanted = false;
+      api.firstSizeGate.complete();
+
+      expect(await owner, isNull);
+      expect(
+        await joiner,
+        bytes,
+        reason:
+            'before the fix the joiner inherited the stale owner\'s null and '
+            'the viewer showed "Failed to load encrypted image"',
+      );
+    },
+  );
+
+  test(
+    'a fetch cancelled while queued does not fail a request that joined it',
+    () async {
+      final bytes = Uint8List.fromList(List<int>.filled(32, 9));
+      final api = _FakeFileIoApi(bytes);
+      final hold1 = Completer<void>();
+      final hold2 = Completer<void>();
+      var hold1Released = false;
+      // Occupy both turns so the owner has to wait in the queue.
+      await FullResImageCache.limiter.acquire(hold1);
+      await FullResImageCache.limiter.acquire(hold2);
+      try {
+        final ownerTicket = Completer<void>();
+        final owner = FullResImageCache.fetch(
+          fileIoApi: api,
+          container: _container,
+          filePath: 'queued.png',
+          completer: ownerTicket,
+          isStillWanted: () => true,
+        );
+        final joiner = FullResImageCache.fetch(
+          fileIoApi: api,
+          container: _container,
+          filePath: 'queued.png',
+          completer: Completer<void>(),
+          isStillWanted: () => true,
+        );
+
+        // The owner's widget is disposed while it still waits for a turn.
+        FullResImageCache.limiter.cancel(ownerTicket);
+        expect(await owner, isNull);
+
+        FullResImageCache.limiter.release(hold1);
+        hold1Released = true;
+        expect(await joiner, bytes);
+      } finally {
+        if (!hold1Released) FullResImageCache.limiter.release(hold1);
+        FullResImageCache.limiter.release(hold2);
+      }
+    },
+  );
 }

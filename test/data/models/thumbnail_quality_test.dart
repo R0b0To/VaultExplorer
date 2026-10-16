@@ -86,6 +86,25 @@ void main() {
       expect(ThumbnailQuality.fromJson(auto.toJson()), auto);
     });
 
+    test('only a cell-resolved quality is marked cellSized', () {
+      expect(auto.cellSized, isFalse);
+      final r = auto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
+      expect(r.cellSized, isTrue);
+      expect(r.auto, isTrue);
+      expect(r == auto, isFalse);
+    });
+
+    test('a cellSized quality may use the auto ceiling in scaledSize', () {
+      const resolved = ThumbnailQuality(size: 1408, auto: true, cellSized: true);
+      expect(resolved.scaledSize(180), 1408);
+    });
+
+    test('copyWith drops cellSized and it is never persisted', () {
+      final r = auto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
+      expect(r.copyWith(quality: 70).cellSized, isFalse);
+      expect(ThumbnailQuality.fromJson(r.toJson()).cellSized, isFalse);
+    });
+
     test('auto is omitted from JSON when false (stored settings unchanged)', () {
       expect(
         const ThumbnailQuality(quality: 70, size: 200).toJson(),

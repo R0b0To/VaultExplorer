@@ -220,7 +220,26 @@ class FullResImageCache {
       );
     }
     final existing = _inFlight[key];
-    if (existing != null) return existing;
+    if (existing != null) {
+      // The fetch we are joining belongs to whoever started it, and it is
+      // abandoned (returns null) when *that* caller goes stale: its widget
+      // was disposed, the page scrolled out of the prefetch window, or its
+      // queue ticket was cancelled. That says nothing about *this* caller,
+      // which would otherwise be told the image failed to load. If we still
+      // want the file, run our own fetch -- the abandoned entry has already
+      // been removed from [_inFlight].
+      return existing.then<Uint8List?>((data) {
+        if (data != null || !isStillWanted()) return data;
+        return fetch(
+          fileIoApi: fileIoApi,
+          container: container,
+          filePath: filePath,
+          completer: completer,
+          isStillWanted: isStillWanted,
+          priority: priority,
+        );
+      });
+    }
 
     final future = _runGated(
       fileIoApi,
@@ -246,7 +265,14 @@ class FullResImageCache {
   ) async {
     bool acquired = false;
     try {
-      await limiter.acquire(completer, priority: priority);
+      try {
+        await limiter.acquire(completer, priority: priority);
+      } catch (_) {
+        // Cancelled while still queued (the caller that owned this ticket
+        // went away). Not a load failure: report "abandoned" like any other
+        // stale request and let a caller that still wants the file retry.
+        return null;
+      }
       acquired = true;
       if (!isStillWanted()) return null;
 

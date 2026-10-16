@@ -97,6 +97,23 @@ class ThumbnailCacheService {
     quality: quality,
   );
 
+  /// Placeholder lookup for surfaces that only need *a* thumbnail on screen
+  /// quickly while the real content loads (the full-screen viewer, its
+  /// neighbour prefetch). Never generates anything. See [getPlaceholder].
+  Future<Uint8List?> fetchPlaceholder({
+    required MountedContainer container,
+    required String filePath,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+    bool Function()? isStillWanted,
+  }) => getPlaceholder(
+    container: container,
+    filePath: filePath,
+    mode: mode,
+    quality: quality,
+    isStillWanted: isStillWanted,
+  );
+
   Future<(Uint8List bytes, int? width, int? height)?> fetchWithSize({
     required MountedContainer container,
     required String filePath,
@@ -241,14 +258,15 @@ class ThumbnailCacheService {
   }
 
   /// Whether the resident entry under [residentKey] may stand in for a
-  /// request at [quality] when no exact-size entry exists. Fixed-size
-  /// requests accept any resident thumbnail (as before). Auto-sized requests
-  /// only accept one generated at least as large, otherwise zooming from many
+  /// request at [quality] when no exact-size entry exists. Most requests
+  /// accept any resident thumbnail (a placeholder only has to be *a* picture
+  /// of the file). Cell-sized requests ([ThumbnailQuality.cellSized], i.e.
+  /// grid/masonry tiles) only accept one generated at least as large, otherwise zooming from many
   /// columns to few would keep showing the small, already-cached thumbnail
   /// instead of fetching a sharp one. The size is read back from the key
   /// layout produced by [_qualifiedPath]: `...|<size>|<quality>`.
   static bool _residentSatisfies(String residentKey, ThumbnailQuality quality) {
-    if (!quality.auto) return true;
+    if (!quality.cellSized) return true;
     final parts = residentKey.split('|');
     if (parts.length < 3) return true;
     final residentSize = int.tryParse(parts[parts.length - 2]);
@@ -412,6 +430,7 @@ class ThumbnailCacheService {
 
     final key = _memKey(container, filePath, quality);
     _memoryCache[key] = data;
+    _noteCellSize(quality);
     _latestKeyByFile[_filePrefix(container, filePath)] = key;
     if (_latestKeyByFile.length > 2048 &&
         _latestKeyByFile.length > _memoryCache.length * 4) {
@@ -573,6 +592,76 @@ class ThumbnailCacheService {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── Public: Placeholder lookup ────────────────────────────────────────────
+
+  /// Pixel sizes of the cell-sized (auto) thumbnails written most recently,
+  /// newest first, so a placeholder lookup tries the sizes the grid actually
+  /// uses before guessing.
+  static final List<int> _recentCellSizes = <int>[];
+
+  static void _noteCellSize(ThumbnailQuality quality) {
+    if (!quality.cellSized) return;
+    _recentCellSizes.remove(quality.size);
+    _recentCellSizes.insert(0, quality.size);
+    if (_recentCellSizes.length > 6) _recentCellSizes.removeLast();
+  }
+
+  /// Cap on disk probes per placeholder lookup: each costs a platform-channel
+  /// hash plus a file/index check.
+  static const int _maxPlaceholderProbes = 10;
+
+  static List<int> _placeholderProbeSizes(int exclude) {
+    final common = <int>[
+      for (var s = 256; s <= ThumbnailQuality.maxAutoSize; s += 64) s,
+      192,
+      128,
+    ];
+    final ordered = <int>{..._recentCellSizes, ...common}..remove(exclude);
+    return ordered.take(_maxPlaceholderProbes).toList();
+  }
+
+  /// Finds an already-generated thumbnail of [filePath] to show as a
+  /// placeholder, without generating anything: memory (any size) first, then
+  /// the exact-size disk entry, and -- for auto-sized qualities, whose size
+  /// is whatever the grid cell needed when the thumbnail was written, not the
+  /// [quality] the caller holds -- the disk entries at the sizes the grid has
+  /// been using. [isStillWanted] lets a caller that has gone away stop the
+  /// probing early.
+  static Future<Uint8List?> getPlaceholder({
+    required MountedContainer container,
+    required String filePath,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+    bool Function()? isStillWanted,
+  }) async {
+    if (mode == ThumbnailCacheMode.disabled) return null;
+    final exact = await get(
+      container: container,
+      filePath: filePath,
+      mode: mode,
+      quality: quality,
+    );
+    if (exact != null || !quality.auto) return exact;
+
+    for (final size in _placeholderProbeSizes(quality.size)) {
+      if (isStillWanted != null && !isStillWanted()) return null;
+      final hit = await get(
+        container: container,
+        filePath: filePath,
+        mode: mode,
+        // Not cellSized: this is a probe, not a tile, and must neither be
+        // recorded as a grid size nor refuse a resident thumbnail.
+        quality: ThumbnailQuality(
+          quality: quality.quality,
+          size: size,
+          auto: true,
+        ),
+      );
+      if (hit != null) return hit;
+    }
+    return null;
   }
 
   // ── Public: Write ─────────────────────────────────────────────────────────

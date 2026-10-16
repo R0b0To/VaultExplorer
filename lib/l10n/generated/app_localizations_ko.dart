@@ -11290,4 +11290,46 @@ class AppLocalizationsKo extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => '모서리 조정';
+
+  @override
+  String get scanResultTitle => '스캔한 페이지';
+
+  @override
+  String get scanAutoDetectButton => '자동 감지';
+
+  @override
+  String get scanFullImageButton => '전체 이미지';
+
+  @override
+  String get scanFilterColor => '컬러';
+
+  @override
+  String get scanFilterGrayscale => '회색조';
+
+  @override
+  String get scanHintSearching => '카메라를 문서에 향하세요';
+
+  @override
+  String get scanHintFound => '문서를 감지했습니다';
+
+  @override
+  String get scanNoDocumentFound => '문서를 감지하지 못했습니다. 모서리를 드래그하여 페이지에 맞추세요.';
+
+  @override
+  String get scanProcessingFailed => '이 페이지를 처리할 수 없습니다';
+
+  @override
+  String get scanDetectingEdges => '가장자리 감지 중…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => '이미지';
+
+  @override
+  String get scanPdfFailed => 'PDF를 만들 수 없습니다';
 }

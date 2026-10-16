@@ -17,11 +17,27 @@ class CapturedMediaItem {
   int trimEndMs;
   Uint8List thumbnailBytes;
 
+  /// True for a page from the document scanner (already cropped, flattened and
+  /// filtered). It is a photo in every other respect; the flag only decides
+  /// whether it may be combined into a PDF when saving.
+  final bool isScan;
+
   CapturedMediaItem.photo({
     required Uint8List photoBytes,
     required this.thumbnailBytes,
   })  : type = CapturedMediaType.photo,
         fullPhotoBytes = photoBytes,
+        isScan = false,
+        videoDurationMs = 0,
+        trimStartMs = 0,
+        trimEndMs = 0;
+
+  CapturedMediaItem.scanPage({
+    required Uint8List pageBytes,
+    required this.thumbnailBytes,
+  })  : type = CapturedMediaType.photo,
+        fullPhotoBytes = pageBytes,
+        isScan = true,
         videoDurationMs = 0,
         trimStartMs = 0,
         trimEndMs = 0;
@@ -31,6 +47,7 @@ class CapturedMediaItem {
     required this.videoDurationMs,
     required this.thumbnailBytes,
   })  : type = CapturedMediaType.video,
+        isScan = false,
         trimStartMs = 0,
         trimEndMs = videoDurationMs;
 

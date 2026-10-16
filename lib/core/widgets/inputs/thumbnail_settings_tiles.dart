@@ -77,7 +77,7 @@ class ThumbnailSettingsTiles extends StatelessWidget {
               l10n.thumbnailUseGlobalDefaultDesc,
               style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
-            secondary: Icon(Icons.sync_alt_rounded, color: cs.primary),
+           
           ),
         if (inherit != true) ...[
           OptionPickerTile<ThumbnailCacheMode>(

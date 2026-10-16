@@ -41,6 +41,9 @@ class VaultCameraPlugin(
     private val eventChannels = LinkedHashMap<Long, EventChannel>()
     private val eventSinks = LinkedHashMap<Long, EventChannel.EventSink?>()
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL)
+    // Document scanning (detect / warp / filter / PDF) has its own channel; it is
+    // owned here so it shares the camera's lifecycle and needs no extra wiring.
+    private val documentScan = DocumentScanPlugin(messenger)
     private val accelEventChannel = EventChannel(messenger, ACCEL_EVENT_CHANNEL)
     private val messenger = messenger
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -116,9 +119,10 @@ class VaultCameraPlugin(
                     eventChannels[id] = eventChannel
 
                    val scanMode = (args["scanMode"] as? Boolean) ?: false
+                    val scanDocument = (args["scanKind"] as? String) == "document"
                     session.open(cameraId, quality, photoRes) { ok, error ->
                         if (ok && scanMode) {
-                            session.setScanMode(true)
+                            session.setScanMode(true, document = scanDocument)
                         }
                         mainHandler.post {
                             if (ok) {
@@ -182,7 +186,8 @@ class VaultCameraPlugin(
                 }
                 "setScanMode" -> withSession(call, result) { session, args ->
                     val enable = (args["enable"] as? Boolean) ?: false
-                    session.setScanMode(enable)
+                    val document = (args["kind"] as? String) == "document"
+                    session.setScanMode(enable, document = document)
                     result.success(null)
                 }
                 "setWhiteBalance" -> withSession(call, result) { session, args ->
@@ -428,6 +433,7 @@ class VaultCameraPlugin(
         accelEventChannel.setStreamHandler(null)
         sessions.keys.toList().forEach { disposeSession(it) }
         methodChannel.setMethodCallHandler(null)
+        documentScan.dispose()
     }
 }
 

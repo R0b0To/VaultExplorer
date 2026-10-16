@@ -11771,4 +11771,47 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => 'Adjust corners';
+
+  @override
+  String get scanResultTitle => 'Scanned page';
+
+  @override
+  String get scanAutoDetectButton => 'Auto-detect';
+
+  @override
+  String get scanFullImageButton => 'Full image';
+
+  @override
+  String get scanFilterColor => 'Color';
+
+  @override
+  String get scanFilterGrayscale => 'Grayscale';
+
+  @override
+  String get scanHintSearching => 'Point the camera at a document';
+
+  @override
+  String get scanHintFound => 'Document detected';
+
+  @override
+  String get scanNoDocumentFound =>
+      'No document detected. Drag the corners to fit the page.';
+
+  @override
+  String get scanProcessingFailed => 'Couldn\'t process this page';
+
+  @override
+  String get scanDetectingEdges => 'Detecting edges…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => 'Images';
+
+  @override
+  String get scanPdfFailed => 'Couldn\'t create the PDF';
 }

@@ -126,5 +126,38 @@ void main() {
         expect(await service.nextAvailableName(isPhoto: false), endsWith('.mp4'));
       });
     });
+
+    group('document scanner names', () {
+      CameraVaultService serviceWith(List<String> entries) => CameraVaultService(
+        container: _container(),
+        targetDirPath: '',
+        fileIoApi: _CollidingFileIoApi(entries),
+        lifecycleApi: _FakeLifecycleApi(),
+      );
+
+      test('scanned pages are SCAN_<timestamp>.jpg', () async {
+        final name = await serviceWith(const []).nextAvailableScanImageName();
+        expect(name, matches(RegExp(r'^SCAN_\d{8}_\d{6}\.jpg$')));
+      });
+
+      test('scanned documents are SCAN_<timestamp>.pdf', () async {
+        final name = await serviceWith(const []).nextAvailableScanPdfName();
+        expect(name, matches(RegExp(r'^SCAN_\d{8}_\d{6}\.pdf$')));
+      });
+
+      test('never reuses a name that already exists', () async {
+        final taken = await serviceWith(const []).nextAvailableScanPdfName();
+        final name = await serviceWith([
+          'F|100|1000|$taken',
+        ]).nextAvailableScanPdfName();
+        // Same second: must get a counter. A later second is also unique.
+        expect(name, isNot(taken));
+        expect(name, startsWith('SCAN_'));
+      });
+
+      test('leaves photo naming unchanged', () async {
+        expect(await serviceWith(const []).nextAvailableName(isPhoto: true), startsWith('IMG_'));
+      });
+    });
   });
 }

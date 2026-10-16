@@ -14,6 +14,10 @@ import 'camera_capture_session_controller.dart';
 import 'camera_ui_components.dart';
 import 'capture_screen_mixin.dart';
 import 'camera_media_review_view.dart';
+import 'scan/document_quad_overlay.dart';
+import 'scan/document_scan_api.dart';
+import 'scan/document_scan_editor_screen.dart';
+import 'scan/scan_geometry.dart';
 import 'vault_camera_controller.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
@@ -55,6 +59,22 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   String? _currentRecordingPath;
 
   bool _isReviewingMedia = false;
+
+  // --- Document scanning --------------------------------------------------
+  final _scanApi = const DocumentScanApi();
+
+  bool _isScanMode = false;
+
+  /// Save scanned pages as one PDF (true) or as separate images (false).
+  bool _scanAsPdf = true;
+
+  /// True from the shutter press until the editor opens.
+  bool _isProcessingScan = false;
+
+  /// Latest outline from the live detector, in the camera's natural frame.
+  final ValueNotifier<ScanQuad?> _liveQuad = ValueNotifier<ScanQuad?>(null);
+
+  Timer? _liveQuadExpiry;
 
   static const String _captureControlsKey = 'camera_capture';
 
@@ -153,6 +173,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     trayScrollController.dispose();
     timer?.cancel();
     exposureHideTimer?.cancel();
+    _liveQuadExpiry?.cancel();
+    _liveQuad.dispose();
     sensorSubscription?.cancel();
     cameraEventSubscription?.cancel();
     unawaited(cameraController.dispose());
@@ -241,6 +263,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         facing: captureControls.preferredFacing,
         quality: captureControls.videoQuality,
         photoResolution: captureControls.photoResolution,
+        scanMode: _isScanMode,
+        scanKind: 'document',
       );
 
       if (!mounted) return;
@@ -309,6 +333,191 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     await applyFlash(cameraController, captureControls.flashMode, logTag: 'CameraCaptureScreen');
   }
 
+  // --- Document scanning --------------------------------------------------
+
+  @override
+  bool get supportsDocumentScan => true;
+
+  @override
+  bool get captureIsScanMode => _isScanMode;
+
+  @override
+  Future<void> setDocumentScanMode(bool enable) async {
+    if (enable == _isScanMode ||
+        captureIsRecording ||
+        isEncrypting ||
+        captureIsCountingDown ||
+        isStartingVideo) {
+      return;
+    }
+    if (enable && captureControls.isVideoMode) {
+      await setVideoMode(false);
+      if (captureControls.isVideoMode) return;
+    }
+    if (!mounted) return;
+    setState(() => _isScanMode = enable);
+    _liveQuadExpiry?.cancel();
+    _liveQuad.value = null;
+    await cameraController.setScanMode(enable, kind: 'document');
+  }
+
+  @override
+  void onDocumentQuadEvent(Map<String, dynamic> event) {
+    if (!mounted || !_isScanMode) return;
+    final points = event['points'];
+    if (event['found'] == true && points is List && points.length == 8) {
+      final next = ScanQuad.fromPoints([for (final v in points) (v as num).toDouble()]);
+      final previous = _liveQuad.value;
+      // Smooth small jitter; jump straight there when the document moved a lot.
+      _liveQuad.value = previous != null && previous.maxCornerDistance(next) < 0.08
+          ? previous.lerp(next, 0.5)
+          : next;
+      _liveQuadExpiry?.cancel();
+      _liveQuadExpiry = Timer(const Duration(milliseconds: 700), () => _liveQuad.value = null);
+    } else {
+      _liveQuadExpiry?.cancel();
+      _liveQuad.value = null;
+    }
+  }
+
+  @override
+  Future<void> takeScanPage() async {
+    if (!cameraController.isInitialized || isEncrypting || isTakingPhoto || _isProcessingScan) {
+      return;
+    }
+    isTakingPhoto = true;
+    triggerShutterFlash();
+    setState(() => _isProcessingScan = true);
+
+    try {
+      await cameraController.setOrientationDegrees(computeDeviceRotationDegrees());
+      final shot = await cameraController.capturePhoto();
+      final jpeg = shot.bytes;
+      if (!shot.success || jpeg == null) {
+        if (mounted) {
+          showErrorToast(shot.error ?? context.l10n.cameraPhotoCaptureFailedMessage);
+        }
+        return;
+      }
+
+      final detection = await _scanApi.detect(jpeg);
+      if (!mounted) return;
+      setState(() => _isProcessingScan = false);
+
+      final page = await Navigator.push<ScanPage>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DocumentScanEditorScreen(
+            original: jpeg,
+            detection: detection,
+            api: _scanApi,
+            volId: widget.container.volId,
+          ),
+        ),
+      );
+      if (page == null || !mounted) return;
+
+      HapticFeedback.lightImpact();
+      final isFirstMedia = capturedMedia.isEmpty;
+      setState(() {
+        capturedMedia.add(
+          CapturedMediaItem.scanPage(pageBytes: page.bytes, thumbnailBytes: page.thumbnail),
+        );
+        if (isFirstMedia) {
+          enterReviewing();
+        }
+      });
+      scrollToEndOfTray();
+    } catch (_) {
+      if (mounted) showErrorToast(context.l10n.scanProcessingFailed);
+    } finally {
+      isTakingPhoto = false;
+      if (mounted) setState(() => _isProcessingScan = false);
+    }
+  }
+
+  /// Camera preview shown uncropped (so the live outline lines up with it) with
+  /// the detector's outline on top.
+  Widget _buildScanPreview() {
+    final aspect = cameraPreviewDisplayAspect(
+      previewWidth: cameraController.previewWidth,
+      previewHeight: cameraController.previewHeight,
+      sensorOrientation: cameraController.sensorOrientation,
+      displayRotation: captureDisplayRotation,
+    );
+    return AspectRatio(
+      aspectRatio: aspect,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CameraPreviewView(
+            textureId: cameraController.textureId!,
+            previewWidth: cameraController.previewWidth,
+            previewHeight: cameraController.previewHeight,
+            sensorOrientation: cameraController.sensorOrientation,
+            displayRotation: captureDisplayRotation,
+            frameAspectRatio: aspect,
+            showShutterFlash: captureShowShutterFlash,
+          ),
+          // The front camera's preview is mirrored, so the outline would be too.
+          if (captureControls.preferredFacing != 'front')
+            IgnorePointer(
+              child: DocumentQuadOverlay(
+                quad: _liveQuad,
+                displayRotation: captureDisplayRotation,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanStatusBar() {
+    final l10n = context.l10n;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ValueListenableBuilder<ScanQuad?>(
+          valueListenable: _liveQuad,
+          builder: (context, quad, _) => _ScanPill(
+            text: quad == null ? l10n.scanHintSearching : l10n.scanHintFound,
+            highlight: quad != null,
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _scanAsPdf = !_scanAsPdf);
+          },
+          child: _ScanPill(
+            text: _scanAsPdf ? l10n.scanOutputPdf : l10n.scanOutputImages,
+            icon: _scanAsPdf ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Saves [pages] as one PDF. Returns its file name, or null on any failure.
+  Future<String?> _saveScansAsPdf(List<CapturedMediaItem> pages) async {
+    try {
+      final pdf = await _scanApi.buildPdf([for (final p in pages) p.fullPhotoBytes!]);
+      final name = await _vaultService.nextAvailableScanPdfName();
+      final virtualPath = _vaultService.buildVirtualPath(name);
+      final ok = await cameraController.savePhotoToVault(
+        bytes: pdf,
+        volId: widget.container.volId,
+        virtualPath: virtualPath,
+      );
+      if (!ok) return null;
+      await _vaultService.finalizeVaultWrite(virtualPath);
+      return name;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _commitAllMediaToVault(List<CapturedMediaItem> mediaToSave) async {
     if (mediaToSave.isEmpty) return;
 
@@ -322,10 +531,31 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       String? firstName;
       bool hasVideo = false;
 
+      // Scanned pages become one PDF when that output is selected; everything
+      // else is saved individually as before.
+      final scanPages = [
+        for (final m in mediaToSave)
+          if (m.isScan && m.isPhoto && m.fullPhotoBytes != null) m,
+      ];
+      final bundleScansAsPdf = _scanAsPdf && scanPages.isNotEmpty;
+      if (bundleScansAsPdf) {
+        final pdfName = await _saveScansAsPdf(scanPages);
+        if (pdfName == null) {
+          // Keep everything on screen so nothing is lost; the user can retry or
+          // switch to saving images.
+          if (mounted) showErrorToast(context.l10n.scanPdfFailed);
+          return;
+        }
+        firstName = pdfName;
+      }
+
       for (int i = 0; i < mediaToSave.length; i++) {
         final item = mediaToSave[i];
         if (item.isPhoto && item.fullPhotoBytes != null) {
-          final name = await _vaultService.nextAvailableName(isPhoto: true);
+          if (bundleScansAsPdf && item.isScan) continue;
+          final name = item.isScan
+              ? await _vaultService.nextAvailableScanImageName()
+              : await _vaultService.nextAvailableName(isPhoto: true);
           firstName ??= name;
           final virtualPath = _vaultService.buildVirtualPath(name);
           final ok = await cameraController.savePhotoToVault(
@@ -578,17 +808,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
                     child: Center(
-                      child: CameraPreviewView(
-                        textureId: cameraController.textureId!,
-                        previewWidth: cameraController.previewWidth,
-                        previewHeight: cameraController.previewHeight,
-                        sensorOrientation: cameraController.sensorOrientation,
-                        displayRotation: captureDisplayRotation,
-                        frameAspectRatio: isLandscapeFrame
-                            ? captureControls.aspectRatio
-                            : 1 / captureControls.aspectRatio,
-                        showShutterFlash: captureShowShutterFlash,
-                      ),
+                      child: _isScanMode
+                          ? _buildScanPreview()
+                          : CameraPreviewView(
+                              textureId: cameraController.textureId!,
+                              previewWidth: cameraController.previewWidth,
+                              previewHeight: cameraController.previewHeight,
+                              sensorOrientation: cameraController.sensorOrientation,
+                              displayRotation: captureDisplayRotation,
+                              frameAspectRatio: isLandscapeFrame
+                                  ? captureControls.aspectRatio
+                                  : 1 / captureControls.aspectRatio,
+                              showShutterFlash: captureShowShutterFlash,
+                            ),
                     ),
                   );
                 },
@@ -616,6 +848,14 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 await applyExposureOffsetSilent(cameraController, val);
               },
             ),
+
+            if (_isScanMode && isInitialized)
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 72,
+                left: 0,
+                right: 0,
+                child: _buildScanStatusBar(),
+              ),
 
             Positioned(
               top: 0,
@@ -677,6 +917,28 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 ),
               ),
 
+            if (_isProcessingScan)
+              Container(
+                color: Colors.black45,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: Colors.white),
+                      const SizedBox(height: 16),
+                      Text(
+                        context.l10n.scanDetectingEdges,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             if (isEncrypting)
               Container(
                 color: Colors.black54,
@@ -703,6 +965,44 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Small rounded label used on the scan overlay.
+class _ScanPill extends StatelessWidget {
+  const _ScanPill({required this.text, this.icon, this.highlight = false});
+
+  final String text;
+  final IconData? icon;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: highlight ? Colors.amber : Colors.black54,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: highlight ? Colors.amber : Colors.white24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: highlight ? Colors.black : Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -153,6 +153,12 @@ class VaultCameraController {
   Stream<String> get qrCodes => events
       .where((e) => e['event'] == 'qr_code' && e['data'] is String)
       .map((e) => e['data'] as String);
+
+  /// Live document-edge detections (only emitted while the session is in the
+  /// `document` scan mode). Each event carries `found` and, when found, eight
+  /// normalised corner coordinates under `points` in the upright camera frame.
+  Stream<Map<String, dynamic>> get documentQuadEvents =>
+      events.where((e) => e['event'] == 'document_quad');
   int? get sessionId => _sessionId;
   int? get textureId => _textureId;
   String? get cameraId => _cameraId;
@@ -213,6 +219,7 @@ class VaultCameraController {
     String quality = 'fhd',
     String photoResolution = 'max',
     bool scanMode = false,
+    String scanKind = 'qr',
   }) async {
     await close();
 
@@ -222,6 +229,7 @@ class VaultCameraController {
       'quality': quality,
       'photoResolution': photoResolution,
       'scanMode': scanMode,
+      'scanKind': scanKind,
     });
 
     if (res == null) throw Exception('Failed to open camera');
@@ -511,12 +519,14 @@ class VaultCameraController {
     });
   }
 
-  Future<void> setScanMode(bool enable) async {
+  /// [kind] is `qr` (default) or `document` for live document-edge detection.
+  Future<void> setScanMode(bool enable, {String kind = 'qr'}) async {
     final sId = _sessionId;
     if (sId == null) return;
     await _channel.invokeMethod('setScanMode', {
       'sessionId': sId,
       'enable': enable,
+      'kind': kind,
     });
   }
 

@@ -3292,5 +3292,19 @@
   "resetVaultThumbnailsSubtitle": "Hace que todas las bóvedas sigan los valores predeterminados de miniaturas de arriba, incluidas las que tienen ajustes propios.",
   "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 bóveda tiene sus propios ajustes de miniaturas. ¿Hacer que siga el valor predeterminado?} other{{count} bóvedas tienen sus propios ajustes de miniaturas. ¿Hacer que sigan el valor predeterminado?}}",
   "resetVaultThumbnailsDone": "{count, plural, =1{1 bóveda sigue ahora el valor predeterminado} other{{count} bóvedas siguen ahora el valor predeterminado}}",
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 bóveda sigue este valor predeterminado y empezará a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.} other{{count} bóvedas siguen este valor predeterminado y empezarán a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.}}"
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 bóveda sigue este valor predeterminado y empezará a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.} other{{count} bóvedas siguen este valor predeterminado y empezarán a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.}}",
+  "scanAdjustCornersTitle": "Ajustar esquinas",
+  "scanResultTitle": "Página escaneada",
+  "scanAutoDetectButton": "Detectar automáticamente",
+  "scanFullImageButton": "Imagen completa",
+  "scanFilterColor": "Color",
+  "scanFilterGrayscale": "Escala de grises",
+  "scanHintSearching": "Apunta la cámara a un documento",
+  "scanHintFound": "Documento detectado",
+  "scanNoDocumentFound": "No se detectó ningún documento. Arrastra las esquinas para ajustarlas a la página.",
+  "scanProcessingFailed": "No se pudo procesar esta página",
+  "scanDetectingEdges": "Detectando bordes…",
+  "scanOutputPdf": "PDF",
+  "scanOutputImages": "Imágenes",
+  "scanPdfFailed": "No se pudo crear el PDF"
 }

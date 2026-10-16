@@ -19914,6 +19914,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.} other{{count} vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.}}'**
   String thumbnailGlobalInContainerConfirmMessage(num count);
+
+  /// Title of the document scanner step where the user drags the four corners to fit the page
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust corners'**
+  String get scanAdjustCornersTitle;
+
+  /// Title of the document scanner step that previews the finished page with filters
+  ///
+  /// In en, this message translates to:
+  /// **'Scanned page'**
+  String get scanResultTitle;
+
+  /// Button in the document scanner that re-applies the automatically detected page corners
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detect'**
+  String get scanAutoDetectButton;
+
+  /// Button in the document scanner that sets the crop corners to the whole photo
+  ///
+  /// In en, this message translates to:
+  /// **'Full image'**
+  String get scanFullImageButton;
+
+  /// Document scanner filter chip: colour page with shadows removed and the paper whitened
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get scanFilterColor;
+
+  /// Document scanner filter chip: monochrome page with shadows removed
+  ///
+  /// In en, this message translates to:
+  /// **'Grayscale'**
+  String get scanFilterGrayscale;
+
+  /// Hint over the camera preview in document scan mode while no page is detected
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at a document'**
+  String get scanHintSearching;
+
+  /// Hint over the camera preview in document scan mode once a page outline is detected
+  ///
+  /// In en, this message translates to:
+  /// **'Document detected'**
+  String get scanHintFound;
+
+  /// Snackbar shown when automatic page detection failed and the user has to place the corners manually
+  ///
+  /// In en, this message translates to:
+  /// **'No document detected. Drag the corners to fit the page.'**
+  String get scanNoDocumentFound;
+
+  /// Error snackbar when straightening or filtering a scanned page fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t process this page'**
+  String get scanProcessingFailed;
+
+  /// Progress label shown after pressing the shutter in document scan mode while the page edges are detected
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting edges…'**
+  String get scanDetectingEdges;
+
+  /// Toggle label in document scan mode: save the scanned pages together as one PDF file
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get scanOutputPdf;
+
+  /// Toggle label in document scan mode: save each scanned page as a separate image file
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get scanOutputImages;
+
+  /// Error snackbar when combining scanned pages into a PDF or saving it fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create the PDF'**
+  String get scanPdfFailed;
 }
 
 class _AppLocalizationsDelegate

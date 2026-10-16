@@ -3292,5 +3292,19 @@
   "resetVaultThumbnailsSubtitle": "자체 설정이 있는 볼트를 포함해 모든 볼트가 위의 썸네일 기본값을 따르게 합니다.",
   "resetVaultThumbnailsConfirmMessage": "{count, plural, other{{count}개의 볼트에 자체 썸네일 설정이 있습니다. 대신 기본값을 따르게 할까요?}}",
   "resetVaultThumbnailsDone": "{count, plural, other{볼트 {count}개가 이제 기본값을 따릅니다}}",
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, other{볼트 {count}개가 이 기본값을 따르며 볼트 안에 썸네일을 저장하기 시작합니다. 속도가 느려지고 읽기 전용 볼트에서는 사용할 수 없습니다.}}"
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, other{볼트 {count}개가 이 기본값을 따르며 볼트 안에 썸네일을 저장하기 시작합니다. 속도가 느려지고 읽기 전용 볼트에서는 사용할 수 없습니다.}}",
+  "scanAdjustCornersTitle": "모서리 조정",
+  "scanResultTitle": "스캔한 페이지",
+  "scanAutoDetectButton": "자동 감지",
+  "scanFullImageButton": "전체 이미지",
+  "scanFilterColor": "컬러",
+  "scanFilterGrayscale": "회색조",
+  "scanHintSearching": "카메라를 문서에 향하세요",
+  "scanHintFound": "문서를 감지했습니다",
+  "scanNoDocumentFound": "문서를 감지하지 못했습니다. 모서리를 드래그하여 페이지에 맞추세요.",
+  "scanProcessingFailed": "이 페이지를 처리할 수 없습니다",
+  "scanDetectingEdges": "가장자리 감지 중…",
+  "scanOutputPdf": "PDF",
+  "scanOutputImages": "이미지",
+  "scanPdfFailed": "PDF를 만들 수 없습니다"
 }

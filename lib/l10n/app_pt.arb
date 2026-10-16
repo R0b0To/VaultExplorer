@@ -3292,5 +3292,19 @@
   "resetVaultThumbnailsSubtitle": "Faz todos os cofres seguirem os padrões de miniaturas acima, inclusive os cofres com configurações próprias.",
   "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 cofre tem configurações de miniaturas próprias. Fazê-lo seguir o padrão?} other{{count} cofres têm configurações de miniaturas próprias. Fazê-los seguir o padrão?}}",
   "resetVaultThumbnailsDone": "{count, plural, =1{1 cofre agora segue o padrão} other{{count} cofres agora seguem o padrão}}",
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 cofre segue este padrão e passará a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.} other{{count} cofres seguem este padrão e passarão a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.}}"
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 cofre segue este padrão e passará a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.} other{{count} cofres seguem este padrão e passarão a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.}}",
+  "scanAdjustCornersTitle": "Ajustar cantos",
+  "scanResultTitle": "Página escaneada",
+  "scanAutoDetectButton": "Detectar automaticamente",
+  "scanFullImageButton": "Imagem inteira",
+  "scanFilterColor": "Cor",
+  "scanFilterGrayscale": "Tons de cinza",
+  "scanHintSearching": "Aponte a câmera para um documento",
+  "scanHintFound": "Documento detectado",
+  "scanNoDocumentFound": "Nenhum documento detectado. Arraste os cantos para ajustá-los à página.",
+  "scanProcessingFailed": "Não foi possível processar esta página",
+  "scanDetectingEdges": "Detectando bordas…",
+  "scanOutputPdf": "PDF",
+  "scanOutputImages": "Imagens",
+  "scanPdfFailed": "Não foi possível criar o PDF"
 }

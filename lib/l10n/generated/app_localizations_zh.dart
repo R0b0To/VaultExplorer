@@ -11114,4 +11114,46 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => '调整边角';
+
+  @override
+  String get scanResultTitle => '已扫描页面';
+
+  @override
+  String get scanAutoDetectButton => '自动检测';
+
+  @override
+  String get scanFullImageButton => '完整图像';
+
+  @override
+  String get scanFilterColor => '彩色';
+
+  @override
+  String get scanFilterGrayscale => '灰度';
+
+  @override
+  String get scanHintSearching => '请将相机对准文档';
+
+  @override
+  String get scanHintFound => '已检测到文档';
+
+  @override
+  String get scanNoDocumentFound => '未检测到文档。请拖动边角以贴合页面。';
+
+  @override
+  String get scanProcessingFailed => '无法处理此页面';
+
+  @override
+  String get scanDetectingEdges => '正在检测边缘…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => '图片';
+
+  @override
+  String get scanPdfFailed => '无法创建PDF';
 }

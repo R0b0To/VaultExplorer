@@ -41,6 +41,19 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   Future<void> startVideoRecording();
   Future<void> stopVideoRecording();
 
+  // Document scanning is optional. Screens that offer it override these; the
+  // defaults keep every other screen (QuickCapture) exactly as it was.
+  /// Whether the mode toggle includes "scan document".
+  bool get supportsDocumentScan => false;
+  /// True while in document-scan mode, where the shutter captures a page.
+  bool get captureIsScanMode => false;
+  Future<void> setDocumentScanMode(bool enable) async {}
+  /// Captures, straightens and filters one page; [takePhoto] hands over to it
+  /// in scan mode.
+  Future<void> takeScanPage() async {}
+  /// Live outline from the native document detector.
+  void onDocumentQuadEvent(Map<String, dynamic> event) {}
+
   // --- Shared state ---------------------------------------------------------
   late final VaultFileIoApi captureFileIoApi;
 
@@ -140,6 +153,10 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
 
   // --- Shared behaviour ---------------------------------------------------------
   void handleCameraEvent(Map<String, dynamic> event) {
+    if (event['event'] == 'document_quad') {
+      onDocumentQuadEvent(event);
+      return;
+    }
     if (event['event'] != 'error' || !mounted) return;
     captureSessionController.setPermissionError(
       context.l10n.cameraDisconnectedError(
@@ -297,16 +314,33 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
       mainAxisSize: MainAxisSize.min,
       children: [
         modeButton(
-          selected: !captureControls.isVideoMode,
+          selected: !captureControls.isVideoMode && !captureIsScanMode,
           icon: Icons.photo_camera_rounded,
-          onTap: () => setVideoMode(false),
+          onTap: () async {
+            if (captureIsScanMode) {
+              await setDocumentScanMode(false);
+            } else {
+              await setVideoMode(false);
+            }
+          },
         ),
         const SizedBox(height: 10),
         modeButton(
           selected: captureControls.isVideoMode,
           icon: Icons.videocam_rounded,
-          onTap: () => setVideoMode(true),
+          onTap: () async {
+            if (captureIsScanMode) await setDocumentScanMode(false);
+            await setVideoMode(true);
+          },
         ),
+        if (supportsDocumentScan) ...[
+          const SizedBox(height: 10),
+          modeButton(
+            selected: captureIsScanMode,
+            icon: Icons.document_scanner_rounded,
+            onTap: () => setDocumentScanMode(true),
+          ),
+        ],
       ],
     );
   }
@@ -344,6 +378,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   }
 
   Future<void> takePhoto() async {
+    if (captureIsScanMode) return takeScanPage();
     if (!cameraController.isInitialized || isEncrypting || isTakingPhoto) return;
     isTakingPhoto = true;
 

@@ -11291,4 +11291,46 @@ class AppLocalizationsJa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => '角を調整';
+
+  @override
+  String get scanResultTitle => 'スキャンしたページ';
+
+  @override
+  String get scanAutoDetectButton => '自動検出';
+
+  @override
+  String get scanFullImageButton => '画像全体';
+
+  @override
+  String get scanFilterColor => 'カラー';
+
+  @override
+  String get scanFilterGrayscale => 'グレースケール';
+
+  @override
+  String get scanHintSearching => 'カメラを書類に向けてください';
+
+  @override
+  String get scanHintFound => '書類を検出しました';
+
+  @override
+  String get scanNoDocumentFound => '書類を検出できませんでした。角をドラッグしてページに合わせてください。';
+
+  @override
+  String get scanProcessingFailed => 'このページを処理できませんでした';
+
+  @override
+  String get scanDetectingEdges => '端を検出中…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => '画像';
+
+  @override
+  String get scanPdfFailed => 'PDFを作成できませんでした';
 }

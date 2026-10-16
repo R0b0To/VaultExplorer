@@ -11981,4 +11981,47 @@ class AppLocalizationsEs extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => 'Ajustar esquinas';
+
+  @override
+  String get scanResultTitle => 'Página escaneada';
+
+  @override
+  String get scanAutoDetectButton => 'Detectar automáticamente';
+
+  @override
+  String get scanFullImageButton => 'Imagen completa';
+
+  @override
+  String get scanFilterColor => 'Color';
+
+  @override
+  String get scanFilterGrayscale => 'Escala de grises';
+
+  @override
+  String get scanHintSearching => 'Apunta la cámara a un documento';
+
+  @override
+  String get scanHintFound => 'Documento detectado';
+
+  @override
+  String get scanNoDocumentFound =>
+      'No se detectó ningún documento. Arrastra las esquinas para ajustarlas a la página.';
+
+  @override
+  String get scanProcessingFailed => 'No se pudo procesar esta página';
+
+  @override
+  String get scanDetectingEdges => 'Detectando bordes…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => 'Imágenes';
+
+  @override
+  String get scanPdfFailed => 'No se pudo crear el PDF';
 }

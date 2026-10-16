@@ -32,6 +32,16 @@ class CameraVaultService {
     );
   }
 
+  /// Name for a page from the document scanner: `SCAN_<timestamp>.jpg`.
+  Future<String> nextAvailableScanImageName() {
+    return _nextAvailableName(prefix: 'SCAN_', ext: '.jpg');
+  }
+
+  /// Name for a scanned document saved as one PDF: `SCAN_<timestamp>.pdf`.
+  Future<String> nextAvailableScanPdfName() {
+    return _nextAvailableName(prefix: 'SCAN_', ext: '.pdf');
+  }
+
   /// Name for an audio-only recording: `AUD_<timestamp>.m4a` (AAC in an
   /// MPEG-4 container, which is what the native recorder produces).
   ///

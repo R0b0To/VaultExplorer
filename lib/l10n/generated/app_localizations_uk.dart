@@ -12042,4 +12042,47 @@ class AppLocalizationsUk extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => 'Налаштування кутів';
+
+  @override
+  String get scanResultTitle => 'Відсканована сторінка';
+
+  @override
+  String get scanAutoDetectButton => 'Автовизначення';
+
+  @override
+  String get scanFullImageButton => 'Усе зображення';
+
+  @override
+  String get scanFilterColor => 'Колір';
+
+  @override
+  String get scanFilterGrayscale => 'Відтінки сірого';
+
+  @override
+  String get scanHintSearching => 'Наведіть камеру на документ';
+
+  @override
+  String get scanHintFound => 'Документ виявлено';
+
+  @override
+  String get scanNoDocumentFound =>
+      'Документ не виявлено. Перетягніть кути, щоб вони збігалися зі сторінкою.';
+
+  @override
+  String get scanProcessingFailed => 'Не вдалося обробити цю сторінку';
+
+  @override
+  String get scanDetectingEdges => 'Виявлення країв…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => 'Зображення';
+
+  @override
+  String get scanPdfFailed => 'Не вдалося створити PDF';
 }

@@ -207,6 +207,58 @@ outcomes: write a new file with a validated, de-conflicted name and leave the
 original untouched, or replace the original file's bytes; either way the write
 goes back into the vault through `writeWholeFile`.
 
+**Document scanner (`lib/features/camera/scan`, `cpp/docscan`).** A third
+mode in `CameraCaptureScreen`'s mode toggle (the quick-capture screen opts out
+through the `supportsDocumentScan` hook on `CaptureScreenStateMixin`). Two
+paths run on the same camera session:
+
+- *Live outline.* `VaultCameraSession.setScanMode(enable, document = true)`
+  reuses the analysis `YUV_420_888` reader that QR scanning uses; each Y plane
+  goes to `docscan::detectFromGray` (~320 px working size, throttled to ~10 fps)
+  and the result is rotated by the sensor orientation into the upright frame
+  before a `document_quad` event reaches Dart. The analysis size is chosen to
+  match the preview's aspect, so a quad maps 1:1 onto the preview; the overlay
+  is drawn in the uncropped preview box and hidden for the front camera (mirrored
+  preview).
+- *Capture.* The shutter takes the normal full-resolution JPEG and hands it to
+  `DocumentScanPlugin` (channel `com.aeidolon.vaultexplorer/docscan`, owned and
+  disposed by `VaultCameraPlugin`, one worker thread). `detect` decodes the
+  photo upright (EXIF applied) at ~1600 px, runs `detectFromRgba` (including a
+  sub-pixel edge-fitting stage) and returns that same upright preview, so the
+  corners always line up with the pixels the editor shows. After the user
+  adjusts corners, picks a filter and rotation in `DocumentScanEditorScreen`,
+  `process` decodes just large enough, warps the quad to a page (aspect ratio
+  recovered from the perspective, not guessed from side lengths), applies the
+  filter and returns a JPEG. The page then travels as an ordinary
+  `CapturedMediaItem` (`isScan`) through the existing tray, review and save.
+
+The native core is dependency-free C++17 (no OpenCV), so the app's
+build-from-pinned-source property is unchanged. It generates candidate quads
+from thresholded regions, a descending Canny sensitivity ladder and the
+interior of edge outlines (after a median filter that removes text and noise
+without softening real edges), fits an enclosing quadrilateral to each convex
+hull and scores it by area, corner angles and how much of each side lies on a
+real perpendicular edge. Frame-border samples are excluded from that score:
+the dark padding added around the frame would otherwise make any frame-sized
+quad look perfectly supported. Filters (`Color`, `Gray`, `BlackWhite`) divide
+by a smooth paper-colour estimate to remove shadows. The JNI surface is five
+functions in `jni/docscan_bridge.cpp` plus `nativeDetectDocument`, so the
+detector can be replaced without touching Kotlin or Dart.
+
+Saving: with the PDF toggle on (default) all scanned pages of a session become
+one `SCAN_<timestamp>.pdf`; otherwise each is a `SCAN_<timestamp>.jpg`. The
+PDF writer (`docscan/doc_pdf.cpp`) embeds each JPEG verbatim, reads its size and
+channel count from the JPEG header (never from the caller), and writes no
+metadata. A page the review screen's editor turned into a PNG is re-encoded as
+JPEG in Kotlin and the build retried; a failed PDF keeps every page on screen.
+
+Invariants (§2) hold: pixels move only as byte arrays and direct buffers, no
+temp files are created, there is no network access, and the editor, being a
+route above the camera screen, hides itself when `cameraCaptureLockProvider`
+reports the container locked. Native tests: `docscan/test/doc_scan_test.cpp`
+(host-side, in the `if(NOT ANDROID)` list in `CMakeLists.txt`); Dart:
+`test/features/camera/scan/scan_geometry_test.dart`.
+
 ### 1.4 Android Share Sheet Integration
 
 An opt-in feature that lets other apps share one or more files straight into a

@@ -11988,4 +11988,47 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get scanAdjustCornersTitle => 'ضبط الزوايا';
+
+  @override
+  String get scanResultTitle => 'الصفحة الممسوحة';
+
+  @override
+  String get scanAutoDetectButton => 'اكتشاف تلقائي';
+
+  @override
+  String get scanFullImageButton => 'الصورة كاملة';
+
+  @override
+  String get scanFilterColor => 'ملوّن';
+
+  @override
+  String get scanFilterGrayscale => 'تدرّج رمادي';
+
+  @override
+  String get scanHintSearching => 'وجّه الكاميرا نحو مستند';
+
+  @override
+  String get scanHintFound => 'تم اكتشاف مستند';
+
+  @override
+  String get scanNoDocumentFound =>
+      'لم يتم اكتشاف مستند. اسحب الزوايا لتطابق الصفحة.';
+
+  @override
+  String get scanProcessingFailed => 'تعذّرت معالجة هذه الصفحة';
+
+  @override
+  String get scanDetectingEdges => 'جارٍ اكتشاف الحواف…';
+
+  @override
+  String get scanOutputPdf => 'PDF';
+
+  @override
+  String get scanOutputImages => 'صور';
+
+  @override
+  String get scanPdfFailed => 'تعذّر إنشاء ملف PDF';
 }

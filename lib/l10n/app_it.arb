@@ -3292,5 +3292,19 @@
   "resetVaultThumbnailsSubtitle": "Fa seguire a ogni vault le impostazioni predefinite delle miniature qui sopra, inclusi i vault con impostazioni proprie.",
   "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 vault ha impostazioni delle miniature proprie. Farlo seguire l’impostazione predefinita?} other{{count} vault hanno impostazioni delle miniature proprie. Farli seguire l’impostazione predefinita?}}",
   "resetVaultThumbnailsDone": "{count, plural, =1{1 vault ora segue l’impostazione predefinita} other{{count} vault ora seguono l’impostazione predefinita}}",
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 vault segue questa impostazione predefinita e inizierà a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.} other{{count} vault seguono questa impostazione predefinita e inizieranno a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.}}"
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 vault segue questa impostazione predefinita e inizierà a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.} other{{count} vault seguono questa impostazione predefinita e inizieranno a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.}}",
+  "scanAdjustCornersTitle": "Regola gli angoli",
+  "scanResultTitle": "Pagina scansionata",
+  "scanAutoDetectButton": "Rileva automaticamente",
+  "scanFullImageButton": "Immagine intera",
+  "scanFilterColor": "Colore",
+  "scanFilterGrayscale": "Scala di grigi",
+  "scanHintSearching": "Inquadra un documento",
+  "scanHintFound": "Documento rilevato",
+  "scanNoDocumentFound": "Nessun documento rilevato. Trascina gli angoli per adattarli alla pagina.",
+  "scanProcessingFailed": "Impossibile elaborare questa pagina",
+  "scanDetectingEdges": "Rilevamento dei bordi…",
+  "scanOutputPdf": "PDF",
+  "scanOutputImages": "Immagini",
+  "scanPdfFailed": "Impossibile creare il PDF"
 }

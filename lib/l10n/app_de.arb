@@ -3292,5 +3292,19 @@
   "resetVaultThumbnailsSubtitle": "Lässt jeden Tresor den obigen Miniaturansicht-Standards folgen, auch Tresore mit eigenen Einstellungen.",
   "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 Tresor hat eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?} other{{count} Tresore haben eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?}}",
   "resetVaultThumbnailsDone": "{count, plural, =1{1 Tresor folgt jetzt dem Standard} other{{count} Tresore folgen jetzt dem Standard}}",
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 Tresor folgt diesem Standard und beginnt, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.} other{{count} Tresore folgen diesem Standard und beginnen, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.}}"
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 Tresor folgt diesem Standard und beginnt, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.} other{{count} Tresore folgen diesem Standard und beginnen, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.}}",
+  "scanAdjustCornersTitle": "Ecken anpassen",
+  "scanResultTitle": "Gescannte Seite",
+  "scanAutoDetectButton": "Automatisch erkennen",
+  "scanFullImageButton": "Ganzes Bild",
+  "scanFilterColor": "Farbe",
+  "scanFilterGrayscale": "Graustufen",
+  "scanHintSearching": "Richten Sie die Kamera auf ein Dokument",
+  "scanHintFound": "Dokument erkannt",
+  "scanNoDocumentFound": "Kein Dokument erkannt. Ziehen Sie die Ecken passend zur Seite.",
+  "scanProcessingFailed": "Diese Seite konnte nicht verarbeitet werden",
+  "scanDetectingEdges": "Kanten werden erkannt…",
+  "scanOutputPdf": "PDF",
+  "scanOutputImages": "Bilder",
+  "scanPdfFailed": "Die PDF-Datei konnte nicht erstellt werden"
 }

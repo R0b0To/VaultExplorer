@@ -467,6 +467,9 @@ add_library(
         ${MKNTFS_EMBEDDED_SOURCE}
         archive/archive_engine.cpp
         jni/qr_bridge.cpp
+        docscan/doc_scan.cpp
+        docscan/doc_pdf.cpp
+        jni/docscan_bridge.cpp
 )
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -573,6 +576,7 @@ if(NOT ANDROID)
 
     add_executable(sector_batching_test io/test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
+    add_executable(doc_scan_test docscan/test/doc_scan_test.cpp docscan/doc_scan.cpp docscan/doc_pdf.cpp)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     add_executable(cryfs_block_cipher_test
@@ -637,6 +641,7 @@ if(NOT ANDROID)
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
+            doc_scan_test
             kdf_table_test
             decrypted_block_cache_test
             cryfs_block_cipher_test
@@ -660,6 +665,7 @@ if(NOT ANDROID)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
+    add_test(NAME doc_scan_test COMMAND doc_scan_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)

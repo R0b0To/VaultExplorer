@@ -62,6 +62,10 @@ class VaultCameraSession(
     private var isScanningFrame = false
     private var lastScanTime = 0L
 
+    // Scan mode flavour: false = QR codes, true = live document-edge detection.
+    @Volatile private var isDocumentScan = false
+    private var wasDocumentFound = false
+
     private external fun nativeScanQrCode(
         yBytes: ByteArray,
         width: Int,
@@ -69,6 +73,15 @@ class VaultCameraSession(
         rowStride: Int,
         rotationDegrees: Int
     ): String?
+
+    /** Live document quad from a Y plane, in the upright frame: [x0,y0,..,x3,y3,score] or null. */
+    private external fun nativeDetectDocument(
+        yBytes: ByteArray,
+        width: Int,
+        height: Int,
+        rowStride: Int,
+        rotationDegrees: Int
+    ): FloatArray?
 
     private var activeCameraId: String = ""
     private var characteristics: CameraCharacteristics? = null
@@ -153,10 +166,13 @@ class VaultCameraSession(
         }
     }
 
-    fun setScanMode(enable: Boolean) {
+    fun setScanMode(enable: Boolean, document: Boolean = false) {
         runOnCameraThread {
-            if (isScanMode == enable) return@runOnCameraThread
+            val wantDocument = enable && document
+            if (isScanMode == enable && isDocumentScan == wantDocument) return@runOnCameraThread
             isScanMode = enable
+            isDocumentScan = wantDocument
+            wasDocumentFound = false
             updateRepeatingRequest()
         }
     }
@@ -166,7 +182,8 @@ class VaultCameraSession(
         try {
             if (!isScanMode || isScanningFrame) return
             val now = System.currentTimeMillis()
-            if (now - lastScanTime < 140) return
+            val documentScan = isDocumentScan
+            if (now - lastScanTime < (if (documentScan) 100 else 140)) return
             lastScanTime = now
             isScanningFrame = true
 
@@ -181,12 +198,31 @@ class VaultCameraSession(
 
             bgHandler.post {
                 try {
-                    val text = nativeScanQrCode(yBytes, w, h, stride, rot)
-                    if (text != null && text.isNotEmpty()) {
-                        onEvent(mapOf("event" to "qr_code", "data" to text))
+                    if (documentScan) {
+                        val quad = nativeDetectDocument(yBytes, w, h, stride, rot)
+                        if (quad != null && quad.size >= 9) {
+                            wasDocumentFound = true
+                            onEvent(
+                                mapOf(
+                                    "event" to "document_quad",
+                                    "found" to true,
+                                    "points" to List(8) { quad[it].toDouble() },
+                                    "score" to quad[8].toDouble(),
+                                )
+                            )
+                        } else if (wasDocumentFound) {
+                            // Only report the loss once, so the overlay can clear immediately.
+                            wasDocumentFound = false
+                            onEvent(mapOf("event" to "document_quad", "found" to false))
+                        }
+                    } else {
+                        val text = nativeScanQrCode(yBytes, w, h, stride, rot)
+                        if (text != null && text.isNotEmpty()) {
+                            onEvent(mapOf("event" to "qr_code", "data" to text))
+                        }
                     }
                 } catch (e: Exception) {
-                    VeLog.w(TAG, e) { "nativeScanQrCode failed" }
+                    VeLog.w(TAG, e) { "analysis frame failed" }
                 } finally {
                     isScanningFrame = false
                 }
@@ -382,7 +418,12 @@ class VaultCameraSession(
 
         analysisReader?.close()
         val yuvSizes = map.getOutputSizes(ImageFormat.YUV_420_888)?.toList().orEmpty()
-        val scanSize = chooseSize(yuvSizes, 720, capAt1080p = true)
+        // Same aspect as the photo/preview, so a quad detected here maps 1:1 onto the
+        // preview (a different aspect would be a differently cropped field of view).
+        val matchingYuv = yuvSizes
+            .filter { abs((it.width.toFloat() / it.height.toFloat()) - photoAspect) < 0.05f }
+            .ifEmpty { yuvSizes }
+        val scanSize = chooseSize(matchingYuv, 720, capAt1080p = true)
         val aReader = ImageReader.newInstance(scanSize.width, scanSize.height, ImageFormat.YUV_420_888, 2)
         aReader.setOnImageAvailableListener({ r -> onAnalysisFrameAvailable(r) }, bgHandler)
         analysisReader = aReader

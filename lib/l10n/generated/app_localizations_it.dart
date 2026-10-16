@@ -11892,4 +11892,12 @@ class AppLocalizationsIt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'Reimposta dimensione al cambio di layout';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Ripristina lo zoom dell\'elenco e il numero di colonne di griglia e mosaico ai valori predefiniti quando cambi layout';
 }

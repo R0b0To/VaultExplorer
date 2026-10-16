@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Squadrati",
   "gridSpacingLabel": "Spaziatura miniature",
   "gridSpacingNone": "Nessuno",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Reimposta dimensione al cambio di layout",
+  "resetSizeOnLayoutChangeDesc": "Ripristina lo zoom dell'elenco e il numero di colonne di griglia e mosaico ai valori predefiniti quando cambi layout"
 }

@@ -126,6 +126,28 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: state.config.resetSizeOnLayoutChange,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setResetSizeOnLayoutChange(v),
+                            title: Text(
+                              context.l10n.resetSizeOnLayoutChangeLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.resetSizeOnLayoutChangeDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.zoom_out_map_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
                           OptionPickerTile<BrowserLayoutMode>(
                             label: context.l10n.defaultFolderLayoutLabel,
                             value: defaultLayoutMode,

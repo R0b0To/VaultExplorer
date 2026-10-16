@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "四角",
   "gridSpacingLabel": "サムネイルの間隔",
   "gridSpacingNone": "なし",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "レイアウト変更時にサイズをリセット",
+  "resetSizeOnLayoutChangeDesc": "レイアウトを切り替えるたびに、リストのズームとグリッド／メイソンリーの列数を初期値に戻す"
 }

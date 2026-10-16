@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Cuadradas",
   "gridSpacingLabel": "Espaciado de miniaturas",
   "gridSpacingNone": "Ninguno",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Restablecer tamaño al cambiar de diseño",
+  "resetSizeOnLayoutChangeDesc": "Restablecer el zoom de la lista y el número de columnas de la cuadrícula y el mosaico a sus valores predeterminados al cambiar de diseño"
 }

@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "مربعة",
   "gridSpacingLabel": "تباعد الصور المصغرة",
   "gridSpacingNone": "بلا",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "إعادة ضبط الحجم عند تغيير التخطيط",
+  "resetSizeOnLayoutChangeDesc": "إعادة تكبير القائمة وعدد أعمدة الشبكة والشبكة المتدرّجة إلى الإعدادات الافتراضية عند تبديل التخطيط"
 }

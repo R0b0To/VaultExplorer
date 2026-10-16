@@ -212,4 +212,65 @@ void main() {
       expect(restored.showHiddenFiles, isTrue);
     });
   });
+
+  group('FileManagerToolbarConfig resetSizeOnLayoutChange', () {
+    test('is enabled by default in defaults() and the constructor', () {
+      expect(FileManagerToolbarConfig.defaults().resetSizeOnLayoutChange,
+          isTrue);
+      expect(
+        const FileManagerToolbarConfig(order: [], hidden: {})
+            .resetSizeOnLayoutChange,
+        isTrue,
+      );
+    });
+
+    test('copyWith toggles it', () {
+      final off = FileManagerToolbarConfig.defaults()
+          .copyWith(resetSizeOnLayoutChange: false);
+      expect(off.resetSizeOnLayoutChange, isFalse);
+      expect(off.copyWith(resetSizeOnLayoutChange: true)
+          .resetSizeOnLayoutChange, isTrue);
+    });
+
+    test('round-trips through JSON', () {
+      final json = FileManagerToolbarConfig.defaults()
+          .copyWith(resetSizeOnLayoutChange: false)
+          .toJson();
+      expect(json['resetSizeOnLayoutChange'], isFalse);
+      expect(FileManagerToolbarConfig.fromJson(json).resetSizeOnLayoutChange,
+          isFalse);
+    });
+
+    test('fromJson defaults to enabled when the key is missing', () {
+      final config = FileManagerToolbarConfig.fromJson(
+        <String, dynamic>{'showBreadcrumbBar': true},
+      );
+      expect(config.resetSizeOnLayoutChange, isTrue);
+    });
+
+    test('withDefaultSizes resets every size and nothing else', () {
+      final custom = FileManagerToolbarConfig.defaults().copyWith(
+        listZoomLevel: 1.8,
+        gridColumnsPortrait: 1,
+        gridColumnsLandscape: 7,
+        masonryColumnsPortrait: 3,
+        masonryColumnsLandscape: 6,
+        showHiddenFiles: true,
+        resetSizeOnLayoutChange: false,
+        folderLayoutModes: const {'c:/a': 'grid'},
+      );
+      final reset = custom.withDefaultSizes();
+      final defaults = FileManagerToolbarConfig.defaults();
+
+      expect(reset.listZoomLevel, defaults.listZoomLevel);
+      expect(reset.gridColumnsPortrait, defaults.gridColumnsPortrait);
+      expect(reset.gridColumnsLandscape, defaults.gridColumnsLandscape);
+      expect(reset.masonryColumnsPortrait, defaults.masonryColumnsPortrait);
+      expect(reset.masonryColumnsLandscape, defaults.masonryColumnsLandscape);
+
+      expect(reset.showHiddenFiles, isTrue);
+      expect(reset.resetSizeOnLayoutChange, isFalse);
+      expect(reset.folderLayoutModes, {'c:/a': 'grid'});
+    });
+  });
 }

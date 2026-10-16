@@ -11241,4 +11241,11 @@ class AppLocalizationsKo extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel => '레이아웃 변경 시 크기 초기화';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      '레이아웃을 전환할 때마다 목록 확대 수준과 그리드/메이슨리 열 수를 기본값으로 되돌림';
 }

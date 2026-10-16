@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Quadrados",
   "gridSpacingLabel": "Espaçamento das miniaturas",
   "gridSpacingNone": "Nenhum",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Redefinir tamanho ao mudar de layout",
+  "resetSizeOnLayoutChangeDesc": "Restaurar o zoom da lista e o número de colunas da grade e do mosaico para os valores padrão ao alternar o layout"
 }

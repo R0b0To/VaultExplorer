@@ -11891,4 +11891,12 @@ class AppLocalizationsPt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'Redefinir tamanho ao mudar de layout';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Restaurar o zoom da lista e o número de colunas da grade e do mosaico para os valores padrão ao alternar o layout';
 }

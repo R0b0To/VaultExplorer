@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Eckig",
   "gridSpacingLabel": "Abstand der Miniaturansichten",
   "gridSpacingNone": "Keiner",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Größe beim Layoutwechsel zurücksetzen",
+  "resetSizeOnLayoutChangeDesc": "Listenzoom sowie Spaltenanzahl von Raster und Masonry beim Wechsel des Layouts auf die Standardwerte zurücksetzen"
 }

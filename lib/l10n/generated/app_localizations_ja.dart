@@ -11242,4 +11242,11 @@ class AppLocalizationsJa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel => 'レイアウト変更時にサイズをリセット';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'レイアウトを切り替えるたびに、リストのズームとグリッド／メイソンリーの列数を初期値に戻す';
 }

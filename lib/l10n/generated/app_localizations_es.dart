@@ -11924,4 +11924,12 @@ class AppLocalizationsEs extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'Restablecer tamaño al cambiar de diseño';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Restablecer el zoom de la lista y el número de columnas de la cuadrícula y el mosaico a sus valores predeterminados al cambiar de diseño';
 }

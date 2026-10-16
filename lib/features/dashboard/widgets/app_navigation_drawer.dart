@@ -165,7 +165,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     });
   }
 
-  Future<void> _lockSingleVault(BuildContext context, WidgetRef ref, MountedContainer container) async {
+Future<void> _lockSingleVault(BuildContext context, WidgetRef ref, MountedContainer container) async {
     final controller = ref.read(vaultDashboardControllerProvider.notifier);
     if (!controller.acquireLockGuard(container.volId)) {
       if (context.mounted) {
@@ -193,6 +193,58 @@ class AppNavigationDrawer extends ConsumerWidget {
       }
     } finally {
       controller.releaseLockGuard(container.volId);
+    }
+  }
+
+  Future<void> _lockAllVaults(
+    BuildContext context,
+    WidgetRef ref,
+    List<MountedContainer> mounted,
+  ) async {
+    final willLeaveCurrentScreen =
+        currentVolId != null && mounted.any((c) => c.volId == currentVolId);
+    final controller = ref.read(vaultDashboardControllerProvider.notifier);
+    final currentVaultGuardAcquired =
+        willLeaveCurrentScreen && controller.acquireLockGuard(currentVolId!);
+    if (currentVaultGuardAcquired) {
+      Navigator.pop(context);
+    }
+    var currentVaultGuardHeld = currentVaultGuardAcquired;
+    var skippedBusyVault = false;
+    try {
+      for (final c in mounted) {
+        final guardAlreadyHeld =
+            c.volId == currentVolId && currentVaultGuardHeld;
+        if (!guardAlreadyHeld && !controller.acquireLockGuard(c.volId)) {
+          skippedBusyVault = true;
+          continue;
+        }
+        try {
+          final locked =
+              await ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
+          if (locked) {
+            controller.onContainerLocked(c.volId);
+          } else {
+            skippedBusyVault = true;
+          }
+        } catch (_) {
+          skippedBusyVault = true;
+        } finally {
+          controller.releaseLockGuard(c.volId);
+          if (guardAlreadyHeld) currentVaultGuardHeld = false;
+        }
+      }
+    } finally {
+      if (currentVaultGuardHeld) {
+        controller.releaseLockGuard(currentVolId!);
+      }
+    }
+    if (skippedBusyVault && context.mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.operationInProgressWaitMessage,
+        tone: AppBannerTone.warning,
+      );
     }
   }
 
@@ -302,7 +354,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                           // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
                           if (displayItems.isNotEmpty || onAddVault != null) ...[
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
+                              padding: const EdgeInsets.fromLTRB(16, 14, 2, 2),
                               child: Row(
                                 children: [
                                   Text(
@@ -313,72 +365,46 @@ class AppNavigationDrawer extends ConsumerWidget {
                                       letterSpacing: 1.1,
                                     ),
                                   ),
-                                  const Spacer(),
+                                 const Spacer(),
                                   if (dashboardState.mounted.isNotEmpty)
-                                    IconButton(
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: cs.error,
-                                        visualDensity: VisualDensity.compact,
-                                        padding: const EdgeInsets.all(4),
-                                        minimumSize: const Size(28, 28),
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    PopupMenuButton<String>(
+                                      icon: Icon(
+                                        Icons.more_vert,
+                                        size: 20,
+                                        color: cs.onSurfaceVariant,
                                       ),
-                                      icon: const Icon(Icons.lock_rounded, size: 16),
-                                      tooltip: context.l10n.lockAllVaultsTitle,
-                                      onPressed: () async {
-                                        // Only close the drawer if the vault currently being
-                                        // browsed is one of the ones about to be locked -- that
-                                        // screen will pop itself in response, and closing the
-                                        // drawer first keeps that pop from being swallowed by
-                                        // the drawer's own local history entry. Otherwise (e.g.
-                                        // locking from the Dashboard, or locking vaults other
-                                        // than the one on screen) the drawer should stay open so
-                                        // the list can simply refresh to show them as locked.
-                                        final willLeaveCurrentScreen = currentVolId != null &&
-                                            dashboardState.mounted.any((c) => c.volId == currentVolId);
-                                        final controller = ref.read(vaultDashboardControllerProvider.notifier);
-                                        final currentVaultGuardAcquired = willLeaveCurrentScreen &&
-                                            controller.acquireLockGuard(currentVolId!);
-                                        if (currentVaultGuardAcquired) {
-                                          Navigator.pop(context);
-                                        }
-                                        var currentVaultGuardHeld = currentVaultGuardAcquired;
-                                        var skippedBusyVault = false;
-                                        try {
-                                          for (final c in dashboardState.mounted) {
-                                            final guardAlreadyHeld = c.volId == currentVolId &&
-                                                currentVaultGuardHeld;
-                                            if (!guardAlreadyHeld && !controller.acquireLockGuard(c.volId)) {
-                                              skippedBusyVault = true;
-                                              continue;
-                                            }
-                                            try {
-                                              final locked = await ref.read(vaultLifecycleApiProvider).lockContainer(c.uri);
-                                              if (locked) {
-                                                controller.onContainerLocked(c.volId);
-                                              } else {
-                                                skippedBusyVault = true;
-                                              }
-                                            } catch (_) {
-                                              skippedBusyVault = true;
-                                            } finally {
-                                              controller.releaseLockGuard(c.volId);
-                                              if (guardAlreadyHeld) currentVaultGuardHeld = false;
-                                            }
-                                          }
-                                        } finally {
-                                          if (currentVaultGuardHeld) {
-                                            controller.releaseLockGuard(currentVolId!);
-                                          }
-                                        }
-                                        if (skippedBusyVault && context.mounted) {
-                                          showAppSnackBar(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      onSelected: (action) {
+                                        if (action == 'lock_all') {
+                                          _lockAllVaults(
                                             context,
-                                            message: context.l10n.operationInProgressWaitMessage,
-                                            tone: AppBannerTone.warning,
+                                            ref,
+                                            dashboardState.mounted,
                                           );
                                         }
                                       },
+                                      itemBuilder: (ctx) => [
+                                        PopupMenuItem<String>(
+                                          value: 'lock_all',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.lock_outline_rounded,
+                                                size: 20,
+                                                color: cs.error,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                context.l10n.lockAllVaultsTitle,
+                                                style: TextStyle(color: cs.error),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                 ],
                               ),

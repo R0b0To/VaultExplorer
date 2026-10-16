@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Carrés",
   "gridSpacingLabel": "Espacement des miniatures",
   "gridSpacingNone": "Aucun",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Réinitialiser la taille au changement de disposition",
+  "resetSizeOnLayoutChangeDesc": "Rétablir le zoom de la liste et le nombre de colonnes de la grille et de la mosaïque à leurs valeurs par défaut lors d'un changement de disposition"
 }

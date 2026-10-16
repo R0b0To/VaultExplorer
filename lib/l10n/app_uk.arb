@@ -3284,5 +3284,7 @@
   "gridCornerSquareLabel": "Прямі",
   "gridSpacingLabel": "Відстань між мініатюрами",
   "gridSpacingNone": "Немає",
-  "gridSpacingValue": "{value} dp"
+  "gridSpacingValue": "{value} dp",
+  "resetSizeOnLayoutChangeLabel": "Скидати розмір при зміні вигляду",
+  "resetSizeOnLayoutChangeDesc": "Повертати масштаб списку та кількість стовпців сітки й мозаїки до типових значень під час зміни вигляду"
 }

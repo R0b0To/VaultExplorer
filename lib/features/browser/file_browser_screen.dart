@@ -3568,6 +3568,20 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _onLayoutModeChanged(BrowserLayoutMode mode) async {
+    // Only an actual switch counts: re-picking the current mode (e.g. the
+    // grid aspect-ratio submenu, which re-selects grid) must not wipe the
+    // size the user just pinched to.
+    final resetSize =
+        _toolbarConfig.resetSizeOnLayoutChange && mode != _layoutMode;
+    if (resetSize) {
+      // Applied synchronously, before the mode switch, so the incoming view
+      // is built straight at the default size rather than flashing the old
+      // one -- and so any follow-up handler (e.g. the aspect-ratio change
+      // fired right after this one) copies from the already-reset config.
+      setState(() {
+        _toolbarConfig = _toolbarConfig.withDefaultSizes();
+      });
+    }
     _navNotifier.setLayoutMode(mode);
     try {
       if (_toolbarConfig.rememberPerFolderLayout) {
@@ -3608,6 +3622,22 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             .read(appSettingsServiceProvider)
             .saveSettings(updatedSettings);
         _appSettings = updatedSettings;
+
+        // The per-folder branch above already saved the reset sizes along
+        // with its folder map; this branch otherwise never touches the
+        // toolbar config, so persist them here.
+        if (resetSize) {
+          await _toolbarSvc.save(_toolbarConfig);
+          final effectiveToolbarUri = widget.container.isLocalStorage
+              ? null
+              : widget.container.uri;
+          ref
+              .read(
+                fileManagerToolbarSettingsProvider(effectiveToolbarUri)
+                    .notifier,
+              )
+              .applyImportedConfig(_toolbarConfig);
+        }
       }
     } catch (e) {
       if (mounted) {

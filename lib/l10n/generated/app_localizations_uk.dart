@@ -11976,4 +11976,11 @@ class AppLocalizationsUk extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel => 'Скидати розмір при зміні вигляду';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Повертати масштаб списку та кількість стовпців сітки й мозаїки до типових значень під час зміни вигляду';
 }

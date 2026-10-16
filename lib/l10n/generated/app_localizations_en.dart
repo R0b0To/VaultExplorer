@@ -11716,4 +11716,11 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel => 'Reset Size on Layout Change';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Return the list zoom and grid/masonry column count to their defaults whenever you switch layouts';
 }

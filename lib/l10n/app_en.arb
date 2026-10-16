@@ -13416,5 +13416,13 @@
         "type": "int"
       }
     }
+  },
+  "resetSizeOnLayoutChangeLabel": "Reset Size on Layout Change",
+  "@resetSizeOnLayoutChangeLabel": {
+    "description": "Toggle label: reset list zoom and grid/masonry column count to their defaults when the layout mode changes"
+  },
+  "resetSizeOnLayoutChangeDesc": "Return the list zoom and grid/masonry column count to their defaults whenever you switch layouts",
+  "@resetSizeOnLayoutChangeDesc": {
+    "description": "Toggle description: reset list zoom and grid/masonry column count to their defaults when the layout mode changes"
   }
 }

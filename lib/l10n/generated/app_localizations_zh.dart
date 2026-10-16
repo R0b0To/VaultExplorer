@@ -11068,4 +11068,10 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel => '切换布局时重置大小';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc => '切换布局时，将列表缩放比例以及网格/瀑布流的列数恢复为默认值';
 }

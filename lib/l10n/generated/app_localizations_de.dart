@@ -11894,4 +11894,12 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'Größe beim Layoutwechsel zurücksetzen';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Listenzoom sowie Spaltenanzahl von Raster und Masonry beim Wechsel des Layouts auf die Standardwerte zurücksetzen';
 }

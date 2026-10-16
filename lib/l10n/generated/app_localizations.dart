@@ -19866,6 +19866,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 recommended setting is still off. Automation works, but may be less reliable.} other{{count} recommended settings are still off. Automation works, but may be less reliable.}}'**
   String automationPermAlmostReadyMessage(int count);
+
+  /// Toggle label: reset list zoom and grid/masonry column count to their defaults when the layout mode changes
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Size on Layout Change'**
+  String get resetSizeOnLayoutChangeLabel;
+
+  /// Toggle description: reset list zoom and grid/masonry column count to their defaults when the layout mode changes
+  ///
+  /// In en, this message translates to:
+  /// **'Return the list zoom and grid/masonry column count to their defaults whenever you switch layouts'**
+  String get resetSizeOnLayoutChangeDesc;
 }
 
 class _AppLocalizationsDelegate

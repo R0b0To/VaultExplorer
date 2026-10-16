@@ -11998,4 +11998,12 @@ class AppLocalizationsFr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'Réinitialiser la taille au changement de disposition';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'Rétablir le zoom de la liste et le nombre de colonnes de la grille et de la mosaïque à leurs valeurs par défaut lors d\'un changement de disposition';
 }

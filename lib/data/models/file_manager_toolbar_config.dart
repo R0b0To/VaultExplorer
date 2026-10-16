@@ -53,6 +53,11 @@ class FileManagerToolbarConfig {
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
   final bool rememberPerFolderLayout;
+
+  /// When true, switching the file-list layout mode puts every
+  /// pinch-adjustable size (list zoom, grid and masonry column counts) back
+  /// at its default -- see [withDefaultSizes].
+  final bool resetSizeOnLayoutChange;
   final bool autoHideAppBar;
   final bool useFabForToolbar;
   final bool bottomSelectionBar;
@@ -101,6 +106,7 @@ class FileManagerToolbarConfig {
     this.showMediaCarousel = true,
     this.autoStartPlaylistMode = true,
     this.rememberPerFolderLayout = true,
+    this.resetSizeOnLayoutChange = true,
     this.autoHideAppBar = true,
     this.useFabForToolbar = false,
     this.bottomSelectionBar = false,
@@ -149,6 +155,7 @@ class FileManagerToolbarConfig {
         showMediaCarousel: true,
         autoStartPlaylistMode: true,
         rememberPerFolderLayout: true,
+        resetSizeOnLayoutChange: true,
         autoHideAppBar: true,
         useFabForToolbar: false,
         bottomSelectionBar: false,
@@ -186,6 +193,22 @@ class FileManagerToolbarConfig {
   List<FileDetailColumn> get visibleDetailColumns => detailColumnsOrder
       .where((c) => !hiddenDetailColumns.contains(c))
       .toList(growable: false);
+
+  /// Copy with every pinch-adjustable size -- list zoom and the grid /
+  /// masonry column counts, portrait and landscape -- back at its default.
+  /// Used when [resetSizeOnLayoutChange] is on and the layout mode changes.
+  /// Reads the values from [FileManagerToolbarConfig.defaults] so the
+  /// defaults stay defined in one place.
+  FileManagerToolbarConfig withDefaultSizes() {
+    final d = FileManagerToolbarConfig.defaults();
+    return copyWith(
+      listZoomLevel: d.listZoomLevel,
+      gridColumnsPortrait: d.gridColumnsPortrait,
+      gridColumnsLandscape: d.gridColumnsLandscape,
+      masonryColumnsPortrait: d.masonryColumnsPortrait,
+      masonryColumnsLandscape: d.masonryColumnsLandscape,
+    );
+  }
 
   /// Shared key format for every per-folder override map
   /// ([folderLayoutModes], [folderGridAspectRatios], [folderSortModes]) so
@@ -227,6 +250,7 @@ class FileManagerToolbarConfig {
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
     bool? rememberPerFolderLayout,
+    bool? resetSizeOnLayoutChange,
     bool? autoHideAppBar,
     bool? useFabForToolbar,
     bool? bottomSelectionBar,
@@ -265,6 +289,8 @@ class FileManagerToolbarConfig {
             autoStartPlaylistMode ?? this.autoStartPlaylistMode,
         rememberPerFolderLayout:
             rememberPerFolderLayout ?? this.rememberPerFolderLayout,
+        resetSizeOnLayoutChange:
+            resetSizeOnLayoutChange ?? this.resetSizeOnLayoutChange,
         autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
         useFabForToolbar: useFabForToolbar ?? this.useFabForToolbar,
         bottomSelectionBar: bottomSelectionBar ?? this.bottomSelectionBar,
@@ -312,6 +338,7 @@ class FileManagerToolbarConfig {
         'showMediaCarousel': showMediaCarousel,
         'autoStartPlaylistMode': autoStartPlaylistMode,
         'rememberPerFolderLayout': rememberPerFolderLayout,
+        'resetSizeOnLayoutChange': resetSizeOnLayoutChange,
         'autoHideAppBar': autoHideAppBar,
         'useFabForToolbar': useFabForToolbar,
         'bottomSelectionBar': bottomSelectionBar,
@@ -408,6 +435,7 @@ class FileManagerToolbarConfig {
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,
+      resetSizeOnLayoutChange: j['resetSizeOnLayoutChange'] as bool? ?? true,
       autoHideAppBar: j['autoHideAppBar'] as bool? ?? true,
       useFabForToolbar: j['useFabForToolbar'] as bool? ?? false,
       bottomSelectionBar: j['bottomSelectionBar'] as bool? ?? false,

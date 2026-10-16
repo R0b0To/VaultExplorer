@@ -11916,4 +11916,12 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get resetSizeOnLayoutChangeLabel =>
+      'إعادة ضبط الحجم عند تغيير التخطيط';
+
+  @override
+  String get resetSizeOnLayoutChangeDesc =>
+      'إعادة تكبير القائمة وعدد أعمدة الشبكة والشبكة المتدرّجة إلى الإعدادات الافتراضية عند تبديل التخطيط';
 }

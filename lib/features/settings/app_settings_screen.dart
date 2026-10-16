@@ -32,6 +32,7 @@ import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.da
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
@@ -54,6 +55,7 @@ enum _SettingsSection {
   security,
   storage,
   fileHandling,
+  fileManager,
   appearance,
   advanced,
   about,
@@ -181,6 +183,17 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               ),
             ),
             _buildHubTile(
+              icon: Icons.tune_rounded,
+              iconColor: Colors.blueAccent,
+              title: context.l10n.fileManagerSettingsTitle,
+              subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
+              selected: _selectedSection == _SettingsSection.fileManager,
+              showChevron: false,
+              onTap: () => setState(
+                () => _selectedSection = _SettingsSection.fileManager,
+              ),
+            ),
+            _buildHubTile(
               icon: Icons.palette_rounded,
               iconColor: Colors.deepPurpleAccent,
               title: context.l10n.sectionAppearanceInterface,
@@ -223,12 +236,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     );
   }
 
-  /// The right-hand detail pane on wide/landscape layouts. Wrapped in its
-  /// own [Navigator] so a hub that pushes a deeper page (e.g. Security ->
-  /// Emergency Panic & Duress) slides in within this pane only, leaving the
-  /// sidebar visible -- rather than covering the whole screen. Keying the
-  /// Navigator by the selected section resets that inner stack whenever the
-  /// sidebar selection changes.
+  /// The right-hand detail pane on wide/landscape layouts.
   Widget _buildDetailPane() {
     return Navigator(
       key: ValueKey(_selectedSection),
@@ -243,6 +251,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
           _SettingsSection.fileHandling => const FileHandlingSettingsScreen(
             embedded: true,
           ),
+          _SettingsSection.fileManager => const FileManagerToolbarSettingsScreen(),
           _SettingsSection.appearance => const AppearanceSettingsScreen(
             embedded: true,
           ),
@@ -293,8 +302,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     );
   }
 
-  /// The narrow-layout hub list: unchanged from before the sidebar was
-  /// added -- tapping a hub pushes its screen as a full-screen route.
+  /// The narrow-layout hub list: tapping a hub pushes its screen as a full-screen route.
   Widget _buildNarrowHubList(ColorScheme cs, TextTheme textTheme) {
     return Align(
       alignment: Alignment.topCenter,
@@ -339,6 +347,18 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileHandlingSettingsScreen()),
+                    ),
+                  ),
+                ),
+                _buildHubTile(
+                  icon: Icons.tune_rounded,
+                  iconColor: Colors.blueAccent,
+                  title: context.l10n.fileManagerSettingsTitle,
+                  subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
                     ),
                   ),
                 ),
@@ -1020,9 +1040,7 @@ class _SecuritySettingsScreenState
               ),
               const SizedBox(height: 16),
 
-              // 2. App Lock Behavior -- independent of vault auto-lock
-              // below: only controls how often the lock gate is re-shown,
-              // never whether mounted containers get unmounted.
+              // 2. App Lock Behavior
               if (state.settings.useMasterPassword &&
                   state.settings.masterPasswordHash != null &&
                   !state.showPwFields) ...[
@@ -1085,11 +1103,6 @@ class _SecuritySettingsScreenState
                         }
                       },
                     ),
-                    // "Screen Lock Only" already means "lock on screen
-                    // off", so this toggle would be redundant (and
-                    // turning it off would contradict the mode) -- hide
-                    // it while that's selected. Its stored value is kept
-                    // for when another option is picked again.
                     if (!state.settings.appLockScreenLockOnly)
                       SwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -1260,7 +1273,7 @@ class _SecuritySettingsScreenState
               ),
               const SizedBox(height: 16),
 
-              // 3a. Mask Mode (disguise the app's identity)
+              // 3a. Mask Mode
               SectionHeader(context.l10n.sectionMaskMode),
               SectionCard(
                 children: [
@@ -1288,8 +1301,7 @@ class _SecuritySettingsScreenState
 
               const SizedBox(height: 16),
 
-              // 3b. Emergency Panic & Duress (its own concept: wipe/duress
-              // triggers, separate from disguising the app's identity)
+              // 3b. Emergency Panic & Duress
               SectionHeader(context.l10n.emergencyPanicTitle),
               SectionCard(
                 children: [
@@ -1320,8 +1332,7 @@ class _SecuritySettingsScreenState
 
               const SizedBox(height: 16),
 
-              // 3c. Quick Capture (a productivity shortcut, not a stealth
-              // or emergency feature -- its own section)
+              // 3c. Quick Capture
               SectionHeader(context.l10n.quickCaptureSettingsTitle),
               SectionCard(
                 children: [
@@ -1406,8 +1417,6 @@ class _SecuritySettingsScreenState
 // ─────────────────────────────────────────────────────────────────────────────
 
 class StorageServicesSettingsScreen extends ConsumerWidget {
-  /// True when embedded in the wide-layout detail pane instead of pushed
-  /// as a full-screen route.
   final bool embedded;
 
   const StorageServicesSettingsScreen({super.key, this.embedded = false});
@@ -1660,8 +1669,6 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class FileHandlingSettingsScreen extends ConsumerWidget {
-  /// True when embedded in the wide-layout detail pane instead of pushed
-  /// as a full-screen route.
   final bool embedded;
 
   const FileHandlingSettingsScreen({super.key, this.embedded = false});
@@ -1923,8 +1930,6 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppearanceSettingsScreen extends ConsumerWidget {
-  /// True when embedded in the wide-layout detail pane instead of pushed
-  /// as a full-screen route.
   final bool embedded;
 
   const AppearanceSettingsScreen({super.key, this.embedded = false});
@@ -1956,14 +1961,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
     final state = ref.watch(appSettingsControllerProvider);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
-    // Fix language resolution: sanitize null / empty / 'system'
-    final currentLang =
-        (state.settings.languageCode == null ||
-            state.settings.languageCode!.trim().isEmpty ||
-            state.settings.languageCode == 'system')
-        ? 'system'
-        : state.settings.languageCode!;
 
     final body = SafeArea(
       child: Align(
@@ -2058,7 +2055,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Language Selection (Bug Fixed)
+                  // Language Selection
                   OptionPickerTile<String>(
                     label: context.l10n.languageLabel,
                     value:
@@ -2103,7 +2100,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Dashboard Layout & Cards (Unified here)
+              // Dashboard Layout & Cards
               SectionHeader(context.l10n.navBarVaultsLabel),
               SectionCard(
                 children: [
@@ -2172,8 +2169,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AdvancedSettingsScreen extends ConsumerWidget {
-  /// True when embedded in the wide-layout detail pane instead of pushed
-  /// as a full-screen route.
   final bool embedded;
 
   const AdvancedSettingsScreen({super.key, this.embedded = false});

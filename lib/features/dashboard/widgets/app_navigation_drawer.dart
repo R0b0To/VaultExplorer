@@ -20,7 +20,6 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
-import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
@@ -643,23 +642,7 @@ Future<void> _lockSingleVault(BuildContext context, WidgetRef ref, MountedContai
                     },
                   ),
 
-                  // 5A. File Manager Settings
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                    leading: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
-                    title: Text(context.l10n.fileManagerSettingsTitle),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // 5B. App & Security Settings
+                  // 5. App & Security Settings
                   ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                     selected: isSettings,

@@ -2104,6 +2104,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Password protection is only available for ZIP and 7-Zip';
 
   @override
+  String get createArchiveEncryptFilenames => 'Encrypt file names';
+
+  @override
+  String get createArchiveEncryptFilenamesHint =>
+      'Needs a password. The password is then required even to list the contents.';
+
+  @override
   String get closeSearchTooltip => 'Close search';
 
   @override

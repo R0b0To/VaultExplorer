@@ -93,6 +93,7 @@ abstract class BrowserDialogs {
       String destPathInContainer,
       ArchiveFormatType format,
       String? passphrase,
+      bool encryptFilenames,
     ) onCreate,
     bool readOnly = false,
   }) {
@@ -620,6 +621,7 @@ class _CreateArchiveDialog extends ConsumerStatefulWidget {
     String destPathInContainer,
     ArchiveFormatType format,
     String? passphrase,
+    bool encryptFilenames,
   ) onCreate;
   const _CreateArchiveDialog({
     required this.container,
@@ -656,7 +658,15 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
   late final FilesystemType _fsType;
   ArchiveFormatType _format = ArchiveFormatType.zip;
   bool _obscurePassword = true;
+  bool _encryptFilenames = false;
   bool _validationSeeded = false;
+
+  bool get _hasPassword => _format.supportsPassword && _passwordCtrl.text.isNotEmpty;
+
+  /// Hiding the names only makes sense for a format that can do it, and only
+  /// together with a password. Anything else must never be applied silently.
+  bool get _encryptFilenamesApplies =>
+      _format.supportsFilenameEncryption && _hasPassword && _encryptFilenames;
 
   @override
   void initState() {
@@ -700,6 +710,7 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
     setState(() {
       _format = format;
       if (!format.supportsPassword) _passwordCtrl.clear();
+      if (!format.supportsFilenameEncryption) _encryptFilenames = false;
     });
     if (text.endsWith('.$oldExt')) {
       final stem = text.substring(0, text.length - oldExt.length - 1);
@@ -724,8 +735,9 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
     if (built is! PathBuildSuccess) return;
     final passphrase =
         _format.supportsPassword && _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : null;
+    final encryptFilenames = passphrase != null && _encryptFilenamesApplies;
     Navigator.pop(context);
-    widget.onCreate(built.path, _format, passphrase);
+    widget.onCreate(built.path, _format, passphrase, encryptFilenames);
   }
 
   @override
@@ -774,6 +786,9 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
               controller: _passwordCtrl,
               enabled: passwordEnabled,
               obscureText: _obscurePassword,
+              onChanged: (_) => setState(() {
+                if (_passwordCtrl.text.isEmpty) _encryptFilenames = false;
+              }),
               decoration: InputDecoration(
                 labelText: context.l10n.passwordFieldLabel,
                 hintText: passwordEnabled
@@ -787,6 +802,18 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
                     : null,
               ),
             ),
+            if (_format.supportsFilenameEncryption)
+              CheckboxListTile(
+                value: _encryptFilenamesApplies,
+                onChanged: _hasPassword
+                    ? (v) => setState(() => _encryptFilenames = v ?? false)
+                    : null,
+                title: Text(context.l10n.createArchiveEncryptFilenames),
+                subtitle: Text(context.l10n.createArchiveEncryptFilenamesHint),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
           ],
         ),
       ),

@@ -706,7 +706,7 @@ index 9c9f9a0..85ff5bb 100644
  		/*
  		 * Preparation to decode BCJ2.
 diff --git a/libarchive/archive_write_set_format_7zip.c b/libarchive/archive_write_set_format_7zip.c
-index b5cc8e5..f57ca24 100644
+index b5cc8e5..eb59573 100644
 --- a/libarchive/archive_write_set_format_7zip.c
 +++ b/libarchive/archive_write_set_format_7zip.c
 @@ -64,6 +64,19 @@
@@ -737,7 +737,17 @@ index b5cc8e5..f57ca24 100644
  
  #define _7Z_ZSTD	0x4F71101 /* Copied from https://github.com/mcmilk/7-Zip-zstd.git */
  
-@@ -233,6 +247,26 @@ struct _7zip {
+@@ -230,9 +244,36 @@ struct _7zip {
+ 
+ 	int			 opt_threads;
+ 
++	/*
++	 * Also encrypt the archive header, which holds the file names, sizes
++	 * and times ("-mhe=on" of the 7-Zip command). Without it, only the
++	 * contents of the files are protected.
++	 */
++	int			 opt_header_encryption;
++
  	struct la_zstream	 stream;
  	struct coder		 coder;
  
@@ -764,7 +774,7 @@ index b5cc8e5..f57ca24 100644
  	struct archive_string_conv *sconv;
  
  	/*
-@@ -323,9 +357,17 @@ static int	compression_end(struct archive *,
+@@ -323,9 +364,17 @@ static int	compression_end(struct archive *,
  		    struct la_zstream *);
  static int	enc_uint64(struct archive_write *, uint64_t);
  static int	make_header(struct archive_write *, uint64_t, uint64_t,
@@ -784,7 +794,31 @@ index b5cc8e5..f57ca24 100644
  
  static int
  string_to_number(const char *string, intmax_t *numberp)
-@@ -561,6 +603,18 @@ _7z_write_header(struct archive_write *a, struct archive_entry *entry)
+@@ -545,6 +594,23 @@ _7z_options(struct archive_write *a, const char *key, const char *value)
+ 		return (ARCHIVE_OK);
+ 	}
+ 
++	if (strcmp(key, "header-encryption") == 0) {
++		/* As for the other boolean options: any value enables it,
++		 * "!header-encryption" (no value) disables it. */
++#ifdef SEVENZIP_ENCRYPT
++		zip->opt_header_encryption = (value != NULL);
++		return (ARCHIVE_OK);
++#else
++		if (value == NULL) {
++			zip->opt_header_encryption = 0;
++			return (ARCHIVE_OK);
++		}
++		archive_set_error(&(a->archive), ARCHIVE_ERRNO_MISC,
++		    "This build of libarchive can not encrypt 7-Zip archives");
++		return (ARCHIVE_FAILED);
++#endif
++	}
++
+ 	/* Note: The "warn" return is just to inform the options
+ 	 * supervisor that we didn't handle it.  It will generate
+ 	 * a suitable error if no one used this option. */
+@@ -561,6 +627,18 @@ _7z_write_header(struct archive_write *a, struct archive_entry *entry)
  	zip->cur_file = NULL;
  	zip->entry_bytes_remaining = 0;
  
@@ -803,7 +837,7 @@ index b5cc8e5..f57ca24 100644
  	if (zip->sconv == NULL) {
  		zip->sconv = archive_string_conversion_to_charset(
  		    &a->archive, "UTF-16LE", 1);
-@@ -624,6 +678,13 @@ _7z_write_header(struct archive_write *a, struct archive_entry *entry)
+@@ -624,6 +702,13 @@ _7z_write_header(struct archive_write *a, struct archive_entry *entry)
  			file_free(file);
  			return (ARCHIVE_FATAL);
  		}
@@ -817,7 +851,7 @@ index b5cc8e5..f57ca24 100644
  	}
  
  	/* Register a non-empty file. */
-@@ -693,6 +754,358 @@ write_to_temp(struct archive_write *a, const void *buff, size_t s)
+@@ -693,6 +778,368 @@ write_to_temp(struct archive_write *a, const void *buff, size_t s)
  	return (ARCHIVE_OK);
  }
  
@@ -997,8 +1031,18 @@ index b5cc8e5..f57ca24 100644
 +	zip->aes.checked = 1;
 +
 +	passphrase = __archive_write_get_passphrase(a);
-+	if (passphrase == NULL)
++	if (passphrase == NULL) {
++		/*
++		 * Never silently produce a readable archive for a caller that
++		 * asked for the file names to be hidden.
++		 */
++		if (zip->opt_header_encryption) {
++			archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
++			    "7-Zip header encryption needs a passphrase");
++			return (ARCHIVE_FATAL);
++		}
 +		return (ARCHIVE_OK);
++	}
 +	if (zip->opt_compression == _7Z_COPY) {
 +		/* Each file would need its own encrypted folder. */
 +		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
@@ -1176,7 +1220,7 @@ index b5cc8e5..f57ca24 100644
  static ssize_t
  compress_out(struct archive_write *a, const void *buff, size_t s,
      enum la_zaction run)
-@@ -714,7 +1127,7 @@ compress_out(struct archive_write *a, const void *buff, size_t s,
+@@ -714,7 +1161,7 @@ compress_out(struct archive_write *a, const void *buff, size_t s,
  		if (r != ARCHIVE_OK && r != ARCHIVE_EOF)
  			return (ARCHIVE_FATAL);
  		if (zip->stream.avail_out == 0) {
@@ -1185,7 +1229,7 @@ index b5cc8e5..f57ca24 100644
  			    != ARCHIVE_OK)
  				return (ARCHIVE_FATAL);
  			zip->stream.next_out = zip->wbuff;
-@@ -730,7 +1143,7 @@ compress_out(struct archive_write *a, const void *buff, size_t s,
+@@ -730,7 +1177,7 @@ compress_out(struct archive_write *a, const void *buff, size_t s,
  	}
  	if (run == ARCHIVE_Z_FINISH) {
  		uint64_t bytes = sizeof(zip->wbuff) - zip->stream.avail_out;
@@ -1194,7 +1238,7 @@ index b5cc8e5..f57ca24 100644
  			return (ARCHIVE_FATAL);
  		if ((zip->crc32flg & ENCODED_CRC32) && bytes)
  			zip->encoded_crc32 = crc32(zip->encoded_crc32,
-@@ -855,6 +1268,9 @@ _7z_close(struct archive_write *a)
+@@ -855,7 +1302,22 @@ _7z_close(struct archive_write *a)
  	if (zip->total_number_entry > 0) {
  		struct archive_rb_node *n;
  		uint64_t data_offset, data_size, data_unpacksize;
@@ -1202,9 +1246,22 @@ index b5cc8e5..f57ca24 100644
 +		struct coder data_coders[2];
 +		int data_ncoders = 1;
  		unsigned header_compression;
++		int header_encrypt = 0;
++		uint64_t header_aes_unpacksize = 0;
++		struct coder hdr_coders[2];
++		int hdr_ncoders = 1;
++#ifdef SEVENZIP_ENCRYPT
++		/*
++		 * The coder properties of the data stream (cipher parameters and
++		 * IV) are written after the header got its own IV, which reuses
++		 * zip->aes.props, so keep a private copy of them.
++		 */
++		uint8_t data_aes_props[sizeof(zip->aes.props)];
++#endif
  
  		r = (int)compress_out(a, NULL, 0, ARCHIVE_Z_FINISH);
-@@ -868,6 +1284,28 @@ _7z_close(struct archive_write *a)
+ 		if (r < 0)
+@@ -868,6 +1330,32 @@ _7z_close(struct archive_write *a)
  		zip->coder.props = zip->stream.props;
  		zip->stream.prop_size = 0;
  		zip->stream.props = NULL;
@@ -1223,17 +1280,48 @@ index b5cc8e5..f57ca24 100644
 +				return (r);
 +			data_size = zip->aes.out_bytes;
 +			data_aes_unpacksize = zip->aes.in_bytes;
++			memcpy(data_aes_props, zip->aes.props,
++			    sizeof(data_aes_props));
 +			data_coders[0].codec = _7Z_CRYPTO_AES_256_SHA_256;
-+			data_coders[0].prop_size = sizeof(zip->aes.props);
-+			data_coders[0].props = zip->aes.props;
++			data_coders[0].prop_size = sizeof(data_aes_props);
++			data_coders[0].props = data_aes_props;
 +			data_coders[1] = zip->coder;
 +			data_ncoders = 2;
 +		}
++		/* Set up in the first _7z_write_header(), as is zip->aes. */
++		header_encrypt = zip->aes.enabled && zip->opt_header_encryption;
 +#endif
  		zip->total_number_nonempty_entry =
  		    zip->total_number_entry - zip->total_number_empty_entry;
  
-@@ -909,7 +1347,7 @@ _7z_close(struct archive_write *a)
+@@ -892,8 +1380,9 @@ _7z_close(struct archive_write *a)
+ 			header_compression = zip->opt_compression;
+ 
+ 		/* If the stored file is only one, do not encode the header.
+-		 * This is the same way 7z command does. */
+-		if (zip->total_number_entry == 1)
++		 * This is the same way 7z command does. An encrypted header
++		 * is always encoded: encryption is a coder of its own folder. */
++		if (zip->total_number_entry == 1 && !header_encrypt)
+ 			header_compression = _7Z_COPY;
+ #else
+ 		header_compression = _7Z_COPY;
+@@ -906,10 +1395,22 @@ _7z_close(struct archive_write *a)
+ 		r = _7z_compression_init_encoder(a, header_compression, level);
+ 		if (r < 0)
+ 			return (r);
++#ifdef SEVENZIP_ENCRYPT
++		if (header_encrypt) {
++			/*
++			 * Everything the header encoder writes from here on is
++			 * encrypted, with an IV of its own and the key of the
++			 * data stream.
++			 */
++			r = aes_begin(a);
++			if (r < 0)
++				return (r);
++		}
++#endif
  		zip->crc32flg = PRECODE_CRC32;
  		zip->precode_crc32 = 0;
  		r = make_header(a, data_offset, data_size, data_unpacksize,
@@ -1242,16 +1330,54 @@ index b5cc8e5..f57ca24 100644
  		if (r < 0)
  			return (r);
  		r = (int)compress_out(a, NULL, 0, ARCHIVE_Z_FINISH);
-@@ -946,7 +1384,7 @@ _7z_close(struct archive_write *a)
+@@ -919,8 +1420,22 @@ _7z_close(struct archive_write *a)
+ 		header_size = zip->stream.total_out;
+ 		header_crc32 = zip->precode_crc32;
+ 		header_unpacksize = zip->stream.total_in;
++#ifdef SEVENZIP_ENCRYPT
++		if (header_encrypt) {
++			/*
++			 * As for the data stream: the packed size is the block
++			 * aligned cipher text, the input of the cipher (the
++			 * output of the header codec) the unpadded one.
++			 */
++			r = aes_end(a);
++			if (r < 0)
++				return (r);
++			header_size = zip->aes.out_bytes;
++			header_aes_unpacksize = zip->aes.in_bytes;
++		}
++#endif
+ 
+-		if (header_compression != _7Z_COPY) {
++		if (header_compression != _7Z_COPY || header_encrypt) {
+ 			/*
+ 			 * Encode the header in order to reduce the size
+ 			 * of the archive.
+@@ -944,9 +1459,20 @@ _7z_close(struct archive_write *a)
+ 			r = enc_uint64(a, kEncodedHeader);
+ 			if (r < 0)
  				return (r);
++			hdr_coders[0] = zip->coder;
++#ifdef SEVENZIP_ENCRYPT
++			if (header_encrypt) {
++				/* Decoding order: decrypt, then decode. */
++				hdr_coders[0].codec = _7Z_CRYPTO_AES_256_SHA_256;
++				hdr_coders[0].prop_size = sizeof(zip->aes.props);
++				hdr_coders[0].props = zip->aes.props;
++				hdr_coders[1] = zip->coder;
++				hdr_ncoders = 2;
++			}
++#endif
  			r = make_streamsInfo(a, header_offset, header_size,
- 			      header_unpacksize, 1, &(zip->coder), 0,
+-			      header_unpacksize, 1, &(zip->coder), 0,
 -			      header_crc32);
-+			      header_crc32, 0);
++			      header_unpacksize, hdr_ncoders, hdr_coders, 0,
++			      header_crc32, header_aes_unpacksize);
  			if (r < 0)
  				return (r);
  			r = (int)compress_out(a, NULL, 0, ARCHIVE_Z_FINISH);
-@@ -1090,7 +1528,7 @@ make_substreamsInfo(struct archive_write *a, struct coder *coders)
+@@ -1090,7 +1616,7 @@ make_substreamsInfo(struct archive_write *a, struct coder *coders)
  static int
  make_streamsInfo(struct archive_write *a, uint64_t offset, uint64_t pack_size,
      uint64_t unpack_size, int num_coder, struct coder *coders, int substrm,
@@ -1260,7 +1386,7 @@ index b5cc8e5..f57ca24 100644
  {
  	struct _7zip *zip = a->format_data;
  	uint8_t codec_buff[8];
-@@ -1213,6 +1651,20 @@ make_streamsInfo(struct archive_write *a, uint64_t offset, uint64_t pack_size,
+@@ -1213,6 +1739,20 @@ make_streamsInfo(struct archive_write *a, uint64_t offset, uint64_t pack_size,
  					return (r);
  			}
  		}
@@ -1281,7 +1407,7 @@ index b5cc8e5..f57ca24 100644
  	}
  
  	/*
-@@ -1233,7 +1685,13 @@ make_streamsInfo(struct archive_write *a, uint64_t offset, uint64_t pack_size,
+@@ -1233,7 +1773,13 @@ make_streamsInfo(struct archive_write *a, uint64_t offset, uint64_t pack_size,
  		}
  
  	} else {
@@ -1296,7 +1422,7 @@ index b5cc8e5..f57ca24 100644
  		r = enc_uint64(a, unpack_size);
  		if (r < 0)
  			return (r);
-@@ -1371,7 +1829,8 @@ make_time(struct archive_write *a, uint8_t type, unsigned flg, int ti)
+@@ -1371,7 +1917,8 @@ make_time(struct archive_write *a, uint8_t type, unsigned flg, int ti)
  
  static int
  make_header(struct archive_write *a, uint64_t offset, uint64_t pack_size,
@@ -1306,7 +1432,7 @@ index b5cc8e5..f57ca24 100644
  {
  	struct _7zip *zip = a->format_data;
  	struct file *file;
-@@ -1396,7 +1855,7 @@ make_header(struct archive_write *a, uint64_t offset, uint64_t pack_size,
+@@ -1396,7 +1943,7 @@ make_header(struct archive_write *a, uint64_t offset, uint64_t pack_size,
  		if (r < 0)
  			return (r);
  		r = make_streamsInfo(a, offset, pack_size, unpack_size,
@@ -1315,7 +1441,7 @@ index b5cc8e5..f57ca24 100644
  		if (r < 0)
  			return (r);
  	}
-@@ -1590,6 +2049,9 @@ _7z_free(struct archive_write *a)
+@@ -1590,6 +2137,9 @@ _7z_free(struct archive_write *a)
  	file_free_register(zip);
  	compression_end(&(a->archive), &(zip->stream));
  	free(zip->coder.props);

@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "압축 실패: {type}",
   "createArchivePasswordHint": "선택적 비밀번호 (AES-256)",
   "createArchivePasswordUnavailableForFormat": "비밀번호 보호는 ZIP 및 7-Zip 형식에서만 사용할 수 있습니다",
+  "createArchiveEncryptFilenames": "파일 이름 암호화",
+  "createArchiveEncryptFilenamesHint": "비밀번호가 필요합니다. 내용을 보는 데에도 비밀번호가 필요해집니다.",
   "closeSearchTooltip": "검색 닫기",
   "searchInThisFolderTooltip": "이 폴더에서 검색",
   "playMediaHereTooltip": "여기서 미디어 재생",

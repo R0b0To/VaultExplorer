@@ -370,6 +370,7 @@ class FileOperationService extends ChangeNotifier {
     required List<ClipboardItem> items,
     required ArchiveFormatType format,
     String? passphrase,
+    bool encryptFilenames = false,
     bool deleteSourceAfter = false,
     required AppLocalizations l10n,
   }) {
@@ -399,6 +400,7 @@ class FileOperationService extends ChangeNotifier {
       items,
       format,
       passphrase,
+      encryptFilenames,
       deleteSourceAfter,
     );
     return op;
@@ -734,6 +736,7 @@ class FileOperationService extends ChangeNotifier {
     List<ClipboardItem> items,
     ArchiveFormatType format,
     String? passphrase,
+    bool encryptFilenames,
     bool deleteSourceAfter,
   ) async {
     op._setStatus(FileOperationStatus.running);
@@ -816,6 +819,7 @@ class FileOperationService extends ChangeNotifier {
             ? p.join(dest.uri, destVaultPath)
             : null,
         passphrase: passphrase,
+        encryptFilenames: encryptFilenames,
         opId: op.id,
       );
 

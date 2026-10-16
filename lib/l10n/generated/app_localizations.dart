@@ -3468,6 +3468,18 @@ abstract class AppLocalizations {
   /// **'Password protection is only available for ZIP and 7-Zip'**
   String get createArchivePasswordUnavailableForFormat;
 
+  /// Checkbox label in the create-archive dialog (7z only): also encrypt the file names inside the archive, not just their contents
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt file names'**
+  String get createArchiveEncryptFilenames;
+
+  /// Helper text under the encrypt-file-names checkbox: it needs a password, and the password is then needed even to list the contents
+  ///
+  /// In en, this message translates to:
+  /// **'Needs a password. The password is then required even to list the contents.'**
+  String get createArchiveEncryptFilenamesHint;
+
   /// Tooltip for closing the in-folder search bar
   ///
   /// In en, this message translates to:

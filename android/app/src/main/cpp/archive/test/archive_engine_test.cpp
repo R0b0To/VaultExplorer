@@ -14,6 +14,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -98,7 +99,8 @@ ArchiveStreamSource sourceOver(const std::vector<uint8_t>& bytes) {
 // Builds a 7-Zip archive through the engine's own archiveCreate() -- the code
 // path the app uses -- from name->content files, optionally password protected.
 std::vector<uint8_t> buildSevenZipViaEngine(const std::vector<std::pair<std::string, std::string>>& files,
-                                            const std::string& passphrase = "") {
+                                            const std::string& passphrase = "",
+                                            bool encryptFilenames = false) {
     std::vector<uint8_t> out;
     ArchiveSink sink;
     sink.write = [&out](const uint8_t* data, size_t length) -> int64_t {
@@ -118,7 +120,7 @@ std::vector<uint8_t> buildSevenZipViaEngine(const std::vector<std::pair<std::str
             return static_cast<int64_t>(n);
         };
     }
-    const auto result = archiveCreate(sink, ArchiveFormat::SevenZip, entries, passphrase);
+    const auto result = archiveCreate(sink, ArchiveFormat::SevenZip, entries, passphrase, encryptFilenames);
     assert(result.status == ArchiveOpenStatus::Ok);
     assert(result.entriesArchived == files.size());
     return out;
@@ -394,6 +396,118 @@ int main() {
             assert(32 + headerOffset + headerSize == b.size());
         }
         printf("7z create (plain + password): ok\n");
+    }
+
+    // --- 7-Zip with encrypted file names ("-mhe=on"). The header is then an
+    // encrypted folder of its own: not even the names may be listed without the
+    // password, and a wrong password must read as such, not as a damaged file. ---
+    {
+        const std::vector<std::pair<std::string, std::string>> files = {
+            {"zqx-secret-dir/zqx-plan.txt", std::string(70000, 'P')},
+            {"zqx-notes.txt", "short secret"},
+        };
+        auto endsAtStartHeader = [](const std::vector<uint8_t>& b) {
+            assert(b.size() > 32 && std::memcmp(b.data(), "7z\xBC\xAF\x27\x1C", 6) == 0);
+            uint64_t headerOffset = 0, headerSize = 0;
+            for (int i = 7; i >= 0; --i) {
+                headerOffset = (headerOffset << 8) | b[12 + i];
+                headerSize = (headerSize << 8) | b[20 + i];
+            }
+            return 32 + headerOffset + headerSize == b.size();
+        };
+
+        const auto he = buildSevenZipViaEngine(files, "hunter2", /*encryptFilenames=*/true);
+        assert(endsAtStartHeader(he));
+
+        // Nothing is listed without a password...
+        const auto noPass = archiveScanEntries(sourceOver(he));
+        assert(noPass.status == ArchiveOpenStatus::PassphraseRequired);
+        assert(noPass.entries.empty());
+        // ...a wrong one is reported as wrong...
+        const auto wrong = archiveScanEntries(sourceOver(he), "wrong password");
+        assert(wrong.status == ArchiveOpenStatus::WrongPassphrase);
+        assert(wrong.entries.empty());
+        // ...and the right one lists the names and gives back the data.
+        const auto unlocked = archiveScanEntries(sourceOver(he), "hunter2");
+        assert(unlocked.status == ArchiveOpenStatus::Ok);
+        int32_t planIndex = -1, notesIndex = -1;
+        for (const auto& e : unlocked.entries) {
+            if (e.path == "zqx-secret-dir/zqx-plan.txt") planIndex = e.index;
+            if (e.path == "zqx-notes.txt") notesIndex = e.index;
+        }
+        assert(planIndex >= 0 && notesIndex >= 0);
+        ArchiveOpenStatus st = ArchiveOpenStatus::IoError;
+        assert(extractText(he, "zqx-secret-dir/zqx-plan.txt", "hunter2", &st) == files[0].second &&
+               st == ArchiveOpenStatus::Ok);
+        assert(extractText(he, "zqx-notes.txt", "hunter2", &st) == files[1].second &&
+               st == ArchiveOpenStatus::Ok);
+        // A wrong password never yields data either.
+        assert(archiveExtractEntry(sourceOver(he), planIndex, "wrong password").status !=
+               ArchiveOpenStatus::Ok);
+
+        // Without the option the same call keeps the names readable (unchanged).
+        const auto namesVisible = buildSevenZipViaEngine(files, "hunter2", /*encryptFilenames=*/false);
+        assert(archiveScanEntries(sourceOver(namesVisible)).status == ArchiveOpenStatus::Ok);
+
+        // One entry is the case where 7-Zip normally skips encoding the header
+        // altogether; an encrypted header must be encoded regardless.
+        const auto single = buildSevenZipViaEngine({{"zqx-only.txt", "just one"}}, "hunter2", true);
+        assert(endsAtStartHeader(single));
+        assert(archiveScanEntries(sourceOver(single)).status == ArchiveOpenStatus::PassphraseRequired);
+        assert(archiveScanEntries(sourceOver(single), "nope").status == ArchiveOpenStatus::WrongPassphrase);
+        assert(extractText(single, "zqx-only.txt", "hunter2", &st) == "just one" &&
+               st == ArchiveOpenStatus::Ok);
+
+        // Only directories: there is no data stream, but the header still is
+        // encrypted.
+        {
+            std::vector<uint8_t> out;
+            ArchiveSink sink;
+            sink.write = [&out](const uint8_t* data, size_t length) -> int64_t {
+                out.insert(out.end(), data, data + length);
+                return static_cast<int64_t>(length);
+            };
+            std::vector<ArchiveSourceEntry> dirs(2);
+            dirs[0].pathInArchive = "zqx-dir/";
+            dirs[0].isDirectory = true;
+            dirs[1].pathInArchive = "zqx-dir/zqx-sub/";
+            dirs[1].isDirectory = true;
+            const auto r = archiveCreate(sink, ArchiveFormat::SevenZip, dirs, "hunter2", true);
+            assert(r.status == ArchiveOpenStatus::Ok);
+            assert(endsAtStartHeader(out));
+            assert(archiveScanEntries(sourceOver(out)).status == ArchiveOpenStatus::PassphraseRequired);
+            const auto ok = archiveScanEntries(sourceOver(out), "hunter2");
+            assert(ok.status == ArchiveOpenStatus::Ok && ok.entries.size() == 2);
+        }
+
+        // A request that can't be honoured fails; it is never downgraded to an
+        // archive whose names are readable.
+        {
+            std::vector<uint8_t> out;
+            ArchiveSink sink;
+            sink.write = [&out](const uint8_t* data, size_t length) -> int64_t {
+                out.insert(out.end(), data, data + length);
+                return static_cast<int64_t>(length);
+            };
+            std::vector<ArchiveSourceEntry> one(1);
+            one[0].pathInArchive = "x.txt";
+            const std::string body = "x";
+            size_t off = 0;
+            one[0].uncompressedSize = body.size();
+            one[0].readData = [&](uint8_t* dest, size_t length) -> int64_t {
+                const size_t n = std::min(length, body.size() - off);
+                std::memcpy(dest, body.data() + off, n);
+                off += n;
+                return static_cast<int64_t>(n);
+            };
+            const auto noPassphrase = archiveCreate(sink, ArchiveFormat::SevenZip, one, "", true);
+            assert(noPassphrase.status != ArchiveOpenStatus::Ok);
+            assert(out.empty());
+            const auto notSevenZip = archiveCreate(sink, ArchiveFormat::Zip, one, "hunter2", true);
+            assert(notSevenZip.status != ArchiveOpenStatus::Ok);
+            assert(out.empty());
+        }
+        printf("7z create (encrypted file names): ok\n");
     }
 
     // --- Reading password-protected 7-Zip archives made by the real 7-Zip. ---

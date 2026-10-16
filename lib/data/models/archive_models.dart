@@ -118,6 +118,10 @@ enum ArchiveFormatType {
   /// creating an archive in this format.
   bool get supportsPassword =>
       this == ArchiveFormatType.zip || this == ArchiveFormatType.sevenZip;
+
+  /// Whether, together with a password, the file names can be encrypted too
+  /// (the 7z header). ZIP can't: its file names are always stored in the clear.
+  bool get supportsFilenameEncryption => this == ArchiveFormatType.sevenZip;
 }
 
 /// Metadata describing a single entry inside an archive.

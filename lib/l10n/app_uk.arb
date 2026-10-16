@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "Не вдалося створити архів: {type}",
   "createArchivePasswordHint": "Необов'язковий пароль (AES-256)",
   "createArchivePasswordUnavailableForFormat": "Захист паролем доступний лише для ZIP та 7-Zip",
+  "createArchiveEncryptFilenames": "Шифрувати імена файлів",
+  "createArchiveEncryptFilenamesHint": "Потрібен пароль. Тоді пароль потрібен навіть для перегляду вмісту.",
   "closeSearchTooltip": "Закрити пошук",
   "searchInThisFolderTooltip": "Шукати в цій папці",
   "playMediaHereTooltip": "Відтворити медіа тут",

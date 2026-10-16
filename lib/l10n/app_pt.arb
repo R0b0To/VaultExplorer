@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "Falha ao compactar: {type}",
   "createArchivePasswordHint": "Senha opcional (AES-256)",
   "createArchivePasswordUnavailableForFormat": "A proteção por senha está disponível apenas para ZIP e 7-Zip",
+  "createArchiveEncryptFilenames": "Criptografar nomes de arquivo",
+  "createArchiveEncryptFilenamesHint": "Requer uma senha. A senha passará a ser necessária até para listar o conteúdo.",
   "closeSearchTooltip": "Fechar pesquisa",
   "searchInThisFolderTooltip": "Pesquisar nesta pasta",
   "playMediaHereTooltip": "Reproduzir mídia aqui",

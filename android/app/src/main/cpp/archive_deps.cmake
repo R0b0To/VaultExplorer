@@ -138,6 +138,13 @@ set(LIBMD_LIBRARY "" CACHE STRING "" FORCE)
 # 7-Zip's SHA-256 key derivation) to both. The script resets the fetched tree
 # before applying, so re-configuring is safe, and fails configure if the patch
 # stops applying (e.g. after a libarchive version bump).
+#
+# The patch file is declared a configure dependency: otherwise an incremental
+# build (Ninja, as used by Gradle) never notices an edited patch, keeps the
+# previously patched libarchive and links it against the newer engine code, so
+# features added in the patch fail at runtime with "Undefined option".
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch")
 FetchContent_Declare(
     libarchive_upstream
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git

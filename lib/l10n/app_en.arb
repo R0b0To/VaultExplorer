@@ -2797,6 +2797,14 @@
   "@createArchivePasswordUnavailableForFormat": {
     "description": "Helper text shown under the disabled password field when the selected archive format doesn't support encryption"
   },
+  "createArchiveEncryptFilenames": "Encrypt file names",
+  "@createArchiveEncryptFilenames": {
+    "description": "Checkbox label in the create-archive dialog (7z only): also encrypt the file names inside the archive, not just their contents"
+  },
+  "createArchiveEncryptFilenamesHint": "Needs a password. The password is then required even to list the contents.",
+  "@createArchiveEncryptFilenamesHint": {
+    "description": "Helper text under the encrypt-file-names checkbox: it needs a password, and the password is then needed even to list the contents"
+  },
   "closeSearchTooltip": "Close search",
   "@closeSearchTooltip": {
     "description": "Tooltip for closing the in-folder search bar"

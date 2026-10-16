@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "Archiviazione non riuscita: {type}",
   "createArchivePasswordHint": "Password opzionale (AES-256)",
   "createArchivePasswordUnavailableForFormat": "La protezione con password è disponibile solo per ZIP e 7-Zip",
+  "createArchiveEncryptFilenames": "Cifra i nomi dei file",
+  "createArchiveEncryptFilenamesHint": "Richiede una password. La password sarà necessaria anche solo per vedere il contenuto.",
   "closeSearchTooltip": "Chiudi ricerca",
   "searchInThisFolderTooltip": "Cerca in questa cartella",
   "playMediaHereTooltip": "Riproduci contenuti multimediali qui",

@@ -2025,6 +2025,13 @@ class AppLocalizationsJa extends AppLocalizations {
       'パスワード保護はZIPおよび7-Zipでのみ利用できます';
 
   @override
+  String get createArchiveEncryptFilenames => 'ファイル名を暗号化';
+
+  @override
+  String get createArchiveEncryptFilenamesHint =>
+      'パスワードが必要です。内容を一覧表示するだけでもパスワードが必要になります。';
+
+  @override
   String get closeSearchTooltip => '検索を閉じる';
 
   @override

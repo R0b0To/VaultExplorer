@@ -41,8 +41,10 @@ A third, independent native subsystem — the **archive engine**
 `archive/patches/libarchive-7zip-encryption.patch`: upstream's 7-Zip writer
 ignores a passphrase and writes an unprotected archive, and its reader refuses
 encrypted streams, so the patch adds 7zAES — AES-256-CBC, key derived like
-7-Zip's — to both creation and reading, including encrypted headers and
-AES+codec+filter chains. `archive/test/archive_engine_test.cpp` fails if the
+7-Zip's — to both creation and reading. Creation can optionally encrypt the
+archive header too (`7zip:header-encryption=1`, 7-Zip's "encrypt file names",
+which the archive dialog offers for 7z with a password); reading handles
+encrypted headers and AES+codec+filter chains. `archive/test/archive_engine_test.cpp` fails if the
 patch is missing.) Its only point of contact with "how do I
 get bytes for this archive" is `ArchiveStreamSource`, a small pread-style
 struct (`read(offset, dest, length)` + `size()`) with no JNI/Dart type in

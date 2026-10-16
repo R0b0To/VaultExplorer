@@ -112,5 +112,9 @@ ArchiveCreateResult archiveCreate(
     ArchiveFormat format,
     const std::vector<ArchiveSourceEntry>& entries,
     const std::string& passphrase = "",
+    // 7z only: also encrypt the archive header, so file names, sizes and times
+    // are hidden as well (7-Zip's "Encrypt file names"). Needs a passphrase;
+    // the request fails, rather than being ignored, when it can't be honoured.
+    bool encryptFilenames = false,
     std::function<bool(uint64_t bytesWrittenSoFar)> progressCallback = nullptr
 );

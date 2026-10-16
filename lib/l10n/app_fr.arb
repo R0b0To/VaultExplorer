@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "Échec de l'archivage : {type}",
   "createArchivePasswordHint": "Mot de passe facultatif (AES-256)",
   "createArchivePasswordUnavailableForFormat": "La protection par mot de passe est uniquement disponible pour ZIP et 7-Zip",
+  "createArchiveEncryptFilenames": "Chiffrer les noms de fichiers",
+  "createArchiveEncryptFilenamesHint": "Nécessite un mot de passe. Il sera alors requis même pour afficher le contenu.",
   "closeSearchTooltip": "Fermer la recherche",
   "searchInThisFolderTooltip": "Rechercher dans ce dossier",
   "playMediaHereTooltip": "Lire les médias ici",

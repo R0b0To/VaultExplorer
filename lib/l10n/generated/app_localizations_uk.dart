@@ -2167,6 +2167,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Захист паролем доступний лише для ZIP та 7-Zip';
 
   @override
+  String get createArchiveEncryptFilenames => 'Шифрувати імена файлів';
+
+  @override
+  String get createArchiveEncryptFilenamesHint =>
+      'Потрібен пароль. Тоді пароль потрібен навіть для перегляду вмісту.';
+
+  @override
   String get closeSearchTooltip => 'Закрити пошук';
 
   @override

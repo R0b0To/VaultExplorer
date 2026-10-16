@@ -1996,6 +1996,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '密码保护仅适用于 ZIP 和 7-Zip 格式';
 
   @override
+  String get createArchiveEncryptFilenames => '加密文件名';
+
+  @override
+  String get createArchiveEncryptFilenamesHint => '需要设置密码。之后即使只是查看内容也需要输入密码。';
+
+  @override
   String get closeSearchTooltip => '关闭搜索';
 
   @override

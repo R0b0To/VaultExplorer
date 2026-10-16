@@ -243,6 +243,11 @@ class VaultArchiveApi {
   }
 
   /// Creates/compresses an archive with optional AES-256 encryption.
+  ///
+  /// [encryptFilenames] (7z with a passphrase only) also encrypts the archive
+  /// header, so file names, sizes and dates can't be read without the
+  /// passphrase. A request that can't be honoured makes the call fail rather
+  /// than produce an archive whose names are readable.
   Future<bool> createArchive({
     required ArchiveFormatType format,
     required List<String> srcPaths,
@@ -253,6 +258,7 @@ class VaultArchiveApi {
     String? destVaultPath,
     String? destFilePath,
     String? passphrase,
+    bool encryptFilenames = false,
     int? opId,
   }) async {
     try {
@@ -269,6 +275,7 @@ class VaultArchiveApi {
           'destFilePath': ?destFilePath,
           if (passphrase != null && passphrase.isNotEmpty)
             'passphrase': passphrase,
+          if (encryptFilenames) 'encryptFilenames': true,
           'opId': ?opId,
         },
       );

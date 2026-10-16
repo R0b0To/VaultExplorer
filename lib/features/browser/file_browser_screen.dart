@@ -2674,6 +2674,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         items: List.of(clip.items),
         format: clip.archiveFormat ?? ArchiveFormatType.zip,
         passphrase: clip.passphrase,
+        encryptFilenames: clip.encryptFilenames,
         deleteSourceAfter: options.deleteSourceAfter,
         l10n: context.l10n,
       );
@@ -2907,7 +2908,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       existingEntries: existingEntries,
       suggestedName: suggestedName,
       readOnly: _isReadOnly,
-      onCreate: (destPath, format, passphrase) async {
+      onCreate: (destPath, format, passphrase, encryptFilenames) async {
         final clipItems = entries.map((e) {
           final path = _fullPathOf(e);
           return ClipboardItem(
@@ -2926,6 +2927,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           archiveName: archiveName,
           format: format,
           passphrase: passphrase,
+          encryptFilenames: encryptFilenames,
         );
         _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },

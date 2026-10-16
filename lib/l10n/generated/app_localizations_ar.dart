@@ -2186,6 +2186,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'الحماية بكلمة مرور متاحة فقط لتنسيقات ZIP و 7-Zip';
 
   @override
+  String get createArchiveEncryptFilenames => 'تشفير أسماء الملفات';
+
+  @override
+  String get createArchiveEncryptFilenamesHint =>
+      'يتطلب كلمة مرور. ستكون كلمة المرور مطلوبة حتى لعرض محتويات الأرشيف.';
+
+  @override
   String get closeSearchTooltip => 'إغلاق البحث';
 
   @override

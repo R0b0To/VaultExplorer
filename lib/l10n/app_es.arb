@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "Error al comprimir: {type}",
   "createArchivePasswordHint": "Contraseña opcional (AES-256)",
   "createArchivePasswordUnavailableForFormat": "La protección con contraseña solo está disponible para ZIP y 7-Zip",
+  "createArchiveEncryptFilenames": "Cifrar nombres de archivo",
+  "createArchiveEncryptFilenamesHint": "Requiere una contraseña. La contraseña será necesaria incluso para ver el contenido.",
   "closeSearchTooltip": "Cerrar búsqueda",
   "searchInThisFolderTooltip": "Buscar en esta carpeta",
   "playMediaHereTooltip": "Reproducir medios aquí",

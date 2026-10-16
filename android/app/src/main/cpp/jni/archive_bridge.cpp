@@ -687,7 +687,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
-        jint destFd, jint format, jstring passphrase, jint opId) {
+        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames, jint opId) {
     JNI_TRY
     if (destFd < 0 || !vaultPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToFd")) {
@@ -763,7 +763,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
     };
 
     ArchiveCreateResult res = archiveCreate(
-        sink, static_cast<ArchiveFormat>(format), entries, passStr, progressCb
+        sink, static_cast<ArchiveFormat>(format), entries, passStr,
+        encryptFilenames == JNI_TRUE, progressCb
     );
 
     {
@@ -774,6 +775,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
     }
 
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
+    logArchiveFailure("create-vault-to-fd", res.status, res.errorMessage);
     return (res.status == ArchiveOpenStatus::Ok) ? JNI_TRUE : JNI_FALSE;
     JNI_CATCH_RETURN(JNI_FALSE)
 }
@@ -783,7 +785,8 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
-        jint destVolId, jstring destVaultPath, jint format, jstring passphrase, jint opId) {
+        jint destVolId, jstring destVaultPath, jint format, jstring passphrase,
+        jboolean encryptFilenames, jint opId) {
     JNI_TRY
     if (!vaultPaths || !entryNames || !modifiedSecs || !destVaultPath) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToVault (src)") ||
@@ -868,7 +871,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
     };
 
     ArchiveCreateResult res = archiveCreate(
-        sink, static_cast<ArchiveFormat>(format), entries, passStr, progressCb
+        sink, static_cast<ArchiveFormat>(format), entries, passStr,
+        encryptFilenames == JNI_TRUE, progressCb
     );
 
     {
@@ -880,6 +884,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
 
     env->ReleaseStringUTFChars(destVaultPath, nativeDestPath);
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
+    logArchiveFailure("create-vault-to-vault", res.status, res.errorMessage);
     return (res.status == ArchiveOpenStatus::Ok) ? JNI_TRUE : JNI_FALSE;
     JNI_CATCH_RETURN(JNI_FALSE)
 }
@@ -889,7 +894,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
         JNIEnv* env, jobject,
         jobjectArray localPaths, jobjectArray entryNames, jlongArray modifiedSecs,
-        jint destFd, jint format, jstring passphrase, jint opId) {
+        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames, jint opId) {
     JNI_TRY
     if (destFd < 0 || !localPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
 
@@ -961,7 +966,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
     };
 
     ArchiveCreateResult res = archiveCreate(
-        sink, static_cast<ArchiveFormat>(format), entries, passStr, progressCb
+        sink, static_cast<ArchiveFormat>(format), entries, passStr,
+        encryptFilenames == JNI_TRUE, progressCb
     );
 
     for (int sfd : openFds) {
@@ -969,6 +975,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
     }
 
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
+    logArchiveFailure("create-local-to-fd", res.status, res.errorMessage);
     return (res.status == ArchiveOpenStatus::Ok) ? JNI_TRUE : JNI_FALSE;
     JNI_CATCH_RETURN(JNI_FALSE)
 }

@@ -2026,6 +2026,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '비밀번호 보호는 ZIP 및 7-Zip 형식에서만 사용할 수 있습니다';
 
   @override
+  String get createArchiveEncryptFilenames => '파일 이름 암호화';
+
+  @override
+  String get createArchiveEncryptFilenamesHint =>
+      '비밀번호가 필요합니다. 내용을 보는 데에도 비밀번호가 필요해집니다.';
+
+  @override
   String get closeSearchTooltip => '검색 닫기';
 
   @override

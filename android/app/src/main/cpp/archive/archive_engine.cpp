@@ -526,7 +526,8 @@ la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buff
 int openSinkCallback(struct archive*, void*) { return ARCHIVE_OK; }
 int closeSinkCallback(struct archive*, void*) { return ARCHIVE_OK; }
 
-int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std::string& passphrase) {
+int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std::string& passphrase,
+                               bool encryptFilenames) {
     switch (format) {
         case ArchiveFormat::Zip:
             if (archive_write_set_format_zip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
@@ -546,6 +547,13 @@ int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std
                 // archive_deps.cmake) adds 7zAES (AES-256, SHA-256 key derivation),
                 // and archive_engine_test.cpp fails if it is ever missing.
                 if (archive_write_set_passphrase(a, passphrase.c_str()) != ARCHIVE_OK) return ARCHIVE_FATAL;
+                // Also encrypt the 7z header (file names, sizes, times). The
+                // option comes from the same patch; an unpatched libarchive
+                // rejects it here instead of writing readable names.
+                if (encryptFilenames &&
+                    archive_write_set_options(a, "7zip:header-encryption=1") != ARCHIVE_OK) {
+                    return ARCHIVE_FATAL;
+                }
             }
             break;
         case ArchiveFormat::Tar:
@@ -590,9 +598,19 @@ ArchiveCreateResult archiveCreate(
     ArchiveFormat format,
     const std::vector<ArchiveSourceEntry>& entries,
     const std::string& passphrase,
+    bool encryptFilenames,
     std::function<bool(uint64_t bytesWrittenSoFar)> progressCallback
 ) {
     ArchiveCreateResult result;
+    if (encryptFilenames && (format != ArchiveFormat::SevenZip || passphrase.empty())) {
+        // Never fall back to an archive whose names are readable when the
+        // caller asked for them to be hidden.
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = format != ArchiveFormat::SevenZip
+            ? "filename encryption is only supported for 7z archives"
+            : "filename encryption needs a passphrase";
+        return result;
+    }
     WriteState state;
     state.sink = &sink;
     state.progressCb = std::move(progressCallback);
@@ -604,7 +622,7 @@ ArchiveCreateResult archiveCreate(
         return result;
     }
 
-    if (configureFormatAndFilters(a, format, passphrase) != ARCHIVE_OK) {
+    if (configureFormatAndFilters(a, format, passphrase, encryptFilenames) != ARCHIVE_OK) {
         result.status = ArchiveOpenStatus::UnsupportedFormat;
         result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "unsupported format or filter";
         archive_write_free(a);

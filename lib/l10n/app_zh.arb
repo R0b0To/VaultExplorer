@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "压缩失败：{type}",
   "createArchivePasswordHint": "可选密码（AES-256）",
   "createArchivePasswordUnavailableForFormat": "密码保护仅适用于 ZIP 和 7-Zip 格式",
+  "createArchiveEncryptFilenames": "加密文件名",
+  "createArchiveEncryptFilenamesHint": "需要设置密码。之后即使只是查看内容也需要输入密码。",
   "closeSearchTooltip": "关闭搜索",
   "searchInThisFolderTooltip": "在此文件夹中搜索",
   "playMediaHereTooltip": "在此播放媒体",

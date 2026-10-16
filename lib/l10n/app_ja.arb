@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "圧縮に失敗しました: {type}",
   "createArchivePasswordHint": "任意のパスワード（AES-256）",
   "createArchivePasswordUnavailableForFormat": "パスワード保護はZIPおよび7-Zipでのみ利用できます",
+  "createArchiveEncryptFilenames": "ファイル名を暗号化",
+  "createArchiveEncryptFilenamesHint": "パスワードが必要です。内容を一覧表示するだけでもパスワードが必要になります。",
   "closeSearchTooltip": "検索を閉じる",
   "searchInThisFolderTooltip": "このフォルダ内を検索",
   "playMediaHereTooltip": "ここでメディアを再生",

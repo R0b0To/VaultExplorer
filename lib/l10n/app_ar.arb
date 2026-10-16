@@ -557,6 +557,8 @@
   "failedToArchiveGeneric": "فشل إنشاء الأرشيف: {type}",
   "createArchivePasswordHint": "كلمة مرور اختيارية (AES-256)",
   "createArchivePasswordUnavailableForFormat": "الحماية بكلمة مرور متاحة فقط لتنسيقات ZIP و 7-Zip",
+  "createArchiveEncryptFilenames": "تشفير أسماء الملفات",
+  "createArchiveEncryptFilenamesHint": "يتطلب كلمة مرور. ستكون كلمة المرور مطلوبة حتى لعرض محتويات الأرشيف.",
   "closeSearchTooltip": "إغلاق البحث",
   "searchInThisFolderTooltip": "البحث في هذا المجلد",
   "playMediaHereTooltip": "تشغيل الوسائط هنا",

@@ -1,0 +1,7 @@
+• Document scanner in camera (photos / multi-page PDF)
+• Case-sensitive file naming & safe conflict handling
+• 7z file name encryption & custom vault entropy
+• Audio quality picker, low-bitrate export & automation
+• Auto thumbnail sizing & customizable grid styles
+• Redesigned drawer header with overflow menu
+• Fixes for text editor scrolling & audio discard timer

@@ -1,0 +1,41 @@
+# What's New
+
+### Camera & Document Scanning
+* **Document Scanner:** Added a new document scanning tool in the camera. Scanned documents can be saved as individual images or combined into multi-page PDF files.
+
+### Filesystem & Naming Rules
+* **Relaxed Naming Constraints:** Relaxed file and folder naming restrictions where the underlying filesystem permits.
+* **Filesystem Detection:** Automatic detection of container filesystem types (`FAT`, `exFAT`, `NTFS`, `ext`).
+* **Case-Sensitivity Support:**
+  * `ext` containers can now store files differing only by capitalization (e.g., `Notes` vs. `notes`).
+  * Cryptomator, gocryptfs, and CryFS vaults now support case-sensitive paste and import operations.
+* **Collision Safety:** Copy, move, import, export, and archive extraction actions will no longer overwrite files differing only by letter case on case-insensitive filesystems (FAT, NTFS, device storage); collisions are safely renamed as `"name (1)"`.
+* **Fix:** Resolved an issue where deleting one of two case-variant files unintentionally hid the other.
+
+### Vaults & Security
+* **7-Zip Filename Encryption:** Enabled an option to encrypt file names when creating password-protected 7z archives.
+* **Custom Entropy:** Added an option to provide user-generated entropy during vault creation.
+
+### Audio & Media
+* **Configurable Recording Quality:** Users can now select the recording quality profile for audio items.
+* **Lower-Bitrate Export:** Added lower-bitrate export options directly within the audio editor.
+* **Recording Automation:** Added triggerable audio recording actions in automation.
+
+### Automation
+* **Permissions Summary:** Added a more transparent and detailed summary of granted permissions on the automation settings page.
+
+### UI / UX & Layout
+* **Smart "Auto" Thumbnail Mode:** Dynamically scales grid and masonry thumbnails to match cell bounds. *(Calculation: `cell width × device pixel ratio × 4/3`, rounded up to multiples of 64, capped at 1536px).*
+* **Manual Thumbnail Size:** Increased maximum allowed manual thumbnail size limit.
+* **Grid & Masonry Customization:** New setting in File Manager settings to style views with squared corners, rounded corners, or custom spacing.
+* **Layout Zoom Reset:** Added an option (enabled by default) to reset the grid/list zoom level when switching view layouts.
+* **Redesigned Drawer "Lock All" Action:**
+  * Replaced the inline lock icon in the Vaults drawer header with a clean 3-dot (`⋮`) overflow menu.
+  * **Prevents Accidental Lockouts:** Eliminates accidental triggers while dragging or scrolling the drawer.
+  * **i18n Friendly:** Fully accommodates longer translated labels (e.g., German, French, Spanish) without text clipping or awkward wraps.
+* **Decluttered Drawer Footer:** Removed the redundant *File Manager Settings* link at the bottom of the drawer to streamline navigation (*Tools → Settings*).
+* General UI/UX refinements across several screens.
+
+### Bug Fixes
+* **Text Editor:** Resolved scrolling anomalies and jitter occurring when text wrap is enabled.
+* **Audio Recorder:** Fixed state leak where the recording timer failed to zero out after discarding a recording.

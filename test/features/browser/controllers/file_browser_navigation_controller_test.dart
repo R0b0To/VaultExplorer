@@ -422,17 +422,26 @@ void main() {
         expect(container.read(fileBrowserNavigationProvider(1)).isContainerLocked, isTrue);
       });
 
-      test('removeItemsByName drops matching entries case-insensitively', () async {
+      test('removeItemsByName drops matching entries case-sensitively', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         dirListingResponse = ['F|1|1|Keep.txt', 'F|1|1|Delete.txt'];
         await notifier.loadDirectoryContents(_testContainer(1), '');
 
+        // Mismatched case should not remove 'Delete.txt'
         notifier.removeItemsByName({'delete.txt'});
+        expect(
+          container.read(fileBrowserNavigationProvider(1)).currentItems.map((e) => e.name),
+          ['Keep.txt', 'Delete.txt'],
+        );
 
-        final names = container.read(fileBrowserNavigationProvider(1)).currentItems.map((e) => e.name);
-        expect(names, ['Keep.txt']);
+        // Exact match removes 'Delete.txt'
+        notifier.removeItemsByName({'Delete.txt'});
+        expect(
+          container.read(fileBrowserNavigationProvider(1)).currentItems.map((e) => e.name),
+          ['Keep.txt'],
+        );
 
         subscription.close();
       });

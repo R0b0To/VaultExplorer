@@ -4,9 +4,9 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 ///
 /// Applies wherever a name is rendered on a single line across the file
 /// manager -- list rows (`FileRowShell`) and grid/masonry captions
-/// (`GridCardShell`) alike -- via `FileNameLabel`. Names are never allowed
-/// to wrap onto a second line; this only controls *how* the overflow is
-/// hidden.
+/// (`GridCardShell`) alike -- and to vault names on the dashboard cards and
+/// in the side drawer, via `FileNameLabel`. Names are never allowed to wrap
+/// onto a second line; this only controls *how* the overflow is hidden.
 enum LongFileNameDisplayMode {
   /// Hide the start of the name, keeping the end (and file extension)
   /// visible: "…report_final_v3.docx".

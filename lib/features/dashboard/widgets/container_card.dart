@@ -15,7 +15,9 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/auto_lock_indicator.dart';
+import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 
 const _kLogTag = 'ContainerCard';
 
@@ -25,7 +27,7 @@ const _kLogTag = 'ContainerCard';
 /// Public (rather than file-private) specifically so that pinned card can
 /// reuse the exact same icon/title/subtitle layout without duplicating it,
 /// while still supplying its own icon, tint, and (lack of) trailing action.
-class BaseContainerCard extends StatelessWidget {
+class BaseContainerCard extends ConsumerWidget {
   final VoidCallback onTap;
   final Widget icon;
   final Color iconBackgroundColor;
@@ -54,10 +56,11 @@ class BaseContainerCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final effectiveRadius = borderRadius ?? BorderRadius.circular(18);
+    final nameMode = ref.watch(longFileNameDisplayModeProvider);
 
     return Card(
       elevation: 0,
@@ -98,15 +101,14 @@ class BaseContainerCard extends StatelessWidget {
                         Expanded(
                           child:
                               titleContent ??
-                              Text(
-                                title,
+                              FileNameLabel(
+                                text: title,
+                                mode: nameMode,
                                 style: textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: -0.1,
                                   height: 1.2,
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
                               ),
                         ),
                         if (titleTrailing != null) ...[

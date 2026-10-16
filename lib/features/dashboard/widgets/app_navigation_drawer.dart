@@ -15,10 +15,12 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
+import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
 class AppNavigationDrawer extends ConsumerWidget {
@@ -677,7 +679,7 @@ Future<void> _lockSingleVault(BuildContext context, WidgetRef ref, MountedContai
   }
 }
 
-class _DrawerVaultRow extends StatelessWidget {
+class _DrawerVaultRow extends ConsumerWidget {
   final VaultListItem item;
   final bool isCurrent;
   final VoidCallback onTap;
@@ -750,9 +752,10 @@ class _DrawerVaultRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final nameMode = ref.watch(longFileNameDisplayModeProvider);
     final isMounted = item.isMounted;
     final isUsb = item.uri.startsWith('usb:');
     final format = switch (item) {
@@ -793,14 +796,13 @@ class _DrawerVaultRow extends StatelessWidget {
                       color: isMounted ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.6),
                     ),
             ),
-            title: Text(
-              item.name,
+            title: FileNameLabel(
+              text: item.name,
+              mode: nameMode,
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: isCurrent ? FontWeight.bold : (isMounted ? FontWeight.w600 : FontWeight.normal),
                 color: isMounted ? cs.onSurface : cs.onSurfaceVariant,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             trailing: onLock != null
                 ? IconButton(

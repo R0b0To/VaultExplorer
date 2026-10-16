@@ -1117,18 +1117,19 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
       _updateDisplayRenderParagraphs();
       return;
     }
-    final double totalHeight;
-    if (_horizontalViewport == null && _displayParagraphs.isNotEmpty) {
-      final double renderedHeight = _displayParagraphs.last.bottom - _displayParagraphs.first.top;
-      final int renderedCount = _displayParagraphs.length;
-      final double avgLineHeight = renderedCount > 0
-          ? max(_preferredLineHeight, renderedHeight / renderedCount)
-          : _preferredLineHeight;
-      final int remainingLines = max(0, _codes.length - (_displayParagraphs.last.index + 1));
-      totalHeight = _displayParagraphs.last.bottom + remainingLines * avgLineHeight + paddingBottom;
-    } else {
-      totalHeight = _displayParagraphs.last.bottom + (_codes.length - (_displayParagraphs.last.index + 1)) * _preferredLineHeight + paddingBottom;
-    }
+    // Lines outside the rendered window count as one preferred line height
+    // each, wrapped or not. That is the scale the scroll offset itself lives
+    // in: the window below is always placed at `startIndex * lineHeight`, and
+    // the offset is corrected by the extra height of every wrapped line that
+    // scrolls past (see the branches above). The total must use the same
+    // scale. Estimating the remaining lines from the average height of the
+    // few lines currently on screen did not: the average swings from one
+    // screenful to the next and is multiplied by every remaining line, so on a
+    // large file the extent (and with it the scroll handle) leapt around and
+    // collapsed to the real value when the end came into view.
+    final double totalHeight = _displayParagraphs.last.bottom +
+        max(0, _codes.length - (_displayParagraphs.last.index + 1)) * _preferredLineHeight +
+        paddingBottom;
     _verticalViewportSize = max(0, totalHeight - size.height);
     if (_verticalViewport.pixels > _verticalViewportSize!) {
       _verticalViewport.correctBy(_verticalViewportSize! - _verticalViewport.pixels);

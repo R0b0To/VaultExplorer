@@ -1008,6 +1008,25 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     _loadFileForTab(newTab);
   }
 
+  /// The tab strip's "+": creates a new file next to the file being edited
+  /// and opens it in a new tab.
+  Future<void> _createNewFileFromTabBar() async {
+    var parentDir = _projectDirPath;
+    if (_tabs.isNotEmpty) {
+      final activePath = _activeTab.filePath;
+      final slash = activePath.lastIndexOf('/');
+      parentDir = slash >= 0 ? activePath.substring(0, slash) : '';
+    }
+    final newFilePath = await _promptAndCreateEmptyFile(
+      context: context,
+      ref: ref,
+      container: widget.container,
+      parentDir: parentDir,
+    );
+    if (newFilePath == null || !mounted) return;
+    _openFileInTab(newFilePath);
+  }
+
   void _scrollToActiveTab() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _activeTabIndex < 0 || _activeTabIndex >= _tabs.length) {
@@ -2624,7 +2643,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
             icon: const Icon(Icons.add_rounded, size: 20),
             visualDensity: VisualDensity.compact,
             tooltip: context.l10n.textEditorNewFileTooltip,
-            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            onPressed: _createNewFileFromTabBar,
           ),
           const SizedBox(width: 4),
         ],
@@ -3675,6 +3694,104 @@ class _MoveToFolderDialogState extends ConsumerState<_MoveToFolderDialog> {
   }
 }
 
+/// Asks for a file name and creates an empty file with it in [parentDir].
+///
+/// Returns the new file's path, or null if the dialog was cancelled, the name
+/// is already taken, or creation failed (the latter two show an error
+/// snackbar).
+Future<String?> _promptAndCreateEmptyFile({
+  required BuildContext context,
+  required WidgetRef ref,
+  required MountedContainer container,
+  required String parentDir,
+}) async {
+  final controller = TextEditingController.fromValue(
+    const TextEditingValue(
+      text: 'untitled.txt',
+      selection: TextSelection(baseOffset: 0, extentOffset: 8),
+    ),
+  );
+  final formKey = GlobalKey<FormState>();
+
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(ctx.l10n.textEditorNewFileTooltip),
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: ctx.l10n.textEditorSaveAsFileNameLabel,
+          ),
+          validator: (val) {
+            final text = val?.trim() ?? '';
+            if (text.isEmpty) return ctx.l10n.validationEmptyName;
+            if (text.contains('/') || text.contains('\\')) {
+              return ctx.l10n.validationIllegalChar('/', 0, 'vault');
+            }
+            return null;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(ctx.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (formKey.currentState?.validate() ?? false) {
+              Navigator.of(ctx).pop(controller.text.trim());
+            }
+          },
+          child: Text(ctx.l10n.done),
+        ),
+      ],
+    ),
+  );
+
+  if (result == null || !context.mounted) return null;
+  final newFilePath = parentDir.isEmpty ? result : '$parentDir/$result';
+
+  final rawList = await ref
+      .read(vaultFileIoApiProvider)
+      .listDirectory(container, parentDir);
+  final caseSensitive = FilesystemRules.of(
+    resolveFilesystemType(container),
+  ).caseSensitive;
+  String foldName(String n) => caseSensitive ? n : n.toLowerCase();
+  final existingNames = RawEntry.parseAll(
+    rawList ?? const [],
+  ).map((e) => foldName(e.name)).toSet();
+
+  if (existingNames.contains(foldName(result))) {
+    if (context.mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.textEditorFileAlreadyExistsError,
+        tone: AppBannerTone.error,
+      );
+    }
+    return null;
+  }
+
+  final ok = await ref
+      .read(vaultFileIoApiProvider)
+      .createEmptyFile(container, newFilePath);
+  if (ok) return newFilePath;
+
+  if (context.mounted) {
+    showAppSnackBar(
+      context,
+      message: context.l10n.saveFailedWithError(''),
+      tone: AppBannerTone.error,
+    );
+  }
+  return null;
+}
+
 class _ProjectDrawer extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String initialDirPath;
@@ -4126,91 +4243,15 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
   }
 
   Future<void> _createNewFileTab() async {
-    final parentDir = _projectDirPath;
-    final controller = TextEditingController.fromValue(
-      const TextEditingValue(
-        text: 'untitled.txt',
-        selection: TextSelection(baseOffset: 0, extentOffset: 8),
-      ),
-    );
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<String>(
+    final newFilePath = await _promptAndCreateEmptyFile(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.textEditorNewFileTooltip),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: ctx.l10n.textEditorSaveAsFileNameLabel,
-            ),
-            validator: (val) {
-              final text = val?.trim() ?? '';
-              if (text.isEmpty) return ctx.l10n.validationEmptyName;
-              if (text.contains('/') || text.contains('\\')) {
-                return ctx.l10n.validationIllegalChar('/', 0, 'vault');
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.of(ctx).pop(controller.text.trim());
-              }
-            },
-            child: Text(ctx.l10n.done),
-          ),
-        ],
-      ),
+      ref: ref,
+      container: widget.container,
+      parentDir: _projectDirPath,
     );
-
-    if (result == null || !mounted) return;
-    final newFilePath = parentDir.isEmpty ? result : '$parentDir/$result';
-
-    final rawList = await ref
-        .read(vaultFileIoApiProvider)
-        .listDirectory(widget.container, parentDir);
-    final caseSensitive = FilesystemRules.of(
-      resolveFilesystemType(widget.container),
-    ).caseSensitive;
-    String foldName(String n) => caseSensitive ? n : n.toLowerCase();
-    final existingNames = RawEntry.parseAll(
-      rawList ?? const [],
-    ).map((e) => foldName(e.name)).toSet();
-
-    if (existingNames.contains(foldName(result)) && mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.textEditorFileAlreadyExistsError,
-        tone: AppBannerTone.error,
-      );
-      return;
-    }
-
-    final ok = await ref
-        .read(vaultFileIoApiProvider)
-        .createEmptyFile(widget.container, newFilePath);
-
-    if (ok && mounted) {
-      setState(() => _loadDirectory(refresh: true));
-      widget.onOpenFile(newFilePath);
-    } else if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.saveFailedWithError(''),
-        tone: AppBannerTone.error,
-      );
-    }
+    if (newFilePath == null || !mounted) return;
+    setState(() => _loadDirectory(refresh: true));
+    widget.onOpenFile(newFilePath);
   }
 
   Future<void> _createDrawerFolder() async {

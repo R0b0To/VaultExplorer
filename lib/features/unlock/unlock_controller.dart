@@ -934,6 +934,7 @@ class UnlockController extends _$UnlockController {
         documentProvider: existing.documentProvider,
         documentProviderFolders: existing.documentProviderFolders,
         thumbnailCacheMode: existing.thumbnailCacheMode,
+        thumbnailQuality: existing.thumbnailQuality,
         cacheDerivedKey: existing.cacheDerivedKey,
         pendingPassword: savedPassword,
         pendingPatternHash: savedPatternHash,

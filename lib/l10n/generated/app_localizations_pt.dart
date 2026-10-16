@@ -11899,4 +11899,53 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Restaurar o zoom da lista e o número de colunas da grade e do mosaico para os valores padrão ao alternar o layout';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Segue os padrões de miniaturas nas configurações do app, então as alterações feitas lá também valem para este cofre.';
+
+  @override
+  String get resetVaultThumbnailsTitle =>
+      'Redefinir todos os cofres para o padrão';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Faz todos os cofres seguirem os padrões de miniaturas acima, inclusive os cofres com configurações próprias.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count cofres têm configurações de miniaturas próprias. Fazê-los seguir o padrão?',
+      one:
+          '1 cofre tem configurações de miniaturas próprias. Fazê-lo seguir o padrão?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cofres agora seguem o padrão',
+      one: '1 cofre agora segue o padrão',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count cofres seguem este padrão e passarão a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.',
+      one:
+          '1 cofre segue este padrão e passará a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.',
+    );
+    return '$_temp0';
+  }
 }

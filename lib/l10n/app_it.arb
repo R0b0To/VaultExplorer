@@ -3286,5 +3286,11 @@
   "gridSpacingNone": "Nessuno",
   "gridSpacingValue": "{value} dp",
   "resetSizeOnLayoutChangeLabel": "Reimposta dimensione al cambio di layout",
-  "resetSizeOnLayoutChangeDesc": "Ripristina lo zoom dell'elenco e il numero di colonne di griglia e mosaico ai valori predefiniti quando cambi layout"
+  "resetSizeOnLayoutChangeDesc": "Ripristina lo zoom dell'elenco e il numero di colonne di griglia e mosaico ai valori predefiniti quando cambi layout",
+  "thumbnailUseGlobalDefaultDesc": "Segue le impostazioni predefinite delle miniature nelle impostazioni dell’app, quindi le modifiche lì valgono anche per questo vault.",
+  "resetVaultThumbnailsTitle": "Ripristina tutti i vault all’impostazione predefinita",
+  "resetVaultThumbnailsSubtitle": "Fa seguire a ogni vault le impostazioni predefinite delle miniature qui sopra, inclusi i vault con impostazioni proprie.",
+  "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 vault ha impostazioni delle miniature proprie. Farlo seguire l’impostazione predefinita?} other{{count} vault hanno impostazioni delle miniature proprie. Farli seguire l’impostazione predefinita?}}",
+  "resetVaultThumbnailsDone": "{count, plural, =1{1 vault ora segue l’impostazione predefinita} other{{count} vault ora seguono l’impostazione predefinita}}",
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 vault segue questa impostazione predefinita e inizierà a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.} other{{count} vault seguono questa impostazione predefinita e inizieranno a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.}}"
 }

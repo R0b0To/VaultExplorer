@@ -11723,4 +11723,52 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Return the list zoom and grid/masonry column count to their defaults whenever you switch layouts';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Follows the thumbnail defaults in App settings, so changes there reach this vault too.';
+
+  @override
+  String get resetVaultThumbnailsTitle => 'Reset all vaults to the default';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Makes every vault follow the thumbnail defaults above, including vaults with their own settings.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count vaults have their own thumbnail settings. Make them follow the default instead?',
+      one:
+          '1 vault has its own thumbnail settings. Make it follow the default instead?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count vaults now follow the default',
+      one: '1 vault now follows the default',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.',
+      one:
+          '1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.',
+    );
+    return '$_temp0';
+  }
 }

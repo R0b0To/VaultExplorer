@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -439,6 +440,42 @@ class ContainerRepository {
       if (!record.cacheDerivedKey) continue;
       if (!wanted.contains(derivedKeyPathForUri(record.uri))) continue;
       _cache![record.uri] = record.copyWith(cacheDerivedKey: false);
+      changed++;
+    }
+    if (changed > 0) await _persist();
+    return changed;
+  }
+
+  /// How many saved vaults carry their own thumbnail settings instead of
+  /// following the app-wide default (see
+  /// [ContainerRecord.followsGlobalThumbnails]).
+  Future<int> countThumbnailOverrides() async {
+    await _ensureLoaded();
+    return _cache!.values.where((r) => !r.followsGlobalThumbnails).length;
+  }
+
+  /// How many saved vaults currently follow the app-wide thumbnail default,
+  /// i.e. how many are affected when that default changes.
+  Future<int> countFollowingGlobalThumbnails() async {
+    await _ensureLoaded();
+    return _cache!.values.where((r) => r.followsGlobalThumbnails).length;
+  }
+
+  /// Makes every vault follow the app-wide thumbnail default again by
+  /// clearing its own thumbnail settings. Returns how many vaults changed.
+  ///
+  /// Touches nothing but the two thumbnail fields (the records held in
+  /// [_cache] never carry secrets, so a [ContainerRecord.copyWith] round
+  /// trip here is safe -- same pattern as [disableDerivedKeyCachingFor]).
+  Future<int> resetThumbnailOverrides() async {
+    await _ensureLoaded();
+    var changed = 0;
+    for (final record in _cache!.values.toList()) {
+      if (record.followsGlobalThumbnails) continue;
+      _cache![record.uri] = record.copyWith(
+        thumbnailCacheMode: null,
+        thumbnailQuality: null,
+      );
       changed++;
     }
     if (changed > 0) await _persist();
@@ -1102,6 +1139,26 @@ class ContainerRecord {
       autoCloseImmediately ||
       autoCloseScreenLockOnly ||
       autoCloseMins > 0;
+
+  /// True when this vault has no thumbnail settings of its own and so
+  /// follows the app-wide default. A record stores that as both thumbnail
+  /// fields being null -- the same shape every record written before the
+  /// "use global default" option already had if the settings were never
+  /// touched.
+  bool get followsGlobalThumbnails =>
+      thumbnailCacheMode == null && thumbnailQuality == null;
+
+  /// This vault's own thumbnail settings, or null when it follows the
+  /// app-wide default. [global] only fills in a half that an older record
+  /// never stored (a record can predate [thumbnailQuality]), so such a vault
+  /// keeps the behaviour it always had: its own mode, the default quality.
+  ThumbnailSettings? ownThumbnailSettings({required ThumbnailSettings global}) {
+    if (followsGlobalThumbnails) return null;
+    return ThumbnailSettings(
+      cacheMode: thumbnailCacheMode ?? global.cacheMode,
+      quality: thumbnailQuality ?? global.quality,
+    );
+  }
 
   ContainerRecord copyWith({
     String? label,

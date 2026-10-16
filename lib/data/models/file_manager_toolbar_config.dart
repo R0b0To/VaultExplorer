@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -88,8 +89,16 @@ class FileManagerToolbarConfig {
   final int masonryColumnsPortrait;
   final int masonryColumnsLandscape;
   final PlaylistTransitionEffect playlistTransitionEffect;
+  /// The app-wide thumbnail default: what every vault that has no thumbnail
+  /// settings of its own ("Use global default") uses.
   final ThumbnailCacheMode defaultThumbnailCacheMode;
   final ThumbnailQuality defaultThumbnailQuality;
+
+  /// The thumbnail settings shared by Local Storage and the decoy file
+  /// manager. Deliberately a slot of its own rather than a fallback to the
+  /// vault default -- see `resolveThumbnailSettings`.
+  final ThumbnailCacheMode localStorageThumbnailCacheMode;
+  final ThumbnailQuality localStorageThumbnailQuality;
   final MediaViewerToolbarConfig mediaViewerToolbarConfig;
 
   /// How file and folder icons, their backgrounds and names look in the
@@ -134,6 +143,8 @@ class FileManagerToolbarConfig {
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.localStorageThumbnailCacheMode = ThumbnailCacheMode.disabled,
+    this.localStorageThumbnailQuality = ThumbnailQuality.defaultQuality,
     this.mediaViewerToolbarConfig = const MediaViewerToolbarConfig(),
     this.skin = FileManagerSkin.classic,
   });
@@ -183,8 +194,22 @@ class FileManagerToolbarConfig {
         playlistTransitionEffect: PlaylistTransitionEffect.slide,
         defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
         defaultThumbnailQuality: ThumbnailQuality.defaultQuality,
+        localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
+        localStorageThumbnailQuality: ThumbnailQuality.defaultQuality,
         mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
         skin: FileManagerSkin.classic,
+      );
+
+  /// [defaultThumbnailCacheMode] + [defaultThumbnailQuality] as one value.
+  ThumbnailSettings get defaultThumbnails => ThumbnailSettings(
+        cacheMode: defaultThumbnailCacheMode,
+        quality: defaultThumbnailQuality,
+      );
+
+  /// The Local Storage / decoy slot as one value.
+  ThumbnailSettings get localStorageThumbnails => ThumbnailSettings(
+        cacheMode: localStorageThumbnailCacheMode,
+        quality: localStorageThumbnailQuality,
       );
 
   List<FileManagerAction> get visible =>
@@ -274,6 +299,8 @@ class FileManagerToolbarConfig {
     PlaylistTransitionEffect? playlistTransitionEffect,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
+    ThumbnailCacheMode? localStorageThumbnailCacheMode,
+    ThumbnailQuality? localStorageThumbnailQuality,
     MediaViewerToolbarConfig? mediaViewerToolbarConfig,
     FileManagerSkin? skin,
   }) =>
@@ -323,6 +350,10 @@ class FileManagerToolbarConfig {
             defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
         defaultThumbnailQuality:
             defaultThumbnailQuality ?? this.defaultThumbnailQuality,
+        localStorageThumbnailCacheMode: localStorageThumbnailCacheMode ??
+            this.localStorageThumbnailCacheMode,
+        localStorageThumbnailQuality:
+            localStorageThumbnailQuality ?? this.localStorageThumbnailQuality,
         mediaViewerToolbarConfig:
             mediaViewerToolbarConfig ?? this.mediaViewerToolbarConfig,
         skin: skin ?? this.skin,
@@ -364,6 +395,8 @@ class FileManagerToolbarConfig {
         'playlistTransitionEffect': playlistTransitionEffect.toJson(),
         'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
         'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
+        'localStorageThumbnailCacheMode': localStorageThumbnailCacheMode.toJson(),
+        'localStorageThumbnailQuality': localStorageThumbnailQuality.toJson(),
         'mediaViewerToolbarConfig': mediaViewerToolbarConfig.toJson(),
         'skin': skin.toJson(),
       };
@@ -415,6 +448,22 @@ class FileManagerToolbarConfig {
         ThumbnailCacheMode.disabled;
     final defaultThumbnailQuality =
         ThumbnailQuality.fromJson(j['defaultThumbnailQuality']);
+    // Configs saved before Local Storage had a thumbnail slot of its own
+    // used the app-wide default for it, so an absent slot is seeded from the
+    // default's value: upgrading changes nothing about how Local Storage
+    // looks, and from then on the two are independent.
+    final localStorageThumbnailCacheMode = j.containsKey(
+          'localStorageThumbnailCacheMode',
+        )
+        ? (ThumbnailCacheMode.fromJson(
+              j['localStorageThumbnailCacheMode'] as String?,
+            ) ??
+            defaultThumbnailCacheMode)
+        : defaultThumbnailCacheMode;
+    final localStorageThumbnailQuality =
+        j.containsKey('localStorageThumbnailQuality')
+            ? ThumbnailQuality.fromJson(j['localStorageThumbnailQuality'])
+            : defaultThumbnailQuality;
     final longFileNameDisplayMode = LongFileNameDisplayMode.fromJson(
           j['longFileNameDisplayMode'] as String?,
         ) ??
@@ -474,6 +523,8 @@ class FileManagerToolbarConfig {
       ),
       defaultThumbnailCacheMode: defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality,
+      localStorageThumbnailCacheMode: localStorageThumbnailCacheMode,
+      localStorageThumbnailQuality: localStorageThumbnailQuality,
       mediaViewerToolbarConfig: mediaViewerConfig,
       // Absent in configs saved before skins existed -> classic.
       skin: FileManagerSkin.fromJson(j['skin']),

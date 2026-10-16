@@ -11249,4 +11249,46 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'レイアウトを切り替えるたびに、リストのズームとグリッド／メイソンリーの列数を初期値に戻す';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'アプリ設定のサムネイルのデフォルトに従うため、そこでの変更はこの保管庫にも反映されます。';
+
+  @override
+  String get resetVaultThumbnailsTitle => 'すべての保管庫をデフォルトに戻す';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      '独自の設定を持つ保管庫を含め、すべての保管庫が上記のサムネイルのデフォルトに従うようにします。';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個の保管庫が独自のサムネイル設定を持っています。代わりにデフォルトに従わせますか？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個の保管庫がデフォルトに従うようになりました',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count個の保管庫がこのデフォルトに従い、保管庫内にサムネイルを保存し始めます。処理が遅くなり、読み取り専用の保管庫では使用できません。',
+    );
+    return '$_temp0';
+  }
 }

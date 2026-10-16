@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
@@ -93,6 +94,82 @@ void main() {
       final config = FileManagerToolbarConfig.fromJson({});
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
       expect(config.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
+    });
+  });
+
+  group('FileManagerToolbarConfig Local Storage thumbnail slot', () {
+    test('defaults match the vault default', () {
+      final def = FileManagerToolbarConfig.defaults();
+      expect(def.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
+      expect(def.localStorageThumbnailQuality, ThumbnailQuality.defaultQuality);
+
+      const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
+      expect(unassigned.localStorageThumbnails, ThumbnailSettings.defaults);
+    });
+
+    test('is independent of the vault default', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        defaultThumbnailCacheMode: ThumbnailCacheMode.appCache,
+      );
+      expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
+      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
+
+      final local = config.copyWith(
+        localStorageThumbnailCacheMode: ThumbnailCacheMode.inContainer,
+        localStorageThumbnailQuality: const ThumbnailQuality(quality: 95, size: 320),
+      );
+      expect(local.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
+      expect(local.localStorageThumbnails.cacheMode, ThumbnailCacheMode.inContainer);
+      expect(local.localStorageThumbnails.quality.size, 320);
+    });
+
+    test('round-trips through JSON', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        localStorageThumbnailCacheMode: ThumbnailCacheMode.inContainer,
+        localStorageThumbnailQuality: const ThumbnailQuality(quality: 95, size: 320),
+      );
+      final json = config.toJson();
+      expect(json['localStorageThumbnailCacheMode'], 'inContainer');
+
+      final restored = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
+      );
+      expect(restored.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      expect(restored.localStorageThumbnailQuality.quality, 95);
+      expect(restored.localStorageThumbnailQuality.size, 320);
+    });
+
+    test('a config saved before the slot existed seeds it from the default, '
+        'so Local Storage looks exactly as it did', () {
+      final legacy = {
+        'defaultThumbnailCacheMode': 'inContainer',
+        'defaultThumbnailQuality': {'quality': 70, 'size': 300},
+      };
+      final config = FileManagerToolbarConfig.fromJson(legacy);
+      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      expect(config.localStorageThumbnailQuality.quality, 70);
+      expect(config.localStorageThumbnailQuality.size, 300);
+
+      // From then on the two are independent.
+      final moved = config.copyWith(defaultThumbnailCacheMode: ThumbnailCacheMode.disabled);
+      expect(moved.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+    });
+
+    test('a stored slot is not overwritten by the default', () {
+      final config = FileManagerToolbarConfig.fromJson({
+        'defaultThumbnailCacheMode': 'appCache',
+        'localStorageThumbnailCacheMode': 'disabled',
+      });
+      expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
+      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
+    });
+
+    test('an unreadable stored mode falls back to the default value', () {
+      final config = FileManagerToolbarConfig.fromJson({
+        'defaultThumbnailCacheMode': 'appCache',
+        'localStorageThumbnailCacheMode': 'nonsense',
+      });
+      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.appCache);
     });
   });
 

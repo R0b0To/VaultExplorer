@@ -135,6 +135,146 @@ void main() {
     });
   });
 
+  group('Thumbnail settings inheritance', () {
+    const params = ContainerConfigParams(
+      uri: 'file:///vault.hc',
+      currentLabel: 'My Vault',
+      containerFormat: 'veracrypt',
+    );
+    final provider = containerConfigControllerProvider(params);
+
+    late ProviderContainer localContainer;
+
+    setUp(() {
+      localContainer = ProviderContainer(
+        overrides: [
+          containerRepositoryProvider.overrideWith((ref) => _FakeContainerRepo()),
+          appSecureStorageProvider.overrideWith((ref) => _FakeAppSecureStorage()),
+          vaultLifecycleApiProvider.overrideWith((ref) => _FakeVaultLifecycleApi()),
+        ],
+      );
+      localContainer.listen(provider, (_, __) {});
+      addTearDown(localContainer.dispose);
+    });
+
+    Future<void> initFromRecord(ContainerRecord? record) async {
+      localContainer.read(provider.notifier).initializeFromRecord(
+            rec: record,
+            appSettings: null,
+            mountedContainer: null,
+          );
+      for (var i = 0; i < 500; i++) {
+        if (!localContainer.read(provider).loadingPassword) return;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      fail('controller never finished loading');
+    }
+
+    Future<ContainerRecord?> save(ContainerRecord? existing) => localContainer
+        .read(provider.notifier)
+        .saveContainer(passwordText: '', labelText: 'My Vault', existingRecord: existing);
+
+    test('a vault being added follows the global default and is not modified', () async {
+      await initFromRecord(null);
+      final state = localContainer.read(provider);
+      expect(state.useGlobalThumbnails, isTrue);
+      expect(state.isModified('', 'My Vault'), isFalse);
+    });
+
+    test('saving a vault that follows the default stores no thumbnail settings '
+        '(nothing is snapshotted)', () async {
+      await initFromRecord(null);
+      final saved = await save(null);
+      expect(saved, isNotNull);
+      expect(saved!.thumbnailCacheMode, isNull);
+      expect(saved.thumbnailQuality, isNull);
+      expect(saved.followsGlobalThumbnails, isTrue);
+    });
+
+    test('a record that never had settings of its own opens as following', () async {
+      await initFromRecord(
+        const ContainerRecord(uri: 'file:///vault.hc', label: 'My Vault'),
+      );
+      expect(localContainer.read(provider).useGlobalThumbnails, isTrue);
+    });
+
+    test('editing the hidden values while following is not a change', () async {
+      await initFromRecord(null);
+      final controller = localContainer.read(provider.notifier);
+      controller.setThumbnailCacheMode(ThumbnailCacheMode.inContainer);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isFalse);
+
+      final saved = await save(null);
+      expect(saved!.thumbnailCacheMode, isNull);
+    });
+
+    test('turning the switch off is a change and keeps the current values', () async {
+      await initFromRecord(null);
+      final before = localContainer.read(provider);
+      final controller = localContainer.read(provider.notifier);
+
+      controller.setUseGlobalThumbnails(false);
+      final state = localContainer.read(provider);
+      expect(state.isModified('', 'My Vault'), isTrue);
+      // Prefilled, so the vault's effective settings do not jump.
+      expect(state.thumbnailCacheMode, before.thumbnailCacheMode);
+      expect(state.thumbnailCacheMode, isNotNull);
+      expect(state.thumbnailQuality, isNotNull);
+
+      final saved = await save(null);
+      expect(saved!.thumbnailCacheMode, state.thumbnailCacheMode);
+      expect(saved.thumbnailQuality, state.thumbnailQuality);
+      expect(saved.followsGlobalThumbnails, isFalse);
+    });
+
+    test('a vault with its own settings opens as custom with those values', () async {
+      await initFromRecord(
+        const ContainerRecord(
+          uri: 'file:///vault.hc',
+          label: 'My Vault',
+          thumbnailCacheMode: ThumbnailCacheMode.inContainer,
+          thumbnailQuality: ThumbnailQuality(quality: 90, size: 280),
+        ),
+      );
+      final state = localContainer.read(provider);
+      expect(state.useGlobalThumbnails, isFalse);
+      expect(state.thumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      expect(state.thumbnailQuality?.size, 280);
+      expect(state.isModified('', 'My Vault'), isFalse);
+    });
+
+    test('switching a custom vault back to the default clears its settings', () async {
+      const existing = ContainerRecord(
+        uri: 'file:///vault.hc',
+        label: 'My Vault',
+        thumbnailCacheMode: ThumbnailCacheMode.inContainer,
+        thumbnailQuality: ThumbnailQuality(quality: 90, size: 280),
+      );
+      await initFromRecord(existing);
+      localContainer.read(provider.notifier).setUseGlobalThumbnails(true);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isTrue);
+
+      final saved = await save(existing);
+      expect(saved!.thumbnailCacheMode, isNull);
+      expect(saved.thumbnailQuality, isNull);
+    });
+
+    test('editing a custom vault\'s values is a change', () async {
+      await initFromRecord(
+        const ContainerRecord(
+          uri: 'file:///vault.hc',
+          label: 'My Vault',
+          thumbnailCacheMode: ThumbnailCacheMode.appCache,
+          thumbnailQuality: ThumbnailQuality(quality: 90, size: 280),
+        ),
+      );
+      localContainer
+          .read(provider.notifier)
+          .setThumbnailCacheMode(ThumbnailCacheMode.disabled);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isTrue);
+    });
+  });
+
   group('Cached derived key lifetime', () {
     const params = ContainerConfigParams(
       uri: 'file:///vault.hc',

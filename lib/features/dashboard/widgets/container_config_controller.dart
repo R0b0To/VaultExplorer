@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dar
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -62,8 +63,17 @@ class ContainerConfigState {
   final ContainerUnlockMethod unlockMethod;
   final int autoCloseMins;
   final bool documentProvider;
+  /// This vault's own thumbnail settings -- what the vault uses when
+  /// [useGlobalThumbnails] is off. Prefilled with the app-wide default while
+  /// the vault follows it, so turning the switch off changes nothing until
+  /// the person picks something.
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
+
+  /// True while the vault has no thumbnail settings of its own and follows
+  /// the app-wide default ("Use global default"). Saved as both thumbnail
+  /// fields being null on the [ContainerRecord].
+  final bool useGlobalThumbnails;
   final bool cacheDerivedKey;
   final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
   final DeleteAfterImportMode globalDeleteAfterImportMode;
@@ -105,6 +115,7 @@ class ContainerConfigState {
   final int initialHashId;
   final ThumbnailCacheMode? initialThumbnailCacheMode;
   final ThumbnailQuality? initialThumbnailQuality;
+  final bool initialUseGlobalThumbnails;
   final bool? initialCacheDerivedKey;
   final VaultDeleteAfterImportMode initialVaultDeleteAfterImportMode;
   final String? initialPatternHash;
@@ -118,6 +129,7 @@ class ContainerConfigState {
     required this.documentProvider,
     this.thumbnailCacheMode,
     this.thumbnailQuality,
+    this.useGlobalThumbnails = true,
     required this.cacheDerivedKey,
     this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.globalDeleteAfterImportMode = DeleteAfterImportMode.ask,
@@ -147,6 +159,7 @@ class ContainerConfigState {
     required this.initialHashId,
     this.initialThumbnailCacheMode,
     this.initialThumbnailQuality,
+    this.initialUseGlobalThumbnails = true,
     this.initialCacheDerivedKey,
     this.initialVaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.initialPatternHash,
@@ -187,8 +200,13 @@ class ContainerConfigState {
     if (unlockMethod != initialUnlockMethod) return true;
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
-    if (thumbnailCacheMode != initialThumbnailCacheMode) return true;
-    if (thumbnailQuality != initialThumbnailQuality) return true;
+    if (useGlobalThumbnails != initialUseGlobalThumbnails) return true;
+    // While following the global default the vault's own values are not
+    // stored, so editing them (or not) is not a change.
+    if (!useGlobalThumbnails) {
+      if (thumbnailCacheMode != initialThumbnailCacheMode) return true;
+      if (thumbnailQuality != initialThumbnailQuality) return true;
+    }
     if (cacheDerivedKey != initialCacheDerivedKey) return true;
     if (vaultDeleteAfterImportMode != initialVaultDeleteAfterImportMode) {
       return true;
@@ -237,6 +255,7 @@ class ContainerConfigState {
     bool? documentProvider,
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
+    bool? useGlobalThumbnails,
     bool? cacheDerivedKey,
     VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
     DeleteAfterImportMode? globalDeleteAfterImportMode,
@@ -263,6 +282,7 @@ class ContainerConfigState {
     bool? isMounted,
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
+    bool? initialUseGlobalThumbnails,
     bool? initialCacheDerivedKey,
     VaultDeleteAfterImportMode? initialVaultDeleteAfterImportMode,
     String? initialPatternHash,
@@ -274,6 +294,7 @@ class ContainerConfigState {
     documentProvider: documentProvider ?? this.documentProvider,
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
+    useGlobalThumbnails: useGlobalThumbnails ?? this.useGlobalThumbnails,
     cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
     vaultDeleteAfterImportMode:
         vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
@@ -309,6 +330,8 @@ class ContainerConfigState {
         initialThumbnailCacheMode ?? this.initialThumbnailCacheMode,
     initialThumbnailQuality:
         initialThumbnailQuality ?? this.initialThumbnailQuality,
+    initialUseGlobalThumbnails:
+        initialUseGlobalThumbnails ?? this.initialUseGlobalThumbnails,
     initialCacheDerivedKey:
         initialCacheDerivedKey ?? this.initialCacheDerivedKey,
     initialVaultDeleteAfterImportMode:
@@ -382,6 +405,9 @@ class ContainerConfigController extends _$ContainerConfigController {
       documentProvider: initialDocumentProvider,
       thumbnailCacheMode: rec?.thumbnailCacheMode,
       thumbnailQuality: rec?.thumbnailQuality,
+      // A vault that is being added, or one that was never given settings of
+      // its own, follows the app-wide default.
+      useGlobalThumbnails: rec?.followsGlobalThumbnails ?? true,
       cacheDerivedKey:
           rec?.cacheDerivedKey ??
           appSettings?.defaultDerivedKeyCacheEnabled ??
@@ -404,6 +430,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialHashId: initialHashId,
       initialThumbnailCacheMode: rec?.thumbnailCacheMode,
       initialThumbnailQuality: rec?.thumbnailQuality,
+      initialUseGlobalThumbnails: rec?.followsGlobalThumbnails ?? true,
       initialCacheDerivedKey: initialCacheDerivedKey,
       initialVaultDeleteAfterImportMode:
           rec?.vaultDeleteAfterImportMode ?? VaultDeleteAfterImportMode.inherit,
@@ -494,8 +521,10 @@ class ContainerConfigController extends _$ContainerConfigController {
           .load();
       thumbMode ??= toolbarConfig.defaultThumbnailCacheMode;
       thumbQuality ??= toolbarConfig.defaultThumbnailQuality;
-    } catch (_) {
-      thumbMode ??= ThumbnailCacheMode.disabled;
+    } catch (e) {
+      VeLog.w('ContainerConfigController', 'Toolbar config load failed', e);
+      thumbMode ??= ThumbnailSettings.defaults.cacheMode;
+      thumbQuality ??= ThumbnailSettings.defaults.quality;
     }
     if (!ref.mounted) return;
 
@@ -581,6 +610,12 @@ class ContainerConfigController extends _$ContainerConfigController {
 
   void setThumbnailQuality(ThumbnailQuality quality) =>
       state = state._copy(thumbnailQuality: quality);
+
+  /// Turning this off keeps the values already in the state (the app-wide
+  /// default's, filled in on load), so the vault's effective settings do not
+  /// change until the person picks something.
+  void setUseGlobalThumbnails(bool value) =>
+      state = state._copy(useGlobalThumbnails: value);
 
   void setCacheDerivedKey(bool val) =>
       state = state._copy(cacheDerivedKey: val);
@@ -762,8 +797,14 @@ class ContainerConfigController extends _$ContainerConfigController {
       documentProvider: state.documentProvider,
       documentProviderFolders:
           existingRecord?.documentProviderFolders ?? const [],
-      thumbnailCacheMode: state.thumbnailCacheMode,
-      thumbnailQuality: state.thumbnailQuality,
+      // Null on both means "follow the app-wide default": nothing is
+      // snapshotted, so later changes to the default reach this vault.
+      thumbnailCacheMode: state.useGlobalThumbnails
+          ? null
+          : (state.thumbnailCacheMode ?? ThumbnailSettings.defaults.cacheMode),
+      thumbnailQuality: state.useGlobalThumbnails
+          ? null
+          : (state.thumbnailQuality ?? ThumbnailSettings.defaults.quality),
       cacheDerivedKey: state.cacheDerivedKey,
       vaultDeleteAfterImportMode: state.vaultDeleteAfterImportMode,
       pendingPassword: shouldSavePassword ? passwordText : null,

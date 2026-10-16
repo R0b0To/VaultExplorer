@@ -30,9 +30,9 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
@@ -1687,7 +1687,6 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appSettingsControllerProvider);
-    final fmSettingsState = ref.watch(fileManagerToolbarSettingsProvider(null));
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -1740,45 +1739,7 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
                           (s) => s.copyWith(deleteAfterImportMode: v),
                         ),
                   ),
-                  OptionPickerTile<AudioRecordingQuality>(
-                    label: context.l10n.audioRecordingQualityLabel,
-                    value: state.settings.audioRecordingQuality,
-                    subtitle: state.settings.audioRecordingQuality
-                        .getLocalizedSubtitle(context.l10n),
-                    options: AudioRecordingQuality.values.map((quality) {
-                      return SelectOption(
-                        value: quality,
-                        label: quality.getLocalizedLabel(context.l10n),
-                        subtitle: quality.getLocalizedSubtitle(context.l10n),
-                      );
-                    }).toList(),
-                    onChanged: (v) => ref
-                        .read(appSettingsControllerProvider.notifier)
-                        .updateSettings(
-                          (s) => s.copyWith(audioRecordingQuality: v),
-                        ),
-                  ),
-                  OptionPickerTile<ThumbnailCacheMode>(
-                    label: context.l10n.thumbnailCachingDefaultLabel,
-                    value: fmSettingsState.config.defaultThumbnailCacheMode,
-                    options: ThumbnailCacheMode.values.map((mode) {
-                      return SelectOption(
-                        value: mode,
-                        label: mode.getLocalizedLabel(context.l10n),
-                        subtitle: mode.getLocalizedDescription(context.l10n),
-                      );
-                    }).toList(),
-                    onChanged: (v) => ref
-                        .read(fileManagerToolbarSettingsProvider(null).notifier)
-                        .setDefaultThumbnailCacheMode(v),
-                  ),
-                  ThumbnailQualityTile(
-                    label: context.l10n.thumbnailQualityDefaultLabel,
-                    value: fmSettingsState.config.defaultThumbnailQuality,
-                    onChanged: (v) => ref
-                        .read(fileManagerToolbarSettingsProvider(null).notifier)
-                        .setDefaultThumbnailQuality(v),
-                  ),
+                  const GlobalThumbnailDefaultsTiles(),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(

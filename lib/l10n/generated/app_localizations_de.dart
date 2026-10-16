@@ -11902,4 +11902,53 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Listenzoom sowie Spaltenanzahl von Raster und Masonry beim Wechsel des Layouts auf die Standardwerte zurücksetzen';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Folgt den Miniaturansicht-Standards in den App-Einstellungen, sodass Änderungen dort auch für diesen Tresor gelten.';
+
+  @override
+  String get resetVaultThumbnailsTitle =>
+      'Alle Tresore auf den Standard zurücksetzen';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Lässt jeden Tresor den obigen Miniaturansicht-Standards folgen, auch Tresore mit eigenen Einstellungen.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Tresore haben eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?',
+      one:
+          '1 Tresor hat eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Tresore folgen jetzt dem Standard',
+      one: '1 Tresor folgt jetzt dem Standard',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Tresore folgen diesem Standard und beginnen, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.',
+      one:
+          '1 Tresor folgt diesem Standard und beginnt, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.',
+    );
+    return '$_temp0';
+  }
 }

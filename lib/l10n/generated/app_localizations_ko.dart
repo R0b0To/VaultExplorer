@@ -11248,4 +11248,46 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       '레이아웃을 전환할 때마다 목록 확대 수준과 그리드/메이슨리 열 수를 기본값으로 되돌림';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      '앱 설정의 썸네일 기본값을 따르므로 그곳에서 바꾼 내용이 이 볼트에도 적용됩니다.';
+
+  @override
+  String get resetVaultThumbnailsTitle => '모든 볼트를 기본값으로 재설정';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      '자체 설정이 있는 볼트를 포함해 모든 볼트가 위의 썸네일 기본값을 따르게 합니다.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개의 볼트에 자체 썸네일 설정이 있습니다. 대신 기본값을 따르게 할까요?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '볼트 $count개가 이제 기본값을 따릅니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '볼트 $count개가 이 기본값을 따르며 볼트 안에 썸네일을 저장하기 시작합니다. 속도가 느려지고 읽기 전용 볼트에서는 사용할 수 없습니다.',
+    );
+    return '$_temp0';
+  }
 }

@@ -12006,4 +12006,53 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Rétablir le zoom de la liste et le nombre de colonnes de la grille et de la mosaïque à leurs valeurs par défaut lors d\'un changement de disposition';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Suit les valeurs par défaut des miniatures dans les paramètres de l’application ; les modifications faites là-bas s’appliquent donc aussi à ce coffre.';
+
+  @override
+  String get resetVaultThumbnailsTitle =>
+      'Réinitialiser tous les coffres sur la valeur par défaut';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Fait suivre à chaque coffre les valeurs par défaut des miniatures ci-dessus, y compris les coffres avec leurs propres paramètres.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count coffres ont leurs propres paramètres de miniatures. Leur faire suivre la valeur par défaut ?',
+      one:
+          '1 coffre a ses propres paramètres de miniatures. Lui faire suivre la valeur par défaut ?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count coffres suivent maintenant la valeur par défaut',
+      one: '1 coffre suit maintenant la valeur par défaut',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count coffres suivent cette valeur par défaut et commenceront à stocker les miniatures dans le coffre. C’est plus lent et impossible sur les coffres en lecture seule.',
+      one:
+          '1 coffre suit cette valeur par défaut et commencera à stocker les miniatures dans le coffre. C’est plus lent et impossible sur les coffres en lecture seule.',
+    );
+    return '$_temp0';
+  }
 }

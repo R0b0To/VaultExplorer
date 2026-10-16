@@ -39,6 +39,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
@@ -442,6 +443,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   AppSettings _appSettings = AppSettings();
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
+
+  /// The saved record of the vault being browsed (null for Local Storage and
+  /// anything else without one). Kept so a change to the app-wide thumbnail
+  /// default can be re-resolved immediately, for vaults that follow it,
+  /// without re-reading the repository.
+  ContainerRecord? _containerRecord;
+
+  /// Re-derives [_resolvedThumbnailCacheMode] / [_resolvedThumbnailQuality]
+  /// from [config] and [_containerRecord]. Call inside `setState`.
+  void _applyResolvedThumbnails(FileManagerToolbarConfig config) {
+    final resolved = resolveThumbnailSettings(
+      config: config,
+      isLocalStorage: widget.container.isLocalStorage,
+      record: _containerRecord,
+      overrideCacheMode: widget.thumbnailCacheMode,
+      overrideQuality: widget.thumbnailQuality,
+    );
+    _resolvedThumbnailCacheMode = resolved.cacheMode;
+    _resolvedThumbnailQuality = resolved.quality;
+  }
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   FileBrowserPinsBookmarksState get _pinsBookmarks =>
       ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
@@ -1205,14 +1226,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         setState(() {
           _appSettings = appSettings;
           _toolbarConfig = toolbarConfig;
-          _resolvedThumbnailCacheMode =
-              widget.thumbnailCacheMode ??
-              record?.thumbnailCacheMode ??
-              toolbarConfig.defaultThumbnailCacheMode;
-          _resolvedThumbnailQuality =
-              widget.thumbnailQuality ??
-              record?.thumbnailQuality ??
-              toolbarConfig.defaultThumbnailQuality;
+          _containerRecord = record;
+          _applyResolvedThumbnails(toolbarConfig);
         });
         _navNotifier.setLayoutMode(
           _getLayoutModeForFolder(_currentDirPath, appSettings: appSettings),
@@ -1245,14 +1260,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (!mounted) return;
     setState(() {
       _toolbarConfig = config;
-      _resolvedThumbnailCacheMode =
-          widget.thumbnailCacheMode ??
-          record?.thumbnailCacheMode ??
-          config.defaultThumbnailCacheMode;
-      _resolvedThumbnailQuality =
-          widget.thumbnailQuality ??
-          record?.thumbnailQuality ??
-          config.defaultThumbnailQuality;
+      _containerRecord = record;
+      _applyResolvedThumbnails(config);
     });
     if (!config.autoHideAppBar && _appBarAnimController.value < 1.0) {
       _appBarAnimController.value = 1.0;
@@ -3969,10 +3978,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     ref.listen<FileManagerToolbarSettingsState>(
       fileManagerToolbarSettingsProvider(effectiveToolbarUri),
       (previous, next) {
-        if (!next.loading && previous?.config != next.config) {
+        if (next.loading) return;
+        if (previous?.config != next.config) {
           setState(() {
             _toolbarConfig = next.config;
+            // The app-wide thumbnail default (or the Local Storage slot) may
+            // be what changed, and this browser may be following it.
+            _applyResolvedThumbnails(next.config);
           });
+        }
+        // Vault records were rewritten in bulk ("reset all vaults to the
+        // default"); a vault's own thumbnail settings live in its record, so
+        // re-read it.
+        if (previous?.thumbnailOverridesRevision !=
+            next.thumbnailOverridesRevision) {
+          _loadToolbarConfig();
         }
       },
     );

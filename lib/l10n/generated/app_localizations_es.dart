@@ -11932,4 +11932,53 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Restablecer el zoom de la lista y el número de columnas de la cuadrícula y el mosaico a sus valores predeterminados al cambiar de diseño';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Sigue los valores predeterminados de miniaturas en los ajustes de la app, así que los cambios allí también se aplican a esta bóveda.';
+
+  @override
+  String get resetVaultThumbnailsTitle =>
+      'Restablecer todas las bóvedas al valor predeterminado';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Hace que todas las bóvedas sigan los valores predeterminados de miniaturas de arriba, incluidas las que tienen ajustes propios.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count bóvedas tienen sus propios ajustes de miniaturas. ¿Hacer que sigan el valor predeterminado?',
+      one:
+          '1 bóveda tiene sus propios ajustes de miniaturas. ¿Hacer que siga el valor predeterminado?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count bóvedas siguen ahora el valor predeterminado',
+      one: '1 bóveda sigue ahora el valor predeterminado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count bóvedas siguen este valor predeterminado y empezarán a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.',
+      one:
+          '1 bóveda sigue este valor predeterminado y empezará a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.',
+    );
+    return '$_temp0';
+  }
 }

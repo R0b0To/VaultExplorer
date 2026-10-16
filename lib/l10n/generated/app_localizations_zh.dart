@@ -11074,4 +11074,44 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetSizeOnLayoutChangeDesc => '切换布局时，将列表缩放比例以及网格/瀑布流的列数恢复为默认值';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      '遵循应用设置中的缩略图默认值，因此在那里所做的更改也会应用到此保险库。';
+
+  @override
+  String get resetVaultThumbnailsTitle => '将所有保险库重置为默认值';
+
+  @override
+  String get resetVaultThumbnailsSubtitle => '让所有保险库（包括有自己设置的）都遵循上方的缩略图默认值。';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 $count 个保险库使用了自己的缩略图设置。要让它们改为遵循默认值吗？',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个保险库现在已遵循默认值',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个保险库遵循此默认值，并将开始把缩略图存储在保险库内。这样会更慢，且无法用于只读保险库。',
+    );
+    return '$_temp0';
+  }
 }

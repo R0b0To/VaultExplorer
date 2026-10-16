@@ -11900,4 +11900,53 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get resetSizeOnLayoutChangeDesc =>
       'Ripristina lo zoom dell\'elenco e il numero di colonne di griglia e mosaico ai valori predefiniti quando cambi layout';
+
+  @override
+  String get thumbnailUseGlobalDefaultDesc =>
+      'Segue le impostazioni predefinite delle miniature nelle impostazioni dell’app, quindi le modifiche lì valgono anche per questo vault.';
+
+  @override
+  String get resetVaultThumbnailsTitle =>
+      'Ripristina tutti i vault all’impostazione predefinita';
+
+  @override
+  String get resetVaultThumbnailsSubtitle =>
+      'Fa seguire a ogni vault le impostazioni predefinite delle miniature qui sopra, inclusi i vault con impostazioni proprie.';
+
+  @override
+  String resetVaultThumbnailsConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count vault hanno impostazioni delle miniature proprie. Farli seguire l’impostazione predefinita?',
+      one:
+          '1 vault ha impostazioni delle miniature proprie. Farlo seguire l’impostazione predefinita?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String resetVaultThumbnailsDone(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count vault ora seguono l’impostazione predefinita',
+      one: '1 vault ora segue l’impostazione predefinita',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String thumbnailGlobalInContainerConfirmMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count vault seguono questa impostazione predefinita e inizieranno a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.',
+      one:
+          '1 vault segue questa impostazione predefinita e inizierà a salvare le miniature all’interno del vault. È più lento e non è possibile sui vault di sola lettura.',
+    );
+    return '$_temp0';
+  }
 }

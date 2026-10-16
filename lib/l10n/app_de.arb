@@ -3286,5 +3286,11 @@
   "gridSpacingNone": "Keiner",
   "gridSpacingValue": "{value} dp",
   "resetSizeOnLayoutChangeLabel": "Größe beim Layoutwechsel zurücksetzen",
-  "resetSizeOnLayoutChangeDesc": "Listenzoom sowie Spaltenanzahl von Raster und Masonry beim Wechsel des Layouts auf die Standardwerte zurücksetzen"
+  "resetSizeOnLayoutChangeDesc": "Listenzoom sowie Spaltenanzahl von Raster und Masonry beim Wechsel des Layouts auf die Standardwerte zurücksetzen",
+  "thumbnailUseGlobalDefaultDesc": "Folgt den Miniaturansicht-Standards in den App-Einstellungen, sodass Änderungen dort auch für diesen Tresor gelten.",
+  "resetVaultThumbnailsTitle": "Alle Tresore auf den Standard zurücksetzen",
+  "resetVaultThumbnailsSubtitle": "Lässt jeden Tresor den obigen Miniaturansicht-Standards folgen, auch Tresore mit eigenen Einstellungen.",
+  "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 Tresor hat eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?} other{{count} Tresore haben eigene Miniaturansicht-Einstellungen. Stattdessen dem Standard folgen lassen?}}",
+  "resetVaultThumbnailsDone": "{count, plural, =1{1 Tresor folgt jetzt dem Standard} other{{count} Tresore folgen jetzt dem Standard}}",
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 Tresor folgt diesem Standard und beginnt, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.} other{{count} Tresore folgen diesem Standard und beginnen, Miniaturansichten im Tresor zu speichern. Das ist langsamer und bei schreibgeschützten Tresoren nicht möglich.}}"
 }

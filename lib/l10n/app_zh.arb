@@ -3286,5 +3286,11 @@
   "gridSpacingNone": "无",
   "gridSpacingValue": "{value} dp",
   "resetSizeOnLayoutChangeLabel": "切换布局时重置大小",
-  "resetSizeOnLayoutChangeDesc": "切换布局时，将列表缩放比例以及网格/瀑布流的列数恢复为默认值"
+  "resetSizeOnLayoutChangeDesc": "切换布局时，将列表缩放比例以及网格/瀑布流的列数恢复为默认值",
+  "thumbnailUseGlobalDefaultDesc": "遵循应用设置中的缩略图默认值，因此在那里所做的更改也会应用到此保险库。",
+  "resetVaultThumbnailsTitle": "将所有保险库重置为默认值",
+  "resetVaultThumbnailsSubtitle": "让所有保险库（包括有自己设置的）都遵循上方的缩略图默认值。",
+  "resetVaultThumbnailsConfirmMessage": "{count, plural, other{有 {count} 个保险库使用了自己的缩略图设置。要让它们改为遵循默认值吗？}}",
+  "resetVaultThumbnailsDone": "{count, plural, other{{count} 个保险库现在已遵循默认值}}",
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, other{{count} 个保险库遵循此默认值，并将开始把缩略图存储在保险库内。这样会更慢，且无法用于只读保险库。}}"
 }

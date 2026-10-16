@@ -19878,6 +19878,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Return the list zoom and grid/masonry column count to their defaults whenever you switch layouts'**
   String get resetSizeOnLayoutChangeDesc;
+
+  /// Explanation under the Use global default switch in a vault's thumbnail settings
+  ///
+  /// In en, this message translates to:
+  /// **'Follows the thumbnail defaults in App settings, so changes there reach this vault too.'**
+  String get thumbnailUseGlobalDefaultDesc;
+
+  /// Title of the action that makes every vault follow the app-wide thumbnail default
+  ///
+  /// In en, this message translates to:
+  /// **'Reset all vaults to the default'**
+  String get resetVaultThumbnailsTitle;
+
+  /// Subtitle of the reset-all-vaults thumbnail action
+  ///
+  /// In en, this message translates to:
+  /// **'Makes every vault follow the thumbnail defaults above, including vaults with their own settings.'**
+  String get resetVaultThumbnailsSubtitle;
+
+  /// Confirmation shown before resetting the thumbnail settings of vaults that have their own; count is how many
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 vault has its own thumbnail settings. Make it follow the default instead?} other{{count} vaults have their own thumbnail settings. Make them follow the default instead?}}'**
+  String resetVaultThumbnailsConfirmMessage(num count);
+
+  /// Snackbar shown after resetting vault thumbnail settings; count is how many vaults changed
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 vault now follows the default} other{{count} vaults now follow the default}}'**
+  String resetVaultThumbnailsDone(num count);
+
+  /// Confirmation shown before switching the app-wide thumbnail default to storing inside vaults; count is how many vaults follow the default
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.} other{{count} vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.}}'**
+  String thumbnailGlobalInContainerConfirmMessage(num count);
 }
 
 class _AppLocalizationsDelegate

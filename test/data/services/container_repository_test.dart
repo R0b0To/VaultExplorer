@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 
@@ -576,6 +579,85 @@ void main() {
         secureStorage.data.containsKey(tempPimStorageKey(shortUri)),
         isFalse,
       );
+    });
+  });
+
+  group('Thumbnail settings inheritance', () {
+    const own = ContainerRecord(
+      uri: uriA,
+      label: 'Own settings',
+      thumbnailCacheMode: ThumbnailCacheMode.inContainer,
+      thumbnailQuality: ThumbnailQuality(quality: 90, size: 280),
+    );
+    const modeOnly = ContainerRecord(
+      uri: uriB,
+      label: 'Older record',
+      thumbnailCacheMode: ThumbnailCacheMode.appCache,
+    );
+    const follower = ContainerRecord(uri: uriC, label: 'Follower');
+
+    test('a record with no thumbnail fields follows the global default', () {
+      expect(follower.followsGlobalThumbnails, isTrue);
+      expect(
+        follower.ownThumbnailSettings(global: ThumbnailSettings.defaults),
+        isNull,
+      );
+      expect(own.followsGlobalThumbnails, isFalse);
+    });
+
+    test('a record that predates quality keeps its own mode and takes the '
+        'global quality for the missing half', () {
+      const global = ThumbnailSettings(
+        cacheMode: ThumbnailCacheMode.disabled,
+        quality: ThumbnailQuality(quality: 60, size: 150),
+      );
+      final resolved = modeOnly.ownThumbnailSettings(global: global);
+      expect(resolved?.cacheMode, ThumbnailCacheMode.appCache);
+      expect(resolved?.quality, global.quality);
+    });
+
+    test('counts split vaults into following and customised', () async {
+      await repo.save(own);
+      await repo.save(modeOnly);
+      await repo.save(follower);
+
+      expect(await repo.countThumbnailOverrides(), 2);
+      expect(await repo.countFollowingGlobalThumbnails(), 1);
+    });
+
+    test('resetThumbnailOverrides clears only the thumbnail fields and '
+        'reports how many vaults changed', () async {
+      await repo.save(own);
+      await repo.save(modeOnly);
+      await repo.save(follower);
+
+      expect(await repo.resetThumbnailOverrides(), 2);
+
+      final records = await repo.loadAll();
+      for (final uri in [uriA, uriB, uriC]) {
+        expect(records[uri]!.thumbnailCacheMode, isNull);
+        expect(records[uri]!.thumbnailQuality, isNull);
+        expect(records[uri]!.followsGlobalThumbnails, isTrue);
+      }
+      // Nothing else about the vault is touched.
+      expect(records[uriA]!.label, 'Own settings');
+      expect(await repo.countThumbnailOverrides(), 0);
+    });
+
+    test('the reset is persisted', () async {
+      await repo.save(own);
+      await repo.resetThumbnailOverrides();
+
+      final reopened = ContainerRepository.withCryptoApi(
+        cryptoApi,
+        secureStorage,
+      );
+      expect((await reopened.loadAll())[uriA]!.followsGlobalThumbnails, isTrue);
+    });
+
+    test('resetting when no vault has its own settings changes nothing', () async {
+      await repo.save(follower);
+      expect(await repo.resetThumbnailOverrides(), 0);
     });
   });
 }

@@ -6,10 +6,10 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -1231,28 +1231,22 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
               )
             else ...[
-              OptionPickerTile<ThumbnailCacheMode>(
-                label: context.l10n.cacheModeLabel,
-                value: state.thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                subtitle:
-                    state.thumbnailCacheMode?.getLocalizedLabel(context.l10n) ??
-                    context.l10n.useGlobalDefaultSubtitle,
-                options: ThumbnailCacheMode.values.map((mode) {
-                  return SelectOption(
-                    value: mode,
-                    label: mode.getLocalizedLabel(context.l10n),
-                    subtitle: mode.getLocalizedDescription(context.l10n),
-                  );
-                }).toList(),
-                onChanged: (v) => ref
+              ThumbnailSettingsTiles(
+                useGlobalDefault: state.useGlobalThumbnails,
+                onUseGlobalDefaultChanged: (v) => ref
+                    .read(containerConfigControllerProvider(_params).notifier)
+                    .setUseGlobalThumbnails(v),
+                cacheMode:
+                    state.thumbnailCacheMode ??
+                    ThumbnailSettings.defaults.cacheMode,
+                quality:
+                    state.thumbnailQuality ?? ThumbnailSettings.defaults.quality,
+                cacheModeLabel: context.l10n.cacheModeLabel,
+                qualityLabel: context.l10n.thumbnailQualityLabel,
+                onCacheModeChanged: (v) => ref
                     .read(containerConfigControllerProvider(_params).notifier)
                     .setThumbnailCacheMode(v),
-              ),
-              ThumbnailQualityTile(
-                label: context.l10n.thumbnailQualityLabel,
-                value:
-                    state.thumbnailQuality ?? ThumbnailQuality.defaultQuality,
-                onChanged: (v) => ref
+                onQualityChanged: (v) => ref
                     .read(containerConfigControllerProvider(_params).notifier)
                     .setThumbnailQuality(v),
               ),

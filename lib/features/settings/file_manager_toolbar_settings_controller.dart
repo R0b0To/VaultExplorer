@@ -29,10 +29,17 @@ class FileManagerToolbarSettingsState {
   final ContainerRecord? record;
   final bool loading;
 
+  /// Bumped whenever a bulk action rewrites vault records behind the
+  /// browsers' backs (see [FileManagerToolbarSettings.resetVaultThumbnailOverrides]).
+  /// A vault's own thumbnail settings live in its record, not in [config],
+  /// so a live file browser can't notice that change from the config alone.
+  final int thumbnailOverridesRevision;
+
   FileManagerToolbarSettingsState({
     FileManagerToolbarConfig? config,
     this.record,
     this.loading = true,
+    this.thumbnailOverridesRevision = 0,
   }) : config = config ?? FileManagerToolbarConfig.defaults();
 
   FileManagerToolbarSettingsState _copy({
@@ -40,10 +47,13 @@ class FileManagerToolbarSettingsState {
     ContainerRecord? record,
     bool setRecord = false,
     bool? loading,
+    int? thumbnailOverridesRevision,
   }) => FileManagerToolbarSettingsState(
     config: config ?? this.config,
     record: setRecord ? record : (record ?? this.record),
     loading: loading ?? this.loading,
+    thumbnailOverridesRevision:
+        thumbnailOverridesRevision ?? this.thumbnailOverridesRevision,
   );
 }
 
@@ -220,6 +230,37 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   Future<void> setDefaultThumbnailQuality(ThumbnailQuality quality) =>
       _updateConfig(state.config.copyWith(defaultThumbnailQuality: quality));
+
+  /// The thumbnail slot shared by Local Storage and the decoy file manager.
+  Future<void> setLocalStorageThumbnailCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(
+        state.config.copyWith(localStorageThumbnailCacheMode: mode),
+      );
+
+  Future<void> setLocalStorageThumbnailQuality(ThumbnailQuality quality) =>
+      _updateConfig(
+        state.config.copyWith(localStorageThumbnailQuality: quality),
+      );
+
+  /// Makes every saved vault follow the app-wide thumbnail default again,
+  /// then tells every live file browser to re-read its vault record (see
+  /// [FileManagerToolbarSettingsState.thumbnailOverridesRevision]). Returns
+  /// how many vaults changed.
+  Future<int> resetVaultThumbnailOverrides() async {
+    final changed = await ref
+        .read(containerRepositoryProvider)
+        .resetThumbnailOverrides();
+    if (changed > 0) {
+      for (final instance in _activeInstances.toList()) {
+        if (!instance.ref.mounted) continue;
+        instance.state = instance.state._copy(
+          thumbnailOverridesRevision:
+              instance.state.thumbnailOverridesRevision + 1,
+        );
+      }
+    }
+    return changed;
+  }
 
   Future<void> reorderActions(int oldIndex, int newIndex) async {
     final order = List<FileManagerAction>.from(state.config.order);

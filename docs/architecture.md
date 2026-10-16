@@ -915,6 +915,16 @@ than take this summary on faith:
 - **The on-disk (L2) thumbnail cache is byte-budgeted with a default 100 MB
   cap, enforced on startup** (`thumbnail_cache_service.dart`,
   `defaultMaxAppCacheBytes`).
+- **Thumbnail settings resolve in exactly one place** (`resolveThumbnailSettings`
+  in `thumbnail_settings_resolver.dart`). Cache mode and quality always travel
+  together as a `ThumbnailSettings` value. Two scopes exist: *vaults* (an
+  app-wide default in `FileManagerToolbarConfig.default*`, plus an optional
+  per-vault override on `ContainerRecord` where both fields null = "Use global
+  default", so changing the default reaches every vault that follows it) and
+  *Local Storage + the decoy file manager* (one shared slot,
+  `FileManagerToolbarConfig.localStorage*`, which never inherits the vault
+  default). Every settings screen renders `ThumbnailSettingsTiles`; consumers
+  of thumbnails only ever see the resolved value.
 - **Unlock sheets dismiss the on-screen keyboard on tap-outside via an
   opaque overlay**, applied identically to local and USB unlock flows
   (`unlock_sheet.dart`, `usb_unlock_sheet.dart`, `advanced_params_panel.dart`).

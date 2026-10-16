@@ -8,18 +8,25 @@ import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/core/widgets/inputs/slider_setting_tile.dart';
+import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
+
+  /// Whether this screen was opened for Local Storage / the decoy file
+  /// manager. Those only see their own thumbnail slot (with wording that
+  /// never names an encrypted container); the app-wide vault default and the
+  /// "reset all vaults" action are hidden, so the decoy never exposes
+  /// anything about vaults.
   final bool isLocalStorage;
 
   const FileManagerToolbarSettingsScreen({
@@ -331,26 +338,36 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.thumbnailCachingDefaultLabel),
                       SectionCard(
                         children: [
-                          OptionPickerTile<ThumbnailCacheMode>(
-                            label: context.l10n.thumbnailCachingDefaultLabel,
-                            value: state.config.defaultThumbnailCacheMode,
-                            options: ThumbnailCacheMode.values.map((mode) {
-                              return SelectOption(
-                                value: mode,
-                                label: mode.getLocalizedLabel(context.l10n, isLocalStorage: isLocalStorage),
-                                subtitle: mode.getLocalizedDescription(context.l10n, isLocalStorage: isLocalStorage),
-                              );
-                            }).toList(),
-                            onChanged: (v) => ref
+                          // Local Storage and the decoy file manager share one
+                          // slot of their own; the vault default (and the
+                          // action that resets vaults to it) is only offered
+                          // where vaults exist, i.e. never from the decoy's
+                          // local-only settings.
+                          if (!isLocalStorage) ...[
+                            const GlobalThumbnailDefaultsTiles(),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                              child: Text(
+                                context.l10n.localStorageCardTitle,
+                                style: textTheme.labelLarge?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                          ThumbnailSettingsTiles(
+                            cacheMode: state.config.localStorageThumbnailCacheMode,
+                            quality: state.config.localStorageThumbnailQuality,
+                            cacheModeLabel: context.l10n.cacheModeLabel,
+                            qualityLabel: context.l10n.thumbnailQualityLabel,
+                            isLocalStorage: true,
+                            onCacheModeChanged: (v) => ref
                                 .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setDefaultThumbnailCacheMode(v),
-                          ),
-                          ThumbnailQualityTile(
-                            label: context.l10n.thumbnailQualityDefaultLabel,
-                            value: state.config.defaultThumbnailQuality,
-                            onChanged: (v) => ref
+                                .setLocalStorageThumbnailCacheMode(v),
+                            onQualityChanged: (v) => ref
                                 .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setDefaultThumbnailQuality(v),
+                                .setLocalStorageThumbnailQuality(v),
                           ),
                         ],
                       ),

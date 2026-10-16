@@ -3286,5 +3286,11 @@
   "gridSpacingNone": "Ninguno",
   "gridSpacingValue": "{value} dp",
   "resetSizeOnLayoutChangeLabel": "Restablecer tamaño al cambiar de diseño",
-  "resetSizeOnLayoutChangeDesc": "Restablecer el zoom de la lista y el número de columnas de la cuadrícula y el mosaico a sus valores predeterminados al cambiar de diseño"
+  "resetSizeOnLayoutChangeDesc": "Restablecer el zoom de la lista y el número de columnas de la cuadrícula y el mosaico a sus valores predeterminados al cambiar de diseño",
+  "thumbnailUseGlobalDefaultDesc": "Sigue los valores predeterminados de miniaturas en los ajustes de la app, así que los cambios allí también se aplican a esta bóveda.",
+  "resetVaultThumbnailsTitle": "Restablecer todas las bóvedas al valor predeterminado",
+  "resetVaultThumbnailsSubtitle": "Hace que todas las bóvedas sigan los valores predeterminados de miniaturas de arriba, incluidas las que tienen ajustes propios.",
+  "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 bóveda tiene sus propios ajustes de miniaturas. ¿Hacer que siga el valor predeterminado?} other{{count} bóvedas tienen sus propios ajustes de miniaturas. ¿Hacer que sigan el valor predeterminado?}}",
+  "resetVaultThumbnailsDone": "{count, plural, =1{1 bóveda sigue ahora el valor predeterminado} other{{count} bóvedas siguen ahora el valor predeterminado}}",
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 bóveda sigue este valor predeterminado y empezará a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.} other{{count} bóvedas siguen este valor predeterminado y empezarán a guardar las miniaturas dentro de la bóveda. Es más lento y no se puede usar en bóvedas de solo lectura.}}"
 }

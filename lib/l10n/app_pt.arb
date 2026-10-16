@@ -3286,5 +3286,11 @@
   "gridSpacingNone": "Nenhum",
   "gridSpacingValue": "{value} dp",
   "resetSizeOnLayoutChangeLabel": "Redefinir tamanho ao mudar de layout",
-  "resetSizeOnLayoutChangeDesc": "Restaurar o zoom da lista e o número de colunas da grade e do mosaico para os valores padrão ao alternar o layout"
+  "resetSizeOnLayoutChangeDesc": "Restaurar o zoom da lista e o número de colunas da grade e do mosaico para os valores padrão ao alternar o layout",
+  "thumbnailUseGlobalDefaultDesc": "Segue os padrões de miniaturas nas configurações do app, então as alterações feitas lá também valem para este cofre.",
+  "resetVaultThumbnailsTitle": "Redefinir todos os cofres para o padrão",
+  "resetVaultThumbnailsSubtitle": "Faz todos os cofres seguirem os padrões de miniaturas acima, inclusive os cofres com configurações próprias.",
+  "resetVaultThumbnailsConfirmMessage": "{count, plural, =1{1 cofre tem configurações de miniaturas próprias. Fazê-lo seguir o padrão?} other{{count} cofres têm configurações de miniaturas próprias. Fazê-los seguir o padrão?}}",
+  "resetVaultThumbnailsDone": "{count, plural, =1{1 cofre agora segue o padrão} other{{count} cofres agora seguem o padrão}}",
+  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 cofre segue este padrão e passará a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.} other{{count} cofres seguem este padrão e passarão a guardar as miniaturas dentro do cofre. Isso é mais lento e não funciona em cofres somente leitura.}}"
 }

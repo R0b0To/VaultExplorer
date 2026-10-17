@@ -1,0 +1,885 @@
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/filesystem/name_validation.dart';
+import 'package:vaultexplorer/core/filesystem/path_components.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/inputs/password_visibility_toggle.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+
+
+extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
+  String localizedTitle(AppLocalizations l10n) => switch (this) {
+        ArchiveCompressionLevel.store => l10n.archiveCompressionStoreTitle,
+        ArchiveCompressionLevel.fast => l10n.archiveCompressionFastTitle,
+        ArchiveCompressionLevel.normal => l10n.archiveCompressionNormalTitle,
+        ArchiveCompressionLevel.ultra => l10n.archiveCompressionUltraTitle,
+      };
+
+  String localizedDescription(AppLocalizations l10n) => switch (this) {
+        ArchiveCompressionLevel.store => l10n.archiveCompressionStoreDesc,
+        ArchiveCompressionLevel.fast => l10n.archiveCompressionFastDesc,
+        ArchiveCompressionLevel.normal => l10n.archiveCompressionNormalDesc,
+        ArchiveCompressionLevel.ultra => l10n.archiveCompressionUltraDesc,
+      };
+}
+
+/// A modal bottom sheet for creating archives with modern layout, decoupled
+/// name/extension, dynamic security options, smart media recommendations,
+/// and progressive disclosure for advanced settings.
+class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  final String currentDirPath;
+  final List<RawEntry> existingEntries;
+  final String suggestedName;
+  final List<RawEntry> selectedEntries;
+  final int? freeSpace;
+  final Future<void> Function(
+    String destPathInContainer,
+    ArchiveFormatType format,
+    String? passphrase,
+    bool encryptFilenames,
+    ArchiveCompressionLevel compressionLevel,
+  ) onCreate;
+
+  const CreateArchiveBottomSheet({
+    super.key,
+    required this.container,
+    required this.currentDirPath,
+    required this.existingEntries,
+    required this.suggestedName,
+    this.selectedEntries = const [],
+    this.freeSpace,
+    required this.onCreate,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    required MountedContainer container,
+    required String currentDirPath,
+    required List<RawEntry> existingEntries,
+    required String suggestedName,
+    List<RawEntry> selectedEntries = const [],
+    int? freeSpace,
+    required Future<void> Function(
+      String destPathInContainer,
+      ArchiveFormatType format,
+      String? passphrase,
+      bool encryptFilenames,
+      ArchiveCompressionLevel compressionLevel,
+    ) onCreate,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      builder: (sheetContext) => CreateArchiveBottomSheet(
+        container: container,
+        currentDirPath: currentDirPath,
+        existingEntries: existingEntries,
+        suggestedName: suggestedName,
+        selectedEntries: selectedEntries,
+        freeSpace: freeSpace,
+        onCreate: onCreate,
+      ),
+    );
+  }
+
+  @override
+  ConsumerState<CreateArchiveBottomSheet> createState() =>
+      _CreateArchiveBottomSheetState();
+}
+
+class _CreateArchiveBottomSheetState
+    extends ConsumerState<CreateArchiveBottomSheet> {
+  static const _selectableFormats = [
+    ArchiveFormatType.zip,
+    ArchiveFormatType.sevenZip,
+    ArchiveFormatType.tar,
+    ArchiveFormatType.tarGz,
+    ArchiveFormatType.tarXz,
+    ArchiveFormatType.tarZstd,
+    ArchiveFormatType.tarLzma,
+    ArchiveFormatType.iso,
+    ArchiveFormatType.cpio,
+  ];
+
+  late final TextEditingController _nameCtrl;
+  final TextEditingController _passwordCtrl = TextEditingController();
+  final TextEditingController _confirmPasswordCtrl = TextEditingController();
+  late final FilesystemType _fsType;
+  ArchiveFormatType _format = ArchiveFormatType.zip;
+  ArchiveCompressionLevel _compressionLevel = ArchiveCompressionLevel.normal;
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _encryptFilenames = false;
+  bool _showAdvanced = false;
+  bool _isMediaRecommended = false;
+
+  List<NameValidationIssue> _issues = [];
+  EntryConflictResult _conflict =
+      const EntryConflictResult(EntryConflictKind.none, null);
+
+  int get _totalSelectedBytes =>
+      widget.selectedEntries.fold<int>(0, (sum, e) => sum + e.sizeBytes);
+
+  bool get _hasPassword =>
+      _format.supportsPassword && _passwordCtrl.text.isNotEmpty;
+
+  bool get _passwordMatchesConfirm =>
+      !_hasPassword || _passwordCtrl.text == _confirmPasswordCtrl.text;
+
+  bool get _isValidName => _issues.isEmpty && !_conflict.isConflict;
+
+  bool get _hasEnoughSpace {
+    if (widget.freeSpace == null || widget.freeSpace! < 0) return true;
+    return widget.freeSpace! >= _totalSelectedBytes;
+  }
+
+  bool get _canCreate {
+    final stem = _nameCtrl.text.trim();
+    if (stem.isEmpty) return false;
+    if (!_isValidName) return false;
+    if (!_hasEnoughSpace) return false;
+    if (!_passwordMatchesConfirm) return false;
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fsType = resolveFilesystemType(widget.container);
+
+    // Decouple name and extension: extract stem without extension
+    final initialSuggested = widget.suggestedName;
+    final dotIdx = initialSuggested.lastIndexOf('.');
+    final stem = dotIdx > 0
+        ? initialSuggested.substring(0, dotIdx)
+        : initialSuggested;
+    _nameCtrl = TextEditingController(text: stem);
+
+    // Smart recommendation: check if only media/precompressed files are selected
+    if (_hasOnlyPrecompressedFiles(widget.selectedEntries)) {
+      _compressionLevel = ArchiveCompressionLevel.store;
+      _isMediaRecommended = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _revalidate();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    super.dispose();
+  }
+
+  static bool _hasOnlyPrecompressedFiles(List<RawEntry> entries) {
+    if (entries.isEmpty) return false;
+    const precompressedExtensions = {
+      'mp4', 'mkv', 'avi', 'mov', 'webm', '3gp', 'flv', 'wmv', 'm4v',
+      'mp3', 'm4a', 'aac', 'ogg', 'opus', 'flac', 'wma',
+      'jpg', 'jpeg', 'png', 'webp', 'heic', 'gif',
+      'zip', '7z', 'rar', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'tar.gz', 'apk', 'pdf'
+    };
+    final fileEntries = entries.where((e) => !e.isDir).toList();
+    if (fileEntries.isEmpty) return false;
+    return fileEntries.every((e) {
+      final dot = e.name.lastIndexOf('.');
+      if (dot == -1) return false;
+      final ext = e.name.substring(dot + 1).toLowerCase();
+      return precompressedExtensions.contains(ext);
+    });
+  }
+
+  void _revalidate() {
+    final stem = _nameCtrl.text.trim();
+    final fullName = stem.isEmpty ? '' : '$stem.${_format.fileExtension}';
+    final l10n = context.l10n;
+
+    final nameResult = validateEntryName(
+      fullName,
+      _fsType,
+      entryType: EntryType.file,
+      l10n: l10n,
+    );
+
+    final conflictResult = fullName.isEmpty
+        ? const EntryConflictResult(EntryConflictKind.none, null)
+        : checkEntryConflict(
+            candidateName: fullName,
+            candidateIsDir: false,
+            existingEntries: widget.existingEntries,
+            caseSensitive: FilesystemRules.of(_fsType).caseSensitive,
+          );
+
+    setState(() {
+      _issues = nameResult.issues;
+      _conflict = conflictResult;
+    });
+  }
+
+  void _onFormatChanged(ArchiveFormatType format) {
+    if (format == _format) return;
+    setState(() {
+      _format = format;
+      if (!format.supportsPassword) {
+        _passwordCtrl.clear();
+        _confirmPasswordCtrl.clear();
+      }
+      if (!format.supportsFilenameEncryption) {
+        _encryptFilenames = false;
+      }
+    });
+    _revalidate();
+  }
+
+  void _onCreate() {
+    if (!_canCreate) return;
+    final stem = _nameCtrl.text.trim();
+    final fullName = '$stem.${_format.fileExtension}';
+    final l10n = context.l10n;
+    final parentSegments = widget.currentDirPath.isEmpty
+        ? <String>[]
+        : widget.currentDirPath.split('/');
+
+    final built = PathComponents(
+      parentSegments: parentSegments,
+      name: fullName,
+      type: EntryType.file,
+      fsType: _fsType,
+    ).validateAndBuild(l10n);
+    if (built is! PathBuildSuccess) return;
+
+    final passphrase = _hasPassword ? _passwordCtrl.text : null;
+    final encryptFilenames =
+        passphrase != null && _format.supportsFilenameEncryption && _encryptFilenames;
+
+    Navigator.pop(context);
+    widget.onCreate(
+      built.path,
+      _format,
+      passphrase,
+      encryptFilenames,
+      _compressionLevel,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final viewInsetsBottom = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.88;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: viewInsetsBottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildHeader(cs, textTheme),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+
+              // ── Scrollable Form Body ────────────────────────────────────
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      // Free space warning if insufficient
+                      if (!_hasEnoughSpace) ...[
+                        _buildInsufficientSpaceBanner(cs, textTheme),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Archive Name & Decoupled Format Pill
+                      Text(
+                        context.l10n.createArchiveNameLabel,
+                        style: textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _buildNameAndFormatRow(cs, textTheme),
+
+                      // Live validation issues & conflict errors
+                      _buildValidationIssues(cs),
+
+                      // Dynamic Password & Security Options
+                      if (_format.supportsPassword) ...[
+                        const SizedBox(height: 16),
+                        _buildSecuritySection(cs, textTheme),
+                      ],
+
+                      const SizedBox(height: 16),
+
+                      // Collapsible Advanced Options Accordion
+                      _buildAdvancedAccordion(cs, textTheme),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Bottom Action Buttons ───────────────────────────────────
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(context.l10n.cancel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _canCreate ? _onCreate : null,
+                      child: Text(context.l10n.create),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ColorScheme cs, TextTheme textTheme) {
+    final count = widget.selectedEntries.length;
+    final totalSizeStr = formatBytes(_totalSelectedBytes);
+
+    final summaryText = count > 0
+        ? context.l10n.createArchiveCompressingSubtitle(
+            context.l10n.fileOpItemsCount(count),
+            totalSizeStr,
+          )
+        : context.l10n.createArchiveTitle;
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: cs.primaryContainer.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.archive_rounded, color: cs.primary, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                context.l10n.createArchiveTitle,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                summaryText,
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsufficientSpaceBanner(ColorScheme cs, TextTheme textTheme) {
+    final requiredStr = formatBytes(_totalSelectedBytes);
+    final freeStr = formatBytes(widget.freeSpace ?? 0);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.error.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 18, color: cs.error),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              context.l10n.createArchiveInsufficientSpace(requiredStr, freeStr),
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onErrorContainer,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildNameAndFormatRow(ColorScheme cs, TextTheme textTheme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Name field (stem only)
+        Expanded(
+          child: TextField(
+            controller: _nameCtrl,
+            decoration: InputDecoration(
+              hintText: context.l10n.createArchiveNameHint,
+              filled: true,
+              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.primary, width: 2),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+            onChanged: (_) => _revalidate(),
+            onSubmitted: (_) => _onCreate(),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Dynamic extension pill / dropdown
+        _buildFormatSelectorPill(cs, textTheme),
+      ],
+    );
+  }
+
+  Widget _buildFormatSelectorPill(ColorScheme cs, TextTheme textTheme) {
+    return PopupMenuButton<ArchiveFormatType>(
+      initialValue: _format,
+      tooltip: context.l10n.createArchiveSelectFormatTooltip,
+      onSelected: _onFormatChanged,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (context) => [
+        for (final f in _selectableFormats)
+          PopupMenuItem(
+            value: f,
+            child: Row(
+              children: [
+                Text(
+                  '.${f.fileExtension}',
+                  style: TextStyle(
+                    fontWeight: f == _format ? FontWeight.bold : FontWeight.normal,
+                    color: f == _format ? cs.primary : cs.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '(${f.displayLabel})',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (f == _format)
+                  Icon(Icons.check, size: 16, color: cs.primary),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '.${_format.fileExtension}',
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidationIssues(ColorScheme cs) {
+    final candidateName = '${_nameCtrl.text.trim()}.${_format.fileExtension}';
+    final hasIssues = _issues.isNotEmpty || _conflict.isConflict;
+    final messages = hasIssues
+        ? [
+            ..._issues.map((i) => i.message),
+            if (_conflict.isConflict)
+              _conflict.message(context.l10n, candidateName)!,
+          ]
+        : const <String>[];
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: hasIssues
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: messages
+                    .map((m) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            m,
+                            style: TextStyle(
+                              color: cs.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildSecuritySection(ColorScheme cs, TextTheme textTheme) {
+    final hasPassword = _passwordCtrl.text.isNotEmpty;
+    final hasConfirmMismatch =
+        hasPassword && _passwordCtrl.text != _confirmPasswordCtrl.text;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.createArchiveSecuritySection,
+          style: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Password field
+        TextField(
+          controller: _passwordCtrl,
+          obscureText: _obscurePassword,
+          decoration: InputDecoration(
+            labelText: context.l10n.createArchivePasswordLabel,
+            hintText: context.l10n.createArchivePasswordHintText,
+            filled: true,
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _obscurePassword,
+              onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+            ),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+
+        // Password strength meter & Repeat password field when entered
+        if (hasPassword) ...[
+          const SizedBox(height: 8),
+          _buildPasswordStrengthBar(cs, textTheme),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _confirmPasswordCtrl,
+            obscureText: _obscureConfirmPassword,
+            decoration: InputDecoration(
+              labelText: context.l10n.createArchiveConfirmPasswordLabel,
+              hintText: context.l10n.createArchiveConfirmPasswordHint,
+              errorText: hasConfirmMismatch ? context.l10n.passwordsDoNotMatch : null,
+              filled: true,
+              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.primary, width: 2),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              suffixIcon: PasswordVisibilityToggle(
+                obscured: _obscureConfirmPassword,
+                onToggle: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+
+        if (_format.supportsFilenameEncryption) ...[
+          const SizedBox(height: 10),
+
+          // Encrypt file names Action Tile / Switch
+          _buildEncryptFilenamesTile(cs, textTheme),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPasswordStrengthBar(ColorScheme cs, TextTheme textTheme) {
+    final pwd = _passwordCtrl.text;
+    int strength = 0;
+    if (pwd.length >= 6) strength++;
+    if (pwd.length >= 10) strength++;
+    if (RegExp(r'[0-9]').hasMatch(pwd) && RegExp(r'[a-zA-Z]').hasMatch(pwd)) {
+      strength++;
+    }
+    if (RegExp(r'[^a-zA-Z0-9]').hasMatch(pwd)) strength++;
+
+    final (color, label) = switch (strength) {
+      0 || 1 => (cs.error, context.l10n.passphraseStrengthWeak),
+      2 => (Colors.orange, context.l10n.passphraseStrengthFair),
+      3 => (cs.primary, context.l10n.passphraseStrengthGood),
+      _ => (Colors.green, context.l10n.passphraseStrengthStrong),
+    };
+
+    return Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (strength + 1) / 5.0,
+              color: color,
+              backgroundColor: cs.outlineVariant.withValues(alpha: 0.3),
+              minHeight: 4,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEncryptFilenamesTile(ColorScheme cs, TextTheme textTheme) {
+    final hasPassword = _passwordCtrl.text.isNotEmpty;
+    final canToggle = hasPassword;
+
+    final subtitle = !hasPassword
+        ? context.l10n.createArchiveEncryptFilenamesNeedsPassword
+        : context.l10n.createArchiveEncryptFilenamesActive;
+
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              Icons.enhanced_encryption_rounded,
+              color: canToggle
+                  ? (_encryptFilenames ? cs.primary : cs.onSurfaceVariant)
+                  : cs.onSurfaceVariant.withValues(alpha: 0.4),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.l10n.createArchiveEncryptFilenames,
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: canToggle
+                          ? cs.onSurface
+                          : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: hasPassword && _encryptFilenames,
+              onChanged:
+                  canToggle ? (v) => setState(() => _encryptFilenames = v) : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdvancedAccordion(ColorScheme cs, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                Icon(
+                  _showAdvanced
+                      ? Icons.arrow_drop_down_rounded
+                      : Icons.arrow_right_rounded,
+                  color: cs.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  context.l10n.createArchiveAdvancedOptions,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showAdvanced) ...[
+          const SizedBox(height: 8),
+          Material(
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Compression level
+                  Text(
+                    context.l10n.createArchiveCompressionLevel,
+                    style: textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<ArchiveCompressionLevel>(
+                    initialValue: _compressionLevel,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor:
+                          cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                    items: [
+                      for (final lvl in ArchiveCompressionLevel.values)
+                        DropdownMenuItem(
+                          value: lvl,
+                          child: Text(lvl.localizedTitle(context.l10n)),
+                        ),
+                    ],
+                    onChanged: (lvl) {
+                      if (lvl != null) {
+                        setState(() {
+                          _compressionLevel = lvl;
+                          _isMediaRecommended = false;
+                        });
+                      }
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 4),
+                    child: Text(
+                      _compressionLevel.localizedDescription(context.l10n),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}

@@ -2594,6 +2594,50 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     exitSelectionMode();
   }
 
+  void _bindOpListener(FileOperation op) {
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (done) {
+        op.removeListener(listener);
+        final isDirectDest = op.destDirPath == _currentDirPath;
+        final isSubdirOfCurrent = op.destDirPath.startsWith(
+          _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
+        );
+        final isCurrentInsideDest = _currentDirPath.startsWith(
+          op.destDirPath.isEmpty ? '' : '${op.destDirPath}/',
+        );
+        // A failed/diskFull/partially-failed op is left in the service's
+        // list instead of being dismissed here -- dismissing unconditionally
+        // used to wipe the operation out (and its error message with it)
+        // the instant it finished, before AppBarTransferButton's
+        // "keep showing while there are errors" linger logic or
+        // FileOperationsSheet's per-item failure detail ever got a chance
+        // to display it. This is exactly why e.g. running out of space
+        // mid-import/copy/move used to look like a silent no-op: the
+        // status and message were computed correctly, just discarded
+        // before anyone could see them. The person (or the sheet's
+        // "Clear all") dismisses it explicitly instead.
+        final keepVisible = _opNeedsAttention(op);
+
+        if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
+          _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
+            if (!keepVisible) _opSvc.dismiss(op.id);
+          });
+        } else if (!keepVisible) {
+          _opSvc.dismiss(op.id);
+        }
+      }
+    }
+
+    op.addListener(listener);
+  }
+
   Future<void> _paste() async {
     final clip = ref.read(crossContainerClipboardProvider);
     if (!clip.hasItems) return;
@@ -2629,50 +2673,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       srcContainer = widget.container;
     }
 
-    void bindOpListener(FileOperation op) {
-      void listener() {
-        if (!mounted) {
-          op.removeListener(listener);
-          return;
-        }
-        final done =
-            op.status != FileOperationStatus.running &&
-            op.status != FileOperationStatus.pending;
-        if (done) {
-          op.removeListener(listener);
-          final isDirectDest = op.destDirPath == _currentDirPath;
-          final isSubdirOfCurrent = op.destDirPath.startsWith(
-            _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
-          );
-          final isCurrentInsideDest = _currentDirPath.startsWith(
-            op.destDirPath.isEmpty ? '' : '${op.destDirPath}/',
-          );
-          // A failed/diskFull/partially-failed op is left in the service's
-          // list instead of being dismissed here -- dismissing unconditionally
-          // used to wipe the operation out (and its error message with it)
-          // the instant it finished, before AppBarTransferButton's
-          // "keep showing while there are errors" linger logic or
-          // FileOperationsSheet's per-item failure detail ever got a chance
-          // to display it. This is exactly why e.g. running out of space
-          // mid-import/copy/move used to look like a silent no-op: the
-          // status and message were computed correctly, just discarded
-          // before anyone could see them. The person (or the sheet's
-          // "Clear all") dismisses it explicitly instead.
-          final keepVisible = _opNeedsAttention(op);
-
-          if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
-            _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
-              if (!keepVisible) _opSvc.dismiss(op.id);
-            });
-          } else if (!keepVisible) {
-            _opSvc.dismiss(op.id);
-          }
-        }
-      }
-
-      op.addListener(listener);
-    }
-
     // ── Archive Create Paste ────────────────────────────────────────────
     if (clip.isArchiveCreate) {
       final archiveName = clip.archiveName ?? 'archive.zip';
@@ -2694,10 +2694,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         passphrase: clip.passphrase,
         encryptFilenames: clip.encryptFilenames,
         deleteSourceAfter: options.deleteSourceAfter,
+        compressionLevel: clip.compressionLevel ?? ArchiveCompressionLevel.normal,
         l10n: context.l10n,
       );
       _clip.clear();
-      bindOpListener(op);
+      _bindOpListener(op);
       return;
     }
 
@@ -2750,7 +2751,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         l10n: context.l10n,
       );
       _clip.clear();
-      bindOpListener(op);
+      _bindOpListener(op);
       return;
     }
 
@@ -2783,7 +2784,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         );
     if (!mounted || op == null) return;
     _clip.clear();
-    bindOpListener(op);
+    _bindOpListener(op);
   }
 
   void _batchDelete() {
@@ -2925,8 +2926,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       currentDirPath: currentDirPath,
       existingEntries: existingEntries,
       suggestedName: suggestedName,
+      selectedEntries: entries,
+      freeSpace: _freeSpace,
       readOnly: _isReadOnly,
-      onCreate: (destPath, format, passphrase, encryptFilenames) async {
+      onCreate: (
+        destPath,
+        format,
+        passphrase,
+        encryptFilenames,
+        compressionLevel,
+      ) async {
         final clipItems = entries.map((e) {
           final path = _fullPathOf(e);
           return ClipboardItem(
@@ -2946,6 +2955,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           format: format,
           passphrase: passphrase,
           encryptFilenames: encryptFilenames,
+          compressionLevel: compressionLevel,
         );
         _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },

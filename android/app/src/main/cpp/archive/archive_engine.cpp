@@ -182,9 +182,14 @@ bool containsCaseInsensitive(const char* haystack, const char* needle) {
 }
 
 ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
-    if (containsCaseInsensitive(archive_error_string(a), "passphrase")) {
+    const char* err = archive_error_string(a);
+    if (containsCaseInsensitive(err, "passphrase") ||
+        containsCaseInsensitive(err, "password")) {
         return passphraseGiven ? ArchiveOpenStatus::WrongPassphrase
                                 : ArchiveOpenStatus::PassphraseRequired;
+    }
+    if (!passphraseGiven && containsCaseInsensitive(err, "encrypt")) {
+        return ArchiveOpenStatus::PassphraseRequired;
     }
     return ArchiveOpenStatus::IoError;
 }
@@ -255,19 +260,21 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
             ++nonDirectoryCount;
         }
 
-        // 7-Zip normally leaves its header (including filenames) unencrypted
-        // even when file data is encrypted. Let the browser index those
-        // entries without a passphrase; extraction will request and validate
-        // the password when data is actually read. If the 7-Zip header itself
-        // is encrypted, libarchive requests a passphrase from
-        // archive_read_next_header() above, so that case still prompts here.
+        // 7-Zip and ZIP formats leave headers (including filenames) unencrypted
+        // even when file data is encrypted (ZIP central directory is always
+        // unencrypted; 7-Zip headers are unencrypted unless header encryption
+        // is selected). Let the browser index those entries without a passphrase;
+        // extraction will request and validate the password when data is actually
+        // read. If the 7-Zip header itself is encrypted, libarchive requests a
+        // passphrase from archive_read_next_header() above, so that case still
+        // prompts here.
         // Other formats retain the scan-time probe so their existing
         // password-required behavior is unchanged.
         const int formatFamily = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
-        const bool deferSevenZipPassphrase =
-            formatFamily == ARCHIVE_FORMAT_7ZIP && passphrase.empty();
+        const bool deferPassphrase =
+            (formatFamily == ARCHIVE_FORMAT_7ZIP || formatFamily == ARCHIVE_FORMAT_ZIP) && passphrase.empty();
         if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
-            if (deferSevenZipPassphrase) {
+            if (deferPassphrase) {
                 // Checked when the data is actually read.
             } else if (passphrase.empty()) {
                 result.status = ArchiveOpenStatus::PassphraseRequired;
@@ -277,7 +284,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
             // Probe only when validating a supplied passphrase. A zero-byte
             // entry has nothing to decrypt, so keep scanning for a non-empty
             // encrypted entry that can validate it.
-            if (!deferSevenZipPassphrase &&
+            if (!deferPassphrase &&
                 archive_entry_size_is_set(entry) && archive_entry_size(entry) > 0) {
                 uint8_t probe[64];
                 const la_ssize_t n = archive_read_data(a, probe, sizeof(probe));
@@ -366,8 +373,13 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
             break;
         }
         if (n < 0) {
-            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
-                                              : classifyFailure(a, !passphrase.empty());
+            ArchiveOpenStatus status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                                        : classifyFailure(a, !passphrase.empty());
+            if (status == ArchiveOpenStatus::IoError && archive_entry_is_data_encrypted(entry) > 0) {
+                status = passphrase.empty() ? ArchiveOpenStatus::PassphraseRequired
+                                            : ArchiveOpenStatus::WrongPassphrase;
+            }
+            result.status = status;
             result.errorMessage = archiveErrorAt(a, "extract/entry data", "failed to read entry data");
             result.data.clear();
             archive_read_free(a);
@@ -439,8 +451,13 @@ ArchiveExtractResult archiveExtractEntryToSink(
         const la_ssize_t n = archive_read_data(a, chunk.data(), chunk.size());
         if (n == 0) break;
         if (n < 0) {
-            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
-                                              : classifyFailure(a, !passphrase.empty());
+            ArchiveOpenStatus status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                                        : classifyFailure(a, !passphrase.empty());
+            if (status == ArchiveOpenStatus::IoError && archive_entry_is_data_encrypted(entry) > 0) {
+                status = passphrase.empty() ? ArchiveOpenStatus::PassphraseRequired
+                                            : ArchiveOpenStatus::WrongPassphrase;
+            }
+            result.status = status;
             result.errorMessage = archiveErrorAt(a, "extract-to-sink/entry data", "failed to read entry data");
             archive_read_free(a);
             return result;
@@ -552,8 +569,13 @@ ArchiveBulkExtractResult archiveExtractAll(
             const la_ssize_t n = archive_read_data(a, chunk.data(), chunk.size());
             if (n == 0) break;
             if (n < 0) {
-                result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
-                                                  : classifyFailure(a, !passphrase.empty());
+                ArchiveOpenStatus status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                                            : classifyFailure(a, !passphrase.empty());
+                if (status == ArchiveOpenStatus::IoError && archive_entry_is_data_encrypted(entry) > 0) {
+                    status = passphrase.empty() ? ArchiveOpenStatus::PassphraseRequired
+                                                : ArchiveOpenStatus::WrongPassphrase;
+                }
+                result.status = status;
                 result.errorMessage = archiveErrorAt(a, "extract-all/entry data", "failed to read entry data");
                 writeSuccess = false;
                 break;

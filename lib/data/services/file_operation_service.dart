@@ -143,6 +143,24 @@ class FileOperationService extends ChangeNotifier {
           op.status != FileOperationStatus.failed,
     );
     for (final op in active) {
+      // Archive-create: the items list holds *source* files, but the only
+      // entry created at the destination is the archive itself.
+      if (op.isArchiveCreate) {
+        final name = op.archiveName;
+        if (name != null && name.isNotEmpty) {
+          placeholders.add(
+            RawEntry(
+              name: name,
+              isDir: false,
+              sizeBytes: op.archiveBytesWritten,
+              modifiedSecs: 0,
+              isPlaceholder: true,
+            ),
+          );
+        }
+        continue;
+      }
+
       for (int i = 0; i < op.items.length; i++) {
         final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
         final result = status?.result ?? FileItemResult.pending;
@@ -372,6 +390,7 @@ class FileOperationService extends ChangeNotifier {
     String? passphrase,
     bool encryptFilenames = false,
     bool deleteSourceAfter = false,
+    ArchiveCompressionLevel compressionLevel = ArchiveCompressionLevel.normal,
     required AppLocalizations l10n,
   }) {
     final op = FileOperation._internal(
@@ -384,6 +403,7 @@ class FileOperationService extends ChangeNotifier {
       destDirPath: destDirPath,
       items: items,
       isArchiveCreate: true,
+      archiveName: archiveName,
       l10n: l10n,
       cancelNativeOperation: _cancelNativeOperation,
     );
@@ -402,6 +422,7 @@ class FileOperationService extends ChangeNotifier {
       passphrase,
       encryptFilenames,
       deleteSourceAfter,
+      compressionLevel,
     );
     return op;
   }
@@ -738,13 +759,14 @@ class FileOperationService extends ChangeNotifier {
     String? passphrase,
     bool encryptFilenames,
     bool deleteSourceAfter,
+    ArchiveCompressionLevel compressionLevel,
   ) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.verbArchiving);
 
     void onProgress(SplitJoinProgress p) {
       if (p.opId != op.id) return;
-      op._setArchiveCreateBytesWritten(p.bytesDone);
+      op._setArchiveCreateBytesWritten(p.bytesDone, p.bytesTotal);
     }
 
     _engineEvents.addSplitJoinProgressListener(onProgress);
@@ -762,6 +784,7 @@ class FileOperationService extends ChangeNotifier {
       final srcPaths = <String>[];
       final entryNames = <String>[];
       final modifiedSecs = <int>[];
+      int totalInputBytes = 0;
 
       Future<void> collect(String containerPath, String archivePath) async {
         if (op.cancelRequested) throw const _CancelledException();
@@ -781,6 +804,7 @@ class FileOperationService extends ChangeNotifier {
             );
             entryNames.add(childArchivePath);
             modifiedSecs.add(child.modifiedSecs);
+            totalInputBytes += child.sizeBytes;
           }
         }
       }
@@ -795,6 +819,7 @@ class FileOperationService extends ChangeNotifier {
           );
           entryNames.add(item.name);
           modifiedSecs.add(item.modifiedSecs);
+          totalInputBytes += item.sizeBytes;
         }
       }
 
@@ -803,6 +828,10 @@ class FileOperationService extends ChangeNotifier {
       if (srcPaths.isEmpty) {
         op._setStatus(FileOperationStatus.completed);
         return;
+      }
+
+      if (totalInputBytes > 0) {
+        op._setArchiveTotalBytes(totalInputBytes);
       }
 
       await _fileIoApi.deleteFile(dest, destVaultPath);
@@ -820,6 +849,7 @@ class FileOperationService extends ChangeNotifier {
             : null,
         passphrase: passphrase,
         encryptFilenames: encryptFilenames,
+        compressionLevel: compressionLevel.level,
         opId: op.id,
       );
 

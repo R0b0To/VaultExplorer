@@ -496,6 +496,7 @@ class ArchiveService {
     String? destFilePath,
     String? passphrase,
     bool encryptFilenames = false,
+    int? compressionLevel,
     int? opId,
   }) {
     return _archive.createArchive(
@@ -509,6 +510,7 @@ class ArchiveService {
       destFilePath: destFilePath,
       passphrase: passphrase,
       encryptFilenames: encryptFilenames,
+      compressionLevel: compressionLevel,
       opId: opId,
     );
   }

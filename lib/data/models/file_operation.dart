@@ -113,6 +113,7 @@ class FileOperation extends ChangeNotifier {
   final bool isDelete;
   final bool isArchiveCreate;
   final bool isArchiveExtract;
+  final String? archiveName;
   final AppLocalizations l10n;
   final DateTime createdAt;
   FileOperationStatus _status = FileOperationStatus.pending;
@@ -142,15 +143,24 @@ class FileOperation extends ChangeNotifier {
   int _importTotal = 0;
 
   int _transferredBytes = 0;
-  int get transferredBytes =>
-      (isImport || isExport) ? _importTransferredBytes : _transferredBytes;
+  int get transferredBytes => (isImport || isExport)
+      ? _importTransferredBytes
+      : isArchiveCreate
+          ? _archiveBytesWritten
+          : _transferredBytes;
 
   int _totalBytes = 0;
-  int get totalBytes =>
-      (isImport || isExport) ? _importTotalBytes : _totalBytes;
+  int get totalBytes => (isImport || isExport)
+      ? _importTotalBytes
+      : isArchiveCreate
+          ? _archiveTotalBytes
+          : _totalBytes;
 
   int _archiveBytesWritten = 0;
   int get archiveBytesWritten => _archiveBytesWritten;
+
+  int _archiveTotalBytes = 0;
+  int get archiveTotalBytes => _archiveTotalBytes;
 
   int _removedCount = 0;
   int get removedCount => _removedCount;
@@ -203,6 +213,9 @@ class FileOperation extends ChangeNotifier {
       return null;
     }
     if (isArchiveCreate) {
+      if (_archiveTotalBytes > 0) {
+        return (_archiveBytesWritten / _archiveTotalBytes).clamp(0.0, 1.0);
+      }
       return null;
     }
     if (_totalBytes > 0) {
@@ -331,6 +344,7 @@ class FileOperation extends ChangeNotifier {
     this.isDelete = false,
     this.isArchiveCreate = false,
     this.isArchiveExtract = false,
+    this.archiveName,
     required this.l10n,
     this._cancelNativeOperation,
     DateTime? createdAt,
@@ -364,8 +378,18 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setArchiveCreateBytesWritten(int bytesWritten) {
+  void _setArchiveTotalBytes(int bytesTotal) {
+    if (bytesTotal > 0) {
+      _archiveTotalBytes = bytesTotal;
+      notifyListeners();
+    }
+  }
+
+  void _setArchiveCreateBytesWritten(int bytesWritten, [int? bytesTotal]) {
     _archiveBytesWritten = bytesWritten;
+    if (bytesTotal != null && bytesTotal > 0) {
+      _archiveTotalBytes = bytesTotal;
+    }
     _currentActivity = l10n.fileOpArchivingBytes(formatBytes(bytesWritten));
     notifyListeners();
   }

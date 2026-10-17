@@ -27,6 +27,7 @@ typedef ClipboardState = ({
   String? passphrase,
   // 7z archive creation: also encrypt the file names (the archive header).
   bool encryptFilenames,
+  ArchiveCompressionLevel? compressionLevel,
   ArchiveContext? archiveContext,
   List<String>? selectedEntryPaths,
 });
@@ -40,6 +41,7 @@ const _emptyClipboard = (
   archiveFormat: null,
   passphrase: null,
   encryptFilenames: false,
+  compressionLevel: null,
   archiveContext: null,
   selectedEntryPaths: null,
 );
@@ -82,6 +84,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       archiveFormat: null,
       passphrase: null,
       encryptFilenames: false,
+      compressionLevel: null,
       archiveContext: null,
       selectedEntryPaths: null,
     );
@@ -95,6 +98,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     required ArchiveFormatType format,
     String? passphrase,
     bool encryptFilenames = false,
+    ArchiveCompressionLevel? compressionLevel,
   }) {
     state = (
       sourceVolId: volId,
@@ -105,6 +109,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       archiveFormat: format,
       passphrase: passphrase,
       encryptFilenames: encryptFilenames,
+      compressionLevel: compressionLevel,
       archiveContext: null,
       selectedEntryPaths: null,
     );
@@ -127,6 +132,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       archiveFormat: null,
       passphrase: archiveContext.passphrase,
       encryptFilenames: false,
+      compressionLevel: null,
       archiveContext: archiveContext,
       selectedEntryPaths: selectedEntryPaths != null
           ? List.unmodifiable(selectedEntryPaths)

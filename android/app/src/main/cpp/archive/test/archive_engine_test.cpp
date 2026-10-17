@@ -299,23 +299,28 @@ int main() {
         printf("zip index+extract: ok\n");
     }
 
-    // --- AES-256 encrypted ZIP: archiveScanEntries probe-decrypts the
-    // first non-empty encrypted entry it hits (see the comment above that
-    // probe in archive_engine.cpp) specifically so a missing or wrong
-    // passphrase is caught at scan time, not silently deferred to
-    // extraction -- so, unlike a plain ZIP, listing this one needs the
-    // right passphrase too. ---
+    // --- AES-256 encrypted ZIP: file names and central directory headers
+    // remain readable without a passphrase, matching 7-Zip (with plaintext
+    // headers) and standard ZIP utility behavior. The passphrase is required
+    // and verified when entries are extracted or when scan explicitly tests
+    // a passphrase. ---
     {
         const auto zipBytes = buildZip({{"secret.txt", "top secret payload"}},
                                        "correct horse battery staple");
         const auto source = sourceOver(zipBytes);
 
+        // Without a password, scan succeeds and lists entries marked as encrypted.
         const auto noPassScan = archiveScanEntries(source);
-        assert(noPassScan.status == ArchiveOpenStatus::PassphraseRequired);
+        assert(noPassScan.status == ArchiveOpenStatus::Ok);
+        assert(noPassScan.entries.size() == 1);
+        assert(noPassScan.entries[0].path == "secret.txt");
+        assert(noPassScan.entries[0].isEncrypted);
 
+        // With wrong passphrase, scan probe reports wrong passphrase.
         const auto wrongPassScan = archiveScanEntries(source, "wrong password");
         assert(wrongPassScan.status == ArchiveOpenStatus::WrongPassphrase);
 
+        // With correct passphrase, scan succeeds.
         const auto indexResult = archiveScanEntries(source, "correct horse battery staple");
         assert(indexResult.status == ArchiveOpenStatus::Ok);
         int32_t secretIndex = -1;
@@ -327,12 +332,15 @@ int main() {
         }
         assert(secretIndex >= 0);
 
+        // Extracting without passphrase returns PassphraseRequired.
         const auto noPass = archiveExtractEntry(source, secretIndex);
-        assert(noPass.status != ArchiveOpenStatus::Ok);
+        assert(noPass.status == ArchiveOpenStatus::PassphraseRequired);
 
+        // Extracting with wrong passphrase returns WrongPassphrase.
         const auto wrongPass = archiveExtractEntry(source, secretIndex, "wrong password");
-        assert(wrongPass.status != ArchiveOpenStatus::Ok);
+        assert(wrongPass.status == ArchiveOpenStatus::WrongPassphrase);
 
+        // Extracting with correct passphrase succeeds and recovers data.
         const auto rightPass = archiveExtractEntry(source, secretIndex, "correct horse battery staple");
         assert(rightPass.status == ArchiveOpenStatus::Ok);
         assert(std::string(rightPass.data.begin(), rightPass.data.end()) == "top secret payload");

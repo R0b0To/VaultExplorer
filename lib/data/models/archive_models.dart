@@ -124,6 +124,69 @@ enum ArchiveFormatType {
   bool get supportsFilenameEncryption => this == ArchiveFormatType.sevenZip;
 }
 
+/// Human-readable presets for compression level.
+enum ArchiveCompressionLevel {
+  store,
+  fast,
+  normal,
+  ultra;
+
+  int get code {
+    switch (this) {
+      case ArchiveCompressionLevel.store:
+        return 0;
+      case ArchiveCompressionLevel.fast:
+        return 1;
+      case ArchiveCompressionLevel.normal:
+        return 5;
+      case ArchiveCompressionLevel.ultra:
+        return 9;
+    }
+  }
+
+  int get level => code;
+
+  String get label {
+    switch (this) {
+      case ArchiveCompressionLevel.store:
+        return 'Store (0)';
+      case ArchiveCompressionLevel.fast:
+        return 'Fast (1–3)';
+      case ArchiveCompressionLevel.normal:
+        return 'Normal (5)';
+      case ArchiveCompressionLevel.ultra:
+        return 'Ultra (9)';
+    }
+  }
+
+  String get title {
+    switch (this) {
+      case ArchiveCompressionLevel.store:
+        return 'Store (0) — No compression';
+      case ArchiveCompressionLevel.fast:
+        return 'Fast (1–3) — Quick';
+      case ArchiveCompressionLevel.normal:
+        return 'Normal (5) — Balanced';
+      case ArchiveCompressionLevel.ultra:
+        return 'Ultra (9) — Smallest size';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ArchiveCompressionLevel.store:
+        return 'Instant packaging, best for videos, music & archives';
+      case ArchiveCompressionLevel.fast:
+        return 'Quick compression for everyday sharing';
+      case ArchiveCompressionLevel.normal:
+        return 'Balanced speed and compression (default)';
+      case ArchiveCompressionLevel.ultra:
+        return 'Maximum compression, slower';
+    }
+  }
+}
+
+
 /// Metadata describing a single entry inside an archive.
 @immutable
 class ArchiveEntryInfo {

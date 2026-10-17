@@ -147,6 +147,74 @@ void main() {
       expect(selection.isEmpty, isTrue);
     });
 
+    testWidgets(
+        'Releasing before the hold delay is a plain tap; a full hold selects and swallows the tap',
+        (tester) async {
+      var taps = 0;
+      Set<RawEntry> selection = {};
+
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return MaterialApp(
+              home: Scaffold(
+                body: HoldRangeSelectContainer(
+                  items: testItems,
+                  selectedItems: selection,
+                  isSelectionMode: selection.isNotEmpty,
+                  onSelectionChanged: (s) => setState(() => selection = s),
+                  onLongPressSelect: (entry) =>
+                      setState(() => selection = {entry}),
+                  child: ListView.builder(
+                    itemCount: testItems.length,
+                    itemBuilder: (context, index) => HoldSelectableItem(
+                      index: index,
+                      entry: testItems[index],
+                      // Mirrors a real tile: tap + a no-op long-press that
+                      // claims the arena at kLongPressTimeout (500 ms).
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => taps++,
+                        onLongPress: () {},
+                        child: SizedBox(
+                          height: 60,
+                          child: Text(
+                            testItems[index].name,
+                            key: ValueKey('item_$index'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+      final center = tester.getCenter(find.byKey(const ValueKey('item_0')));
+
+      // Released before the hold delay (400 ms): a plain tap, nothing selected.
+      var gesture = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 300));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selection.isEmpty, isTrue);
+      expect(taps, 1);
+
+      // Held past the hold delay but released before the tile's own 500 ms
+      // long-press deadline (the window that used to select and then
+      // deselect): must select, and the release must not also fire a tap.
+      gesture = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 450));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selection.length, 1);
+      expect(selection.contains(testItems[0]), isTrue);
+      expect(taps, 1);
+    });
+
     testWidgets('Works in multi-column GridView layout with hold to range-select',
         (tester) async {
       Set<RawEntry> selection = {};
@@ -204,14 +272,14 @@ void main() {
 
       // Hold item 0 to start selection mode
       var gesture = await tester.startGesture(item0Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
       expect(selection.contains(testItems[0]), isTrue);
 
       // Hold item 3 to range-select 0..3
       gesture = await tester.startGesture(item3Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
 
@@ -243,9 +311,9 @@ void main() {
 
       final item4Center = tester.getCenter(find.byKey(const ValueKey('item_4')));
 
-      // Hold on item 4 for >= holdDelay (280ms)
+      // Hold on item 4 for >= holdDelay (kHoldSelectDelay, 400ms)
       final gesture = await tester.startGesture(item4Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
 
@@ -282,7 +350,7 @@ void main() {
 
       // Hold on earlier item 1 for >= holdDelay
       final gesture = await tester.startGesture(item1Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
 
@@ -324,14 +392,14 @@ void main() {
 
       // Step 1: Hold item 1 to start selection mode
       var g = await tester.startGesture(item1Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await g.up();
       await tester.pumpAndSettle();
       expect(selection, {testItems[1]});
 
       // Step 2: Hold item 3 to range select 1..3
       g = await tester.startGesture(item3Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await g.up();
       await tester.pumpAndSettle();
       expect(selection, {testItems[1], testItems[2], testItems[3]});
@@ -360,7 +428,7 @@ void main() {
 
       // Step 4: Hold item 9 to range select from 7 to 9
       g = await tester.startGesture(item9Center);
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await g.up();
       await tester.pumpAndSettle();
       expect(selection, {
@@ -426,7 +494,7 @@ void main() {
       // Step 1: Hold item 0 to select it and enter selection mode
       final item0Finder = find.byKey(const ValueKey('many_item_0'));
       var gesture = await tester.startGesture(tester.getCenter(item0Finder));
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
       expect(selection, {manyItems[0]});
@@ -449,7 +517,7 @@ void main() {
       final item25Finder = find.byKey(const ValueKey('many_item_25'));
       expect(item25Finder, findsOneWidget);
       gesture = await tester.startGesture(tester.getCenter(item25Finder));
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
       await gesture.up();
       await tester.pumpAndSettle();
 

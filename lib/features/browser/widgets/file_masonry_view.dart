@@ -548,9 +548,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
-      onLongPress: entry.isPlaceholder
-          ? () {}
-          : () => widget.onItemLongPress(entry),
+      // Selection is owned by HoldRangeSelectContainer's hold recognizer
+      // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
+      onLongPress: () {},
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
@@ -681,9 +681,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
-      onLongPress: entry.isPlaceholder
-          ? () {}
-          : () => widget.onItemLongPress(entry),
+      // Selection is owned by HoldRangeSelectContainer's hold recognizer
+      // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
+      onLongPress: () {},
       onMoreTap: (widget.isSelectionMode || entry.isPlaceholder)
           ? null
           : () => widget.onFileLongMenu?.call(entry),

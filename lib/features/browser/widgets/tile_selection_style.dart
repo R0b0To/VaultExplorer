@@ -16,8 +16,9 @@ abstract final class TileSelectionStyle {
     horizontal: 16,
     vertical: 4,
   );
-  static FontWeight titleWeight(bool selected) =>
-      selected ? FontWeight.w500 : FontWeight.normal;
+  /// Name weight is deliberately the same selected or not: a heavier weight
+  /// widens the glyphs, so selecting a row would visibly shift/reflow its name.
+  static const FontWeight titleWeight = FontWeight.normal;
   static Color leadingIconColor(
     ColorScheme cs, {
     required bool selected,
@@ -193,7 +194,7 @@ class FileRowShell extends StatelessWidget {
           mode: longFileNameMode,
           style: skin.nameStyle(
             textTheme.titleMedium?.copyWith(
-              fontWeight: TileSelectionStyle.titleWeight(isSelected),
+              fontWeight: TileSelectionStyle.titleWeight,
               letterSpacing: 0,
               height: 1.2,
             ),
@@ -415,8 +416,7 @@ class FileRowShell extends StatelessWidget {
                             mode: longFileNameMode,
                             style: skin.nameStyle(
                               textTheme.titleMedium?.copyWith(
-                                fontWeight:
-                                    TileSelectionStyle.titleWeight(isSelected),
+                                fontWeight: TileSelectionStyle.titleWeight,
                                 letterSpacing: 0,
                               ),
                               isDir: entry.isDir,

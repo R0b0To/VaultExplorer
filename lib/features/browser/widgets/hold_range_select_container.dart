@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
@@ -58,6 +57,31 @@ class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
   }
 }
 
+/// The hold-to-select recognizer.
+///
+/// A stock [LongPressGestureRecognizer] with a shorter deadline than the
+/// tiles' own (500 ms) one, and a per-pointer filter so it only takes part in
+/// the gesture arena for touches that land on a real, non-placeholder item.
+///
+/// Living in the arena is what makes tap and hold mutually exclusive: if the
+/// finger lifts before [duration], the tile's tap wins and nothing is
+/// selected; once [duration] passes this recognizer accepts, which rejects the
+/// tile's tap (and its own, later, long-press), so the release can never fire
+/// a tap that toggles the fresh selection back off.
+class _HoldSelectGestureRecognizer extends LongPressGestureRecognizer {
+  _HoldSelectGestureRecognizer({super.duration, super.debugOwner});
+
+  /// Returns whether a touch starting with [PointerDownEvent] may become a hold.
+  bool Function(PointerDownEvent event)? pointerFilter;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) {
+    final filter = pointerFilter;
+    if (filter != null && !filter(event)) return false;
+    return super.isPointerAllowed(event);
+  }
+}
+
 /// Carries the item index and [RawEntry] model in the render tree for
 /// high-performance hit testing during hold range selection.
 class HoldSelectMetadata {
@@ -95,13 +119,25 @@ class HoldSelectableItem extends StatelessWidget {
   }
 }
 
+/// How long a finger must rest on an item before hold-select fires.
+///
+/// Must stay *below* [kLongPressTimeout] (500 ms). Every tile also carries a
+/// long-press recognizer with that deadline (an `InkWell` `onLongPress`, a
+/// no-op in the browser views); the hold recognizer has to accept first, since
+/// the first recognizer to accept wins the arena, and a longer delay here
+/// would let the tile's no-op win and hold-select never fire.
+const Duration kHoldSelectDelay = Duration(milliseconds: 400);
+
 /// A container that coordinates hold-to-select and hold-to-range-select across
 /// any layout (List, Compact, Grid, Masonry) without interfering with native scrolling.
 ///
 /// Features:
 ///  • Hold an item when [isSelectionMode] is false (selects initial item and enters selection mode).
 ///  • Hold another item when [isSelectionMode] is true (selects all items in range between anchor and held item).
-///  • Moving the finger cancels the hold timer, allowing fluid native scrolling.
+///  • Moving the finger (past the touch slop) before the hold completes hands
+///    the touch to native scrolling instead.
+///  • A release before the hold completes is a plain tap; a completed hold
+///    selects and the release does not also fire a tap (arena-exclusive).
 ///  • Seamless coexistence with pinch-to-zoom (2+ fingers).
 class HoldRangeSelectContainer extends StatefulWidget {
   final Widget child;
@@ -126,7 +162,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
     this.onScaleStart,
     this.onScaleUpdate,
     this.onScaleEnd,
-    this.holdDelay = const Duration(milliseconds: 280),
+    this.holdDelay = kHoldSelectDelay,
   });
 
   @override
@@ -143,7 +179,6 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   int? _lastInteractedIndex;
   bool _hasMoved = false;
   final Set<int> _downPointers = <int>{};
-  Timer? _holdTimer;
   bool _scaleStarted = false;
 
   int? get _effectiveAnchorIndex {
@@ -165,23 +200,22 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    assert(
+      widget.holdDelay < kLongPressTimeout,
+      'holdDelay must be shorter than kLongPressTimeout so the hold recognizer '
+      'wins the gesture arena before the tiles\' own long-press does.',
+    );
+  }
+
+  @override
   void didUpdateWidget(covariant HoldRangeSelectContainer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.isSelectionMode || widget.selectedItems.isEmpty) {
       _lastInteractedIndex = null;
       _lastInteractedEntry = null;
     }
-  }
-
-  @override
-  void dispose() {
-    _cancelHoldTimer();
-    super.dispose();
-  }
-
-  void _cancelHoldTimer() {
-    _holdTimer?.cancel();
-    _holdTimer = null;
   }
 
   HoldSelectMetadata? _findItemAt(Offset globalPosition) {
@@ -206,75 +240,73 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   // ── Gestures ───────────────────────────────────────────────────────────────
 
+  /// Pointer filter for [_HoldSelectGestureRecognizer]: only touches that land
+  /// on a real item may become a hold.
+  bool _shouldTrackHold(PointerDownEvent event) {
+    final item = _findItemAt(event.position);
+    return item != null && !item.entry.isPlaceholder;
+  }
+
   void _handlePointerDown(PointerDownEvent event) {
     _downPointers.add(event.pointer);
-    if (_downPointers.length > 1) {
-      _cancelHoldTimer();
-      return;
-    }
+    if (_downPointers.length > 1) return;
 
     _hasMoved = false;
     _pointerDownPosition = event.position;
     _pointerDownItem = _findItemAt(event.position);
+  }
 
-    if (_pointerDownItem != null && !_pointerDownItem!.entry.isPlaceholder) {
-      _cancelHoldTimer();
-      _holdTimer = Timer(widget.holdDelay, () {
-        if (!mounted || _downPointers.length != 1 || _pointerDownItem == null) return;
-        final touchedItem = _pointerDownItem!;
-        if (touchedItem.entry.isPlaceholder) return;
+  /// Called by the hold recognizer once the finger has rested on the item for
+  /// the full hold delay (the arena has already been won at this point).
+  void _handleHoldStart(LongPressStartDetails details) {
+    if (!mounted || _downPointers.length != 1) return;
+    final touchedItem = _pointerDownItem;
+    if (touchedItem == null || touchedItem.entry.isPlaceholder) return;
 
-        if (!widget.isSelectionMode) {
-          _lastInteractedIndex = touchedItem.index;
-          _lastInteractedEntry = touchedItem.entry;
-          HapticFeedback.selectionClick();
-          widget.onLongPressSelect?.call(touchedItem.entry);
-        } else {
-          final anchorIndex = _effectiveAnchorIndex;
-          if (anchorIndex != null && anchorIndex != touchedItem.index) {
-            final minIndex = math.min(anchorIndex, touchedItem.index);
-            final maxIndex = math.max(anchorIndex, touchedItem.index);
+    if (!widget.isSelectionMode) {
+      _lastInteractedIndex = touchedItem.index;
+      _lastInteractedEntry = touchedItem.entry;
+      HapticFeedback.selectionClick();
+      widget.onLongPressSelect?.call(touchedItem.entry);
+    } else {
+      final anchorIndex = _effectiveAnchorIndex;
+      if (anchorIndex != null && anchorIndex != touchedItem.index) {
+        final minIndex = math.min(anchorIndex, touchedItem.index);
+        final maxIndex = math.max(anchorIndex, touchedItem.index);
 
-            final newSelection = Set<RawEntry>.from(widget.selectedItems);
-            for (int i = minIndex; i <= maxIndex && i < widget.items.length; i++) {
-              if (!widget.items[i].isPlaceholder) {
-                newSelection.add(widget.items[i]);
-              }
-            }
-
-            _lastInteractedIndex = touchedItem.index;
-            _lastInteractedEntry = touchedItem.entry;
-            HapticFeedback.selectionClick();
-            widget.onSelectionChanged(newSelection);
-          } else {
-            _lastInteractedIndex = touchedItem.index;
-            _lastInteractedEntry = touchedItem.entry;
-            final newSelection = Set<RawEntry>.from(widget.selectedItems)
-              ..add(touchedItem.entry);
-            HapticFeedback.selectionClick();
-            widget.onSelectionChanged(newSelection);
+        final newSelection = Set<RawEntry>.from(widget.selectedItems);
+        for (int i = minIndex; i <= maxIndex && i < widget.items.length; i++) {
+          if (!widget.items[i].isPlaceholder) {
+            newSelection.add(widget.items[i]);
           }
         }
-      });
+
+        _lastInteractedIndex = touchedItem.index;
+        _lastInteractedEntry = touchedItem.entry;
+        HapticFeedback.selectionClick();
+        widget.onSelectionChanged(newSelection);
+      } else {
+        _lastInteractedIndex = touchedItem.index;
+        _lastInteractedEntry = touchedItem.entry;
+        final newSelection = Set<RawEntry>.from(widget.selectedItems)
+          ..add(touchedItem.entry);
+        HapticFeedback.selectionClick();
+        widget.onSelectionChanged(newSelection);
+      }
     }
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    if (_downPointers.length != 1) {
-      _cancelHoldTimer();
-      return;
-    }
+    if (_downPointers.length != 1) return;
 
     final startPos = _pointerDownPosition;
     if (startPos != null && (event.position - startPos).distance > 12.0) {
       _hasMoved = true;
-      _cancelHoldTimer();
     }
   }
 
   void _handlePointerUp(PointerUpEvent event) {
     _downPointers.remove(event.pointer);
-    _cancelHoldTimer();
     if (!_hasMoved && _pointerDownItem != null) {
       _lastInteractedIndex = _pointerDownItem!.index;
       _lastInteractedEntry = _pointerDownItem!.entry;
@@ -287,7 +319,6 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _downPointers.remove(event.pointer);
-    _cancelHoldTimer();
     _pointerDownPosition = null;
     _pointerDownItem = null;
     _hasMoved = false;
@@ -304,14 +335,12 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   void _handleScaleStart(ScaleStartDetails details) {
     if (details.pointerCount >= 2) {
       _scaleStarted = true;
-      _cancelHoldTimer();
       widget.onScaleStart?.call(details);
     }
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount >= 2) {
-      _cancelHoldTimer();
       if (!_scaleStarted) {
         _scaleStarted = true;
         widget.onScaleStart?.call(
@@ -350,6 +379,15 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
         key: _containerKey,
         behavior: HitTestBehavior.translucent,
         gestures: <Type, GestureRecognizerFactory>{
+          _HoldSelectGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<_HoldSelectGestureRecognizer>(
+            () => _HoldSelectGestureRecognizer(duration: widget.holdDelay),
+            (_HoldSelectGestureRecognizer instance) {
+              instance
+                ..pointerFilter = _shouldTrackHold
+                ..onLongPressStart = _handleHoldStart;
+            },
+          ),
           _PinchScaleGestureRecognizer:
               GestureRecognizerFactoryWithHandlers<_PinchScaleGestureRecognizer>(
             () => _PinchScaleGestureRecognizer(),

@@ -1197,21 +1197,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'حفظ إعدادات التطبيق وتخطيط مدير الملفات في ملف';
+      'حفظ سلوك التطبيق والأمان والإعدادات الافتراضية في ملف. يُحفظ المظهر من «مظهر التطبيق».';
 
   @override
   String get importSettingsTitle => 'استيراد الإعدادات';
 
   @override
   String get importSettingsSubtitle =>
-      'استعادة إعدادات التطبيق وتخطيط مدير الملفات من ملف';
+      'استعادة سلوك التطبيق والأمان والإعدادات الافتراضية من ملف';
 
   @override
   String get importSettingsConfirmTitle => 'استيراد الإعدادات؟';
 
   @override
   String get importSettingsConfirmMessage =>
-      'سيستبدل هذا إعدادات التطبيق الحالية وتخطيط مدير الملفات. لا يمكن التراجع عن هذا الإجراء.';
+      'سيستبدل هذا إعدادات التطبيق الحالية. لن تتأثر مظاهرك وتخطيط الواجهة. لا يمكن التراجع عن هذا الإجراء.';
 
   @override
   String get exportSettingsSuccessMessage => 'تم تصدير الإعدادات';
@@ -11063,6 +11063,39 @@ class AppLocalizationsAr extends AppLocalizations {
   String get skinExportedMultiple => 'تم تصدير المظاهر.';
 
   @override
+  String get skinExportSkinsOnly => 'المظاهر فقط';
+
+  @override
+  String get skinExportSkinsOnlySubtitle =>
+      'الألوان وأنماط الأيقونات. آمنة للمشاركة.';
+
+  @override
+  String get skinExportSkinsAndInterface => 'المظاهر والواجهة';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      'يحفظ أيضًا وضع السمة وتخطيط شريط الأدوات والشبكة ومظهر المحرر وتخطيط عارض الوسائط. لنسخك الاحتياطية الخاصة.';
+
+  @override
+  String get skinAppearanceExported => 'تم تصدير المظاهر والواجهة.';
+
+  @override
+  String get skinImportInterfaceTitle => 'تطبيق إعدادات الواجهة؟';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      'يحتوي هذا الملف أيضًا على إعدادات الواجهة. سيؤدي تطبيقها إلى استبدال وضع السمة الحالي وتخطيط شريط الأدوات والشبكة ومظهر المحرر وتخطيط عارض الوسائط.';
+
+  @override
+  String get skinImportInterfaceApply => 'تطبيق';
+
+  @override
+  String get skinImportInterfaceSkip => 'المظاهر فقط';
+
+  @override
+  String get skinInterfaceApplied => 'تم تطبيق إعدادات الواجهة.';
+
+  @override
   String get automationBatteryHintTitle => 'السماح بالبدء في الخلفية';
 
   @override
@@ -12048,4 +12081,97 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get settingsSearchUnavailable =>
       'يظهر هذا الخيار فقط عند تفعيل إعداد ذي صلة.';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return 'ضغط $count ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return 'لا توجد مساحة كافية — المطلوب $required، المتوفر $available فقط.';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      'تم اكتشاف ملفات وسائط مضغوطة مسبقًا. تم اختيار ضغط \"تخزين\" تلقائيًا لتوفير المعالج والبطارية.';
+
+  @override
+  String get createArchiveNameLabel => 'اسم الأرشيف';
+
+  @override
+  String get createArchiveNameHint => 'أرشيف';
+
+  @override
+  String get createArchiveSelectFormatTooltip => 'تحديد التنسيق';
+
+  @override
+  String get createArchiveSecuritySection => 'الأمان';
+
+  @override
+  String get createArchivePasswordLabel => 'كلمة المرور (اختياري)';
+
+  @override
+  String get createArchivePasswordHintText => 'أدخل كلمة المرور';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => 'تأكيد كلمة المرور';
+
+  @override
+  String get createArchiveConfirmPasswordHint => 'كرر كلمة المرور';
+
+  @override
+  String get passphraseStrengthFair => 'مقبول';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword =>
+      'يتطلب كلمة مرور لمعاينة الملفات';
+
+  @override
+  String get createArchiveEncryptFilenamesActive =>
+      'يخفي قائمة الملفات حتى يتم إلغاء القفل';
+
+  @override
+  String get createArchiveAdvancedOptions => 'خيارات متقدمة';
+
+  @override
+  String get createArchiveCompressionLevel => 'مستوى الضغط';
+
+  @override
+  String get createArchiveSplitVolumes => 'تقسيم إلى أجزاء';
+
+  @override
+  String get createArchiveSplitVolumeNone => 'بلا';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel =>
+      'حجم الجزء المخصص (ميجابايت)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => 'مثال: 50';
+
+  @override
+  String get archiveCompressionStoreTitle => 'تخزين (0) — بدون ضغط';
+
+  @override
+  String get archiveCompressionStoreDesc =>
+      'تجميع فوري، الأفضل لمقاطع الفيديو والموسيقى والأرشيفات';
+
+  @override
+  String get archiveCompressionFastTitle => 'سريع (1–3) — سريع';
+
+  @override
+  String get archiveCompressionFastDesc => 'ضغط سريع للمشاركة اليومية';
+
+  @override
+  String get archiveCompressionNormalTitle => 'عادي (5) — متوازن';
+
+  @override
+  String get archiveCompressionNormalDesc => 'توازن بين الضغط والسرعة';
+
+  @override
+  String get archiveCompressionUltraTitle => 'فائق (9) — أصغر حجم';
+
+  @override
+  String get archiveCompressionUltraDesc => 'أصغر حجم، ضغط أبطأ';
 }

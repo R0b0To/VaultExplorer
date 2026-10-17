@@ -1545,7 +1545,7 @@
   "@exportSettingsTitle": {
     "description": "Settings row title for exporting app settings to a file"
   },
-  "exportSettingsSubtitle": "Save app settings and file manager layout to a file",
+  "exportSettingsSubtitle": "Save app behavior, security and defaults to a file. Appearance is saved from App skin.",
   "@exportSettingsSubtitle": {
     "description": "Settings row subtitle for exporting app settings to a file"
   },
@@ -1553,7 +1553,7 @@
   "@importSettingsTitle": {
     "description": "Settings row title for importing app settings from a file"
   },
-  "importSettingsSubtitle": "Restore app settings and file manager layout from a file",
+  "importSettingsSubtitle": "Restore app behavior, security and defaults from a file",
   "@importSettingsSubtitle": {
     "description": "Settings row subtitle for importing app settings from a file"
   },
@@ -1561,7 +1561,7 @@
   "@importSettingsConfirmTitle": {
     "description": "Confirmation dialog title before overwriting settings with an imported file"
   },
-  "importSettingsConfirmMessage": "This replaces your current app settings and file manager layout. This can't be undone.",
+  "importSettingsConfirmMessage": "This replaces your current app settings. Your skins and interface layout aren't affected. This can't be undone.",
   "@importSettingsConfirmMessage": {
     "description": "Confirmation dialog message before overwriting settings with an imported file"
   },
@@ -12559,6 +12559,16 @@
   "skinFileNameColorSettingDescription": "This color is controlled by the name color setting in the file manager section.",
   "skinExportedSingle": "Skin exported.",
   "skinExportedMultiple": "Skins exported.",
+  "skinExportSkinsOnly": "Skins only",
+  "skinExportSkinsOnlySubtitle": "Colors and icon styles. Safe to share.",
+  "skinExportSkinsAndInterface": "Skins and interface",
+  "skinExportSkinsAndInterfaceSubtitle": "Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.",
+  "skinAppearanceExported": "Skins and interface exported.",
+  "skinImportInterfaceTitle": "Apply interface settings?",
+  "skinImportInterfaceMessage": "This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.",
+  "skinImportInterfaceApply": "Apply",
+  "skinImportInterfaceSkip": "Skins only",
+  "skinInterfaceApplied": "Interface settings applied.",
   "@skinImportSucceeded": {
     "description": "Confirmation shown after importing one or more app skins.",
     "placeholders": {
@@ -13539,5 +13549,133 @@
   "settingsSearchUnavailable": "That option only appears when a related setting is turned on.",
   "@settingsSearchUnavailable": {
     "description": "Snackbar shown when a settings search result opens a screen but the setting itself is currently hidden because a related setting is off"
+  },
+  "createArchiveCompressingSubtitle": "Compressing {count} ({size})",
+  "@createArchiveCompressingSubtitle": {
+    "description": "Subtitle in the create archive sheet showing items count and total size",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "createArchiveInsufficientSpace": "Not enough free space — need {required}, only {available} free.",
+  "@createArchiveInsufficientSpace": {
+    "description": "Warning message when there is not enough free space to create the archive",
+    "placeholders": {
+      "required": {
+        "type": "String"
+      },
+      "available": {
+        "type": "String"
+      }
+    }
+  },
+  "createArchiveMediaRecommendation": "Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.",
+  "@createArchiveMediaRecommendation": {
+    "description": "Banner informing user that Store compression was automatically selected for pre-compressed media files"
+  },
+  "createArchiveNameLabel": "Archive Name",
+  "@createArchiveNameLabel": {
+    "description": "Label above the archive filename field in the create archive sheet"
+  },
+  "createArchiveNameHint": "archive",
+  "@createArchiveNameHint": {
+    "description": "Placeholder hint text inside the archive filename field"
+  },
+  "createArchiveSelectFormatTooltip": "Select format",
+  "@createArchiveSelectFormatTooltip": {
+    "description": "Tooltip for the archive format dropdown pill"
+  },
+  "createArchiveSecuritySection": "Security",
+  "@createArchiveSecuritySection": {
+    "description": "Header for the security/password section in the create archive sheet"
+  },
+  "createArchivePasswordLabel": "Password (Optional)",
+  "@createArchivePasswordLabel": {
+    "description": "Label for optional password field when creating an archive"
+  },
+  "createArchivePasswordHintText": "Enter password",
+  "@createArchivePasswordHintText": {
+    "description": "Hint text for entering an archive password"
+  },
+  "createArchiveConfirmPasswordLabel": "Confirm Password",
+  "@createArchiveConfirmPasswordLabel": {
+    "description": "Label for the confirm password field when creating an archive"
+  },
+  "createArchiveConfirmPasswordHint": "Repeat password",
+  "@createArchiveConfirmPasswordHint": {
+    "description": "Hint text for repeating the password"
+  },
+  "passphraseStrengthFair": "Fair",
+  "@passphraseStrengthFair": {
+    "description": "Medium-low qualitative password strength rating"
+  },
+  "createArchiveEncryptFilenamesNeedsPassword": "Requires password to preview files",
+  "@createArchiveEncryptFilenamesNeedsPassword": {
+    "description": "Subtitle for encrypt file names toggle when no password has been entered yet"
+  },
+  "createArchiveEncryptFilenamesActive": "Hides file list until unlocked",
+  "@createArchiveEncryptFilenamesActive": {
+    "description": "Subtitle for encrypt file names toggle when enabled"
+  },
+  "createArchiveAdvancedOptions": "Advanced Options",
+  "@createArchiveAdvancedOptions": {
+    "description": "Accordion header for advanced archive settings"
+  },
+  "createArchiveCompressionLevel": "Compression Level",
+  "@createArchiveCompressionLevel": {
+    "description": "Label for the compression level dropdown"
+  },
+  "createArchiveSplitVolumes": "Split into volumes",
+  "@createArchiveSplitVolumes": {
+    "description": "Label for splitting archive into volume chunks"
+  },
+  "createArchiveSplitVolumeNone": "None",
+  "@createArchiveSplitVolumeNone": {
+    "description": "Option to not split archive into volumes"
+  },
+  "createArchiveCustomVolumeSizeLabel": "Custom volume size (MB)",
+  "@createArchiveCustomVolumeSizeLabel": {
+    "description": "Label for custom archive volume split size in MB"
+  },
+  "createArchiveCustomVolumeSizeHint": "e.g. 50",
+  "@createArchiveCustomVolumeSizeHint": {
+    "description": "Hint for custom archive volume split size in MB"
+  },
+  "archiveCompressionStoreTitle": "Store (0) — No compression",
+  "@archiveCompressionStoreTitle": {
+    "description": "Title for store/uncompressed archive compression preset"
+  },
+  "archiveCompressionStoreDesc": "Instant packaging, best for videos, music & archives",
+  "@archiveCompressionStoreDesc": {
+    "description": "Description for store archive compression preset"
+  },
+  "archiveCompressionFastTitle": "Fast (1–3) — Quick",
+  "@archiveCompressionFastTitle": {
+    "description": "Title for fast archive compression preset"
+  },
+  "archiveCompressionFastDesc": "Quick compression for everyday sharing",
+  "@archiveCompressionFastDesc": {
+    "description": "Description for fast archive compression preset"
+  },
+  "archiveCompressionNormalTitle": "Normal (5) — Balanced",
+  "@archiveCompressionNormalTitle": {
+    "description": "Title for normal/balanced archive compression preset"
+  },
+  "archiveCompressionNormalDesc": "Balanced compression and speed",
+  "@archiveCompressionNormalDesc": {
+    "description": "Description for normal archive compression preset"
+  },
+  "archiveCompressionUltraTitle": "Ultra (9) — Smallest size",
+  "@archiveCompressionUltraTitle": {
+    "description": "Title for ultra/maximum archive compression preset"
+  },
+  "archiveCompressionUltraDesc": "Smallest size, slower compression",
+  "@archiveCompressionUltraDesc": {
+    "description": "Description for ultra archive compression preset"
   }
 }

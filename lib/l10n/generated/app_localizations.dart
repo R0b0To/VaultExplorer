@@ -1983,7 +1983,7 @@ abstract class AppLocalizations {
   /// Settings row subtitle for exporting app settings to a file
   ///
   /// In en, this message translates to:
-  /// **'Save app settings and file manager layout to a file'**
+  /// **'Save app behavior, security and defaults to a file. Appearance is saved from App skin.'**
   String get exportSettingsSubtitle;
 
   /// Settings row title for importing app settings from a file
@@ -1995,7 +1995,7 @@ abstract class AppLocalizations {
   /// Settings row subtitle for importing app settings from a file
   ///
   /// In en, this message translates to:
-  /// **'Restore app settings and file manager layout from a file'**
+  /// **'Restore app behavior, security and defaults from a file'**
   String get importSettingsSubtitle;
 
   /// Confirmation dialog title before overwriting settings with an imported file
@@ -2007,7 +2007,7 @@ abstract class AppLocalizations {
   /// Confirmation dialog message before overwriting settings with an imported file
   ///
   /// In en, this message translates to:
-  /// **'This replaces your current app settings and file manager layout. This can\'t be undone.'**
+  /// **'This replaces your current app settings. Your skins and interface layout aren\'t affected. This can\'t be undone.'**
   String get importSettingsConfirmMessage;
 
   /// Snackbar shown after successfully exporting settings
@@ -18391,6 +18391,66 @@ abstract class AppLocalizations {
   /// **'Skins exported.'**
   String get skinExportedMultiple;
 
+  /// No description provided for @skinExportSkinsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins only'**
+  String get skinExportSkinsOnly;
+
+  /// No description provided for @skinExportSkinsOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors and icon styles. Safe to share.'**
+  String get skinExportSkinsOnlySubtitle;
+
+  /// No description provided for @skinExportSkinsAndInterface.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins and interface'**
+  String get skinExportSkinsAndInterface;
+
+  /// No description provided for @skinExportSkinsAndInterfaceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.'**
+  String get skinExportSkinsAndInterfaceSubtitle;
+
+  /// No description provided for @skinAppearanceExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins and interface exported.'**
+  String get skinAppearanceExported;
+
+  /// No description provided for @skinImportInterfaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply interface settings?'**
+  String get skinImportInterfaceTitle;
+
+  /// No description provided for @skinImportInterfaceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.'**
+  String get skinImportInterfaceMessage;
+
+  /// No description provided for @skinImportInterfaceApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get skinImportInterfaceApply;
+
+  /// No description provided for @skinImportInterfaceSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skins only'**
+  String get skinImportInterfaceSkip;
+
+  /// No description provided for @skinInterfaceApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface settings applied.'**
+  String get skinInterfaceApplied;
+
   /// Title of the hint card on the automation settings screen asking the user to set battery usage to Unrestricted
   ///
   /// In en, this message translates to:
@@ -20028,6 +20088,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That option only appears when a related setting is turned on.'**
   String get settingsSearchUnavailable;
+
+  /// Subtitle in the create archive sheet showing items count and total size
+  ///
+  /// In en, this message translates to:
+  /// **'Compressing {count} ({size})'**
+  String createArchiveCompressingSubtitle(String count, String size);
+
+  /// Warning message when there is not enough free space to create the archive
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space — need {required}, only {available} free.'**
+  String createArchiveInsufficientSpace(String required, String available);
+
+  /// Banner informing user that Store compression was automatically selected for pre-compressed media files
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.'**
+  String get createArchiveMediaRecommendation;
+
+  /// Label above the archive filename field in the create archive sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Archive Name'**
+  String get createArchiveNameLabel;
+
+  /// Placeholder hint text inside the archive filename field
+  ///
+  /// In en, this message translates to:
+  /// **'archive'**
+  String get createArchiveNameHint;
+
+  /// Tooltip for the archive format dropdown pill
+  ///
+  /// In en, this message translates to:
+  /// **'Select format'**
+  String get createArchiveSelectFormatTooltip;
+
+  /// Header for the security/password section in the create archive sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get createArchiveSecuritySection;
+
+  /// Label for optional password field when creating an archive
+  ///
+  /// In en, this message translates to:
+  /// **'Password (Optional)'**
+  String get createArchivePasswordLabel;
+
+  /// Hint text for entering an archive password
+  ///
+  /// In en, this message translates to:
+  /// **'Enter password'**
+  String get createArchivePasswordHintText;
+
+  /// Label for the confirm password field when creating an archive
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Password'**
+  String get createArchiveConfirmPasswordLabel;
+
+  /// Hint text for repeating the password
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat password'**
+  String get createArchiveConfirmPasswordHint;
+
+  /// Medium-low qualitative password strength rating
+  ///
+  /// In en, this message translates to:
+  /// **'Fair'**
+  String get passphraseStrengthFair;
+
+  /// Subtitle for encrypt file names toggle when no password has been entered yet
+  ///
+  /// In en, this message translates to:
+  /// **'Requires password to preview files'**
+  String get createArchiveEncryptFilenamesNeedsPassword;
+
+  /// Subtitle for encrypt file names toggle when enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Hides file list until unlocked'**
+  String get createArchiveEncryptFilenamesActive;
+
+  /// Accordion header for advanced archive settings
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Options'**
+  String get createArchiveAdvancedOptions;
+
+  /// Label for the compression level dropdown
+  ///
+  /// In en, this message translates to:
+  /// **'Compression Level'**
+  String get createArchiveCompressionLevel;
+
+  /// Label for splitting archive into volume chunks
+  ///
+  /// In en, this message translates to:
+  /// **'Split into volumes'**
+  String get createArchiveSplitVolumes;
+
+  /// Option to not split archive into volumes
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get createArchiveSplitVolumeNone;
+
+  /// Label for custom archive volume split size in MB
+  ///
+  /// In en, this message translates to:
+  /// **'Custom volume size (MB)'**
+  String get createArchiveCustomVolumeSizeLabel;
+
+  /// Hint for custom archive volume split size in MB
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 50'**
+  String get createArchiveCustomVolumeSizeHint;
+
+  /// Title for store/uncompressed archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Store (0) — No compression'**
+  String get archiveCompressionStoreTitle;
+
+  /// Description for store archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Instant packaging, best for videos, music & archives'**
+  String get archiveCompressionStoreDesc;
+
+  /// Title for fast archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Fast (1–3) — Quick'**
+  String get archiveCompressionFastTitle;
+
+  /// Description for fast archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Quick compression for everyday sharing'**
+  String get archiveCompressionFastDesc;
+
+  /// Title for normal/balanced archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Normal (5) — Balanced'**
+  String get archiveCompressionNormalTitle;
+
+  /// Description for normal archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced compression and speed'**
+  String get archiveCompressionNormalDesc;
+
+  /// Title for ultra/maximum archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Ultra (9) — Smallest size'**
+  String get archiveCompressionUltraTitle;
+
+  /// Description for ultra archive compression preset
+  ///
+  /// In en, this message translates to:
+  /// **'Smallest size, slower compression'**
+  String get archiveCompressionUltraDesc;
 }
 
 class _AppLocalizationsDelegate

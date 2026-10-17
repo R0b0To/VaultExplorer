@@ -1172,21 +1172,21 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Salvar as configurações do app e o layout do gerenciador de arquivos em um arquivo';
+      'Salvar o comportamento, a segurança e os padrões do app em um arquivo. A aparência é salva em Skin do app.';
 
   @override
   String get importSettingsTitle => 'Importar configurações';
 
   @override
   String get importSettingsSubtitle =>
-      'Restaurar as configurações do app e o layout do gerenciador de arquivos a partir de um arquivo';
+      'Restaurar o comportamento, a segurança e os padrões do app a partir de um arquivo';
 
   @override
   String get importSettingsConfirmTitle => 'Importar configurações?';
 
   @override
   String get importSettingsConfirmMessage =>
-      'Isso substituirá suas configurações atuais e o layout do gerenciador de arquivos. Isso não pode ser desfeito.';
+      'Isso substituirá suas configurações atuais do app. Suas skins e o layout da interface não são afetados. Isso não pode ser desfeito.';
 
   @override
   String get exportSettingsSuccessMessage => 'Configurações exportadas';
@@ -11037,6 +11037,40 @@ class AppLocalizationsPt extends AppLocalizations {
   String get skinExportedMultiple => 'Skins exportadas.';
 
   @override
+  String get skinExportSkinsOnly => 'Somente skins';
+
+  @override
+  String get skinExportSkinsOnlySubtitle =>
+      'Cores e estilos de ícones. Seguro para compartilhar.';
+
+  @override
+  String get skinExportSkinsAndInterface => 'Skins e interface';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      'Também salva o modo de tema, o layout da barra de ferramentas e da grade, a aparência do editor e o layout do visualizador de mídia. Para seus próprios backups.';
+
+  @override
+  String get skinAppearanceExported => 'Skins e interface exportadas.';
+
+  @override
+  String get skinImportInterfaceTitle =>
+      'Aplicar as configurações da interface?';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      'Este arquivo também contém configurações da interface. Aplicá-las substitui o modo de tema, o layout da barra de ferramentas e da grade, a aparência do editor e o layout do visualizador de mídia atuais.';
+
+  @override
+  String get skinImportInterfaceApply => 'Aplicar';
+
+  @override
+  String get skinImportInterfaceSkip => 'Somente skins';
+
+  @override
+  String get skinInterfaceApplied => 'Configurações da interface aplicadas.';
+
+  @override
   String get automationBatteryHintTitle => 'Permitir início em segundo plano';
 
   @override
@@ -12008,4 +12042,100 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get settingsSearchUnavailable =>
       'Esta opção só aparece quando uma configuração relacionada está ativada.';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return 'Compactando $count ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return 'Espaço livre insuficiente — necessário $required, apenas $available livre.';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      'Arquivos de mídia pré-compactados detectados. Compactação \"Armazenar\" selecionada automaticamente para economizar CPU e bateria.';
+
+  @override
+  String get createArchiveNameLabel => 'Nome do arquivo';
+
+  @override
+  String get createArchiveNameHint => 'arquivo';
+
+  @override
+  String get createArchiveSelectFormatTooltip => 'Selecionar formato';
+
+  @override
+  String get createArchiveSecuritySection => 'Segurança';
+
+  @override
+  String get createArchivePasswordLabel => 'Senha (opcional)';
+
+  @override
+  String get createArchivePasswordHintText => 'Digite a senha';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => 'Confirmar senha';
+
+  @override
+  String get createArchiveConfirmPasswordHint => 'Repita a senha';
+
+  @override
+  String get passphraseStrengthFair => 'Razoável';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword =>
+      'Requer senha para pré-visualizar arquivos';
+
+  @override
+  String get createArchiveEncryptFilenamesActive =>
+      'Oculta a lista de arquivos até o desbloqueio';
+
+  @override
+  String get createArchiveAdvancedOptions => 'Opções avançadas';
+
+  @override
+  String get createArchiveCompressionLevel => 'Nível de compactação';
+
+  @override
+  String get createArchiveSplitVolumes => 'Dividir em volumes';
+
+  @override
+  String get createArchiveSplitVolumeNone => 'Nenhum';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel =>
+      'Tamanho de volume personalizado (MB)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => 'ex.: 50';
+
+  @override
+  String get archiveCompressionStoreTitle => 'Armazenar (0) — Sem compactação';
+
+  @override
+  String get archiveCompressionStoreDesc =>
+      'Empacotamento instantâneo, ideal para vídeos, músicas e arquivos';
+
+  @override
+  String get archiveCompressionFastTitle => 'Rápido (1–3) — Rápido';
+
+  @override
+  String get archiveCompressionFastDesc =>
+      'Compactação rápida para compartilhamento diário';
+
+  @override
+  String get archiveCompressionNormalTitle => 'Normal (5) — Equilibrado';
+
+  @override
+  String get archiveCompressionNormalDesc =>
+      'Compactação e velocidade equilibradas';
+
+  @override
+  String get archiveCompressionUltraTitle => 'Ultra (9) — Menor tamanho';
+
+  @override
+  String get archiveCompressionUltraDesc =>
+      'Menor tamanho, compactação mais lenta';
 }

@@ -1186,21 +1186,21 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Зберегти налаштування програми та панелі інструментів у файл';
+      'Зберегти поведінку, безпеку та типові налаштування програми у файл. Вигляд зберігається зі «Скін програми».';
 
   @override
   String get importSettingsTitle => 'Імпорт налаштувань';
 
   @override
   String get importSettingsSubtitle =>
-      'Відновити налаштування програми та панелі інструментів із файлу';
+      'Відновити поведінку, безпеку та типові налаштування програми з файлу';
 
   @override
   String get importSettingsConfirmTitle => 'Імпортувати налаштування?';
 
   @override
   String get importSettingsConfirmMessage =>
-      'Це замінить ваші поточні налаштування програми та панелі інструментів. Дію не можна скасувати.';
+      'Це замінить ваші поточні налаштування програми. Ваші скіни та розташування інтерфейсу не зміняться. Дію не можна скасувати.';
 
   @override
   String get exportSettingsSuccessMessage => 'Налаштування експортовано';
@@ -11115,6 +11115,39 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinExportedMultiple => 'Скіни експортовано.';
 
   @override
+  String get skinExportSkinsOnly => 'Лише скіни';
+
+  @override
+  String get skinExportSkinsOnlySubtitle =>
+      'Кольори та стилі піктограм. Безпечно ділитися.';
+
+  @override
+  String get skinExportSkinsAndInterface => 'Скіни та інтерфейс';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      'Також зберігає режим теми, розташування панелі інструментів і сітки, вигляд редактора та розташування медіаплеєра. Для ваших власних резервних копій.';
+
+  @override
+  String get skinAppearanceExported => 'Скіни та інтерфейс експортовано.';
+
+  @override
+  String get skinImportInterfaceTitle => 'Застосувати налаштування інтерфейсу?';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      'Цей файл також містить налаштування інтерфейсу. Їх застосування замінить ваші поточні режим теми, розташування панелі інструментів і сітки, вигляд редактора та розташування медіаплеєра.';
+
+  @override
+  String get skinImportInterfaceApply => 'Застосувати';
+
+  @override
+  String get skinImportInterfaceSkip => 'Лише скіни';
+
+  @override
+  String get skinInterfaceApplied => 'Налаштування інтерфейсу застосовано.';
+
+  @override
   String get automationBatteryHintTitle => 'Дозволити запуск у фоні';
 
   @override
@@ -12102,4 +12135,99 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get settingsSearchUnavailable =>
       'Цей параметр з’являється лише за ввімкненого пов’язаного налаштування.';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return 'Стиснення $count ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return 'Недостатньо вільного місця — потрібно $required, доступно лише $available.';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      'Виявлено попередньо стиснені медіафайли. Стиснення «Зберегти» вибрано автоматично для економії процесора та заряду.';
+
+  @override
+  String get createArchiveNameLabel => 'Назва архіву';
+
+  @override
+  String get createArchiveNameHint => 'архів';
+
+  @override
+  String get createArchiveSelectFormatTooltip => 'Вибрати формат';
+
+  @override
+  String get createArchiveSecuritySection => 'Безпека';
+
+  @override
+  String get createArchivePasswordLabel => 'Пароль (необов\'язково)';
+
+  @override
+  String get createArchivePasswordHintText => 'Введіть пароль';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => 'Підтвердіть пароль';
+
+  @override
+  String get createArchiveConfirmPasswordHint => 'Повторіть пароль';
+
+  @override
+  String get passphraseStrengthFair => 'Задовільний';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword =>
+      'Потрібен пароль для попереднього перегляду файлів';
+
+  @override
+  String get createArchiveEncryptFilenamesActive =>
+      'Приховує список файлів до розблокування';
+
+  @override
+  String get createArchiveAdvancedOptions => 'Розширені параметри';
+
+  @override
+  String get createArchiveCompressionLevel => 'Рівень стиснення';
+
+  @override
+  String get createArchiveSplitVolumes => 'Розділити на томи';
+
+  @override
+  String get createArchiveSplitVolumeNone => 'Немає';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel => 'Власний розмір тому (МБ)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => 'напр., 50';
+
+  @override
+  String get archiveCompressionStoreTitle => 'Зберегти (0) — Без стиснення';
+
+  @override
+  String get archiveCompressionStoreDesc =>
+      'Миттєве пакування, найкраще для відео, музики та архівів';
+
+  @override
+  String get archiveCompressionFastTitle => 'Швидко (1–3) — Швидко';
+
+  @override
+  String get archiveCompressionFastDesc =>
+      'Швидке стиснення для щоденного обміну';
+
+  @override
+  String get archiveCompressionNormalTitle => 'Звичайне (5) — Збалансовано';
+
+  @override
+  String get archiveCompressionNormalDesc =>
+      'Збалансоване стиснення та швидкість';
+
+  @override
+  String get archiveCompressionUltraTitle => 'Ультра (9) — Найменший розмір';
+
+  @override
+  String get archiveCompressionUltraDesc =>
+      'Найменший розмір, повільніше стиснення';
 }

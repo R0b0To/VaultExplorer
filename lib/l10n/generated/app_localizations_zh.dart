@@ -1101,19 +1101,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exportSettingsTitle => '导出设置';
 
   @override
-  String get exportSettingsSubtitle => '将应用设置和文件管理器布局保存到文件';
+  String get exportSettingsSubtitle => '将应用行为、安全和默认设置保存到文件。外观请从“应用皮肤”中保存。';
 
   @override
   String get importSettingsTitle => '导入设置';
 
   @override
-  String get importSettingsSubtitle => '从文件恢复应用设置和文件管理器布局';
+  String get importSettingsSubtitle => '从文件恢复应用行为、安全和默认设置';
 
   @override
   String get importSettingsConfirmTitle => '导入设置？';
 
   @override
-  String get importSettingsConfirmMessage => '这将替换您当前的应用设置和文件管理器布局。此操作无法撤销。';
+  String get importSettingsConfirmMessage =>
+      '这将替换您当前的应用设置。您的皮肤和界面布局不受影响。此操作无法撤销。';
 
   @override
   String get exportSettingsSuccessMessage => '设置已导出';
@@ -10277,6 +10278,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinExportedMultiple => '皮肤已导出。';
 
   @override
+  String get skinExportSkinsOnly => '仅皮肤';
+
+  @override
+  String get skinExportSkinsOnlySubtitle => '颜色和图标样式。可放心分享。';
+
+  @override
+  String get skinExportSkinsAndInterface => '皮肤和界面';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      '同时保存主题模式、工具栏和网格布局、编辑器外观以及媒体查看器布局。供您自己备份使用。';
+
+  @override
+  String get skinAppearanceExported => '皮肤和界面已导出。';
+
+  @override
+  String get skinImportInterfaceTitle => '应用界面设置？';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      '此文件还包含界面设置。应用后将替换您当前的主题模式、工具栏和网格布局、编辑器外观以及媒体查看器布局。';
+
+  @override
+  String get skinImportInterfaceApply => '应用';
+
+  @override
+  String get skinImportInterfaceSkip => '仅皮肤';
+
+  @override
+  String get skinInterfaceApplied => '界面设置已应用。';
+
+  @override
   String get automationBatteryHintTitle => '允许后台启动';
 
   @override
@@ -11171,4 +11204,93 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsSearchUnavailable => '此选项仅在开启相关设置后显示。';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return '正在压缩 $count ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return '可用空间不足 — 需要 $required，仅剩 $available。';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      '检测到已压缩的媒体文件。已自动选择“仅存储”以节省 CPU 和电量。';
+
+  @override
+  String get createArchiveNameLabel => '压缩包名称';
+
+  @override
+  String get createArchiveNameHint => 'archive';
+
+  @override
+  String get createArchiveSelectFormatTooltip => '选择格式';
+
+  @override
+  String get createArchiveSecuritySection => '安全';
+
+  @override
+  String get createArchivePasswordLabel => '密码（可选）';
+
+  @override
+  String get createArchivePasswordHintText => '输入密码';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => '确认密码';
+
+  @override
+  String get createArchiveConfirmPasswordHint => '重复输入密码';
+
+  @override
+  String get passphraseStrengthFair => '一般';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword => '预览文件需要密码';
+
+  @override
+  String get createArchiveEncryptFilenamesActive => '在解锁之前隐藏文件列表';
+
+  @override
+  String get createArchiveAdvancedOptions => '高级选项';
+
+  @override
+  String get createArchiveCompressionLevel => '压缩等级';
+
+  @override
+  String get createArchiveSplitVolumes => '分卷压缩';
+
+  @override
+  String get createArchiveSplitVolumeNone => '无';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel => '自定义分卷大小 (MB)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => '例如 50';
+
+  @override
+  String get archiveCompressionStoreTitle => '仅存储 (0) — 不压缩';
+
+  @override
+  String get archiveCompressionStoreDesc => '即时打包，最适合视频、音乐和压缩文件';
+
+  @override
+  String get archiveCompressionFastTitle => '快速 (1–3) — 速度快';
+
+  @override
+  String get archiveCompressionFastDesc => '日常分享的快速压缩';
+
+  @override
+  String get archiveCompressionNormalTitle => '标准 (5) — 均衡';
+
+  @override
+  String get archiveCompressionNormalDesc => '压缩比与速度的最佳平衡';
+
+  @override
+  String get archiveCompressionUltraTitle => '极限 (9) — 最小体积';
+
+  @override
+  String get archiveCompressionUltraDesc => '体积最小，压缩速度较慢';
 }

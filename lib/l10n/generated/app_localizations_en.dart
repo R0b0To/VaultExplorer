@@ -1153,21 +1153,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Save app settings and file manager layout to a file';
+      'Save app behavior, security and defaults to a file. Appearance is saved from App skin.';
 
   @override
   String get importSettingsTitle => 'Import settings';
 
   @override
   String get importSettingsSubtitle =>
-      'Restore app settings and file manager layout from a file';
+      'Restore app behavior, security and defaults from a file';
 
   @override
   String get importSettingsConfirmTitle => 'Import settings?';
 
   @override
   String get importSettingsConfirmMessage =>
-      'This replaces your current app settings and file manager layout. This can\'t be undone.';
+      'This replaces your current app settings. Your skins and interface layout aren\'t affected. This can\'t be undone.';
 
   @override
   String get exportSettingsSuccessMessage => 'Settings exported';
@@ -10873,6 +10873,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinExportedMultiple => 'Skins exported.';
 
   @override
+  String get skinExportSkinsOnly => 'Skins only';
+
+  @override
+  String get skinExportSkinsOnlySubtitle =>
+      'Colors and icon styles. Safe to share.';
+
+  @override
+  String get skinExportSkinsAndInterface => 'Skins and interface';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      'Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.';
+
+  @override
+  String get skinAppearanceExported => 'Skins and interface exported.';
+
+  @override
+  String get skinImportInterfaceTitle => 'Apply interface settings?';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      'This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.';
+
+  @override
+  String get skinImportInterfaceApply => 'Apply';
+
+  @override
+  String get skinImportInterfaceSkip => 'Skins only';
+
+  @override
+  String get skinInterfaceApplied => 'Interface settings applied.';
+
+  @override
   String get automationBatteryHintTitle => 'Allow background start';
 
   @override
@@ -11831,4 +11864,97 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchUnavailable =>
       'That option only appears when a related setting is turned on.';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return 'Compressing $count ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return 'Not enough free space — need $required, only $available free.';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      'Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.';
+
+  @override
+  String get createArchiveNameLabel => 'Archive Name';
+
+  @override
+  String get createArchiveNameHint => 'archive';
+
+  @override
+  String get createArchiveSelectFormatTooltip => 'Select format';
+
+  @override
+  String get createArchiveSecuritySection => 'Security';
+
+  @override
+  String get createArchivePasswordLabel => 'Password (Optional)';
+
+  @override
+  String get createArchivePasswordHintText => 'Enter password';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => 'Confirm Password';
+
+  @override
+  String get createArchiveConfirmPasswordHint => 'Repeat password';
+
+  @override
+  String get passphraseStrengthFair => 'Fair';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword =>
+      'Requires password to preview files';
+
+  @override
+  String get createArchiveEncryptFilenamesActive =>
+      'Hides file list until unlocked';
+
+  @override
+  String get createArchiveAdvancedOptions => 'Advanced Options';
+
+  @override
+  String get createArchiveCompressionLevel => 'Compression Level';
+
+  @override
+  String get createArchiveSplitVolumes => 'Split into volumes';
+
+  @override
+  String get createArchiveSplitVolumeNone => 'None';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel => 'Custom volume size (MB)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => 'e.g. 50';
+
+  @override
+  String get archiveCompressionStoreTitle => 'Store (0) — No compression';
+
+  @override
+  String get archiveCompressionStoreDesc =>
+      'Instant packaging, best for videos, music & archives';
+
+  @override
+  String get archiveCompressionFastTitle => 'Fast (1–3) — Quick';
+
+  @override
+  String get archiveCompressionFastDesc =>
+      'Quick compression for everyday sharing';
+
+  @override
+  String get archiveCompressionNormalTitle => 'Normal (5) — Balanced';
+
+  @override
+  String get archiveCompressionNormalDesc => 'Balanced compression and speed';
+
+  @override
+  String get archiveCompressionUltraTitle => 'Ultra (9) — Smallest size';
+
+  @override
+  String get archiveCompressionUltraDesc => 'Smallest size, slower compression';
 }

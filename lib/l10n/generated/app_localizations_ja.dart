@@ -1116,20 +1116,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get exportSettingsTitle => '設定をエクスポート';
 
   @override
-  String get exportSettingsSubtitle => 'アプリの設定とファイルマネージャーのレイアウトをファイルに保存します';
+  String get exportSettingsSubtitle =>
+      'アプリの動作、セキュリティ、デフォルト設定をファイルに保存します。外観はアプリスキンから保存します。';
 
   @override
   String get importSettingsTitle => '設定をインポート';
 
   @override
-  String get importSettingsSubtitle => 'ファイルからアプリの設定とファイルマネージャーのレイアウトを復元します';
+  String get importSettingsSubtitle => 'ファイルからアプリの動作、セキュリティ、デフォルト設定を復元します';
 
   @override
   String get importSettingsConfirmTitle => '設定をインポートしますか？';
 
   @override
   String get importSettingsConfirmMessage =>
-      '現在のアプリ設定とファイルマネージャーのレイアウトが置き換えられます。この操作は元に戻せません。';
+      '現在のアプリ設定が置き換えられます。スキンとインターフェースのレイアウトは影響を受けません。この操作は元に戻せません。';
 
   @override
   String get exportSettingsSuccessMessage => '設定をエクスポートしました';
@@ -10438,6 +10439,38 @@ class AppLocalizationsJa extends AppLocalizations {
   String get skinExportedMultiple => 'スキンをエクスポートしました。';
 
   @override
+  String get skinExportSkinsOnly => 'スキンのみ';
+
+  @override
+  String get skinExportSkinsOnlySubtitle => '色とアイコンスタイル。共有しても安全です。';
+
+  @override
+  String get skinExportSkinsAndInterface => 'スキンとインターフェース';
+
+  @override
+  String get skinExportSkinsAndInterfaceSubtitle =>
+      'テーマモード、ツールバーとグリッドのレイアウト、エディターの外観、メディアビューアーのレイアウトも保存します。ご自身のバックアップ用です。';
+
+  @override
+  String get skinAppearanceExported => 'スキンとインターフェースをエクスポートしました。';
+
+  @override
+  String get skinImportInterfaceTitle => 'インターフェース設定を適用しますか？';
+
+  @override
+  String get skinImportInterfaceMessage =>
+      'このファイルにはインターフェース設定も含まれています。適用すると、現在のテーマモード、ツールバーとグリッドのレイアウト、エディターの外観、メディアビューアーのレイアウトが置き換えられます。';
+
+  @override
+  String get skinImportInterfaceApply => '適用';
+
+  @override
+  String get skinImportInterfaceSkip => 'スキンのみ';
+
+  @override
+  String get skinInterfaceApplied => 'インターフェース設定を適用しました。';
+
+  @override
   String get automationBatteryHintTitle => 'バックグラウンドでの開始を許可';
 
   @override
@@ -11348,4 +11381,94 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsSearchUnavailable => 'このオプションは、関連する設定がオンのときにのみ表示されます。';
+
+  @override
+  String createArchiveCompressingSubtitle(String count, String size) {
+    return '$count を圧縮中 ($size)';
+  }
+
+  @override
+  String createArchiveInsufficientSpace(String required, String available) {
+    return '空き容量が不足しています — $required が必要ですが、空きは $available のみです。';
+  }
+
+  @override
+  String get createArchiveMediaRecommendation =>
+      '圧縮済みメディアファイルを検出しました。CPUとバッテリーを節約するため「無圧縮 (Store)」が自動選択されました。';
+
+  @override
+  String get createArchiveNameLabel => 'アーカイブ名';
+
+  @override
+  String get createArchiveNameHint => 'archive';
+
+  @override
+  String get createArchiveSelectFormatTooltip => '形式を選択';
+
+  @override
+  String get createArchiveSecuritySection => 'セキュリティ';
+
+  @override
+  String get createArchivePasswordLabel => 'パスワード (省略可能)';
+
+  @override
+  String get createArchivePasswordHintText => 'パスワードを入力';
+
+  @override
+  String get createArchiveConfirmPasswordLabel => 'パスワードの確認';
+
+  @override
+  String get createArchiveConfirmPasswordHint => 'パスワードを再入力';
+
+  @override
+  String get passphraseStrengthFair => '普通';
+
+  @override
+  String get createArchiveEncryptFilenamesNeedsPassword =>
+      'ファイルのプレビューにはパスワードが必要です';
+
+  @override
+  String get createArchiveEncryptFilenamesActive => 'ロック解除されるまでファイル一覧を非表示にします';
+
+  @override
+  String get createArchiveAdvancedOptions => '詳細設定';
+
+  @override
+  String get createArchiveCompressionLevel => '圧縮レベル';
+
+  @override
+  String get createArchiveSplitVolumes => '分割アーカイブ';
+
+  @override
+  String get createArchiveSplitVolumeNone => 'なし';
+
+  @override
+  String get createArchiveCustomVolumeSizeLabel => 'カスタム分割サイズ (MB)';
+
+  @override
+  String get createArchiveCustomVolumeSizeHint => '例: 50';
+
+  @override
+  String get archiveCompressionStoreTitle => '無圧縮 (0) — 圧縮なし';
+
+  @override
+  String get archiveCompressionStoreDesc => '瞬時にパッケージ化、動画・音楽・アーカイブに最適';
+
+  @override
+  String get archiveCompressionFastTitle => '高速 (1–3) — すばやく圧縮';
+
+  @override
+  String get archiveCompressionFastDesc => '日常的な共有に適した高速圧縮';
+
+  @override
+  String get archiveCompressionNormalTitle => '標準 (5) — バランス';
+
+  @override
+  String get archiveCompressionNormalDesc => '圧縮率と速度のバランスが良い';
+
+  @override
+  String get archiveCompressionUltraTitle => '最高 (9) — 最小サイズ';
+
+  @override
+  String get archiveCompressionUltraDesc => '最小サイズ、圧縮時間は長くなります';
 }

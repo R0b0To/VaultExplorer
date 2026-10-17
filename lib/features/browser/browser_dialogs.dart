@@ -15,6 +15,7 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
+import 'package:vaultexplorer/features/browser/widgets/create_archive_bottom_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
@@ -89,11 +90,14 @@ abstract class BrowserDialogs {
     required String currentDirPath,
     required List<RawEntry> existingEntries,
     required String suggestedName,
+    List<RawEntry> selectedEntries = const [],
+    int? freeSpace,
     required Future<void> Function(
       String destPathInContainer,
       ArchiveFormatType format,
       String? passphrase,
       bool encryptFilenames,
+      ArchiveCompressionLevel compressionLevel,
     ) onCreate,
     bool readOnly = false,
   }) {
@@ -101,15 +105,15 @@ abstract class BrowserDialogs {
       _blockedReadOnly(context);
       return;
     }
-    showDialog(
-      context: context,
-      builder: (dialogContext) => _CreateArchiveDialog(
-        container: container,
-        currentDirPath: currentDirPath,
-        existingEntries: existingEntries,
-        suggestedName: suggestedName,
-        onCreate: onCreate,
-      ),
+    CreateArchiveBottomSheet.show(
+      context,
+      container: container,
+      currentDirPath: currentDirPath,
+      existingEntries: existingEntries,
+      suggestedName: suggestedName,
+      selectedEntries: selectedEntries,
+      freeSpace: freeSpace,
+      onCreate: onCreate,
     );
   }
 
@@ -606,225 +610,6 @@ class _ArchivePasswordDialogState extends State<_ArchivePasswordDialog> {
         FilledButton(
           onPressed: _ctrl.text.isEmpty ? null : _submit,
           child: Text(context.l10n.unlock),
-        ),
-      ],
-    );
-  }
-}
-
-class _CreateArchiveDialog extends ConsumerStatefulWidget {
-  final MountedContainer container;
-  final String currentDirPath;
-  final List<RawEntry> existingEntries;
-  final String suggestedName;
-  final Future<void> Function(
-    String destPathInContainer,
-    ArchiveFormatType format,
-    String? passphrase,
-    bool encryptFilenames,
-  ) onCreate;
-  const _CreateArchiveDialog({
-    required this.container,
-    required this.currentDirPath,
-    required this.existingEntries,
-    required this.suggestedName,
-    required this.onCreate,
-  });
-
-  @override
-  ConsumerState<_CreateArchiveDialog> createState() => _CreateArchiveDialogState();
-}
-
-class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
-    with _LiveNameValidation<_CreateArchiveDialog> {
-  // Curated subset per the archive-migration plan's resolved open question:
-  // all 7 native formats are supported for extraction, but only these 5 are
-  // offered for creation (plain TAR and TAR.BZ2 are hidden to keep the
-  // dropdown short).
-  static const _selectableFormats = [
-    ArchiveFormatType.zip,
-    ArchiveFormatType.sevenZip,
-    ArchiveFormatType.tar,
-    ArchiveFormatType.tarGz,
-    ArchiveFormatType.tarXz,
-    ArchiveFormatType.tarZstd,
-    ArchiveFormatType.tarLzma,
-    ArchiveFormatType.iso,
-    ArchiveFormatType.cpio,
-  ];
-
-  late final TextEditingController _ctrl;
-  final TextEditingController _passwordCtrl = TextEditingController();
-  late final FilesystemType _fsType;
-  ArchiveFormatType _format = ArchiveFormatType.zip;
-  bool _obscurePassword = true;
-  bool _encryptFilenames = false;
-  bool _validationSeeded = false;
-
-  bool get _hasPassword => _format.supportsPassword && _passwordCtrl.text.isNotEmpty;
-
-  /// Hiding the names only makes sense for a format that can do it, and only
-  /// together with a password. Anything else must never be applied silently.
-  bool get _encryptFilenamesApplies =>
-      _format.supportsFilenameEncryption && _hasPassword && _encryptFilenames;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.suggestedName);
-    _fsType = resolveFilesystemType(widget.container);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_validationSeeded) {
-      _validationSeeded = true;
-      seedValidation(
-        text: _ctrl.text,
-        fsType: _fsType,
-        entryType: EntryType.file,
-        existingEntries: widget.existingEntries,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onChanged(String text) => revalidate(
-        text: text,
-        fsType: _fsType,
-        entryType: EntryType.file,
-        existingEntries: widget.existingEntries,
-      );
-
-  void _onFormatChanged(ArchiveFormatType? format) {
-    if (format == null || format == _format) return;
-    final oldExt = _format.fileExtension;
-    final text = _ctrl.text;
-    setState(() {
-      _format = format;
-      if (!format.supportsPassword) _passwordCtrl.clear();
-      if (!format.supportsFilenameEncryption) _encryptFilenames = false;
-    });
-    if (text.endsWith('.$oldExt')) {
-      final stem = text.substring(0, text.length - oldExt.length - 1);
-      final newText = '$stem.${format.fileExtension}';
-      _ctrl.text = newText;
-      _onChanged(newText);
-    }
-  }
-
-  void _onCreate() {
-    final name = _ctrl.text;
-    if (name.isEmpty || !isValid) return;
-    final l10n = context.l10n;
-    final parentSegments =
-        widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
-    final built = PathComponents(
-      parentSegments: parentSegments,
-      name: name,
-      type: EntryType.file,
-      fsType: _fsType,
-    ).validateAndBuild(l10n);
-    if (built is! PathBuildSuccess) return;
-    final passphrase =
-        _format.supportsPassword && _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : null;
-    final encryptFilenames = passphrase != null && _encryptFilenamesApplies;
-    Navigator.pop(context);
-    widget.onCreate(built.path, _format, passphrase, encryptFilenames);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final name = _ctrl.text;
-    final passwordEnabled = _format.supportsPassword;
-    return AlertDialog(
-      title: Text(context.l10n.createArchiveTitle),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _ctrl,
-              decoration: InputDecoration(hintText: context.l10n.archiveNameHint),
-              autofocus: true,
-              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
-              onChanged: _onChanged,
-              onSubmitted: (_) => _onCreate(),
-            ),
-            buildIssuesList(name),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(context.l10n.formatLabel),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButton<ArchiveFormatType>(
-                    value: _format,
-                    isDense: true,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    items: [
-                      for (final f in _selectableFormats)
-                        DropdownMenuItem(value: f, child: Text(f.displayLabel)),
-                    ],
-                    onChanged: _onFormatChanged,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordCtrl,
-              enabled: passwordEnabled,
-              obscureText: _obscurePassword,
-              onChanged: (_) => setState(() {
-                if (_passwordCtrl.text.isEmpty) _encryptFilenames = false;
-              }),
-              decoration: InputDecoration(
-                labelText: context.l10n.passwordFieldLabel,
-                hintText: passwordEnabled
-                    ? context.l10n.createArchivePasswordHint
-                    : context.l10n.createArchivePasswordUnavailableForFormat,
-                suffixIcon: passwordEnabled
-                    ? PasswordVisibilityToggle(
-                        obscured: _obscurePassword,
-                        onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
-                      )
-                    : null,
-              ),
-            ),
-            if (_format.supportsFilenameEncryption)
-              CheckboxListTile(
-                value: _encryptFilenamesApplies,
-                onChanged: _hasPassword
-                    ? (v) => setState(() => _encryptFilenames = v ?? false)
-                    : null,
-                title: Text(context.l10n.createArchiveEncryptFilenames),
-                subtitle: Text(context.l10n.createArchiveEncryptFilenamesHint),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(context.l10n.cancel),
-        ),
-        TextButton(
-          onPressed: name.isNotEmpty && isValid ? _onCreate : null,
-          child: Text(context.l10n.create),
         ),
       ],
     );

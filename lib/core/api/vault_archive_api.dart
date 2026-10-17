@@ -259,6 +259,7 @@ class VaultArchiveApi {
     String? destFilePath,
     String? passphrase,
     bool encryptFilenames = false,
+    int? compressionLevel,
     int? opId,
   }) async {
     try {
@@ -276,6 +277,7 @@ class VaultArchiveApi {
           if (passphrase != null && passphrase.isNotEmpty)
             'passphrase': passphrase,
           if (encryptFilenames) 'encryptFilenames': true,
+          'compressionLevel': ?compressionLevel,
           'opId': ?opId,
         },
       );

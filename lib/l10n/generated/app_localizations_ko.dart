@@ -11332,4 +11332,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get scanPdfFailed => 'PDF를 만들 수 없습니다';
+
+  @override
+  String get settingsSearchHint => '설정 검색';
+
+  @override
+  String get settingsSearchClear => '검색어 지우기';
+
+  @override
+  String get settingsSearchNoResults => '일치하는 설정이 없습니다';
+
+  @override
+  String get settingsSearchNoResultsHint => '다른 단어를 입력하거나 맞춤법을 확인해 보세요.';
+
+  @override
+  String get settingsSearchUnavailable => '이 옵션은 관련 설정이 켜져 있을 때만 표시됩니다.';
 }

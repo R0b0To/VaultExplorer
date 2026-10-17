@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "端を検出中…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "画像",
-  "scanPdfFailed": "PDFを作成できませんでした"
+  "scanPdfFailed": "PDFを作成できませんでした",
+  "settingsSearchHint": "設定を検索",
+  "settingsSearchClear": "検索をクリア",
+  "settingsSearchNoResults": "一致する設定がありません",
+  "settingsSearchNoResultsHint": "別のキーワードを試すか、スペルを確認してください。",
+  "settingsSearchUnavailable": "このオプションは、関連する設定がオンのときにのみ表示されます。"
 }

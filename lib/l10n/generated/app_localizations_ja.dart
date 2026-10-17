@@ -11333,4 +11333,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get scanPdfFailed => 'PDFを作成できませんでした';
+
+  @override
+  String get settingsSearchHint => '設定を検索';
+
+  @override
+  String get settingsSearchClear => '検索をクリア';
+
+  @override
+  String get settingsSearchNoResults => '一致する設定がありません';
+
+  @override
+  String get settingsSearchNoResultsHint => '別のキーワードを試すか、スペルを確認してください。';
+
+  @override
+  String get settingsSearchUnavailable => 'このオプションは、関連する設定がオンのときにのみ表示されます。';
 }

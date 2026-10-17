@@ -11156,4 +11156,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scanPdfFailed => '无法创建PDF';
+
+  @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchClear => '清除搜索';
+
+  @override
+  String get settingsSearchNoResults => '没有匹配的设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '请尝试其他关键词，或检查拼写。';
+
+  @override
+  String get settingsSearchUnavailable => '此选项仅在开启相关设置后显示。';
 }

@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "Виявлення країв…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "Зображення",
-  "scanPdfFailed": "Не вдалося створити PDF"
+  "scanPdfFailed": "Не вдалося створити PDF",
+  "settingsSearchHint": "Пошук у налаштуваннях",
+  "settingsSearchClear": "Очистити пошук",
+  "settingsSearchNoResults": "Відповідних налаштувань не знайдено",
+  "settingsSearchNoResultsHint": "Спробуйте інше слово або перевірте написання.",
+  "settingsSearchUnavailable": "Цей параметр з’являється лише за ввімкненого пов’язаного налаштування."
 }

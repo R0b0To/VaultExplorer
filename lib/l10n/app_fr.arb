@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "Détection des bords…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "Images",
-  "scanPdfFailed": "Impossible de créer le PDF"
+  "scanPdfFailed": "Impossible de créer le PDF",
+  "settingsSearchHint": "Rechercher dans les paramètres",
+  "settingsSearchClear": "Effacer la recherche",
+  "settingsSearchNoResults": "Aucun paramètre correspondant",
+  "settingsSearchNoResultsHint": "Essayez un autre mot ou vérifiez l'orthographe.",
+  "settingsSearchUnavailable": "Cette option n'apparaît que lorsqu'un paramètre associé est activé."
 }

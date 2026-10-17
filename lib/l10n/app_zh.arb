@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "正在检测边缘…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "图片",
-  "scanPdfFailed": "无法创建PDF"
+  "scanPdfFailed": "无法创建PDF",
+  "settingsSearchHint": "搜索设置",
+  "settingsSearchClear": "清除搜索",
+  "settingsSearchNoResults": "没有匹配的设置",
+  "settingsSearchNoResultsHint": "请尝试其他关键词，或检查拼写。",
+  "settingsSearchUnavailable": "此选项仅在开启相关设置后显示。"
 }

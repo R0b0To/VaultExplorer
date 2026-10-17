@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "가장자리 감지 중…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "이미지",
-  "scanPdfFailed": "PDF를 만들 수 없습니다"
+  "scanPdfFailed": "PDF를 만들 수 없습니다",
+  "settingsSearchHint": "설정 검색",
+  "settingsSearchClear": "검색어 지우기",
+  "settingsSearchNoResults": "일치하는 설정이 없습니다",
+  "settingsSearchNoResultsHint": "다른 단어를 입력하거나 맞춤법을 확인해 보세요.",
+  "settingsSearchUnavailable": "이 옵션은 관련 설정이 켜져 있을 때만 표시됩니다."
 }

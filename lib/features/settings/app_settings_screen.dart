@@ -23,6 +23,8 @@ import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
+import 'package:vaultexplorer/features/authenticator/authenticator_settings_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/features/settings/app_skin_settings_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -30,8 +32,14 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
+import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/features/settings/search/settings_search_index.dart';
+import 'package:vaultexplorer/features/settings/search/settings_search_matcher.dart';
+import 'package:vaultexplorer/features/settings/search/settings_search_models.dart';
+import 'package:vaultexplorer/features/settings/search/settings_search_target.dart';
+import 'package:vaultexplorer/features/settings/search/settings_search_widgets.dart';
 import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
@@ -68,6 +76,26 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   // navigates with the app's normal Navigator instead.
   _SettingsSection _selectedSection = _SettingsSection.security;
 
+  // ── Settings search ──────────────────────────────────────────────────────
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  String _searchQuery = '';
+
+  // The resolved search index, rebuilt when the app language or the Android
+  // version it was built for changes.
+  List<ResolvedSettingsEntry>? _searchIndex;
+  Locale? _searchIndexLocale;
+  int _searchIndexSdk = -1;
+
+  // Set when a search result is opened on the wide layout and consumed, once,
+  // by the detail pane's Navigator when it builds its initial routes.
+  // [_detailNonce] gives each opened result a fresh Navigator.
+  int _detailNonce = 0;
+  SettingsDestination? _pendingDestination;
+  SettingsSearchTarget? _pendingTarget;
+
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +105,8 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -85,6 +115,142 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     if (state == AppLifecycleState.resumed) {
       ref.read(appSettingsControllerProvider.notifier).checkStoragePermission();
     }
+  }
+
+  // ───────────────────────────── Settings search ─────────────────────────────
+
+  List<ResolvedSettingsEntry> _resolveSearchIndex(int androidSdkInt) {
+    final locale = Localizations.localeOf(context);
+    final cached = _searchIndex;
+    if (cached != null &&
+        _searchIndexLocale == locale &&
+        _searchIndexSdk == androidSdkInt) {
+      return cached;
+    }
+    final index = resolveSettingsSearchIndex(
+      context.l10n,
+      androidSdkInt: androidSdkInt,
+    );
+    _searchIndex = index;
+    _searchIndexLocale = locale;
+    _searchIndexSdk = androidSdkInt;
+    return index;
+  }
+
+  List<ResolvedSettingsEntry> _searchResults() {
+    final sdk = ref.read(appSettingsControllerProvider).androidSdkInt;
+    return searchSettingsIndex(_searchQuery, _resolveSearchIndex(sdk));
+  }
+
+  Widget _buildSearchField() {
+    return SettingsSearchField(
+      controller: _searchController,
+      focusNode: _searchFocus,
+      onChanged: (value) => setState(() => _searchQuery = value),
+      onSubmitted: () {
+        final results = _searchResults();
+        if (results.isNotEmpty) _openSearchResult(results.first);
+      },
+    );
+  }
+
+  Widget _buildSearchResults() {
+    return SettingsSearchResults(
+      results: _searchResults(),
+      onOpen: _openSearchResult,
+    );
+  }
+
+  /// Opens the screen a search result lives on and scrolls to its row.
+  void _openSearchResult(ResolvedSettingsEntry result) {
+    _searchFocus.unfocus();
+    final destination = result.destination;
+    final target = result.scrollTo
+        ? SettingsSearchTarget(
+            text: result.title,
+            section: result.section,
+            fallback: result.fallback,
+            unavailableMessage: context.l10n.settingsSearchUnavailable,
+          )
+        : null;
+
+    if (context.screen.useWideLayout) {
+      // Select the result's hub in the sidebar and open it (and, for a
+      // sub-screen, the sub-screen on top of it) in the detail pane.
+      setState(() {
+        _selectedSection = _sectionFor(destination.hub);
+        _detailNonce++;
+        _pendingDestination = destination;
+        _pendingTarget = target;
+      });
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsSearchTargetScope(
+          target: target,
+          child: SkinAreaScope(
+            area: SkinArea.settings,
+            child: _screenFor(destination, embedded: false),
+          ),
+        ),
+      ),
+    );
+  }
+
+  _SettingsSection _sectionFor(SettingsHub hub) => switch (hub) {
+    SettingsHub.security => _SettingsSection.security,
+    SettingsHub.storage => _SettingsSection.storage,
+    SettingsHub.fileHandling => _SettingsSection.fileHandling,
+    SettingsHub.fileManager => _SettingsSection.fileManager,
+    SettingsHub.appearance => _SettingsSection.appearance,
+    SettingsHub.advanced => _SettingsSection.advanced,
+    SettingsHub.about => _SettingsSection.about,
+  };
+
+  SettingsDestination _destinationFor(_SettingsSection section) =>
+      switch (section) {
+        _SettingsSection.security => SettingsDestination.security,
+        _SettingsSection.storage => SettingsDestination.storage,
+        _SettingsSection.fileHandling => SettingsDestination.fileHandling,
+        _SettingsSection.fileManager => SettingsDestination.fileManager,
+        _SettingsSection.appearance => SettingsDestination.appearance,
+        _SettingsSection.advanced => SettingsDestination.advanced,
+        _SettingsSection.about => SettingsDestination.about,
+      };
+
+  /// The screen for a search destination. [embedded] is true for hubs shown in
+  /// the wide layout's detail pane (drawn without their own app bar).
+  Widget _screenFor(SettingsDestination destination, {required bool embedded}) {
+    return switch (destination) {
+      SettingsDestination.security => SecuritySettingsScreen(
+        embedded: embedded,
+      ),
+      SettingsDestination.storage => StorageServicesSettingsScreen(
+        embedded: embedded,
+      ),
+      SettingsDestination.fileHandling => FileHandlingSettingsScreen(
+        embedded: embedded,
+      ),
+      SettingsDestination.fileManager => const FileManagerToolbarSettingsScreen(),
+      SettingsDestination.appearance => AppearanceSettingsScreen(
+        embedded: embedded,
+      ),
+      SettingsDestination.advanced => AdvancedSettingsScreen(
+        embedded: embedded,
+      ),
+      SettingsDestination.about => AboutScreen(embedded: embedded),
+      SettingsDestination.emergency => const EmergencySettingsScreen(),
+      SettingsDestination.quickCapture => const QuickCaptureSettingsScreen(),
+      SettingsDestination.authenticator => const AuthenticatorSettingsScreen(),
+      SettingsDestination.appSkin => const AppSkinSettingsScreen(),
+      SettingsDestination.fileManagerSkin => const FileManagerSkinScreen(),
+      SettingsDestination.mediaPlayer =>
+        const MediaViewerToolbarSettingsScreen(),
+      SettingsDestination.logcat => const LogcatScreen(),
+    };
   }
 
   Widget _buildHubTile({
@@ -149,89 +315,95 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       children: [
-        SectionCard(
-          children: [
-            _buildHubTile(
-              icon: Icons.shield_rounded,
-              iconColor: cs.primary,
-              title: context.l10n.sectionSecurityPrivacy,
-              subtitle: context.l10n.settingsHubSecuritySubtitle,
-              selected: _selectedSection == _SettingsSection.security,
-              showChevron: false,
-              onTap: () =>
-                  setState(() => _selectedSection = _SettingsSection.security),
-            ),
-            _buildHubTile(
-              icon: Icons.settings_input_composite_rounded,
-              iconColor: cs.secondary,
-              title: context.l10n.sectionKeyStorageIntegration,
-              subtitle: context.l10n.settingsHubStorageSubtitle,
-              selected: _selectedSection == _SettingsSection.storage,
-              showChevron: false,
-              onTap: () =>
-                  setState(() => _selectedSection = _SettingsSection.storage),
-            ),
-            _buildHubTile(
-              icon: Icons.folder_copy_rounded,
-              iconColor: cs.tertiary,
-              title: context.l10n.sectionVaultFileHandling,
-              subtitle: context.l10n.settingsHubFileHandlingSubtitle,
-              selected: _selectedSection == _SettingsSection.fileHandling,
-              showChevron: false,
-              onTap: () => setState(
-                () => _selectedSection = _SettingsSection.fileHandling,
+        _buildSearchField(),
+        const SizedBox(height: 12),
+        if (_isSearching)
+          _buildSearchResults()
+        else ...[
+          SectionCard(
+            children: [
+              _buildHubTile(
+                icon: Icons.shield_rounded,
+                iconColor: cs.primary,
+                title: context.l10n.sectionSecurityPrivacy,
+                subtitle: context.l10n.settingsHubSecuritySubtitle,
+                selected: _selectedSection == _SettingsSection.security,
+                showChevron: false,
+                onTap: () =>
+                    setState(() => _selectedSection = _SettingsSection.security),
               ),
-            ),
-            _buildHubTile(
-              icon: Icons.tune_rounded,
-              iconColor: Colors.blueAccent,
-              title: context.l10n.fileManagerSettingsTitle,
-              subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
-              selected: _selectedSection == _SettingsSection.fileManager,
-              showChevron: false,
-              onTap: () => setState(
-                () => _selectedSection = _SettingsSection.fileManager,
+              _buildHubTile(
+                icon: Icons.settings_input_composite_rounded,
+                iconColor: cs.secondary,
+                title: context.l10n.sectionKeyStorageIntegration,
+                subtitle: context.l10n.settingsHubStorageSubtitle,
+                selected: _selectedSection == _SettingsSection.storage,
+                showChevron: false,
+                onTap: () =>
+                    setState(() => _selectedSection = _SettingsSection.storage),
               ),
-            ),
-            _buildHubTile(
-              icon: Icons.palette_rounded,
-              iconColor: Colors.deepPurpleAccent,
-              title: context.l10n.sectionAppearanceInterface,
-              subtitle: context.l10n.settingsHubAppearanceSubtitle,
-              selected: _selectedSection == _SettingsSection.appearance,
-              showChevron: false,
-              onTap: () => setState(
-                () => _selectedSection = _SettingsSection.appearance,
+              _buildHubTile(
+                icon: Icons.folder_copy_rounded,
+                iconColor: cs.tertiary,
+                title: context.l10n.sectionVaultFileHandling,
+                subtitle: context.l10n.settingsHubFileHandlingSubtitle,
+                selected: _selectedSection == _SettingsSection.fileHandling,
+                showChevron: false,
+                onTap: () => setState(
+                  () => _selectedSection = _SettingsSection.fileHandling,
+                ),
               ),
-            ),
-            _buildHubTile(
-              icon: Icons.terminal_rounded,
-              iconColor: Colors.teal,
-              title:
-                  '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-              subtitle: context.l10n.settingsHubAdvancedSubtitle,
-              selected: _selectedSection == _SettingsSection.advanced,
-              showChevron: false,
-              onTap: () =>
-                  setState(() => _selectedSection = _SettingsSection.advanced),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SectionCard(
-          children: [
-            _buildHubTile(
-              icon: Icons.info_outline_rounded,
-              iconColor: cs.primary,
-              title: context.l10n.aboutAppTitle,
-              subtitle: context.l10n.versionInfoSubtitle(appVersion),
-              selected: _selectedSection == _SettingsSection.about,
-              showChevron: false,
-              onTap: () =>
-                  setState(() => _selectedSection = _SettingsSection.about),
-            ),
-          ],
-        ),
+              _buildHubTile(
+                icon: Icons.tune_rounded,
+                iconColor: Colors.blueAccent,
+                title: context.l10n.fileManagerSettingsTitle,
+                subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
+                selected: _selectedSection == _SettingsSection.fileManager,
+                showChevron: false,
+                onTap: () => setState(
+                  () => _selectedSection = _SettingsSection.fileManager,
+                ),
+              ),
+              _buildHubTile(
+                icon: Icons.palette_rounded,
+                iconColor: Colors.deepPurpleAccent,
+                title: context.l10n.sectionAppearanceInterface,
+                subtitle: context.l10n.settingsHubAppearanceSubtitle,
+                selected: _selectedSection == _SettingsSection.appearance,
+                showChevron: false,
+                onTap: () => setState(
+                  () => _selectedSection = _SettingsSection.appearance,
+                ),
+              ),
+              _buildHubTile(
+                icon: Icons.terminal_rounded,
+                iconColor: Colors.teal,
+                title:
+                    '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+                subtitle: context.l10n.settingsHubAdvancedSubtitle,
+                selected: _selectedSection == _SettingsSection.advanced,
+                showChevron: false,
+                onTap: () =>
+                    setState(() => _selectedSection = _SettingsSection.advanced),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            children: [
+              _buildHubTile(
+                icon: Icons.info_outline_rounded,
+                iconColor: cs.primary,
+                title: context.l10n.aboutAppTitle,
+                subtitle: context.l10n.versionInfoSubtitle(appVersion),
+                selected: _selectedSection == _SettingsSection.about,
+                showChevron: false,
+                onTap: () =>
+                    setState(() => _selectedSection = _SettingsSection.about),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -239,27 +411,48 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   /// The right-hand detail pane on wide/landscape layouts.
   Widget _buildDetailPane() {
     return Navigator(
-      key: ValueKey(_selectedSection),
-      onGenerateRoute: (_) => MaterialPageRoute(
-        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: switch (_selectedSection) {
-          _SettingsSection.security => const SecuritySettingsScreen(
-            embedded: true,
+      key: ValueKey((_selectedSection, _detailNonce)),
+      onGenerateInitialRoutes: (navigator, initialRoute) {
+        // A search result opened on this layout leaves its destination and
+        // row here; take them once so later rebuilds don't replay them.
+        final destination = _pendingDestination;
+        final target = _pendingTarget;
+        _pendingDestination = null;
+        _pendingTarget = null;
+        final subScreen = (destination != null && !destination.isHub)
+            ? destination
+            : null;
+
+        return [
+          MaterialPageRoute<void>(
+            builder: (_) => SettingsSearchTargetScope(
+              target: subScreen == null ? target : null,
+              child: SkinAreaScope(
+                area: SkinArea.settings,
+                child: _screenFor(
+                  _destinationFor(_selectedSection),
+                  embedded: true,
+                ),
+              ),
+            ),
           ),
-          _SettingsSection.storage => const StorageServicesSettingsScreen(
-            embedded: true,
-          ),
-          _SettingsSection.fileHandling => const FileHandlingSettingsScreen(
-            embedded: true,
-          ),
-          _SettingsSection.fileManager => const FileManagerToolbarSettingsScreen(),
-          _SettingsSection.appearance => const AppearanceSettingsScreen(
-            embedded: true,
-          ),
-          _SettingsSection.advanced => const AdvancedSettingsScreen(
-            embedded: true,
-          ),
-          _SettingsSection.about => const AboutScreen(embedded: true),
-        }),
+          if (subScreen != null)
+            MaterialPageRoute<void>(
+              builder: (_) => SettingsSearchTargetScope(
+                target: target,
+                child: SkinAreaScope(
+                  area: SkinArea.settings,
+                  child: _screenFor(subScreen, embedded: false),
+                ),
+              ),
+            ),
+        ];
+      },
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.settings,
+          child: _screenFor(_destinationFor(_selectedSection), embedded: true),
+        ),
       ),
     );
   }
@@ -311,132 +504,139 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           children: [
-            // Grouped Settings Hubs in a single SectionCard
-            SectionCard(
-              children: [
-                _buildHubTile(
-                  icon: Icons.shield_rounded,
-                  iconColor: cs.primary,
-                  title: context.l10n.sectionSecurityPrivacy,
-                  subtitle: context.l10n.settingsHubSecuritySubtitle,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const SecuritySettingsScreen()),
+            _buildSearchField(),
+            const SizedBox(height: 12),
+            if (_isSearching)
+              _buildSearchResults()
+            else ...[
+              // Grouped Settings Hubs in a single SectionCard
+              SectionCard(
+                children: [
+                  _buildHubTile(
+                    icon: Icons.shield_rounded,
+                    iconColor: cs.primary,
+                    title: context.l10n.sectionSecurityPrivacy,
+                    subtitle: context.l10n.settingsHubSecuritySubtitle,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const SecuritySettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-                _buildHubTile(
-                  icon: Icons.settings_input_composite_rounded,
-                  iconColor: cs.secondary,
-                  title: context.l10n.sectionKeyStorageIntegration,
-                  subtitle: context.l10n.settingsHubStorageSubtitle,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const StorageServicesSettingsScreen()),
+                  _buildHubTile(
+                    icon: Icons.settings_input_composite_rounded,
+                    iconColor: cs.secondary,
+                    title: context.l10n.sectionKeyStorageIntegration,
+                    subtitle: context.l10n.settingsHubStorageSubtitle,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const StorageServicesSettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-                _buildHubTile(
-                  icon: Icons.folder_copy_rounded,
-                  iconColor: cs.tertiary,
-                  title: context.l10n.sectionVaultFileHandling,
-                  subtitle: context.l10n.settingsHubFileHandlingSubtitle,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileHandlingSettingsScreen()),
+                  _buildHubTile(
+                    icon: Icons.folder_copy_rounded,
+                    iconColor: cs.tertiary,
+                    title: context.l10n.sectionVaultFileHandling,
+                    subtitle: context.l10n.settingsHubFileHandlingSubtitle,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileHandlingSettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-                _buildHubTile(
-                  icon: Icons.tune_rounded,
-                  iconColor: Colors.blueAccent,
-                  title: context.l10n.fileManagerSettingsTitle,
-                  subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
+                  _buildHubTile(
+                    icon: Icons.tune_rounded,
+                    iconColor: Colors.blueAccent,
+                    title: context.l10n.fileManagerSettingsTitle,
+                    subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const FileManagerToolbarSettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-                _buildHubTile(
-                  icon: Icons.palette_rounded,
-                  iconColor: Colors.deepPurpleAccent,
-                  title: context.l10n.sectionAppearanceInterface,
-                  subtitle: context.l10n.settingsHubAppearanceSubtitle,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppearanceSettingsScreen()),
+                  _buildHubTile(
+                    icon: Icons.palette_rounded,
+                    iconColor: Colors.deepPurpleAccent,
+                    title: context.l10n.sectionAppearanceInterface,
+                    subtitle: context.l10n.settingsHubAppearanceSubtitle,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppearanceSettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-                _buildHubTile(
-                  icon: Icons.terminal_rounded,
-                  iconColor: Colors.teal,
-                  title:
-                      '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-                  subtitle: context.l10n.settingsHubAdvancedSubtitle,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AdvancedSettingsScreen()),
+                  _buildHubTile(
+                    icon: Icons.terminal_rounded,
+                    iconColor: Colors.teal,
+                    title:
+                        '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+                    subtitle: context.l10n.settingsHubAdvancedSubtitle,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AdvancedSettingsScreen()),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // About Card in its own matching SectionCard
-            SectionCard(
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+              // About Card in its own matching SectionCard
+              SectionCard(
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
-                    child: Icon(
-                      Icons.info_outline_rounded,
-                      color: cs.primary,
-                      size: 22,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        color: cs.primary,
+                        size: 22,
+                      ),
+                    ),
+                    title: Text(
+                      context.l10n.aboutAppTitle,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      context.l10n.versionInfoSubtitle(appVersion),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AboutScreen())),
                     ),
                   ),
-                  title: Text(
-                    context.l10n.aboutAppTitle,
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    context.l10n.versionInfoSubtitle(appVersion),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AboutScreen())),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
+
             const SizedBox(height: 24),
           ],
         ),

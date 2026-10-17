@@ -13519,5 +13519,25 @@
   "scanPdfFailed": "Couldn't create the PDF",
   "@scanPdfFailed": {
     "description": "Error snackbar when combining scanned pages into a PDF or saving it fails"
+  },
+  "settingsSearchHint": "Search settings",
+  "@settingsSearchHint": {
+    "description": "Hint text of the search field at the top of the App settings screen"
+  },
+  "settingsSearchClear": "Clear search",
+  "@settingsSearchClear": {
+    "description": "Tooltip of the button that clears the settings search field"
+  },
+  "settingsSearchNoResults": "No matching settings",
+  "@settingsSearchNoResults": {
+    "description": "Title shown when a settings search query matches no setting"
+  },
+  "settingsSearchNoResultsHint": "Try a different word, or check the spelling.",
+  "@settingsSearchNoResultsHint": {
+    "description": "Suggestion shown below the \"no matching settings\" title"
+  },
+  "settingsSearchUnavailable": "That option only appears when a related setting is turned on.",
+  "@settingsSearchUnavailable": {
+    "description": "Snackbar shown when a settings search result opens a screen but the setting itself is currently hidden because a related setting is off"
   }
 }

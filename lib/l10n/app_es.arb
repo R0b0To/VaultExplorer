@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "Detectando bordes…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "Imágenes",
-  "scanPdfFailed": "No se pudo crear el PDF"
+  "scanPdfFailed": "No se pudo crear el PDF",
+  "settingsSearchHint": "Buscar en ajustes",
+  "settingsSearchClear": "Borrar búsqueda",
+  "settingsSearchNoResults": "No hay ajustes que coincidan",
+  "settingsSearchNoResultsHint": "Prueba con otra palabra o revisa la ortografía.",
+  "settingsSearchUnavailable": "Esta opción solo aparece cuando se activa un ajuste relacionado."
 }

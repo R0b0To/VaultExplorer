@@ -12031,4 +12031,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get scanPdfFailed => 'تعذّر إنشاء ملف PDF';
+
+  @override
+  String get settingsSearchHint => 'البحث في الإعدادات';
+
+  @override
+  String get settingsSearchClear => 'مسح البحث';
+
+  @override
+  String get settingsSearchNoResults => 'لا توجد إعدادات مطابقة';
+
+  @override
+  String get settingsSearchNoResultsHint =>
+      'جرّب كلمة أخرى أو تحقق من الإملاء.';
+
+  @override
+  String get settingsSearchUnavailable =>
+      'يظهر هذا الخيار فقط عند تفعيل إعداد ذي صلة.';
 }

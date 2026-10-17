@@ -12085,4 +12085,21 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get scanPdfFailed => 'Не вдалося створити PDF';
+
+  @override
+  String get settingsSearchHint => 'Пошук у налаштуваннях';
+
+  @override
+  String get settingsSearchClear => 'Очистити пошук';
+
+  @override
+  String get settingsSearchNoResults => 'Відповідних налаштувань не знайдено';
+
+  @override
+  String get settingsSearchNoResultsHint =>
+      'Спробуйте інше слово або перевірте написання.';
+
+  @override
+  String get settingsSearchUnavailable =>
+      'Цей параметр з’являється лише за ввімкненого пов’язаного налаштування.';
 }

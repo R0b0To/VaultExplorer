@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "جارٍ اكتشاف الحواف…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "صور",
-  "scanPdfFailed": "تعذّر إنشاء ملف PDF"
+  "scanPdfFailed": "تعذّر إنشاء ملف PDF",
+  "settingsSearchHint": "البحث في الإعدادات",
+  "settingsSearchClear": "مسح البحث",
+  "settingsSearchNoResults": "لا توجد إعدادات مطابقة",
+  "settingsSearchNoResultsHint": "جرّب كلمة أخرى أو تحقق من الإملاء.",
+  "settingsSearchUnavailable": "يظهر هذا الخيار فقط عند تفعيل إعداد ذي صلة."
 }

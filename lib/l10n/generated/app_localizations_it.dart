@@ -11992,4 +11992,21 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get scanPdfFailed => 'Impossibile creare il PDF';
+
+  @override
+  String get settingsSearchHint => 'Cerca nelle impostazioni';
+
+  @override
+  String get settingsSearchClear => 'Cancella ricerca';
+
+  @override
+  String get settingsSearchNoResults => 'Nessuna impostazione corrispondente';
+
+  @override
+  String get settingsSearchNoResultsHint =>
+      'Prova con un\'altra parola o controlla l\'ortografia.';
+
+  @override
+  String get settingsSearchUnavailable =>
+      'Questa opzione compare solo quando è attiva un\'impostazione correlata.';
 }

@@ -19998,6 +19998,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t create the PDF'**
   String get scanPdfFailed;
+
+  /// Hint text of the search field at the top of the App settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get settingsSearchHint;
+
+  /// Tooltip of the button that clears the settings search field
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get settingsSearchClear;
+
+  /// Title shown when a settings search query matches no setting
+  ///
+  /// In en, this message translates to:
+  /// **'No matching settings'**
+  String get settingsSearchNoResults;
+
+  /// Suggestion shown below the "no matching settings" title
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different word, or check the spelling.'**
+  String get settingsSearchNoResultsHint;
+
+  /// Snackbar shown when a settings search result opens a screen but the setting itself is currently hidden because a related setting is off
+  ///
+  /// In en, this message translates to:
+  /// **'That option only appears when a related setting is turned on.'**
+  String get settingsSearchUnavailable;
 }
 
 class _AppLocalizationsDelegate

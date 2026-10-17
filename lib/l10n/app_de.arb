@@ -3306,5 +3306,10 @@
   "scanDetectingEdges": "Kanten werden erkannt…",
   "scanOutputPdf": "PDF",
   "scanOutputImages": "Bilder",
-  "scanPdfFailed": "Die PDF-Datei konnte nicht erstellt werden"
+  "scanPdfFailed": "Die PDF-Datei konnte nicht erstellt werden",
+  "settingsSearchHint": "Einstellungen durchsuchen",
+  "settingsSearchClear": "Suche löschen",
+  "settingsSearchNoResults": "Keine passenden Einstellungen",
+  "settingsSearchNoResultsHint": "Versuche es mit einem anderen Begriff oder prüfe die Schreibweise.",
+  "settingsSearchUnavailable": "Diese Option erscheint nur, wenn eine zugehörige Einstellung aktiviert ist."
 }

@@ -876,6 +876,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 onAspectRatioChanged: captureControlsController.selectAspectRatio,
                 timerDelaySeconds: captureControls.timerDelaySeconds,
                 flashMode: captureControls.flashMode,
+                hasFlash: captureHasFlash,
                 iconTurns: captureIconTurns,
                 onClose: () => Navigator.pop(context),
                 onVideoQualityChanged: changeQuality,

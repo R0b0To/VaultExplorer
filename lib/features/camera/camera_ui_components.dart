@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'vault_camera_controller.dart' show NativeCameraLens;
 
 class CameraPopupMenuItem<T> {
   final T value;
@@ -393,6 +394,10 @@ class CameraTopControlsBar extends StatelessWidget {
   final ValueChanged<double> onAspectRatioChanged;
   final int timerDelaySeconds;
   final String flashMode;
+
+  /// False for cameras without a flash unit (most front cameras): the flash
+  /// button is hidden instead of silently doing nothing.
+  final bool hasFlash;
   final double iconTurns;
   final VoidCallback onClose;
   final ValueChanged<String> onVideoQualityChanged;
@@ -416,6 +421,7 @@ class CameraTopControlsBar extends StatelessWidget {
     required this.onAspectRatioChanged,
     required this.timerDelaySeconds,
     required this.flashMode,
+    this.hasFlash = true,
     required this.iconTurns,
     required this.onClose,
     required this.onVideoQualityChanged,
@@ -653,6 +659,9 @@ class CameraTopControlsBar extends StatelessWidget {
                         onPressed: onCycleTimerDelay,
                       ),
                     ),
+                  ],
+                  // Photo: auto / on / off. Video: torch on / off.
+                  if (hasFlash)
                     buildRotatedWidget(
                       iconTurns: iconTurns,
                       child: IconButton(
@@ -667,7 +676,6 @@ class CameraTopControlsBar extends StatelessWidget {
                         onPressed: onCycleFlashMode,
                       ),
                     ),
-                  ],
                 ],
               ),
           ],
@@ -734,6 +742,90 @@ class CameraZoomIndicator extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lens picker (0.5x / 1x / 3x ...) for cameras with more than one lens. The
+/// active stop shows the live zoom (follows pinch zoom); the others jump to
+/// their lens when tapped.
+class CameraLensSelector extends StatelessWidget {
+  final List<NativeCameraLens> stops;
+  final String selectedCameraId;
+
+  /// Zoom as the user reads it (zoom ratio x the lens' intrinsic ratio).
+  final double displayZoom;
+  final double iconTurns;
+  final Future<void> Function(NativeCameraLens stop) onSelect;
+
+  const CameraLensSelector({
+    super.key,
+    required this.stops,
+    required this.selectedCameraId,
+    required this.displayZoom,
+    required this.iconTurns,
+    required this.onSelect,
+  });
+
+  /// The stop whose field of view is closest (in log space) to what is shown.
+  int _activeIndex() {
+    final shown = math.log(displayZoom.clamp(0.1, 100.0));
+    var best = 0;
+    var bestDistance = double.infinity;
+    for (var i = 0; i < stops.length; i++) {
+      final d = (math.log(stops[i].relativeZoom.clamp(0.1, 100.0)) - shown).abs();
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _activeIndex();
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: Colors.black45,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < stops.length; i++)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: i == active ? null : () => onSelect(stops[i]),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  constraints: const BoxConstraints(minWidth: 38, minHeight: 34),
+                  alignment: Alignment.center,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: i == active ? Colors.amber : Colors.transparent,
+                  ),
+                  child: buildRotatedWidget(
+                    iconTurns: iconTurns,
+                    child: Text(
+                      i == active ? formatCameraZoom(displayZoom) : stops[i].displayName,
+                      style: TextStyle(
+                        color: i == active ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

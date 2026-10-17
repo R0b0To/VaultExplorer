@@ -176,12 +176,16 @@ class CameraCaptureControls extends _$CameraCaptureControls {
     _persistState();
   }
 
+  /// Photo mode cycles auto -> on -> off. Video has no still flash, so the same
+  /// button toggles the torch (off <-> torch) there.
   String cyclePhotoFlashMode() {
-    final next = switch (state.flashMode) {
-      'auto' => 'on',
-      'on' => 'off',
-      _ => 'auto',
-    };
+    final next = state.isVideoMode
+        ? (state.flashMode == 'torch' ? 'off' : 'torch')
+        : switch (state.flashMode) {
+            'auto' => 'on',
+            'on' => 'off',
+            _ => 'auto',
+          };
     state = state.copyWith(flashMode: next);
     _persistState();
     return next;

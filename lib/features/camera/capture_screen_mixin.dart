@@ -125,6 +125,28 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
 
   List<NativeCameraLens> get lenses => captureSession.lenses;
 
+  List<NativeCameraLens> get captureLensStops => captureSession.lensStops;
+
+  bool get captureHasFlash => captureSession.hasFlash;
+
+  double get captureIntrinsicZoom => captureSession.intrinsicZoomRatio;
+
+  /// Facing of the camera that is open right now ('back' / 'front').
+  String get captureActiveFacing {
+    for (final l in [...captureLensStops, ...lenses]) {
+      if (l.cameraId == selectedCameraId) return l.facing;
+    }
+    return 'back';
+  }
+
+  /// Lens stops of the active facing, ascending by field of view.
+  List<NativeCameraLens> get captureFacingStops {
+    final facing = captureActiveFacing;
+    final stops = captureLensStops.where((l) => l.facing == facing).toList()
+      ..sort((a, b) => a.relativeZoom.compareTo(b.relativeZoom));
+    return stops;
+  }
+
   bool get isEncrypting => captureSession.isEncrypting;
 
   bool get isStartingVideo => captureSession.isStartingVideo;
@@ -358,7 +380,10 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
 
     final currentLens = lenses.firstWhere(
       (l) => l.cameraId == selectedCameraId,
-      orElse: () => lenses.first,
+      orElse: () => lenses.firstWhere(
+        (l) => l.facing == captureActiveFacing,
+        orElse: () => lenses.first,
+      ),
     );
 
     final targetFacing = currentLens.facing == 'back' ? 'front' : 'back';
@@ -374,6 +399,35 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
       captureControlsController.setPreferredFacing(targetFacing);
       captureSessionController.setUninitialized(cancelCountdown: false);
       await initCamera(cameraId: targetLens.cameraId);
+    }
+  }
+
+  /// Switches to one lens stop (0.5x / 1x / 3x). A stop of the camera that is
+  /// already open is only a zoom change (the logical camera switches lens by
+  /// itself); a standalone camera id reopens the session on that camera.
+  Future<void> selectLensStop(NativeCameraLens stop) async {
+    if (captureIsRecording ||
+        isEncrypting ||
+        captureIsCountingDown ||
+        isStartingVideo) {
+      return;
+    }
+    HapticFeedback.selectionClick();
+
+    if (stop.cameraId == selectedCameraId) {
+      final zoom = stop.zoomRatio.clamp(captureMinZoom, captureMaxZoom).toDouble();
+      captureSessionController.setZoom(zoom);
+      await applyZoomLogged(cameraController, zoom, logTag: captureLogTag);
+      return;
+    }
+
+    captureSessionController.setUninitialized(cancelCountdown: false);
+    await initCamera(cameraId: stop.cameraId);
+    if (!mounted || !cameraController.isInitialized) return;
+    if (stop.cameraId == selectedCameraId && (stop.zoomRatio - 1.0).abs() > 0.01) {
+      final zoom = stop.zoomRatio.clamp(captureMinZoom, captureMaxZoom).toDouble();
+      captureSessionController.setZoom(zoom);
+      await applyZoomLogged(cameraController, zoom, logTag: captureLogTag);
     }
   }
 
@@ -608,16 +662,28 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
               buildCapturedMediaTray(),
 
             if (!captureIsRecording && !captureIsCountingDown) ...[
-              CameraZoomIndicator(
-                currentZoom: captureCurrentZoom,
-                minZoom: captureMinZoom,
-                maxZoom: captureMaxZoom,
-                iconTurns: captureIconTurns,
-                onSetZoom: (zoom) async {
-                  captureSessionController.setZoom(zoom);
-                  await applyZoomLogged(cameraController, zoom, logTag: captureLogTag);
-                },
-              ),
+              if (captureFacingStops.length > 1)
+                CameraLensSelector(
+                  stops: captureFacingStops,
+                  selectedCameraId: selectedCameraId,
+                  displayZoom: captureCurrentZoom * captureIntrinsicZoom,
+                  iconTurns: captureIconTurns,
+                  onSelect: selectLensStop,
+                )
+              else
+                CameraZoomIndicator(
+                  currentZoom: captureCurrentZoom * captureIntrinsicZoom,
+                  minZoom: captureMinZoom * captureIntrinsicZoom,
+                  maxZoom: captureMaxZoom * captureIntrinsicZoom,
+                  iconTurns: captureIconTurns,
+                  onSetZoom: (shown) async {
+                    final zoom = (shown / captureIntrinsicZoom)
+                        .clamp(captureMinZoom, captureMaxZoom)
+                        .toDouble();
+                    captureSessionController.setZoom(zoom);
+                    await applyZoomLogged(cameraController, zoom, logTag: captureLogTag);
+                  },
+                ),
               SizedBox(height: isLandscape ? 6 : 16),
             ],
             SizedBox(height: isLandscape ? 8 : 24),

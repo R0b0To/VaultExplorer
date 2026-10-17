@@ -139,6 +139,9 @@ class VaultCameraPlugin(
                                     "previewHeight" to session.previewHeight,
                                     "sensorOrientation" to session.sensorOrientationDegrees,
                                     "lenses" to listCameraLenses(cameraManager).map { it.toMap() },
+                                    "lensStops" to listCameraLensStops(cameraManager).map { it.toMap() },
+                                    "hasFlash" to session.hasFlash,
+                                    "intrinsicZoomRatio" to session.intrinsicZoomRatio.toDouble(),
                                     "photoResolutions" to session.photoResolutions,
                                     "videoQualities" to session.videoQualities,
                                     "currentPhotoResolution" to session.currentPhotoResolution,
@@ -453,4 +456,6 @@ private fun CameraLensInfo.toMap(): Map<String, Any?> = mapOf(
     "relativeZoom" to relativeZoom.toDouble(),
     "lensType" to lensType,
     "displayName" to displayName,
+    "zoomRatio" to zoomRatio.toDouble(),
+    "hasFlash" to hasFlash,
 )

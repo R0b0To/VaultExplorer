@@ -13,6 +13,9 @@ class CameraCaptureSessionState {
     this.isInitialized = false,
     this.selectedCameraId = '',
     this.lenses = const [],
+    this.lensStops = const [],
+    this.hasFlash = true,
+    this.intrinsicZoomRatio = 1.0,
     this.permissionError,
     this.isRecording = false,
     this.isEncrypting = false,
@@ -37,6 +40,15 @@ class CameraCaptureSessionState {
   final bool isInitialized;
   final String selectedCameraId;
   final List<NativeCameraLens> lenses;
+
+  /// Selectable lenses (0.5x / 1x / 3x ...) of every facing.
+  final List<NativeCameraLens> lensStops;
+
+  /// The opened camera has a flash unit / torch.
+  final bool hasFlash;
+
+  /// Field of view of the opened camera relative to the main lens of its facing.
+  final double intrinsicZoomRatio;
   final String? permissionError;
   final bool isRecording;
   final bool isEncrypting;
@@ -61,6 +73,9 @@ class CameraCaptureSessionState {
     bool? isInitialized,
     String? selectedCameraId,
     List<NativeCameraLens>? lenses,
+    List<NativeCameraLens>? lensStops,
+    bool? hasFlash,
+    double? intrinsicZoomRatio,
     String? permissionError,
     bool clearPermissionError = false,
     bool? isRecording,
@@ -85,6 +100,9 @@ class CameraCaptureSessionState {
     isInitialized: isInitialized ?? this.isInitialized,
     selectedCameraId: selectedCameraId ?? this.selectedCameraId,
     lenses: lenses ?? this.lenses,
+    lensStops: lensStops ?? this.lensStops,
+    hasFlash: hasFlash ?? this.hasFlash,
+    intrinsicZoomRatio: intrinsicZoomRatio ?? this.intrinsicZoomRatio,
     permissionError:
         clearPermissionError ? null : permissionError ?? this.permissionError,
     isRecording: isRecording ?? this.isRecording,
@@ -136,6 +154,9 @@ class CameraCaptureSession extends _$CameraCaptureSession {
       clearPermissionError: true,
       selectedCameraId: info.cameraId,
       lenses: info.lenses,
+      lensStops: info.lensStops,
+      hasFlash: info.hasFlash,
+      intrinsicZoomRatio: info.intrinsicZoomRatio,
       minZoom: info.zoomMin,
       maxZoom: info.zoomMax,
       currentZoom: 1.0.clamp(info.zoomMin, info.zoomMax),

@@ -7,12 +7,16 @@ import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
+import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
+import android.hardware.camera2.CaptureFailure
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.MeteringRectangle
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
@@ -25,6 +29,7 @@ import android.media.ThumbnailUtils
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Range
 import android.util.Size
 import android.view.Surface
@@ -38,6 +43,21 @@ import kotlin.math.abs
 import com.aeidolon.vaultexplorer.VeLog
 
 private const val TAG = "VaultCameraSession"
+
+// CameraX capture-pipeline time limits (Camera2CapturePipeline): wait up to 5 s for AE to
+// settle when a flash is involved, then shoot anyway.
+private const val FLASH_3A_TIMEOUT_MS = 5_000L
+// Torch-as-flash: the torch has to be lit and AE must have re-metered under it.
+private const val TORCH_SETTLE_MS = 200L
+private const val TORCH_CONVERGED_FRAMES = 2
+// Whole still (3A + exposure + JPEG) must never leave the session "busy" forever.
+private const val STILL_WATCHDOG_MS = 12_000L
+private const val ERROR_IN_USE = CameraDevice.StateCallback.ERROR_CAMERA_IN_USE
+private const val ERROR_MAX_IN_USE = CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE
+private const val ERROR_DEVICE = CameraDevice.StateCallback.ERROR_CAMERA_DEVICE
+private const val ERROR_SERVICE = CameraDevice.StateCallback.ERROR_CAMERA_SERVICE
+private const val MAX_OPEN_ATTEMPTS = 3
+private const val OPEN_RETRY_DELAY_MS = 700L
 
 class VaultCameraSession(
     private val context: Context,
@@ -97,6 +117,58 @@ class VaultCameraSession(
     private var maxAfRegions = 0
     private var maxAeRegions = 0
     private var isFlashSupported = false
+    // Modes the HAL actually advertises. Requesting one it doesn't list is how
+    // flash/AE/AF requests end up silently ignored (or capture-failing) on
+    // some devices, so every mode goes through the matching `supported*()`.
+    private var availableAeModes = IntArray(0)
+    private var availableAfModes = IntArray(0)
+    private var availableAwbModes = IntArray(0)
+    private var availableEffects = IntArray(0)
+    private var avoidAutoFlashAeMode = false
+
+    /** Field of view relative to the main camera of this facing (CameraX "intrinsic zoom ratio"). */
+    private var intrinsicZoom = 1f
+
+    // Latest 3A state seen on the live preview; decides whether AUTO flash fires
+    // (CONTROL_AE_STATE_FLASH_REQUIRED) exactly like CameraX's capture pipeline.
+    private var lastAeState: Int? = null
+    private var lastAfState: Int? = null
+    @Volatile private var lastActivePhysicalId: String? = null
+
+    // Flash-photo state (camera thread only).
+    private var stillFlow: StillFlow? = null
+    /** Torch is lit as the flash of the capture currently in flight ("torch as flash"). */
+    private var torchForFlash = false
+    /** Set once a regular flash capture came out black: from then on use torch-as-flash. */
+    private var forceTorchAsFlash = false
+    private var openAttempts = 0
+    private var lastOpenArgs: OpenArgs? = null
+
+    private class OpenArgs(
+        val cameraId: String,
+        val quality: VaultVideoQuality,
+        val photo: VaultPhotoResolution,
+    )
+
+    private enum class StillPhase { WAIT_TORCH, WAIT_PRECAPTURE, MAIN }
+
+    /** State of the one still capture in flight (CameraX capture pipeline, ported to Camera2). */
+    private class StillFlow(
+        val flashRequired: Boolean,
+        val useTorch: Boolean,
+        /** AE precapture trigger is sent (always for regular flash; only S24 UW with torch). */
+        val triggerPrecapture: Boolean,
+        val retried: Boolean,
+    ) {
+        var phase = if (useTorch) StillPhase.WAIT_TORCH else StillPhase.WAIT_PRECAPTURE
+        var triggerFrame = -1L
+        var torchRequestedAt = 0L
+        var torchLitAt = 0L
+        var convergedFrames = 0
+        var postDone = false
+        var timeout: Runnable? = null
+        var watchdog: Runnable? = null
+    }
 
     // Tap-to-focus & metering state
     private var activeAfRegions: Array<MeteringRectangle>? = null
@@ -139,6 +211,8 @@ class VaultCameraSession(
     private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
 
     val currentCameraId: String get() = activeCameraId
+    val hasFlash: Boolean get() = isFlashSupported
+    val intrinsicZoomRatio: Float get() = intrinsicZoom
     val currentZoomMin: Float get() = zoomMinCurrent
     val currentZoomMax: Float get() = zoomMaxCurrent
     val currentMinExposureEv: Double get() = minExposureSteps * exposureStepValue
@@ -256,19 +330,63 @@ class VaultCameraSession(
         try {
             @Suppress("MissingPermission")
             val chars = cameraManager.getCameraCharacteristics(cameraId)
+            if (cameraId != activeCameraId) {
+                // A different sensor: whatever flash workaround was learned does not carry over.
+                forceTorchAsFlash = false
+                lastAeState = null
+                lastAfState = null
+                lastActivePhysicalId = null
+            }
             characteristics = chars
             activeCameraId = cameraId
             pendingQuality = videoQuality
             pendingPhotoResolution = photoResolution
             pendingOpenResult = callback
+            torchForFlash = false
+            openAttempts = 0
+            lastOpenArgs = OpenArgs(cameraId, videoQuality, photoResolution)
             configureSizesAndSurfacesLocked(chars, videoQuality, photoResolution)
-            cameraManager.openCamera(cameraId, deviceStateCallback, bgHandler)
+            openDeviceWithRetry(cameraId)
         } catch (e: Exception) {
+            pendingOpenResult = null
             callback(false, e.message)
         }
     }
 
+    private fun openDeviceWithRetry(cameraId: String) {
+        try {
+            @Suppress("MissingPermission")
+            cameraManager.openCamera(cameraId, deviceStateCallback, bgHandler)
+        } catch (e: CameraAccessException) {
+            val busy = e.reason == CameraAccessException.CAMERA_IN_USE ||
+                e.reason == CameraAccessException.MAX_CAMERAS_IN_USE
+            if (!scheduleOpenRetry(busy, "openCamera threw ${e.reason}")) failOpen(e.message ?: "camera access failed")
+        } catch (e: Exception) {
+            failOpen(e.message ?: "camera open failed")
+        }
+    }
+
+    private fun scheduleOpenRetry(retryable: Boolean, why: String): Boolean {
+        val args = lastOpenArgs
+        if (!retryable || args == null || pendingOpenResult == null || openAttempts >= MAX_OPEN_ATTEMPTS) return false
+        openAttempts++
+        VeLog.w(TAG) { "$why; retrying open ($openAttempts/$MAX_OPEN_ATTEMPTS)" }
+        bgHandler.postDelayed({
+            if (pendingOpenResult != null && cameraDevice == null && activeCameraId == args.cameraId) {
+                openDeviceWithRetry(args.cameraId)
+            }
+        }, OPEN_RETRY_DELAY_MS)
+        return true
+    }
+
+    private fun failOpen(reason: String) {
+        val cb = pendingOpenResult ?: return
+        pendingOpenResult = null
+        cb(false, reason)
+    }
+
     private fun closeCameraOnly(then: () -> Unit) {
+        dropStillFlow("camera closed")
         val device = cameraDevice
         if (device == null) {
             then()
@@ -294,23 +412,27 @@ class VaultCameraSession(
         }
 
         override fun onDisconnected(device: CameraDevice) {
-            device.close()
-            cameraDevice = null
+            // Another app took the camera, or the HAL dropped it. Previously this closed the
+            // device silently and left the UI on a frozen preview with a dead shutter button.
+            VeLog.w(TAG) { "Camera device ${device.id} disconnected" }
+            releaseAfterDeviceLoss(device, "camera disconnected")
+            failOpen("camera disconnected")
+            pendingRecordStart?.invoke(false, "camera disconnected")
+            pendingRecordStart = null
+            onEvent(mapOf("event" to "error", "message" to "camera disconnected"))
         }
 
         override fun onError(device: CameraDevice, error: Int) {
             VeLog.e(TAG) { "Camera device error $error on device ${device.id}" }
-            try { captureSession?.close() } catch (_: Exception) {}
-            try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
-            captureSession = null
-            videoRecorder = null
-            isRecording = false
-            recordingChunkWriter = null
-            try { device.close() } catch (_: Exception) {}
-            cameraDevice = null
+            releaseAfterDeviceLoss(device, "camera error $error")
 
-            pendingOpenResult?.invoke(false, "camera error $error")
-            pendingOpenResult = null
+            // IN_USE / MAX_CAMERAS_IN_USE / CAMERA_DEVICE / CAMERA_SERVICE while opening are
+            // frequently transient (CameraX retries them too).
+            val transient = error == ERROR_IN_USE || error == ERROR_MAX_IN_USE ||
+                error == ERROR_DEVICE || error == ERROR_SERVICE
+            if (scheduleOpenRetry(transient, "camera error $error")) return
+
+            failOpen("camera error $error")
             pendingRecordStart?.invoke(false, "camera error $error")
             pendingRecordStart = null
             onEvent(mapOf("event" to "error", "message" to "camera error $error"))
@@ -319,6 +441,20 @@ class VaultCameraSession(
         override fun onClosed(device: CameraDevice) {
             pendingCloseCallback?.let { cb -> pendingCloseCallback = null; cb() }
         }
+    }
+
+    /** Common teardown when the device goes away underneath us (disconnect / error). */
+    private fun releaseAfterDeviceLoss(device: CameraDevice, @Suppress("UNUSED_PARAMETER") why: String) {
+        dropStillFlow("camera unavailable")
+        try { captureSession?.close() } catch (_: Exception) {}
+        try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
+        captureSession = null
+        videoRecorder = null
+        isRecording = false
+        recordingChunkWriter = null
+        torchForFlash = false
+        try { device.close() } catch (_: Exception) {}
+        cameraDevice = null
     }
 
     private fun configureSizesAndSurfacesLocked(
@@ -333,7 +469,13 @@ class VaultCameraSession(
         isFixedFocus = minFocusDist == null || minFocusDist == 0f
         maxAfRegions = chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
         maxAeRegions = chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0
-        isFlashSupported = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false
+        isFlashSupported = chars.hasFlashUnit()
+        availableAeModes = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES) ?: IntArray(0)
+        availableAfModes = chars.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES) ?: IntArray(0)
+        availableAwbModes = chars.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES) ?: IntArray(0)
+        availableEffects = chars.get(CameraCharacteristics.CONTROL_AVAILABLE_EFFECTS) ?: IntArray(0)
+        avoidAutoFlashAeMode = CameraFlashQuirks.shouldAvoidAutoFlashAeMode(chars)
+        intrinsicZoom = try { intrinsicZoomRatioFor(cameraManager, activeCameraId) } catch (_: Exception) { 1f }
 
         zoomRatioSupported = Build.VERSION.SDK_INT >= 30 && chars.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) != null
         if (zoomRatioSupported) {
@@ -460,6 +602,7 @@ class VaultCameraSession(
     private fun createSessionLocked() {
         val device = cameraDevice ?: return
 
+        dropStillFlow("camera session restarted")
         captureSession?.let { try { it.close() } catch (_: Exception) {} }
         captureSession = null
 
@@ -560,9 +703,29 @@ class VaultCameraSession(
     private fun updateRepeatingRequest() {
         val session = captureSession ?: return
         try {
-            session.setRepeatingRequest(buildRequest(), null, bgHandler)
+            session.setRepeatingRequest(buildRequest(), repeatingCallback, bgHandler)
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "updateRepeatingRequest failed" }
+        }
+    }
+
+    /**
+     * Watches every preview frame. CameraX bases the "does AUTO flash fire" decision and the
+     * wait-for-AE-to-settle logic on these results; without them a flash photo is taken blind.
+     */
+    private val repeatingCallback = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(
+            session: CameraCaptureSession,
+            request: CaptureRequest,
+            result: TotalCaptureResult,
+        ) {
+            lastAeState = result.get(CaptureResult.CONTROL_AE_STATE)
+            lastAfState = result.get(CaptureResult.CONTROL_AF_STATE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                lastActivePhysicalId = result.get(CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID)
+            }
+            val flow = stillFlow ?: return
+            onStillFrame(flow, result)
         }
     }
 
@@ -585,10 +748,13 @@ class VaultCameraSession(
         if (isFixedFocus) {
             builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
         } else if (isTapToFocusActive && activeAfRegions != null && maxAfRegions > 0) {
-            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+            builder.set(CaptureRequest.CONTROL_AF_MODE, supportedAfMode(CaptureRequest.CONTROL_AF_MODE_AUTO))
             builder.set(CaptureRequest.CONTROL_AF_REGIONS, activeAfRegions)
         } else {
-            builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+            // CameraX: CONTINUOUS_PICTURE for preview/stills, CONTINUOUS_VIDEO only while recording.
+            val wanted = if (isRecording) CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO
+            else CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+            builder.set(CaptureRequest.CONTROL_AF_MODE, supportedAfMode(wanted))
         }
 
         if (isTapToFocusActive && activeAeRegions != null && maxAeRegions > 0) {
@@ -694,7 +860,32 @@ class VaultCameraSession(
     }
 
     private fun applyWhiteBalance(builder: CaptureRequest.Builder) {
-        builder.set(CaptureRequest.CONTROL_AWB_MODE, awbMode)
+        val mode = if (availableAwbModes.isEmpty() || awbMode in availableAwbModes) awbMode
+        else CaptureRequest.CONTROL_AWB_MODE_AUTO
+        builder.set(CaptureRequest.CONTROL_AWB_MODE, mode)
+    }
+
+    // CameraX CameraMetadata.getSupportedAeMode/AfMode: never put a mode on a request that the
+    // HAL doesn't advertise -- some devices ignore the whole 3A block (flash included) then.
+    private fun supportedAeMode(preferred: Int): Int {
+        if (availableAeModes.isEmpty() || preferred in availableAeModes) return preferred
+        if (CaptureRequest.CONTROL_AE_MODE_ON in availableAeModes) return CaptureRequest.CONTROL_AE_MODE_ON
+        return availableAeModes.firstOrNull { it == CaptureRequest.CONTROL_AE_MODE_OFF } ?: preferred
+    }
+
+    private fun supportedAfMode(preferred: Int): Int {
+        if (availableAfModes.isEmpty() || preferred in availableAfModes) return preferred
+        val continuous = intArrayOf(
+            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE,
+            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO,
+        )
+        if (preferred == CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE ||
+            preferred == CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO
+        ) {
+            continuous.firstOrNull { it in availableAfModes }?.let { return it }
+        }
+        if (CaptureRequest.CONTROL_AF_MODE_AUTO in availableAfModes) return CaptureRequest.CONTROL_AF_MODE_AUTO
+        return CaptureRequest.CONTROL_AF_MODE_OFF
     }
 
     fun setWhiteBalance(modeStr: String) {
@@ -711,7 +902,9 @@ class VaultCameraSession(
     }
 
     private fun applyColorEffect(builder: CaptureRequest.Builder) {
-        builder.set(CaptureRequest.CONTROL_EFFECT_MODE, effectMode)
+        val mode = if (availableEffects.isEmpty() || effectMode in availableEffects) effectMode
+        else CaptureRequest.CONTROL_EFFECT_MODE_OFF
+        builder.set(CaptureRequest.CONTROL_EFFECT_MODE, mode)
     }
 
     fun setColorEffect(effectStr: String) {
@@ -742,21 +935,32 @@ class VaultCameraSession(
 
     private fun applyFlash(builder: CaptureRequest.Builder) {
         if (!isFlashSupported) {
-            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-            builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            // No flash unit: don't send FLASH_MODE at all, some HALs reject it.
+            builder.set(CaptureRequest.CONTROL_AE_MODE, supportedAeMode(CaptureRequest.CONTROL_AE_MODE_ON))
             return
         }
-        when (flashMode) {
-            VaultFlashMode.OFF -> {
-                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
-            }
-            VaultFlashMode.AUTO -> builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH)
-            VaultFlashMode.ON -> builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH)
-            VaultFlashMode.TORCH -> {
-                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH)
-            }
+        // The torch is lit either because the user asked for it, or because a flash photo is
+        // being taken with "torch as flash" (device quirk / black-frame fallback).
+        val torch = torchForFlash || flashMode == VaultFlashMode.TORCH
+        if (torch) {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, supportedAeMode(CaptureRequest.CONTROL_AE_MODE_ON))
+            builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH)
+            return
+        }
+        // While recording, flash ON/AUTO mean nothing (a still-flash would fire mid-video).
+        val aeMode = if (isRecording) {
+            CaptureRequest.CONTROL_AE_MODE_ON
+        } else when (flashMode) {
+            VaultFlashMode.ON -> CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH
+            VaultFlashMode.AUTO ->
+                if (avoidAutoFlashAeMode) CaptureRequest.CONTROL_AE_MODE_ON
+                else CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH
+            else -> CaptureRequest.CONTROL_AE_MODE_ON
+        }
+        val chosen = supportedAeMode(aeMode)
+        builder.set(CaptureRequest.CONTROL_AE_MODE, chosen)
+        if (chosen == CaptureRequest.CONTROL_AE_MODE_ON || chosen == CaptureRequest.CONTROL_AE_MODE_OFF) {
+            builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
         }
     }
 
@@ -791,30 +995,28 @@ class VaultCameraSession(
         }
     }
 
+    /** Common gate for both photo entry points; reports the reason through [onError]. */
+    private fun stillPreconditionsOk(onError: (String) -> Unit): Boolean {
+        if (cameraDevice == null || captureSession == null || jpegReader == null) {
+            onError("camera not ready")
+            return false
+        }
+        if (isRecording) {
+            onError("cannot take photo while recording")
+            return false
+        }
+        if (stillFlow != null) {
+            onError("capture already in progress")
+            return false
+        }
+        return true
+    }
+
     fun capturePhoto(callback: (Boolean, ByteArray?, ByteArray?, String?) -> Unit) {
         runOnCameraThread {
-            val device = cameraDevice
-            val session = captureSession
-            val reader = jpegReader
-            if (device == null || session == null || reader == null) {
-                callback(false, null, null, "camera not ready")
-                return@runOnCameraThread
-            }
-            if (isRecording) {
-                callback(false, null, null, "cannot take photo while recording")
-                return@runOnCameraThread
-            }
+            if (!stillPreconditionsOk { callback(false, null, null, it) }) return@runOnCameraThread
             pendingPhotoBytesCallback = callback
-            try {
-                val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                builder.addTarget(reader.surface)
-                applyControls(builder)
-                builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
-                session.capture(builder.build(), null, bgHandler)
-            } catch (e: Exception) {
-                pendingPhotoBytesCallback = null
-                callback(false, null, null, e.message)
-            }
+            startStill(retried = false)
         }
     }
 
@@ -832,30 +1034,320 @@ class VaultCameraSession(
 
     private fun capturePhotoInternal(writer: ChunkSink, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
-            val device = cameraDevice
-            val session = captureSession
-            val reader = jpegReader
-            if (device == null || session == null || reader == null) {
-                callback(false, "camera not ready")
-                return@runOnCameraThread
-            }
-            if (isRecording) {
-                callback(false, "cannot take photo while recording")
-                return@runOnCameraThread
-            }
+            if (!stillPreconditionsOk { callback(false, it) }) return@runOnCameraThread
             pendingPhotoCallback = callback
             pendingPhotoWriter = writer
-            try {
-                val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                builder.addTarget(reader.surface)
-                applyControls(builder)
-                builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
-                session.capture(builder.build(), null, bgHandler)
-            } catch (e: Exception) {
-                pendingPhotoCallback = null
-                pendingPhotoWriter = null
-                callback(false, e.message)
+            startStill(retried = false)
+        }
+    }
+
+    private fun isFlashRequiredForStill(): Boolean {
+        if (!isFlashSupported || isRecording) return false
+        return when (flashMode) {
+            VaultFlashMode.ON -> true
+            VaultFlashMode.AUTO -> lastAeState == CaptureResult.CONTROL_AE_STATE_FLASH_REQUIRED
+            else -> false // OFF, or the torch is already lit
+        }
+    }
+
+    /** Is the ultra-wide sensor the one producing the image? (Only matters for the S24 quirk.) */
+    private fun isUltraWideActive(): Boolean {
+        val phys = lastActivePhysicalId
+        if (phys != null) {
+            return try { intrinsicZoomRatioFor(cameraManager, phys) < 1f } catch (_: Exception) { true }
+        }
+        if (intrinsicZoom < 0.95f) return true
+        if (zoomRatioSupported) return currentZoom < 0.95f
+        return true // unknown -> be safe, like CameraX
+    }
+
+    private fun startStill(retried: Boolean) {
+        val chars = characteristics
+        if (cameraDevice == null || captureSession == null || jpegReader == null || chars == null) {
+            failPendingPhoto("camera not ready")
+            return
+        }
+        val flashRequired = isFlashRequiredForStill()
+        val useTorch = flashRequired &&
+            (forceTorchAsFlash || CameraFlashQuirks.shouldUseTorchAsFlash(chars, isUltraWideActive()))
+        val triggerPrecapture = when {
+            !flashRequired -> false
+            !useTorch -> true
+            forceTorchAsFlash -> false
+            else -> CameraFlashQuirks.torchAsFlashAllowsAePrecapture()
+        }
+        val flow = StillFlow(flashRequired, useTorch, triggerPrecapture, retried)
+        stillFlow = flow
+        VeLog.d(TAG) { "still: flashRequired=$flashRequired torch=$useTorch precapture=$triggerPrecapture retried=$retried" }
+
+        flow.watchdog = Runnable {
+            if (stillFlow === flow) {
+                VeLog.w(TAG) { "still capture timed out in phase ${flow.phase}" }
+                abortStill("capture timed out")
             }
+        }.also { bgHandler.postDelayed(it, STILL_WATCHDOG_MS) }
+
+        when {
+            !flashRequired -> submitMainCapture(flow)
+            useTorch -> {
+                flow.torchRequestedAt = SystemClock.elapsedRealtime()
+                torchForFlash = true
+                updateRepeatingRequest()
+                armThreeATimeout(flow)
+            }
+            else -> {
+                sendPrecaptureTrigger(flow)
+                armThreeATimeout(flow)
+            }
+        }
+    }
+
+    /** CameraX waits at most 5 s for 3A when a flash is involved, then shoots anyway. */
+    private fun armThreeATimeout(flow: StillFlow) {
+        flow.timeout = Runnable {
+            if (stillFlow === flow && flow.phase != StillPhase.MAIN) {
+                VeLog.w(TAG) { "3A did not settle in ${FLASH_3A_TIMEOUT_MS}ms; shooting anyway" }
+                submitMainCapture(flow)
+            }
+        }.also { bgHandler.postDelayed(it, FLASH_3A_TIMEOUT_MS) }
+    }
+
+    private fun sendPrecaptureTrigger(flow: StillFlow) {
+        val session = captureSession
+        if (session == null) {
+            submitMainCapture(flow)
+            return
+        }
+        try {
+            val builder = newRequestBuilder()
+            builder.set(
+                CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+                CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_START,
+            )
+            session.capture(builder.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureStarted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    timestamp: Long,
+                    frameNumber: Long,
+                ) {
+                    if (stillFlow === flow) flow.triggerFrame = frameNumber
+                }
+
+                override fun onCaptureFailed(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    failure: CaptureFailure,
+                ) {
+                    // Metering failed; a flash shot without it is still better than no photo.
+                    if (stillFlow === flow && flow.phase != StillPhase.MAIN) submitMainCapture(flow)
+                }
+            }, bgHandler)
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "AE precapture trigger failed" }
+            submitMainCapture(flow)
+        }
+    }
+
+    /** Preview-frame hook: decides when the 3A wait of the current still is over. */
+    private fun onStillFrame(flow: StillFlow, result: TotalCaptureResult) {
+        when (flow.phase) {
+            StillPhase.MAIN -> Unit
+            StillPhase.WAIT_PRECAPTURE -> {
+                if (flow.triggerFrame < 0 || result.frameNumber <= flow.triggerFrame) return
+                if (isPrecaptureSettled(result)) submitMainCapture(flow)
+            }
+            StillPhase.WAIT_TORCH -> {
+                // 1) the torch really is on: the request echo says so (and the flash fired)
+                val echo = result.get(CaptureResult.FLASH_MODE)
+                if (echo != null && echo != CaptureResult.FLASH_MODE_TORCH) return
+                val now = SystemClock.elapsedRealtime()
+                val fs = result.get(CaptureResult.FLASH_STATE)
+                // Some HALs never report FIRED for the torch: don't wait on it for more than a second.
+                if (fs != null && fs != CaptureResult.FLASH_STATE_FIRED && now - flow.torchRequestedAt < 1_000L) return
+                if (flow.torchLitAt == 0L) {
+                    flow.torchLitAt = now
+                    if (flow.triggerPrecapture) sendPrecaptureTrigger(flow)
+                }
+                // 2) AE has re-metered under the torch
+                if (flow.triggerPrecapture) {
+                    if (flow.triggerFrame >= 0 && result.frameNumber > flow.triggerFrame && isPrecaptureSettled(result)) {
+                        submitMainCapture(flow)
+                    }
+                    return
+                }
+                flow.convergedFrames = if (isTorchConverged(result)) flow.convergedFrames + 1 else 0
+                if (now - flow.torchLitAt >= TORCH_SETTLE_MS && flow.convergedFrames >= TORCH_CONVERGED_FRAMES) {
+                    submitMainCapture(flow)
+                }
+            }
+        }
+    }
+
+    // CameraX Controller3A.createLock3AForCaptureExitConditions
+    private fun isPrecaptureSettled(result: CaptureResult): Boolean {
+        val aeMode = result.get(CaptureResult.CONTROL_AE_MODE)
+        val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
+        val aeReady = aeMode == null || aeMode == CaptureResult.CONTROL_AE_MODE_OFF || aeState == null ||
+            aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED ||
+            aeState == CaptureResult.CONTROL_AE_STATE_FLASH_REQUIRED ||
+            aeState == CaptureResult.CONTROL_AE_STATE_LOCKED
+        return aeReady && isAfSettled(result)
+    }
+
+    // CameraX ConvergenceUtils.is3AConverged(isTorchAsFlash = true): FLASH_REQUIRED and
+    // UNKNOWN are *not* accepted here (some devices report FLASH_REQUIRED the whole time
+    // the torch is lit).
+    private fun isTorchConverged(result: CaptureResult): Boolean {
+        val aeMode = result.get(CaptureResult.CONTROL_AE_MODE)
+        val aeState = result.get(CaptureResult.CONTROL_AE_STATE)
+        val aeReady = aeMode == CaptureResult.CONTROL_AE_MODE_OFF ||
+            aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED
+        val awbMode = result.get(CaptureResult.CONTROL_AWB_MODE)
+        val awbState = result.get(CaptureResult.CONTROL_AWB_STATE)
+        val awbReady = awbMode == CaptureResult.CONTROL_AWB_MODE_OFF || awbState == null ||
+            awbState == CaptureResult.CONTROL_AWB_STATE_CONVERGED
+        return aeReady && awbReady && isAfSettled(result)
+    }
+
+    private fun isAfSettled(result: CaptureResult): Boolean {
+        val afMode = result.get(CaptureResult.CONTROL_AF_MODE)
+        val continuous = afMode == CaptureResult.CONTROL_AF_MODE_CONTINUOUS_PICTURE ||
+            afMode == CaptureResult.CONTROL_AF_MODE_CONTINUOUS_VIDEO
+        if (!continuous) return true
+        val afState = result.get(CaptureResult.CONTROL_AF_STATE) ?: return true
+        return afState == CaptureResult.CONTROL_AF_STATE_PASSIVE_FOCUSED ||
+            afState == CaptureResult.CONTROL_AF_STATE_PASSIVE_UNFOCUSED ||
+            afState == CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED ||
+            afState == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED
+    }
+
+    private fun submitMainCapture(flow: StillFlow) {
+        if (stillFlow !== flow || flow.phase == StillPhase.MAIN) return
+        flow.phase = StillPhase.MAIN
+        flow.timeout?.let { bgHandler.removeCallbacks(it) }
+        flow.timeout = null
+
+        val device = cameraDevice
+        val session = captureSession
+        val reader = jpegReader
+        if (device == null || session == null || reader == null) {
+            abortStill("camera not ready")
+            return
+        }
+        try {
+            val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+            builder.addTarget(reader.surface)
+            applyControls(builder)
+            builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
+            session.capture(builder.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    result: TotalCaptureResult,
+                ) {
+                    // Exposure is done: torch off / precapture cancel. The JPEG follows via the reader.
+                    postStillCapture(flow)
+                }
+
+                override fun onCaptureFailed(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    failure: CaptureFailure,
+                ) {
+                    VeLog.w(TAG) { "still capture failed, reason=${failure.reason}" }
+                    if (stillFlow === flow) abortStill("capture failed (reason ${failure.reason})")
+                }
+            }, bgHandler)
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "still capture submit failed" }
+            abortStill(e.message ?: "capture failed")
+        }
+    }
+
+    /** CameraX POST_CAPTURE: put the torch back and reset the AE state machine. */
+    private fun postStillCapture(flow: StillFlow) {
+        if (flow.postDone) return
+        flow.postDone = true
+        if (flow.useTorch && torchForFlash) {
+            torchForFlash = false
+            updateRepeatingRequest()
+        }
+        if (flow.flashRequired && (!flow.useTorch || flow.triggerPrecapture)) {
+            val session = captureSession ?: return
+            try {
+                val builder = newRequestBuilder()
+                builder.set(
+                    CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+                    CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL,
+                )
+                session.capture(builder.build(), null, bgHandler)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Ends the flow (successfully or not) and releases timers. Does not touch callbacks. */
+    private fun finishStill(flow: StillFlow) {
+        flow.watchdog?.let { bgHandler.removeCallbacks(it) }
+        flow.timeout?.let { bgHandler.removeCallbacks(it) }
+        flow.watchdog = null
+        flow.timeout = null
+        postStillCapture(flow)
+        if (stillFlow === flow) stillFlow = null
+    }
+
+    private fun abortStill(reason: String) {
+        val flow = stillFlow ?: return
+        finishStill(flow)
+        failPendingPhoto(reason)
+    }
+
+    /** Session/device went away: release the torch and fail whoever was waiting. */
+    private fun dropStillFlow(reason: String) {
+        val flow = stillFlow
+        if (flow != null) finishStill(flow)
+        if (torchForFlash) torchForFlash = false
+        if (flow != null) failPendingPhoto(reason)
+    }
+
+    private fun failPendingPhoto(reason: String) {
+        pendingPhotoBytesCallback?.let {
+            pendingPhotoBytesCallback = null
+            it(false, null, null, reason)
+        }
+        pendingPhotoCallback?.let {
+            pendingPhotoCallback = null
+            pendingPhotoWriter = null
+            it(false, reason)
+        }
+    }
+
+    /**
+     * A flash photo that came out (near-)black is the failure the user reported on some
+     * devices. Real dark scenes still have sensor noise; a black frame is flat ~0.
+     */
+    private fun isBlackJpeg(bytes: ByteArray): Boolean {
+        return try {
+            val opts = BitmapFactory.Options().apply { inSampleSize = 16 }
+            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return false
+            val w = bmp.width
+            val h = bmp.height
+            val px = IntArray(w * h)
+            bmp.getPixels(px, 0, w, 0, 0, w, h)
+            bmp.recycle()
+            if (px.isEmpty()) return false
+            var sum = 0L
+            var bright = 0
+            for (c in px) {
+                val luma = (((c shr 16) and 0xFF) * 299 + ((c shr 8) and 0xFF) * 587 + (c and 0xFF) * 114) / 1000
+                sum += luma
+                if (luma > 24) bright++
+            }
+            val mean = sum.toDouble() / px.size
+            mean < 3.0 && bright < px.size / 200
+        } catch (_: Throwable) {
+            false
         }
     }
 
@@ -869,6 +1361,22 @@ class VaultCameraSession(
             val buffer = image.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
+
+            val flow = stillFlow
+            if (flow != null) {
+                if (flow.flashRequired && !flow.useTorch && !flow.retried && isBlackJpeg(bytes)) {
+                    // The regular flash sequence produced a black frame on this device. Shoot it
+                    // again once with the torch as the flash (and keep doing so on this camera).
+                    VeLog.w(TAG) { "flash photo is black; retrying with torch-as-flash" }
+                    forceTorchAsFlash = true
+                    finishStill(flow)
+                    startStill(retried = true)
+                    return
+                }
+                // Release the session *before* handing the photo out: the callback may
+                // immediately ask for the next one.
+                finishStill(flow)
+            }
 
             val bytesCb = pendingPhotoBytesCallback
             if (bytesCb != null) {

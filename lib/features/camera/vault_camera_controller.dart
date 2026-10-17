@@ -14,6 +14,12 @@ class NativeCameraLens {
   final String lensType;
   final String displayName;
 
+  /// Zoom value to program (`setZoom`) after opening [cameraId] to land on this
+  /// lens. 1.0 for a standalone camera id; e.g. 0.5 for the ultra-wide stop of
+  /// a logical multi-camera (the HAL switches lens by zoom ratio).
+  final double zoomRatio;
+  final bool hasFlash;
+
   const NativeCameraLens({
     required this.cameraId,
     required this.facing,
@@ -23,6 +29,8 @@ class NativeCameraLens {
     this.relativeZoom = 1.0,
     this.lensType = 'main',
     this.displayName = '1x',
+    this.zoomRatio = 1.0,
+    this.hasFlash = false,
   });
 
   factory NativeCameraLens.fromMap(Map<dynamic, dynamic> map) {
@@ -35,6 +43,8 @@ class NativeCameraLens {
       relativeZoom: (map['relativeZoom'] as num?)?.toDouble() ?? 1.0,
       lensType: map['lensType'] as String? ?? 'main',
       displayName: map['displayName'] as String? ?? '1x',
+      zoomRatio: (map['zoomRatio'] as num?)?.toDouble() ?? 1.0,
+      hasFlash: map['hasFlash'] as bool? ?? false,
     );
   }
 }
@@ -51,6 +61,17 @@ class VaultCameraSessionInfo {
  final int previewHeight;
   final int sensorOrientation;
   final List<NativeCameraLens> lenses;
+
+  /// Every selectable lens (0.5x / 1x / 3x ...), main camera first per facing.
+  /// [lenses] only holds the main camera of each facing (used to flip front/back).
+  final List<NativeCameraLens> lensStops;
+
+  /// Whether the opened camera has a flash unit / torch.
+  final bool hasFlash;
+
+  /// Field of view of the opened camera relative to the main camera of its
+  /// facing; multiply the zoom by it for the "x" label the user expects.
+  final double intrinsicZoomRatio;
   final Map<String, String> photoResolutions;
   final Map<String, String> videoQualities;
   final String? currentPhotoResolution;
@@ -68,6 +89,9 @@ class VaultCameraSessionInfo {
     required this.previewHeight,
     required this.sensorOrientation,
     required this.lenses,
+    this.lensStops = const [],
+    this.hasFlash = true,
+    this.intrinsicZoomRatio = 1.0,
     this.photoResolutions = const {},
     this.videoQualities = const {},
     this.currentPhotoResolution,
@@ -79,6 +103,11 @@ class VaultCameraSessionInfo {
             ?.map((e) => NativeCameraLens.fromMap(e as Map<dynamic, dynamic>))
             .toList() ??
         [];
+
+    final stopsList = (map['lensStops'] as List<dynamic>?)
+            ?.map((e) => NativeCameraLens.fromMap(e as Map<dynamic, dynamic>))
+            .toList() ??
+        lensesList;
 
     final photoResMap = (map['photoResolutions'] as Map<dynamic, dynamic>?)?.map(
           (k, v) => MapEntry(k.toString(), v.toString()),
@@ -102,6 +131,9 @@ class VaultCameraSessionInfo {
       previewHeight: (map['previewHeight'] as num?)?.toInt() ?? 1080,
       sensorOrientation: (map['sensorOrientation'] as num?)?.toInt() ?? 90,
       lenses: lensesList,
+      lensStops: stopsList,
+      hasFlash: map['hasFlash'] as bool? ?? true,
+      intrinsicZoomRatio: (map['intrinsicZoomRatio'] as num?)?.toDouble() ?? 1.0,
       photoResolutions: photoResMap,
       videoQualities: videoQualMap,
       currentPhotoResolution: map['currentPhotoResolution'] as String?,

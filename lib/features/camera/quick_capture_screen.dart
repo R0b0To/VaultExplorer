@@ -659,6 +659,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                         onAspectRatioChanged: captureControlsController.selectAspectRatio,
                         timerDelaySeconds: captureControls.timerDelaySeconds,
                         flashMode: captureControls.flashMode,
+                        hasFlash: captureHasFlash,
                         iconTurns: captureIconTurns,
                         onClose: () {
                           if (_phase == _Phase.saving) return;

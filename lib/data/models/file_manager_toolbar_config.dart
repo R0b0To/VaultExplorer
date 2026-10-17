@@ -359,6 +359,106 @@ class FileManagerToolbarConfig {
         skin: skin ?? this.skin,
       );
 
+  // -- Which export each field belongs to -------------------------------------
+  //
+  // Every key of [toJson] is in exactly one of these three sets (a test
+  // enforces it), so a new option has to be classified when it is added.
+
+  /// Look and layout of the file manager: toolbar buttons and their order,
+  /// which bars are shown, list/grid/masonry sizing and style, and the
+  /// media viewer's button layout. Travels with App skin -> Export.
+  static const Set<String> interfaceKeys = {
+    'order',
+    'hidden',
+    'showBreadcrumbBar',
+    'showStatsBar',
+    'showBookmarkBar',
+    'showMediaCarousel',
+    'autoHideAppBar',
+    'useFabForToolbar',
+    'bottomSelectionBar',
+    'detailColumnsOrder',
+    'hiddenDetailColumns',
+    'showGridFileNames',
+    'gridAspectRatio',
+    'gridCornerStyle',
+    'gridSpacing',
+    'showListThumbnails',
+    'showItemActionsMenu',
+    'longFileNameDisplayMode',
+    'listZoomLevel',
+    'gridColumnsPortrait',
+    'gridColumnsLandscape',
+    'masonryColumnsPortrait',
+    'masonryColumnsLandscape',
+    'playlistTransitionEffect',
+    'skin',
+  };
+
+  /// How the file manager behaves rather than how it looks. Travels with
+  /// Settings -> Export.
+  static const Set<String> behaviorKeys = {
+    'showHiddenFiles',
+    'autoStartPlaylistMode',
+    'rememberPerFolderLayout',
+    'resetSizeOnLayoutChange',
+    'defaultThumbnailCacheMode',
+    'defaultThumbnailQuality',
+    'localStorageThumbnailCacheMode',
+    'localStorageThumbnailQuality',
+  };
+
+  /// Keyed by `containerUri:dirPath`, i.e. per-container path data. Never
+  /// exported (see [SettingsBackupService]); the import side keeps whatever
+  /// this device already has.
+  static const Set<String> perFolderKeys = {
+    'folderLayoutModes',
+    'folderGridAspectRatios',
+    'folderSortModes',
+  };
+
+  /// The nested media viewer config is split between the two exports, so it is
+  /// handled by its own `interfaceToJson`/`behaviorToJson`.
+  static const String _mediaViewerKey = 'mediaViewerToolbarConfig';
+
+  Map<String, dynamic> interfaceToJson() {
+    final all = toJson();
+    return {
+      for (final key in interfaceKeys) key: all[key],
+      _mediaViewerKey: mediaViewerToolbarConfig.interfaceToJson(),
+    };
+  }
+
+  Map<String, dynamic> behaviorToJson() {
+    final all = toJson();
+    return {
+      for (final key in behaviorKeys) key: all[key],
+      _mediaViewerKey: mediaViewerToolbarConfig.behaviorToJson(),
+    };
+  }
+
+  /// A copy of this with the layout taken from [other]. Behavior and the
+  /// per-folder maps of this device are kept.
+  FileManagerToolbarConfig withInterfaceFrom(FileManagerToolbarConfig other) =>
+      FileManagerToolbarConfig.fromJson({
+        ...toJson(),
+        ...other.interfaceToJson(),
+        _mediaViewerKey: mediaViewerToolbarConfig
+            .withInterfaceFrom(other.mediaViewerToolbarConfig)
+            .toJson(),
+      });
+
+  /// A copy of this with the behavior taken from [other]. Layout and the
+  /// per-folder maps of this device are kept.
+  FileManagerToolbarConfig withBehaviorFrom(FileManagerToolbarConfig other) =>
+      FileManagerToolbarConfig.fromJson({
+        ...toJson(),
+        ...other.behaviorToJson(),
+        _mediaViewerKey: mediaViewerToolbarConfig
+            .withBehaviorFrom(other.mediaViewerToolbarConfig)
+            .toJson(),
+      });
+
   Map<String, dynamic> toJson() => {
         'order': order.map((a) => a.toJson()).toList(),
         'hidden': hidden.map((a) => a.toJson()).toList(),

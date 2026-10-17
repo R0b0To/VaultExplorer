@@ -579,6 +579,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   controller: _passwordCtrl,
                   enabled: canConfigure,
                   obscureText: _revealLocked ? true : _obscure,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  enableIMEPersonalizedLearning: false,
                   enableInteractiveSelection: !_revealLocked && canConfigure,
                   autofocus: widget.existingRecord != null && widget.prefillPassword?.isEmpty != false,
                   onChanged: (val) {
@@ -779,6 +782,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           child: TextField(
             controller: _hiddenPasswordCtrl,
             obscureText: _hiddenObscure,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
             enabled: canConfigure,
             decoration: InputDecoration(
               filled: true,

@@ -210,6 +210,53 @@ class MediaViewerToolbarConfig {
     equalizer: equalizer ?? this.equalizer,
   );
 
+  /// JSON keys describing what the viewer's controls look like and where they
+  /// sit: which buttons exist in which bar, and which on-screen elements are
+  /// shown. This is the part that travels with App skin -> Export.
+  ///
+  /// Everything else (gestures, playback defaults, decoders, equalizer,
+  /// thumbnail generation, ...) is behavior and travels with Settings ->
+  /// Export. A key added to [toJson] later is behavior unless it is listed
+  /// here, which keeps new options out of shared skin files by default.
+  static const Set<String> interfaceKeys = {
+    'topBarActions',
+    'bottomBarActions',
+    'moreMenuActions',
+    'advancedSettingsActions',
+    'hiddenActions',
+    'showProgressBar',
+    'showCenterTransport',
+    'showPreviousNext',
+    'showCenterScreenPlayButton',
+    'showCenterTransportForImages',
+    'showStatusBadge',
+    'scrubPreviewStyle',
+  };
+
+  Map<String, dynamic> interfaceToJson() {
+    final all = toJson();
+    return {for (final key in interfaceKeys) key: all[key]};
+  }
+
+  Map<String, dynamic> behaviorToJson() => {
+    for (final entry in toJson().entries)
+      if (!interfaceKeys.contains(entry.key)) entry.key: entry.value,
+  };
+
+  /// A copy of this with the layout taken from [other]; behavior is kept.
+  MediaViewerToolbarConfig withInterfaceFrom(MediaViewerToolbarConfig other) =>
+      MediaViewerToolbarConfig.fromJson({
+        ...toJson(),
+        ...other.interfaceToJson(),
+      });
+
+  /// A copy of this with the behavior taken from [other]; layout is kept.
+  MediaViewerToolbarConfig withBehaviorFrom(MediaViewerToolbarConfig other) =>
+      MediaViewerToolbarConfig.fromJson({
+        ...toJson(),
+        ...other.behaviorToJson(),
+      });
+
   Map<String, dynamic> toJson() => {
     'topBarActions': topBarActions.map((a) => a.toJson()).toList(),
     'bottomBarActions': bottomBarActions.map((a) => a.toJson()).toList(),

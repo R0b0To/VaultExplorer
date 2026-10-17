@@ -398,7 +398,24 @@ class AppSettings {
     );
   }
 
+  /// Every persisted field is in exactly one of the three groups below, so a
+  /// new setting has to be classified when it is added:
+  ///
+  /// * [configurationToJson] -- how the app *behaves* (locks, defaults,
+  ///   playback/import handling, language). Travels with Settings -> Export.
+  /// * [interfaceToJson] -- how the app *looks and is laid out* (theme mode,
+  ///   view modes, editor appearance, ...). Travels with App skin -> Export.
+  /// * [skinsToJson] -- the skin library and which skin is active. Owned by
+  ///   the App skin screens.
   Map<String, dynamic> toJson() => {
+    ...configurationToJson(),
+    ...interfaceToJson(),
+    ...skinsToJson(),
+  };
+
+  /// Behavior, security and defaults. Never contains the master-password,
+  /// pattern or PIN hashes (they live in their own secure-storage keys).
+  Map<String, dynamic> configurationToJson() => {
     'useMasterPassword': useMasterPassword,
     'masterUnlockMethod': masterUnlockMethod.toJson(),
     'defaultDocumentProvider': defaultDocumentProvider,
@@ -412,16 +429,30 @@ class AppSettings {
     'lockAppOnScreenLock': lockAppOnScreenLock,
     'appLockAfterMins': appLockAfterMins,
     'appLockScreenLockOnly': appLockScreenLockOnly,
-    'defaultLayoutMode': defaultLayoutMode.toJson(),
-    'containerSortMode': containerSortMode.toJson(),
-    'themeMode': themeMode.index,
-    'useDynamicColor': useDynamicColor,
-    'useOledBlackTheme': useOledBlackTheme,
     'extensionPreferences': extensionPreferences,
     'autoOpenOnUnlock': autoOpenOnUnlock,
+    'htmlEnableJavaScript': htmlEnableJavaScript,
+    'languageCode': languageCode,
+    'debugLoggingEnabled': debugLoggingEnabled,
+    'deleteAfterImportMode': deleteAfterImportMode.toJson(),
+    'audioRecordingQuality': audioRecordingQuality.toJson(),
+    'videoMuted': videoMuted,
+    'videoPlaybackMode': videoPlaybackMode.name,
+    'autoLockOnShareImport': autoLockOnShareImport,
+    'quickActionLockMode': quickActionLockMode.toJson(),
+    'enableAuthenticator': enableAuthenticator,
+  };
+
+  /// Look and layout: everything the "Appearance & Interface" pages and the
+  /// per-screen appearance sheets let the person change.
+  Map<String, dynamic> interfaceToJson() => {
+    'themeMode': themeMode.index,
+    'useDynamicColor': useDynamicColor,
+    'defaultLayoutMode': defaultLayoutMode.toJson(),
     'defaultFileSortBy': defaultFileSortBy.toJson(),
     'defaultFileSortAscending': defaultFileSortAscending,
-    'htmlEnableJavaScript': htmlEnableJavaScript,
+    'containerSortMode': containerSortMode.toJson(),
+    'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'playlistScrollMode': playlistScrollMode.toJson(),
     'playlistScrollDirection':
         playlistScrollMode == PlaylistScrollMode.verticalPage
@@ -429,27 +460,75 @@ class AppSettings {
         : (playlistScrollMode == PlaylistScrollMode.verticalContinuous
               ? 'verticalContinuous'
               : 'horizontal'),
-    'languageCode': languageCode,
-    'debugLoggingEnabled': debugLoggingEnabled,
-    'deleteAfterImportMode': deleteAfterImportMode.toJson(),
-    'audioRecordingQuality': audioRecordingQuality.toJson(),
-    'videoMuted': videoMuted,
-    'videoPlaybackMode': videoPlaybackMode.name,
-    'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
-    'autoLockOnShareImport': autoLockOnShareImport,
-    'quickActionLockMode': quickActionLockMode.toJson(),
-    'enableAuthenticator': enableAuthenticator,
     'authenticatorShowNumbers': authenticatorShowNumbers,
     'authenticatorSearchPlacement': authenticatorSearchPlacement.toJson(),
-    'appSkinPreset': appSkinPreset.id,
-    'customAppSkin': customAppSkin.toJson(),
-    'customAppSkins': customAppSkins.map((skin) => skin.toJson()).toList(),
     'fileManagerSkin': fileManagerSkin.toJson(),
     'fileManagerFollowsAppSkin': fileManagerFollowsAppSkin,
     'editorFollowsAppSkin': editorFollowsAppSkin,
     'editorAppearancePrefs': editorAppearancePrefs,
+  };
+
+  /// The skin library and the active selection. Unlike the other two groups
+  /// this is not merged field-by-field: skins are added, selected and removed
+  /// through the App skin screens.
+  Map<String, dynamic> skinsToJson() => {
+    'appSkinPreset': appSkinPreset.id,
+    'useOledBlackTheme': useOledBlackTheme,
+    'customAppSkin': customAppSkin.toJson(),
+    'customAppSkins': customAppSkins.map((skin) => skin.toJson()).toList(),
     'appSkinSchemaVersion': appSkinSchemaVersion,
   };
+
+  /// A copy of this with every *configuration* field taken from [other].
+  /// Interface fields, skins and the private hash material stay as they are.
+  AppSettings withConfigurationFrom(AppSettings other) => copyWith(
+    useMasterPassword: other.useMasterPassword,
+    masterUnlockMethod: other.masterUnlockMethod,
+    defaultDocumentProvider: other.defaultDocumentProvider,
+    videoAutoPlay: other.videoAutoPlay,
+    blockScreenshots: other.blockScreenshots,
+    keepVaultsRunningInBackground: other.keepVaultsRunningInBackground,
+    defaultDerivedKeyCacheEnabled: other.defaultDerivedKeyCacheEnabled,
+    lockContainersOnScreenLock: other.lockContainersOnScreenLock,
+    autoLockMins: other.autoLockMins,
+    autoLockScreenLockOnly: other.autoLockScreenLockOnly,
+    lockAppOnScreenLock: other.lockAppOnScreenLock,
+    appLockAfterMins: other.appLockAfterMins,
+    appLockScreenLockOnly: other.appLockScreenLockOnly,
+    extensionPreferences: other.extensionPreferences,
+    autoOpenOnUnlock: other.autoOpenOnUnlock,
+    htmlEnableJavaScript: other.htmlEnableJavaScript,
+    // copyWith can't set a null language through `languageCode` alone.
+    languageCode: other.languageCode,
+    clearLanguageCode: other.languageCode == null,
+    debugLoggingEnabled: other.debugLoggingEnabled,
+    deleteAfterImportMode: other.deleteAfterImportMode,
+    audioRecordingQuality: other.audioRecordingQuality,
+    videoMuted: other.videoMuted,
+    videoPlaybackMode: other.videoPlaybackMode,
+    autoLockOnShareImport: other.autoLockOnShareImport,
+    quickActionLockMode: other.quickActionLockMode,
+    enableAuthenticator: other.enableAuthenticator,
+  );
+
+  /// A copy of this with every *interface* field taken from [other].
+  /// Configuration, skins and the private hash material stay as they are.
+  AppSettings withInterfaceFrom(AppSettings other) => copyWith(
+    themeMode: other.themeMode,
+    useDynamicColor: other.useDynamicColor,
+    defaultLayoutMode: other.defaultLayoutMode,
+    defaultFileSortBy: other.defaultFileSortBy,
+    defaultFileSortAscending: other.defaultFileSortAscending,
+    containerSortMode: other.containerSortMode,
+    showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
+    playlistScrollMode: other.playlistScrollMode,
+    authenticatorShowNumbers: other.authenticatorShowNumbers,
+    authenticatorSearchPlacement: other.authenticatorSearchPlacement,
+    fileManagerSkin: other.fileManagerSkin,
+    fileManagerFollowsAppSkin: other.fileManagerFollowsAppSkin,
+    editorFollowsAppSkin: other.editorFollowsAppSkin,
+    editorAppearancePrefs: other.editorAppearancePrefs,
+  );
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,

@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/services/skin_backup_service.dart';
 
 class AppSkinSettings {
   final AppSkinPreset preset;
@@ -213,47 +211,21 @@ class AppSkinSettingsNotifier extends Notifier<AppSkinSettings> {
     );
   }
 
-  Future<List<CustomAppSkin>?> pickAndParseSkins() async {
-    final raw = await ref.read(vaultFileIoApiProvider).importAppSettingsFile();
-    if (raw == null) return null;
-    final Object? decoded;
-    try {
-      decoded = jsonDecode(raw);
-    } on FormatException {
-      throw const FormatException('This file is not a valid skin export.');
-    }
+  /// Opens the file picker and parses a skin file: its skins and, when it was
+  /// exported with them, the interface settings. Nothing is applied yet.
+  Future<ParsedSkinFile?> pickAndParseSkinFile() =>
+      ref.read(skinBackupServiceProvider).pickAndParseFile();
 
-    final payloads = <Object?>[];
-    if (decoded is Map && decoded['skins'] is List) {
-      payloads.addAll(decoded['skins'] as List);
-    } else if (decoded is Map && decoded['skin'] is Map) {
-      payloads.add(decoded['skin']);
-    } else {
-      payloads.add(decoded);
-    }
-    if (payloads.isEmpty || payloads.any((value) => !_isSkinPayload(value))) {
-      throw const FormatException('This file does not contain an app skin.');
-    }
-    return payloads.map(CustomAppSkin.fromJson).toList();
-  }
-
-  Future<bool> exportSkins(List<CustomAppSkin> skins) async {
-    if (skins.isEmpty) return false;
-    final payload = {
-      'format': 'vault-explorer-skins',
-      'schemaVersion': 1,
-      'skins': skins.map((skin) => skin.toJson()).toList(),
-    };
-    final name = skins.length == 1
-        ? '${_safeSkinFileName(skins.single.name)}.vaultskin.json'
-        : 'vaultexplorer_skins.json';
-    return ref
-        .read(vaultFileIoApiProvider)
-        .exportAppSettingsFile(
-          const JsonEncoder.withIndent('  ').convert(payload),
-          name,
-        );
-  }
+  /// Exports [skins]. With [includeInterface] the file also carries theme
+  /// mode, toolbar/grid layout, editor appearance and the other interface
+  /// settings (see [SkinBackupService]); without it the file only holds the
+  /// skins and is safe to share.
+  Future<bool> exportSkins(
+    List<CustomAppSkin> skins, {
+    bool includeInterface = false,
+  }) => ref
+      .read(skinBackupServiceProvider)
+      .exportToFile(skins, includeInterface: includeInterface);
 
   Future<void> setFileManagerFollowsAppSkin(bool follows) => _update(
     state.copyWith(fileManagerFollowsAppSkin: follows),
@@ -281,19 +253,6 @@ class AppSkinSettingsNotifier extends Notifier<AppSkinSettings> {
       (settings) => updateSettings(settings).copyWith(appSkinSchemaVersion: 1),
     );
   }
-}
-
-bool _isSkinPayload(Object? value) =>
-    value is Map &&
-    value['name'] is String &&
-    (value['lightColors'] is Map || value['darkColors'] is Map);
-
-String _safeSkinFileName(String name) {
-  final cleaned = name
-      .trim()
-      .replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')
-      .replaceAll(RegExp(r'_+'), '_');
-  return cleaned.isEmpty ? 'app_skin' : cleaned;
 }
 
 AppSettings _normalizeOledPreset(AppSettings settings) {

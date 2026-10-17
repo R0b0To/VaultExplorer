@@ -1090,6 +1090,9 @@ case _UnlockCredentialState.password:
                     // _revealLocked: a saved credential shouldn't be
                     // revealable in plain text just by editing around it.
                     obscureText: _revealLocked ? true : _obscure,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    enableIMEPersonalizedLearning: false,
                     enableInteractiveSelection: !_revealLocked && canConfigure,
                     autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
                     onChanged: (val) {
@@ -1294,6 +1297,9 @@ List<Widget> _buildAdvancedOptionsSection(
             child: TextField(
               controller: _hiddenPasswordCtrl,
               obscureText: _hiddenObscure,
+              autocorrect: false,
+              enableSuggestions: false,
+              enableIMEPersonalizedLearning: false,
               enabled: canConfigure,
               decoration: InputDecoration(
                 filled: true,

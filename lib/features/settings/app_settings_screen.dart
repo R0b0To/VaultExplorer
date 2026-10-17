@@ -33,15 +33,14 @@ import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
-import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_index.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_matcher.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_models.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_target.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_widgets.dart';
+import 'package:vaultexplorer/features/settings/settings_live_refresh.dart';
 import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
-import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import '../../app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -2419,31 +2418,19 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       return;
     }
     try {
-      await ref.read(settingsBackupServiceProvider).applyImportedBundle(bundle);
+      final applied = await ref
+          .read(settingsBackupServiceProvider)
+          .applyImportedBundle(bundle);
       if (!context.mounted) return;
-      await ref
-          .read(appSettingsControllerProvider.notifier)
-          .applyImportedSettings(bundle.appSettings);
-      await ref
-          .read(appSkinSettingsProvider.notifier)
-          .applyImportedSettings(bundle.appSettings);
-      ref
-          .read(fileManagerToolbarSettingsProvider(null).notifier)
-          .applyImportedConfig(bundle.toolbarConfig);
-      ref.invalidate(fileManagerToolbarSettingsProvider);
-      ref.invalidate(textEditorAppearanceProvider);
+      // Push what was actually persisted (this file only carries the
+      // configuration half), not the partial settings parsed from it.
+      await refreshLiveSettings(ref, applied.settings, applied.toolbarConfig);
 
       if (bundle.shareTargetEnabled != null) {
         await ref
             .read(appSettingsControllerProvider.notifier)
             .setShareTargetEnabled(bundle.shareTargetEnabled!);
       }
-      VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
-      appThemeModeNotifier.value = bundle.appSettings.themeMode;
-      appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
-      appLocaleNotifier.value = bundle.appSettings.languageCode != null
-          ? Locale(bundle.appSettings.languageCode!)
-          : null;
       showAppSnackBar(
         context,
         message: context.l10n.importSettingsSuccessMessage,

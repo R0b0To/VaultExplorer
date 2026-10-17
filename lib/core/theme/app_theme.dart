@@ -660,7 +660,7 @@ ThemeData _buildTheme(
       thumbColor: cs.primary,
       overlayColor: cs.primary.withValues(alpha: 0.12),
     ),
-    filledButtonTheme: FilledButtonThemeData(
+     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
@@ -672,7 +672,7 @@ ThemeData _buildTheme(
           letterSpacing: 0.1,
         ),
         shape: const StadiumBorder(),
-        minimumSize: const Size(double.infinity, 48),
+        minimumSize: const Size(0, 48),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(

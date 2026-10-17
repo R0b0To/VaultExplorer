@@ -2,9 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/data/services/skin_backup_service.dart';
+import 'package:vaultexplorer/features/settings/settings_live_refresh.dart';
 import 'package:vaultexplorer/features/settings/custom_app_skin_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -14,19 +17,52 @@ class AppSkinSettingsScreen extends ConsumerWidget {
 
   Future<void> _importSkins(BuildContext context, WidgetRef ref) async {
     try {
-      final imported = await ref
+      final parsed = await ref
           .read(sessionLockControllerProvider)
           .withLockSuppression(
-            () =>
-                ref.read(appSkinSettingsProvider.notifier).pickAndParseSkins(),
+            () => ref
+                .read(appSkinSettingsProvider.notifier)
+                .pickAndParseSkinFile(),
           );
-      if (!context.mounted || imported == null) return;
-      final added = await ref
-          .read(appSkinSettingsProvider.notifier)
-          .addImportedSkins(imported);
+      if (!context.mounted || parsed == null) return;
+      // Skins are always added first, so that the active skin recorded in the
+      // interface settings can resolve to one of them.
+      final added = parsed.skins.isEmpty
+          ? <CustomAppSkin>[]
+          : await ref
+                .read(appSkinSettingsProvider.notifier)
+                .addImportedSkins(parsed.skins);
+      var interfaceApplied = false;
+      final interfaceSettings = parsed.interfaceSettings;
+      if (interfaceSettings != null && context.mounted) {
+        final apply = await showAppConfirmDialog(
+          context,
+          title: context.l10n.skinImportInterfaceTitle,
+          message: context.l10n.skinImportInterfaceMessage,
+          confirmLabel: context.l10n.skinImportInterfaceApply,
+          cancelLabel: context.l10n.skinImportInterfaceSkip,
+        );
+        if (apply && context.mounted) {
+          final applied = await ref
+              .read(skinBackupServiceProvider)
+              .applyInterface(interfaceSettings);
+          if (!context.mounted) return;
+          await refreshLiveSettings(
+            ref,
+            applied.settings,
+            applied.toolbarConfig,
+          );
+          interfaceApplied = true;
+        }
+      }
       if (!context.mounted) return;
+      final message = [
+        if (added.isNotEmpty || !interfaceApplied)
+          context.l10n.skinImportSucceeded(added.length),
+        if (interfaceApplied) context.l10n.skinInterfaceApplied,
+      ].join(' ');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.skinImportSucceeded(added.length))),
+        SnackBar(content: Text(message)),
       );
     } catch (error) {
       if (!context.mounted) return;
@@ -38,22 +74,73 @@ class AppSkinSettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _exportSkins(
+  /// The toolbar button: asks what to export, because a file that also carries
+  /// the interface settings is a personal backup rather than something to
+  /// share (single-skin export from a skin's menu never includes them).
+  Future<void> _chooseExport(
     BuildContext context,
     WidgetRef ref,
     List<CustomAppSkin> skins,
   ) async {
+    final includeInterface = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(dialogContext.l10n.skinExportSkins),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              enabled: skins.isNotEmpty,
+              leading: const Icon(Icons.palette_outlined),
+              title: Text(dialogContext.l10n.skinExportSkinsOnly),
+              subtitle: Text(dialogContext.l10n.skinExportSkinsOnlySubtitle),
+              onTap: skins.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+            ),
+            ListTile(
+              leading: const Icon(Icons.tune_rounded),
+              title: Text(dialogContext.l10n.skinExportSkinsAndInterface),
+              subtitle: Text(
+                dialogContext.l10n.skinExportSkinsAndInterfaceSubtitle,
+              ),
+              onTap: () => Navigator.pop(dialogContext, true),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (includeInterface == null || !context.mounted) return;
+    await _exportSkins(
+      context,
+      ref,
+      skins,
+      includeInterface: includeInterface,
+    );
+  }
+
+  Future<void> _exportSkins(
+    BuildContext context,
+    WidgetRef ref,
+    List<CustomAppSkin> skins, {
+    bool includeInterface = false,
+  }) async {
     try {
       final exported = await ref
           .read(sessionLockControllerProvider)
           .withLockSuppression(
-            () => ref.read(appSkinSettingsProvider.notifier).exportSkins(skins),
+            () => ref
+                .read(appSkinSettingsProvider.notifier)
+                .exportSkins(skins, includeInterface: includeInterface),
           );
       if (!context.mounted || !exported) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            skins.length == 1
+            includeInterface
+                ? context.l10n.skinAppearanceExported
+                : skins.length == 1
                 ? context.l10n.skinExportedSingle
                 : context.l10n.skinExportedMultiple,
           ),
@@ -129,9 +216,7 @@ class AppSkinSettingsScreen extends ConsumerWidget {
           ),
           IconButton(
             tooltip: context.l10n.skinExportSkins,
-            onPressed: exportableSkins.isEmpty
-                ? null
-                : () => _exportSkins(context, ref, exportableSkins),
+            onPressed: () => _chooseExport(context, ref, exportableSkins),
             icon: const Icon(Icons.ios_share_rounded),
           ),
         ],

@@ -13,6 +13,100 @@ namespace {
 constexpr size_t kSequentialChunkSize = 256 * 1024;
 constexpr size_t kPostSeekChunkSize = 8 * 1024;
 
+// ── zstd trailing-padding tolerance ─────────────────────────────────────
+//
+// libarchive pads the final write block with zeros even after a compression
+// filter, so older `.tar.zst` files made by archiveCreate() end in up to 10 KiB
+// of NULs after the last zstd frame. gzip/xz/lzma readers ignore trailing
+// zeros; libarchive's zstd reader instead tries to decode them as another
+// frame and fails the whole archive ("Unknown frame descriptor"). This walks
+// the frame/block headers (3 bytes per block, payload skipped) to find where
+// the real stream ends, and the engine then hands libarchive a source that
+// stops there. Anything unexpected returns the original size unchanged.
+uint32_t readLe(const uint8_t* b, size_t n) {
+    uint32_t v = 0;
+    for (size_t i = 0; i < n; ++i) v |= static_cast<uint32_t>(b[i]) << (8 * i);
+    return v;
+}
+
+// Returns the offset one past the standard zstd frame starting at `start`, or
+// 0 if the frame can't be parsed or runs past `total`.
+uint64_t zstdFrameEnd(const ArchiveStreamSource& src, uint64_t start, uint64_t total) {
+    uint64_t p = start + 4;  // past the magic
+    uint8_t descriptor = 0;
+    if (p >= total || src.read(p, &descriptor, 1) != 1) return 0;
+    ++p;
+    const unsigned fcsFlag = descriptor >> 6;
+    const bool singleSegment = ((descriptor >> 5) & 1) != 0;
+    const bool hasChecksum = ((descriptor >> 2) & 1) != 0;
+    static const unsigned kDictIdBytes[4] = {0, 1, 2, 4};
+    static const unsigned kFcsBytes[4] = {0, 2, 4, 8};
+    p += singleSegment ? 0 : 1;  // Window_Descriptor
+    p += kDictIdBytes[descriptor & 3];
+    p += kFcsBytes[fcsFlag] + ((fcsFlag == 0 && singleSegment) ? 1 : 0);
+    for (;;) {
+        uint8_t h[3];
+        if (p + 3 > total || src.read(p, h, 3) != 3) return 0;
+        const uint32_t header = readLe(h, 3);
+        const bool lastBlock = (header & 1) != 0;
+        const unsigned blockType = (header >> 1) & 3;  // 0 raw, 1 RLE, 2 compressed
+        const uint32_t blockSize = header >> 3;
+        if (blockType == 3) return 0;  // reserved
+        p += 3 + (blockType == 1 ? 1 : blockSize);
+        if (p > total) return 0;
+        if (lastBlock) break;
+    }
+    if (hasChecksum) p += 4;
+    return p <= total ? p : 0;
+}
+
+// Size of the archive bytes libarchive should see: `total`, or, for a zstd
+// stream followed only by zero padding, the end of its last frame.
+uint64_t effectiveArchiveSize(const ArchiveStreamSource& src) {
+    const uint64_t total = src.size();
+    if (total < 16) return total;
+    uint8_t magic[4];
+    if (src.read(0, magic, 4) != 4 || readLe(magic, 4) != 0xFD2FB528u) return total;
+    // Only a stream that ends in a zero byte can carry padding; this keeps the
+    // frame walk off every normally-terminated zstd file.
+    uint8_t lastByte = 1;
+    if (src.read(total - 1, &lastByte, 1) != 1 || lastByte != 0) return total;
+
+    uint64_t off = 0;
+    while (off < total) {
+        if (total - off < 4) break;
+        uint8_t m[4];
+        if (src.read(off, m, 4) != 4) return total;
+        const uint32_t word = readLe(m, 4);
+        if (word == 0xFD2FB528u) {
+            const uint64_t end = zstdFrameEnd(src, off, total);
+            if (end == 0) return total;
+            off = end;
+        } else if ((word & 0xFFFFFFF0u) == 0x184D2A50u) {  // skippable frame
+            uint8_t sz[4];
+            if (total - off < 8 || src.read(off + 4, sz, 4) != 4) return total;
+            const uint64_t skip = 8 + static_cast<uint64_t>(readLe(sz, 4));
+            if (skip > total - off) return total;
+            off += skip;
+        } else {
+            break;
+        }
+    }
+    if (off >= total) return total;  // frames end exactly at EOF
+
+    // Trim only if everything after the last frame is zero.
+    std::vector<uint8_t> chunk(64 * 1024);
+    for (uint64_t pos = off; pos < total;) {
+        const size_t want = static_cast<size_t>(std::min<uint64_t>(chunk.size(), total - pos));
+        if (src.read(pos, chunk.data(), want) != static_cast<int64_t>(want)) return total;
+        for (size_t i = 0; i < want; ++i) {
+            if (chunk[i] != 0) return total;
+        }
+        pos += want;
+    }
+    return off;
+}
+
 struct CallbackState {
     const ArchiveStreamSource* source = nullptr;
     uint64_t position = 0;
@@ -22,7 +116,7 @@ struct CallbackState {
     bool ioErrorSeen = false;
 
     explicit CallbackState(const ArchiveStreamSource& src)
-        : source(&src), size(src.size()) {
+        : source(&src), size(effectiveArchiveSize(src)) {
         buffer.resize(kSequentialChunkSize);
     }
 };
@@ -412,8 +506,10 @@ ArchiveBulkExtractResult archiveExtractAll(
         while (!entryPath.empty() && entryPath.front() == '/') entryPath.erase(entryPath.begin());
         while (!entryPath.empty() && entryPath.back() == '/') entryPath.pop_back();
 
-        // Zip-slip traversal defense
-        if (entryPath.empty() || entryPath.find("..") != std::string::npos || entryPath.find(':') != std::string::npos) {
+        // Zip-slip traversal defense. "." is the archive's own root record
+        // (ISO 9660 lists one): it is the destination itself, and handing it
+        // to makeDir would ask a vault filesystem to create a folder named ".".
+        if (entryPath.empty() || entryPath == "." || entryPath.find("..") != std::string::npos || entryPath.find(':') != std::string::npos) {
             archive_read_data_skip(a);
             continue;
         }
@@ -559,25 +655,35 @@ int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std
         case ArchiveFormat::Tar:
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             break;
+        // Compressed tars: libarchive would otherwise pad the *compressed*
+        // output to a 10 KiB multiple with zeros. That padding means nothing
+        // after a compression filter, and `zstd -d` and libarchive's own zstd
+        // reader reject it, so write the final block unpadded (same call as
+        // the 7z case above). Plain Tar keeps the conventional padding.
         case ArchiveFormat::TarGz:
             if (archive_write_add_filter_gzip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            archive_write_set_bytes_in_last_block(a, 1);
             break;
         case ArchiveFormat::TarBz2:
             if (archive_write_add_filter_bzip2(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            archive_write_set_bytes_in_last_block(a, 1);
             break;
         case ArchiveFormat::TarXz:
             if (archive_write_add_filter_xz(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            archive_write_set_bytes_in_last_block(a, 1);
             break;
         case ArchiveFormat::TarZstd:
             if (archive_write_add_filter_zstd(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            archive_write_set_bytes_in_last_block(a, 1);
             break;
         case ArchiveFormat::TarLzma:
             if (archive_write_add_filter_lzma(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            archive_write_set_bytes_in_last_block(a, 1);
             break;
         case ArchiveFormat::Iso:
             if (archive_write_set_format_iso9660(a) != ARCHIVE_OK) return ARCHIVE_FATAL;

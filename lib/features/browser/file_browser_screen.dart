@@ -1749,7 +1749,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final ext = parts.length > 1
         ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
         : '';
-    if (ArchiveService.isArchive(ext)) {
+    if (ArchiveService.opensOnTap(ext)) {
       await _openArchive(fullPath, entry.name);
       return;
     }

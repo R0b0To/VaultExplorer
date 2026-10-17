@@ -81,6 +81,9 @@ class ArchiveContext {
       if (entryName.endsWith('/')) {
         entryName = entryName.substring(0, entryName.length - 1);
       }
+      // The archive's own root record ("." / "./", written by ISO 9660 and
+      // cpio) is the listing itself, not an item inside it.
+      if (entryName == '.') continue;
       if (entryName.isEmpty || !_isSafeRelativePath(entryName)) continue;
 
       entryMap[entryName] = entry;

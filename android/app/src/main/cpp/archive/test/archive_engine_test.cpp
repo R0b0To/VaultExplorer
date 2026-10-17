@@ -126,6 +126,35 @@ std::vector<uint8_t> buildSevenZipViaEngine(const std::vector<std::pair<std::str
     return out;
 }
 
+// Builds an archive in any ArchiveFormat through the engine's own
+// archiveCreate(), from name->content files (no passphrase).
+std::vector<uint8_t> buildViaEngine(ArchiveFormat format,
+                                    const std::vector<std::pair<std::string, std::string>>& files) {
+    std::vector<uint8_t> out;
+    ArchiveSink sink;
+    sink.write = [&out](const uint8_t* data, size_t length) -> int64_t {
+        out.insert(out.end(), data, data + length);
+        return static_cast<int64_t>(length);
+    };
+    std::vector<size_t> offsets(files.size(), 0);
+    std::vector<ArchiveSourceEntry> entries(files.size());
+    for (size_t i = 0; i < files.size(); ++i) {
+        const std::string& content = files[i].second;
+        entries[i].pathInArchive = files[i].first;
+        entries[i].uncompressedSize = content.size();
+        entries[i].readData = [&content, &offsets, i](uint8_t* dest, size_t length) -> int64_t {
+            const size_t n = std::min(length, content.size() - offsets[i]);
+            std::memcpy(dest, content.data() + offsets[i], n);
+            offsets[i] += n;
+            return static_cast<int64_t>(n);
+        };
+    }
+    const auto result = archiveCreate(sink, format, entries);
+    assert(result.status == ArchiveOpenStatus::Ok);
+    assert(result.entriesArchived == files.size());
+    return out;
+}
+
 // Tiny 7-Zip archives produced by the real 7-Zip (password: hunter2).
 // Files: a.txt = "hello from a" + newline, 20 times; b.txt = "bravo" + newline, 30 times;
 // c.txt = "charlie" + newline, 25 times.
@@ -539,6 +568,106 @@ int main() {
         extractText(ns, "c.txt", "wrong", &st);
         assert(st == ArchiveOpenStatus::WrongPassphrase);
         printf("7z read (encrypted header, AES+BCJ, non-solid): ok\n");
+    }
+
+    // --- Every format the app can create must also be openable: create with
+    // archiveCreate(), then list and extract with the same engine. Covers the
+    // formats the browser must open from a tap (.tar.zst, .tar.lzma, .iso,
+    // .cpio) next to the ones that already worked. ---
+    {
+        std::string payload;
+        for (int i = 0; i < 2000; ++i) payload += "round trip line " + std::to_string(i) + "\n";
+        const struct {
+            ArchiveFormat format;
+            const char* name;
+        } formats[] = {
+            {ArchiveFormat::TarGz, "tar.gz"},   {ArchiveFormat::TarXz, "tar.xz"},
+            {ArchiveFormat::TarZstd, "tar.zst"}, {ArchiveFormat::TarLzma, "tar.lzma"},
+            {ArchiveFormat::Iso, "iso"},        {ArchiveFormat::Cpio, "cpio"},
+        };
+        for (const auto& f : formats) {
+            const auto bytes = buildViaEngine(f.format, {{"docs/a.txt", payload}});
+            const auto source = sourceOver(bytes);
+            const auto scan = archiveScanEntries(source);
+            if (scan.status != ArchiveOpenStatus::Ok) {
+                printf("round trip %s failed to scan: %s\n", f.name, scan.errorMessage.c_str());
+            }
+            assert(scan.status == ArchiveOpenStatus::Ok);
+            int32_t fileIndex = -1;
+            for (const auto& e : scan.entries) {
+                if (e.path == "docs/a.txt") fileIndex = e.index;
+            }
+            assert(fileIndex >= 0);
+            const auto extracted = archiveExtractEntry(source, fileIndex);
+            assert(extracted.status == ArchiveOpenStatus::Ok);
+            assert(std::string(extracted.data.begin(), extracted.data.end()) == payload);
+        }
+        printf("create -> open round trip (tar.gz/xz/zst/lzma, iso, cpio): ok\n");
+
+        // Extract-all over an ISO: its root record "." must not reach makeDir
+        // (a vault filesystem would be asked to create a folder named "."),
+        // and the real content must still come out.
+        const auto isoBytes = buildViaEngine(ArchiveFormat::Iso, {{"docs/a.txt", payload}});
+        std::vector<std::string> madeDirs;
+        std::string extractedAll;
+        const auto all = archiveExtractAll(
+            sourceOver(isoBytes), "", "",
+            [&madeDirs](const std::string& dir) {
+                madeDirs.push_back(dir);
+                return true;
+            },
+            [&extractedAll](const std::string& path, uint64_t, const uint8_t* data, size_t length) {
+                if (path == "docs/a.txt" && data) extractedAll.append(reinterpret_cast<const char*>(data), length);
+                return true;
+            });
+        assert(all.status == ArchiveOpenStatus::Ok);
+        assert(std::find(madeDirs.begin(), madeDirs.end(), ".") == madeDirs.end());
+        assert(extractedAll == payload);
+        printf("iso extract-all skips the root record: ok\n");
+    }
+
+    // --- zstd: libarchive pads the last 10 KiB block with zeros, even after a
+    // compression filter. Its zstd reader can't skip that padding, so
+    //  (a) archiveCreate() must not write it for compressed tars, and
+    //  (b) archives that already carry it (made by older app versions) must
+    //      still open, while genuinely corrupt trailing bytes still fail. ---
+    {
+        const std::vector<uint8_t> fresh = buildViaEngine(ArchiveFormat::TarZstd, {{"a.txt", "hello zstd"}});
+        // Tiny input: the old writer always produced exactly one 10240-byte block.
+        assert(fresh.size() < 10240);
+
+        std::vector<uint8_t> padded = fresh;
+        padded.resize(10240, 0);
+        const auto paddedScan = archiveScanEntries(sourceOver(padded));
+        assert(paddedScan.status == ArchiveOpenStatus::Ok);
+        assert(paddedScan.entries.size() == 1);
+        const auto paddedFile = archiveExtractEntry(sourceOver(padded), paddedScan.entries[0].index);
+        assert(paddedFile.status == ArchiveOpenStatus::Ok);
+        assert(std::string(paddedFile.data.begin(), paddedFile.data.end()) == "hello zstd");
+
+        // Several blocks (incompressible data) plus padding: the frame walk must
+        // find the true end across block headers, not just in the one-block case.
+        std::string noise(1500000, '\0');
+        uint32_t x = 12345;
+        for (auto& ch : noise) {
+            x = x * 1664525u + 1013904223u;
+            ch = static_cast<char>(x >> 24);
+        }
+        std::vector<uint8_t> big = buildViaEngine(ArchiveFormat::TarZstd, {{"big.bin", noise}});
+        big.resize((big.size() / 10240 + 1) * 10240, 0);
+        const auto bigSource = sourceOver(big);
+        const auto bigScan = archiveScanEntries(bigSource);
+        assert(bigScan.status == ArchiveOpenStatus::Ok);
+        const auto bigFile = archiveExtractEntry(bigSource, bigScan.entries[0].index);
+        assert(bigFile.status == ArchiveOpenStatus::Ok);
+        assert(std::string(bigFile.data.begin(), bigFile.data.end()) == noise);
+
+        // A non-zero byte in the "padding" is damage, not padding.
+        std::vector<uint8_t> damaged = padded;
+        damaged[damaged.size() - 100] = 1;
+        assert(archiveScanEntries(sourceOver(damaged)).status != ArchiveOpenStatus::Ok);
+
+        printf("tar.zst: unpadded writer, padded files still open, damage still rejected: ok\n");
     }
 
     // --- Out-of-range index: should fail cleanly, not crash or return

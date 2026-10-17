@@ -35,7 +35,56 @@ ArchiveEntryInfo _entry(String path, int size, int index) => ArchiveEntryInfo(
   index: index,
 );
 
+ArchiveEntryInfo _dir(String path, int index) => ArchiveEntryInfo(
+  path: path,
+  uncompressedSize: 0,
+  compressedSize: 0,
+  modTime: DateTime(2026, 1, 1),
+  isEncrypted: false,
+  isDirectory: true,
+  index: index,
+);
+
 void main() {
+  test('the root record of an ISO/cpio ("." / "./") is not listed as a folder', () {
+    final context = ArchiveContext.fromScanResult(
+      archivePathInContainer: 'disc.iso',
+      pathStackEntryIndex: 0,
+      indexResult: ArchiveIndexResult(
+        status: ArchiveOpenStatus.ok,
+        isSolid: false,
+        errorMessage: '',
+        entries: [
+          _dir('.', 0),
+          _dir('docs', 1),
+          _entry('docs/a.txt', 10, 2),
+          _entry('readme.txt', 5, 3),
+        ],
+      ),
+    );
+
+    final root = context.listDirectory('');
+    expect(root.where((e) => e.endsWith('|.')), isEmpty);
+    expect(root.where((e) => e.startsWith('D|') && e.endsWith('|docs')), hasLength(1));
+    expect(root.where((e) => e.startsWith('F|') && e.endsWith('|readme.txt')), hasLength(1));
+    expect(
+      context.listDirectory('docs').where((e) => e.endsWith('|a.txt')),
+      hasLength(1),
+    );
+
+    final dotSlash = ArchiveContext.fromScanResult(
+      archivePathInContainer: 'x.cpio',
+      pathStackEntryIndex: 0,
+      indexResult: ArchiveIndexResult(
+        status: ArchiveOpenStatus.ok,
+        isSolid: false,
+        errorMessage: '',
+        entries: [_dir('./', 0), _entry('only.txt', 1, 1)],
+      ),
+    );
+    expect(dotSlash.listDirectory('').where((e) => e.endsWith('|.')), isEmpty);
+  });
+
   test('entries above the in-memory cap are refused without a native call', () async {
     final api = _CountingArchiveApi();
     final context = ArchiveContext.fromScanResult(

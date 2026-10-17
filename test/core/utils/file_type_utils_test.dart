@@ -83,6 +83,12 @@ void main() {
       expect(iconForFile('a.tar.zst'), Icons.archive_outlined);
     });
 
+    test('tar.lzma, iso and cpio get the archive icon', () {
+      expect(iconForFile('a.tar.lzma'), Icons.archive_outlined);
+      expect(iconForFile('a.iso'), Icons.archive_outlined);
+      expect(iconForFile('a.cpio'), Icons.archive_outlined);
+    });
+
     test('app-encrypted files get the encrypted icon', () {
       for (final name in ['a.vxenc', 'a.aes', 'A.VXENC']) {
         expect(isAppEncryptedFileName(name), isTrue, reason: name);

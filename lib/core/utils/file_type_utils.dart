@@ -111,7 +111,8 @@ const Map<FileKind, Set<String>> fileKindExtensions = {
   FileKind.web: {'html', 'htm', 'xhtml', 'mhtml', 'mht'},
   FileKind.archive: {
     'zip', 'zipx', 'gz', 'tar', '7z', 'rar', 'bz2', 'xz', 'zst', 'tgz', 'tbz',
-    'tbz2', 'txz', 'lz', 'lzma', 'lz4', 'z', 'cab', 'arj', 'jar',
+    'tbz2', 'txz', 'lz', 'lzma', 'lz4', 'z', 'cab', 'arj', 'jar', 'iso',
+    'cpio',
   },
   FileKind.ebook: {'epub', 'mobi', 'azw', 'azw3', 'fb2', 'djvu', 'cbz', 'cbr'},
   FileKind.font: {'ttf', 'otf', 'ttc', 'woff', 'woff2', 'eot'},

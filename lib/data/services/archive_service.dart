@@ -59,6 +59,7 @@ class ArchiveService {
     'xz',
     'zst',
     'zstd',
+    'lzma',
   };
 
   static bool isSupported(String ext) =>
@@ -85,11 +86,26 @@ class ArchiveService {
   static bool isZipLikePackage(String ext) =>
       zipLikePackageExtensions.contains(ext.toLowerCase());
 
+  /// Formats the app can create and the native engine reads (libarchive
+  /// detects them from their bytes) that are opened on tap like any archive,
+  /// but are deliberately kept out of [allArchiveExtensions] for the same
+  /// reason as the APK: [isArchive] also decides which files are rejected as
+  /// composite-container carriers, and ISO images are valid carriers.
+  static const isoCpioExtensions = {'iso', 'cpio'};
+
+  static bool isIsoOrCpio(String ext) =>
+      isoCpioExtensions.contains(ext.toLowerCase());
+
+  /// True when tapping a file with this extension should open the archive
+  /// browser: every [isArchive] extension plus ISO and cpio. (Not `.apk`: a
+  /// tap installs it; see [zipLikePackageExtensions].)
+  static bool opensOnTap(String ext) => isArchive(ext) || isIsoOrCpio(ext);
+
   /// True when the file can be opened in the archive browser and extracted,
-  /// whether or not a tap does that by default: every [isArchive] extension
+  /// whether or not a tap does that by default: everything that [opensOnTap]
   /// plus the [zipLikePackageExtensions].
   static bool isOpenableAsArchive(String ext) =>
-      isArchive(ext) || isZipLikePackage(ext);
+      opensOnTap(ext) || isZipLikePackage(ext);
 
   static Future<ArchiveContext> open({
     required MountedContainer container,

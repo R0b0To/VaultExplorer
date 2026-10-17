@@ -189,6 +189,32 @@ void main() {
       }
     });
 
+    test('every format the app can create is openable and opens on tap', () {
+      // tar.gz / tar.bz2 / tar.xz / tar.zst / tar.lzma are named by their last
+      // extension; iso and cpio have their own.
+      for (final ext in [
+        'zip', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'lzma', 'iso', 'cpio',
+      ]) {
+        expect(ArchiveService.opensOnTap(ext), isTrue, reason: ext);
+        expect(ArchiveService.isOpenableAsArchive(ext), isTrue, reason: ext);
+      }
+      expect(ArchiveService.opensOnTap('ISO'), isTrue);
+      expect(ArchiveService.opensOnTap('Cpio'), isTrue);
+    });
+
+    test('iso/cpio open on tap but are not rejected as composite carriers', () {
+      // isArchive() backs isUnsupportedArchiveCarrierName(); an ISO image is a
+      // valid composite-container carrier, so it must stay false there.
+      expect(ArchiveService.isArchive('iso'), isFalse);
+      expect(ArchiveService.isArchive('cpio'), isFalse);
+      expect(ArchiveService.isIsoOrCpio('iso'), isTrue);
+      expect(ArchiveService.isZipLikePackage('iso'), isFalse);
+    });
+
+    test('an apk is still not opened on tap', () {
+      expect(ArchiveService.opensOnTap('apk'), isFalse);
+    });
+
     test('unrelated extensions are not openable as an archive', () {
       for (final ext in ['txt', 'pdf', 'xapk', '']) {
         expect(ArchiveService.isOpenableAsArchive(ext), isFalse, reason: ext);

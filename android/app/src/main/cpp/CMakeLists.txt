@@ -638,6 +638,15 @@ if(NOT ANDROID)
     target_link_libraries(archive_engine_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS archive_engine_test)
 
+    # Compression level, source-byte progress and cancellation of archiveCreate.
+    # Separate executable so it isn't skipped if archive_engine_test aborts early.
+    add_executable(archive_create_options_test
+            archive/test/archive_create_options_test.cpp
+            archive/archive_engine.cpp)
+    target_include_directories(archive_create_options_test PRIVATE ${ARCHIVE_ENGINE_INCLUDE_DIRS})
+    target_link_libraries(archive_create_options_test ${ARCHIVE_ENGINE_LIBRARY})
+    list(APPEND VAULTEXPLORER_HOST_TESTS archive_create_options_test)
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -676,5 +685,8 @@ if(NOT ANDROID)
     add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)
     if(TARGET archive_engine_test)
         add_test(NAME archive_engine_test COMMAND archive_engine_test)
+    endif()
+    if(TARGET archive_create_options_test)
+        add_test(NAME archive_create_options_test COMMAND archive_create_options_test)
     endif()
 endif()

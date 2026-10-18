@@ -742,6 +742,8 @@ class ArchiveHandlers(
         val passphrase = call.argument<String>("passphrase")
         // 7z only: also encrypt the archive header, i.e. the file names.
         val encryptFilenames = call.argument<Boolean>("encryptFilenames") ?: false
+        // 0 = store, 1..9 = fastest..smallest; -1 (absent) keeps the library default.
+        val compressionLevel = call.argument<Number>("compressionLevel")?.toInt() ?: -1
         val opId = call.argument<Number>("opId")?.toInt() ?: 0
 
         val srcUri = call.argument<String>("srcUri")
@@ -787,7 +789,7 @@ class ArchiveHandlers(
                     if (srcVolId != null && destVolId != null && destVaultPath != null) {
                         val ok = NativeEngine.archiveCreateVaultToVaultNative(
                             srcVolId, srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
-                            destVolId, destVaultPath, format, passphrase, encryptFilenames, opId
+                            destVolId, destVaultPath, format, passphrase, encryptFilenames, compressionLevel, opId
                         )
                         activity.runOnUiThread { result.success(ok) }
                     } else if (srcVolId != null) {
@@ -815,7 +817,7 @@ class ArchiveHandlers(
 
                         val ok = NativeEngine.archiveCreateVaultToFdNative(
                             srcVolId, srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
-                            destPfd.fd, format, passphrase, encryptFilenames, opId
+                            destPfd.fd, format, passphrase, encryptFilenames, compressionLevel, opId
                         )
                         activity.runOnUiThread { result.success(ok) }
                     } else {
@@ -843,7 +845,7 @@ class ArchiveHandlers(
 
                         val ok = NativeEngine.archiveCreateLocalToFdNative(
                             srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
-                            destPfd.fd, format, passphrase, encryptFilenames, opId
+                            destPfd.fd, format, passphrase, encryptFilenames, compressionLevel, opId
                         )
                         activity.runOnUiThread { result.success(ok) }
                     }
@@ -933,12 +935,12 @@ class ArchiveHandlers(
                 val ok = if (srcIsFolderVault || srcVolId == null) {
                     NativeEngine.archiveCreateLocalToFdNative(
                         localSourcePaths.toTypedArray(), localEntryNames.toTypedArray(), localModifiedSecs,
-                        targetPfd.fd, format, passphrase, encryptFilenames, opId
+                        targetPfd.fd, format, passphrase, encryptFilenames, compressionLevel, opId
                     )
                 } else {
                     NativeEngine.archiveCreateVaultToFdNative(
                         srcVolId, srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
-                        targetPfd.fd, format, passphrase, encryptFilenames, opId
+                        targetPfd.fd, format, passphrase, encryptFilenames, compressionLevel, opId
                     )
                 }
 

@@ -107,6 +107,9 @@ struct ArchiveCreateResult {
     std::string errorMessage;
 };
 
+// Keeps the compression library's own default for the chosen format.
+constexpr int kArchiveDefaultCompressionLevel = -1;
+
 ArchiveCreateResult archiveCreate(
     const ArchiveSink& sink,
     ArchiveFormat format,
@@ -116,5 +119,21 @@ ArchiveCreateResult archiveCreate(
     // are hidden as well (7-Zip's "Encrypt file names"). Needs a passphrase;
     // the request fails, rather than being ignored, when it can't be honoured.
     bool encryptFilenames = false,
-    std::function<bool(uint64_t bytesWrittenSoFar)> progressCallback = nullptr
+    // Called after each chunk of *source* data has been handed to the writer,
+    // with the running total of source bytes consumed across all entries.
+    // Return false to cancel.
+    //
+    // This deliberately counts input, not archive bytes written to the sink:
+    // the 7z writer buffers everything in a temporary file and only emits its
+    // output when the archive is closed, so output bytes stay at 0 for the
+    // whole compression and then jump to the full size.
+    std::function<bool(uint64_t sourceBytesProcessed)> progressCallback = nullptr,
+    // 0 = store (no compression), 1 = fastest .. 9 = smallest. Applies to ZIP,
+    // 7z and the compressed TAR variants; TAR, ISO and CPIO don't compress, so
+    // it is ignored for them. kArchiveDefaultCompressionLevel keeps the
+    // library default; any other value outside 0-9 is rejected. (Password-
+    // protected 7z stores via Deflate level 0: its encryption can't be
+    // combined with the 7z "copy" method. The tar filters have no store mode,
+    // so 0 selects each one's fastest setting.)
+    int compressionLevel = kArchiveDefaultCompressionLevel
 );

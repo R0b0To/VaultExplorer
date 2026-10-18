@@ -682,12 +682,27 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryToFdNative(
     JNI_CATCH_RETURN(nullptr)
 }
 
+// Progress/cancel hook shared by the archiveCreate* entry points. The engine
+// reports how many *source* bytes it has consumed; the total is the sum of the
+// files going in. (It used to report bytes written to the destination with a
+// total of 0, which for 7z stays at 0 until the archive is closed.)
+static std::function<bool(uint64_t)> makeCreateProgress(jint opId, uint64_t totalSourceBytes) {
+    return [opId, totalSourceBytes](uint64_t sourceBytesProcessed) -> bool {
+        if (opId > 0) {
+            reportSplitJoinProgress(opId, sourceBytesProcessed, totalSourceBytes);
+            if (isSplitJoinCancelled(opId) || isCopyCancelled(opId)) return false;
+        }
+        return true;
+    };
+}
+
 // ── Create Archive: In-Vault Files -> Local File Descriptor ────────────
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
-        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames, jint opId) {
+        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames,
+        jint compressionLevel, jint opId) {
     JNI_TRY
     if (destFd < 0 || !vaultPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToFd")) {
@@ -754,17 +769,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         }
     }
 
-    auto progressCb = [opId](uint64_t bytesWritten) -> bool {
-        if (opId > 0) {
-            reportSplitJoinProgress(opId, bytesWritten, 0);
-            if (isSplitJoinCancelled(opId) || isCopyCancelled(opId)) return false;
-        }
-        return true;
-    };
+    uint64_t totalSourceBytes = 0;
+    for (const auto& e : entries) {
+        if (!e.isDirectory) totalSourceBytes += e.uncompressedSize;
+    }
 
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
-        encryptFilenames == JNI_TRUE, progressCb
+        encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
+        static_cast<int>(compressionLevel)
     );
 
     {
@@ -786,7 +799,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
         jint destVolId, jstring destVaultPath, jint format, jstring passphrase,
-        jboolean encryptFilenames, jint opId) {
+        jboolean encryptFilenames, jint compressionLevel, jint opId) {
     JNI_TRY
     if (!vaultPaths || !entryNames || !modifiedSecs || !destVaultPath) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToVault (src)") ||
@@ -862,17 +875,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
         }
     }
 
-    auto progressCb = [opId](uint64_t bytesWritten) -> bool {
-        if (opId > 0) {
-            reportSplitJoinProgress(opId, bytesWritten, 0);
-            if (isSplitJoinCancelled(opId) || isCopyCancelled(opId)) return false;
-        }
-        return true;
-    };
+    uint64_t totalSourceBytes = 0;
+    for (const auto& e : entries) {
+        if (!e.isDirectory) totalSourceBytes += e.uncompressedSize;
+    }
 
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
-        encryptFilenames == JNI_TRUE, progressCb
+        encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
+        static_cast<int>(compressionLevel)
     );
 
     {
@@ -894,7 +905,8 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
         JNIEnv* env, jobject,
         jobjectArray localPaths, jobjectArray entryNames, jlongArray modifiedSecs,
-        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames, jint opId) {
+        jint destFd, jint format, jstring passphrase, jboolean encryptFilenames,
+        jint compressionLevel, jint opId) {
     JNI_TRY
     if (destFd < 0 || !localPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
 
@@ -957,17 +969,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
         }
     }
 
-    auto progressCb = [opId](uint64_t bytesWritten) -> bool {
-        if (opId > 0) {
-            reportSplitJoinProgress(opId, bytesWritten, 0);
-            if (isSplitJoinCancelled(opId) || isCopyCancelled(opId)) return false;
-        }
-        return true;
-    };
+    uint64_t totalSourceBytes = 0;
+    for (const auto& e : entries) {
+        if (!e.isDirectory) totalSourceBytes += e.uncompressedSize;
+    }
 
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
-        encryptFilenames == JNI_TRUE, progressCb
+        encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
+        static_cast<int>(compressionLevel)
     );
 
     for (int sfd : openFds) {

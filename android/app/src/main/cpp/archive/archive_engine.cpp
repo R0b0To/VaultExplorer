@@ -617,7 +617,6 @@ struct WriteState {
     uint64_t totalWritten = 0;
     bool ioErrorSeen = false;
     bool cancelled = false;
-    std::function<bool(uint64_t)> progressCb;
 };
 
 la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buffer, size_t length) {
@@ -632,12 +631,6 @@ la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buff
     }
 
     state->totalWritten += static_cast<uint64_t>(n);
-    if (state->progressCb) {
-        if (!state->progressCb(state->totalWritten)) {
-            state->cancelled = true;
-            return -1;
-        }
-    }
     return static_cast<la_ssize_t>(n);
 }
 
@@ -719,6 +712,48 @@ int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std
     return ARCHIVE_OK;
 }
 
+// Maps the UI level (0 = store, 1 = fastest .. 9 = smallest) onto the options
+// libarchive reads for each format. Must run after the format and filters are
+// set up. A non-OK return means libarchive rejected the option; that is
+// reported rather than ignored, so a level request never silently does nothing.
+//
+// Level 0 is "store" only where the container supports it. A bare level of 0
+// on 7z would still run LZMA at its fastest preset, so 7z/ZIP switch codec.
+// TAR filters have no store mode, so 0 means that filter's fastest setting.
+int applyCompressionLevel(struct archive* a, ArchiveFormat format, int level, bool encrypted) {
+    if (level == kArchiveDefaultCompressionLevel) return ARCHIVE_OK;
+    const std::string lvl = std::to_string(level);
+    switch (format) {
+        case ArchiveFormat::Zip:
+            // zip:compression-level=0 selects "store"; 1-9 selects deflate.
+            return archive_write_set_options(a, ("zip:compression-level=" + lvl).c_str());
+        case ArchiveFormat::SevenZip:
+            if (level == 0) {
+                if (!encrypted) return archive_write_set_options(a, "7zip:compression=store");
+                // libarchive's 7z "copy" method gives every file its own folder,
+                // while libarchive-7zip-encryption.patch encrypts one folder and
+                // refuses copy outright. Deflate at level 0 writes stored blocks
+                // (no compression, negligible CPU) and is allowed with encryption.
+                return archive_write_set_options(
+                    a, "7zip:compression=deflate,7zip:compression-level=0");
+            }
+            return archive_write_set_options(a, ("7zip:compression-level=" + lvl).c_str());
+        case ArchiveFormat::TarGz:    // 0-9
+        case ArchiveFormat::TarBz2:   // 1-9 (libarchive raises 0 to 1)
+        case ArchiveFormat::TarXz:    // 0-9
+        case ArchiveFormat::TarLzma:  // 0-9
+            return archive_write_set_filter_option(a, nullptr, "compression-level", lvl.c_str());
+        case ArchiveFormat::TarZstd:  // 1-22; 0 would mean zstd's default (3), not "fastest"
+            return archive_write_set_filter_option(
+                a, nullptr, "compression-level", std::to_string(std::max(1, level)).c_str());
+        case ArchiveFormat::Tar:
+        case ArchiveFormat::Iso:
+        case ArchiveFormat::Cpio:
+        default:
+            return ARCHIVE_OK;  // nothing to compress
+    }
+}
+
 }  // namespace
 
 ArchiveCreateResult archiveCreate(
@@ -727,9 +762,16 @@ ArchiveCreateResult archiveCreate(
     const std::vector<ArchiveSourceEntry>& entries,
     const std::string& passphrase,
     bool encryptFilenames,
-    std::function<bool(uint64_t bytesWrittenSoFar)> progressCallback
+    std::function<bool(uint64_t sourceBytesProcessed)> progressCallback,
+    int compressionLevel
 ) {
     ArchiveCreateResult result;
+    if (compressionLevel != kArchiveDefaultCompressionLevel &&
+        (compressionLevel < 0 || compressionLevel > 9)) {
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = "compression level must be between 0 and 9";
+        return result;
+    }
     if (encryptFilenames && (format != ArchiveFormat::SevenZip || passphrase.empty())) {
         // Never fall back to an archive whose names are readable when the
         // caller asked for them to be hidden.
@@ -741,7 +783,6 @@ ArchiveCreateResult archiveCreate(
     }
     WriteState state;
     state.sink = &sink;
-    state.progressCb = std::move(progressCallback);
 
     struct archive* a = archive_write_new();
     if (!a) {
@@ -757,6 +798,13 @@ ArchiveCreateResult archiveCreate(
         return result;
     }
 
+    if (applyCompressionLevel(a, format, compressionLevel, !passphrase.empty()) != ARCHIVE_OK) {
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "compression level rejected";
+        archive_write_free(a);
+        return result;
+    }
+
     if (archive_write_open(a, &state, openSinkCallback, writeSinkCallback, closeSinkCallback) != ARCHIVE_OK) {
         result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError : ArchiveOpenStatus::UnsupportedFormat;
         result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive write sink";
@@ -765,6 +813,7 @@ ArchiveCreateResult archiveCreate(
     }
 
     std::vector<uint8_t> chunkBuf(kSequentialChunkSize);
+    uint64_t sourceBytesProcessed = 0;
     for (const auto& entry : entries) {
         if (state.cancelled) break;
 
@@ -807,6 +856,15 @@ ArchiveCreateResult archiveCreate(
                     break;
                 }
                 bytesProcessed += static_cast<uint64_t>(written);
+                sourceBytesProcessed += static_cast<uint64_t>(written);
+
+                // Polled per source chunk (not per sink write): for 7z the sink
+                // stays silent until close, so this is the only place progress
+                // and cancellation can be observed during compression.
+                if (progressCallback && !progressCallback(sourceBytesProcessed)) {
+                    state.cancelled = true;
+                    break;
+                }
             }
             if (state.ioErrorSeen) {
                 result.status = ArchiveOpenStatus::IoError;
@@ -816,7 +874,20 @@ ArchiveCreateResult archiveCreate(
                 return result;
             }
         }
+        if (state.cancelled) break;
         result.entriesArchived++;
+    }
+
+    if (state.cancelled) {
+        // Don't close: finishing an unfinished entry makes the 7z writer push the
+        // rest of its declared size through the encoder as zeros, which can take
+        // a long time after an early cancel of a large file. Marking the writer
+        // failed makes archive_write_free skip that and just release resources.
+        archive_write_fail(a);
+        archive_write_free(a);
+        result.status = ArchiveOpenStatus::IoError;
+        result.errorMessage = "archive creation cancelled";
+        return result;
     }
 
     if (archive_write_close(a) != ARCHIVE_OK) {

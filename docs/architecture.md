@@ -290,41 +290,60 @@ and `prepareShareImport`.
   with Mask Mode by `DisguiseModeHandlers.syncShareTargetIdentity`, the same
   way the launcher aliases are (§6).
 
-### 1.5 Sharing out of a vault
+### 1.5 Sharing files and folders out
 
 The outgoing counterpart of §1.4: the Share action in the browser hands files
--- and folders -- from an unlocked vault to whichever app the person picks.
-Dart calls `VaultFileIoApi.shareFiles`; native side is
-`SystemPermissionHandlers.handleShareFile`, which builds `ACTION_SEND` /
-`ACTION_SEND_MULTIPLE` over URIs served by `ContainerShareProvider`.
+-- and folders -- from whatever container is open to the app the person
+picks. Dart calls `VaultFileIoApi.shareFiles` (vault containers and SAF
+trees) or `VaultLocalShareApi.shareLocalFiles` (plain on-disk storage in the
+decoy's local explorer); native side builds `ACTION_SEND` /
+`ACTION_SEND_MULTIPLE` over URIs from the provider that fits the source.
 
-- **Files** are streamed through a proxy file descriptor onto the live vault
-  session -- nothing decrypted is written to disk.
+- **Files** are never copied or staged. Vault files stream through a proxy
+  file descriptor onto the live session (`ContainerShareProvider`); SAF files
+  go out as their own document URI; plain local files through the
+  `FileProvider`.
 - **Folders** are shared as one `<name>.zip`, because the share sheet has no
-  notion of a directory. `FolderZipWriter` (pure JVM, vault reached only
-  through its `Source` interface) walks the subtree and writes the archive
-  into a pipe that `ContainerShareProvider.openFolderZip` returns, so the
-  zip is never staged on disk either. The folder itself is the archive's
+  notion of a directory. `FolderZipWriter` walks the subtree and writes the
+  archive into a pipe (`FolderZipPipe`) whose read end the provider returns,
+  so the zip is never staged on disk. The folder itself is the archive's
   top-level entry and empty subfolders are kept. Entry type is passed
-  explicitly (`directoryPaths`), never inferred from a name.
-- **Item Vault pseudo-files are left out of a shared folder** (Dart passes
-  their extensions as `skipExtensions`), matching multi-select share, which
-  already refuses to hand them out as loose files.
+  explicitly (`directoryPaths`), never inferred from a name. The writer
+  reaches storage only through its `Source` interface, one per backend:
+  `ContainerFolderSource` (vault, inside `ContainerShareProvider`),
+  `RawFolderSource` (plain files) and `SafFolderSource` (SAF trees); the last
+  two are served by `StorageFolderShareProvider`.
+- **SAF folders are walked by document id, not by path.** The browsing helpers
+  in `SafStorageManager` match names case-insensitively and turn a provider
+  error into an empty listing -- harmless for browsing, but an archive would
+  silently lose a subfolder. `SafFolderSource` addresses every child by the
+  exact id its provider reported and throws on any provider failure. The
+  root folder's id is resolved by the share action from the listing the
+  person just picked it from and travels inside the share URI. A provider
+  that says it is still loading is waited on; one that hands out a
+  non-seekable descriptor is archived to end of stream
+  (`FolderZipWriter.UNKNOWN_SIZE`).
+- **Item Vault pseudo-files are left out of a shared vault folder** (Dart
+  passes their extensions as `skipExtensions`), matching multi-select share,
+  which already refuses to hand them out as loose files. Not applicable to
+  SAF or local storage, which never hold them.
 - **A failed folder share must look failed.** A truncated listing
-  (`System:TRUNCATED`), a read error, an unsafe entry name or a vault that
-  starts locking throws; the archive is then never finalized (no central
-  directory is written, so unzippers reject it) and the pipe is closed with
-  an error. Existing export paths flag truncation and carry on; a share has
-  no side channel for that flag, so it refuses instead.
-- **A folder share never blocks locking.** The writer holds a
+  (`System:TRUNCATED`), a read error, an unlistable folder, an unsafe entry
+  name or a vault that starts locking throws; the archive is then never
+  finalized (no central directory is written, so unzippers reject it) and the
+  pipe is closed with an error. Existing export paths flag truncation and
+  carry on; a share has no side channel for that flag, so it refuses instead.
+- **A vault folder share never blocks locking.** The writer holds a
   `ContainerDocumentIoRegistry` lease, and polls `isLockPending` between
   chunks so auto-lock aborts it rather than waiting for a large archive.
-- **Only real vault containers can share folders**
-  (`LocalStorageContainerX.canShareFolders`). SAF and device-storage
-  browsers have no provider that can archive a subtree, so the UI hides
-  folder share there and `shareFiles` returns false for them.
+- **Routing in the browser keys on `isRawLocal`, not `isLocalStorage`.** A SAF
+  tree is also a negative-`volId` "local" container, but it has no real path
+  to hand the local share API; it goes through `shareFiles`' SAF channel.
 - The archive's length is unknown up front and the descriptor isn't
   seekable; that is fine for the copy-to-end readers a share sheet targets.
+  `StorageFolderShareProvider` is a plain read-only provider with
+  `exported=false`; a URI grant matches the exact URI, so a receiver can't
+  retarget one.
 
 ---
 

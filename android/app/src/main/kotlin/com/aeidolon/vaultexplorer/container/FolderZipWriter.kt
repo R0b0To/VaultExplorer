@@ -58,12 +58,20 @@ class FolderZipWriter(
     }
 
     interface FileReader : AutoCloseable {
-        /** Total length in bytes. */
+        /**
+         * Total length in bytes, or [UNKNOWN_SIZE] if the source genuinely
+         * can't say up front (a cloud-backed document provider streaming a
+         * file it has no fixed length for). A source that merely failed to
+         * learn the size must throw from [Source.openFile] instead -- an
+         * unknown size switches off the "file shrank" integrity check below.
+         */
         val size: Long
 
         /**
          * Reads up to [length] bytes starting at [offset] into [buffer].
-         * Returns the number of bytes read; negative means an I/O error.
+         * Returns the number of bytes read, 0 at end of file; negative means
+         * an I/O error. The writer only ever reads front to back, so a
+         * source that can't seek may treat [offset] as informational.
          */
         fun read(offset: Long, buffer: ByteArray, length: Int): Int
     }
@@ -72,6 +80,9 @@ class FolderZipWriter(
     class AbortedException(message: String) : IOException(message)
 
     companion object {
+        /** See [FileReader.size]. */
+        const val UNKNOWN_SIZE = -1L
+
         private const val TRUNCATED_SENTINEL = "System:TRUNCATED"
         private const val CHUNK_BYTES = 256 * 1024
 
@@ -186,7 +197,7 @@ class FolderZipWriter(
         checkAbort()
         source.openFile(path).use { reader ->
             val size = reader.size
-            if (size < 0) throw IOException("Could not determine a file's size")
+            if (size < 0 && size != UNKNOWN_SIZE) throw IOException("Could not determine a file's size")
 
             zos.setLevel(if (ext in ALREADY_COMPRESSED) Deflater.NO_COMPRESSION else Deflater.BEST_SPEED)
             val entry = ZipEntry(zipName)
@@ -194,16 +205,29 @@ class FolderZipWriter(
             zos.putNextEntry(entry)
 
             var offset = 0L
-            while (offset < size) {
-                checkAbort()
-                val want = minOf(buffer.size.toLong(), size - offset).toInt()
-                val n = reader.read(offset, buffer, want)
-                if (n < 0) throw IOException("Read error while archiving a file")
-                // The file shrank underneath us; ending the entry early
-                // would silently produce a truncated file inside the zip.
-                if (n == 0) throw IOException("Unexpected end of file while archiving")
-                zos.write(buffer, 0, n)
-                offset += n
+            if (size == UNKNOWN_SIZE) {
+                // No length to check against: end of file is simply the first
+                // empty read.
+                while (true) {
+                    checkAbort()
+                    val n = reader.read(offset, buffer, buffer.size)
+                    if (n < 0) throw IOException("Read error while archiving a file")
+                    if (n == 0) break
+                    zos.write(buffer, 0, n)
+                    offset += n
+                }
+            } else {
+                while (offset < size) {
+                    checkAbort()
+                    val want = minOf(buffer.size.toLong(), size - offset).toInt()
+                    val n = reader.read(offset, buffer, want)
+                    if (n < 0) throw IOException("Read error while archiving a file")
+                    // The file shrank underneath us; ending the entry early
+                    // would silently produce a truncated file inside the zip.
+                    if (n == 0) throw IOException("Unexpected end of file while archiving")
+                    zos.write(buffer, 0, n)
+                    offset += n
+                }
             }
             zos.closeEntry()
         }

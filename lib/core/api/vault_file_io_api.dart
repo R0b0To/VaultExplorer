@@ -103,16 +103,16 @@ class VaultFileIoApi {
   /// `ACTION_SEND`, multiple entries fire `ACTION_SEND_MULTIPLE`.
   ///
   /// [directoryPaths] names which of [fileNames] are folders (an entry's type
-  /// is always explicit, never guessed from its name). Each is shared as a
-  /// single `<name>.zip` generated while the receiving app reads it, so a
-  /// folder is only supported for real vault containers
-  /// ([LocalStorageContainerX.canShareFolders]); for SAF/device storage this
-  /// returns false rather than silently sharing less than was asked for.
+  /// is always explicit, never guessed from its name). The share sheet can't
+  /// carry a directory, so each one is shared as a single `<name>.zip`
+  /// generated while the receiving app reads it -- for vault containers and
+  /// for SAF trees alike.
   ///
   /// [skipExtensions] are lower-case extensions (no dot) left out of any
-  /// shared folder -- callers pass the Item Vault pseudo-file extensions so a
-  /// folder zip never carries passwords/notes that multi-select share already
-  /// refuses to hand out as loose files.
+  /// shared *vault* folder -- callers pass the Item Vault pseudo-file
+  /// extensions so a folder zip never carries passwords/notes that
+  /// multi-select share already refuses to hand out as loose files. Ignored
+  /// for SAF trees, which never hold Item Vault entries.
   Future<bool> shareFiles(
     MountedContainer container,
     List<String> fileNames, {
@@ -121,10 +121,13 @@ class VaultFileIoApi {
   }) async {
     if (fileNames.isEmpty) return false;
     if (_isSaf(container)) {
-      if (directoryPaths.isNotEmpty) return false;
       final result = await _channel.invokeMethod<bool>(
         ChannelMethods.safShareFiles,
-        {'treeUri': container.uri, 'filePaths': fileNames},
+        {
+          'treeUri': container.uri,
+          'filePaths': fileNames,
+          if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
+        },
       );
       return result ?? false;
     }

@@ -1302,7 +1302,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SAF_SHARE_FILES -> {
                     val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
                     val filePaths = call.argument<List<String>>("filePaths") ?: emptyList()
-                    val ok = safStorageManager.shareFiles(treeUri, filePaths)
+                    val directoryPaths = call.argument<List<String>>("directoryPaths")?.toSet() ?: emptySet()
+                    val ok = safStorageManager.shareFiles(treeUri, filePaths, directoryPaths)
                     result.success(ok)
                 }
                 ChannelMethods.SAF_GET_DOCUMENT_URI -> {

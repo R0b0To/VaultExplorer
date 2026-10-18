@@ -367,35 +367,41 @@ void main() {
       expect(calls.single.arguments['skipExtensions'], ['password', 'securenote']);
     });
 
-    test('refuses folders on SAF storage instead of sharing less than asked', () async {
+    test('shares SAF folders through the SAF channel with the folder named', () async {
       final saf = buildExternalStorageContainer(
         rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
         displayName: 'SD card',
         volId: -100,
       );
+      nextResult = true;
 
-      final ok = await api.shareFiles(saf, ['Trips'], directoryPaths: ['Trips']);
+      final ok = await api.shareFiles(
+        saf,
+        ['DCIM/Camera', 'notes.txt'],
+        directoryPaths: ['DCIM/Camera'],
+        skipExtensions: ['password'],
+      );
 
-      expect(ok, isFalse);
-      expect(calls, isEmpty);
+      expect(ok, isTrue);
+      expect(calls.single.method, 'safShareFiles');
+      expect(calls.single.arguments['treeUri'], saf.uri);
+      expect(calls.single.arguments['filePaths'], ['DCIM/Camera', 'notes.txt']);
+      expect(calls.single.arguments['directoryPaths'], ['DCIM/Camera']);
+      // Item Vault entries only exist inside vault containers.
+      expect(calls.single.arguments.containsKey('skipExtensions'), isFalse);
     });
-  });
 
-  group('canShareFolders', () {
-    test('is true only for real vault containers', () {
+    test('a plain SAF file share sends no folder arguments', () async {
       final saf = buildExternalStorageContainer(
         rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
         displayName: 'SD card',
         volId: -100,
       );
-      final local = buildLocalStorageContainer(
-        rootPath: '/storage/emulated/0',
-        displayName: 'Local Storage',
-      );
+      nextResult = true;
 
-      expect(container.canShareFolders, isTrue);
-      expect(saf.canShareFolders, isFalse);
-      expect(local.canShareFolders, isFalse);
+      await api.shareFiles(saf, ['photo.jpg']);
+
+      expect(calls.single.arguments.containsKey('directoryPaths'), isFalse);
     });
   });
 

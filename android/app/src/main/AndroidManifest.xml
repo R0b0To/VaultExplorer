@@ -196,6 +196,11 @@
             android:exported="true"
             android:grantUriPermissions="true" />
         <provider
+            android:name="com.aeidolon.vaultexplorer.share.StorageFolderShareProvider"
+            android:authorities="${applicationId}.foldershare"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.localfiles"
             android:exported="false"

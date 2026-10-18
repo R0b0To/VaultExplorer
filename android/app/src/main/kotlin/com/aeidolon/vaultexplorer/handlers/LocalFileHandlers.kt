@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.share.StorageFolderShareProvider
 
 /**
  * Opens/shares/imports real, already-decrypted files sitting on device
@@ -173,15 +174,32 @@ class LocalFileHandlers(
 
     fun handleShareLocalFile(call: MethodCall, result: MethodChannel.Result) {
         val paths = call.argument<List<String>>("filePaths")
+        // Which of [paths] are directories, as the caller knows them (an
+        // entry's type is never guessed from its name). Each is shared as a
+        // single zip, since the share sheet can't carry a folder.
+        val directoryPaths = call.argument<List<String>>("directoryPaths")?.toSet() ?: emptySet()
         if (paths.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "filePaths required", null)
             return
         }
         try {
             val uris = ArrayList<android.os.Parcelable>()
+            // The path each URI came from, in step with [uris] -- the single-
+            // item MIME type below must describe the item actually kept, not
+            // paths[0], which may have been dropped as missing.
+            val kept = ArrayList<String>()
             for (path in paths) {
                 val file = File(path)
-                if (file.exists()) uris.add(uriFor(path))
+                if (!file.exists()) continue
+                if (path in directoryPaths) {
+                    val folderUri = file.takeIf { it.isDirectory }
+                        ?.let { StorageFolderShareProvider.buildLocalUri(activity, path) }
+                        ?: continue
+                    uris.add(folderUri)
+                } else {
+                    uris.add(uriFor(path))
+                }
+                kept.add(path)
             }
             if (uris.isEmpty()) {
                 result.error("NOT_FOUND", "None of the requested files exist", null)
@@ -190,7 +208,11 @@ class LocalFileHandlers(
             val intent = if (uris.size == 1) {
                 Intent(Intent.ACTION_SEND).apply {
                     putExtra(Intent.EXTRA_STREAM, uris[0])
-                    type = MimeTypeHelper.getMimeType(File(paths[0]).name)
+                    type = if (kept[0] in directoryPaths) {
+                        "application/zip"
+                    } else {
+                        MimeTypeHelper.getMimeType(File(kept[0]).name)
+                    }
                 }
             } else {
                 Intent(Intent.ACTION_SEND_MULTIPLE).apply {

@@ -21,6 +21,7 @@ import com.aeidolon.vaultexplorer.ImageDecodeGuard
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
+import com.aeidolon.vaultexplorer.share.StorageFolderShareProvider
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -942,20 +943,45 @@ class SafStorageManager(private val context: Context) {
         }
     }
 
-    fun shareFiles(treeUri: Uri, relativePaths: List<String>): Boolean {
+    /**
+     * Shares [relativePaths] through the system share sheet. Entries named in
+     * [directoryPaths] are folders: the share sheet can't carry a directory,
+     * so each goes out as one zip served by [StorageFolderShareProvider].
+     * Files keep using their SAF document URI directly.
+     */
+    fun shareFiles(
+        treeUri: Uri,
+        relativePaths: List<String>,
+        directoryPaths: Set<String> = emptySet(),
+    ): Boolean {
         if (relativePaths.isEmpty()) return false
         val uris = ArrayList<Uri>()
+        // The path each URI came from, in step with [uris], so the single-item
+        // MIME type below describes the item that was actually kept.
+        val kept = ArrayList<String>()
         for (rel in relativePaths) {
-            val docUri = getDocumentUri(treeUri, rel)
-            if (docUri != null) uris.add(docUri)
+            val uri = if (rel in directoryPaths) {
+                // The root folder's own document id is resolved here, from the
+                // same cache the listing the person just picked it from filled
+                // -- the provider then never has to look a folder up by name.
+                resolveDocumentId(treeUri, rel)?.let { docId ->
+                    StorageFolderShareProvider.buildSafUri(context, treeUri, docId, rel)
+                }
+            } else {
+                getDocumentUri(treeUri, rel)
+            }
+            if (uri != null) {
+                uris.add(uri)
+                kept.add(rel)
+            }
         }
         if (uris.isEmpty()) return false
 
         val intent = if (uris.size == 1) {
-            val fileName = relativePaths[0].substringAfterLast('/')
+            val fileName = kept[0].substringAfterLast('/')
             Intent(Intent.ACTION_SEND).apply {
                 putExtra(Intent.EXTRA_STREAM, uris[0])
-                type = MimeTypeHelper.getMimeType(fileName)
+                type = if (kept[0] in directoryPaths) "application/zip" else MimeTypeHelper.getMimeType(fileName)
             }
         } else {
             Intent(Intent.ACTION_SEND_MULTIPLE).apply {

@@ -36,13 +36,24 @@ class VaultLocalShareApi {
     }
   }
 
-  /// Shares one or more real files via the system share sheet.
-  Future<bool> shareLocalFiles(List<String> filePaths) async {
+  /// Shares one or more real files and/or folders via the system share sheet.
+  ///
+  /// [directoryPaths] names which of [filePaths] are folders (an entry's type
+  /// is always explicit, never guessed from its name). The share sheet can't
+  /// carry a directory, so each one is shared as a single `<name>.zip` built
+  /// while the receiving app reads it.
+  Future<bool> shareLocalFiles(
+    List<String> filePaths, {
+    List<String> directoryPaths = const [],
+  }) async {
     if (filePaths.isEmpty) return false;
     try {
       final ok = await _channel.invokeMethod<bool>(
         ChannelMethods.shareLocalFile,
-        {'filePaths': filePaths},
+        {
+          'filePaths': filePaths,
+          if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
+        },
       );
       return ok ?? false;
     } catch (e) {

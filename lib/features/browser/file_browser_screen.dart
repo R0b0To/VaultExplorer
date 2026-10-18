@@ -1045,23 +1045,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               }
             }
           : null,
-      onShare: (!entry.isDir || widget.container.canShareFolders)
-          ? () async {
-              final ok = widget.container.isLocalStorage
-                  ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles([
-                      p.join(widget.container.uri, fullPath),
-                    ])
-                  : await ref.read(vaultFileIoApiProvider).shareFiles(
-                      widget.container,
-                      [fullPath],
-                      directoryPaths: entry.isDir ? [fullPath] : const [],
-                      skipExtensions: _vaultItemExtensions,
-                    );
-              if (!ok && mounted) {
-                _setStatus(context.l10n.couldNotShareFiles, error: true);
-              }
-            }
-          : null,
+      onShare: () async {
+        // Only plain on-disk storage goes through the local share API; a SAF
+        // tree is also a negative-volId "local" container, but has no real
+        // path to hand out and is shared through its own channel instead.
+        final localPath = p.join(widget.container.uri, fullPath);
+        final ok = widget.container.isRawLocal
+            ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
+                [localPath],
+                directoryPaths: entry.isDir ? [localPath] : const [],
+              )
+            : await ref.read(vaultFileIoApiProvider).shareFiles(
+                widget.container,
+                [fullPath],
+                directoryPaths: entry.isDir ? [fullPath] : const [],
+                skipExtensions: _vaultItemExtensions,
+              );
+        if (!ok && mounted) {
+          _setStatus(context.l10n.couldNotShareFiles, error: true);
+        }
+      },
       onEditImage: (!entry.isDir && MediaViewerConstants.isImage(entry.name))
           ? () => _editImage(entry.name, fullPath)
           : null,
@@ -2531,9 +2534,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   /// app via the system share sheet, skipping vault-item pseudo-files
   /// (passwords, secure notes, etc. -- see [VaultItemType]) the same way
   /// [_openFileWithApp] does for a single file. Folders are shared too, each
-  /// as one zip, but only where the container can archive them
-  /// ([LocalStorageContainerX.canShareFolders]); elsewhere they are skipped
-  /// like any other non-shareable entry. Unlike [_openFileWithApp], this
+  /// as one zip, in every kind of container. Unlike [_openFileWithApp], this
   /// silently drops just the non-shareable entries rather than aborting
   /// the whole action, so sharing five photos alongside one accidentally
   /// co-selected password entry still shares the five photos.
@@ -2541,9 +2542,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final entries = selectedItems.toList();
     exitSelectionMode();
 
-    final canShareFolders = widget.container.canShareFolders;
     final shareable = entries.where((e) {
-      if (e.isDir) return canShareFolders;
+      if (e.isDir) return true;
       final parts = e.name.split('.');
       final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
       return !VaultItemType.values.any((t) => t.name.toLowerCase() == ext);
@@ -2558,15 +2558,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
     _signalActivity();
     try {
-      // Local storage has no vault session/ContainerDocumentsProvider to
-      // stream from -- VaultLocalShareApi exposes the real files directly
-      // via its own FileProvider instead (see vault_local_share_api.dart),
-      // same split _openFileWithApp makes above.
-      final ok = widget.container.isLocalStorage
+      // Plain on-disk storage has no vault session/ContainerDocumentsProvider
+      // to stream from -- VaultLocalShareApi exposes the real files directly
+      // via its own FileProvider instead (see vault_local_share_api.dart).
+      // A SAF tree is *not* that: it has no real path, so (unlike
+      // _openFileWithApp, which keys on isLocalStorage) it goes through
+      // VaultFileIoApi.shareFiles' SAF channel along with the vault containers.
+      final ok = widget.container.isRawLocal
           ? await ref
                 .read(vaultLocalShareApiProvider)
                 .shareLocalFiles(
                   shareable
+                      .map((e) => p.join(widget.container.uri, _fullPathOf(e)))
+                      .toList(),
+                  directoryPaths: shareable
+                      .where((e) => e.isDir)
                       .map((e) => p.join(widget.container.uri, _fullPathOf(e)))
                       .toList(),
                 )

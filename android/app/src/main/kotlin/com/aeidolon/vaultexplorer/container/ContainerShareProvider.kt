@@ -17,6 +17,7 @@ import java.io.IOException
 import com.aeidolon.vaultexplorer.DocumentId
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.share.FolderZipPipe
 
 /**
  * Plain ContentProvider -- deliberately NOT a DocumentsProvider -- used only
@@ -271,22 +272,14 @@ class ContainerShareProvider : ContentProvider() {
             ?: emptySet()
 
     /**
-     * Serves a folder document as a zip stream. The archive is produced by a
-     * background thread writing into a pipe whose read end is returned here,
-     * so nothing is staged on disk and the receiver can start consuming
-     * immediately.
+     * Serves a folder document as a zip stream (see [FolderZipPipe] for how
+     * the archive reaches the receiver).
      *
-     * The thread holds an [ContainerDocumentIoRegistry] lease for as long as
-     * it runs, like a proxy descriptor does -- but a whole-folder archive can
-     * take far longer than any one descriptor, so it also polls
+     * The writer thread holds a [ContainerDocumentIoRegistry] lease for as
+     * long as it runs, like a proxy descriptor does -- but a whole-folder
+     * archive can take far longer than any one descriptor, so it also polls
      * [ContainerDocumentIoRegistry.isLockPending] and stops the moment a lock
      * begins draining; otherwise auto-lock would hang behind a big share.
-     *
-     * A *reliable* pipe is used so that failure reaches the receiver as an
-     * error ([ParcelFileDescriptor.closeWithError]) instead of an ordinary
-     * end-of-stream. [FolderZipWriter] separately guarantees a failed archive
-     * is never finalized, so even a receiver that ignores the error sees a
-     * corrupt zip, never a plausible-looking partial one.
      */
     @Throws(FileNotFoundException::class)
     private fun openFolderZip(doc: DocumentId, skipExtensions: Set<String>): ParcelFileDescriptor {
@@ -299,48 +292,19 @@ class ContainerShareProvider : ContentProvider() {
             ioLease.close()
             throw FileNotFoundException("Container is no longer mounted")
         }
-        val pipe = try {
-            ParcelFileDescriptor.createReliablePipe()
-        } catch (e: IOException) {
-            ioLease.close()
-            throw FileNotFoundException("Could not create a pipe for the folder archive")
-        }
-        val readSide = pipe[0]
-        val writeSide = pipe[1]
-
         val writer = FolderZipWriter(
             source = ContainerFolderSource(volId),
             skipExtensions = skipExtensions,
             shouldAbort = { ContainerDocumentIoRegistry.isLockPending(volId) },
         )
-        val thread = Thread({
-            try {
-                val out = ParcelFileDescriptor.AutoCloseOutputStream(writeSide)
-                writer.write(doc.fatPath, out)
-                out.close()
-            } catch (e: FolderZipWriter.AbortedException) {
-                VeLog.d(TAG) { "folder share aborted (vault locking)" }
-                try { writeSide.closeWithError("Folder share aborted") } catch (_: Exception) {}
-            } catch (e: Exception) {
-                // Includes the receiver hanging up mid-stream (EPIPE) -- an
-                // ordinary cancel, not worth more than a debug line. Paths are
-                // left out of the message on purpose.
-                VeLog.d(TAG) { "folder share stopped: ${e.javaClass.simpleName}" }
-                try { writeSide.closeWithError(e.message ?: "Folder archive failed") } catch (_: Exception) {}
-            } finally {
-                ioLease.close()
-            }
-        }, "vc_share_zip_${volId}_${System.nanoTime()}")
-        thread.isDaemon = true
-        try {
-            thread.start()
-        } catch (e: Throwable) {
-            ioLease.close()
-            try { writeSide.close() } catch (_: Exception) {}
-            try { readSide.close() } catch (_: Exception) {}
-            throw FileNotFoundException("Could not start the folder archive")
-        }
-        return readSide
+        // open() releases the lease itself on every path, including its own
+        // setup failures.
+        return FolderZipPipe.open(
+            writer = writer,
+            rootPath = doc.fatPath,
+            threadName = "vc_share_zip_${volId}_${System.nanoTime()}",
+            onFinished = { ioLease.close() },
+        )
     }
 
     /** Bridges [FolderZipWriter] onto the live vault session. */
@@ -350,6 +314,9 @@ class ContainerShareProvider : ContentProvider() {
 
         override fun openFile(path: String): FolderZipWriter.FileReader {
             val fileSize = ContainerFileSystem.getFileSize(volId, path)
+            // -1 means "unknown" to the writer; for a vault file it means the
+            // size lookup failed, which must not be mistaken for that.
+            if (fileSize < 0) throw IOException("Could not determine a file's size")
             val ptr = ContainerFileSystem.withReadLock(volId) {
                 ContainerFileSystem.openStream(volId, path)
             }

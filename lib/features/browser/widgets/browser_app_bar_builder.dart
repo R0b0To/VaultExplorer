@@ -115,10 +115,9 @@ PreferredSizeWidget buildBrowserAppBar(
     // Vault items (passwords, secure notes, etc.) are internal structured
     // records rather than real files -- like doOpenWithApp/doRename below,
     // they're excluded from what counts as "shareable". Unlike those two,
-    // a vault item (or a folder in a container that can't archive one)
-    // mixed into a larger selection doesn't hide the option entirely: it's
-    // still shown as long as at least one real file or shareable folder
-    // qualifies. onShare (_shareSelected in file_browser_screen.dart)
+    // a vault item mixed into a larger selection doesn't hide the option
+    // entirely: it's still shown as long as at least one real file or
+    // folder qualifies. onShare (_shareSelected in file_browser_screen.dart)
     // silently skips the rest -- sharing is inherently a partial,
     // best-effort action (this mirrors how a plain Android file manager's
     // own multi-select share behaves), unlike renaming or opening a
@@ -130,13 +129,10 @@ PreferredSizeWidget buildBrowserAppBar(
       return VaultItemType.values.any((t) => t.name.toLowerCase() == ext);
     }
 
-    // A folder counts as shareable (it goes out as a zip) wherever the
-    // container can archive one; see LocalStorageContainerX.canShareFolders.
-    final showShareOption = !isInsideArchive &&
-        selectedItems.any(
-          (item) =>
-              item.isDir ? container.canShareFolders : !isVaultItemFile(item),
-        );
+    // A folder is shareable (it goes out as a zip) in every kind of
+    // container, and isVaultItemFile is already false for folders.
+    final showShareOption =
+        !isInsideArchive && selectedItems.any((item) => !isVaultItemFile(item));
     final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
     final showEditVideoOption = singleFile && MediaViewerConstants.isVideo(selectedItems.first.name);
     final showEditAudioOption = onEditAudio != null &&

@@ -190,6 +190,44 @@ class FolderZipWriterTest {
     }
 
     @Test
+    fun `a file of unknown size is read to end of stream`() {
+        val data = ByteArray(600_000) { (it * 13).toByte() }
+        val streaming = object : FolderZipWriter.Source {
+            override fun list(dirPath: String) = arrayOf(file("cloud.bin", 0))
+            override fun openFile(path: String) = object : FolderZipWriter.FileReader {
+                override val size = FolderZipWriter.UNKNOWN_SIZE
+                override fun read(offset: Long, buffer: ByteArray, length: Int): Int {
+                    if (offset >= data.size) return 0
+                    val n = minOf(length, data.size - offset.toInt(), 100_000)
+                    System.arraycopy(data, offset.toInt(), buffer, 0, n)
+                    return n
+                }
+                override fun close() {}
+            }
+        }
+        val out = ByteArrayOutputStream()
+        FolderZipWriter(streaming).write("S", out)
+        assertArrayEquals(data, unzip(out.toByteArray())["S/cloud.bin"])
+    }
+
+    @Test
+    fun `a size other than a length or UNKNOWN_SIZE is refused`() {
+        val bad = object : FolderZipWriter.Source {
+            override fun list(dirPath: String) = arrayOf(file("b.bin", 1))
+            override fun openFile(path: String) = object : FolderZipWriter.FileReader {
+                override val size = -5L
+                override fun read(offset: Long, buffer: ByteArray, length: Int) = 0
+                override fun close() {}
+            }
+        }
+        try {
+            FolderZipWriter(bad).write("S", ByteArrayOutputStream())
+            fail("expected IOException")
+        } catch (_: IOException) {
+        }
+    }
+
+    @Test
     fun `the vault root cannot be archived`() {
         try {
             FolderZipWriter(sampleVault()).write("", ByteArrayOutputStream())

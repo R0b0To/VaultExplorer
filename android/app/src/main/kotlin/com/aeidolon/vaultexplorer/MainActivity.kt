@@ -676,6 +676,11 @@ open class MainActivity : FlutterFragmentActivity() {
         )
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
+            com.aeidolon.vaultexplorer.officeviewer.OFFICE_VIEWER_VIEW_TYPE,
+            com.aeidolon.vaultexplorer.officeviewer.OfficeViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
+
+        flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.pdf.JETPACK_PDF_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerViewFactory(this, flutterEngine.dartExecutor.binaryMessenger),
         )

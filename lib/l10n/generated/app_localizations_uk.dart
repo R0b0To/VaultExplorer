@@ -12230,4 +12230,29 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get archiveCompressionUltraDesc =>
       'Найменший розмір, повільніше стиснення';
+
+  @override
+  String get officeViewerErrorTitle => 'Неможливо переглянути цей документ';
+
+  @override
+  String get officeViewerEncrypted =>
+      'Цей документ захищено паролем, а зашифровані файли Office переглянути неможливо.';
+
+  @override
+  String get officeViewerUnsupported =>
+      'Не вдалося прочитати цей файл. Він може бути пошкоджений або мати формат, який переглядач не підтримує.';
+
+  @override
+  String get officeViewerTooLarge =>
+      'Цей документ завеликий для перегляду в програмі.';
+
+  @override
+  String get officeViewerSpeakerNotes => 'Нотатки доповідача';
+
+  @override
+  String get fileAssocDocumentViewer => 'Вбудований переглядач документів';
+
+  @override
+  String get viewOfficeDocumentsInApp =>
+      'Перегляд файлів Word, Excel, PowerPoint і OpenDocument у програмі';
 }

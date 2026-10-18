@@ -224,4 +224,51 @@ void main() {
       expect(action, isA<ShowOpenWithDialog>());
     });
   });
+
+  group('decideFileOpenAction — built-in document viewer', () {
+    FileOpenAction decide(String ext, {String? pref, bool local = false}) =>
+        decideFileOpenAction(
+          ext: ext,
+          extensionPreference: pref,
+          needsSystemAppForLocal: local,
+          isSupportedMedia: false,
+        );
+
+    test('every supported Office / OpenDocument extension opens in it', () {
+      for (final ext in const [
+        'docx', 'docm', 'dotx', 'pptx', 'ppsx', 'potx', 'ppt', 'pps',
+        'xlsx', 'xlsm', 'xltx', 'odt', 'ott', 'odp', 'otp', 'ods', 'ots',
+      ]) {
+        expect(decide(ext), isA<OpenInDocumentViewer>(), reason: ext);
+      }
+    });
+
+    test("a saved 'document' preference opens it, for supported types", () {
+      expect(decide('docx', pref: 'document'), isA<OpenInDocumentViewer>());
+    });
+
+    test("'document' on an unsupported extension falls through", () {
+      // A stale or hand-edited value must not send an unreadable file to a
+      // viewer that cannot render it.
+      expect(decide('xyz', pref: 'document'), isA<ShowOpenWithDialog>());
+      expect(decide('doc', pref: 'document'), isA<ShowOpenWithDialog>());
+    });
+
+    test('an explicit preference for another app still wins', () {
+      expect(decide('docx', pref: 'external'), isA<OpenWithSystemApp>());
+      expect(decide('xlsx', pref: 'editor'), isA<OpenInEditor>());
+      final pkg = decide('pptx', pref: 'package:com.example.office');
+      expect((pkg as OpenWithSystemApp).packageName, 'com.example.office');
+    });
+
+    test('formats without a reader still ask (legacy .doc / .xls, .rtf)', () {
+      for (final ext in const ['doc', 'xls', 'rtf', 'pages', 'numbers']) {
+        expect(decide(ext), isA<ShowOpenWithDialog>(), reason: ext);
+      }
+    });
+
+    test('works for local storage too (bytes are read, not shared)', () {
+      expect(decide('docx', local: true), isA<OpenInDocumentViewer>());
+    });
+  });
 }

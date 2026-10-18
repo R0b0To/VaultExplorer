@@ -3349,5 +3349,12 @@
   "archiveCompressionNormalTitle": "標準 (5) — バランス",
   "archiveCompressionNormalDesc": "圧縮率と速度のバランスが良い",
   "archiveCompressionUltraTitle": "最高 (9) — 最小サイズ",
-  "archiveCompressionUltraDesc": "最小サイズ、圧縮時間は長くなります"
+  "archiveCompressionUltraDesc": "最小サイズ、圧縮時間は長くなります",
+  "officeViewerErrorTitle": "このドキュメントをプレビューできません",
+  "officeViewerEncrypted": "このドキュメントはパスワードで保護されています。暗号化されたOfficeファイルはプレビューできません。",
+  "officeViewerUnsupported": "このファイルを読み込めませんでした。破損しているか、ビューアが対応していない形式の可能性があります。",
+  "officeViewerTooLarge": "このドキュメントはサイズが大きすぎて、アプリ内でプレビューできません。",
+  "officeViewerSpeakerNotes": "スピーカーノート",
+  "fileAssocDocumentViewer": "アプリ内ドキュメントビューア",
+  "viewOfficeDocumentsInApp": "Word、Excel、PowerPoint、OpenDocumentファイルをアプリ内でプレビュー"
 }

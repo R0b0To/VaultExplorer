@@ -3349,5 +3349,12 @@
   "archiveCompressionNormalTitle": "Normale (5) — Bilanciata",
   "archiveCompressionNormalDesc": "Compressione e velocità bilanciate",
   "archiveCompressionUltraTitle": "Ultra (9) — Dimensione minima",
-  "archiveCompressionUltraDesc": "Dimensione minima, compressione più lenta"
+  "archiveCompressionUltraDesc": "Dimensione minima, compressione più lenta",
+  "officeViewerErrorTitle": "Impossibile visualizzare l'anteprima di questo documento",
+  "officeViewerEncrypted": "Questo documento è protetto da password e i file Office cifrati non possono essere visualizzati in anteprima.",
+  "officeViewerUnsupported": "Impossibile leggere questo file. Potrebbe essere danneggiato o in un formato non supportato dal visualizzatore.",
+  "officeViewerTooLarge": "Questo documento è troppo grande per l'anteprima nell'app.",
+  "officeViewerSpeakerNotes": "Note del relatore",
+  "fileAssocDocumentViewer": "Visualizzatore di documenti integrato",
+  "viewOfficeDocumentsInApp": "Visualizza in anteprima file Word, Excel, PowerPoint e OpenDocument nell'app"
 }

@@ -3349,5 +3349,12 @@
   "archiveCompressionNormalTitle": "보통 (5) — 균형",
   "archiveCompressionNormalDesc": "압축률과 속도의 균형",
   "archiveCompressionUltraTitle": "최대 (9) — 최소 크기",
-  "archiveCompressionUltraDesc": "최소 크기, 압축 속도 느림"
+  "archiveCompressionUltraDesc": "최소 크기, 압축 속도 느림",
+  "officeViewerErrorTitle": "이 문서를 미리 볼 수 없습니다",
+  "officeViewerEncrypted": "이 문서는 비밀번호로 보호되어 있으며, 암호화된 Office 파일은 미리 볼 수 없습니다.",
+  "officeViewerUnsupported": "이 파일을 읽을 수 없습니다. 파일이 손상되었거나 뷰어가 지원하지 않는 형식일 수 있습니다.",
+  "officeViewerTooLarge": "이 문서는 너무 커서 앱에서 미리 볼 수 없습니다.",
+  "officeViewerSpeakerNotes": "발표자 노트",
+  "fileAssocDocumentViewer": "앱 내장 문서 뷰어",
+  "viewOfficeDocumentsInApp": "Word, Excel, PowerPoint, OpenDocument 파일을 앱에서 미리 보기"
 }

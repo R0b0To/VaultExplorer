@@ -3349,5 +3349,12 @@
   "archiveCompressionNormalTitle": "Normal (5) — Equilibrado",
   "archiveCompressionNormalDesc": "Compresión y velocidad equilibradas",
   "archiveCompressionUltraTitle": "Ultra (9) — Tamaño mínimo",
-  "archiveCompressionUltraDesc": "Tamaño mínimo, compresión más lenta"
+  "archiveCompressionUltraDesc": "Tamaño mínimo, compresión más lenta",
+  "officeViewerErrorTitle": "No se puede previsualizar este documento",
+  "officeViewerEncrypted": "Este documento está protegido con contraseña y los archivos de Office cifrados no se pueden previsualizar.",
+  "officeViewerUnsupported": "No se pudo leer este archivo. Puede estar dañado o tener un formato que el visor no admite.",
+  "officeViewerTooLarge": "Este documento es demasiado grande para previsualizarlo en la app.",
+  "officeViewerSpeakerNotes": "Notas del orador",
+  "fileAssocDocumentViewer": "Visor de documentos integrado",
+  "viewOfficeDocumentsInApp": "Previsualiza archivos de Word, Excel, PowerPoint y OpenDocument en la app"
 }

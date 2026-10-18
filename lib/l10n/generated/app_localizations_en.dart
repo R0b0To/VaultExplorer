@@ -11957,4 +11957,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get archiveCompressionUltraDesc => 'Smallest size, slower compression';
+
+  @override
+  String get officeViewerErrorTitle => 'Can\'t preview this document';
+
+  @override
+  String get officeViewerEncrypted =>
+      'This document is password-protected, and encrypted Office files can\'t be previewed.';
+
+  @override
+  String get officeViewerUnsupported =>
+      'This file couldn\'t be read. It may be damaged, or use a format the viewer doesn\'t support.';
+
+  @override
+  String get officeViewerTooLarge =>
+      'This document is too large to preview in the app.';
+
+  @override
+  String get officeViewerSpeakerNotes => 'Speaker notes';
+
+  @override
+  String get fileAssocDocumentViewer => 'In-app Document Viewer';
+
+  @override
+  String get viewOfficeDocumentsInApp =>
+      'Preview Word, Excel, PowerPoint and OpenDocument files in the app';
 }

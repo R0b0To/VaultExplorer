@@ -61,6 +61,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/services/media_scan_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/office_document_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
@@ -1904,6 +1905,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         await _openPdfViewer(fullPath);
       case OpenInHtmlViewer():
         _openHtmlViewer(fullPath);
+      case OpenInDocumentViewer():
+        _openDocumentViewer(fullPath);
       case OpenWithSystemApp(packageName: final packageName):
         _openFileWithApp(entry.name, fullPath, packageName: packageName);
       case InstallApk():
@@ -2028,6 +2031,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       MaterialPageRoute(
         builder: (_) =>
             HtmlViewerScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
+  }
+
+  void _openDocumentViewer(String fullPath) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OfficeDocumentViewerScreen(
+          container: widget.container,
+          filePath: fullPath,
+        ),
       ),
     );
   }
@@ -2296,6 +2311,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
       if (!mounted) return;
       await _openMediaViewer(fileName, fullPath);
+    } else if (choice.action == 'document') {
+      if (choice.remember && cleanExt.isNotEmpty) {
+        await _saveExtensionPreference(cleanExt, 'document');
+      }
+      if (!mounted) return;
+      _openDocumentViewer(fullPath);
     } else if (choice.action == 'external') {
       if (choice.remember && cleanExt.isNotEmpty) {
         await _saveExtensionPreference(cleanExt, 'external');

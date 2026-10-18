@@ -13677,5 +13677,33 @@
   "archiveCompressionUltraDesc": "Smallest size, slower compression",
   "@archiveCompressionUltraDesc": {
     "description": "Description for ultra archive compression preset"
+  },
+  "officeViewerErrorTitle": "Can't preview this document",
+  "@officeViewerErrorTitle": {
+    "description": "Title of the error state in the document viewer (Word/Excel/PowerPoint/OpenDocument preview)"
+  },
+  "officeViewerEncrypted": "This document is password-protected, and encrypted Office files can't be previewed.",
+  "@officeViewerEncrypted": {
+    "description": "Document viewer error: the file is encrypted / password-protected"
+  },
+  "officeViewerUnsupported": "This file couldn't be read. It may be damaged, or use a format the viewer doesn't support.",
+  "@officeViewerUnsupported": {
+    "description": "Document viewer error: the file is corrupt or in an unsupported format"
+  },
+  "officeViewerTooLarge": "This document is too large to preview in the app.",
+  "@officeViewerTooLarge": {
+    "description": "Document viewer error: the file exceeds the preview size limit"
+  },
+  "officeViewerSpeakerNotes": "Speaker notes",
+  "@officeViewerSpeakerNotes": {
+    "description": "Label of the collapsible speaker-notes section under a slide in the document viewer"
+  },
+  "fileAssocDocumentViewer": "In-app Document Viewer",
+  "@fileAssocDocumentViewer": {
+    "description": "File association label: files open in the built-in document viewer (Word, Excel, PowerPoint, OpenDocument)"
+  },
+  "viewOfficeDocumentsInApp": "Preview Word, Excel, PowerPoint and OpenDocument files in the app",
+  "@viewOfficeDocumentsInApp": {
+    "description": "Subtitle of the 'In-app Document Viewer' choice in the Open with dialog"
   }
 }

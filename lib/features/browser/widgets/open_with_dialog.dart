@@ -1,9 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/office_document_formats.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
 typedef OpenWithChoice = ({
-  String? action, // 'editor' | 'media' | 'external' | 'open_as' | null
+  String? action, // 'editor' | 'media' | 'document' | 'external' | 'open_as' | null
   bool remember,
   String? mimeType, // only meaningful when action == 'open_as'
 });
@@ -161,6 +162,7 @@ class OpenWithDialog {
   }) async {
     bool remember = false;
     final isMedia = MediaViewerConstants.isSupported(fileName);
+    final isDocument = OfficeDocumentFormats.isSupportedName(fileName);
 
     // --- Dialog 1: Choose Action ---
     final result = await showDialog<String>(
@@ -202,17 +204,28 @@ class OpenWithDialog {
               _ActionTile(
                 icon: isMedia
                     ? Icons.play_circle_outline_rounded
+                    : isDocument
+                    ? Icons.description_outlined
                     : Icons.edit_note_rounded,
                 iconColor: cs.primary,
                 title: isMedia
                     ? context.l10n.fileAssocInAppMediaViewer
+                    : isDocument
+                    ? context.l10n.fileAssocDocumentViewer
                     : context.l10n.fileAssocInAppTextEditor,
                 subtitle: isMedia
                     ? context.l10n.playVideoAudioViewImageInApp
+                    : isDocument
+                    ? context.l10n.viewOfficeDocumentsInApp
                     : context.l10n.viewEditTextMarkdownCode,
                 dense: isLandscape,
-                onTap: () =>
-                    Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
+                onTap: () => Navigator.of(context).pop(
+                  isMedia
+                      ? 'media'
+                      : isDocument
+                      ? 'document'
+                      : 'editor',
+                ),
               ),
               _ActionTile(
                 icon: Icons.open_in_new_rounded,

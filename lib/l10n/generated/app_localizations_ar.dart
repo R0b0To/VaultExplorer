@@ -12174,4 +12174,29 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get archiveCompressionUltraDesc => 'أصغر حجم، ضغط أبطأ';
+
+  @override
+  String get officeViewerErrorTitle => 'تعذّر معاينة هذا المستند';
+
+  @override
+  String get officeViewerEncrypted =>
+      'هذا المستند محمي بكلمة مرور، ولا يمكن معاينة ملفات Office المشفّرة.';
+
+  @override
+  String get officeViewerUnsupported =>
+      'تعذّرت قراءة هذا الملف. قد يكون تالفًا أو بصيغة غير مدعومة في العارض.';
+
+  @override
+  String get officeViewerTooLarge =>
+      'هذا المستند كبير جدًا بحيث لا يمكن معاينته داخل التطبيق.';
+
+  @override
+  String get officeViewerSpeakerNotes => 'ملاحظات المتحدث';
+
+  @override
+  String get fileAssocDocumentViewer => 'عارض المستندات المدمج';
+
+  @override
+  String get viewOfficeDocumentsInApp =>
+      'معاينة ملفات Word وExcel وPowerPoint وOpenDocument داخل التطبيق';
 }

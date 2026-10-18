@@ -11293,4 +11293,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get archiveCompressionUltraDesc => '体积最小，压缩速度较慢';
+
+  @override
+  String get officeViewerErrorTitle => '无法预览此文档';
+
+  @override
+  String get officeViewerEncrypted => '此文档受密码保护，无法预览已加密的 Office 文件。';
+
+  @override
+  String get officeViewerUnsupported => '无法读取此文件。文件可能已损坏，或使用了查看器不支持的格式。';
+
+  @override
+  String get officeViewerTooLarge => '此文档过大，无法在应用内预览。';
+
+  @override
+  String get officeViewerSpeakerNotes => '演讲者备注';
+
+  @override
+  String get fileAssocDocumentViewer => '应用内文档查看器';
+
+  @override
+  String get viewOfficeDocumentsInApp =>
+      '在应用内预览 Word、Excel、PowerPoint 和 OpenDocument 文件';
 }

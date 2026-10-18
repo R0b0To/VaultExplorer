@@ -11470,4 +11470,28 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get archiveCompressionUltraDesc => '최소 크기, 압축 속도 느림';
+
+  @override
+  String get officeViewerErrorTitle => '이 문서를 미리 볼 수 없습니다';
+
+  @override
+  String get officeViewerEncrypted =>
+      '이 문서는 비밀번호로 보호되어 있으며, 암호화된 Office 파일은 미리 볼 수 없습니다.';
+
+  @override
+  String get officeViewerUnsupported =>
+      '이 파일을 읽을 수 없습니다. 파일이 손상되었거나 뷰어가 지원하지 않는 형식일 수 있습니다.';
+
+  @override
+  String get officeViewerTooLarge => '이 문서는 너무 커서 앱에서 미리 볼 수 없습니다.';
+
+  @override
+  String get officeViewerSpeakerNotes => '발표자 노트';
+
+  @override
+  String get fileAssocDocumentViewer => '앱 내장 문서 뷰어';
+
+  @override
+  String get viewOfficeDocumentsInApp =>
+      'Word, Excel, PowerPoint, OpenDocument 파일을 앱에서 미리 보기';
 }

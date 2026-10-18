@@ -20256,6 +20256,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Smallest size, slower compression'**
   String get archiveCompressionUltraDesc;
+
+  /// Title of the error state in the document viewer (Word/Excel/PowerPoint/OpenDocument preview)
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t preview this document'**
+  String get officeViewerErrorTitle;
+
+  /// Document viewer error: the file is encrypted / password-protected
+  ///
+  /// In en, this message translates to:
+  /// **'This document is password-protected, and encrypted Office files can\'t be previewed.'**
+  String get officeViewerEncrypted;
+
+  /// Document viewer error: the file is corrupt or in an unsupported format
+  ///
+  /// In en, this message translates to:
+  /// **'This file couldn\'t be read. It may be damaged, or use a format the viewer doesn\'t support.'**
+  String get officeViewerUnsupported;
+
+  /// Document viewer error: the file exceeds the preview size limit
+  ///
+  /// In en, this message translates to:
+  /// **'This document is too large to preview in the app.'**
+  String get officeViewerTooLarge;
+
+  /// Label of the collapsible speaker-notes section under a slide in the document viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker notes'**
+  String get officeViewerSpeakerNotes;
+
+  /// File association label: files open in the built-in document viewer (Word, Excel, PowerPoint, OpenDocument)
+  ///
+  /// In en, this message translates to:
+  /// **'In-app Document Viewer'**
+  String get fileAssocDocumentViewer;
+
+  /// Subtitle of the 'In-app Document Viewer' choice in the Open with dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Preview Word, Excel, PowerPoint and OpenDocument files in the app'**
+  String get viewOfficeDocumentsInApp;
 }
 
 class _AppLocalizationsDelegate

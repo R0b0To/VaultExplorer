@@ -3349,5 +3349,12 @@
   "archiveCompressionNormalTitle": "Звичайне (5) — Збалансовано",
   "archiveCompressionNormalDesc": "Збалансоване стиснення та швидкість",
   "archiveCompressionUltraTitle": "Ультра (9) — Найменший розмір",
-  "archiveCompressionUltraDesc": "Найменший розмір, повільніше стиснення"
+  "archiveCompressionUltraDesc": "Найменший розмір, повільніше стиснення",
+  "officeViewerErrorTitle": "Неможливо переглянути цей документ",
+  "officeViewerEncrypted": "Цей документ захищено паролем, а зашифровані файли Office переглянути неможливо.",
+  "officeViewerUnsupported": "Не вдалося прочитати цей файл. Він може бути пошкоджений або мати формат, який переглядач не підтримує.",
+  "officeViewerTooLarge": "Цей документ завеликий для перегляду в програмі.",
+  "officeViewerSpeakerNotes": "Нотатки доповідача",
+  "fileAssocDocumentViewer": "Вбудований переглядач документів",
+  "viewOfficeDocumentsInApp": "Перегляд файлів Word, Excel, PowerPoint і OpenDocument у програмі"
 }

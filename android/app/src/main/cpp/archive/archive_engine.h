@@ -119,15 +119,19 @@ ArchiveCreateResult archiveCreate(
     // are hidden as well (7-Zip's "Encrypt file names"). Needs a passphrase;
     // the request fails, rather than being ignored, when it can't be honoured.
     bool encryptFilenames = false,
-    // Called after each chunk of *source* data has been handed to the writer,
-    // with the running total of source bytes consumed across all entries.
-    // Return false to cancel.
+    // Progress, in units of source bytes: the range is 0 .. (sum of the
+    // entries' uncompressedSize), so a caller can divide by that total. Return
+    // false to cancel.
     //
-    // This deliberately counts input, not archive bytes written to the sink:
-    // the 7z writer buffers everything in a temporary file and only emits its
-    // output when the archive is closed, so output bytes stay at 0 for the
-    // whole compression and then jump to the full size.
-    std::function<bool(uint64_t sourceBytesProcessed)> progressCallback = nullptr,
+    // It deliberately follows the input rather than archive bytes written: the
+    // 7z and ISO writers buffer everything in a temporary file and only emit
+    // output when the archive is closed, so output bytes stay at 0 for the whole
+    // run and then jump. For those two the range is split in two: reading the
+    // sources, then copying the buffered output to the sink. A store spends
+    // most of its time in the second part (the first is a plain copy), so it
+    // gets half of the range; compressing 7z gets a tenth. Streaming formats
+    // (ZIP, TAR, CPIO) have no second part and use the whole range for reading.
+    std::function<bool(uint64_t progress)> progressCallback = nullptr,
     // 0 = store (no compression), 1 = fastest .. 9 = smallest. Applies to ZIP,
     // 7z and the compressed TAR variants; TAR, ISO and CPIO don't compress, so
     // it is ignored for them. kArchiveDefaultCompressionLevel keeps the

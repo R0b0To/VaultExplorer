@@ -683,9 +683,12 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryToFdNative(
 }
 
 // Progress/cancel hook shared by the archiveCreate* entry points. The engine
-// reports how many *source* bytes it has consumed; the total is the sum of the
-// files going in. (It used to report bytes written to the destination with a
-// total of 0, which for 7z stays at 0 until the archive is closed.)
+// reports progress on a 0..totalSourceBytes scale, where the total is the sum of
+// the files going in, so Dart can keep showing "done / total" in real file
+// sizes. For 7z and ISO the top part of that scale covers copying the buffered
+// output to the destination, so a store doesn't sit at 100% while it finishes.
+// (It used to report bytes written to the destination with a total of 0, which
+// for those formats stays at 0 until the archive is closed.)
 static std::function<bool(uint64_t)> makeCreateProgress(jint opId, uint64_t totalSourceBytes) {
     return [opId, totalSourceBytes](uint64_t sourceBytesProcessed) -> bool {
         if (opId > 0) {

@@ -612,11 +612,28 @@ ArchiveBulkExtractResult archiveExtractAll(
 
 namespace {
 
+// How often (in archive bytes) the finishing phase reports progress. The sink
+// is called once per libarchive block, which is far more often than a progress
+// bar or a JNI round trip needs.
+constexpr uint64_t kFinishProgressStepBytes = 256 * 1024;
+
 struct WriteState {
     const ArchiveSink* sink = nullptr;
     uint64_t totalWritten = 0;
     bool ioErrorSeen = false;
     bool cancelled = false;
+
+    // Finishing phase. 7z and ISO keep their whole output in a temporary file
+    // and only copy it to the sink when the archive is closed, so after the last
+    // source byte there is still real work (and for a store, most of it). While
+    // `finalizing`, each sink write is mapped onto the tail of the progress range
+    // so the bar keeps moving instead of sitting at 100%.
+    bool finalizing = false;
+    const std::function<bool(uint64_t)>* progress = nullptr;
+    uint64_t finishBase = 0;      // progress already reported when finishing began
+    uint64_t finishSpan = 0;      // share of the range reserved for finishing
+    uint64_t finishExpected = 1;  // output size the span is spread over
+    uint64_t lastFinishReport = 0;
 };
 
 la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buffer, size_t length) {
@@ -631,6 +648,18 @@ la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buff
     }
 
     state->totalWritten += static_cast<uint64_t>(n);
+
+    if (state->finalizing && state->progress && state->finishSpan > 0 &&
+        state->totalWritten - state->lastFinishReport >= kFinishProgressStepBytes) {
+        state->lastFinishReport = state->totalWritten;
+        const double fraction = std::min(
+            1.0, static_cast<double>(state->totalWritten) / static_cast<double>(state->finishExpected));
+        const uint64_t done = state->finishBase + static_cast<uint64_t>(fraction * static_cast<double>(state->finishSpan));
+        if (!(*state->progress)(done)) {
+            state->cancelled = true;
+            return -1;
+        }
+    }
     return static_cast<la_ssize_t>(n);
 }
 
@@ -762,7 +791,7 @@ ArchiveCreateResult archiveCreate(
     const std::vector<ArchiveSourceEntry>& entries,
     const std::string& passphrase,
     bool encryptFilenames,
-    std::function<bool(uint64_t sourceBytesProcessed)> progressCallback,
+    std::function<bool(uint64_t progress)> progressCallback,
     int compressionLevel
 ) {
     ArchiveCreateResult result;
@@ -811,6 +840,24 @@ ArchiveCreateResult archiveCreate(
         archive_write_free(a);
         return result;
     }
+
+    // The progress range is the real source size, so byte counts, speed and ETA
+    // derived from it stay meaningful. For writers that only produce output at
+    // close, the tail of the range is reserved for that finishing phase: half of
+    // it when the data is merely stored (reading and copying out are the same
+    // amount of work), a tenth when compression dominates.
+    uint64_t sourceTotal = 0;
+    for (const auto& entry : entries) {
+        if (!entry.isDirectory) sourceTotal += entry.uncompressedSize;
+    }
+    double finishShare = 0.0;
+    if (format == ArchiveFormat::SevenZip || format == ArchiveFormat::Iso) {
+        const bool storesData = format == ArchiveFormat::Iso || compressionLevel == 0;
+        finishShare = storesData ? 0.5 : 0.1;
+    }
+    const auto scaleReading = [finishShare](uint64_t bytes) {
+        return static_cast<uint64_t>(static_cast<double>(bytes) * (1.0 - finishShare));
+    };
 
     std::vector<uint8_t> chunkBuf(kSequentialChunkSize);
     uint64_t sourceBytesProcessed = 0;
@@ -861,7 +908,7 @@ ArchiveCreateResult archiveCreate(
                 // Polled per source chunk (not per sink write): for 7z the sink
                 // stays silent until close, so this is the only place progress
                 // and cancellation can be observed during compression.
-                if (progressCallback && !progressCallback(sourceBytesProcessed)) {
+                if (progressCallback && !progressCallback(scaleReading(sourceBytesProcessed))) {
                     state.cancelled = true;
                     break;
                 }
@@ -890,8 +937,20 @@ ArchiveCreateResult archiveCreate(
         return result;
     }
 
+    if (progressCallback && finishShare > 0.0 && sourceTotal > 0) {
+        state.progress = &progressCallback;
+        state.finishBase = scaleReading(sourceTotal);
+        state.finishSpan = sourceTotal - state.finishBase;
+        state.finishExpected = sourceTotal;
+        state.finalizing = true;
+    }
+
     if (archive_write_close(a) != ARCHIVE_OK) {
-        if (result.status == ArchiveOpenStatus::Ok || result.errorMessage.empty()) {
+        if (state.cancelled) {
+            // Cancelled while the buffered output was being copied out.
+            result.status = ArchiveOpenStatus::IoError;
+            result.errorMessage = "archive creation cancelled";
+        } else if (result.status == ArchiveOpenStatus::Ok || result.errorMessage.empty()) {
             result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError : ArchiveOpenStatus::UnsupportedFormat;
             result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to finalize archive";
         }

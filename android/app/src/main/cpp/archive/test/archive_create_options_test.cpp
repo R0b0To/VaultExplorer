@@ -65,16 +65,8 @@ struct Built {
     std::vector<uint8_t> bytes;
 };
 
-Built build(ArchiveFormat format, const Files& files, int level,
-            const std::string& pass = "", bool encryptNames = false,
-            std::function<bool(uint64_t)> progress = nullptr) {
-    Built b;
-    ArchiveSink sink;
-    sink.write = [&b](const uint8_t* d, size_t n) -> int64_t {
-        b.bytes.insert(b.bytes.end(), d, d + n);
-        return static_cast<int64_t>(n);
-    };
-    std::vector<size_t> offsets(files.size(), 0);
+std::vector<ArchiveSourceEntry> entriesFor(const Files& files, std::vector<size_t>& offsets) {
+    offsets.assign(files.size(), 0);
     std::vector<ArchiveSourceEntry> entries(files.size());
     for (size_t i = 0; i < files.size(); ++i) {
         const std::string& content = files[i].second;
@@ -88,8 +80,59 @@ Built build(ArchiveFormat format, const Files& files, int level,
             return static_cast<int64_t>(n);
         };
     }
+    return entries;
+}
+
+Built build(ArchiveFormat format, const Files& files, int level,
+            const std::string& pass = "", bool encryptNames = false,
+            std::function<bool(uint64_t)> progress = nullptr) {
+    Built b;
+    ArchiveSink sink;
+    sink.write = [&b](const uint8_t* d, size_t n) -> int64_t {
+        b.bytes.insert(b.bytes.end(), d, d + n);
+        return static_cast<int64_t>(n);
+    };
+    std::vector<size_t> offsets;
+    const auto entries = entriesFor(files, offsets);
     b.result = archiveCreate(sink, format, entries, pass, encryptNames, std::move(progress), level);
     return b;
+}
+
+// One progress report, with how many archive bytes had reached the sink when it
+// was made. That pairing is what tells the reading phase (sink still empty, for
+// 7z/ISO) from the finishing phase (buffered output being copied out).
+struct ProgressSample {
+    uint64_t value;
+    size_t sinkBytes;
+};
+
+struct ProgressRun {
+    ArchiveCreateResult result;
+    std::vector<ProgressSample> samples;
+    size_t sinkTotal = 0;
+};
+
+// `cancelWhen` returning true for a sample makes the callback ask to cancel.
+ProgressRun runWithProgress(ArchiveFormat format, const Files& files, int level,
+                            const std::string& pass = "",
+                            std::function<bool(const ProgressSample&)> cancelWhen = nullptr) {
+    ProgressRun run;
+    ArchiveSink sink;
+    sink.write = [&run](const uint8_t*, size_t n) -> int64_t {
+        run.sinkTotal += n;
+        return static_cast<int64_t>(n);
+    };
+    std::vector<size_t> offsets;
+    const auto entries = entriesFor(files, offsets);
+    run.result = archiveCreate(
+        sink, format, entries, pass, false,
+        [&](uint64_t value) {
+            const ProgressSample sample{value, run.sinkTotal};
+            run.samples.push_back(sample);
+            return !(cancelWhen && cancelWhen(sample));
+        },
+        level);
+    return run;
 }
 
 ArchiveStreamSource sourceOver(const std::vector<uint8_t>& bytes) {
@@ -227,48 +270,86 @@ int main() {
         std::printf("encrypted zip / 7z / 7z+header at levels 0,1,9: ok\n");
     }
 
-    // --- Progress counts source bytes, monotonic, ends at the total. ------
+    // --- Progress ------------------------------------------------------------
+    // Range is 0 .. total source bytes. Streaming formats use all of it for
+    // reading. 7z and ISO only write output when the archive is closed, so the
+    // tail of the range belongs to that finishing phase: otherwise a store would
+    // sit at 100% for as long as the copy-out takes (nearly all of its time).
     {
-        std::vector<uint64_t> seen;
-        std::vector<uint8_t> out;
-        size_t sinkBytesAtLastProgress = 0;
-        ArchiveSink sink;
-        sink.write = [&out](const uint8_t* d, size_t n) -> int64_t {
-            out.insert(out.end(), d, d + n);
-            return static_cast<int64_t>(n);
-        };
-        std::vector<size_t> offsets(files.size(), 0);
-        std::vector<ArchiveSourceEntry> entries(files.size());
-        for (size_t i = 0; i < files.size(); ++i) {
-            const std::string& content = files[i].second;
-            entries[i].pathInArchive = files[i].first;
-            entries[i].uncompressedSize = content.size();
-            entries[i].modTimeEpochSeconds = 1700000000;
-            entries[i].readData = [&content, &offsets, i](uint8_t* dest, size_t length) -> int64_t {
-                const size_t n = std::min(length, content.size() - offsets[i]);
-                std::memcpy(dest, content.data() + offsets[i], n);
-                offsets[i] += n;
-                return static_cast<int64_t>(n);
-            };
+        for (ArchiveFormat f : {ArchiveFormat::Zip, ArchiveFormat::Tar, ArchiveFormat::Cpio}) {
+            const auto run = runWithProgress(f, files, 5);
+            CHECK(run.result.status == ArchiveOpenStatus::Ok);
+            CHECK(run.samples.size() > 4);
+            for (size_t i = 1; i < run.samples.size(); ++i) {
+                CHECK(run.samples[i].value >= run.samples[i - 1].value);
+            }
+            CHECK(run.samples.back().value == raw);  // all of the range is reading
+            // ...and the sink is already being fed while it reads.
+            CHECK(run.samples[run.samples.size() / 2].sinkBytes > 0);
         }
-        const auto r = archiveCreate(
-            sink, ArchiveFormat::SevenZip, entries, "", false,
-            [&](uint64_t processed) {
-                seen.push_back(processed);
-                sinkBytesAtLastProgress = out.size();
-                return true;
-            },
-            1);
-        CHECK(r.status == ArchiveOpenStatus::Ok);
-        CHECK(seen.size() > 4);                          // many updates, not one at the end
-        CHECK(std::is_sorted(seen.begin(), seen.end())); // monotonic
-        CHECK(seen.back() == raw);                       // ends exactly at total source bytes
-        // The reason progress must count input: a 7z sink is still empty at the
-        // last progress update; all output arrives afterwards, at close.
-        CHECK(sinkBytesAtLastProgress == 0);
-        CHECK(!out.empty());
-        std::printf("7z progress: %zu updates, final=%llu of %zu, sink empty until close: ok\n",
-                    seen.size(), static_cast<unsigned long long>(seen.back()), raw);
+        std::printf("zip/tar/cpio progress: whole range is reading, ends at total: ok\n");
+
+        struct Case {
+            const char* label;
+            ArchiveFormat format;
+            int level;
+            const char* pass;
+            double readShare;  // part of the range given to reading the sources
+            bool storesData;
+        };
+        const Case cases[] = {
+            {"7z level 1", ArchiveFormat::SevenZip, 1, "", 0.9, false},
+            {"7z default level", ArchiveFormat::SevenZip, kArchiveDefaultCompressionLevel, "", 0.9, false},
+            {"7z store", ArchiveFormat::SevenZip, 0, "", 0.5, true},
+            {"7z store + password", ArchiveFormat::SevenZip, 0, "hunter2", 0.5, true},
+            {"iso", ArchiveFormat::Iso, kArchiveDefaultCompressionLevel, "", 0.5, true},
+        };
+        for (const Case& c : cases) {
+            const auto run = runWithProgress(c.format, files, c.level, c.pass);
+            CHECK(run.result.status == ArchiveOpenStatus::Ok);
+            const uint64_t readEnd = static_cast<uint64_t>(static_cast<double>(raw) * c.readShare);
+
+            uint64_t lastReading = 0;
+            size_t finishing = 0;
+            for (size_t i = 0; i < run.samples.size(); ++i) {
+                const auto& sm = run.samples[i];
+                CHECK(sm.value <= raw);
+                if (i > 0) CHECK(sm.value >= run.samples[i - 1].value);
+                if (sm.sinkBytes == 0) {
+                    // Reading never claims the share reserved for finishing.
+                    CHECK(sm.value <= readEnd);
+                    lastReading = sm.value;
+                } else {
+                    // Finishing starts where reading stopped and stays within range.
+                    CHECK(sm.value >= readEnd);
+                    ++finishing;
+                }
+            }
+            CHECK(lastReading + 1 >= readEnd);  // reading really does use its whole share
+            CHECK(finishing > 0);               // the copy-out is reported, not silent
+            if (c.storesData) {
+                CHECK(finishing >= 3);
+                // The bar must be well short of done when the copy-out begins, and
+                // finish close to the total (it's nearly the same amount of data).
+                CHECK(lastReading <= raw / 2 + 1);
+                CHECK(run.samples.back().value >= raw * 9 / 10);
+            }
+            std::printf("%-20s progress: reading ends at %5.1f%%, %zu finishing updates, last=%5.1f%%: ok\n",
+                        c.label, 100.0 * static_cast<double>(lastReading) / static_cast<double>(raw),
+                        finishing, 100.0 * static_cast<double>(run.samples.back().value) / static_cast<double>(raw));
+        }
+
+        // Cancelling while the buffered output is copied out is a cancel, not an
+        // "unsupported format" failure, and stops the copy.
+        const auto full = runWithProgress(ArchiveFormat::SevenZip, files, 0);
+        const auto cut = runWithProgress(ArchiveFormat::SevenZip, files, 0, "",
+                                         [](const ProgressSample& sm) { return sm.sinkBytes > 0; });
+        CHECK(full.result.status == ArchiveOpenStatus::Ok);
+        CHECK(cut.result.status == ArchiveOpenStatus::IoError);
+        CHECK(cut.result.errorMessage.find("cancelled") != std::string::npos);
+        CHECK(cut.sinkTotal < full.sinkTotal / 2);
+        std::printf("7z cancel during copy-out: reported as cancelled, %zu of %zu bytes written: ok\n",
+                    cut.sinkTotal, full.sinkTotal);
     }
 
     // --- Cancel: observed during compression, quick, never "Ok". ----------

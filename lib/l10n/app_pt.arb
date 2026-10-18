@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "Oculta a lista de arquivos até o desbloqueio",
   "createArchiveAdvancedOptions": "Opções avançadas",
   "createArchiveCompressionLevel": "Nível de compactação",
+  "createArchiveSplitHintZip": "Guardado como .z01, .z02 … e um .zip final. Mantenha todas as partes na mesma pasta.",
+  "createArchiveSplitHintSevenZip": "Guardado como .7z.001, .7z.002 … Mantenha todas as partes na mesma pasta.",
   "createArchiveSplitVolumes": "Dividir em volumes",
   "createArchiveSplitVolumeNone": "Nenhum",
   "createArchiveCustomVolumeSizeLabel": "Tamanho de volume personalizado (MB)",

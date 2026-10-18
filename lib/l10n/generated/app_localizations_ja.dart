@@ -11437,6 +11437,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get createArchiveCompressionLevel => '圧縮レベル';
 
   @override
+  String get createArchiveSplitHintZip =>
+      '.z01、.z02 … と最後の .zip として保存されます。すべてのパートを同じフォルダーに置いてください。';
+
+  @override
+  String get createArchiveSplitHintSevenZip =>
+      '.7z.001、.7z.002 … として保存されます。すべてのパートを同じフォルダーに置いてください。';
+
+  @override
   String get createArchiveSplitVolumes => '分割アーカイブ';
 
   @override

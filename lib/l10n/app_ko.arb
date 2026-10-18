@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "잠금이 해제될 때까지 파일 목록을 숨깁니다",
   "createArchiveAdvancedOptions": "고급 옵션",
   "createArchiveCompressionLevel": "압축 수준",
+  "createArchiveSplitHintZip": ".z01, .z02 … 및 마지막 .zip으로 저장됩니다. 모든 파트를 같은 폴더에 함께 보관하세요.",
+  "createArchiveSplitHintSevenZip": ".7z.001, .7z.002 … 로 저장됩니다. 모든 파트를 같은 폴더에 함께 보관하세요.",
   "createArchiveSplitVolumes": "분할 압축",
   "createArchiveSplitVolumeNone": "없음",
   "createArchiveCustomVolumeSizeLabel": "사용자 지정 분할 크기 (MB)",

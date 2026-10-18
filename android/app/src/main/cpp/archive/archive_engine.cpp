@@ -1,4 +1,5 @@
 #include "archive_engine.h"
+#include "archive_engine_internal.h"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -187,10 +188,14 @@ ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
         containsCaseInsensitive(err, "password") ||
         containsCaseInsensitive(err, "encrypt")) {
         return passphraseGiven ? ArchiveOpenStatus::WrongPassphrase
-                                : ArchiveOpenStatus::PassphraseRequired;
+                               : ArchiveOpenStatus::PassphraseRequired;
     }
-    if (passphraseGiven && (containsCaseInsensitive(err, "crc") ||
-                            containsCaseInsensitive(err, "checksum"))) {
+    if (passphraseGiven &&
+        (containsCaseInsensitive(err, "crc") ||
+         containsCaseInsensitive(err, "checksum") ||
+         containsCaseInsensitive(err, "too small block") ||
+         containsCaseInsensitive(err, "header type error") ||
+         containsCaseInsensitive(err, "block header size"))) {
         return ArchiveOpenStatus::WrongPassphrase;
     }
     return ArchiveOpenStatus::IoError;
@@ -275,7 +280,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         const int formatFamily = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
         const bool deferPassphrase =
             (formatFamily == ARCHIVE_FORMAT_7ZIP || formatFamily == ARCHIVE_FORMAT_ZIP || formatFamily == ARCHIVE_FORMAT_RAR_V5) && passphrase.empty();
-        if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
+        if (!passphraseVerified && info.isEncrypted && !info.isDirectory && info.uncompressedSize > 0) {
             if (deferPassphrase) {
                 // Checked when the data is actually read.
             } else if (passphrase.empty()) {
@@ -1030,4 +1035,42 @@ ArchiveCreateResult archiveCreate(
     result.totalBytesWritten = state.totalWritten;
     archive_write_free(a);
     return result;
+}
+
+// Same checks and the same configuration steps as the start of archiveCreate().
+// Kept next to it (and to the helpers it uses) so the two can't drift apart.
+bool archiveConfigureWriter(struct archive* a, ArchiveFormat format, const std::string& passphrase,
+                            bool encryptFilenames, int compressionLevel,
+                            ArchiveCompressionMethod compressionMethod, std::string* error) {
+    auto fail = [error](const std::string& msg) {
+        if (error) *error = msg;
+        return false;
+    };
+    if (compressionLevel != kArchiveDefaultCompressionLevel && (compressionLevel < 0 || compressionLevel > 9)) {
+        return fail("compression level must be between 0 and 9");
+    }
+    if (!archiveCompressionMethodSupported(format, compressionMethod)) {
+        return fail("this archive format can't use the requested compression method");
+    }
+    if (compressionMethod != ArchiveCompressionMethod::Default && compressionLevel == 0 &&
+        (format == ArchiveFormat::Zip || format == ArchiveFormat::SevenZip)) {
+        return fail("a compression method can't be combined with store (level 0)");
+    }
+    if (encryptFilenames && (format != ArchiveFormat::SevenZip || passphrase.empty())) {
+        return fail(format != ArchiveFormat::SevenZip ? "filename encryption is only supported for 7z archives"
+                                                      : "filename encryption needs a passphrase");
+    }
+    const auto libraryError = [a](const char* fallback) {
+        return std::string(archive_error_string(a) ? archive_error_string(a) : fallback);
+    };
+    if (configureFormatAndFilters(a, format, passphrase, encryptFilenames) != ARCHIVE_OK) {
+        return fail(libraryError("unsupported format or filter"));
+    }
+    if (applyCompressionMethod(a, format, compressionMethod) != ARCHIVE_OK) {
+        return fail(libraryError("compression method rejected"));
+    }
+    if (applyCompressionLevel(a, format, compressionLevel, !passphrase.empty()) != ARCHIVE_OK) {
+        return fail(libraryError("compression level rejected"));
+    }
+    return true;
 }

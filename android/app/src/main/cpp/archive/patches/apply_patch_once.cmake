@@ -194,6 +194,12 @@ static int consume(struct archive_read* a, int64_t how_many) {
 				return 0;
 			}
 
+			RLOG("read_ahead (crypt): can_take=%zu outl=%d raw_rem=%zu", can_take, outl, rar5->crypt.raw_bytes_remaining);
+			RLOG("read_ahead (crypt): cptr=[%02x %02x %02x %02x] dec=[%02x %02x %02x %02x]",
+				((const uint8_t*)cptr)[0], ((const uint8_t*)cptr)[1], ((const uint8_t*)cptr)[2], ((const uint8_t*)cptr)[3],
+				(rar5->crypt.dec_buf + avail)[0], (rar5->crypt.dec_buf + avail)[1],
+				(rar5->crypt.dec_buf + avail)[2], (rar5->crypt.dec_buf + avail)[3]);
+
 			__archive_read_consume(a, (int64_t)can_take);
 			rar5->crypt.raw_bytes_remaining -= can_take;
 			rar5->crypt.dec_buf_len += (size_t)outl;
@@ -227,6 +233,8 @@ static int consume(struct archive_read* a, int64_t how_many) {
 
 	if(rar5 && rar5->crypt.in_data_stream) {
 		rar5->crypt.dec_buf_offset += (size_t)how_many;
+		RLOG("consume (crypt): how_many=%lld, offset=%zu, len=%zu",
+			(long long)how_many, rar5->crypt.dec_buf_offset, rar5->crypt.dec_buf_len);
 		return ARCHIVE_OK;
 	}
 #endif
@@ -528,7 +536,7 @@ static int process_head_file_extra(struct archive_read* a,]=]
 case EX_SUBDATA:]=]
     )
 
-    # Track raw encrypted byte count for this file
+    # 10. Track raw encrypted byte count for this file
     rar5_replace(
 [=[		rar5->file.bytes_remaining = data_size;
 	} else {
@@ -546,7 +554,47 @@ case EX_SUBDATA:]=]
 	}]=]
     )
 
-    # 10. Key derivation and cipher init in rar5_read_data
+    # 11. Wrap file_entry_sanity_checks to allow directory records in encrypted archives
+    rar5_replace(
+[=[static int file_entry_sanity_checks(struct archive_read* a,]=]
+[=[static int file_entry_sanity_checks_orig(struct archive_read* a,
+    size_t block_flags, uint8_t is_dir, uint64_t unpacked_size,
+    size_t packed_size);
+
+static int file_entry_sanity_checks(struct archive_read* a,
+    size_t block_flags, uint8_t is_dir, uint64_t unpacked_size,
+    size_t packed_size)
+{
+	if(is_dir) return ARCHIVE_OK;
+	return file_entry_sanity_checks_orig(a, block_flags, is_dir, unpacked_size, packed_size);
+}
+
+static int file_entry_sanity_checks_orig(struct archive_read* a,]=]
+    )
+
+    # 12. Wrap parse_block_header to recognize AES zero-padding at EOF
+    rar5_replace(
+[=[static int parse_block_header(struct archive_read* a, const uint8_t* p,]=]
+[=[static int parse_block_header_orig(struct archive_read* a, const uint8_t* p,
+    ssize_t* block_size, struct compressed_block_header* hdr);
+
+static int parse_block_header(struct archive_read* a, const uint8_t* p,
+    ssize_t* block_size, struct compressed_block_header* hdr)
+{
+	if(p && p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0) {
+		return ARCHIVE_EOF;
+	}
+	int ret = parse_block_header_orig(a, p, block_size, hdr);
+	if(ret != ARCHIVE_OK && hdr && hdr->block_cksum == 0 && *block_size == 0) {
+		return ARCHIVE_EOF;
+	}
+	return ret;
+}
+
+static int parse_block_header_orig(struct archive_read* a, const uint8_t* p,]=]
+    )
+
+    # 13. Key derivation and cipher init in rar5_read_data
     rar5_replace(
 [=[static int rar5_read_data(struct archive_read *a, const void **buff,
     size_t *size, int64_t *offset) {
@@ -611,6 +659,7 @@ static int rar5_read_data(struct archive_read *a, const void **buff,
 
 #ifdef HAVE_LIBCRYPTO
 	if (rar5->crypt.enabled) {
+		rar5->crypt.in_header_buf = 0;
 		int retCiph = rar5_init_cipher(a, rar5);
 		if (retCiph != ARCHIVE_OK) return retCiph;
 		rar5->cstate.data_encrypted = 0;
@@ -625,7 +674,7 @@ static int rar5_read_data(struct archive_read *a, const void **buff,
 	}]=]
     )
 
-    # 11. Reset cipher context and in_data_stream in reset_file_context
+    # 14. Reset cipher context and in_data_stream in reset_file_context
     rar5_replace(
 [=[static void reset_file_context(struct rar5 *rar5) {
 	memset(&rar5->file, 0, sizeof(rar5->file));
@@ -668,15 +717,18 @@ static int rar5_read_data(struct archive_read *a, const void **buff,
 	rar5->crypt.in_data_stream = 0;
 	rar5->crypt.dec_buf_offset = 0;
 	rar5->crypt.dec_buf_len = 0;
+	rar5->crypt.in_header_buf = 0;
 	if(!rar5->main.solid) {
-		rar5->crypt.enabled = 0;
+		if(!rar5->crypt.headers_encrypted) {
+			rar5->crypt.enabled = 0;
+		}
 		rar5->crypt.key_ready = 0;
 	}
 #endif
 }]=]
     )
 
-    # 12. Free crypto buffers on archive cleanup
+    # 15. Free crypto buffers on archive cleanup
     rar5_replace(
 [=[static int rar5_cleanup(struct archive_read *a) {
 	struct rar5 *rar5 = a->format->data;

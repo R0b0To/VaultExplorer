@@ -99,6 +99,7 @@ abstract class BrowserDialogs {
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
       ArchiveCompressionMethod compressionMethod,
+      int splitSizeBytes,
     ) onCreate,
     bool readOnly = false,
   }) {

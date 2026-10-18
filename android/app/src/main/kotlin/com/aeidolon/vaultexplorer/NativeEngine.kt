@@ -315,6 +315,24 @@ internal object NativeEngine {
         destFd: Int, format: Int, passphrase: String?, encryptFilenames: Boolean,
         compressionLevel: Int, compressionMethod: Int, opId: Int
     ): Boolean
+
+    /**
+     * Split (multi-part) archive: ZIP as a spanned set (`.z01`, `.z02`, ... and a last `.zip`)
+     * or 7z as plain volumes (`.7z.001`, `.002`, ...). Only 7z and ZIP can be split.
+     *
+     * [srcVolId] / [destVolId] are `-1` for plain device paths, otherwise the unlocked vault the
+     * paths live in. [destArchivePath] is where the unsplit archive would have gone
+     * (`.../name.zip`, `.../name.7z`); the part names are derived from it. Parts are never
+     * overwritten: if one already exists the call fails, and on any failure or cancellation the
+     * parts written so far are deleted again. [compressionLevel] (-1 = default) and
+     * [compressionMethod] (0 = the format's own) mean what they do for the single-file calls.
+     */
+    @JvmStatic external fun archiveCreateSplitNative(
+        srcVolId: Int, srcPaths: Array<String>, entryNames: Array<String>, modifiedSecs: LongArray,
+        destVolId: Int, destArchivePath: String, partSize: Long, format: Int,
+        passphrase: String?, encryptFilenames: Boolean,
+        compressionLevel: Int, compressionMethod: Int, opId: Int
+    ): Boolean
     
     @JvmStatic external fun archiveExtractFdToLocalDirNative(
         fd: Int, destDirPath: String, subPath: String?, passphrase: String?, opId: Int

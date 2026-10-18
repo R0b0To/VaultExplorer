@@ -31,6 +31,8 @@ typedef ClipboardState = ({
   // 7z archive creation: which codec (LZMA2 / LZMA / Deflate). `auto` for every
   // other format and for everything that isn't an archive create.
   ArchiveCompressionMethod compressionMethod,
+  // ZIP / 7z archive creation: part size in bytes, 0 = a single file.
+  int splitSizeBytes,
   ArchiveContext? archiveContext,
   List<String>? selectedEntryPaths,
 });
@@ -46,6 +48,7 @@ const _emptyClipboard = (
   encryptFilenames: false,
   compressionLevel: null,
   compressionMethod: ArchiveCompressionMethod.auto,
+  splitSizeBytes: 0,
   archiveContext: null,
   selectedEntryPaths: null,
 );
@@ -90,6 +93,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       encryptFilenames: false,
       compressionLevel: null,
       compressionMethod: ArchiveCompressionMethod.auto,
+      splitSizeBytes: 0,
       archiveContext: null,
       selectedEntryPaths: null,
     );
@@ -105,6 +109,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     bool encryptFilenames = false,
     ArchiveCompressionLevel? compressionLevel,
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
+    int splitSizeBytes = 0,
   }) {
     state = (
       sourceVolId: volId,
@@ -117,6 +122,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       encryptFilenames: encryptFilenames,
       compressionLevel: compressionLevel,
       compressionMethod: compressionMethod,
+      splitSizeBytes: splitSizeBytes,
       archiveContext: null,
       selectedEntryPaths: null,
     );
@@ -141,6 +147,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       encryptFilenames: false,
       compressionLevel: null,
       compressionMethod: ArchiveCompressionMethod.auto,
+      splitSizeBytes: 0,
       archiveContext: archiveContext,
       selectedEntryPaths: selectedEntryPaths != null
           ? List.unmodifiable(selectedEntryPaths)

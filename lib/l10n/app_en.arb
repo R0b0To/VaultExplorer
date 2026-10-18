@@ -13630,6 +13630,14 @@
   "@createArchiveCompressionLevel": {
     "description": "Label for the compression level dropdown"
   },
+  "createArchiveSplitHintZip": "Saved as .z01, .z02 … plus a final .zip. Keep all parts together in one folder.",
+  "@createArchiveSplitHintZip": {
+    "description": "Hint shown when a ZIP archive will be split into parts"
+  },
+  "createArchiveSplitHintSevenZip": "Saved as .7z.001, .7z.002 … Keep all parts together in one folder.",
+  "@createArchiveSplitHintSevenZip": {
+    "description": "Hint shown when a 7z archive will be split into parts"
+  },
   "createArchiveSplitVolumes": "Split into volumes",
   "@createArchiveSplitVolumes": {
     "description": "Label for splitting archive into volume chunks"

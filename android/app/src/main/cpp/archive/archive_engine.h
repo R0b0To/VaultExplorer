@@ -123,6 +123,8 @@ struct ArchiveCreateResult {
     ArchiveOpenStatus status = ArchiveOpenStatus::IoError;
     uint64_t totalBytesWritten = 0;
     uint32_t entriesArchived = 0;
+    // archiveCreateSplit() only: how many part files were written.
+    uint32_t partCount = 0;
     std::string errorMessage;
 };
 
@@ -166,3 +168,104 @@ ArchiveCreateResult archiveCreate(
     // "store", which has no codec).
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod::Default
 );
+
+
+// ── Split (multi-part) archives ─────────────────────────────────────────
+//
+// 7z  -> plain volumes: the finished archive cut into pieces. Name them
+//        `<name>.7z.001`, `.002`, ... (what 7-Zip itself writes).
+// ZIP -> a real spanned archive (PKWARE APPNOTE 8.5): `<name>.z01`, `.z02`,
+//        ... and the final part named `<name>.zip` (what WinRAR, Info-ZIP
+//        and MiXplorer write). Every part is a separate "disk": the central
+//        directory records which disk each entry starts on, so a ZIP set
+//        can NOT simply be concatenated (the reader side below handles it).
+//
+// The engine never names or opens files. It asks the target for part N (0
+// based) and tells it when a part is finished, and whether it was the last
+// one (the ZIP set's last part is named differently, so a target that
+// writes straight to its final name has to rename it then).
+
+constexpr uint64_t kArchiveMinPartSize = 64 * 1024;
+// Offsets inside a part are stored as 32-bit values; one value is reserved.
+constexpr uint64_t kArchiveMaxPartSize = 0xFFFFFFFEull;
+
+struct ArchivePartTarget {
+    // Creates/opens part `index`. Must fail (return false) rather than
+    // replace an existing file.
+    std::function<bool(uint32_t index)> openPart;
+    // Appends to the part opened last. Returns bytes written or -1.
+    std::function<int64_t(const uint8_t* data, size_t length)> writePart;
+    // Finishes part `index`. `isLast` is true exactly once, for the final part.
+    std::function<bool(uint32_t index, bool isLast)> closePart;
+    // Optional. Called when creation fails or is cancelled after any part was
+    // opened, so the target can delete what was written.
+    std::function<void()> abort;
+};
+
+// Only ArchiveFormat::Zip and ArchiveFormat::SevenZip can be split; any other
+// format (or a partSize outside [kArchiveMinPartSize, kArchiveMaxPartSize])
+// returns UnsupportedFormat without touching the target.
+//
+// Everything else means what it does for archiveCreate(): the same options are
+// validated the same way, and `progressCallback` is in source bytes (0 .. sum of
+// the entries' sizes; return false to cancel), including the extra "finishing"
+// share a 7z gets for copying its buffered output to the parts.
+ArchiveCreateResult archiveCreateSplit(
+    const ArchivePartTarget& target,
+    uint64_t partSize,
+    ArchiveFormat format,
+    const std::vector<ArchiveSourceEntry>& entries,
+    const std::string& passphrase = "",
+    bool encryptFilenames = false,
+    std::function<bool(uint64_t progress)> progressCallback = nullptr,
+    int compressionLevel = kArchiveDefaultCompressionLevel,
+    ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod::Default
+);
+
+// Presents the ordered parts of a split archive (`.001, .002...` or
+// `.z01, .z02, ..., .zip`) as ONE seekable archive for archiveScanEntries /
+// archiveExtract*. Plain volumes are concatenated; a spanned ZIP additionally
+// gets its central directory rewritten in memory (disk + offset -> absolute
+// offset), the same thing `zip -s 0` does on disk. Parts must be given in
+// order, the ZIP set's final `.zip` part last. A single part is returned as is.
+bool archiveOpenPartsSource(const std::vector<ArchiveStreamSource>& parts,
+                            ArchiveStreamSource* out,
+                            std::string* errorMessage = nullptr);
+
+// ── Finding the parts of a split archive ────────────────────────────────
+//
+// Given the file the user opened (any part of a set), works out which sibling
+// files belong to it and opens them as one archive via archiveOpenPartsSource.
+// Recognized names (case-insensitive):
+//   name.7z.001, .002, ...   name.zip.001, .002, ...   plain volumes
+//   name.z01, .z02, ... + name.zip                      spanned ZIP
+// A lone `name.zip` is only treated as a set when its end record says it is
+// the last of several disks.
+//
+// The caller supplies the two filesystem operations, so the same logic serves
+// device folders and vaults (and is testable in memory).
+struct ArchivePartSetEnv {
+    // File names (no directories) next to the opened file, itself included.
+    std::function<std::vector<std::string>()> listSiblings;
+    // Opens the sibling with exactly this name for reading.
+    std::function<bool(const std::string& name, ArchiveStreamSource* out)> openSibling;
+};
+
+// Number of disks (parts) a ZIP's end record claims it belongs to; 0 when `lastPart`
+// does not end with a ZIP end record. 1 for any ordinary ZIP.
+uint32_t archiveZipDiskCount(const ArchiveStreamSource& lastPart);
+
+enum class ArchivePartSetStatus {
+    NotASet,  // an ordinary single-file archive: open it as is
+    Opened,   // `out` presents all parts as one archive
+    Missing,  // looks like a set but a part is absent; `error` names it
+};
+
+ArchivePartSetStatus archiveOpenPartSet(const std::string& fileName,
+                                        const ArchivePartSetEnv& env,
+                                        ArchiveStreamSource* out,
+                                        std::string* error);
+
+// True when `fileName` is named like a part of a split archive (see above),
+// i.e. archiveOpenPartSet() might treat it as one.
+bool archiveIsSplitPartName(const std::string& fileName);

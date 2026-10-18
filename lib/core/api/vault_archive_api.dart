@@ -244,6 +244,10 @@ class VaultArchiveApi {
 
   /// Creates/compresses an archive with optional AES-256 encryption.
   ///
+  /// [splitSizeBytes] (ZIP and 7z only) writes the archive as several parts of
+  /// at most that size instead of one file; the destination name is then the
+  /// base for the part names (see [ArchiveFormatType.supportsSplit]).
+  ///
   /// [encryptFilenames] (7z with a passphrase only) also encrypts the archive
   /// header, so file names, sizes and dates can't be read without the
   /// passphrase. A request that can't be honoured makes the call fail rather
@@ -265,6 +269,7 @@ class VaultArchiveApi {
     bool encryptFilenames = false,
     int? compressionLevel,
     int? compressionMethod,
+    int? splitSizeBytes,
     int? opId,
   }) async {
     try {
@@ -284,6 +289,9 @@ class VaultArchiveApi {
           if (encryptFilenames) 'encryptFilenames': true,
           'compressionLevel': ?compressionLevel,
           'compressionMethod': ?compressionMethod,
+          // ZIP / 7z only: write the archive as parts of at most this many bytes.
+          if (splitSizeBytes != null && splitSizeBytes > 0)
+            'splitSizeBytes': splitSizeBytes,
           'opId': ?opId,
         },
       );

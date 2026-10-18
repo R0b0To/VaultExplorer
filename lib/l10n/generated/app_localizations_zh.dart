@@ -11259,6 +11259,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createArchiveCompressionLevel => '压缩等级';
 
   @override
+  String get createArchiveSplitHintZip =>
+      '将保存为 .z01、.z02 … 以及最后的 .zip。请将所有分卷放在同一文件夹中。';
+
+  @override
+  String get createArchiveSplitHintSevenZip =>
+      '将保存为 .7z.001、.7z.002 … 请将所有分卷放在同一文件夹中。';
+
+  @override
   String get createArchiveSplitVolumes => '分卷压缩';
 
   @override

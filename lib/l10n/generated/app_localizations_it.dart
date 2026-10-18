@@ -12101,6 +12101,14 @@ class AppLocalizationsIt extends AppLocalizations {
   String get createArchiveCompressionLevel => 'Livello di compressione';
 
   @override
+  String get createArchiveSplitHintZip =>
+      'Salvato come .z01, .z02 … più un .zip finale. Tieni tutte le parti nella stessa cartella.';
+
+  @override
+  String get createArchiveSplitHintSevenZip =>
+      'Salvato come .7z.001, .7z.002 … Tieni tutte le parti nella stessa cartella.';
+
+  @override
   String get createArchiveSplitVolumes => 'Dividi in volumi';
 
   @override

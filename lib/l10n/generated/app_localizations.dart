@@ -20185,6 +20185,18 @@ abstract class AppLocalizations {
   /// **'Compression Level'**
   String get createArchiveCompressionLevel;
 
+  /// Hint shown when a ZIP archive will be split into parts
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as .z01, .z02 … plus a final .zip. Keep all parts together in one folder.'**
+  String get createArchiveSplitHintZip;
+
+  /// Hint shown when a 7z archive will be split into parts
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as .7z.001, .7z.002 … Keep all parts together in one folder.'**
+  String get createArchiveSplitHintSevenZip;
+
   /// Label for splitting archive into volume chunks
   ///
   /// In en, this message translates to:

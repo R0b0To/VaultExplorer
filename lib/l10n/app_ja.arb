@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "ロック解除されるまでファイル一覧を非表示にします",
   "createArchiveAdvancedOptions": "詳細設定",
   "createArchiveCompressionLevel": "圧縮レベル",
+  "createArchiveSplitHintZip": ".z01、.z02 … と最後の .zip として保存されます。すべてのパートを同じフォルダーに置いてください。",
+  "createArchiveSplitHintSevenZip": ".7z.001、.7z.002 … として保存されます。すべてのパートを同じフォルダーに置いてください。",
   "createArchiveSplitVolumes": "分割アーカイブ",
   "createArchiveSplitVolumeNone": "なし",
   "createArchiveCustomVolumeSizeLabel": "カスタム分割サイズ (MB)",

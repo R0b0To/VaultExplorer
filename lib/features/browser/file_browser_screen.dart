@@ -904,9 +904,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _signalActivity();
     HapticFeedback.selectionClick();
     final fullPath = _fullPathOf(entry);
-    final extension = entry.name.contains('.')
-        ? entry.name.split('.').last.toLowerCase()
-        : '';
+    final extension = ArchiveService.splitPartExtension(entry.name) ??
+        (entry.name.contains('.')
+            ? entry.name.split('.').last.toLowerCase()
+            : '');
     final canExtract =
         _archiveContext != null ||
         (!entry.isDir && ArchiveService.isOpenableAsArchive(extension));
@@ -1751,9 +1752,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final fullPath = _fullPathOf(entry);
     final parts = entry.name.split('.');
-    final ext = parts.length > 1
-        ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
-        : '';
+    final ext = ArchiveService.splitPartExtension(entry.name) ??
+        (parts.length > 1
+            ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
+            : '');
     if (ArchiveService.opensOnTap(ext)) {
       await _openArchive(fullPath, entry.name);
       return;
@@ -2721,6 +2723,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         deleteSourceAfter: options.deleteSourceAfter,
         compressionLevel: clip.compressionLevel ?? ArchiveCompressionLevel.normal,
         compressionMethod: clip.compressionMethod,
+        splitSizeBytes: clip.splitSizeBytes,
         l10n: context.l10n,
       );
       _clip.clear();
@@ -2962,6 +2965,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         encryptFilenames,
         compressionLevel,
         compressionMethod,
+        splitSizeBytes,
       ) async {
         final clipItems = entries.map((e) {
           final path = _fullPathOf(e);
@@ -2984,6 +2988,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           encryptFilenames: encryptFilenames,
           compressionLevel: compressionLevel,
           compressionMethod: compressionMethod,
+          splitSizeBytes: splitSizeBytes,
         );
         _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },
@@ -3056,9 +3061,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // ── Outside archive: stage full archive file for extraction ─────────
     if (selectedItems.length != 1) return;
     final entry = selectedItems.first;
-    final ext = entry.name.contains('.')
-        ? entry.name.split('.').last.toLowerCase()
-        : '';
+    final ext = ArchiveService.splitPartExtension(entry.name) ??
+        (entry.name.contains('.')
+            ? entry.name.split('.').last.toLowerCase()
+            : '');
     if (entry.isDir || !ArchiveService.isOpenableAsArchive(ext)) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);

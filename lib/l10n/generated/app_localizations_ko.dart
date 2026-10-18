@@ -11436,6 +11436,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get createArchiveCompressionLevel => '압축 수준';
 
   @override
+  String get createArchiveSplitHintZip =>
+      '.z01, .z02 … 및 마지막 .zip으로 저장됩니다. 모든 파트를 같은 폴더에 함께 보관하세요.';
+
+  @override
+  String get createArchiveSplitHintSevenZip =>
+      '.7z.001, .7z.002 … 로 저장됩니다. 모든 파트를 같은 폴더에 함께 보관하세요.';
+
+  @override
   String get createArchiveSplitVolumes => '분할 압축';
 
   @override

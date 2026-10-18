@@ -21,6 +21,7 @@ Widget _buildTestApp({
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
     ArchiveCompressionMethod compressionMethod,
+    int splitSizeBytes,
   ) onCreate,
 }) {
   return ProviderScope(
@@ -124,7 +125,7 @@ void main() {
         suggestedName: 'documents.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -182,7 +183,7 @@ void main() {
         suggestedName: 'media.zip',
         selectedEntries: selected,
         freeSpace: 200 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -205,7 +206,7 @@ void main() {
         suggestedName: 'backup.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -260,7 +261,7 @@ void main() {
         suggestedName: 'test.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024, // Only 100 MB free
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -292,7 +293,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
+        onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
           createdPath = path;
           createdFormat = fmt;
           createdPassphrase = pass;
@@ -337,7 +338,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
+        onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
           createdLvl = lvl;
         },
       ),
@@ -368,7 +369,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -433,7 +434,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f) async {},
+        onCreate: (a, b, c, d, e, f, g) async {},
       ),
     );
 
@@ -467,7 +468,7 @@ void main() {
           suggestedName: 'archive.zip',
           selectedEntries: [],
           freeSpace: 1000 * 1024 * 1024,
-          onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
+          onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
             onCreated(fmt, lvl, method);
           },
         );

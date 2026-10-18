@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "在解锁之前隐藏文件列表",
   "createArchiveAdvancedOptions": "高级选项",
   "createArchiveCompressionLevel": "压缩等级",
+  "createArchiveSplitHintZip": "将保存为 .z01、.z02 … 以及最后的 .zip。请将所有分卷放在同一文件夹中。",
+  "createArchiveSplitHintSevenZip": "将保存为 .7z.001、.7z.002 … 请将所有分卷放在同一文件夹中。",
   "createArchiveSplitVolumes": "分卷压缩",
   "createArchiveSplitVolumeNone": "无",
   "createArchiveCustomVolumeSizeLabel": "自定义分卷大小 (MB)",

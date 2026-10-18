@@ -784,6 +784,18 @@ class ArchiveHandlers(
         val srcIsFolderVault = srcVolId != null && VaultBackendRegistry.get(srcVolId) != null
         val destIsFolderVault = destVolId != null && VaultBackendRegistry.get(destVolId) != null
 
+        // Split into parts (ZIP / 7z only; the Dart side only offers it for those).
+        val splitSizeBytes = call.argument<Number>("splitSizeBytes")?.toLong() ?: 0L
+        if (splitSizeBytes > 0L) {
+            createSplitArchive(
+                result, srcVolId, srcIsFolderVault, srcPaths, entryNames, sourceModifiedSecs,
+                destVolId, destIsFolderVault, destVaultPath, destFilePath, destUri,
+                splitSizeBytes, format, passphrase, encryptFilenames,
+                compressionLevel, compressionMethod, opId
+            )
+            return
+        }
+
         // 1. If neither side is a folder vault, use direct native-to-native C++ streaming paths
         if (!srcIsFolderVault && !destIsFolderVault) {
             ioExecutor.execute {
@@ -964,6 +976,138 @@ class ArchiveHandlers(
             } finally {
                 runCatching { destPfd?.close() }
                 tempArchiveFile?.let { SecureFileWipe.secureDeleteFile(it) }
+                tempSrcDir?.let { dir ->
+                    dir.listFiles()?.forEach { SecureFileWipe.secureDeleteFile(it) }
+                    dir.delete()
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates a split archive. Unlike the single-file paths above, the native side opens and names
+     * the parts itself (it has to: the last ZIP part is only named once the archive is complete), so
+     * this only resolves where sources and parts live:
+     *  - a folder vault as source is extracted to cache first, like the single-file path does;
+     *  - a folder vault as destination gets its parts written to cache first and copied in after
+     *    the archive is complete (the cache needs room for the whole archive, as it does for the
+     *    single-file path); each part is wiped from cache as soon as it is in the vault.
+     * Device paths and regular vaults are used directly.
+     */
+    private fun createSplitArchive(
+        result: MethodChannel.Result,
+        srcVolId: Int?, srcIsFolderVault: Boolean, srcPaths: List<String>,
+        entryNames: List<String>, sourceModifiedSecs: LongArray,
+        destVolId: Int?, destIsFolderVault: Boolean,
+        destVaultPath: String?, destFilePath: String?, destUri: String?,
+        splitSizeBytes: Long, format: Int, passphrase: String?, encryptFilenames: Boolean,
+        compressionLevel: Int, compressionMethod: Int, opId: Int
+    ) {
+        ioExecutor.execute {
+            var tempSrcDir: File? = null
+            var tempOutDir: File? = null
+            val writtenToVault = mutableListOf<String>()
+            try {
+                // Sources
+                var nativeSrcVol = srcVolId ?: -1
+                var nativeSrcPaths: List<String> = srcPaths
+                var nativeNames: List<String> = entryNames
+                var nativeModified: LongArray = sourceModifiedSecs
+                if (srcIsFolderVault) {
+                    val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
+                    tempSrcDir = dir
+                    val files = mutableListOf<String>()
+                    val names = mutableListOf<String>()
+                    val modified = mutableListOf<Long>()
+                    for (i in srcPaths.indices) {
+                        val en = entryNames[i]
+                        val tmp = File(dir, "f_${i}_${en.substringAfterLast('/')}")
+                        val ok = ContainerFileSystem.extractToFile(srcVolId!!, srcPaths[i], tmp.absolutePath, opId)
+                        if (ok && tmp.exists()) {
+                            files.add(tmp.absolutePath)
+                            names.add(en)
+                            modified.add(sourceModifiedSecs[i])
+                        }
+                    }
+                    nativeSrcVol = -1
+                    nativeSrcPaths = files
+                    nativeNames = names
+                    nativeModified = modified.toLongArray()
+                }
+
+                // Where the archive (= its parts) goes
+                var nativeDestVol = -1
+                val archivePath: String
+                val intoVault = destVolId != null && destVaultPath != null
+                if (intoVault && destIsFolderVault) {
+                    val dir = File(activity.cacheDir, "arch_out_${System.nanoTime()}").apply { mkdirs() }
+                    tempOutDir = dir
+                    archivePath = File(dir, File(destVaultPath!!).name).absolutePath
+                } else if (intoVault) {
+                    nativeDestVol = destVolId!!
+                    archivePath = destVaultPath!!
+                } else {
+                    val target = destFilePath
+                        ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                            File(destUri, destVaultPath).absolutePath
+                        } else {
+                            destUri
+                        }
+                    if (target == null) {
+                        activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
+                        return@execute
+                    }
+                    val targetUri = Uri.parse(target)
+                    if (targetUri.scheme == "content") {
+                        activity.runOnUiThread {
+                            result.error("UNSUPPORTED", "Split archives can only be written to a folder, not to a content:// file", null)
+                        }
+                        return@execute
+                    }
+                    val file = File(targetUri.path ?: target)
+                    file.parentFile?.mkdirs()
+                    archivePath = file.absolutePath
+                }
+
+                var success = NativeEngine.archiveCreateSplitNative(
+                    nativeSrcVol, nativeSrcPaths.toTypedArray(), nativeNames.toTypedArray(), nativeModified,
+                    nativeDestVol, archivePath, splitSizeBytes, format, passphrase, encryptFilenames,
+                    compressionLevel, compressionMethod, opId
+                )
+
+                // Folder-vault destination: copy the finished parts in.
+                if (success && tempOutDir != null) {
+                    val vaultPrefix = destVaultPath!!.let { it.substring(0, it.lastIndexOf('/') + 1) }
+                    val parts = tempOutDir.listFiles()?.sortedBy { it.name } ?: emptyList()
+                    for (part in parts) {
+                        val vaultTarget = vaultPrefix + part.name
+                        val written = ContainerFileSystem.writeBackFile(destVolId!!, vaultTarget, part.absolutePath, opId)
+                        ContainerFileSystem.finishWrite(destVolId, vaultTarget)
+                        if (!written) {
+                            success = false
+                            break
+                        }
+                        writtenToVault.add(vaultTarget)
+                        SecureFileWipe.secureDeleteFile(part)
+                    }
+                    if (!success) {
+                        // Leave no half-written set behind.
+                        writtenToVault.forEach { runCatching { ContainerFileSystem.deleteFile(destVolId!!, it) } }
+                    }
+                }
+
+                val finalSuccess = success
+                activity.runOnUiThread { result.success(finalSuccess) }
+            } catch (e: Exception) {
+                if (destVolId != null && destIsFolderVault) {
+                    writtenToVault.forEach { runCatching { ContainerFileSystem.deleteFile(destVolId, it) } }
+                }
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } finally {
+                tempOutDir?.let { dir ->
+                    dir.listFiles()?.forEach { SecureFileWipe.secureDeleteFile(it) }
+                    dir.delete()
+                }
                 tempSrcDir?.let { dir ->
                     dir.listFiles()?.forEach { SecureFileWipe.secureDeleteFile(it) }
                     dir.delete()

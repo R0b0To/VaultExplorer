@@ -466,6 +466,7 @@ add_library(
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
         archive/archive_engine.cpp
+        archive/archive_split.cpp
         jni/qr_bridge.cpp
         docscan/doc_scan.cpp
         docscan/doc_pdf.cpp
@@ -647,6 +648,14 @@ if(NOT ANDROID)
     target_link_libraries(archive_create_options_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS archive_create_options_test)
 
+    add_executable(archive_split_test
+            archive/test/archive_split_test.cpp
+            archive/archive_engine.cpp
+            archive/archive_split.cpp)
+    target_include_directories(archive_split_test PRIVATE ${ARCHIVE_ENGINE_INCLUDE_DIRS})
+    target_link_libraries(archive_split_test ${ARCHIVE_ENGINE_LIBRARY})
+    list(APPEND VAULTEXPLORER_HOST_TESTS archive_split_test)
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -688,5 +697,8 @@ if(NOT ANDROID)
     endif()
     if(TARGET archive_create_options_test)
         add_test(NAME archive_create_options_test COMMAND archive_create_options_test)
+    endif()
+    if(TARGET archive_split_test)
+        add_test(NAME archive_split_test COMMAND archive_split_test)
     endif()
 endif()

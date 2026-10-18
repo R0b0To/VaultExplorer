@@ -65,6 +65,58 @@ class ArchiveService {
   static bool isSupported(String ext) =>
       allArchiveExtensions.contains(ext.toLowerCase());
 
+  // ── Split archives ──────────────────────────────────────────────────────
+
+  static final RegExp _numberedPartName = RegExp(
+    r'^.+\.(7z|zip)\.\d{3,}$',
+    caseSensitive: false,
+  );
+  static final RegExp _spannedPartName = RegExp(
+    r'^.+\.z\d{2,}$',
+    caseSensitive: false,
+  );
+
+  /// True for a file named like one part of a split archive:
+  /// `name.7z.001`, `name.zip.001` or `name.z01` (the last ZIP part is a plain
+  /// `name.zip`; the native engine finds the other parts from it).
+  static bool isSplitArchivePart(String fileName) =>
+      _numberedPartName.hasMatch(fileName) ||
+      _spannedPartName.hasMatch(fileName);
+
+  /// The extension to route a file by, when it is a split archive part
+  /// (`'7z'` / `'zip'`), else null. A part's real extension (`001`, `z01`) is
+  /// not an archive extension on its own; `001` in particular is also what
+  /// the file splitter writes for arbitrary files.
+  static String? splitPartExtension(String fileName) {
+    if (!isSplitArchivePart(fileName)) return null;
+    return fileName.toLowerCase().contains('.7z.') ? '7z' : 'zip';
+  }
+
+  /// The first existing name that would collide with the parts of a split
+  /// archive called [archiveName] ("name.zip" -> name.z01, name.z02, ...;
+  /// "name.7z" -> name.7z.001, ...), or null. Parts are never overwritten.
+  static String? existingSplitPartName(
+    String archiveName,
+    ArchiveFormatType format,
+    Iterable<String> existingNames,
+  ) {
+    final lower = archiveName.toLowerCase();
+    final String pattern;
+    if (format == ArchiveFormatType.zip) {
+      final stem = lower.endsWith('.zip')
+          ? lower.substring(0, lower.length - 4)
+          : lower;
+      pattern = '^${RegExp.escape(stem)}\\.z\\d{2,}\$';
+    } else {
+      pattern = '^${RegExp.escape(lower)}\\.\\d{3,}\$';
+    }
+    final re = RegExp(pattern);
+    for (final name in existingNames) {
+      if (re.hasMatch(name.toLowerCase())) return name;
+    }
+    return null;
+  }
+
   static bool isUnsupported(String ext) => false;
 
   static bool isArchive(String ext) =>
@@ -498,6 +550,7 @@ class ArchiveService {
     bool encryptFilenames = false,
     int? compressionLevel,
     int? compressionMethod,
+    int? splitSizeBytes,
     int? opId,
   }) {
     return _archive.createArchive(
@@ -513,6 +566,7 @@ class ArchiveService {
       encryptFilenames: encryptFilenames,
       compressionLevel: compressionLevel,
       compressionMethod: compressionMethod,
+      splitSizeBytes: splitSizeBytes,
       opId: opId,
     );
   }

@@ -183,6 +183,12 @@ enum ArchiveFormatType {
         ArchiveFormatType.cpio =>
           null,
       };
+
+  /// Whether the archive can be written as several parts: ZIP as a spanned
+  /// set (`name.z01`, `name.z02`, ... `name.zip`) and 7z as plain volumes
+  /// (`name.7z.001`, `name.7z.002`, ...).
+  bool get supportsSplit =>
+      this == ArchiveFormatType.zip || this == ArchiveFormatType.sevenZip;
 }
 
 /// The codec an archive's data is compressed with, for formats that let the

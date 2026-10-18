@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "يخفي قائمة الملفات حتى يتم إلغاء القفل",
   "createArchiveAdvancedOptions": "خيارات متقدمة",
   "createArchiveCompressionLevel": "مستوى الضغط",
+  "createArchiveSplitHintZip": "يُحفظ بالصيغة .z01 و.z02 … مع ملف .zip أخير. احتفظ بكل الأجزاء معًا في مجلد واحد.",
+  "createArchiveSplitHintSevenZip": "يُحفظ بالصيغة .7z.001 و.7z.002 … احتفظ بكل الأجزاء معًا في مجلد واحد.",
   "createArchiveSplitVolumes": "تقسيم إلى أجزاء",
   "createArchiveSplitVolumeNone": "بلا",
   "createArchiveCustomVolumeSizeLabel": "حجم الجزء المخصص (ميجابايت)",

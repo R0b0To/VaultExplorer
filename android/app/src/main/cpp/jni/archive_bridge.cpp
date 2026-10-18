@@ -5,11 +5,20 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <shared_mutex>
+#include <cerrno>
+#include <climits>
+#include <dirent.h>
+#include <cstdio>
+#include <cstring>
+#include <memory>
+#include <mutex>
 
 #include "archive/archive_engine.h"
 #include "filesystems/fs_ops.h"
+#define DIR FatFs_DIR
 #include "session/volume_state.h"
 #include "session/session_guard.h"
+#undef DIR
 #include "virtual_block_device.h"
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"
@@ -47,6 +56,178 @@ static bool readModifiedSecs(JNIEnv* env, jlongArray modifiedSecs, jsize count,
         out[i] = static_cast<int64_t>(sourceTimes[i]);
     }
     return true;
+}
+
+// ── Archives that are split into parts ──────────────────────────────────
+// Opening any part of a split archive (name.7z.001, name.z01 + name.zip, ...) must open the
+// whole set, so every reader goes through these instead of building a one-file source. All the
+// recognition and joining lives in the engine (archiveOpenPartSet); this only supplies "list the
+// folder" and "open a sibling" for a device folder or a vault.
+
+// Descriptors opened for sibling parts; closed when the last copy of the source goes away.
+struct OpenedPartFds {
+    std::vector<int> fds;
+    ~OpenedPartFds() {
+        for (int f : fds) ::close(f);
+    }
+};
+
+static ArchiveStreamSource singleFdSource(int fd, uint64_t totalSize) {
+    ArchiveStreamSource source;
+    source.size = [totalSize]() { return totalSize; };
+    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
+        return static_cast<int64_t>(::pread(fd, dest, length, static_cast<off_t>(offset)));
+    };
+    return source;
+}
+
+// Source for an archive file opened by descriptor. If that file is a part of a split archive that
+// lives in a device folder, the result covers the whole set; when the set is incomplete the
+// message goes to `partSetError` (if given) and the single file is returned.
+static ArchiveStreamSource archiveSourceForFd(int fd, uint64_t totalSize, std::string* partSetError) {
+    ArchiveStreamSource single = singleFdSource(fd, totalSize);
+
+    char link[64];
+    std::snprintf(link, sizeof(link), "/proc/self/fd/%d", fd);
+    char target[PATH_MAX];
+    const ssize_t len = ::readlink(link, target, sizeof(target) - 1);
+    if (len <= 0) return single;  // not a real path (pipe, proxy fd, ...)
+    const std::string path(target, static_cast<size_t>(len));
+    const size_t slash = path.rfind('/');
+    if (path[0] != '/' || slash == std::string::npos) return single;
+    const std::string dir = path.substr(0, slash);
+    const std::string name = path.substr(slash + 1);
+
+    auto opened = std::make_shared<OpenedPartFds>();
+    ArchivePartSetEnv partEnv;
+    partEnv.listSiblings = [dir]() {
+        std::vector<std::string> names;
+        if (DIR* d = ::opendir(dir.c_str())) {
+            while (const dirent* e = ::readdir(d)) {
+                if (e->d_type != DT_DIR) names.emplace_back(e->d_name);
+            }
+            ::closedir(d);
+        }
+        return names;
+    };
+    partEnv.openSibling = [dir, opened](const std::string& siblingName, ArchiveStreamSource* out) {
+        const int f = ::open((dir + "/" + siblingName).c_str(), O_RDONLY | O_CLOEXEC);
+        if (f < 0) return false;
+        struct stat st;
+        if (::fstat(f, &st) != 0) {
+            ::close(f);
+            return false;
+        }
+        opened->fds.push_back(f);
+        *out = singleFdSource(f, static_cast<uint64_t>(st.st_size));
+        return true;
+    };
+
+    ArchiveStreamSource joined;
+    std::string error;
+    switch (archiveOpenPartSet(name, partEnv, &joined, &error)) {
+        case ArchivePartSetStatus::Opened: {
+            // The sibling descriptors must live exactly as long as the source.
+            auto sizeFn = joined.size;
+            auto readFn = joined.read;
+            joined.size = [sizeFn, opened]() { return sizeFn(); };
+            joined.read = [readFn, opened](uint64_t off, uint8_t* dest, size_t n) { return readFn(off, dest, n); };
+            return joined;
+        }
+        case ArchivePartSetStatus::Missing:
+            if (partSetError) *partSetError = error;
+            return single;
+        case ArchivePartSetStatus::NotASet:
+            break;
+    }
+    return single;
+}
+
+// Same for an archive inside an unlocked vault. Streams opened for sibling parts are collected so the
+// caller can close them (while holding the volume lock) together with the main one.
+struct VaultPartStreams {
+    std::vector<void*> streams;
+    void closeAll(int volId) {
+        for (void* s : streams) fsCloseStream(volId, s);
+        streams.clear();
+    }
+};
+
+// `callerHoldsLock`: true when the caller already holds the volume's mutex for the whole read
+// (the single-entry paths); false when it does not (the bulk path), in which case every vault
+// access here takes the lock itself.
+static ArchiveStreamSource vaultArchiveSource(int volId, const std::string& vaultPath, void* mainStream,
+                                              uint64_t mainSize, bool callerHoldsLock,
+                                              VaultPartStreams& parts, std::string* partSetError) {
+    auto lockedRead = [volId, callerHoldsLock](void* stream, uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
+        if (callerHoldsLock) return fsReadStream(volId, stream, offset, dest, length);
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        return fsReadStream(volId, stream, offset, dest, length);
+    };
+    ArchiveStreamSource single;
+    single.size = [mainSize]() { return mainSize; };
+    single.read = [mainStream, lockedRead](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
+        return lockedRead(mainStream, offset, dest, length);
+    };
+
+    const size_t slash = vaultPath.rfind('/');
+    const std::string dir = slash == std::string::npos ? std::string() : vaultPath.substr(0, slash);
+    const std::string name = slash == std::string::npos ? vaultPath : vaultPath.substr(slash + 1);
+    auto prefix = [dir](const std::string& n) { return dir.empty() ? n : dir + "/" + n; };
+
+    ArchivePartSetEnv partEnv;
+    partEnv.listSiblings = [volId, dir, callerHoldsLock]() {
+        std::vector<std::string> lines;
+        {
+            std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex, std::defer_lock);
+            if (!callerHoldsLock) lock.lock();
+            fsListDirectory(volId, dir, lines);
+        }
+        std::vector<std::string> names;
+        for (const auto& line : lines) {
+            // "F|size|unixSecs|name" -- the name is everything after the third '|'.
+            if (line.size() < 2 || line[0] != 'F') continue;
+            size_t bar = 0;
+            int seen = 0;
+            while (seen < 3 && (bar = line.find('|', bar)) != std::string::npos) {
+                ++bar;
+                ++seen;
+            }
+            if (seen == 3) names.push_back(line.substr(bar));
+        }
+        return names;
+    };
+    partEnv.openSibling = [volId, callerHoldsLock, prefix, lockedRead, &parts](const std::string& n, ArchiveStreamSource* out) {
+        const std::string full = prefix(n);
+        void* stream = nullptr;
+        uint64_t size = 0;
+        {
+            std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex, std::defer_lock);
+            if (!callerHoldsLock) lock.lock();
+            stream = fsOpenStream(volId, full);
+            if (stream) size = fsGetFileSize(volId, full);
+        }
+        if (!stream) return false;
+        parts.streams.push_back(stream);
+        out->size = [size]() { return size; };
+        out->read = [stream, lockedRead](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
+            return lockedRead(stream, offset, dest, length);
+        };
+        return true;
+    };
+
+    ArchiveStreamSource joined;
+    std::string error;
+    switch (archiveOpenPartSet(name, partEnv, &joined, &error)) {
+        case ArchivePartSetStatus::Opened:
+            return joined;
+        case ArchivePartSetStatus::Missing:
+            if (partSetError) *partSetError = error;
+            return single;
+        case ArchivePartSetStatus::NotASet:
+            break;
+    }
+    return single;
 }
 
 static jobject buildEntryInfoMap(JNIEnv* env, jclass mapClass, jmethodID mapInit, jmethodID mapPut,
@@ -256,13 +437,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanVaultNative(
                 res.errorMessage = "Failed to open in-vault stream for archive";
             } else {
                 uint64_t totalSize = fsGetFileSize(volId, nativePath);
-                ArchiveStreamSource source;
-                source.size = [totalSize]() { return totalSize; };
-                source.read = [volId, stream](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-                    return fsReadStream(volId, stream, offset, dest, length);
-                };
-                res = archiveScanEntries(source, passStr);
+                VaultPartStreams vaultParts;
+                std::string partSetError;
+                ArchiveStreamSource source = vaultArchiveSource(volId, nativePath, stream, totalSize, true,
+                                                                vaultParts, &partSetError);
+                if (!partSetError.empty()) {
+                    res.status = ArchiveOpenStatus::IoError;
+                    res.errorMessage = partSetError;
+                } else {
+                    res = archiveScanEntries(source, passStr);
+                }
                 fsCloseStream(volId, stream);
+                vaultParts.closeAll(volId);
             }
         }
     }
@@ -298,13 +484,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultEntryNative(
                 res.errorMessage = "Failed to open in-vault stream for archive";
             } else {
                 uint64_t totalSize = fsGetFileSize(volId, nativePath);
-                ArchiveStreamSource source;
-                source.size = [totalSize]() { return totalSize; };
-                source.read = [volId, stream](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-                    return fsReadStream(volId, stream, offset, dest, length);
-                };
-                res = archiveExtractEntry(source, targetIndex, passStr);
+                VaultPartStreams vaultParts;
+                std::string partSetError;
+                ArchiveStreamSource source = vaultArchiveSource(volId, nativePath, stream, totalSize, true,
+                                                                vaultParts, &partSetError);
+                if (!partSetError.empty()) {
+                    res.status = ArchiveOpenStatus::IoError;
+                    res.errorMessage = partSetError;
+                } else {
+                    res = archiveExtractEntry(source, targetIndex, passStr);
+                }
                 fsCloseStream(volId, stream);
+                vaultParts.closeAll(volId);
             }
         }
     }
@@ -357,12 +548,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultAllNative(
         res.status = ArchiveOpenStatus::IoError;
         res.errorMessage = "Failed to open archive stream in vault";
     } else {
-        ArchiveStreamSource source;
-        source.size = [totalSize]() { return totalSize; };
-        source.read = [volId, stream](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-            std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-            return fsReadStream(volId, stream, offset, dest, length);
-        };
+        VaultPartStreams vaultParts;
+        std::string partSetError;
+        ArchiveStreamSource source = vaultArchiveSource(volId, nativePath, stream, totalSize, false,
+                                                        vaultParts, &partSetError);
 
         auto makeDir = [volId, targetDirPath](const std::string& relPath) -> bool {
             std::string fullDest = targetDirPath.empty() ? relPath : (targetDirPath + "/" + relPath);
@@ -388,11 +577,17 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultAllNative(
             return true;
         };
 
-        res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+        if (!partSetError.empty()) {
+            res.status = ArchiveOpenStatus::IoError;
+            res.errorMessage = partSetError;
+        } else {
+            res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+        }
 
         {
             std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
             fsCloseStream(volId, stream);
+            vaultParts.closeAll(volId);
         }
     }
 
@@ -436,12 +631,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToVaultNative(
     }
 
     uint64_t totalSize = static_cast<uint64_t>(st.st_size);
-    ArchiveStreamSource source;
-    source.size = [totalSize]() { return totalSize; };
-    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-        ssize_t n = pread(fd, dest, length, static_cast<off_t>(offset));
-        return static_cast<int64_t>(n);
-    };
+    ArchiveStreamSource source = archiveSourceForFd(fd, totalSize, nullptr);
 
     auto makeDir = [destVolId, targetDirPath](const std::string& relPath) -> bool {
         std::string fullDest = targetDirPath.empty() ? relPath : (targetDirPath + "/" + relPath);
@@ -503,12 +693,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToLocalDirNative(
     }
 
     uint64_t totalSize = static_cast<uint64_t>(st.st_size);
-    ArchiveStreamSource source;
-    source.size = [totalSize]() { return totalSize; };
-    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-        ssize_t n = pread(fd, dest, length, static_cast<off_t>(offset));
-        return static_cast<int64_t>(n);
-    };
+    ArchiveStreamSource source = archiveSourceForFd(fd, totalSize, nullptr);
 
     auto makeDir = [targetDirPath](const std::string& relPath) -> bool {
         std::string fullDest = targetDirPath + "/" + relPath;
@@ -579,14 +764,16 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanFdNative(
     }
 
     uint64_t totalSize = static_cast<uint64_t>(st.st_size);
-    ArchiveStreamSource source;
-    source.size = [totalSize]() { return totalSize; };
-    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-        ssize_t n = pread(fd, dest, length, static_cast<off_t>(offset));
-        return static_cast<int64_t>(n);
-    };
+    std::string partSetError;
+    ArchiveStreamSource source = archiveSourceForFd(fd, totalSize, &partSetError);
 
-    ArchiveIndexResult res = archiveScanEntries(source, passStr);
+    ArchiveIndexResult res;
+    if (!partSetError.empty()) {
+        res.status = ArchiveOpenStatus::IoError;
+        res.errorMessage = partSetError;
+    } else {
+        res = archiveScanEntries(source, passStr);
+    }
 
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
     return buildIndexResultMap(env, res);
@@ -613,12 +800,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryNative(
     }
 
     uint64_t totalSize = static_cast<uint64_t>(st.st_size);
-    ArchiveStreamSource source;
-    source.size = [totalSize]() { return totalSize; };
-    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-        ssize_t n = pread(fd, dest, length, static_cast<off_t>(offset));
-        return static_cast<int64_t>(n);
-    };
+    ArchiveStreamSource source = archiveSourceForFd(fd, totalSize, nullptr);
 
     ArchiveExtractResult res = archiveExtractEntry(source, targetIndex, passStr);
 
@@ -649,11 +831,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryToFdNative(
     }
 
     const uint64_t totalSize = static_cast<uint64_t>(st.st_size);
-    ArchiveStreamSource source;
-    source.size = [totalSize]() { return totalSize; };
-    source.read = [sourceFd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
-        return static_cast<int64_t>(pread(sourceFd, dest, length, static_cast<off_t>(offset)));
-    };
+    ArchiveStreamSource source = archiveSourceForFd(sourceFd, totalSize, nullptr);
 
     uint64_t destinationOffset = 0;
     result = archiveExtractEntryToSink(
@@ -1004,6 +1182,320 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
 
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
     logArchiveFailure("create-local-to-fd", res.status, res.errorMessage);
+    return (res.status == ArchiveOpenStatus::Ok) ? JNI_TRUE : JNI_FALSE;
+    JNI_CATCH_RETURN(JNI_FALSE)
+}
+
+
+// ── Split (multi-part) archive creation ─────────────────────────────────
+//
+// One entry point for every source/destination combination: a negative volume
+// id means "plain device path", otherwise the path lives inside that unlocked
+// vault. The archive engine only asks for "part N" / "part N is finished"; all
+// naming and file handling is here.
+//
+//   7z : <archive>.7z.001, .002, ...        (archive path already ends in .7z)
+//   ZIP: <archive>.z01, .z02, ... and the last part <archive>.zip
+//
+// The last ZIP part's name is only known once the archive is complete, so each
+// part is created under its numbered name and the final one is renamed.
+
+namespace {
+
+std::vector<std::string> readJavaStringArray(JNIEnv* env, jobjectArray arr) {
+    const jsize n = env->GetArrayLength(arr);
+    std::vector<std::string> out(static_cast<size_t>(n));
+    for (jsize i = 0; i < n; ++i) {
+        jstring js = static_cast<jstring>(env->GetObjectArrayElement(arr, i));
+        const char* c = env->GetStringUTFChars(js, nullptr);
+        out[static_cast<size_t>(i)] = c ? c : "";
+        if (c) env->ReleaseStringUTFChars(js, c);
+        env->DeleteLocalRef(js);
+    }
+    return out;
+}
+
+bool endsWithIgnoreCase(const std::string& s, const char* suffix) {
+    const size_t n = std::strlen(suffix);
+    if (s.size() < n) return false;
+    for (size_t i = 0; i < n; ++i) {
+        const char a = s[s.size() - n + i];
+        const char b = suffix[i];
+        if ((a >= 'A' && a <= 'Z' ? a - 'A' + 'a' : a) != b) return false;
+    }
+    return true;
+}
+
+// Names of the parts of one split archive.
+struct SplitNaming {
+    bool zip = false;
+    std::string base;   // 7z: the archive path; zip: the path without ".zip"
+
+    static SplitNaming forArchive(const std::string& archivePath, bool zip) {
+        SplitNaming n;
+        n.zip = zip;
+        n.base = (zip && endsWithIgnoreCase(archivePath, ".zip"))
+                     ? archivePath.substr(0, archivePath.size() - 4)
+                     : archivePath;
+        return n;
+    }
+    // Name a part has while it is being written.
+    std::string working(uint32_t index) const {
+        char suffix[24];
+        if (zip) std::snprintf(suffix, sizeof(suffix), ".z%02u", index + 1);
+        else std::snprintf(suffix, sizeof(suffix), ".%03u", index + 1);
+        return base + suffix;
+    }
+    // Name once the archive is complete (only differs for the last ZIP part).
+    std::string finalName(uint32_t index, bool isLast) const {
+        return (zip && isLast) ? base + ".zip" : working(index);
+    }
+};
+
+// Part target writing to plain files next to each other.
+struct LocalPartFiles {
+    SplitNaming naming;
+    int fd = -1;
+    std::string current;
+    std::vector<std::string> created;
+
+    bool open(uint32_t index) {
+        current = naming.working(index);
+        fd = ::open(current.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+        if (fd < 0) {
+            __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_Archive", "cannot create part %s: %s",
+                                current.c_str(), std::strerror(errno));
+            return false;
+        }
+        created.push_back(current);
+        return true;
+    }
+    int64_t write(const uint8_t* data, size_t length) {
+        size_t done = 0;
+        while (done < length) {
+            const ssize_t n = ::write(fd, data + done, length - done);
+            if (n < 0) {
+                if (errno == EINTR) continue;
+                return -1;
+            }
+            done += static_cast<size_t>(n);
+        }
+        return static_cast<int64_t>(length);
+    }
+    bool close(uint32_t index, bool isLast) {
+        const int rc = ::close(fd);
+        fd = -1;
+        if (rc != 0) return false;
+        const std::string finalPath = naming.finalName(index, isLast);
+        if (finalPath == current) return true;
+        if (::access(finalPath.c_str(), F_OK) == 0) return false;  // never replace a file
+        if (::rename(current.c_str(), finalPath.c_str()) != 0) return false;
+        created.back() = finalPath;
+        return true;
+    }
+    void abort() {
+        if (fd >= 0) {
+            ::close(fd);
+            fd = -1;
+        }
+        for (const auto& path : created) ::unlink(path.c_str());
+        created.clear();
+    }
+};
+
+// Part target writing into an unlocked vault.
+struct VaultPartFiles {
+    int volId = -1;
+    SplitNaming naming;
+    std::string current;
+    uint64_t offset = 0;
+    std::vector<std::string> created;
+
+    bool open(uint32_t index) {
+        current = naming.working(index);
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        if (!ensureMounted(volId)) return false;
+        if (fsGetFileSize(volId, current) > 0) return false;  // never replace a file
+        if (created.empty()) ensureParentDirs(volId, current);
+        offset = 0;
+        created.push_back(current);
+        return true;
+    }
+    int64_t write(const uint8_t* data, size_t length) {
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        if (!fsWriteFileChunk(volId, current, offset, data, length)) return -1;
+        offset += length;
+        return static_cast<int64_t>(length);
+    }
+    bool close(uint32_t index, bool isLast) {
+        const std::string finalPath = naming.finalName(index, isLast);
+        if (finalPath == current) return true;
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        if (fsGetFileSize(volId, finalPath) > 0) return false;
+        if (!fsRenameFile(volId, current, finalPath)) return false;
+        created.back() = finalPath;
+        return true;
+    }
+    void abort() {
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        for (const auto& path : created) fsDeleteFile(volId, path);
+        created.clear();
+    }
+};
+
+// Reads one source file only while the archive is working on it, so a
+// selection with thousands of files never holds thousands of descriptors.
+struct LazySource {
+    std::string path;
+    uint64_t size = 0;
+    uint64_t offset = 0;
+    int fd = -1;              // device source
+    void* stream = nullptr;   // vault source
+    bool opened = false;
+    bool finished = false;
+};
+
+}  // namespace
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateSplitNative(
+        JNIEnv* env, jobject,
+        jint srcVolId, jobjectArray srcPaths, jobjectArray entryNames, jlongArray modifiedSecs,
+        jint destVolId, jstring destArchivePath, jlong partSize, jint format,
+        jstring passphrase, jboolean encryptFilenames,
+        jint compressionLevel, jint compressionMethod, jint opId) {
+    JNI_TRY
+    if (!srcPaths || !entryNames || !modifiedSecs || !destArchivePath || partSize <= 0) return JNI_FALSE;
+    if (srcVolId >= 0 && !requireActiveSession(srcVolId, "archiveCreateSplit (src)")) {
+        throwNotUnlocked(env, srcVolId, "archiveCreateSplit");
+        return JNI_FALSE;
+    }
+    if (destVolId >= 0 && !requireActiveSession(destVolId, "archiveCreateSplit (dest)")) {
+        throwNotUnlocked(env, destVolId, "archiveCreateSplit");
+        return JNI_FALSE;
+    }
+
+    const jsize count = env->GetArrayLength(srcPaths);
+    std::vector<int64_t> sourceModifiedSecs;
+    if (!readModifiedSecs(env, modifiedSecs, count, sourceModifiedSecs)) return JNI_FALSE;
+    const std::vector<std::string> sources = readJavaStringArray(env, srcPaths);
+    const std::vector<std::string> inArchivePaths = readJavaStringArray(env, entryNames);
+
+    std::string passStr;
+    if (passphrase) {
+        const char* p = env->GetStringUTFChars(passphrase, nullptr);
+        if (p) {
+            passStr = p;
+            env->ReleaseStringUTFChars(passphrase, p);
+        }
+    }
+    std::string archivePath;
+    {
+        const char* d = env->GetStringUTFChars(destArchivePath, nullptr);
+        archivePath = d ? d : "";
+        if (d) env->ReleaseStringUTFChars(destArchivePath, d);
+    }
+
+    const ArchiveFormat fmt = static_cast<ArchiveFormat>(format);
+    const SplitNaming naming = SplitNaming::forArchive(archivePath, fmt == ArchiveFormat::Zip);
+
+    // Where the parts go.
+    LocalPartFiles localParts;
+    VaultPartFiles vaultParts;
+    ArchivePartTarget target;
+    if (destVolId < 0) {
+        localParts.naming = naming;
+        target.openPart = [&localParts](uint32_t i) { return localParts.open(i); };
+        target.writePart = [&localParts](const uint8_t* d, size_t n) { return localParts.write(d, n); };
+        target.closePart = [&localParts](uint32_t i, bool last) { return localParts.close(i, last); };
+        target.abort = [&localParts]() { localParts.abort(); };
+    } else {
+        vaultParts.volId = destVolId;
+        vaultParts.naming = naming;
+        target.openPart = [&vaultParts](uint32_t i) { return vaultParts.open(i); };
+        target.writePart = [&vaultParts](const uint8_t* d, size_t n) { return vaultParts.write(d, n); };
+        target.closePart = [&vaultParts](uint32_t i, bool last) { return vaultParts.close(i, last); };
+        target.abort = [&vaultParts]() { vaultParts.abort(); };
+    }
+
+    // What goes in.
+    std::vector<LazySource> lazy(static_cast<size_t>(count));
+    std::vector<ArchiveSourceEntry> entries(static_cast<size_t>(count));
+    if (srcVolId >= 0) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[srcVolId].mutex);
+        if (!ensureMounted(srcVolId)) return JNI_FALSE;
+        for (jsize i = 0; i < count; ++i) {
+            lazy[i].path = sources[i];
+            lazy[i].size = fsGetFileSize(srcVolId, sources[i]);
+        }
+    } else {
+        for (jsize i = 0; i < count; ++i) {
+            lazy[i].path = sources[i];
+            struct stat st;
+            if (stat(sources[i].c_str(), &st) == 0 && !S_ISDIR(st.st_mode)) {
+                lazy[i].size = static_cast<uint64_t>(st.st_size);
+                if (sourceModifiedSecs[i] <= 0) sourceModifiedSecs[i] = static_cast<int64_t>(st.st_mtime);
+            }
+        }
+    }
+    for (jsize i = 0; i < count; ++i) {
+        entries[i].pathInArchive = inArchivePaths[i];
+        entries[i].isDirectory = false;
+        entries[i].uncompressedSize = lazy[i].size;
+        entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
+        entries[i].readData = [&lazy, srcVolId, i](uint8_t* dest, size_t length) -> int64_t {
+            LazySource& s = lazy[i];
+            if (s.finished) return 0;
+            int64_t n = -1;
+            if (srcVolId >= 0) {
+                std::unique_lock<std::shared_mutex> lock(volumes[srcVolId].mutex);
+                if (!s.opened) {
+                    s.stream = fsOpenStream(srcVolId, s.path);
+                    s.opened = true;
+                }
+                if (!s.stream) return -1;
+                n = fsReadStream(srcVolId, s.stream, s.offset, dest, length);
+                if (n <= 0 || s.offset + static_cast<uint64_t>(n) >= s.size) {
+                    fsCloseStream(srcVolId, s.stream);
+                    s.stream = nullptr;
+                    s.finished = true;
+                }
+            } else {
+                if (!s.opened) {
+                    s.fd = ::open(s.path.c_str(), O_RDONLY);
+                    s.opened = true;
+                }
+                if (s.fd < 0) return -1;
+                n = ::pread(s.fd, dest, length, static_cast<off_t>(s.offset));
+                if (n <= 0 || s.offset + static_cast<uint64_t>(n) >= s.size) {
+                    ::close(s.fd);
+                    s.fd = -1;
+                    s.finished = true;
+                }
+            }
+            if (n > 0) s.offset += static_cast<uint64_t>(n);
+            return n;
+        };
+    }
+
+    uint64_t totalSourceBytes = 0;
+    for (const auto& src : lazy) totalSourceBytes += src.size;
+
+    const ArchiveCreateResult res = archiveCreateSplit(
+        target, static_cast<uint64_t>(partSize), fmt, entries, passStr,
+        encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
+        static_cast<int>(compressionLevel), toCompressionMethod(compressionMethod));
+
+    // Anything the archive stopped reading before the end (failure, cancel).
+    for (auto& s : lazy) {
+        if (s.fd >= 0) ::close(s.fd);
+        if (s.stream && srcVolId >= 0) {
+            std::unique_lock<std::shared_mutex> lock(volumes[srcVolId].mutex);
+            fsCloseStream(srcVolId, s.stream);
+        }
+    }
+
+    logArchiveFailure("create-split", res.status, res.errorMessage);
     return (res.status == ArchiveOpenStatus::Ok) ? JNI_TRUE : JNI_FALSE;
     JNI_CATCH_RETURN(JNI_FALSE)
 }

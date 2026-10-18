@@ -3338,6 +3338,8 @@
   "createArchiveEncryptFilenamesActive": "Приховує список файлів до розблокування",
   "createArchiveAdvancedOptions": "Розширені параметри",
   "createArchiveCompressionLevel": "Рівень стиснення",
+  "createArchiveSplitHintZip": "Збережеться як .z01, .z02 … і фінальний .zip. Тримайте всі частини в одній папці.",
+  "createArchiveSplitHintSevenZip": "Збережеться як .7z.001, .7z.002 … Тримайте всі частини в одній папці.",
   "createArchiveSplitVolumes": "Розділити на томи",
   "createArchiveSplitVolumeNone": "Немає",
   "createArchiveCustomVolumeSizeLabel": "Власний розмір тому (МБ)",

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -59,6 +60,7 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
     ArchiveCompressionMethod compressionMethod,
+    int splitSizeBytes,
   ) onCreate;
 
   const CreateArchiveBottomSheet({
@@ -87,6 +89,7 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
       ArchiveCompressionMethod compressionMethod,
+      int splitSizeBytes,
     ) onCreate,
   }) {
     return showModalBottomSheet<void>(
@@ -136,6 +139,16 @@ class _CreateArchiveBottomSheetState
   ArchiveCompressionMethod _method =
       ArchiveFormatType.sevenZip.selectableCompressionMethods.first;
 
+  // Split into parts (ZIP / 7z): 0 = one file. [_splitCustom] means the size
+  // comes from [_splitCustomCtrl] (in MB) instead of one of the presets.
+  static const _mb = 1024 * 1024;
+  // The largest part that still fits a FAT32 file (4 GiB - 1 byte).
+  static const _fat32PartMb = 4095;
+  static const _splitPresetsMb = [100, 500, 1024, _fat32PartMb];
+  int _splitSizeBytes = 0;
+  bool _splitCustom = false;
+  final TextEditingController _splitCustomCtrl = TextEditingController();
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _encryptFilenames = false;
@@ -173,6 +186,23 @@ class _CreateArchiveBottomSheetState
   ArchiveCompressionMethod get _effectiveMethod =>
       _canPickMethod ? _method : ArchiveCompressionMethod.auto;
 
+  /// The custom part size in MB, or null when the field is not a whole number
+  /// between 1 MB and the FAT32 limit.
+  int? get _customSplitMb {
+    final mb = int.tryParse(_splitCustomCtrl.text.trim());
+    if (mb == null || mb < 1 || mb > _fat32PartMb) return null;
+    return mb;
+  }
+
+  /// Part size to create with; 0 = a single file.
+  int get _effectiveSplitBytes {
+    if (!_format.supportsSplit) return 0;
+    if (_splitCustom) return (_customSplitMb ?? 0) * _mb;
+    return _splitSizeBytes;
+  }
+
+  bool get _splitValid => !_splitCustom || !_format.supportsSplit || _customSplitMb != null;
+
   bool get _hasEnoughSpace {
     if (widget.freeSpace == null || widget.freeSpace! < 0) return true;
     return widget.freeSpace! >= _totalSelectedBytes;
@@ -184,6 +214,7 @@ class _CreateArchiveBottomSheetState
     if (!_isValidName) return false;
     if (!_hasEnoughSpace) return false;
     if (!_passwordMatchesConfirm) return false;
+    if (!_splitValid) return false;
     return true;
   }
 
@@ -218,6 +249,7 @@ class _CreateArchiveBottomSheetState
     _nameCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _splitCustomCtrl.dispose();
     super.dispose();
   }
 
@@ -277,6 +309,10 @@ class _CreateArchiveBottomSheetState
       if (!format.supportsFilenameEncryption) {
         _encryptFilenames = false;
       }
+      if (!format.supportsSplit) {
+        _splitSizeBytes = 0;
+        _splitCustom = false;
+      }
     });
     _revalidate();
   }
@@ -310,6 +346,7 @@ class _CreateArchiveBottomSheetState
       encryptFilenames,
       _compressionLevel,
       _effectiveMethod,
+      _effectiveSplitBytes,
     );
   }
 
@@ -370,6 +407,12 @@ class _CreateArchiveBottomSheetState
                         _buildCompressionSection(cs, textTheme),
                         const SizedBox(height: 12),
                         _buildCompressionMethodSection(cs, textTheme),
+                      ],
+
+                      // Split into parts, only for formats that can be spanned
+                      if (_format.supportsSplit) ...[
+                        const SizedBox(height: 12),
+                        _buildSplitSection(cs, textTheme),
                       ],
                     ],
                   ),
@@ -790,6 +833,92 @@ class _CreateArchiveBottomSheetState
           ],
         ),
       ),
+    );
+  }
+
+  static String _splitPresetLabel(int mb) {
+    if (mb == _fat32PartMb) return '4 GB (FAT32)';
+    return mb % 1024 == 0 ? '${mb ~/ 1024} GB' : '$mb MB';
+  }
+
+  Widget _buildSplitSection(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
+    final isZip = _format == ArchiveFormatType.zip;
+    final active = _splitCustom || _splitSizeBytes > 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.createArchiveSplitVolumes,
+          style: textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            ChoiceChip(
+              label: Text(l10n.createArchiveSplitVolumeNone),
+              selected: !active,
+              onSelected: (_) => setState(() {
+                _splitSizeBytes = 0;
+                _splitCustom = false;
+              }),
+            ),
+            for (final mb in _splitPresetsMb)
+              ChoiceChip(
+                label: Text(_splitPresetLabel(mb)),
+                selected: !_splitCustom && _splitSizeBytes == mb * _mb,
+                onSelected: (_) => setState(() {
+                  _splitSizeBytes = mb * _mb;
+                  _splitCustom = false;
+                }),
+              ),
+            ChoiceChip(
+              label: Text(l10n.splitChunkSizeCustom),
+              selected: _splitCustom,
+              onSelected: (_) => setState(() {
+                _splitCustom = true;
+                _splitSizeBytes = 0;
+              }),
+            ),
+          ],
+        ),
+        if (_splitCustom) ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: _splitCustomCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              labelText: l10n.createArchiveCustomVolumeSizeLabel,
+              hintText: l10n.createArchiveCustomVolumeSizeHint,
+              errorText: _splitCustomCtrl.text.isNotEmpty && _customSplitMb == null
+                  ? '1 – $_fat32PartMb'
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+        if (active)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              isZip ? l10n.createArchiveSplitHintZip : l10n.createArchiveSplitHintSevenZip,
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                fontSize: 11,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

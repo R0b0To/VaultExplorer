@@ -392,6 +392,7 @@ class FileOperationService extends ChangeNotifier {
     bool deleteSourceAfter = false,
     ArchiveCompressionLevel compressionLevel = ArchiveCompressionLevel.normal,
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
+    int splitSizeBytes = 0,
     required AppLocalizations l10n,
   }) {
     final op = FileOperation._internal(
@@ -425,6 +426,7 @@ class FileOperationService extends ChangeNotifier {
       deleteSourceAfter,
       compressionLevel,
       compressionMethod,
+      splitSizeBytes,
     );
     return op;
   }
@@ -763,6 +765,7 @@ class FileOperationService extends ChangeNotifier {
     bool deleteSourceAfter,
     ArchiveCompressionLevel compressionLevel,
     ArchiveCompressionMethod compressionMethod,
+    int splitSizeBytes,
   ) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.verbArchiving);
@@ -837,6 +840,22 @@ class FileOperationService extends ChangeNotifier {
         op._setArchiveTotalBytes(totalInputBytes);
       }
 
+      final split = splitSizeBytes > 0 && format.supportsSplit;
+      if (split) {
+        // Parts are never overwritten; refuse up front, with the name that is in the way.
+        final rawSiblings = await _fileIoApi.listDirectory(dest, destDirPath);
+        final clash = ArchiveService.existingSplitPartName(
+          archiveName,
+          format,
+          RawEntry.parseAll(rawSiblings ?? const []).map((e) => e.name),
+        );
+        if (clash != null) {
+          op._setError(op.l10n.failedToArchiveGeneric('"$clash" already exists'));
+          op._setStatus(FileOperationStatus.failed);
+          return;
+        }
+      }
+
       await _fileIoApi.deleteFile(dest, destVaultPath);
 
       final ok = await ArchiveService.createArchive(
@@ -854,6 +873,7 @@ class FileOperationService extends ChangeNotifier {
         encryptFilenames: encryptFilenames,
         compressionLevel: compressionLevel.level,
         compressionMethod: compressionMethod.code,
+        splitSizeBytes: split ? splitSizeBytes : null,
         opId: op.id,
       );
 

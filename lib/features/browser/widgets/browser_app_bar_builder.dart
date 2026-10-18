@@ -100,9 +100,10 @@ PreferredSizeWidget buildBrowserAppBar(
     final hideVaultOnlyActions = container.isLocalStorage;
     final singleArchiveSelected = singleFile &&
         ArchiveService.isOpenableAsArchive(
-          selectedItems.first.name.contains('.')
-              ? selectedItems.first.name.split('.').last.toLowerCase()
-              : '',
+          ArchiveService.splitPartExtension(selectedItems.first.name) ??
+              (selectedItems.first.name.contains('.')
+                  ? selectedItems.first.name.split('.').last.toLowerCase()
+                  : ''),
         );
     final showPinOption = selectedItems.any((item) => !isPinned(item));
     final showUnpinOption = selectedItems.any((item) => isPinned(item));

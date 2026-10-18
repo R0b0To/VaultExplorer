@@ -699,13 +699,25 @@ static std::function<bool(uint64_t)> makeCreateProgress(jint opId, uint64_t tota
     };
 }
 
+// Maps the Dart/Kotlin method code onto the engine enum. An unknown code
+// falls back to the format's default instead of being cast blindly, so a stale
+// caller can't select a codec that doesn't exist.
+static ArchiveCompressionMethod toCompressionMethod(jint code) {
+    switch (code) {
+        case 1: return ArchiveCompressionMethod::Deflate;
+        case 2: return ArchiveCompressionMethod::Lzma;
+        case 3: return ArchiveCompressionMethod::Lzma2;
+        default: return ArchiveCompressionMethod::Default;
+    }
+}
+
 // ── Create Archive: In-Vault Files -> Local File Descriptor ────────────
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
         jint destFd, jint format, jstring passphrase, jboolean encryptFilenames,
-        jint compressionLevel, jint opId) {
+        jint compressionLevel, jint compressionMethod, jint opId) {
     JNI_TRY
     if (destFd < 0 || !vaultPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToFd")) {
@@ -780,7 +792,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
         encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
-        static_cast<int>(compressionLevel)
+        static_cast<int>(compressionLevel),
+        toCompressionMethod(compressionMethod)
     );
 
     {
@@ -802,7 +815,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
         JNIEnv* env, jobject,
         jint srcVolId, jobjectArray vaultPaths, jobjectArray entryNames, jlongArray modifiedSecs,
         jint destVolId, jstring destVaultPath, jint format, jstring passphrase,
-        jboolean encryptFilenames, jint compressionLevel, jint opId) {
+        jboolean encryptFilenames, jint compressionLevel, jint compressionMethod, jint opId) {
     JNI_TRY
     if (!vaultPaths || !entryNames || !modifiedSecs || !destVaultPath) return JNI_FALSE;
     if (!requireActiveSession(srcVolId, "archiveCreateVaultToVault (src)") ||
@@ -886,7 +899,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
         encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
-        static_cast<int>(compressionLevel)
+        static_cast<int>(compressionLevel),
+        toCompressionMethod(compressionMethod)
     );
 
     {
@@ -909,7 +923,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
         JNIEnv* env, jobject,
         jobjectArray localPaths, jobjectArray entryNames, jlongArray modifiedSecs,
         jint destFd, jint format, jstring passphrase, jboolean encryptFilenames,
-        jint compressionLevel, jint opId) {
+        jint compressionLevel, jint compressionMethod, jint opId) {
     JNI_TRY
     if (destFd < 0 || !localPaths || !entryNames || !modifiedSecs) return JNI_FALSE;
 
@@ -980,7 +994,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
     ArchiveCreateResult res = archiveCreate(
         sink, static_cast<ArchiveFormat>(format), entries, passStr,
         encryptFilenames == JNI_TRUE, makeCreateProgress(opId, totalSourceBytes),
-        static_cast<int>(compressionLevel)
+        static_cast<int>(compressionLevel),
+        toCompressionMethod(compressionMethod)
     );
 
     for (int sfd : openFds) {

@@ -4,6 +4,9 @@
 //    before it reached libarchive, so every archive came out at the default),
 //    must round-trip for every format that compresses, and out-of-range values
 //    must be refused rather than ignored.
+//  * compressionMethod -- LZMA2 / LZMA / Deflate where the format can write
+//    them (7z; ZIP and the TARs only their own), refused everywhere else, and
+//    checked on the bytes rather than on archiveCreate's say-so.
 //  * progressCallback -- counts *source* bytes. The 7z writer buffers all of
 //    its output in a temporary file until close, so output bytes cannot drive
 //    a progress bar; this pins that down.
@@ -85,7 +88,8 @@ std::vector<ArchiveSourceEntry> entriesFor(const Files& files, std::vector<size_
 
 Built build(ArchiveFormat format, const Files& files, int level,
             const std::string& pass = "", bool encryptNames = false,
-            std::function<bool(uint64_t)> progress = nullptr) {
+            std::function<bool(uint64_t)> progress = nullptr,
+            ArchiveCompressionMethod method = ArchiveCompressionMethod::Default) {
     Built b;
     ArchiveSink sink;
     sink.write = [&b](const uint8_t* d, size_t n) -> int64_t {
@@ -94,7 +98,7 @@ Built build(ArchiveFormat format, const Files& files, int level,
     };
     std::vector<size_t> offsets;
     const auto entries = entriesFor(files, offsets);
-    b.result = archiveCreate(sink, format, entries, pass, encryptNames, std::move(progress), level);
+    b.result = archiveCreate(sink, format, entries, pass, encryptNames, std::move(progress), level, method);
     return b;
 }
 
@@ -180,6 +184,51 @@ const char* name(ArchiveFormat f) {
         case ArchiveFormat::TarZstd: return "tar.zst";
         case ArchiveFormat::TarLzma: return "tar.lzma";
         default: return "?";
+    }
+}
+
+const char* methodName(ArchiveCompressionMethod m) {
+    switch (m) {
+        case ArchiveCompressionMethod::Default: return "default";
+        case ArchiveCompressionMethod::Deflate: return "deflate";
+        case ArchiveCompressionMethod::Lzma: return "lzma";
+        case ArchiveCompressionMethod::Lzma2: return "lzma2";
+    }
+    return "?";
+}
+
+// Which codec a finished archive really used, read off its bytes.
+//  * 7z: the first packed stream starts right after the 32-byte signature
+//    header. A raw LZMA stream always begins with a 0x00 range-coder byte; an
+//    LZMA2 stream begins with a chunk control byte whose top three bits are set
+//    (0xE0: dictionary reset + new properties) for compressible input. Anything
+//    else here is Deflate. Only meaningful for an unencrypted archive.
+//  * ZIP: the first local header holds the method at offset 8 (8 = deflate).
+//  * TAR.GZ / .XZ / .LZMA: the filter's own magic.
+ArchiveCompressionMethod detectMethod(ArchiveFormat f, const std::vector<uint8_t>& b) {
+    switch (f) {
+        case ArchiveFormat::SevenZip: {
+            CHECK(b.size() > 33);
+            const uint8_t first = b[32];
+            if (first == 0x00) return ArchiveCompressionMethod::Lzma;
+            if ((first & 0xE0) == 0xE0) return ArchiveCompressionMethod::Lzma2;
+            return ArchiveCompressionMethod::Deflate;
+        }
+        case ArchiveFormat::Zip:
+            CHECK(b.size() > 10 && b[0] == 'P' && b[1] == 'K');
+            return (b[8] | (b[9] << 8)) == 8 ? ArchiveCompressionMethod::Deflate
+                                             : ArchiveCompressionMethod::Default;
+        case ArchiveFormat::TarGz:
+            CHECK(b.size() > 2 && b[0] == 0x1f && b[1] == 0x8b);
+            return ArchiveCompressionMethod::Deflate;
+        case ArchiveFormat::TarXz:
+            CHECK(b.size() > 6 && b[0] == 0xfd && b[1] == '7' && b[2] == 'z' && b[3] == 'X' && b[4] == 'Z');
+            return ArchiveCompressionMethod::Lzma2;
+        case ArchiveFormat::TarLzma:
+            CHECK(b.size() > 5 && b[0] == 0x5d && !(b[1] == '7' && b[2] == 'z'));
+            return ArchiveCompressionMethod::Lzma;
+        default:
+            return ArchiveCompressionMethod::Default;
     }
 }
 
@@ -384,6 +433,127 @@ int main() {
         CHECK(sinkWrites == 0);               // nothing half-written reaches the destination
         CHECK(secs < 2.0);
         std::printf("7z cancel: stopped after %d callbacks in %.3fs, status!=Ok, no output: ok\n", calls, secs);
+    }
+
+    // --- Compression method ------------------------------------------------
+    {
+        using M = ArchiveCompressionMethod;
+        const std::vector<ArchiveFormat> allFormats = {
+            ArchiveFormat::Zip, ArchiveFormat::SevenZip, ArchiveFormat::Tar, ArchiveFormat::TarGz,
+            ArchiveFormat::TarBz2, ArchiveFormat::TarXz, ArchiveFormat::TarZstd, ArchiveFormat::TarLzma,
+            ArchiveFormat::Iso, ArchiveFormat::Cpio};
+        const std::vector<M> allMethods = {M::Default, M::Deflate, M::Lzma, M::Lzma2};
+
+        // The support matrix, spelled out.
+        auto expected = [](ArchiveFormat f, M m) {
+            if (m == M::Default) return true;
+            switch (f) {
+                case ArchiveFormat::Zip: return m == M::Deflate;
+                case ArchiveFormat::SevenZip: return m != M::Default;
+                case ArchiveFormat::TarGz: return m == M::Deflate;
+                case ArchiveFormat::TarXz: return m == M::Lzma2;
+                case ArchiveFormat::TarLzma: return m == M::Lzma;
+                default: return false;
+            }
+        };
+        for (ArchiveFormat f : allFormats) {
+            for (M m : allMethods) CHECK(archiveCompressionMethodSupported(f, m) == expected(f, m));
+        }
+        std::printf("method support matrix: ok\n");
+
+        // archiveCreate agrees with the matrix: supported combinations write an
+        // archive that reads back, unsupported ones are refused with nothing written.
+        for (ArchiveFormat f : allFormats) {
+            for (M m : allMethods) {
+                const auto b = build(f, files, kArchiveDefaultCompressionLevel, "", false, nullptr, m);
+                if (expected(f, m)) {
+                    if (b.result.status != ArchiveOpenStatus::Ok) {
+                        std::fprintf(stderr, "%s + %s failed: %s\n", name(f), methodName(m),
+                                     b.result.errorMessage.c_str());
+                    }
+                    CHECK(b.result.status == ArchiveOpenStatus::Ok);
+                    if (f != ArchiveFormat::Iso && f != ArchiveFormat::Cpio && f != ArchiveFormat::Tar) {
+                        checkRoundTrip(b.bytes, files);
+                    }
+                } else {
+                    CHECK(b.result.status == ArchiveOpenStatus::UnsupportedFormat);
+                    CHECK(b.bytes.empty());
+                }
+            }
+        }
+        std::printf("every format x method follows the matrix (written, or refused with no output): ok\n");
+
+        // The method that was asked for is the one on disk.
+        for (M m : {M::Deflate, M::Lzma, M::Lzma2}) {
+            const auto b = build(ArchiveFormat::SevenZip, files, kArchiveDefaultCompressionLevel, "",
+                                 false, nullptr, m);
+            CHECK(b.result.status == ArchiveOpenStatus::Ok);
+            CHECK(detectMethod(ArchiveFormat::SevenZip, b.bytes) == m);
+            checkRoundTrip(b.bytes, files);
+        }
+        for (auto [f, m] : {std::pair{ArchiveFormat::Zip, M::Deflate}, std::pair{ArchiveFormat::TarGz, M::Deflate},
+                            std::pair{ArchiveFormat::TarXz, M::Lzma2}, std::pair{ArchiveFormat::TarLzma, M::Lzma}}) {
+            const auto b = build(f, files, kArchiveDefaultCompressionLevel, "", false, nullptr, m);
+            CHECK(b.result.status == ArchiveOpenStatus::Ok);
+            CHECK(detectMethod(f, b.bytes) == m);
+        }
+        std::printf("the chosen method is what ends up in the archive: ok\n");
+
+        // 7z with no method keeps libarchive's own default, which is LZMA (not
+        // LZMA2): byte-identical to asking for LZMA, and different from LZMA2.
+        {
+            const auto dflt = build(ArchiveFormat::SevenZip, files, kArchiveDefaultCompressionLevel);
+            const auto lzma = build(ArchiveFormat::SevenZip, files, kArchiveDefaultCompressionLevel, "", false, nullptr, M::Lzma);
+            const auto lzma2 = build(ArchiveFormat::SevenZip, files, kArchiveDefaultCompressionLevel, "", false, nullptr, M::Lzma2);
+            const auto deflate = build(ArchiveFormat::SevenZip, files, kArchiveDefaultCompressionLevel, "", false, nullptr, M::Deflate);
+            CHECK(dflt.bytes == lzma.bytes);
+            CHECK(dflt.bytes != lzma2.bytes);
+            // On compressible text both LZMA flavours beat Deflate.
+            CHECK(lzma.bytes.size() < deflate.bytes.size());
+            CHECK(lzma2.bytes.size() < deflate.bytes.size());
+            std::printf("7z sizes  deflate=%zu  lzma=%zu  lzma2=%zu (default == lzma): ok\n",
+                        deflate.bytes.size(), lzma.bytes.size(), lzma2.bytes.size());
+        }
+
+        // Methods combine with levels, passwords and (7z) encrypted file names.
+        {
+            const std::string pw = "hunter2";
+            for (M m : {M::Deflate, M::Lzma, M::Lzma2}) {
+                for (int level : {1, 5, 9}) {
+                    const auto b = build(ArchiveFormat::SevenZip, files, level, "", false, nullptr, m);
+                    CHECK(b.result.status == ArchiveOpenStatus::Ok);
+                    CHECK(detectMethod(ArchiveFormat::SevenZip, b.bytes) == m);
+                    checkRoundTrip(b.bytes, files);
+                }
+                const auto enc = build(ArchiveFormat::SevenZip, files, 5, pw, false, nullptr, m);
+                CHECK(enc.result.status == ArchiveOpenStatus::Ok);
+                checkRoundTrip(enc.bytes, files, pw);
+                const auto hidden = build(ArchiveFormat::SevenZip, files, 5, pw, true, nullptr, m);
+                CHECK(hidden.result.status == ArchiveOpenStatus::Ok);
+                checkRoundTrip(hidden.bytes, files, pw);
+                const std::string needle = "log.txt";
+                CHECK(std::search(hidden.bytes.begin(), hidden.bytes.end(), needle.begin(), needle.end()) ==
+                      hidden.bytes.end());
+            }
+            const auto zipPw = build(ArchiveFormat::Zip, files, 5, pw, false, nullptr, M::Deflate);
+            CHECK(zipPw.result.status == ArchiveOpenStatus::Ok);
+            checkRoundTrip(zipPw.bytes, files, pw);
+            std::printf("methods x levels x password x hidden names: ok\n");
+        }
+
+        // Level 0 is "store", which has no codec: naming one is an error on ZIP and
+        // 7z rather than a silent override. The TARs still accept their own.
+        for (ArchiveFormat f : {ArchiveFormat::Zip, ArchiveFormat::SevenZip}) {
+            for (M m : {M::Deflate, M::Lzma, M::Lzma2}) {
+                if (!expected(f, m)) continue;
+                const auto b = build(f, files, 0, "", false, nullptr, m);
+                CHECK(b.result.status == ArchiveOpenStatus::UnsupportedFormat);
+                CHECK(b.bytes.empty());
+            }
+        }
+        const auto xzStore = build(ArchiveFormat::TarXz, files, 0, "", false, nullptr, M::Lzma2);
+        CHECK(xzStore.result.status == ArchiveOpenStatus::Ok);
+        std::printf("method + store: refused on zip/7z, fine where the method is the filter: ok\n");
     }
 
     std::printf("archive_create_options_test: all checks passed\n");

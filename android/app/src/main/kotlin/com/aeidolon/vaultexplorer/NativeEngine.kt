@@ -301,19 +301,19 @@ internal object NativeEngine {
     @JvmStatic external fun archiveCreateVaultToFdNative(
         srcVolId: Int, vaultPaths: Array<String>, entryNames: Array<String>, modifiedSecs: LongArray,
         destFd: Int, format: Int, passphrase: String?, encryptFilenames: Boolean,
-        compressionLevel: Int, opId: Int
+        compressionLevel: Int, compressionMethod: Int, opId: Int
     ): Boolean
 
     @JvmStatic external fun archiveCreateVaultToVaultNative(
         srcVolId: Int, vaultPaths: Array<String>, entryNames: Array<String>, modifiedSecs: LongArray,
         destVolId: Int, destVaultPath: String, format: Int, passphrase: String?, encryptFilenames: Boolean,
-        compressionLevel: Int, opId: Int
+        compressionLevel: Int, compressionMethod: Int, opId: Int
     ): Boolean
 
     @JvmStatic external fun archiveCreateLocalToFdNative(
         localPaths: Array<String>, entryNames: Array<String>, modifiedSecs: LongArray,
         destFd: Int, format: Int, passphrase: String?, encryptFilenames: Boolean,
-        compressionLevel: Int, opId: Int
+        compressionLevel: Int, compressionMethod: Int, opId: Int
     ): Boolean
     
     @JvmStatic external fun archiveExtractFdToLocalDirNative(

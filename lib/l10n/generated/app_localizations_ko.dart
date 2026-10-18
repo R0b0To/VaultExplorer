@@ -11494,4 +11494,29 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get viewOfficeDocumentsInApp =>
       'Word, Excel, PowerPoint, OpenDocument 파일을 앱에서 미리 보기';
+
+  @override
+  String get archiveCompressionMethodLabel => '압축 방식';
+
+  @override
+  String get archiveMethodLzma2Desc => '가장 균형 잡힌 선택입니다. .tar.xz에서도 사용됩니다.';
+
+  @override
+  String get archiveMethodLzmaDesc => '7-Zip의 이전 방식입니다. .tar.lzma에서도 사용됩니다.';
+
+  @override
+  String get archiveMethodDeflateDesc =>
+      '가장 빠르지만 파일이 더 커지며 호환성이 가장 넓습니다. ZIP과 .tar.gz에서도 사용됩니다.';
+
+  @override
+  String archiveMethodFixedInfo(String format, String method) {
+    return '$format 형식은 항상 $method 방식으로 압축합니다.';
+  }
+
+  @override
+  String get archiveMethodMoreInSevenZip =>
+      'LZMA2와 LZMA는 7-Zip 아카이브에서 사용할 수 있습니다.';
+
+  @override
+  String get archiveMethodStoreNote => '저장은 압축하지 않으므로 선택할 방식이 없습니다.';
 }

@@ -248,6 +248,10 @@ class VaultArchiveApi {
   /// header, so file names, sizes and dates can't be read without the
   /// passphrase. A request that can't be honoured makes the call fail rather
   /// than produce an archive whose names are readable.
+  ///
+  /// [compressionMethod] is an [ArchiveCompressionMethod.code]; null / 0 keeps
+  /// the format's own codec. A method the format can't write (anything but
+  /// Deflate for ZIP, say) makes the call fail rather than be ignored.
   Future<bool> createArchive({
     required ArchiveFormatType format,
     required List<String> srcPaths,
@@ -260,6 +264,7 @@ class VaultArchiveApi {
     String? passphrase,
     bool encryptFilenames = false,
     int? compressionLevel,
+    int? compressionMethod,
     int? opId,
   }) async {
     try {
@@ -278,6 +283,7 @@ class VaultArchiveApi {
             'passphrase': passphrase,
           if (encryptFilenames) 'encryptFilenames': true,
           'compressionLevel': ?compressionLevel,
+          'compressionMethod': ?compressionMethod,
           'opId': ?opId,
         },
       );

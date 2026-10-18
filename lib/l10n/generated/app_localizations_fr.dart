@@ -12271,4 +12271,32 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get viewOfficeDocumentsInApp =>
       'Prévisualiser les fichiers Word, Excel, PowerPoint et OpenDocument dans l\'application';
+
+  @override
+  String get archiveCompressionMethodLabel => 'Méthode de compression';
+
+  @override
+  String get archiveMethodLzma2Desc =>
+      'Le meilleur choix dans l\'ensemble. Également utilisée par .tar.xz.';
+
+  @override
+  String get archiveMethodLzmaDesc =>
+      'L\'ancienne méthode de 7-Zip. Également utilisée par .tar.lzma.';
+
+  @override
+  String get archiveMethodDeflateDesc =>
+      'La plus rapide, avec des fichiers plus volumineux et la compatibilité la plus large. Également utilisée par ZIP et .tar.gz.';
+
+  @override
+  String archiveMethodFixedInfo(String format, String method) {
+    return '$format compresse toujours avec $method.';
+  }
+
+  @override
+  String get archiveMethodMoreInSevenZip =>
+      'LZMA2 et LZMA sont disponibles dans les archives 7-Zip.';
+
+  @override
+  String get archiveMethodStoreNote =>
+      'Stocker ne compresse pas, il n\'y a donc aucune méthode à choisir.';
 }

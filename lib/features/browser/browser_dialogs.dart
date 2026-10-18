@@ -98,6 +98,7 @@ abstract class BrowserDialogs {
       String? passphrase,
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
+      ArchiveCompressionMethod compressionMethod,
     ) onCreate,
     bool readOnly = false,
   }) {

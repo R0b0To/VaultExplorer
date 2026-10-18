@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "Dieses Dokument ist zu groß für die Vorschau in der App.",
   "officeViewerSpeakerNotes": "Sprechernotizen",
   "fileAssocDocumentViewer": "Interner Dokumentbetrachter",
-  "viewOfficeDocumentsInApp": "Word-, Excel-, PowerPoint- und OpenDocument-Dateien in der App anzeigen"
+  "viewOfficeDocumentsInApp": "Word-, Excel-, PowerPoint- und OpenDocument-Dateien in der App anzeigen",
+  "archiveCompressionMethodLabel": "Komprimierungsmethode",
+  "archiveMethodLzma2Desc": "Beste Allround-Wahl. Wird auch von .tar.xz verwendet.",
+  "archiveMethodLzmaDesc": "Die ältere 7-Zip-Methode. Wird auch von .tar.lzma verwendet.",
+  "archiveMethodDeflateDesc": "Am schnellsten, mit größeren Dateien und der breitesten Unterstützung. Wird auch von ZIP und .tar.gz verwendet.",
+  "archiveMethodFixedInfo": "{format} komprimiert immer mit {method}.",
+  "archiveMethodMoreInSevenZip": "LZMA2 und LZMA sind in 7-Zip-Archiven verfügbar.",
+  "archiveMethodStoreNote": "Speichern komprimiert nicht, daher gibt es keine Methode zur Auswahl."
 }

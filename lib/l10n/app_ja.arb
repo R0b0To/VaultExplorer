@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "このドキュメントはサイズが大きすぎて、アプリ内でプレビューできません。",
   "officeViewerSpeakerNotes": "スピーカーノート",
   "fileAssocDocumentViewer": "アプリ内ドキュメントビューア",
-  "viewOfficeDocumentsInApp": "Word、Excel、PowerPoint、OpenDocumentファイルをアプリ内でプレビュー"
+  "viewOfficeDocumentsInApp": "Word、Excel、PowerPoint、OpenDocumentファイルをアプリ内でプレビュー",
+  "archiveCompressionMethodLabel": "圧縮方式",
+  "archiveMethodLzma2Desc": "最もバランスの良い選択肢。.tar.xz でも使われます。",
+  "archiveMethodLzmaDesc": "7-Zip の従来方式。.tar.lzma でも使われます。",
+  "archiveMethodDeflateDesc": "最速ですがファイルは大きくなります。互換性が最も広く、ZIP や .tar.gz でも使われます。",
+  "archiveMethodFixedInfo": "{format} は常に {method} で圧縮します。",
+  "archiveMethodMoreInSevenZip": "LZMA2 と LZMA は 7-Zip アーカイブで利用できます。",
+  "archiveMethodStoreNote": "無圧縮では圧縮しないため、選択できる方式はありません。"
 }

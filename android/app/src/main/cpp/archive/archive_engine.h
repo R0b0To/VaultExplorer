@@ -86,6 +86,25 @@ enum class ArchiveFormat : int32_t {
     Cpio = 9,
 };
 
+// The codec behind a compressed archive. Values are shared with the Dart
+// ArchiveCompressionMethod enum and the JNI layer, so don't renumber them.
+enum class ArchiveCompressionMethod : int32_t {
+    Default = 0,  // the format's own default codec
+    Deflate = 1,  // ZIP, 7z, TAR.GZ
+    Lzma    = 2,  // LZMA1: 7z, TAR.LZMA
+    Lzma2   = 3,  // 7z, TAR.XZ
+};
+
+/// Whether `format` can write its data with `method`:
+///   ZIP      Deflate
+///   7z       Deflate, LZMA, LZMA2 (with or without a password)
+///   TAR.GZ   Deflate   (the only codec; accepted so a caller can state it)
+///   TAR.XZ   LZMA2     (same)
+///   TAR.LZMA LZMA      (same)
+/// Everything else (TAR.BZ2, TAR.ZST, plain TAR, ISO, CPIO) only accepts
+/// Default. Default is accepted by every format.
+bool archiveCompressionMethodSupported(ArchiveFormat format, ArchiveCompressionMethod method);
+
 struct ArchiveSourceEntry {
     std::string pathInArchive;
     bool isDirectory = false;
@@ -139,5 +158,11 @@ ArchiveCreateResult archiveCreate(
     // protected 7z stores via Deflate level 0: its encryption can't be
     // combined with the 7z "copy" method. The tar filters have no store mode,
     // so 0 selects each one's fastest setting.)
-    int compressionLevel = kArchiveDefaultCompressionLevel
+    int compressionLevel = kArchiveDefaultCompressionLevel,
+    // Which codec compresses the data. kDefault keeps the format's own choice
+    // (see archiveCompressionMethodSupported for what each format accepts).
+    // A method the format can't write is rejected rather than ignored, and so
+    // is any explicit method together with level 0 on ZIP/7z (level 0 means
+    // "store", which has no codec).
+    ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod::Default
 );

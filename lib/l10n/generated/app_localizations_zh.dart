@@ -11315,4 +11315,28 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get viewOfficeDocumentsInApp =>
       '在应用内预览 Word、Excel、PowerPoint 和 OpenDocument 文件';
+
+  @override
+  String get archiveCompressionMethodLabel => '压缩方法';
+
+  @override
+  String get archiveMethodLzma2Desc => '综合表现最佳的选择。.tar.xz 也使用该方法。';
+
+  @override
+  String get archiveMethodLzmaDesc => '7-Zip 较早的方法。.tar.lzma 也使用该方法。';
+
+  @override
+  String get archiveMethodDeflateDesc =>
+      '速度最快，但文件较大，兼容性最广。ZIP 和 .tar.gz 也使用该方法。';
+
+  @override
+  String archiveMethodFixedInfo(String format, String method) {
+    return '$format 始终使用 $method 压缩。';
+  }
+
+  @override
+  String get archiveMethodMoreInSevenZip => '7-Zip 压缩包支持 LZMA2 和 LZMA。';
+
+  @override
+  String get archiveMethodStoreNote => '仅存储不进行压缩，因此无需选择压缩方法。';
 }

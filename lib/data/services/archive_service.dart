@@ -497,6 +497,7 @@ class ArchiveService {
     String? passphrase,
     bool encryptFilenames = false,
     int? compressionLevel,
+    int? compressionMethod,
     int? opId,
   }) {
     return _archive.createArchive(
@@ -511,6 +512,7 @@ class ArchiveService {
       passphrase: passphrase,
       encryptFilenames: encryptFilenames,
       compressionLevel: compressionLevel,
+      compressionMethod: compressionMethod,
       opId: opId,
     );
   }

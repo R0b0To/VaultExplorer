@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "هذا المستند كبير جدًا بحيث لا يمكن معاينته داخل التطبيق.",
   "officeViewerSpeakerNotes": "ملاحظات المتحدث",
   "fileAssocDocumentViewer": "عارض المستندات المدمج",
-  "viewOfficeDocumentsInApp": "معاينة ملفات Word وExcel وPowerPoint وOpenDocument داخل التطبيق"
+  "viewOfficeDocumentsInApp": "معاينة ملفات Word وExcel وPowerPoint وOpenDocument داخل التطبيق",
+  "archiveCompressionMethodLabel": "طريقة الضغط",
+  "archiveMethodLzma2Desc": "أفضل خيار شامل. يُستخدم أيضًا في .tar.xz.",
+  "archiveMethodLzmaDesc": "طريقة 7-Zip الأقدم. تُستخدم أيضًا في .tar.lzma.",
+  "archiveMethodDeflateDesc": "الأسرع، لكن بحجم ملفات أكبر وأوسع دعم. يُستخدم أيضًا في ZIP و.tar.gz.",
+  "archiveMethodFixedInfo": "{format} يضغط دائمًا باستخدام {method}.",
+  "archiveMethodMoreInSevenZip": "LZMA2 وLZMA متاحان في أرشيفات 7-Zip.",
+  "archiveMethodStoreNote": "وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار."
 }

@@ -31,6 +31,17 @@ extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
       };
 }
 
+extension ArchiveCompressionMethodL10n on ArchiveCompressionMethod {
+  /// What the method is good for and where else it is used. Empty for `auto`,
+  /// which is never shown to the user.
+  String localizedDescription(AppLocalizations l10n) => switch (this) {
+        ArchiveCompressionMethod.auto => '',
+        ArchiveCompressionMethod.lzma2 => l10n.archiveMethodLzma2Desc,
+        ArchiveCompressionMethod.lzma => l10n.archiveMethodLzmaDesc,
+        ArchiveCompressionMethod.deflate => l10n.archiveMethodDeflateDesc,
+      };
+}
+
 /// A modal bottom sheet for creating archives with modern layout, decoupled
 /// name/extension, dynamic security options, and a compression level picker
 /// that only appears for formats that actually compress.
@@ -47,6 +58,7 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
     String? passphrase,
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
+    ArchiveCompressionMethod compressionMethod,
   ) onCreate;
 
   const CreateArchiveBottomSheet({
@@ -74,6 +86,7 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
       String? passphrase,
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
+      ArchiveCompressionMethod compressionMethod,
     ) onCreate,
   }) {
     return showModalBottomSheet<void>(
@@ -117,6 +130,11 @@ class _CreateArchiveBottomSheetState
   late final FilesystemType _fsType;
   ArchiveFormatType _format = ArchiveFormatType.zip;
   ArchiveCompressionLevel _compressionLevel = ArchiveCompressionLevel.normal;
+  // The user's pick for formats that offer one (7z). Kept across format
+  // switches so going 7z -> ZIP -> 7z doesn't forget it; what is actually sent
+  // is [_effectiveMethod].
+  ArchiveCompressionMethod _method =
+      ArchiveFormatType.sevenZip.selectableCompressionMethods.first;
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -137,6 +155,23 @@ class _CreateArchiveBottomSheetState
       !_hasPassword || _passwordCtrl.text == _confirmPasswordCtrl.text;
 
   bool get _isValidName => _issues.isEmpty && !_conflict.isConflict;
+
+  /// Store really stores only in ZIP and 7z. On the compressed TARs level 0
+  /// just means that filter's fastest setting, so it still has a codec.
+  bool get _isStoring =>
+      _compressionLevel == ArchiveCompressionLevel.store &&
+      (_format == ArchiveFormatType.zip ||
+          _format == ArchiveFormatType.sevenZip);
+
+  /// Whether the user can choose the codec right now: the format offers a
+  /// choice and it isn't being stored (no compression, so no codec).
+  bool get _canPickMethod =>
+      _format.selectableCompressionMethods.isNotEmpty && !_isStoring;
+
+  /// The method sent to the engine. `auto` whenever the user had no say, so the
+  /// engine never sees a method its format can't write.
+  ArchiveCompressionMethod get _effectiveMethod =>
+      _canPickMethod ? _method : ArchiveCompressionMethod.auto;
 
   bool get _hasEnoughSpace {
     if (widget.freeSpace == null || widget.freeSpace! < 0) return true;
@@ -274,6 +309,7 @@ class _CreateArchiveBottomSheetState
       passphrase,
       encryptFilenames,
       _compressionLevel,
+      _effectiveMethod,
     );
   }
 
@@ -332,6 +368,8 @@ class _CreateArchiveBottomSheetState
                       if (_format.supportsCompressionLevel) ...[
                         const SizedBox(height: 12),
                         _buildCompressionSection(cs, textTheme),
+                        const SizedBox(height: 12),
+                        _buildCompressionMethodSection(cs, textTheme),
                       ],
                     ],
                   ),
@@ -797,6 +835,95 @@ class _CreateArchiveBottomSheetState
           },
         ),
       ],
+    );
+  }
+
+  /// Where each codec is available, and when it can be chosen:
+  ///  * 7z: a picker (LZMA2 / LZMA / Deflate), disabled while the level is Store.
+  ///  * every other compressing format: a read-only line naming its one codec,
+  ///    with a pointer to 7z when the user might be after LZMA.
+  Widget _buildCompressionMethodSection(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
+    final methods = _format.selectableCompressionMethods;
+
+    if (_isStoring) {
+      return _buildMethodNote(cs, textTheme, l10n.archiveMethodStoreNote);
+    }
+
+    if (methods.isEmpty) {
+      final fixed = _format.fixedCompressionLabel;
+      if (fixed == null) return const SizedBox.shrink();
+      final showSevenZipHint = _format != ArchiveFormatType.tarXz &&
+          _format != ArchiveFormatType.tarLzma;
+      return _buildMethodNote(
+        cs,
+        textTheme,
+        [
+          l10n.archiveMethodFixedInfo(_format.displayLabel, fixed),
+          if (showSevenZipHint) l10n.archiveMethodMoreInSevenZip,
+        ].join(' '),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<ArchiveCompressionMethod>(
+          initialValue: _method,
+          isDense: true,
+          decoration: InputDecoration(
+            labelText: l10n.archiveCompressionMethodLabel,
+            filled: true,
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.primary, width: 2),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          items: [
+            for (final m in methods)
+              DropdownMenuItem(value: m, child: Text(m.displayLabel)),
+          ],
+          onChanged: (m) {
+            if (m != null) setState(() => _method = m);
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+          child: Text(
+            _method.localizedDescription(l10n),
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMethodNote(ColorScheme cs, TextTheme textTheme, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "Este documento es demasiado grande para previsualizarlo en la app.",
   "officeViewerSpeakerNotes": "Notas del orador",
   "fileAssocDocumentViewer": "Visor de documentos integrado",
-  "viewOfficeDocumentsInApp": "Previsualiza archivos de Word, Excel, PowerPoint y OpenDocument en la app"
+  "viewOfficeDocumentsInApp": "Previsualiza archivos de Word, Excel, PowerPoint y OpenDocument en la app",
+  "archiveCompressionMethodLabel": "Método de compresión",
+  "archiveMethodLzma2Desc": "La mejor opción en general. También lo usa .tar.xz.",
+  "archiveMethodLzmaDesc": "El método anterior de 7-Zip. También lo usa .tar.lzma.",
+  "archiveMethodDeflateDesc": "El más rápido, con archivos más grandes y la mayor compatibilidad. También lo usan ZIP y .tar.gz.",
+  "archiveMethodFixedInfo": "{format} siempre comprime con {method}.",
+  "archiveMethodMoreInSevenZip": "LZMA2 y LZMA están disponibles en archivos 7-Zip.",
+  "archiveMethodStoreNote": "Almacenar no comprime, así que no hay método que elegir."
 }

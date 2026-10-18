@@ -20,6 +20,7 @@ Widget _buildTestApp({
     String? passphrase,
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
+    ArchiveCompressionMethod compressionMethod,
   ) onCreate,
 }) {
   return ProviderScope(
@@ -76,6 +77,26 @@ MountedContainer _mockContainer({
 Finder get _compressionPicker =>
     find.byType(DropdownButtonFormField<ArchiveCompressionLevel>);
 
+Finder get _methodPicker =>
+    find.byType(DropdownButtonFormField<ArchiveCompressionMethod>);
+
+/// Opens the sheet (suggested name is a .zip) and switches it to [extension].
+Future<void> _openAndSwitchFormat(WidgetTester tester, String extension) async {
+  await tester.tap(find.text('Open Sheet'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('.zip'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(extension));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _submit(WidgetTester tester) async {
+  await tester.ensureVisible(find.widgetWithText(FilledButton, 'Create'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('Renders bottom sheet with decoupled name and extension pill',
       (tester) async {
@@ -103,7 +124,7 @@ void main() {
         suggestedName: 'documents.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -161,7 +182,7 @@ void main() {
         suggestedName: 'media.zip',
         selectedEntries: selected,
         freeSpace: 200 * 1024 * 1024,
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -184,7 +205,7 @@ void main() {
         suggestedName: 'backup.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -239,7 +260,7 @@ void main() {
         suggestedName: 'test.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024, // Only 100 MB free
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -271,7 +292,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl) async {
+        onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
           createdPath = path;
           createdFormat = fmt;
           createdPassphrase = pass;
@@ -316,7 +337,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl) async {
+        onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
           createdLvl = lvl;
         },
       ),
@@ -347,7 +368,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -412,7 +433,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -431,5 +452,254 @@ void main() {
 
     // Now format is 7-Zip -> Encrypt file names MUST be shown
     expect(find.text('Encrypt file names'), findsOneWidget);
+  });
+
+  group('Compression method', () {
+    Widget app(
+      void Function(ArchiveFormatType, ArchiveCompressionLevel,
+              ArchiveCompressionMethod)
+          onCreated,
+    ) =>
+        _buildTestApp(
+          container: _mockContainer(),
+          currentDirPath: '',
+          existingEntries: [],
+          suggestedName: 'archive.zip',
+          selectedEntries: [],
+          freeSpace: 1000 * 1024 * 1024,
+          onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
+            onCreated(fmt, lvl, method);
+          },
+        );
+
+    testWidgets('7-Zip offers LZMA2 (preselected), LZMA and Deflate',
+        (tester) async {
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, __, m) => created = m));
+      await _openAndSwitchFormat(tester, '.7z');
+
+      expect(_methodPicker, findsOneWidget);
+      expect(
+        find.widgetWithText(
+          DropdownButtonFormField<ArchiveCompressionMethod>,
+          'Compression method',
+        ),
+        findsOneWidget,
+      );
+      // Preselected, with its description underneath.
+      expect(find.text('LZMA2'), findsOneWidget);
+      expect(find.text('Best all-round choice. Also used by .tar.xz.'),
+          findsOneWidget);
+
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      expect(find.text('LZMA2'), findsWidgets);
+      expect(find.text('LZMA'), findsOneWidget);
+      expect(find.text('Deflate'), findsOneWidget);
+      await tester.tap(find.text('LZMA2').last);
+      await tester.pumpAndSettle();
+
+      await _submit(tester);
+      expect(created, ArchiveCompressionMethod.lzma2);
+    });
+
+    testWidgets('The picked method is submitted and its description follows',
+        (tester) async {
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, __, m) => created = m));
+      await _openAndSwitchFormat(tester, '.7z');
+
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LZMA').last);
+      await tester.pumpAndSettle();
+      expect(find.text("7-Zip's older method. Also used by .tar.lzma."),
+          findsOneWidget);
+      await _submit(tester);
+      expect(created, ArchiveCompressionMethod.lzma);
+    });
+
+    testWidgets('Deflate can be picked', (tester) async {
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, __, m) => created = m));
+      await _openAndSwitchFormat(tester, '.7z');
+
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Deflate').last);
+      await tester.pumpAndSettle();
+      await _submit(tester);
+      expect(created, ArchiveCompressionMethod.deflate);
+    });
+
+    testWidgets('ZIP has no picker: a note names its codec, and `auto` is sent',
+        (tester) async {
+      ArchiveFormatType? fmt;
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((f, _, m) {
+        fmt = f;
+        created = m;
+      }));
+      await tester.tap(find.text('Open Sheet'));
+      await tester.pumpAndSettle();
+
+      expect(_methodPicker, findsNothing);
+      expect(find.textContaining('ZIP always compresses with Deflate.'),
+          findsOneWidget);
+      // ZIP can't do LZMA, so the note says where that is available.
+      expect(
+        find.textContaining('LZMA2 and LZMA are available in 7-Zip archives.'),
+        findsOneWidget,
+      );
+
+      await _submit(tester);
+      expect(fmt, ArchiveFormatType.zip);
+      expect(created, ArchiveCompressionMethod.auto);
+    });
+
+    testWidgets('TAR.XZ is LZMA2 and has nothing to point at',
+        (tester) async {
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, __, m) => created = m));
+      await _openAndSwitchFormat(tester, '.tar.xz');
+
+      expect(_methodPicker, findsNothing);
+      expect(find.textContaining('TAR.XZ always compresses with LZMA2.'),
+          findsOneWidget);
+      expect(find.textContaining('available in 7-Zip archives'), findsNothing);
+      await _submit(tester);
+      expect(created, ArchiveCompressionMethod.auto);
+    });
+
+    testWidgets('Plain TAR does not compress, so there is no method row',
+        (tester) async {
+      await tester.pumpWidget(app((_, __, ___) {}));
+      await _openAndSwitchFormat(tester, '.tar');
+
+      expect(_methodPicker, findsNothing);
+      expect(find.textContaining('always compresses with'), findsNothing);
+      expect(find.textContaining('no method to choose'), findsNothing);
+    });
+
+    testWidgets('Store has no codec: the 7z picker gives way to a note',
+        (tester) async {
+      ArchiveCompressionLevel? lvl;
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, l, m) {
+        lvl = l;
+        created = m;
+      }));
+      await _openAndSwitchFormat(tester, '.7z');
+
+      // Pick LZMA first, so it's clear Store overrides a real choice.
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LZMA').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_compressionPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Store (0) — No compression').last);
+      await tester.pumpAndSettle();
+
+      expect(_methodPicker, findsNothing);
+      expect(find.text("Store doesn't compress, so there is no method to choose."),
+          findsOneWidget);
+
+      await _submit(tester);
+      expect(lvl, ArchiveCompressionLevel.store);
+      expect(created, ArchiveCompressionMethod.auto);
+    });
+
+    testWidgets('Leaving Store brings the picker back with the earlier pick',
+        (tester) async {
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((_, __, m) => created = m));
+      await _openAndSwitchFormat(tester, '.7z');
+
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Deflate').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(_compressionPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Store (0) — No compression').last);
+      await tester.pumpAndSettle();
+      expect(_methodPicker, findsNothing);
+
+      await tester.tap(_compressionPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Normal (5) — Balanced').last);
+      await tester.pumpAndSettle();
+
+      expect(_methodPicker, findsOneWidget);
+      await _submit(tester);
+      expect(created, ArchiveCompressionMethod.deflate);
+    });
+
+    testWidgets('A 7z pick does not leak into ZIP', (tester) async {
+      ArchiveFormatType? fmt;
+      ArchiveCompressionMethod? created;
+      await tester.pumpWidget(app((f, _, m) {
+        fmt = f;
+        created = m;
+      }));
+      await _openAndSwitchFormat(tester, '.7z');
+      await tester.tap(_methodPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('LZMA').last);
+      await tester.pumpAndSettle();
+
+      // Back to ZIP: ZIP can only write Deflate, so it must not get LZMA.
+      await tester.tap(find.text('.7z'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('.zip').last);
+      await tester.pumpAndSettle();
+
+      await _submit(tester);
+      expect(fmt, ArchiveFormatType.zip);
+      expect(created, ArchiveCompressionMethod.auto);
+    });
+  });
+
+  group('Compression method support rules', () {
+    test('only 7z lets the user choose, LZMA2 first', () {
+      for (final f in ArchiveFormatType.values) {
+        final methods = f.selectableCompressionMethods;
+        if (f == ArchiveFormatType.sevenZip) {
+          expect(methods, [
+            ArchiveCompressionMethod.lzma2,
+            ArchiveCompressionMethod.lzma,
+            ArchiveCompressionMethod.deflate,
+          ]);
+        } else {
+          expect(methods, isEmpty, reason: f.displayLabel);
+        }
+        expect(methods.contains(ArchiveCompressionMethod.auto), isFalse);
+      }
+    });
+
+    test('every compressing format without a choice names its one codec', () {
+      for (final f in ArchiveFormatType.values) {
+        final fixed = f.fixedCompressionLabel;
+        final tied = f.supportsCompressionLevel &&
+            f.selectableCompressionMethods.isEmpty;
+        expect(fixed != null, tied, reason: f.displayLabel);
+      }
+      expect(ArchiveFormatType.zip.fixedCompressionLabel, 'Deflate');
+      expect(ArchiveFormatType.tarGz.fixedCompressionLabel, 'Deflate');
+      expect(ArchiveFormatType.tarXz.fixedCompressionLabel, 'LZMA2');
+      expect(ArchiveFormatType.tarLzma.fixedCompressionLabel, 'LZMA');
+      expect(ArchiveFormatType.tarBz2.fixedCompressionLabel, 'BZip2');
+      expect(ArchiveFormatType.tarZstd.fixedCompressionLabel, 'Zstandard');
+    });
+
+    test('codes match the native engine (archive_engine.h)', () {
+      expect(ArchiveCompressionMethod.auto.code, 0);
+      expect(ArchiveCompressionMethod.deflate.code, 1);
+      expect(ArchiveCompressionMethod.lzma.code, 2);
+      expect(ArchiveCompressionMethod.lzma2.code, 3);
+    });
   });
 }

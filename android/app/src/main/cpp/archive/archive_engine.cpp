@@ -783,7 +783,54 @@ int applyCompressionLevel(struct archive* a, ArchiveFormat format, int level, bo
     }
 }
 
+// Selects the codec on top of what configureFormatAndFilters set up. Only ZIP
+// and 7z have a choice to make; for the compressed TARs the codec is the
+// filter itself, and archiveCompressionMethodSupported has already checked that
+// the caller asked for that same one. Runs before applyCompressionLevel.
+int applyCompressionMethod(struct archive* a, ArchiveFormat format, ArchiveCompressionMethod method) {
+    if (method == ArchiveCompressionMethod::Default) return ARCHIVE_OK;
+    switch (format) {
+        case ArchiveFormat::Zip:
+            // Deflate is the only method here; naming it just makes the
+            // writer's default explicit.
+            return archive_write_set_options(a, "zip:compression=deflate");
+        case ArchiveFormat::SevenZip:
+            switch (method) {
+                case ArchiveCompressionMethod::Deflate:
+                    return archive_write_set_options(a, "7zip:compression=deflate");
+                case ArchiveCompressionMethod::Lzma:
+                    return archive_write_set_options(a, "7zip:compression=lzma1");
+                case ArchiveCompressionMethod::Lzma2:
+                    return archive_write_set_options(a, "7zip:compression=lzma2");
+                default:
+                    return ARCHIVE_FATAL;
+            }
+        default:
+            return ARCHIVE_OK;  // the filter already is the method
+    }
+}
+
 }  // namespace
+
+bool archiveCompressionMethodSupported(ArchiveFormat format, ArchiveCompressionMethod method) {
+    if (method == ArchiveCompressionMethod::Default) return true;
+    switch (format) {
+        case ArchiveFormat::Zip:
+            return method == ArchiveCompressionMethod::Deflate;
+        case ArchiveFormat::SevenZip:
+            return method == ArchiveCompressionMethod::Deflate ||
+                   method == ArchiveCompressionMethod::Lzma ||
+                   method == ArchiveCompressionMethod::Lzma2;
+        case ArchiveFormat::TarGz:
+            return method == ArchiveCompressionMethod::Deflate;
+        case ArchiveFormat::TarXz:
+            return method == ArchiveCompressionMethod::Lzma2;
+        case ArchiveFormat::TarLzma:
+            return method == ArchiveCompressionMethod::Lzma;
+        default:
+            return false;
+    }
+}
 
 ArchiveCreateResult archiveCreate(
     const ArchiveSink& sink,
@@ -792,13 +839,26 @@ ArchiveCreateResult archiveCreate(
     const std::string& passphrase,
     bool encryptFilenames,
     std::function<bool(uint64_t progress)> progressCallback,
-    int compressionLevel
+    int compressionLevel,
+    ArchiveCompressionMethod compressionMethod
 ) {
     ArchiveCreateResult result;
     if (compressionLevel != kArchiveDefaultCompressionLevel &&
         (compressionLevel < 0 || compressionLevel > 9)) {
         result.status = ArchiveOpenStatus::UnsupportedFormat;
         result.errorMessage = "compression level must be between 0 and 9";
+        return result;
+    }
+    if (!archiveCompressionMethodSupported(format, compressionMethod)) {
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = "this archive format can't use the requested compression method";
+        return result;
+    }
+    if (compressionMethod != ArchiveCompressionMethod::Default && compressionLevel == 0 &&
+        (format == ArchiveFormat::Zip || format == ArchiveFormat::SevenZip)) {
+        // Level 0 stores the data, so there is no codec to pick.
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = "a compression method can't be combined with store (level 0)";
         return result;
     }
     if (encryptFilenames && (format != ArchiveFormat::SevenZip || passphrase.empty())) {
@@ -823,6 +883,13 @@ ArchiveCreateResult archiveCreate(
     if (configureFormatAndFilters(a, format, passphrase, encryptFilenames) != ARCHIVE_OK) {
         result.status = ArchiveOpenStatus::UnsupportedFormat;
         result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "unsupported format or filter";
+        archive_write_free(a);
+        return result;
+    }
+
+    if (applyCompressionMethod(a, format, compressionMethod) != ARCHIVE_OK) {
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "compression method rejected";
         archive_write_free(a);
         return result;
     }

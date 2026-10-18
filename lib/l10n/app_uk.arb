@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "Цей документ завеликий для перегляду в програмі.",
   "officeViewerSpeakerNotes": "Нотатки доповідача",
   "fileAssocDocumentViewer": "Вбудований переглядач документів",
-  "viewOfficeDocumentsInApp": "Перегляд файлів Word, Excel, PowerPoint і OpenDocument у програмі"
+  "viewOfficeDocumentsInApp": "Перегляд файлів Word, Excel, PowerPoint і OpenDocument у програмі",
+  "archiveCompressionMethodLabel": "Метод стиснення",
+  "archiveMethodLzma2Desc": "Найкращий універсальний вибір. Також використовується в .tar.xz.",
+  "archiveMethodLzmaDesc": "Старіший метод 7-Zip. Також використовується в .tar.lzma.",
+  "archiveMethodDeflateDesc": "Найшвидший, але файли більші, а сумісність найширша. Також використовується в ZIP і .tar.gz.",
+  "archiveMethodFixedInfo": "{format} завжди стискає за допомогою {method}.",
+  "archiveMethodMoreInSevenZip": "LZMA2 і LZMA доступні в архівах 7-Zip.",
+  "archiveMethodStoreNote": "Режим «Зберегти» не стискає, тому методу для вибору немає."
 }

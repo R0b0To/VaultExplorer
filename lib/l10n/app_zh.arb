@@ -3356,5 +3356,12 @@
   "officeViewerTooLarge": "此文档过大，无法在应用内预览。",
   "officeViewerSpeakerNotes": "演讲者备注",
   "fileAssocDocumentViewer": "应用内文档查看器",
-  "viewOfficeDocumentsInApp": "在应用内预览 Word、Excel、PowerPoint 和 OpenDocument 文件"
+  "viewOfficeDocumentsInApp": "在应用内预览 Word、Excel、PowerPoint 和 OpenDocument 文件",
+  "archiveCompressionMethodLabel": "压缩方法",
+  "archiveMethodLzma2Desc": "综合表现最佳的选择。.tar.xz 也使用该方法。",
+  "archiveMethodLzmaDesc": "7-Zip 较早的方法。.tar.lzma 也使用该方法。",
+  "archiveMethodDeflateDesc": "速度最快，但文件较大，兼容性最广。ZIP 和 .tar.gz 也使用该方法。",
+  "archiveMethodFixedInfo": "{format} 始终使用 {method} 压缩。",
+  "archiveMethodMoreInSevenZip": "7-Zip 压缩包支持 LZMA2 和 LZMA。",
+  "archiveMethodStoreNote": "仅存储不进行压缩，因此无需选择压缩方法。"
 }

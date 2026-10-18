@@ -142,6 +142,75 @@ enum ArchiveFormatType {
         ArchiveFormatType.cpio =>
           false,
       };
+
+  /// The compression methods the user can choose between for this format.
+  /// Only 7z has a real choice; every other format is tied to one codec (see
+  /// [fixedCompressionLabel]). Mirrors `archiveCompressionMethodSupported` in
+  /// the native engine, which refuses anything outside this list.
+  ///
+  /// The first entry is the preselected one.
+  List<ArchiveCompressionMethod> get selectableCompressionMethods =>
+      switch (this) {
+        ArchiveFormatType.sevenZip => const [
+            ArchiveCompressionMethod.lzma2,
+            ArchiveCompressionMethod.lzma,
+            ArchiveCompressionMethod.deflate,
+          ],
+        ArchiveFormatType.zip ||
+        ArchiveFormatType.tar ||
+        ArchiveFormatType.tarGz ||
+        ArchiveFormatType.tarBz2 ||
+        ArchiveFormatType.tarXz ||
+        ArchiveFormatType.tarZstd ||
+        ArchiveFormatType.tarLzma ||
+        ArchiveFormatType.iso ||
+        ArchiveFormatType.cpio =>
+          const [],
+      };
+
+  /// Short technical name of the one codec a compressing format always uses,
+  /// or null when the user picks it ([selectableCompressionMethods]) or when
+  /// the format doesn't compress at all. Not localized, like [displayLabel].
+  String? get fixedCompressionLabel => switch (this) {
+        ArchiveFormatType.zip || ArchiveFormatType.tarGz => 'Deflate',
+        ArchiveFormatType.tarBz2 => 'BZip2',
+        ArchiveFormatType.tarXz => 'LZMA2',
+        ArchiveFormatType.tarZstd => 'Zstandard',
+        ArchiveFormatType.tarLzma => 'LZMA',
+        ArchiveFormatType.sevenZip ||
+        ArchiveFormatType.tar ||
+        ArchiveFormatType.iso ||
+        ArchiveFormatType.cpio =>
+          null,
+      };
+}
+
+/// The codec an archive's data is compressed with, for formats that let the
+/// user choose (see [ArchiveFormatType.selectableCompressionMethods]).
+///
+/// [code] is shared with the native engine (`ArchiveCompressionMethod` in
+/// archive_engine.h) and the Kotlin handler; don't renumber it.
+enum ArchiveCompressionMethod {
+  /// No explicit choice: the format uses its own codec.
+  auto,
+  deflate,
+  lzma,
+  lzma2;
+
+  int get code => switch (this) {
+        ArchiveCompressionMethod.auto => 0,
+        ArchiveCompressionMethod.deflate => 1,
+        ArchiveCompressionMethod.lzma => 2,
+        ArchiveCompressionMethod.lzma2 => 3,
+      };
+
+  /// Short technical name for UI display (not localized).
+  String get displayLabel => switch (this) {
+        ArchiveCompressionMethod.auto => '',
+        ArchiveCompressionMethod.deflate => 'Deflate',
+        ArchiveCompressionMethod.lzma => 'LZMA',
+        ArchiveCompressionMethod.lzma2 => 'LZMA2',
+      };
 }
 
 /// Human-readable presets for compression level.

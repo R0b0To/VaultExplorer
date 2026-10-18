@@ -2720,6 +2720,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         encryptFilenames: clip.encryptFilenames,
         deleteSourceAfter: options.deleteSourceAfter,
         compressionLevel: clip.compressionLevel ?? ArchiveCompressionLevel.normal,
+        compressionMethod: clip.compressionMethod,
         l10n: context.l10n,
       );
       _clip.clear();
@@ -2960,6 +2961,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         passphrase,
         encryptFilenames,
         compressionLevel,
+        compressionMethod,
       ) async {
         final clipItems = entries.map((e) {
           final path = _fullPathOf(e);
@@ -2981,6 +2983,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           passphrase: passphrase,
           encryptFilenames: encryptFilenames,
           compressionLevel: compressionLevel,
+          compressionMethod: compressionMethod,
         );
         _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },

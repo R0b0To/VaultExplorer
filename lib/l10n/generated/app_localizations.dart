@@ -20298,6 +20298,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preview Word, Excel, PowerPoint and OpenDocument files in the app'**
   String get viewOfficeDocumentsInApp;
+
+  /// Label for the compression method dropdown in the create archive sheet (7-Zip only)
+  ///
+  /// In en, this message translates to:
+  /// **'Compression method'**
+  String get archiveCompressionMethodLabel;
+
+  /// Description of the LZMA2 method in the compression method dropdown. LZMA2 is a technical name and is not translated
+  ///
+  /// In en, this message translates to:
+  /// **'Best all-round choice. Also used by .tar.xz.'**
+  String get archiveMethodLzma2Desc;
+
+  /// Description of the LZMA method in the compression method dropdown. LZMA is a technical name and is not translated
+  ///
+  /// In en, this message translates to:
+  /// **'7-Zip\'s older method. Also used by .tar.lzma.'**
+  String get archiveMethodLzmaDesc;
+
+  /// Description of the Deflate method in the compression method dropdown. Deflate is a technical name and is not translated
+  ///
+  /// In en, this message translates to:
+  /// **'Fastest, with larger files and the widest support. Also used by ZIP and .tar.gz.'**
+  String get archiveMethodDeflateDesc;
+
+  /// Note shown for archive formats that always use one compression method. format is the format name (e.g. ZIP), method the technical method name (e.g. Deflate)
+  ///
+  /// In en, this message translates to:
+  /// **'{format} always compresses with {method}.'**
+  String archiveMethodFixedInfo(String format, String method);
+
+  /// Hint shown after the fixed-method note: LZMA2 and LZMA are only available when creating 7-Zip archives
+  ///
+  /// In en, this message translates to:
+  /// **'LZMA2 and LZMA are available in 7-Zip archives.'**
+  String get archiveMethodMoreInSevenZip;
+
+  /// Note shown instead of the method dropdown when the compression level is Store (no compression)
+  ///
+  /// In en, this message translates to:
+  /// **'Store doesn\'t compress, so there is no method to choose.'**
+  String get archiveMethodStoreNote;
 }
 
 class _AppLocalizationsDelegate

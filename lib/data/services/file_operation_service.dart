@@ -391,6 +391,7 @@ class FileOperationService extends ChangeNotifier {
     bool encryptFilenames = false,
     bool deleteSourceAfter = false,
     ArchiveCompressionLevel compressionLevel = ArchiveCompressionLevel.normal,
+    ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
     required AppLocalizations l10n,
   }) {
     final op = FileOperation._internal(
@@ -423,6 +424,7 @@ class FileOperationService extends ChangeNotifier {
       encryptFilenames,
       deleteSourceAfter,
       compressionLevel,
+      compressionMethod,
     );
     return op;
   }
@@ -760,6 +762,7 @@ class FileOperationService extends ChangeNotifier {
     bool encryptFilenames,
     bool deleteSourceAfter,
     ArchiveCompressionLevel compressionLevel,
+    ArchiveCompressionMethod compressionMethod,
   ) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.verbArchiving);
@@ -850,6 +853,7 @@ class FileOperationService extends ChangeNotifier {
         passphrase: passphrase,
         encryptFilenames: encryptFilenames,
         compressionLevel: compressionLevel.level,
+        compressionMethod: compressionMethod.code,
         opId: op.id,
       );
 

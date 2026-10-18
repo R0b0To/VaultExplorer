@@ -11495,4 +11495,29 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get viewOfficeDocumentsInApp =>
       'Word、Excel、PowerPoint、OpenDocumentファイルをアプリ内でプレビュー';
+
+  @override
+  String get archiveCompressionMethodLabel => '圧縮方式';
+
+  @override
+  String get archiveMethodLzma2Desc => '最もバランスの良い選択肢。.tar.xz でも使われます。';
+
+  @override
+  String get archiveMethodLzmaDesc => '7-Zip の従来方式。.tar.lzma でも使われます。';
+
+  @override
+  String get archiveMethodDeflateDesc =>
+      '最速ですがファイルは大きくなります。互換性が最も広く、ZIP や .tar.gz でも使われます。';
+
+  @override
+  String archiveMethodFixedInfo(String format, String method) {
+    return '$format は常に $method で圧縮します。';
+  }
+
+  @override
+  String get archiveMethodMoreInSevenZip =>
+      'LZMA2 と LZMA は 7-Zip アーカイブで利用できます。';
+
+  @override
+  String get archiveMethodStoreNote => '無圧縮では圧縮しないため、選択できる方式はありません。';
 }

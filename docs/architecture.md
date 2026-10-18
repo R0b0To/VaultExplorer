@@ -290,6 +290,42 @@ and `prepareShareImport`.
   with Mask Mode by `DisguiseModeHandlers.syncShareTargetIdentity`, the same
   way the launcher aliases are (§6).
 
+### 1.5 Sharing out of a vault
+
+The outgoing counterpart of §1.4: the Share action in the browser hands files
+-- and folders -- from an unlocked vault to whichever app the person picks.
+Dart calls `VaultFileIoApi.shareFiles`; native side is
+`SystemPermissionHandlers.handleShareFile`, which builds `ACTION_SEND` /
+`ACTION_SEND_MULTIPLE` over URIs served by `ContainerShareProvider`.
+
+- **Files** are streamed through a proxy file descriptor onto the live vault
+  session -- nothing decrypted is written to disk.
+- **Folders** are shared as one `<name>.zip`, because the share sheet has no
+  notion of a directory. `FolderZipWriter` (pure JVM, vault reached only
+  through its `Source` interface) walks the subtree and writes the archive
+  into a pipe that `ContainerShareProvider.openFolderZip` returns, so the
+  zip is never staged on disk either. The folder itself is the archive's
+  top-level entry and empty subfolders are kept. Entry type is passed
+  explicitly (`directoryPaths`), never inferred from a name.
+- **Item Vault pseudo-files are left out of a shared folder** (Dart passes
+  their extensions as `skipExtensions`), matching multi-select share, which
+  already refuses to hand them out as loose files.
+- **A failed folder share must look failed.** A truncated listing
+  (`System:TRUNCATED`), a read error, an unsafe entry name or a vault that
+  starts locking throws; the archive is then never finalized (no central
+  directory is written, so unzippers reject it) and the pipe is closed with
+  an error. Existing export paths flag truncation and carry on; a share has
+  no side channel for that flag, so it refuses instead.
+- **A folder share never blocks locking.** The writer holds a
+  `ContainerDocumentIoRegistry` lease, and polls `isLockPending` between
+  chunks so auto-lock aborts it rather than waiting for a large archive.
+- **Only real vault containers can share folders**
+  (`LocalStorageContainerX.canShareFolders`). SAF and device-storage
+  browsers have no provider that can archive a subtree, so the UI hides
+  folder share there and `shareFiles` returns false for them.
+- The archive's length is unknown up front and the descriptor isn't
+  seekable; that is fine for the copy-to-end readers a share sheet targets.
+
 ---
 
 ## 2. Ownership & invariants

@@ -21,6 +21,15 @@ object ContainerDocumentIoRegistry {
         }
     }
 
+    /**
+     * True once a lock has started draining [volId]. Long-running holders of
+     * a [HandleLease] (a folder share streaming a whole subtree, unlike a
+     * single proxy descriptor the receiver closes on its own schedule) poll
+     * this between chunks and bail out, so [LockPermit.awaitHandlesClosed]
+     * -- and with it auto-lock -- never waits on a share to finish.
+     */
+    fun isLockPending(volId: Int): Boolean = lock.withLock { volId in lockPending }
+
     /** Returns null once a lock has started draining this container. */
     fun acquireHandle(volId: Int): HandleLease? = lock.withLock {
         if (volId in lockPending) return null

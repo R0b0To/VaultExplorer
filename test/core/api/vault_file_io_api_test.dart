@@ -340,6 +340,63 @@ void main() {
 
       expect(ok, isFalse);
     });
+
+    test('a plain file share sends no folder arguments', () async {
+      nextResult = true;
+
+      await api.shareFiles(container, ['photo.jpg'], skipExtensions: ['password']);
+
+      expect(calls.single.arguments.containsKey('directoryPaths'), isFalse);
+      expect(calls.single.arguments.containsKey('skipExtensions'), isFalse);
+    });
+
+    test('names which entries are folders and what to leave out of them', () async {
+      nextResult = true;
+
+      final ok = await api.shareFiles(
+        container,
+        ['Trips', 'notes.txt'],
+        directoryPaths: ['Trips'],
+        skipExtensions: ['password', 'securenote'],
+      );
+
+      expect(ok, isTrue);
+      expect(calls.single.method, 'shareFile');
+      expect(calls.single.arguments['fileNames'], ['Trips', 'notes.txt']);
+      expect(calls.single.arguments['directoryPaths'], ['Trips']);
+      expect(calls.single.arguments['skipExtensions'], ['password', 'securenote']);
+    });
+
+    test('refuses folders on SAF storage instead of sharing less than asked', () async {
+      final saf = buildExternalStorageContainer(
+        rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+        displayName: 'SD card',
+        volId: -100,
+      );
+
+      final ok = await api.shareFiles(saf, ['Trips'], directoryPaths: ['Trips']);
+
+      expect(ok, isFalse);
+      expect(calls, isEmpty);
+    });
+  });
+
+  group('canShareFolders', () {
+    test('is true only for real vault containers', () {
+      final saf = buildExternalStorageContainer(
+        rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+        displayName: 'SD card',
+        volId: -100,
+      );
+      final local = buildLocalStorageContainer(
+        rootPath: '/storage/emulated/0',
+        displayName: 'Local Storage',
+      );
+
+      expect(container.canShareFolders, isTrue);
+      expect(saf.canShareFolders, isFalse);
+      expect(local.canShareFolders, isFalse);
+    });
   });
 
   group('onImportItemFinished callback via VaultEngineEvents', () {

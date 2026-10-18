@@ -1044,7 +1044,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               }
             }
           : null,
-      onShare: !entry.isDir
+      onShare: (!entry.isDir || widget.container.canShareFolders)
           ? () async {
               final ok = widget.container.isLocalStorage
                   ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles([
@@ -1053,6 +1053,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                   : await ref.read(vaultFileIoApiProvider).shareFiles(
                       widget.container,
                       [fullPath],
+                      directoryPaths: entry.isDir ? [fullPath] : const [],
+                      skipExtensions: _vaultItemExtensions,
                     );
               if (!ok && mounted) {
                 _setStatus(context.l10n.couldNotShareFiles, error: true);
@@ -2496,10 +2498,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
-  /// Shares every real file in the current selection with another app via
-  /// the system share sheet, skipping folders and vault-item pseudo-files
+  /// Lower-case extensions of Item Vault pseudo-files (passwords, secure
+  /// notes, etc. -- see [VaultItemType]). Share never hands these out: not as
+  /// loose files, and not inside a shared folder's zip either, which is why
+  /// they're forwarded to the native side alongside the folder paths.
+  static final List<String> _vaultItemExtensions = [
+    for (final t in VaultItemType.values) t.name.toLowerCase(),
+  ];
+
+  /// Shares every real file and folder in the current selection with another
+  /// app via the system share sheet, skipping vault-item pseudo-files
   /// (passwords, secure notes, etc. -- see [VaultItemType]) the same way
-  /// [_openFileWithApp] does for a single file. Unlike that one, this
+  /// [_openFileWithApp] does for a single file. Folders are shared too, each
+  /// as one zip, but only where the container can archive them
+  /// ([LocalStorageContainerX.canShareFolders]); elsewhere they are skipped
+  /// like any other non-shareable entry. Unlike [_openFileWithApp], this
   /// silently drops just the non-shareable entries rather than aborting
   /// the whole action, so sharing five photos alongside one accidentally
   /// co-selected password entry still shares the five photos.
@@ -2507,8 +2520,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final entries = selectedItems.toList();
     exitSelectionMode();
 
+    final canShareFolders = widget.container.canShareFolders;
     final shareable = entries.where((e) {
-      if (e.isDir) return false;
+      if (e.isDir) return canShareFolders;
       final parts = e.name.split('.');
       final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
       return !VaultItemType.values.any((t) => t.name.toLowerCase() == ext);
@@ -2540,6 +2554,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                 .shareFiles(
                   widget.container,
                   shareable.map(_fullPathOf).toList(),
+                  directoryPaths: shareable
+                      .where((e) => e.isDir)
+                      .map(_fullPathOf)
+                      .toList(),
+                  skipExtensions: _vaultItemExtensions,
                 );
       if (!ok && mounted) {
         _setStatus(context.l10n.couldNotShareFiles, error: true);

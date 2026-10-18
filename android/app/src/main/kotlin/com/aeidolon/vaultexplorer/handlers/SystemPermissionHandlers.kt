@@ -628,12 +628,24 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
     fun handleShareFile(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val fileNames = call.argument<List<String>>("fileNames")
+        // Which of [fileNames] are folders. Sent explicitly by the caller
+        // rather than guessed from the names (an entry's type is never
+        // inferred from its name); each one is shared as a zip.
+        val directoryPaths = call.argument<List<String>>("directoryPaths")?.toSet() ?: emptySet()
+        // Extensions (lower-case, no dot) to leave out of shared folders --
+        // Item Vault pseudo-files, which multi-select share already drops.
+        val skipExtensions = call.argument<List<String>>("skipExtensions") ?: emptyList()
         if (uriString == null || fileNames.isNullOrEmpty()) {
             result.error(
                 "INVALID_ARGS",
                 "filePath and fileNames required",
                 null
             )
+            return
+        }
+        if (directoryPaths.any { it.isBlank() }) {
+            // The vault root has no name to archive under.
+            result.error("INVALID_ARGS", "Cannot share the vault root as a folder", null)
             return
         }
         try {
@@ -643,12 +655,16 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     return
                 }
             val docUris = fileNames.map { fileName ->
-                ContainerShareProvider.buildUri(volId, fileName)
+                ContainerShareProvider.buildUri(volId, fileName, fileName in directoryPaths, skipExtensions)
             }
             val intent = if (docUris.size == 1) {
                 Intent(Intent.ACTION_SEND).apply {
                     putExtra(Intent.EXTRA_STREAM, docUris[0])
-                    type = MimeTypeHelper.getMimeType(fileNames[0])
+                    type = if (fileNames[0] in directoryPaths) {
+                        "application/zip"
+                    } else {
+                        MimeTypeHelper.getMimeType(fileNames[0])
+                    }
                 }
             } else {
                 Intent(Intent.ACTION_SEND_MULTIPLE).apply {

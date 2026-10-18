@@ -13,6 +13,7 @@ import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.OpenableColumns
 import java.io.FileNotFoundException
+import java.io.IOException
 import com.aeidolon.vaultexplorer.DocumentId
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
@@ -58,6 +59,15 @@ import com.aeidolon.vaultexplorer.VeLog
  * here either -- the bytes only touch disk once they reach the *receiving*
  * app's own sandboxed storage, which is the expected, unavoidable result of
  * the user deliberately sharing the file out in the first place.
+ *
+ * Folders: a document ID of type "dir" is served as `<folder name>.zip`
+ * (MIME `application/zip`), built on the fly by [FolderZipWriter] and
+ * handed over through a pipe rather than a proxy descriptor. The archive is
+ * never staged on disk, so the "nothing decrypted is written here" rule
+ * above holds for folders too. Two consequences of streaming: the length is
+ * unknown up front (no `OpenableColumns.SIZE`), and the descriptor is not
+ * seekable -- fine for the copy-to-end readers the share sheet hands URIs
+ * to, which is the only audience this provider has.
  */
 class ContainerShareProvider : ContentProvider() {
 
@@ -71,16 +81,44 @@ class ContainerShareProvider : ContentProvider() {
          * uses for [ContainerDocumentsProvider]. Deliberately shaped so it
          * can never be mistaken for a SAF document URI (see class doc).
          */
-        fun buildUri(docId: String): Uri =
+        fun buildUri(docId: String, skipExtensions: Collection<String> = emptyList()): Uri =
             Uri.Builder()
                 .scheme("content")
                 .authority(AUTHORITY)
                 .appendPath("vaultshare")
                 .appendPath(docId)
+                .apply {
+                    // Only meaningful for folder (zip) documents; carried in
+                    // the URI because it's the one thing the receiver hands
+                    // back to this provider -- see [skipExtensionsOf].
+                    if (skipExtensions.isNotEmpty()) {
+                        appendQueryParameter(PARAM_SKIP_EXTENSIONS, skipExtensions.joinToString(","))
+                    }
+                }
                 .build()
 
         fun buildUri(volId: Int, fatPath: String): Uri =
             buildUri(DocumentId(volId, "file", fatPath).toString())
+
+        /**
+         * Same as above, but the entry's type is explicit ([isDir]) rather
+         * than assumed to be a file -- per the project rule that an entry's
+         * type is carried in metadata, never inferred from its name. A
+         * folder is shared as a zip; [skipExtensions] names file extensions
+         * (lower-case, no dot) to leave out of that zip.
+         */
+        fun buildUri(
+            volId: Int,
+            fatPath: String,
+            isDir: Boolean,
+            skipExtensions: Collection<String> = emptyList(),
+        ): Uri = buildUri(
+            DocumentId(volId, if (isDir) "dir" else "file", fatPath).toString(),
+            if (isDir) skipExtensions else emptyList(),
+        )
+
+        private const val PARAM_SKIP_EXTENSIONS = "skipExt"
+
     }
 
     private fun docIdOf(uri: Uri): String {
@@ -118,8 +156,12 @@ class ContainerShareProvider : ContentProvider() {
             return cursor
         }
 
-        val displayName = doc.fatPath.substringAfterLast("/")
-        val size = try {
+        // A folder is offered as "<name>.zip" with no size: the archive is
+        // generated while it's read, so its length isn't known up front.
+        val displayName = doc.fatPath.substringAfterLast("/").let { if (doc.isDir) "$it.zip" else it }
+        val size = if (doc.isDir) {
+            -1L
+        } else try {
             ContainerFileSystem.getFileSize(doc.volId, doc.fatPath)
         } catch (e: Exception) {
             VeLog.w(TAG, e) { "getFileSize failed for ${doc.fatPath}: ${e.message}" }
@@ -145,6 +187,7 @@ class ContainerShareProvider : ContentProvider() {
         } catch (e: Exception) {
             return "application/octet-stream"
         }
+        if (doc.isDir) return "application/zip"
         return doc.mimeTypeOverride
             ?: MimeTypeHelper.getMimeType(doc.fatPath.substringAfterLast("/"))
             ?: "application/octet-stream"
@@ -172,6 +215,7 @@ class ContainerShareProvider : ContentProvider() {
         }
 
         val doc = DocumentId.parse(docIdOf(uri), "share document")
+        if (doc.isDir) return openFolderZip(doc, skipExtensionsOf(uri))
         val volId = doc.volId
         val fatPath = doc.fatPath
 
@@ -209,6 +253,7 @@ class ContainerShareProvider : ContentProvider() {
         } catch (_: Exception) {
             return AssetFileDescriptor(pfd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
         }
+        if (doc.isDir) return AssetFileDescriptor(pfd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
         val size = try {
             ContainerFileSystem.getFileSize(doc.volId, doc.fatPath).coerceAtLeast(0L)
         } catch (_: Exception) {
@@ -216,6 +261,116 @@ class ContainerShareProvider : ContentProvider() {
         }
         val length = if (size > 0L) size else AssetFileDescriptor.UNKNOWN_LENGTH
         return AssetFileDescriptor(pfd, 0, length)
+    }
+
+    private fun skipExtensionsOf(uri: Uri): Set<String> =
+        uri.getQueryParameter(PARAM_SKIP_EXTENSIONS)
+            ?.split(',')
+            ?.mapNotNull { it.trim().lowercase().ifEmpty { null } }
+            ?.toSet()
+            ?: emptySet()
+
+    /**
+     * Serves a folder document as a zip stream. The archive is produced by a
+     * background thread writing into a pipe whose read end is returned here,
+     * so nothing is staged on disk and the receiver can start consuming
+     * immediately.
+     *
+     * The thread holds an [ContainerDocumentIoRegistry] lease for as long as
+     * it runs, like a proxy descriptor does -- but a whole-folder archive can
+     * take far longer than any one descriptor, so it also polls
+     * [ContainerDocumentIoRegistry.isLockPending] and stops the moment a lock
+     * begins draining; otherwise auto-lock would hang behind a big share.
+     *
+     * A *reliable* pipe is used so that failure reaches the receiver as an
+     * error ([ParcelFileDescriptor.closeWithError]) instead of an ordinary
+     * end-of-stream. [FolderZipWriter] separately guarantees a failed archive
+     * is never finalized, so even a receiver that ignores the error sees a
+     * corrupt zip, never a plausible-looking partial one.
+     */
+    @Throws(FileNotFoundException::class)
+    private fun openFolderZip(doc: DocumentId, skipExtensions: Set<String>): ParcelFileDescriptor {
+        val volId = doc.volId
+        val ioLease = ContainerDocumentIoRegistry.acquireHandle(volId)
+            ?: throw FileNotFoundException("Container is being locked; retry after the lock completes")
+        try {
+            ContainerFileSystem.requireSession(volId)
+        } catch (e: Exception) {
+            ioLease.close()
+            throw FileNotFoundException("Container is no longer mounted")
+        }
+        val pipe = try {
+            ParcelFileDescriptor.createReliablePipe()
+        } catch (e: IOException) {
+            ioLease.close()
+            throw FileNotFoundException("Could not create a pipe for the folder archive")
+        }
+        val readSide = pipe[0]
+        val writeSide = pipe[1]
+
+        val writer = FolderZipWriter(
+            source = ContainerFolderSource(volId),
+            skipExtensions = skipExtensions,
+            shouldAbort = { ContainerDocumentIoRegistry.isLockPending(volId) },
+        )
+        val thread = Thread({
+            try {
+                val out = ParcelFileDescriptor.AutoCloseOutputStream(writeSide)
+                writer.write(doc.fatPath, out)
+                out.close()
+            } catch (e: FolderZipWriter.AbortedException) {
+                VeLog.d(TAG) { "folder share aborted (vault locking)" }
+                try { writeSide.closeWithError("Folder share aborted") } catch (_: Exception) {}
+            } catch (e: Exception) {
+                // Includes the receiver hanging up mid-stream (EPIPE) -- an
+                // ordinary cancel, not worth more than a debug line. Paths are
+                // left out of the message on purpose.
+                VeLog.d(TAG) { "folder share stopped: ${e.javaClass.simpleName}" }
+                try { writeSide.closeWithError(e.message ?: "Folder archive failed") } catch (_: Exception) {}
+            } finally {
+                ioLease.close()
+            }
+        }, "vc_share_zip_${volId}_${System.nanoTime()}")
+        thread.isDaemon = true
+        try {
+            thread.start()
+        } catch (e: Throwable) {
+            ioLease.close()
+            try { writeSide.close() } catch (_: Exception) {}
+            try { readSide.close() } catch (_: Exception) {}
+            throw FileNotFoundException("Could not start the folder archive")
+        }
+        return readSide
+    }
+
+    /** Bridges [FolderZipWriter] onto the live vault session. */
+    private class ContainerFolderSource(private val volId: Int) : FolderZipWriter.Source {
+        override fun list(dirPath: String): Array<String>? =
+            ContainerFileSystem.listDirectory(volId, dirPath)
+
+        override fun openFile(path: String): FolderZipWriter.FileReader {
+            val fileSize = ContainerFileSystem.getFileSize(volId, path)
+            val ptr = ContainerFileSystem.withReadLock(volId) {
+                ContainerFileSystem.openStream(volId, path)
+            }
+            if (ptr == 0L) throw IOException("Could not open a file to archive")
+            return object : FolderZipWriter.FileReader {
+                override val size: Long = fileSize
+
+                override fun read(offset: Long, buffer: ByteArray, length: Int): Int =
+                    ContainerFileSystem.withReadLock(volId) {
+                        ContainerFileSystem.readStream(volId, ptr, offset, buffer, length)
+                    }
+
+                override fun close() {
+                    try {
+                        ContainerFileSystem.withReadLock(volId) {
+                            ContainerFileSystem.closeStream(volId, ptr)
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null

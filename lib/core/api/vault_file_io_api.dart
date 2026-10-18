@@ -94,18 +94,34 @@ class VaultFileIoApi {
     }
   }
 
-  /// Shares one or more files with another app via the system share sheet.
+  /// Shares one or more files and/or folders with another app via the system
+  /// share sheet.
   ///
-  /// Like [openWithApp], this streams decrypted bytes straight from
-  /// `ContainerDocumentsProvider` -- no temp files are written to disk.
+  /// Like [openWithApp], this streams decrypted bytes straight from the
+  /// container -- no temp files are written to disk.
   /// [fileNames] are container-relative paths; a single entry fires
   /// `ACTION_SEND`, multiple entries fire `ACTION_SEND_MULTIPLE`.
+  ///
+  /// [directoryPaths] names which of [fileNames] are folders (an entry's type
+  /// is always explicit, never guessed from its name). Each is shared as a
+  /// single `<name>.zip` generated while the receiving app reads it, so a
+  /// folder is only supported for real vault containers
+  /// ([LocalStorageContainerX.canShareFolders]); for SAF/device storage this
+  /// returns false rather than silently sharing less than was asked for.
+  ///
+  /// [skipExtensions] are lower-case extensions (no dot) left out of any
+  /// shared folder -- callers pass the Item Vault pseudo-file extensions so a
+  /// folder zip never carries passwords/notes that multi-select share already
+  /// refuses to hand out as loose files.
   Future<bool> shareFiles(
     MountedContainer container,
-    List<String> fileNames,
-  ) async {
+    List<String> fileNames, {
+    List<String> directoryPaths = const [],
+    List<String> skipExtensions = const [],
+  }) async {
     if (fileNames.isEmpty) return false;
     if (_isSaf(container)) {
+      if (directoryPaths.isNotEmpty) return false;
       final result = await _channel.invokeMethod<bool>(
         ChannelMethods.safShareFiles,
         {'treeUri': container.uri, 'filePaths': fileNames},
@@ -115,6 +131,9 @@ class VaultFileIoApi {
     final result = await _channel.invokeMethod<bool>(ChannelMethods.shareFile, {
       'filePath': container.uri,
       'fileNames': fileNames,
+      if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
+      if (directoryPaths.isNotEmpty && skipExtensions.isNotEmpty)
+        'skipExtensions': skipExtensions,
     });
     return result ?? false;
   }

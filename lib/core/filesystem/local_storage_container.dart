@@ -47,4 +47,11 @@ extension LocalStorageContainerX on MountedContainer {
   bool get isExternalStorage => volId <= kExternalStorageBaseVolId;
   bool get isSafStorage => volId < 0 && uri.startsWith('content://');
   bool get isRawLocal => volId < 0 && !uri.startsWith('content://');
+
+  /// Whether a folder in this container can be handed to the system share
+  /// sheet (as a zip streamed out of the vault -- see
+  /// `ContainerShareProvider`). Only real vault containers can: device
+  /// storage and SAF trees expose files, not a provider that can archive a
+  /// subtree on the fly.
+  bool get canShareFolders => !isLocalStorage && !isSafStorage;
 }

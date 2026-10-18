@@ -32,8 +32,8 @@ extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
 }
 
 /// A modal bottom sheet for creating archives with modern layout, decoupled
-/// name/extension, dynamic security options, smart media recommendations,
-/// and progressive disclosure for advanced settings.
+/// name/extension, dynamic security options, and a compression level picker
+/// that only appears for formats that actually compress.
 class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
@@ -109,9 +109,6 @@ class _CreateArchiveBottomSheetState
     ArchiveFormatType.tarGz,
     ArchiveFormatType.tarXz,
     ArchiveFormatType.tarZstd,
-    ArchiveFormatType.tarLzma,
-    ArchiveFormatType.iso,
-    ArchiveFormatType.cpio,
   ];
 
   late final TextEditingController _nameCtrl;
@@ -124,7 +121,6 @@ class _CreateArchiveBottomSheetState
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _encryptFilenames = false;
-  bool _showAdvanced = false;
   bool _isMediaRecommended = false;
 
   List<NameValidationIssue> _issues = [];
@@ -308,7 +304,7 @@ class _CreateArchiveBottomSheetState
               Flexible(
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -321,14 +317,6 @@ class _CreateArchiveBottomSheetState
                       ],
 
                       // Archive Name & Decoupled Format Pill
-                      Text(
-                        context.l10n.createArchiveNameLabel,
-                        style: textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       _buildNameAndFormatRow(cs, textTheme),
 
                       // Live validation issues & conflict errors
@@ -336,14 +324,15 @@ class _CreateArchiveBottomSheetState
 
                       // Dynamic Password & Security Options
                       if (_format.supportsPassword) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         _buildSecuritySection(cs, textTheme),
                       ],
 
-                      const SizedBox(height: 16),
-
-                      // Collapsible Advanced Options Accordion
-                      _buildAdvancedAccordion(cs, textTheme),
+                      // Compression level, only for formats that compress
+                      if (_format.supportsCompressionLevel) ...[
+                        const SizedBox(height: 12),
+                        _buildCompressionSection(cs, textTheme),
+                      ],
                     ],
                   ),
                 ),
@@ -462,6 +451,7 @@ class _CreateArchiveBottomSheetState
           child: TextField(
             controller: _nameCtrl,
             decoration: InputDecoration(
+              labelText: context.l10n.createArchiveNameLabel,
               hintText: context.l10n.createArchiveNameHint,
               filled: true,
               fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -504,25 +494,17 @@ class _CreateArchiveBottomSheetState
             value: f,
             child: Row(
               children: [
-                Text(
-                  '.${f.fileExtension}',
-                  style: TextStyle(
-                    fontWeight: f == _format ? FontWeight.bold : FontWeight.normal,
-                    color: f == _format ? cs.primary : cs.onSurface,
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '(${f.displayLabel})',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
+                    '.${f.fileExtension}',
+                    style: TextStyle(
+                      fontWeight: f == _format ? FontWeight.bold : FontWeight.normal,
+                      color: f == _format ? cs.primary : cs.onSurface,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (f == _format)
-                  Icon(Icons.check, size: 16, color: cs.primary),
+                  Icon(Icons.check, size: 18, color: cs.primary),
               ],
             ),
           ),
@@ -600,15 +582,6 @@ class _CreateArchiveBottomSheetState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          context.l10n.createArchiveSecuritySection,
-          style: textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
-        ),
-        const SizedBox(height: 6),
-
         // Password field
         TextField(
           controller: _passwordCtrl,
@@ -782,103 +755,47 @@ class _CreateArchiveBottomSheetState
     );
   }
 
-  Widget _buildAdvancedAccordion(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildCompressionSection(ColorScheme cs, TextTheme textTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: Row(
-              children: [
-                Icon(
-                  _showAdvanced
-                      ? Icons.arrow_drop_down_rounded
-                      : Icons.arrow_right_rounded,
-                  color: cs.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  context.l10n.createArchiveAdvancedOptions,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_showAdvanced) ...[
-          const SizedBox(height: 8),
-          Material(
-            color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
-            shape: RoundedRectangleBorder(
+        DropdownButtonFormField<ArchiveCompressionLevel>(
+          initialValue: _compressionLevel,
+          isDense: true,
+          decoration: InputDecoration(
+            labelText: context.l10n.createArchiveCompressionLevel,
+            filled: true,
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.3),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Compression level
-                  Text(
-                    context.l10n.createArchiveCompressionLevel,
-                    style: textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<ArchiveCompressionLevel>(
-                    initialValue: _compressionLevel,
-                    isDense: true,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor:
-                          cs.surfaceContainerHighest.withValues(alpha: 0.4),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                    ),
-                    items: [
-                      for (final lvl in ArchiveCompressionLevel.values)
-                        DropdownMenuItem(
-                          value: lvl,
-                          child: Text(lvl.localizedTitle(context.l10n)),
-                        ),
-                    ],
-                    onChanged: (lvl) {
-                      if (lvl != null) {
-                        setState(() {
-                          _compressionLevel = lvl;
-                          _isMediaRecommended = false;
-                        });
-                      }
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, left: 4),
-                    child: Text(
-                      _compressionLevel.localizedDescription(context.l10n),
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.primary, width: 2),
             ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-        ],
+          items: [
+            for (final lvl in ArchiveCompressionLevel.values)
+              DropdownMenuItem(
+                value: lvl,
+                child: Text(lvl.localizedTitle(context.l10n)),
+              ),
+          ],
+          onChanged: (lvl) {
+            if (lvl != null) {
+              setState(() {
+                _compressionLevel = lvl;
+                _isMediaRecommended = false;
+              });
+            }
+          },
+        ),
       ],
     );
   }

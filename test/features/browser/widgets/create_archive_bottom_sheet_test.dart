@@ -72,6 +72,10 @@ MountedContainer _mockContainer({
   );
 }
 
+// A getter, not a final: a fresh finder per use avoids stale cached matches.
+Finder get _compressionPicker =>
+    find.byType(DropdownButtonFormField<ArchiveCompressionLevel>);
+
 void main() {
   testWidgets('Renders bottom sheet with decoupled name and extension pill',
       (tester) async {
@@ -117,6 +121,18 @@ void main() {
 
     // Verify extension pill displays .zip
     expect(find.text('.zip'), findsOneWidget);
+
+    // Labels live inside the inputs; there are no separate section headings.
+    expect(find.widgetWithText(TextField, 'Archive Name'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Password (Optional)'), findsOneWidget);
+    expect(
+      find.widgetWithText(
+        DropdownButtonFormField<ArchiveCompressionLevel>,
+        'Compression Level',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Security'), findsNothing);
   });
 
   testWidgets('Smart media recommendation triggers for media files',
@@ -238,7 +254,7 @@ void main() {
     expect(createBtn.onPressed, isNull);
   });
 
-  testWidgets('Advanced options accordion expands and submits correct parameters',
+  testWidgets('Compression picker is shown by default for ZIP, with no advanced toggle',
       (tester) async {
     final container = _mockContainer();
     String? createdPath;
@@ -268,12 +284,9 @@ void main() {
     await tester.tap(find.text('Open Sheet'));
     await tester.pumpAndSettle();
 
-    // Tap Advanced Options to expand accordion
-    await tester.tap(find.text('Advanced Options'));
-    await tester.pumpAndSettle();
-
-    // Advanced controls should now be visible
-    expect(find.text('Compression Level'), findsOneWidget);
+    // The toggle is gone and the picker is visible without any tap.
+    expect(find.text('Advanced Options'), findsNothing);
+    expect(_compressionPicker, findsOneWidget);
     // Split into volumes, Exclude system files, and Delete original files should NOT be present in this sheet
     expect(find.text('Split into volumes'), findsNothing);
     expect(find.text('Exclude system files'), findsNothing);
@@ -290,6 +303,101 @@ void main() {
     expect(createdPassphrase, isNull);
     expect(createdEncryptFilenames, false);
     expect(createdLvl, ArchiveCompressionLevel.normal);
+  });
+
+  testWidgets('Picked compression level is submitted', (tester) async {
+    ArchiveCompressionLevel? createdLvl;
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        container: _mockContainer(),
+        currentDirPath: '',
+        existingEntries: [],
+        suggestedName: 'archive.zip',
+        selectedEntries: [],
+        freeSpace: 1000 * 1024 * 1024,
+        onCreate: (path, fmt, pass, encFilenames, lvl) async {
+          createdLvl = lvl;
+        },
+      ),
+    );
+
+    await tester.tap(find.text('Open Sheet'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_compressionPicker);
+    await tester.pumpAndSettle();
+    // `.last`: the open menu repeats the selected item's text.
+    await tester.tap(find.text('Ultra (9) — Smallest size').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.pumpAndSettle();
+
+    expect(createdLvl, ArchiveCompressionLevel.ultra);
+  });
+
+  testWidgets('Compression picker only shows for formats that compress',
+      (tester) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        container: _mockContainer(),
+        currentDirPath: '',
+        existingEntries: [],
+        suggestedName: 'archive.zip',
+        selectedEntries: [],
+        freeSpace: 1000 * 1024 * 1024,
+        onCreate: (a, b, c, d, e) async {},
+      ),
+    );
+
+    await tester.tap(find.text('Open Sheet'));
+    await tester.pumpAndSettle();
+
+    // Every format offered in the picker, in menu order, with whether it
+    // should show the compression level.
+    const expectations = <(String, bool)>[
+      ('.zip', true),
+      ('.7z', true),
+      ('.tar', false),
+      ('.tar.gz', true),
+      ('.tar.xz', true),
+      ('.tar.zst', true),
+      ('.tar.lzma', true),
+      ('.iso', false),
+      ('.cpio', false),
+    ];
+
+    var currentExt = '.zip';
+    for (final (ext, shown) in expectations) {
+      if (ext != currentExt) {
+        await tester.tap(find.text(currentExt)); // opens the format menu
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(ext).last); // the menu item
+        await tester.pumpAndSettle();
+        currentExt = ext;
+      }
+      expect(
+        _compressionPicker,
+        shown ? findsOneWidget : findsNothing,
+        reason: 'compression picker visibility for $ext',
+      );
+    }
+  });
+
+  test('supportsCompressionLevel matches what the engine can compress', () {
+    const notCompressed = {
+      ArchiveFormatType.tar,
+      ArchiveFormatType.iso,
+      ArchiveFormatType.cpio,
+    };
+    for (final f in ArchiveFormatType.values) {
+      expect(
+        f.supportsCompressionLevel,
+        !notCompressed.contains(f),
+        reason: f.displayLabel,
+      );
+    }
   });
 
   testWidgets('Encrypt file names is hidden for ZIP and shown for 7-Zip',

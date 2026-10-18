@@ -122,6 +122,26 @@ enum ArchiveFormatType {
   /// Whether, together with a password, the file names can be encrypted too
   /// (the 7z header). ZIP can't: its file names are always stored in the clear.
   bool get supportsFilenameEncryption => this == ArchiveFormatType.sevenZip;
+
+  /// Whether the format compresses its contents and so honors a compression
+  /// level. Plain TAR, ISO and CPIO only package files; the native engine
+  /// ignores the level for them, so the UI should not offer it.
+  ///
+  /// Exhaustive on purpose: adding a format forces a decision here.
+  bool get supportsCompressionLevel => switch (this) {
+        ArchiveFormatType.zip ||
+        ArchiveFormatType.sevenZip ||
+        ArchiveFormatType.tarGz ||
+        ArchiveFormatType.tarBz2 ||
+        ArchiveFormatType.tarXz ||
+        ArchiveFormatType.tarZstd ||
+        ArchiveFormatType.tarLzma =>
+          true,
+        ArchiveFormatType.tar ||
+        ArchiveFormatType.iso ||
+        ArchiveFormatType.cpio =>
+          false,
+      };
 }
 
 /// Human-readable presets for compression level.

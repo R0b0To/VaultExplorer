@@ -1,5 +1,3 @@
-import 'package:vaultexplorer/core/utils/office_document_formats.dart';
-
 /// What tapping a file in the browser should do next, decided from the
 /// file's extension, any saved per-extension preference, and a couple of
 /// booleans -- with no I/O, no BuildContext, and no widget state.
@@ -32,13 +30,6 @@ class OpenInPdfViewer extends FileOpenAction {
 
 class OpenInHtmlViewer extends FileOpenAction {
   const OpenInHtmlViewer();
-}
-
-/// Preview a Word / PowerPoint / Excel / OpenDocument file in the built-in
-/// document viewer (converted natively to a sandboxed, script-free page;
-/// nothing is written to disk). See `OfficeDocumentFormats` for the list.
-class OpenInDocumentViewer extends FileOpenAction {
-  const OpenInDocumentViewer();
 }
 
 /// Hand off to a system app -- either the one already remembered for this
@@ -113,12 +104,6 @@ FileOpenAction decideFileOpenAction({
   if (pref == 'media') return const OpenInMediaViewer();
   if (pref == 'pdf') return const OpenInPdfViewer();
   if (pref == 'html') return const OpenInHtmlViewer();
-  // Like 'installer'/'archive' below: only meaningful for the formats the
-  // viewer can read; a stale or hand-edited value on any other extension
-  // falls through to the normal fallback.
-  if (pref == 'document' && OfficeDocumentFormats.isSupportedExtension(ext)) {
-    return const OpenInDocumentViewer();
-  }
   // Only meaningful for .apk (the chooser is the only thing that saves them);
   // anything else with one of these values -- a hand-edited settings file --
   // falls through to the normal extension fallback instead of being
@@ -130,12 +115,9 @@ FileOpenAction decideFileOpenAction({
   }
   if (pref == 'external') return const OpenWithSystemApp();
   if (isSupportedMedia) return const OpenInMediaViewer();
-  if (ext == 'pdf') return const OpenInPdfViewer();
+if (ext == 'pdf') return const OpenInPdfViewer();
   if (ext == 'html' || ext == 'htm') return const OpenInHtmlViewer();
   if (ext == 'md' || ext == 'markdown') return const OpenInEditor();
-  if (OfficeDocumentFormats.isSupportedExtension(ext)) {
-    return const OpenInDocumentViewer();
-  }
   if (ext == 'apk') return const ShowApkOpenChooser();
   return const ShowOpenWithDialog();
 }

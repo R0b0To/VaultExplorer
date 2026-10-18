@@ -670,14 +670,9 @@ open class MainActivity : FlutterFragmentActivity() {
         vaultAudioCapturePlugin = com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin(this, flutterEngine.dartExecutor.binaryMessenger)
         quickCaptureScratchpadPlugin = com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
 
-        flutterEngine.platformViewsController.registry.registerViewFactory(
+         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
-        )
-
-        flutterEngine.platformViewsController.registry.registerViewFactory(
-            com.aeidolon.vaultexplorer.officeviewer.OFFICE_VIEWER_VIEW_TYPE,
-            com.aeidolon.vaultexplorer.officeviewer.OfficeViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
 
         flutterEngine.platformViewsController.registry.registerViewFactory(

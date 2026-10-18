@@ -10,9 +10,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/core/utils/office_document_formats.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
-import 'package:vaultexplorer/features/browser/viewer/office_document_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
@@ -137,24 +135,11 @@ class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
       return;
     }
 
-    if (ext == 'html' || ext == 'htm') {
+  if (ext == 'html' || ext == 'htm') {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => HtmlViewerScreen(
-            container: item.container,
-            filePath: item.relativePath,
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (OfficeDocumentFormats.isSupportedExtension(ext)) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OfficeDocumentViewerScreen(
             container: item.container,
             filePath: item.relativePath,
           ),

@@ -144,7 +144,8 @@ set(LIBMD_LIBRARY "" CACHE STRING "" FORCE)
 # previously patched libarchive and links it against the newer engine code, so
 # features added in the patch fail at runtime with "Undefined option".
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch")
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch"
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/apply_patch_once.cmake")
 FetchContent_Declare(
     libarchive_upstream
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git
@@ -188,6 +189,18 @@ set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 set(ENABLE_WERROR  OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libarchive_upstream)
+
+# Re-apply patches whenever apply_patch_once.cmake or the patch changes, even inside an existing .cxx build tree
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+            -DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch
+            -P ${CMAKE_CURRENT_LIST_DIR}/archive/patches/apply_patch_once.cmake
+    WORKING_DIRECTORY ${libarchive_upstream_SOURCE_DIR}
+    RESULT_VARIABLE apply_patch_res
+)
+if(NOT apply_patch_res EQUAL 0)
+    message(FATAL_ERROR "Failed to patch libarchive sources")
+endif()
 
 set(ARCHIVE_ENGINE_LIBRARY archive_static CACHE INTERNAL "libarchive target to link against")
 set(ARCHIVE_ENGINE_INCLUDE_DIRS

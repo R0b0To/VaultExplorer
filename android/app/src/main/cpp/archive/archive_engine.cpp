@@ -184,12 +184,14 @@ bool containsCaseInsensitive(const char* haystack, const char* needle) {
 ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
     const char* err = archive_error_string(a);
     if (containsCaseInsensitive(err, "passphrase") ||
-        containsCaseInsensitive(err, "password")) {
+        containsCaseInsensitive(err, "password") ||
+        containsCaseInsensitive(err, "encrypt")) {
         return passphraseGiven ? ArchiveOpenStatus::WrongPassphrase
                                 : ArchiveOpenStatus::PassphraseRequired;
     }
-    if (!passphraseGiven && containsCaseInsensitive(err, "encrypt")) {
-        return ArchiveOpenStatus::PassphraseRequired;
+    if (passphraseGiven && (containsCaseInsensitive(err, "crc") ||
+                            containsCaseInsensitive(err, "checksum"))) {
+        return ArchiveOpenStatus::WrongPassphrase;
     }
     return ArchiveOpenStatus::IoError;
 }
@@ -272,7 +274,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         // password-required behavior is unchanged.
         const int formatFamily = archive_format(a) & ARCHIVE_FORMAT_BASE_MASK;
         const bool deferPassphrase =
-            (formatFamily == ARCHIVE_FORMAT_7ZIP || formatFamily == ARCHIVE_FORMAT_ZIP) && passphrase.empty();
+            (formatFamily == ARCHIVE_FORMAT_7ZIP || formatFamily == ARCHIVE_FORMAT_ZIP || formatFamily == ARCHIVE_FORMAT_RAR_V5) && passphrase.empty();
         if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
             if (deferPassphrase) {
                 // Checked when the data is actually read.

@@ -3820,6 +3820,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cameraCouldNotSaveRecordingMessage => '无法保存录制内容';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage => '无法保存拍摄内容。内容仍然保留，可以重试。';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage => '保险库可用空间不足。请释放空间后重试。';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return '无法保存录制内容：$error';
   }

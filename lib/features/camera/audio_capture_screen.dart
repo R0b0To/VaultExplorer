@@ -538,6 +538,16 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       }
       final name = await _vaultService.nextAvailableAudioName(at: _startedAt);
       final virtualPath = _vaultService.buildVirtualPath(name);
+      final audioBytes = await _vaultService.localFileSize(savePath);
+      if (audioBytes != null &&
+          !await _vaultService.hasEnoughSpaceFor(audioBytes)) {
+        if (mounted) {
+          await _failSave(
+            message: context.l10n.cameraNotEnoughVaultSpaceMessage,
+          );
+        }
+        return;
+      }
       final ok = await _recorder.saveToVault(
         path: savePath,
         volId: widget.container.volId,
@@ -546,12 +556,17 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       if (!ok) {
         // The native side keeps the temp file when the vault write fails,
         // so the person can retry. Don't leave a half-written file behind.
-        unawaited(_deletePartialVaultFile(virtualPath));
+        await _deletePartialVaultFile(virtualPath);
         await _failSave();
         return;
       }
-      await _vaultService.finalizeVaultWrite(virtualPath);
-      _recordedPath = null; // wiped natively
+      if (!await _vaultService.finalizeVaultWrite(virtualPath)) {
+        await _deletePartialVaultFile(virtualPath);
+        await _failSave();
+        return;
+      }
+      await _recorder.discard(savePath);
+      _recordedPath = null; // securely wiped after the vault commit succeeded
       _saved = true;
       if (popOnSuccess && mounted) Navigator.pop(context, name);
     } catch (e) {
@@ -564,13 +579,14 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
 
   /// Back to review after a failed save, with the player pointing at the
   /// file that actually still exists (a successful trim replaces it).
-  Future<void> _failSave({String? error}) async {
+  Future<void> _failSave({String? error, String? message}) async {
     if (!mounted) return;
     final l10n = context.l10n;
     _showError(
-      error == null
-          ? l10n.cameraCouldNotSaveRecordingMessage
-          : l10n.cameraCouldNotSaveRecordingWithReasonMessage(error),
+      message ??
+          (error == null
+              ? l10n.cameraCouldNotSaveRecordingMessage
+              : l10n.cameraCouldNotSaveRecordingWithReasonMessage(error)),
     );
     final current = _recordedPath;
     if (current != null && current != _playerPath) {

@@ -3872,6 +3872,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get cameraCouldNotSaveRecordingMessage => '録画を保存できませんでした';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      '撮影データを保存できませんでした。もう一度保存できるよう、データは残っています。';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      '保管庫の空き容量が不足しています。空き容量を確保してから、もう一度お試しください。';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return '録画を保存できませんでした: $error';
   }

@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "Échec de l'enregistrement : {error}",
   "cameraRecordingTooShortMessage": "L'enregistrement était trop court pour être sauvegardé",
   "cameraCouldNotSaveRecordingMessage": "Impossible d'enregistrer la vidéo",
+  "cameraCouldNotSaveCaptureMessage": "Impossible d'enregistrer la capture. Elle reste disponible pour réessayer.",
+  "cameraNotEnoughVaultSpaceMessage": "Espace libre insuffisant dans le coffre. Libérez de l’espace et réessayez.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "Impossible d'enregistrer la vidéo : {error}",
   "cameraCouldNotSwitchLensMessage": "Impossible de changer d'objectif",
   "cameraEncryptingPhotoLabel": "Chiffrement de la photo…",

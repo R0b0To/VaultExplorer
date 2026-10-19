@@ -318,7 +318,10 @@ class VaultCameraPlugin(
                         result.error("bad_args", "volId, virtualPath and videoPath required", null)
                         return
                     }
-                    val ok = VaultVideoRecorder.streamFileToSinkAndWipe(
+                    // Keep the review copy until Dart has successfully finalized
+                    // the vault write. If the write or finalization fails, the
+                    // capture remains available for retry.
+                    val ok = VaultVideoRecorder.streamFileToSink(
                         java.io.File(videoPath),
                         VaultChunkWriter(volId, virtualPath)
                     )

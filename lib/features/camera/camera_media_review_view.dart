@@ -85,6 +85,7 @@ class _CameraMediaReviewViewState extends State<CameraMediaReviewView> {
   NativeVideoController? _videoController;
   bool _isPlaying = true;
   bool _isDraggingTrim = false;
+  bool _isSaving = false;
 
   CapturedMediaItem? get _currentMedia =>
       _media.isNotEmpty ? _media[_selectedIndex] : null;
@@ -211,6 +212,55 @@ class _CameraMediaReviewViewState extends State<CameraMediaReviewView> {
       controller.pause();
     } else {
       controller.play();
+    }
+  }
+
+  Future<void> _saveMedia() async {
+    final onSaveMedia = widget.onSaveMedia;
+    if (_isSaving || _media.isEmpty || onSaveMedia == null) return;
+
+    final selectedBeforeSave = _currentMedia;
+    final selectedVideoPathBeforeSave = selectedBeforeSave?.videoPath;
+    setState(() => _isSaving = true);
+    try {
+      await _videoController?.pause();
+      await onSaveMedia(_media);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.cameraCouldNotSaveCaptureMessage)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        final selectedStillExists =
+            selectedBeforeSave != null && _media.contains(selectedBeforeSave);
+        final selectedVideoPathChanged =
+            selectedStillExists &&
+            selectedBeforeSave.isVideo &&
+            selectedBeforeSave.videoPath != selectedVideoPathBeforeSave;
+        if (!selectedStillExists || selectedVideoPathChanged) {
+          _videoController?.removeListener(_onVideoTick);
+          await _videoController?.dispose();
+          _videoController = null;
+        }
+        setState(() {
+          if (_media.isNotEmpty) {
+            _selectedIndex = _selectedIndex.clamp(0, _media.length - 1);
+          } else {
+            _selectedIndex = 0;
+          }
+          _isSaving = false;
+        });
+        if ((!selectedStillExists || selectedVideoPathChanged) &&
+            _currentMedia?.isVideo == true) {
+          await _initVideoPlayer(_currentMedia!.videoPath!);
+        } else if (selectedStillExists && selectedBeforeSave.isVideo) {
+          try {
+            await _videoController?.play();
+          } catch (_) {}
+        }
+      }
     }
   }
 
@@ -513,12 +563,12 @@ class _CameraMediaReviewViewState extends State<CameraMediaReviewView> {
                         FloatingActionButton(
                           backgroundColor: Colors.amber,
                           foregroundColor: Colors.black,
-                          onPressed: () {
-                            HapticFeedback.mediumImpact();
-                            if (_media.isNotEmpty) {
-                              widget.onSaveMedia?.call(_media);
-                            }
-                          },
+                          onPressed: _isSaving
+                              ? null
+                              : () {
+                                  HapticFeedback.mediumImpact();
+                                  unawaited(_saveMedia());
+                                },
                           child: const Icon(Icons.check_rounded, size: 30),
                         ),
                       ],

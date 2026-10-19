@@ -4081,6 +4081,14 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível salvar a gravação';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      'Não foi possível salvar a captura. Ela continua disponível para tentar novamente.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      'Não há espaço livre suficiente no cofre. Libere espaço e tente novamente.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return 'Não foi possível salvar a gravação: $error';
   }

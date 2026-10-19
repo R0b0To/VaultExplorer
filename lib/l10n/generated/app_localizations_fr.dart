@@ -4106,6 +4106,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible d\'enregistrer la vidéo';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      'Impossible d\'enregistrer la capture. Elle reste disponible pour réessayer.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      'Espace libre insuffisant dans le coffre. Libérez de l’espace et réessayez.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return 'Impossible d\'enregistrer la vidéo : $error';
   }

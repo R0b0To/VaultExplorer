@@ -327,24 +327,45 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       lifecycleApi: captureLifecycleApi,
     );
 
+    final successfullySaved = <CapturedMediaItem>[];
     try {
       String? firstName;
       bool hasVideo = false;
 
-      for (int i = 0; i < mediaToSave.length; i++) {
-        final item = mediaToSave[i];
+      for (final item in List<CapturedMediaItem>.from(mediaToSave)) {
         if (item.isPhoto && item.fullPhotoBytes != null) {
+          final bytes = item.fullPhotoBytes!;
+          if (!await vaultService.hasEnoughSpaceFor(bytes.length)) {
+            if (mounted) {
+              _returnToReviewWithError(
+                context.l10n.cameraNotEnoughVaultSpaceMessage,
+                mediaToSave,
+                successfullySaved,
+              );
+            }
+            return;
+          }
           final name = await vaultService.nextAvailableName(isPhoto: true);
-          firstName ??= name;
           final virtualPath = vaultService.buildVirtualPath(name);
           final ok = await cameraController.savePhotoToVault(
-            bytes: item.fullPhotoBytes!,
+            bytes: bytes,
             volId: container.volId,
             virtualPath: virtualPath,
           );
-          if (ok) await vaultService.finalizeVaultWrite(virtualPath);
+          if (!ok || !await vaultService.finalizeVaultWrite(virtualPath)) {
+            await vaultService.deleteFile(virtualPath);
+            if (mounted) {
+              _returnToReviewWithError(
+                context.l10n.cameraCouldNotSaveCaptureMessage,
+                mediaToSave,
+                successfullySaved,
+              );
+            }
+            return;
+          }
+          firstName ??= name;
+          successfullySaved.add(item);
         } else if (item.isVideo && item.videoPath != null) {
-          hasVideo = true;
           var finalVideoPath = item.videoPath!;
           if (item.trimStartMs > 0 || (item.trimEndMs > 0 && item.trimEndMs < item.videoDurationMs)) {
             final trimmed = await cameraController.trimVideo(
@@ -352,17 +373,47 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
               startMs: item.trimStartMs,
               endMs: item.trimEndMs,
             );
-            if (trimmed != null) finalVideoPath = trimmed;
+            if (trimmed != null) {
+              finalVideoPath = trimmed;
+              item.videoPath = trimmed;
+              item.trimStartMs = 0;
+              item.trimEndMs = item.videoDurationMs;
+            }
+          }
+          final videoBytes = await vaultService.localFileSize(finalVideoPath);
+          if (videoBytes != null &&
+              !await vaultService.hasEnoughSpaceFor(videoBytes)) {
+            if (mounted) {
+              _returnToReviewWithError(
+                context.l10n.cameraNotEnoughVaultSpaceMessage,
+                mediaToSave,
+                successfullySaved,
+              );
+            }
+            return;
           }
           final name = await vaultService.nextAvailableName(isPhoto: false);
-          firstName ??= name;
           final virtualPath = vaultService.buildVirtualPath(name);
           final ok = await cameraController.saveVideoToVault(
             videoPath: finalVideoPath,
             volId: container.volId,
             virtualPath: virtualPath,
           );
-          if (ok) await vaultService.finalizeVaultWrite(virtualPath);
+          if (!ok || !await vaultService.finalizeVaultWrite(virtualPath)) {
+            await vaultService.deleteFile(virtualPath);
+            if (mounted) {
+              _returnToReviewWithError(
+                context.l10n.cameraCouldNotSaveCaptureMessage,
+                mediaToSave,
+                successfullySaved,
+              );
+            }
+            return;
+          }
+          await cameraController.discardVideo(finalVideoPath);
+          firstName ??= name;
+          hasVideo = true;
+          successfullySaved.add(item);
         }
       }
 
@@ -385,10 +436,27 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       }
     } catch (_) {
       if (mounted) {
-        showErrorToast(context.l10n.cameraCouldNotSaveRecordingMessage);
-        setState(() => _phase = _Phase.camera);
+        _returnToReviewWithError(
+          context.l10n.cameraCouldNotSaveCaptureMessage,
+          mediaToSave,
+          successfullySaved,
+        );
       }
     }
+  }
+
+  void _returnToReviewWithError(
+    String message,
+    List<CapturedMediaItem> mediaToSave,
+    List<CapturedMediaItem> successfullySaved,
+  ) {
+    for (final item in successfullySaved) {
+      mediaToSave.remove(item);
+      capturedMedia.remove(item);
+    }
+    if (!mounted) return;
+    showErrorToast(message);
+    setState(() => _phase = _Phase.reviewing);
   }
 
   @override

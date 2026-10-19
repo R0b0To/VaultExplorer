@@ -6840,6 +6840,18 @@ abstract class AppLocalizations {
   /// **'Could not save recording'**
   String get cameraCouldNotSaveRecordingMessage;
 
+  /// Error toast shown when saving a captured photo or video fails; the capture remains available for retry
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save capture. It is still available to retry.'**
+  String get cameraCouldNotSaveCaptureMessage;
+
+  /// Error toast shown when a camera capture is larger than the vault's currently available space
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space in the vault. Free up space and try again.'**
+  String get cameraNotEnoughVaultSpaceMessage;
+
   /// Error toast when saving a finished video recording throws an exception
   ///
   /// In en, this message translates to:

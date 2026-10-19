@@ -154,8 +154,9 @@ class VaultAudioRecorderController {
     }
   }
 
-  /// Streams the temp file at [path] into the vault and wipes it. On
-  /// failure the temp file is kept so the save can be retried.
+  /// Streams the temp file at [path] into the vault. The caller must wipe it
+  /// only after the vault write has been finalized successfully. On failure
+  /// the temp file remains available for retry.
   Future<bool> saveToVault({
     required String path,
     required int volId,

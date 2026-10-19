@@ -4120,6 +4120,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraCouldNotSaveRecordingMessage => 'تعذّر حفظ التسجيل';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      'تعذّر حفظ اللقطة. ما زالت متاحة لإعادة المحاولة.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      'لا توجد مساحة كافية في الخزنة. أفرغ بعض المساحة ثم حاول مرة أخرى.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return 'تعذّر حفظ التسجيل: $error';
   }

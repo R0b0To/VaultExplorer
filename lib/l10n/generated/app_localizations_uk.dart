@@ -4099,6 +4099,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cameraCouldNotSaveRecordingMessage => 'Не вдалося зберегти запис';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      'Не вдалося зберегти знімок. Він залишився доступним для повторної спроби.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      'У сховищі недостатньо вільного місця. Звільніть місце й повторіть спробу.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return 'Не вдалося зберегти запис: $error';
   }

@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "Помилка запису: {error}",
   "cameraRecordingTooShortMessage": "Запис занадто короткий для збереження",
   "cameraCouldNotSaveRecordingMessage": "Не вдалося зберегти запис",
+  "cameraCouldNotSaveCaptureMessage": "Не вдалося зберегти знімок. Він залишився доступним для повторної спроби.",
+  "cameraNotEnoughVaultSpaceMessage": "У сховищі недостатньо вільного місця. Звільніть місце й повторіть спробу.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "Не вдалося зберегти запис: {error}",
   "cameraCouldNotSwitchLensMessage": "Не вдалося перемкнути об'єктив",
   "cameraEncryptingPhotoLabel": "Шифрування фото…",

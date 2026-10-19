@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "فشل التسجيل: {error}",
   "cameraRecordingTooShortMessage": "كان التسجيل قصيرًا جدًا ولا يمكن حفظه",
   "cameraCouldNotSaveRecordingMessage": "تعذّر حفظ التسجيل",
+  "cameraCouldNotSaveCaptureMessage": "تعذّر حفظ اللقطة. ما زالت متاحة لإعادة المحاولة.",
+  "cameraNotEnoughVaultSpaceMessage": "لا توجد مساحة كافية في الخزنة. أفرغ بعض المساحة ثم حاول مرة أخرى.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "تعذّر حفظ التسجيل: {error}",
   "cameraCouldNotSwitchLensMessage": "تعذّر تبديل العدسة",
   "cameraEncryptingPhotoLabel": "جارٍ تشفير الصورة…",

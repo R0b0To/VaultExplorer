@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "Error en la grabación: {error}",
   "cameraRecordingTooShortMessage": "La grabación fue demasiado corta para guardarse",
   "cameraCouldNotSaveRecordingMessage": "No se pudo guardar la grabación",
+  "cameraCouldNotSaveCaptureMessage": "No se pudo guardar la captura. Sigue disponible para volver a intentarlo.",
+  "cameraNotEnoughVaultSpaceMessage": "No hay suficiente espacio libre en la bóveda. Libera espacio e inténtalo de nuevo.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "No se pudo guardar la grabación: {error}",
   "cameraCouldNotSwitchLensMessage": "No se pudo cambiar de lente",
   "cameraEncryptingPhotoLabel": "Cifrando foto…",

@@ -4080,6 +4080,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Aufnahme konnte nicht gespeichert werden';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      'Aufnahme konnte nicht gespeichert werden. Sie ist weiterhin zum erneuten Versuch verfügbar.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      'Nicht genügend freier Speicherplatz im Tresor. Gib Speicherplatz frei und versuche es erneut.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return 'Aufnahme konnte nicht gespeichert werden: $error';
   }

@@ -58,6 +58,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   String? _currentRecordingPath;
 
+  String? _firstSavedCaptureName;
+
+  bool _hasSavedVideoCapture = false;
+
   bool _isReviewingMedia = false;
 
   // --- Document scanning --------------------------------------------------
@@ -499,22 +503,53 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
   }
 
-  /// Saves [pages] as one PDF. Returns its file name, or null on any failure.
-  Future<String?> _saveScansAsPdf(List<CapturedMediaItem> pages) async {
+  /// Saves [pages] as one PDF. Returns its file name, or null on failure.
+  Future<({String? name, bool insufficientSpace})> _saveScansAsPdf(
+    List<CapturedMediaItem> pages,
+  ) async {
+    String? virtualPath;
     try {
       final pdf = await _scanApi.buildPdf([for (final p in pages) p.fullPhotoBytes!]);
+      if (!await _vaultService.hasEnoughSpaceFor(pdf.length)) {
+        return (name: null, insufficientSpace: true);
+      }
       final name = await _vaultService.nextAvailableScanPdfName();
-      final virtualPath = _vaultService.buildVirtualPath(name);
+      virtualPath = _vaultService.buildVirtualPath(name);
       final ok = await cameraController.savePhotoToVault(
         bytes: pdf,
         volId: widget.container.volId,
         virtualPath: virtualPath,
       );
-      if (!ok) return null;
-      await _vaultService.finalizeVaultWrite(virtualPath);
-      return name;
+      if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
+        await _vaultService.deleteFile(virtualPath);
+        return (name: null, insufficientSpace: false);
+      }
+      return (name: name, insufficientSpace: false);
     } catch (_) {
-      return null;
+      if (virtualPath != null) await _vaultService.deleteFile(virtualPath);
+      return (name: null, insufficientSpace: false);
+    }
+  }
+
+  void _removeAlreadySavedMedia(
+    CapturedMediaItem item,
+    List<CapturedMediaItem> mediaToSave,
+  ) {
+    mediaToSave.remove(item);
+    capturedMedia.remove(item);
+  }
+
+  void _handleSaveFailure(
+    List<CapturedMediaItem> mediaToSave,
+    List<CapturedMediaItem> successfullySaved,
+    String message,
+  ) {
+    for (final item in successfullySaved) {
+      _removeAlreadySavedMedia(item, mediaToSave);
+    }
+    if (mounted) {
+      setState(() {});
+      showErrorToast(message);
     }
   }
 
@@ -527,6 +562,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
     await Future.delayed(const Duration(milliseconds: 50));
 
+    final successfullySaved = <CapturedMediaItem>[];
     try {
       String? firstName;
       bool hasVideo = false;
@@ -539,33 +575,64 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       ];
       final bundleScansAsPdf = _scanAsPdf && scanPages.isNotEmpty;
       if (bundleScansAsPdf) {
-        final pdfName = await _saveScansAsPdf(scanPages);
-        if (pdfName == null) {
+        final pdfResult = await _saveScansAsPdf(scanPages);
+        if (pdfResult.name == null) {
           // Keep everything on screen so nothing is lost; the user can retry or
           // switch to saving images.
-          if (mounted) showErrorToast(context.l10n.scanPdfFailed);
+          if (mounted) {
+            _handleSaveFailure(
+              mediaToSave,
+              successfullySaved,
+              pdfResult.insufficientSpace
+                  ? context.l10n.cameraNotEnoughVaultSpaceMessage
+                  : context.l10n.scanPdfFailed,
+            );
+          }
           return;
         }
-        firstName = pdfName;
+        firstName = pdfResult.name!;
+        _firstSavedCaptureName ??= pdfResult.name;
+        successfullySaved.addAll(scanPages);
       }
 
-      for (int i = 0; i < mediaToSave.length; i++) {
-        final item = mediaToSave[i];
+      for (final item in List<CapturedMediaItem>.from(mediaToSave)) {
         if (item.isPhoto && item.fullPhotoBytes != null) {
           if (bundleScansAsPdf && item.isScan) continue;
+          final bytes = item.fullPhotoBytes!;
+          if (!await _vaultService.hasEnoughSpaceFor(bytes.length)) {
+            if (mounted) {
+              _handleSaveFailure(
+                mediaToSave,
+                successfullySaved,
+                context.l10n.cameraNotEnoughVaultSpaceMessage,
+              );
+            }
+            return;
+          }
           final name = item.isScan
               ? await _vaultService.nextAvailableScanImageName()
               : await _vaultService.nextAvailableName(isPhoto: true);
-          firstName ??= name;
           final virtualPath = _vaultService.buildVirtualPath(name);
           final ok = await cameraController.savePhotoToVault(
-            bytes: item.fullPhotoBytes!,
+            bytes: bytes,
             volId: widget.container.volId,
             virtualPath: virtualPath,
           );
-          if (ok) await _vaultService.finalizeVaultWrite(virtualPath);
+          if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
+            await _vaultService.deleteFile(virtualPath);
+            if (mounted) {
+              _handleSaveFailure(
+                mediaToSave,
+                successfullySaved,
+                context.l10n.cameraCouldNotSaveCaptureMessage,
+              );
+            }
+            return;
+          }
+          firstName ??= name;
+          _firstSavedCaptureName ??= name;
+          successfullySaved.add(item);
         } else if (item.isVideo && item.videoPath != null) {
-          hasVideo = true;
           var finalVideoPath = item.videoPath!;
           if (item.trimStartMs > 0 || (item.trimEndMs > 0 && item.trimEndMs < item.videoDurationMs)) {
             final trimmed = await cameraController.trimVideo(
@@ -573,22 +640,68 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               startMs: item.trimStartMs,
               endMs: item.trimEndMs,
             );
-            if (trimmed != null) finalVideoPath = trimmed;
+            if (trimmed != null) {
+              finalVideoPath = trimmed;
+              item.videoPath = trimmed;
+              item.trimStartMs = 0;
+              item.trimEndMs = item.videoDurationMs;
+            }
+          }
+          final videoBytes = await _vaultService.localFileSize(finalVideoPath);
+          if (videoBytes != null &&
+              !await _vaultService.hasEnoughSpaceFor(videoBytes)) {
+            if (mounted) {
+              _handleSaveFailure(
+                mediaToSave,
+                successfullySaved,
+                context.l10n.cameraNotEnoughVaultSpaceMessage,
+              );
+            }
+            return;
           }
           final name = await _vaultService.nextAvailableName(isPhoto: false);
-          firstName ??= name;
           final virtualPath = _vaultService.buildVirtualPath(name);
           final ok = await cameraController.saveVideoToVault(
             videoPath: finalVideoPath,
             volId: widget.container.volId,
             virtualPath: virtualPath,
           );
-          if (ok) await _vaultService.finalizeVaultWrite(virtualPath);
+          if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
+            await _vaultService.deleteFile(virtualPath);
+            if (mounted) {
+              _handleSaveFailure(
+                mediaToSave,
+                successfullySaved,
+                context.l10n.cameraCouldNotSaveCaptureMessage,
+              );
+            }
+            return;
+          }
+          await cameraController.discardVideo(finalVideoPath);
+          firstName ??= name;
+          hasVideo = true;
+          _firstSavedCaptureName ??= name;
+          _hasSavedVideoCapture = true;
+          successfullySaved.add(item);
         }
       }
 
       if (mounted) {
-        Navigator.pop(context, (savedName: firstName ?? 'media', isVideo: hasVideo));
+        Navigator.pop(
+          context,
+          (
+            savedName: _firstSavedCaptureName ?? firstName ?? 'media',
+            isVideo: _hasSavedVideoCapture || hasVideo,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _handleSaveFailure(
+          mediaToSave,
+          successfullySaved,
+          context.l10n.cameraCouldNotSaveCaptureMessage,
+        );
       }
     } finally {
       if (mounted) captureSessionController.setEncrypting(false);

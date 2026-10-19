@@ -179,7 +179,11 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   int? _lastInteractedIndex;
   bool _hasMoved = false;
   final Set<int> _downPointers = <int>{};
+  final Set<int> _scrollInterruptPointers = <int>{};
   bool _scaleStarted = false;
+  bool _isScrollActive = false;
+  bool _scrollEndPending = false;
+  bool _scrollEndResetScheduled = false;
 
   int? get _effectiveAnchorIndex {
     if (_lastInteractedEntry != null &&
@@ -241,10 +245,44 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   // ── Gestures ───────────────────────────────────────────────────────────────
 
   /// Pointer filter for [_HoldSelectGestureRecognizer]: only touches that land
-  /// on a real item may become a hold.
+  /// on a real item may become a hold. A press that interrupts scrolling only
+  /// stops the scroll; it must be released before a hold can select an item.
   bool _shouldTrackHold(PointerDownEvent event) {
+    if (_isScrollActive || _scrollEndPending) {
+      _scrollInterruptPointers.add(event.pointer);
+      return false;
+    }
+
     final item = _findItemAt(event.position);
     return item != null && !item.entry.isPlaceholder;
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+
+    if (notification is ScrollStartNotification ||
+        notification is ScrollUpdateNotification ||
+        notification is OverscrollNotification) {
+      _isScrollActive = true;
+      _scrollEndPending = false;
+    } else if (notification is ScrollEndNotification) {
+      _isScrollActive = false;
+      _scrollEndPending = true;
+
+      // A press can itself end a ballistic scroll. Keep the activity visible
+      // through the current frame so that press is still treated as the one
+      // that stopped scrolling, even if ScrollEnd arrives before its hold
+      // recognizer checks the pointer.
+      if (!_scrollEndResetScheduled) {
+        _scrollEndResetScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollEndPending = false;
+          _scrollEndResetScheduled = false;
+        });
+      }
+    }
+
+    return false;
   }
 
   void _handlePointerDown(PointerDownEvent event) {
@@ -307,7 +345,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   void _handlePointerUp(PointerUpEvent event) {
     _downPointers.remove(event.pointer);
-    if (!_hasMoved && _pointerDownItem != null) {
+    final interruptedScroll = _scrollInterruptPointers.remove(event.pointer);
+    if (!interruptedScroll && !_hasMoved && _pointerDownItem != null) {
       _lastInteractedIndex = _pointerDownItem!.index;
       _lastInteractedEntry = _pointerDownItem!.entry;
     }
@@ -319,6 +358,7 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _downPointers.remove(event.pointer);
+    _scrollInterruptPointers.remove(event.pointer);
     _pointerDownPosition = null;
     _pointerDownItem = null;
     _hasMoved = false;
@@ -400,7 +440,10 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
             },
           ),
         },
-        child: widget.child,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: widget.child,
+        ),
       ),
     );
   }

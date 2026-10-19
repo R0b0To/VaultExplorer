@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "Aufnahme fehlgeschlagen: {error}",
   "cameraRecordingTooShortMessage": "Aufnahme war zu kurz zum Speichern",
   "cameraCouldNotSaveRecordingMessage": "Aufnahme konnte nicht gespeichert werden",
+  "cameraCouldNotSaveCaptureMessage": "Aufnahme konnte nicht gespeichert werden. Sie ist weiterhin zum erneuten Versuch verfügbar.",
+  "cameraNotEnoughVaultSpaceMessage": "Nicht genügend freier Speicherplatz im Tresor. Gib Speicherplatz frei und versuche es erneut.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "Aufnahme konnte nicht gespeichert werden: {error}",
   "cameraCouldNotSwitchLensMessage": "Objektiv konnte nicht gewechselt werden",
   "cameraEncryptingPhotoLabel": "Foto wird verschlüsselt…",

@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "Registrazione non riuscita: {error}",
   "cameraRecordingTooShortMessage": "La registrazione era troppo breve per essere salvata",
   "cameraCouldNotSaveRecordingMessage": "Impossibile salvare la registrazione",
+  "cameraCouldNotSaveCaptureMessage": "Impossibile salvare la cattura. È ancora disponibile per riprovare.",
+  "cameraNotEnoughVaultSpaceMessage": "Spazio libero insufficiente nel vault. Libera spazio e riprova.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "Impossibile salvare la registrazione: {error}",
   "cameraCouldNotSwitchLensMessage": "Impossibile cambiare obiettivo",
   "cameraEncryptingPhotoLabel": "Cifratura foto…",

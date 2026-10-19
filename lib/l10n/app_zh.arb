@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "录制失败：{error}",
   "cameraRecordingTooShortMessage": "录制时间过短，无法保存",
   "cameraCouldNotSaveRecordingMessage": "无法保存录制内容",
+  "cameraCouldNotSaveCaptureMessage": "无法保存拍摄内容。内容仍然保留，可以重试。",
+  "cameraNotEnoughVaultSpaceMessage": "保险库可用空间不足。请释放空间后重试。",
   "cameraCouldNotSaveRecordingWithReasonMessage": "无法保存录制内容：{error}",
   "cameraCouldNotSwitchLensMessage": "无法切换镜头",
   "cameraEncryptingPhotoLabel": "正在加密照片…",

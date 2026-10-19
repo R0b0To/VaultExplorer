@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "녹화에 실패했습니다: {error}",
   "cameraRecordingTooShortMessage": "녹화 시간이 너무 짧아 저장할 수 없습니다",
   "cameraCouldNotSaveRecordingMessage": "녹화 내용을 저장할 수 없습니다",
+  "cameraCouldNotSaveCaptureMessage": "촬영한 파일을 저장할 수 없습니다. 다시 시도할 수 있도록 파일은 그대로 남아 있습니다.",
+  "cameraNotEnoughVaultSpaceMessage": "금고에 여유 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.",
   "cameraCouldNotSaveRecordingWithReasonMessage": "녹화 내용을 저장할 수 없습니다: {error}",
   "cameraCouldNotSwitchLensMessage": "렌즈를 전환할 수 없습니다",
   "cameraEncryptingPhotoLabel": "사진 암호화 중…",

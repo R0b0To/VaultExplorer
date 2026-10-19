@@ -172,7 +172,7 @@ class VaultVideoRecorder(
             }
         }
 
-        fun streamFileToSinkAndWipe(file: File, sink: ChunkSink): Boolean {
+        fun streamFileToSink(file: File, sink: ChunkSink): Boolean {
             if (!file.exists() || file.length() == 0L) return false
             try {
                 java.io.BufferedInputStream(FileInputStream(file), 64 * 1024).use { bis ->
@@ -187,8 +187,15 @@ class VaultVideoRecorder(
                 }
                 return sink.finish()
             } catch (e: Exception) {
-                VeLog.e(TAG, e) { "streamFileToSinkAndWipe failed" }
+                VeLog.e(TAG, e) { "streamFileToSink failed" }
                 return false
+            }
+        }
+
+        fun streamFileToSinkAndWipe(file: File, sink: ChunkSink): Boolean {
+            if (!file.exists() || file.length() == 0L) return false
+            return try {
+                streamFileToSink(file, sink)
             } finally {
                 secureDeleteFile(file)
             }

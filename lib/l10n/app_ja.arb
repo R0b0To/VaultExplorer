@@ -1117,6 +1117,8 @@
   "cameraRecordingFailedWithReasonMessage": "録画に失敗しました: {error}",
   "cameraRecordingTooShortMessage": "録画時間が短すぎたため保存できませんでした",
   "cameraCouldNotSaveRecordingMessage": "録画を保存できませんでした",
+  "cameraCouldNotSaveCaptureMessage": "撮影データを保存できませんでした。もう一度保存できるよう、データは残っています。",
+  "cameraNotEnoughVaultSpaceMessage": "保管庫の空き容量が不足しています。空き容量を確保してから、もう一度お試しください。",
   "cameraCouldNotSaveRecordingWithReasonMessage": "録画を保存できませんでした: {error}",
   "cameraCouldNotSwitchLensMessage": "レンズを切り替えられませんでした",
   "cameraEncryptingPhotoLabel": "写真を暗号化中…",

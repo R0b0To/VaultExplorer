@@ -35,13 +35,12 @@ private const val TRIMMED_TEMP_PREFIX = "vx_vid_trim_"
  *
  * Flow, mirroring the camera: start -> (pause/resume) -> stop returns a
  * plaintext temp file for review -> optional trim -> save streams it into
- * the vault and wipes it, or discard wipes it. See [VaultAudioRecorder] for
- * the temp-file lifecycle.
+ * the vault, finalizes the vault write, then wipes it, or discard wipes it.
+ * See [VaultAudioRecorder] for the temp-file lifecycle.
  *
  * Only paths that [VaultAudioRecorder] / trim created inside the app cache
- * directory are accepted by save/trim/discard: those operations delete
- * their input, so a bad argument must not be able to point them at an
- * arbitrary file.
+ * directory are accepted by save/trim/discard. Trim and discard delete their
+ * input, so a bad argument must not point them at an arbitrary file.
  */
 class VaultAudioCapturePlugin(
     private val activity: Activity,
@@ -234,11 +233,10 @@ class VaultAudioCapturePlugin(
     }
 
     /**
-     * Streams [file] into the vault at [virtualPath] and wipes it -- but only
-     * once the whole write succeeded. [VaultVideoRecorder.streamFileToSinkAndWipe]
-     * wipes in a `finally`, so a failed vault write there loses the take;
-     * for a recording that cannot be redone, the temp file is kept on
-     * failure so the person can retry the save.
+     * Streams [file] into the vault at [virtualPath] but leaves the source
+     * intact. Dart wipes it only after `finishWrite` commits the complete
+     * vault file, so either a failed stream or failed finalization can be
+     * retried without losing the take.
      */
     private fun streamIntoVault(file: File, volId: Int, virtualPath: String): Boolean {
         if (!file.exists() || file.length() == 0L) return false
@@ -253,8 +251,6 @@ class VaultAudioCapturePlugin(
                 }
             }
         }
-        if (!sink.finish()) return false
-        VaultVideoRecorder.secureDeleteFile(file)
-        return true
+        return sink.finish()
     }
 }

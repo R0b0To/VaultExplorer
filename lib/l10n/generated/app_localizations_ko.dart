@@ -3873,6 +3873,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get cameraCouldNotSaveRecordingMessage => '녹화 내용을 저장할 수 없습니다';
 
   @override
+  String get cameraCouldNotSaveCaptureMessage =>
+      '촬영한 파일을 저장할 수 없습니다. 다시 시도할 수 있도록 파일은 그대로 남아 있습니다.';
+
+  @override
+  String get cameraNotEnoughVaultSpaceMessage =>
+      '금고에 여유 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.';
+
+  @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
     return '녹화 내용을 저장할 수 없습니다: $error';
   }

@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
+import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
@@ -69,9 +72,39 @@ class CameraVaultService {
     return candidate;
   }
 
-  Future<void> finalizeVaultWrite(String virtualPath) async {
+  Future<bool> hasEnoughSpaceFor(int requiredBytes) async {
+    if (requiredBytes <= 0) return true;
+    try {
+      final info = await _fileIoApi.getSpaceInfo(container);
+      if (info == null || info.length < 2 || info[1] < 0) return true;
+      return fitsWithinSpaceSafetyMargin(requiredBytes, info[1]);
+    } catch (_) {
+      // Space information is best effort. The write itself remains the
+      // authoritative check when the mounted vault cannot report capacity.
+      return true;
+    }
+  }
+
+  Future<int?> localFileSize(String path) async {
+    try {
+      return await File(path).length();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> finalizeVaultWrite(String virtualPath) async {
     if (['cryptomator', 'gocryptfs', 'cryfs'].contains(container.containerFormat)) {
-      await _lifecycleApi.finishWrite(container, virtualPath);
+      return _lifecycleApi.finishWrite(container, virtualPath);
+    }
+    return true;
+  }
+
+  Future<bool> deleteFile(String virtualPath) async {
+    try {
+      return await _fileIoApi.deleteFile(container, virtualPath);
+    } catch (_) {
+      return false;
     }
   }
 

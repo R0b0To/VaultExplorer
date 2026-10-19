@@ -1010,7 +1010,7 @@ class VaultLifecycleApi {
       return success ?? true;
     } catch (e) {
       logSwallowed('finishWrite', e);
-      return true;
+      return false;
     }
   }
 

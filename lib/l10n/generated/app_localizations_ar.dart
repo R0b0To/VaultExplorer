@@ -11297,7 +11297,22 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'استخدم خيارات الأيقونات والألوان لمدير الملفات أدناه.';
+      'تضبط هذه الخيارات مظهر مدير الملفات الخاص به. إذا كان يتبع مظهر التطبيق، فسيؤدي تغيير إعداد مسبق أو نمط أدناه إلى إيقاف اتباعه.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle => 'مدير الملفات يتبع مظهر التطبيق';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'تعرض المعاينة مظهر التطبيق النشط. سيؤدي تغيير إعداد مسبق أو أي نمط أدناه إلى حفظ مظهر مستقل لمدير الملفات وإيقاف اتباع مظهر التطبيق.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'يستخدم مدير الملفات مظهرًا مستقلًا';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'لن تظهر تغييرات أنماط الملفات والمجلدات في مظهر التطبيق هذا في مدير الملفات ما دام يستخدم مظهرًا خاصًا به. فعّل اتباع مظهر التطبيق لتطبيق هذا المظهر عليه.';
 
   @override
   String get skinChooseOrCreateSkin => 'اختر مظهرًا أو أنشئه';

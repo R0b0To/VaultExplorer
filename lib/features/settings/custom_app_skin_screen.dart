@@ -13,6 +13,8 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_theme.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
+import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
+import 'package:vaultexplorer/features/settings/widgets/file_manager_skin_mode_notice.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
@@ -382,11 +384,13 @@ List<(String, String, List<String>)> _appColorGroups(BuildContext context) => [
 class CustomAppSkinScreen extends ConsumerStatefulWidget {
   final bool showControls;
   final bool? initialDarkColors;
+  final bool showFileManagerSkinShortcut;
 
   const CustomAppSkinScreen({
     super.key,
     this.showControls = false,
     this.initialDarkColors,
+    this.showFileManagerSkinShortcut = true,
   });
 
   @override
@@ -1041,6 +1045,8 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
               builder: (_) => SkinAreaScope(area: SkinArea.settings, child: CustomAppSkinScreen(
                 showControls: true,
                 initialDarkColors: _darkColors,
+                showFileManagerSkinShortcut:
+                    widget.showFileManagerSkinShortcut,
               )),
             ),
           ),
@@ -1136,10 +1142,38 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
                 ],
               ),
             ),
+            if (_previewPane == _PreviewPane.files) ...[
+              const SizedBox(height: 10),
+              const FileManagerSkinModeNotice(),
+            ],
             const SizedBox(height: 10),
             Expanded(child: _livePreview(skin)),
             const SizedBox(height: 10),
             _previewInspector(),
+            if (_previewPane == _PreviewPane.files &&
+                widget.showFileManagerSkinShortcut) ...[
+              const SizedBox(height: 8),
+              Card(
+                child: ListTile(
+                  leading: Icon(
+                    Icons.folder_special_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(context.l10n.fileSkinScreenTitle),
+                  subtitle: Text(
+                    context.l10n.fileSkinUseIndependentStylesDescription,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FileManagerSkinScreen(
+                        showAppSkinShortcut: false,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1318,7 +1352,11 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         context.l10n.skinPagesDescription,
       ),
       for (final area in SkinArea.values) _areaSection(skin, area),
-      _fileManagerSection(skin),
+      const FileManagerSkinModeNotice(),
+      _fileManagerSection(
+        skin,
+        showIndependentSkinShortcut: widget.showFileManagerSkinShortcut,
+      ),
       _editorSection(skin),
       const SizedBox(height: 20),
       Text(
@@ -3806,7 +3844,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
-  Widget _fileManagerSection(CustomAppSkin skin) => _sectionCard(
+  Widget _fileManagerSection(
+    CustomAppSkin skin, {
+    required bool showIndependentSkinShortcut,
+  }) => _sectionCard(
     title: context.l10n.skinFileManager,
     subtitle: context.l10n.skinFolderAndFileGlyphsTilesAndLabelColors,
     children: [
@@ -3869,6 +3910,23 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           ),
         ),
       ),
+      if (showIndependentSkinShortcut)
+        ListTile(
+          leading: Icon(
+            Icons.folder_special_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: Text(context.l10n.fileSkinScreenTitle),
+          subtitle: Text(context.l10n.fileSkinUseIndependentStylesDescription),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const FileManagerSkinScreen(
+                showAppSkinShortcut: false,
+              ),
+            ),
+          ),
+        ),
     ],
   );
 

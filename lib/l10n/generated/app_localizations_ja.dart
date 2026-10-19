@@ -10665,7 +10665,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      '以下のファイルマネージャーのアイコンと色の設定を使います。';
+      'ここではファイルマネージャー独自のスタイルを設定します。アプリスキンに合わせている場合、以下のプリセットやスタイルを変更すると「アプリのスキンに合わせる」がオフになります。';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle => 'ファイルマネージャーはアプリスキンに合わせています';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'プレビューには現在のアプリスキンが表示されます。以下のプリセットまたはスタイルを変更すると、ファイルマネージャー用の独立したスキンが保存され、「アプリのスキンに合わせる」がオフになります。';
+
+  @override
+  String get skinFileManagerIndependentTitle => 'ファイルマネージャーは独立したスキンを使用しています';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'このアプリスキンでファイルやフォルダーのスタイルを変更しても、ファイルマネージャーが独自のスキンを使用している間は反映されません。「アプリのスキンに合わせる」をオンにすると、このスキンが適用されます。';
 
   @override
   String get skinChooseOrCreateSkin => 'スキンを選択または作成';

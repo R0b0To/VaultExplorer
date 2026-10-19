@@ -18784,8 +18784,32 @@ abstract class AppLocalizations {
   /// No description provided for @fileSkinUseIndependentStylesDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use the file manager icon and color choices below.'**
+  /// **'These options set the File Manager’s own style. If it follows App Skin, changing a preset or style below turns off Follow app skin.'**
   String get fileSkinUseIndependentStylesDescription;
+
+  /// No description provided for @fileSkinManagedByAppSkinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager is following the app skin'**
+  String get fileSkinManagedByAppSkinTitle;
+
+  /// No description provided for @fileSkinManagedByAppSkinDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The preview uses the active App Skin. Changing a preset or style below saves an independent file manager skin and turns off Follow app skin.'**
+  String get fileSkinManagedByAppSkinDescription;
+
+  /// No description provided for @skinFileManagerIndependentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File manager uses an independent skin'**
+  String get skinFileManagerIndependentTitle;
+
+  /// No description provided for @skinFileManagerIndependentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes to file and folder styles in this App Skin will not appear in File Manager while it uses its own skin. Turn on Follow app skin to apply this App Skin there.'**
+  String get skinFileManagerIndependentDescription;
 
   /// No description provided for @skinChooseOrCreateSkin.
   ///

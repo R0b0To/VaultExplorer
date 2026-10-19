@@ -11276,7 +11276,23 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Verwende die folgenden Symbol- und Farboptionen des Dateimanagers.';
+      'Diese Optionen legen das eigene Design des Dateimanagers fest. Wenn er dem App-Design folgt, wird diese Einstellung beim Ändern einer Vorgabe oder eines Stils unten deaktiviert.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'Der Dateimanager folgt dem App-Design';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'Die Vorschau zeigt das aktive App-Design. Wenn du unten eine Vorgabe oder einen Stil änderst, wird ein unabhängiges Dateimanager-Design gespeichert und „App-Design übernehmen“ deaktiviert.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'Der Dateimanager verwendet ein eigenes Design';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'Änderungen an Datei- und Ordnerstilen in diesem App-Design werden nicht im Dateimanager angezeigt, solange er ein eigenes Design verwendet. Aktiviere „App-Design übernehmen“, um dieses App-Design dort anzuwenden.';
 
   @override
   String get skinChooseOrCreateSkin => 'Design auswählen oder erstellen';

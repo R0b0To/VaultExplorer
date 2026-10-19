@@ -11354,7 +11354,23 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Використовуйте наведені нижче параметри значків і кольорів файлового менеджера.';
+      'Ці параметри задають власний стиль файлового менеджера. Якщо він використовує тему програми, зміна набору або стилю нижче вимкне цей режим.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'Файловий менеджер використовує тему програми';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'У попередньому перегляді показано активну тему програми. Зміна набору або стилю нижче збереже окрему тему файлового менеджера й вимкне використання теми програми.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'Файловий менеджер використовує окрему тему';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'Зміни стилів файлів і папок у цій темі не відображатимуться у файловому менеджері, доки він використовує власну тему. Увімкніть використання теми програми, щоб застосувати тутешню тему.';
 
   @override
   String get skinChooseOrCreateSkin => 'Вибрати або створити тему';

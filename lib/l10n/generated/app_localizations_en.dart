@@ -11108,7 +11108,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Use the file manager icon and color choices below.';
+      'These options set the File Manager’s own style. If it follows App Skin, changing a preset or style below turns off Follow app skin.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'File manager is following the app skin';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'The preview uses the active App Skin. Changing a preset or style below saves an independent file manager skin and turns off Follow app skin.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'File manager uses an independent skin';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'Changes to file and folder styles in this App Skin will not appear in File Manager while it uses its own skin. Turn on Follow app skin to apply this App Skin there.';
 
   @override
   String get skinChooseOrCreateSkin => 'Choose or create a skin';

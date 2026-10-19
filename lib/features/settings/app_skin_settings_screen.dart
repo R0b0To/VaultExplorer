@@ -13,7 +13,12 @@ import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class AppSkinSettingsScreen extends ConsumerWidget {
-  const AppSkinSettingsScreen({super.key});
+  final bool showFileManagerSkinShortcut;
+
+  const AppSkinSettingsScreen({
+    super.key,
+    this.showFileManagerSkinShortcut = true,
+  });
 
   Future<void> _importSkins(BuildContext context, WidgetRef ref) async {
     try {
@@ -165,7 +170,14 @@ class AppSkinSettingsScreen extends ConsumerWidget {
     await notifier.activateCustomSkin(skin);
     if (!context.mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const CustomAppSkinScreen())),
+      MaterialPageRoute<void>(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.settings,
+          child: CustomAppSkinScreen(
+            showFileManagerSkinShortcut: showFileManagerSkinShortcut,
+          ),
+        ),
+      ),
     );
   }
 
@@ -266,7 +278,13 @@ class AppSkinSettingsScreen extends ConsumerWidget {
                     if (!context.mounted) return;
                     await Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const CustomAppSkinScreen()),
+                        builder: (_) => SkinAreaScope(
+                          area: SkinArea.settings,
+                          child: CustomAppSkinScreen(
+                            showFileManagerSkinShortcut:
+                                showFileManagerSkinShortcut,
+                          ),
+                        ),
                       ),
                     );
                   },

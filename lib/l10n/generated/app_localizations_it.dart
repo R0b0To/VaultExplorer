@@ -11273,7 +11273,23 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Usa le opzioni di icone e colori del file manager qui sotto.';
+      'Queste opzioni impostano lo stile del file manager. Se segue il tema dell’app, modificare un predefinito o uno stile qui sotto disattiva “Segui il tema dell’app”.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'Il file manager segue il tema dell’app';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'L’anteprima usa il tema attivo dell’app. Modificando un predefinito o uno stile qui sotto, verrà salvato un tema indipendente per il file manager e sarà disattivato “Segui il tema dell’app”.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'Il file manager usa un tema indipendente';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'Le modifiche agli stili di file e cartelle in questo tema non appariranno nel file manager finché usa un tema proprio. Attiva “Segui il tema dell’app” per applicare questo tema anche lì.';
 
   @override
   String get skinChooseOrCreateSkin => 'Scegli o crea un tema';

@@ -24,8 +24,13 @@ import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.
 /// made.
 class FileManagerSkinScreen extends ConsumerWidget {
   final String? containerUri;
+  final bool showAppSkinShortcut;
 
-  const FileManagerSkinScreen({super.key, this.containerUri});
+  const FileManagerSkinScreen({
+    super.key,
+    this.containerUri,
+    this.showAppSkinShortcut = true,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,8 +39,9 @@ class FileManagerSkinScreen extends ConsumerWidget {
       fileManagerToolbarSettingsProvider(containerUri).notifier,
     );
     final appSkinSettings = ref.watch(appSkinSettingsProvider);
+    final followsAppSkin = appSkinSettings.fileManagerFollowsAppSkin;
     final activeSkinTokens = Theme.of(context).extension<AppSkinTokens>();
-    final skin = appSkinSettings.fileManagerFollowsAppSkin
+    final skin = followsAppSkin
         ? activeSkinTokens?.fileManagerSkin ?? state.config.skin
         : state.config.skin;
     final cs = Theme.of(context).colorScheme;
@@ -52,9 +58,7 @@ class FileManagerSkinScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: l10n.resetToDefaultsTooltip,
-            onPressed:
-                appSkinSettings.fileManagerFollowsAppSkin ||
-                    skin == FileManagerSkin.classic
+            onPressed: state.config.skin == FileManagerSkin.classic
                 ? null
                 : () => notifier.setSkin(FileManagerSkin.classic),
           ),
@@ -104,11 +108,39 @@ class FileManagerSkinScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          AppSkinShortcutTile(preset: appSkinSettings.preset),
+                          if (showAppSkinShortcut)
+                            AppSkinShortcutTile(
+                              preset: appSkinSettings.preset,
+                              showFileManagerSkinShortcut: false,
+                            ),
                         ],
                       ),
                       SectionHeader(l10n.fileSkinPreviewHeader),
                       _SkinPreview(skin: skin),
+                      if (followsAppSkin) ...[
+                        SectionCard(
+                          children: [
+                            ListTile(
+                              leading: Icon(
+                                Icons.info_outline_rounded,
+                                color: cs.primary,
+                              ),
+                              title: Text(
+                                l10n.fileSkinManagedByAppSkinTitle,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                l10n.fileSkinManagedByAppSkinDescription,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       SectionHeader(l10n.fileSkinPresetsHeader),
                       _PresetPicker(
                         skin: skin,

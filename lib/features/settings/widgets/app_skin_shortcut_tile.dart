@@ -11,8 +11,13 @@ import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 /// the preset page so the user can choose or create a custom skin.
 class AppSkinShortcutTile extends StatelessWidget {
   final AppSkinPreset preset;
+  final bool showFileManagerSkinShortcut;
 
-  const AppSkinShortcutTile({super.key, required this.preset});
+  const AppSkinShortcutTile({
+    super.key,
+    required this.preset,
+    this.showFileManagerSkinShortcut = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +44,16 @@ class AppSkinShortcutTile extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: isCustom
-              ? const CustomAppSkinScreen()
-              : const AppSkinSettingsScreen()),
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.settings,
+            child: isCustom
+                ? CustomAppSkinScreen(
+                    showFileManagerSkinShortcut: showFileManagerSkinShortcut,
+                  )
+                : AppSkinSettingsScreen(
+                    showFileManagerSkinShortcut: showFileManagerSkinShortcut,
+                  ),
+          ),
         ),
       ),
     );

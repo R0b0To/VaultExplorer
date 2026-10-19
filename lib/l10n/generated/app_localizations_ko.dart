@@ -10664,7 +10664,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      '아래의 파일 관리자 아이콘 및 색상 옵션을 사용합니다.';
+      '이 옵션은 파일 관리자 전용 스타일을 설정합니다. 앱 스킨을 따르는 중에 아래 프리셋이나 스타일을 변경하면 ‘앱 스킨 따르기’가 꺼집니다.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle => '파일 관리자가 앱 스킨을 따르고 있습니다';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      '미리보기에는 현재 앱 스킨이 표시됩니다. 아래 프리셋이나 스타일을 변경하면 파일 관리자 전용 스킨이 저장되고 ‘앱 스킨 따르기’가 꺼집니다.';
+
+  @override
+  String get skinFileManagerIndependentTitle => '파일 관리자가 독립 스킨을 사용합니다';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      '이 앱 스킨에서 파일 및 폴더 스타일을 변경해도 파일 관리자가 자체 스킨을 사용하는 동안에는 적용되지 않습니다. 이 앱 스킨을 적용하려면 ‘앱 스킨 따르기’를 켜세요.';
 
   @override
   String get skinChooseOrCreateSkin => '스킨 선택 또는 만들기';

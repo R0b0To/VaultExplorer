@@ -11276,7 +11276,23 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Use as opções de ícones e cores do gerenciador de arquivos abaixo.';
+      'Estas opções definem o estilo próprio do gerenciador de arquivos. Se ele seguir o tema do app, alterar uma predefinição ou estilo abaixo desativa “Seguir o tema do app”.';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'O gerenciador de arquivos segue o tema do app';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'A prévia usa o tema ativo do app. Alterar uma predefinição ou um estilo abaixo salva um tema independente para o gerenciador de arquivos e desativa “Seguir o tema do app”.';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'O gerenciador de arquivos usa um tema independente';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'As alterações nos estilos de arquivos e pastas neste tema não aparecerão no gerenciador enquanto ele usar um tema próprio. Ative “Seguir o tema do app” para aplicar este tema nele.';
 
   @override
   String get skinChooseOrCreateSkin => 'Escolher ou criar um tema';

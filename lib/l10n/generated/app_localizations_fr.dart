@@ -11378,7 +11378,23 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Utilisez les options d’icônes et de couleurs du gestionnaire de fichiers ci-dessous.';
+      'Ces options définissent le style propre du gestionnaire de fichiers. S’il suit le thème de l’application, modifier un préréglage ou un style ci-dessous désactive « Suivre le thème de l’application ».';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle =>
+      'Le gestionnaire de fichiers suit le thème de l’application';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      'L’aperçu utilise le thème actif de l’application. Toute modification d’un préréglage ou d’un style ci-dessous enregistre un thème indépendant pour le gestionnaire de fichiers et désactive « Suivre le thème de l’application ».';
+
+  @override
+  String get skinFileManagerIndependentTitle =>
+      'Le gestionnaire de fichiers utilise un thème indépendant';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      'Les changements de style des fichiers et dossiers de ce thème ne s’afficheront pas dans le gestionnaire tant qu’il utilisera son propre thème. Activez « Suivre le thème de l’application » pour appliquer ce thème au gestionnaire.';
 
   @override
   String get skinChooseOrCreateSkin => 'Choisir ou créer un thème';

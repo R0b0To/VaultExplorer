@@ -10497,7 +10497,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileSkinFollowAppSkinDescription => '文件和文件夹样式跟随当前应用皮肤。';
 
   @override
-  String get fileSkinUseIndependentStylesDescription => '使用下方的文件管理器图标和颜色选项。';
+  String get fileSkinUseIndependentStylesDescription =>
+      '这些选项用于设置文件管理器自己的样式。如果文件管理器正在跟随应用皮肤，更改下方的预设或样式会关闭“跟随应用皮肤”。';
+
+  @override
+  String get fileSkinManagedByAppSkinTitle => '文件管理器正在跟随应用皮肤';
+
+  @override
+  String get fileSkinManagedByAppSkinDescription =>
+      '预览使用当前应用皮肤。更改下方的预设或样式后，会保存独立的文件管理器皮肤，并关闭“跟随应用皮肤”。';
+
+  @override
+  String get skinFileManagerIndependentTitle => '文件管理器使用独立皮肤';
+
+  @override
+  String get skinFileManagerIndependentDescription =>
+      '文件管理器使用独立皮肤时，此应用皮肤中的文件和文件夹样式更改不会显示在那里。开启“跟随应用皮肤”即可在文件管理器中应用此皮肤。';
 
   @override
   String get skinChooseOrCreateSkin => '选择或创建皮肤';

@@ -132,7 +132,6 @@ class _CreateArchiveBottomSheetState
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _encryptFilenames = false;
-  bool _isMediaRecommended = false;
 
   List<NameValidationIssue> _issues = [];
   EntryConflictResult _conflict =
@@ -188,7 +187,6 @@ class _CreateArchiveBottomSheetState
 
     if (_hasOnlyPrecompressedFiles(widget.selectedEntries)) {
       _compressionLevel = ArchiveCompressionLevel.store;
-      _isMediaRecommended = true;
     }
   }
 
@@ -788,11 +786,10 @@ class _CreateArchiveBottomSheetState
                 child: Text(lvl.localizedTitle(context.l10n)),
               ),
           ],
-          onChanged: (lvl) {
+         onChanged: (lvl) {
             if (lvl != null) {
               setState(() {
                 _compressionLevel = lvl;
-                _isMediaRecommended = false;
               });
             }
           },

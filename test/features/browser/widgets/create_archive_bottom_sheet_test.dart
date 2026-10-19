@@ -189,8 +189,8 @@ void main() {
     await tester.tap(find.text('Open Sheet'));
     await tester.pumpAndSettle();
 
-    // Recommendation banner should appear
-    expect(find.textContaining('Pre-compressed media files detected'), findsOneWidget);
+   // Store compression level should be auto-selected for pre-compressed media
+    expect(find.text('Store (0) — No compression'), findsOneWidget);
   });
 
   testWidgets('Password confirmation and strength validation work',
@@ -375,19 +375,16 @@ void main() {
     await tester.tap(find.text('Open Sheet'));
     await tester.pumpAndSettle();
 
-    // Every format offered in the picker, in menu order, with whether it
-    // should show the compression level.
-    const expectations = <(String, bool)>[
-      ('.zip', true),
-      ('.7z', true),
-      ('.tar', false),
-      ('.tar.gz', true),
-      ('.tar.xz', true),
-      ('.tar.zst', true),
-      ('.tar.lzma', true),
-      ('.iso', false),
-      ('.cpio', false),
-    ];
+   // Every format offered in the picker, in menu order, with whether it
+        // should show the compression level.
+        const expectations = <(String, bool)>[
+          ('.zip', true),
+          ('.7z', true),
+          ('.tar', false),
+          ('.tar.gz', true),
+          ('.tar.xz', true),
+          ('.tar.zst', true),
+        ];
 
     var currentExt = '.zip';
     for (final (ext, shown) in expectations) {

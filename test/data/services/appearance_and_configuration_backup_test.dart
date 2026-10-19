@@ -194,12 +194,12 @@ void main() {
   });
 
   Future<void> deviceA() async {
-    await settingsService.saveSettings(_settingsA());
+    await settingsService.replaceSettings(_settingsA());
     await toolbarService.save(_toolbarA());
   }
 
   Future<void> deviceB() async {
-    await settingsService.saveSettings(_settingsB());
+    await settingsService.replaceSettings(_settingsB());
     await toolbarService.save(_toolbarB());
   }
 

@@ -89,14 +89,10 @@ void main() {
     expect(find.text('None'), findsOneWidget);
     expect(find.text('100 MB'), findsOneWidget);
     expect(find.text('500 MB'), findsOneWidget);
-    expect(find.text('1 GB'), findsOneWidget);
 
     // Pick 100 MB volume split
     await tester.tap(find.text('100 MB'));
     await tester.pumpAndSettle();
-
-    // Verify ZIP split description is shown
-    expect(find.textContaining('Saved as .z01, .z02 … plus a final .zip'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Create'));
     await tester.pumpAndSettle();

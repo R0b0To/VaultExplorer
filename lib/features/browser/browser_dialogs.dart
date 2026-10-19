@@ -92,14 +92,13 @@ abstract class BrowserDialogs {
     required String suggestedName,
     List<RawEntry> selectedEntries = const [],
     int? freeSpace,
-    required Future<void> Function(
+   required Future<void> Function(
       String destPathInContainer,
       ArchiveFormatType format,
       String? passphrase,
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
       ArchiveCompressionMethod compressionMethod,
-      int splitSizeBytes,
     ) onCreate,
     bool readOnly = false,
   }) {

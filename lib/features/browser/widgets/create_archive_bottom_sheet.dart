@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -14,7 +13,6 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/inputs/password_visibility_toggle.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-
 
 extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
   String localizedTitle(AppLocalizations l10n) => switch (this) {
@@ -33,8 +31,6 @@ extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
 }
 
 extension ArchiveCompressionMethodL10n on ArchiveCompressionMethod {
-  /// What the method is good for and where else it is used. Empty for `auto`,
-  /// which is never shown to the user.
   String localizedDescription(AppLocalizations l10n) => switch (this) {
         ArchiveCompressionMethod.auto => '',
         ArchiveCompressionMethod.lzma2 => l10n.archiveMethodLzma2Desc,
@@ -44,8 +40,7 @@ extension ArchiveCompressionMethodL10n on ArchiveCompressionMethod {
 }
 
 /// A modal bottom sheet for creating archives with modern layout, decoupled
-/// name/extension, dynamic security options, and a compression level picker
-/// that only appears for formats that actually compress.
+/// name/extension, dynamic security options, and a compression level picker.
 class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
@@ -60,7 +55,6 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
     ArchiveCompressionMethod compressionMethod,
-    int splitSizeBytes,
   ) onCreate;
 
   const CreateArchiveBottomSheet({
@@ -89,7 +83,6 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
       bool encryptFilenames,
       ArchiveCompressionLevel compressionLevel,
       ArchiveCompressionMethod compressionMethod,
-      int splitSizeBytes,
     ) onCreate,
   }) {
     return showModalBottomSheet<void>(
@@ -133,21 +126,8 @@ class _CreateArchiveBottomSheetState
   late final FilesystemType _fsType;
   ArchiveFormatType _format = ArchiveFormatType.zip;
   ArchiveCompressionLevel _compressionLevel = ArchiveCompressionLevel.normal;
-  // The user's pick for formats that offer one (7z). Kept across format
-  // switches so going 7z -> ZIP -> 7z doesn't forget it; what is actually sent
-  // is [_effectiveMethod].
   ArchiveCompressionMethod _method =
       ArchiveFormatType.sevenZip.selectableCompressionMethods.first;
-
-  // Split into parts (ZIP / 7z): 0 = one file. [_splitCustom] means the size
-  // comes from [_splitCustomCtrl] (in MB) instead of one of the presets.
-  static const _mb = 1024 * 1024;
-  // The largest part that still fits a FAT32 file (4 GiB - 1 byte).
-  static const _fat32PartMb = 4095;
-  static const _splitPresetsMb = [100, 500, 1024, _fat32PartMb];
-  int _splitSizeBytes = 0;
-  bool _splitCustom = false;
-  final TextEditingController _splitCustomCtrl = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -169,39 +149,16 @@ class _CreateArchiveBottomSheetState
 
   bool get _isValidName => _issues.isEmpty && !_conflict.isConflict;
 
-  /// Store really stores only in ZIP and 7z. On the compressed TARs level 0
-  /// just means that filter's fastest setting, so it still has a codec.
   bool get _isStoring =>
       _compressionLevel == ArchiveCompressionLevel.store &&
       (_format == ArchiveFormatType.zip ||
           _format == ArchiveFormatType.sevenZip);
 
-  /// Whether the user can choose the codec right now: the format offers a
-  /// choice and it isn't being stored (no compression, so no codec).
   bool get _canPickMethod =>
       _format.selectableCompressionMethods.isNotEmpty && !_isStoring;
 
-  /// The method sent to the engine. `auto` whenever the user had no say, so the
-  /// engine never sees a method its format can't write.
   ArchiveCompressionMethod get _effectiveMethod =>
       _canPickMethod ? _method : ArchiveCompressionMethod.auto;
-
-  /// The custom part size in MB, or null when the field is not a whole number
-  /// between 1 MB and the FAT32 limit.
-  int? get _customSplitMb {
-    final mb = int.tryParse(_splitCustomCtrl.text.trim());
-    if (mb == null || mb < 1 || mb > _fat32PartMb) return null;
-    return mb;
-  }
-
-  /// Part size to create with; 0 = a single file.
-  int get _effectiveSplitBytes {
-    if (!_format.supportsSplit) return 0;
-    if (_splitCustom) return (_customSplitMb ?? 0) * _mb;
-    return _splitSizeBytes;
-  }
-
-  bool get _splitValid => !_splitCustom || !_format.supportsSplit || _customSplitMb != null;
 
   bool get _hasEnoughSpace {
     if (widget.freeSpace == null || widget.freeSpace! < 0) return true;
@@ -214,7 +171,6 @@ class _CreateArchiveBottomSheetState
     if (!_isValidName) return false;
     if (!_hasEnoughSpace) return false;
     if (!_passwordMatchesConfirm) return false;
-    if (!_splitValid) return false;
     return true;
   }
 
@@ -223,7 +179,6 @@ class _CreateArchiveBottomSheetState
     super.initState();
     _fsType = resolveFilesystemType(widget.container);
 
-    // Decouple name and extension: extract stem without extension
     final initialSuggested = widget.suggestedName;
     final dotIdx = initialSuggested.lastIndexOf('.');
     final stem = dotIdx > 0
@@ -231,7 +186,6 @@ class _CreateArchiveBottomSheetState
         : initialSuggested;
     _nameCtrl = TextEditingController(text: stem);
 
-    // Smart recommendation: check if only media/precompressed files are selected
     if (_hasOnlyPrecompressedFiles(widget.selectedEntries)) {
       _compressionLevel = ArchiveCompressionLevel.store;
       _isMediaRecommended = true;
@@ -249,7 +203,6 @@ class _CreateArchiveBottomSheetState
     _nameCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
-    _splitCustomCtrl.dispose();
     super.dispose();
   }
 
@@ -309,10 +262,6 @@ class _CreateArchiveBottomSheetState
       if (!format.supportsFilenameEncryption) {
         _encryptFilenames = false;
       }
-      if (!format.supportsSplit) {
-        _splitSizeBytes = 0;
-        _splitCustom = false;
-      }
     });
     _revalidate();
   }
@@ -346,7 +295,6 @@ class _CreateArchiveBottomSheetState
       encryptFilenames,
       _compressionLevel,
       _effectiveMethod,
-      _effectiveSplitBytes,
     );
   }
 
@@ -382,37 +330,23 @@ class _CreateArchiveBottomSheetState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-
-                      // Free space warning if insufficient
                       if (!_hasEnoughSpace) ...[
                         _buildInsufficientSpaceBanner(cs, textTheme),
                         const SizedBox(height: 12),
                       ],
-
-                      // Archive Name & Decoupled Format Pill
                       _buildNameAndFormatRow(cs, textTheme),
-
-                      // Live validation issues & conflict errors
                       _buildValidationIssues(cs),
-
-                      // Dynamic Password & Security Options
                       if (_format.supportsPassword) ...[
                         const SizedBox(height: 12),
                         _buildSecuritySection(cs, textTheme),
                       ],
-
-                      // Compression level, only for formats that compress
                       if (_format.supportsCompressionLevel) ...[
                         const SizedBox(height: 12),
                         _buildCompressionSection(cs, textTheme),
-                        const SizedBox(height: 12),
-                        _buildCompressionMethodSection(cs, textTheme),
-                      ],
-
-                      // Split into parts, only for formats that can be spanned
-                      if (_format.supportsSplit) ...[
-                        const SizedBox(height: 12),
-                        _buildSplitSection(cs, textTheme),
+                        if (_canPickMethod) ...[
+                          const SizedBox(height: 12),
+                          _buildCompressionMethodSection(cs, textTheme),
+                        ],
                       ],
                     ],
                   ),
@@ -522,12 +456,10 @@ class _CreateArchiveBottomSheetState
     );
   }
 
-
   Widget _buildNameAndFormatRow(ColorScheme cs, TextTheme textTheme) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name field (stem only)
         Expanded(
           child: TextField(
             controller: _nameCtrl,
@@ -556,8 +488,6 @@ class _CreateArchiveBottomSheetState
           ),
         ),
         const SizedBox(width: 8),
-
-        // Dynamic extension pill / dropdown
         _buildFormatSelectorPill(cs, textTheme),
       ],
     );
@@ -663,7 +593,6 @@ class _CreateArchiveBottomSheetState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Password field
         TextField(
           controller: _passwordCtrl,
           obscureText: _obscurePassword,
@@ -692,8 +621,6 @@ class _CreateArchiveBottomSheetState
           ),
           onChanged: (_) => setState(() {}),
         ),
-
-        // Password strength meter & Repeat password field when entered
         if (hasPassword) ...[
           const SizedBox(height: 8),
           _buildPasswordStrengthBar(cs, textTheme),
@@ -730,11 +657,8 @@ class _CreateArchiveBottomSheetState
             onChanged: (_) => setState(() {}),
           ),
         ],
-
         if (_format.supportsFilenameEncryption) ...[
           const SizedBox(height: 10),
-
-          // Encrypt file names Action Tile / Switch
           _buildEncryptFilenamesTile(cs, textTheme),
         ],
       ],
@@ -787,10 +711,6 @@ class _CreateArchiveBottomSheetState
     final hasPassword = _passwordCtrl.text.isNotEmpty;
     final canToggle = hasPassword;
 
-    final subtitle = !hasPassword
-        ? context.l10n.createArchiveEncryptFilenamesNeedsPassword
-        : context.l10n.createArchiveEncryptFilenamesActive;
-
     return Material(
       color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
@@ -833,92 +753,6 @@ class _CreateArchiveBottomSheetState
           ],
         ),
       ),
-    );
-  }
-
-  static String _splitPresetLabel(int mb) {
-    if (mb == _fat32PartMb) return '4 GB (FAT32)';
-    return mb % 1024 == 0 ? '${mb ~/ 1024} GB' : '$mb MB';
-  }
-
-  Widget _buildSplitSection(ColorScheme cs, TextTheme textTheme) {
-    final l10n = context.l10n;
-    final isZip = _format == ArchiveFormatType.zip;
-    final active = _splitCustom || _splitSizeBytes > 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.createArchiveSplitVolumes,
-          style: textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: cs.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            ChoiceChip(
-              label: Text(l10n.createArchiveSplitVolumeNone),
-              selected: !active,
-              onSelected: (_) => setState(() {
-                _splitSizeBytes = 0;
-                _splitCustom = false;
-              }),
-            ),
-            for (final mb in _splitPresetsMb)
-              ChoiceChip(
-                label: Text(_splitPresetLabel(mb)),
-                selected: !_splitCustom && _splitSizeBytes == mb * _mb,
-                onSelected: (_) => setState(() {
-                  _splitSizeBytes = mb * _mb;
-                  _splitCustom = false;
-                }),
-              ),
-            ChoiceChip(
-              label: Text(l10n.splitChunkSizeCustom),
-              selected: _splitCustom,
-              onSelected: (_) => setState(() {
-                _splitCustom = true;
-                _splitSizeBytes = 0;
-              }),
-            ),
-          ],
-        ),
-        if (_splitCustom) ...[
-          const SizedBox(height: 8),
-          TextField(
-            controller: _splitCustomCtrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-              labelText: l10n.createArchiveCustomVolumeSizeLabel,
-              hintText: l10n.createArchiveCustomVolumeSizeHint,
-              errorText: _splitCustomCtrl.text.isNotEmpty && _customSplitMb == null
-                  ? '1 – $_fat32PartMb'
-                  : null,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-        if (active)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 4),
-            child: Text(
-              isZip ? l10n.createArchiveSplitHintZip : l10n.createArchiveSplitHintSevenZip,
-              style: textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                fontSize: 11,
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -967,92 +801,40 @@ class _CreateArchiveBottomSheetState
     );
   }
 
-  /// Where each codec is available, and when it can be chosen:
-  ///  * 7z: a picker (LZMA2 / LZMA / Deflate), disabled while the level is Store.
-  ///  * every other compressing format: a read-only line naming its one codec,
-  ///    with a pointer to 7z when the user might be after LZMA.
   Widget _buildCompressionMethodSection(ColorScheme cs, TextTheme textTheme) {
+    if (!_canPickMethod) return const SizedBox.shrink();
+
     final l10n = context.l10n;
     final methods = _format.selectableCompressionMethods;
 
-    if (_isStoring) {
-      return _buildMethodNote(cs, textTheme, l10n.archiveMethodStoreNote);
-    }
-
-    if (methods.isEmpty) {
-      final fixed = _format.fixedCompressionLabel;
-      if (fixed == null) return const SizedBox.shrink();
-      final showSevenZipHint = _format != ArchiveFormatType.tarXz &&
-          _format != ArchiveFormatType.tarLzma;
-      return _buildMethodNote(
-        cs,
-        textTheme,
-        [
-          l10n.archiveMethodFixedInfo(_format.displayLabel, fixed),
-          if (showSevenZipHint) l10n.archiveMethodMoreInSevenZip,
-        ].join(' '),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<ArchiveCompressionMethod>(
-          initialValue: _method,
-          isDense: true,
-          decoration: InputDecoration(
-            labelText: l10n.archiveCompressionMethodLabel,
-            filled: true,
-            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-          items: [
-            for (final m in methods)
-              DropdownMenuItem(value: m, child: Text(m.displayLabel)),
-          ],
-          onChanged: (m) {
-            if (m != null) setState(() => _method = m);
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-          child: Text(
-            _method.localizedDescription(l10n),
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+    return DropdownButtonFormField<ArchiveCompressionMethod>(
+      initialValue: _method,
+      isDense: true,
+      decoration: InputDecoration(
+        labelText: l10n.archiveCompressionMethodLabel,
+        filled: true,
+        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: 0.4),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildMethodNote(ColorScheme cs, TextTheme textTheme, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline_rounded, size: 16, color: cs.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ),
-        ],
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.primary, width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
+      items: [
+        for (final m in methods)
+          DropdownMenuItem(value: m, child: Text(m.displayLabel)),
+      ],
+      onChanged: (m) {
+        if (m != null) setState(() => _method = m);
+      },
     );
   }
 }

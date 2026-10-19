@@ -2708,6 +2708,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         isExtract: false,
         archiveName: archiveName,
         destDirPath: _currentDirPath,
+        format: clip.archiveFormat,
       );
       if (options == null || !mounted) return;
 
@@ -2723,7 +2724,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         deleteSourceAfter: options.deleteSourceAfter,
         compressionLevel: clip.compressionLevel ?? ArchiveCompressionLevel.normal,
         compressionMethod: clip.compressionMethod,
-        splitSizeBytes: clip.splitSizeBytes,
+        splitSizeBytes: options.splitSizeBytes,
         l10n: context.l10n,
       );
       _clip.clear();
@@ -2965,7 +2966,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         encryptFilenames,
         compressionLevel,
         compressionMethod,
-        splitSizeBytes,
       ) async {
         final clipItems = entries.map((e) {
           final path = _fullPathOf(e);
@@ -2988,7 +2988,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           encryptFilenames: encryptFilenames,
           compressionLevel: compressionLevel,
           compressionMethod: compressionMethod,
-          splitSizeBytes: splitSizeBytes,
         );
         _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },
@@ -4417,23 +4416,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                                                       .isLocalStorage &&
                                                   _archiveContext == null)
                                                 const SyncStatusBanner(),
-                                              if (_archiveContext?.isSolid ==
-                                                  true)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.fromLTRB(
-                                                        12,
-                                                        8,
-                                                        12,
-                                                        0,
-                                                      ),
-                                                  child: InlineBanner(
-                                                    context
-                                                        .l10n
-                                                        .archiveSolidWarning,
-                                                    tone: AppBannerTone.warning,
-                                                  ),
-                                                ),
+                                             
                                               Expanded(
                                                 child: Stack(
                                                   children: [

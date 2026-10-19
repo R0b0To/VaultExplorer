@@ -21,7 +21,6 @@ Widget _buildTestApp({
     bool encryptFilenames,
     ArchiveCompressionLevel compressionLevel,
     ArchiveCompressionMethod compressionMethod,
-    int splitSizeBytes,
   ) onCreate,
 }) {
   return ProviderScope(
@@ -125,7 +124,7 @@ void main() {
         suggestedName: 'documents.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -175,7 +174,7 @@ void main() {
       ),
     ];
 
-    await tester.pumpWidget(
+     await tester.pumpWidget(
       _buildTestApp(
         container: container,
         currentDirPath: '',
@@ -183,7 +182,7 @@ void main() {
         suggestedName: 'media.zip',
         selectedEntries: selected,
         freeSpace: 200 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -198,7 +197,7 @@ void main() {
       (tester) async {
     final container = _mockContainer();
 
-    await tester.pumpWidget(
+      await tester.pumpWidget(
       _buildTestApp(
         container: container,
         currentDirPath: '',
@@ -206,7 +205,7 @@ void main() {
         suggestedName: 'backup.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -253,7 +252,7 @@ void main() {
       ),
     ];
 
-    await tester.pumpWidget(
+     await tester.pumpWidget(
       _buildTestApp(
         container: container,
         currentDirPath: '',
@@ -261,7 +260,7 @@ void main() {
         suggestedName: 'test.zip',
         selectedEntries: selected,
         freeSpace: 100 * 1024 * 1024, // Only 100 MB free
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -293,7 +292,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
+        onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
           createdPath = path;
           createdFormat = fmt;
           createdPassphrase = pass;
@@ -338,7 +337,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
+         onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
           createdLvl = lvl;
         },
       ),
@@ -369,7 +368,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 1000 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -434,7 +433,7 @@ void main() {
         suggestedName: 'archive.zip',
         selectedEntries: [],
         freeSpace: 100 * 1024 * 1024,
-        onCreate: (a, b, c, d, e, f, g) async {},
+        onCreate: (a, b, c, d, e, f) async {},
       ),
     );
 
@@ -468,7 +467,7 @@ void main() {
           suggestedName: 'archive.zip',
           selectedEntries: [],
           freeSpace: 1000 * 1024 * 1024,
-          onCreate: (path, fmt, pass, encFilenames, lvl, method, split) async {
+          onCreate: (path, fmt, pass, encFilenames, lvl, method) async {
             onCreated(fmt, lvl, method);
           },
         );
@@ -487,10 +486,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      // Preselected, with its description underneath.
       expect(find.text('LZMA2'), findsOneWidget);
-      expect(find.text('Best all-round choice. Also used by .tar.xz.'),
-          findsOneWidget);
 
       await tester.tap(_methodPicker);
       await tester.pumpAndSettle();
@@ -504,7 +500,7 @@ void main() {
       expect(created, ArchiveCompressionMethod.lzma2);
     });
 
-    testWidgets('The picked method is submitted and its description follows',
+   testWidgets('The picked method is submitted',
         (tester) async {
       ArchiveCompressionMethod? created;
       await tester.pumpWidget(app((_, __, m) => created = m));
@@ -514,8 +510,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('LZMA').last);
       await tester.pumpAndSettle();
-      expect(find.text("7-Zip's older method. Also used by .tar.lzma."),
-          findsOneWidget);
       await _submit(tester);
       expect(created, ArchiveCompressionMethod.lzma);
     });
@@ -533,7 +527,7 @@ void main() {
       expect(created, ArchiveCompressionMethod.deflate);
     });
 
-    testWidgets('ZIP has no picker: a note names its codec, and `auto` is sent',
+   testWidgets('ZIP has no picker, and `auto` is sent',
         (tester) async {
       ArchiveFormatType? fmt;
       ArchiveCompressionMethod? created;
@@ -546,19 +540,14 @@ void main() {
 
       expect(_methodPicker, findsNothing);
       expect(find.textContaining('ZIP always compresses with Deflate.'),
-          findsOneWidget);
-      // ZIP can't do LZMA, so the note says where that is available.
-      expect(
-        find.textContaining('LZMA2 and LZMA are available in 7-Zip archives.'),
-        findsOneWidget,
-      );
+          findsNothing);
 
       await _submit(tester);
       expect(fmt, ArchiveFormatType.zip);
       expect(created, ArchiveCompressionMethod.auto);
     });
 
-    testWidgets('TAR.XZ is LZMA2 and has nothing to point at',
+     testWidgets('TAR.XZ is LZMA2 and has nothing to point at',
         (tester) async {
       ArchiveCompressionMethod? created;
       await tester.pumpWidget(app((_, __, m) => created = m));
@@ -566,8 +555,7 @@ void main() {
 
       expect(_methodPicker, findsNothing);
       expect(find.textContaining('TAR.XZ always compresses with LZMA2.'),
-          findsOneWidget);
-      expect(find.textContaining('available in 7-Zip archives'), findsNothing);
+          findsNothing);
       await _submit(tester);
       expect(created, ArchiveCompressionMethod.auto);
     });
@@ -582,7 +570,7 @@ void main() {
       expect(find.textContaining('no method to choose'), findsNothing);
     });
 
-    testWidgets('Store has no codec: the 7z picker gives way to a note',
+      testWidgets('Store has no codec: 7z method picker is hidden',
         (tester) async {
       ArchiveCompressionLevel? lvl;
       ArchiveCompressionMethod? created;
@@ -605,7 +593,7 @@ void main() {
 
       expect(_methodPicker, findsNothing);
       expect(find.text("Store doesn't compress, so there is no method to choose."),
-          findsOneWidget);
+          findsNothing);
 
       await _submit(tester);
       expect(lvl, ArchiveCompressionLevel.store);

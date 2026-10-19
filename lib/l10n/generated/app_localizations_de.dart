@@ -12228,4 +12228,33 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Speichern komprimiert nicht, daher gibt es keine Methode zur Auswahl.';
+
+  @override
+  String get browserTabNew => 'Neuer Tab';
+
+  @override
+  String get browserTabClose => 'Tab schließen';
+
+  @override
+  String get browserTabCloseOthers => 'Andere Tabs schließen';
+
+  @override
+  String get browserTabDuplicate => 'Tab duplizieren';
+
+  @override
+  String get browserTabSwitchPrevious => 'Zum vorherigen Tab wechseln';
+
+  @override
+  String get browserTabOpenInNewTab => 'In neuem Tab öffnen';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Tab-Limit erreicht ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'In anderen Tab kopieren';
+
+  @override
+  String get browserTabMoveToOtherTab => 'In anderen Tab verschieben';
 }

@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "La plus rapide, avec des fichiers plus volumineux et la compatibilité la plus large. Également utilisée par ZIP et .tar.gz.",
   "archiveMethodFixedInfo": "{format} compresse toujours avec {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 et LZMA sont disponibles dans les archives 7-Zip.",
-  "archiveMethodStoreNote": "Stocker ne compresse pas, il n'y a donc aucune méthode à choisir."
+  "archiveMethodStoreNote": "Stocker ne compresse pas, il n'y a donc aucune méthode à choisir.",
+  "browserTabNew": "Nouvel onglet",
+  "browserTabClose": "Fermer l'onglet",
+  "browserTabCloseOthers": "Fermer les autres onglets",
+  "browserTabDuplicate": "Dupliquer l'onglet",
+  "browserTabSwitchPrevious": "Passer à l'onglet précédent",
+  "browserTabOpenInNewTab": "Ouvrir dans un nouvel onglet",
+  "browserTabLimitReached": "Limite d'onglets atteinte ({max})",
+  "browserTabCopyToOtherTab": "Copier vers l'autre onglet",
+  "browserTabMoveToOtherTab": "Déplacer vers l'autre onglet"
 }

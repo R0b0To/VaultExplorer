@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "Найшвидший, але файли більші, а сумісність найширша. Також використовується в ZIP і .tar.gz.",
   "archiveMethodFixedInfo": "{format} завжди стискає за допомогою {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 і LZMA доступні в архівах 7-Zip.",
-  "archiveMethodStoreNote": "Режим «Зберегти» не стискає, тому методу для вибору немає."
+  "archiveMethodStoreNote": "Режим «Зберегти» не стискає, тому методу для вибору немає.",
+  "browserTabNew": "Нова вкладка",
+  "browserTabClose": "Закрити вкладку",
+  "browserTabCloseOthers": "Закрити інші вкладки",
+  "browserTabDuplicate": "Дублювати вкладку",
+  "browserTabSwitchPrevious": "Перейти на попередню вкладку",
+  "browserTabOpenInNewTab": "Відкрити в новій вкладці",
+  "browserTabLimitReached": "Досягнуто ліміту вкладок ({max})",
+  "browserTabCopyToOtherTab": "Копіювати в іншу вкладку",
+  "browserTabMoveToOtherTab": "Перемістити в іншу вкладку"
 }

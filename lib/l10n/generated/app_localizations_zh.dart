@@ -11368,4 +11368,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get archiveMethodStoreNote => '仅存储不进行压缩，因此无需选择压缩方法。';
+
+  @override
+  String get browserTabNew => '新标签页';
+
+  @override
+  String get browserTabClose => '关闭标签页';
+
+  @override
+  String get browserTabCloseOthers => '关闭其他标签页';
+
+  @override
+  String get browserTabDuplicate => '复制标签页';
+
+  @override
+  String get browserTabSwitchPrevious => '切换到上一个标签页';
+
+  @override
+  String get browserTabOpenInNewTab => '在新标签页中打开';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return '已达到标签页上限（$max）';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => '复制到另一个标签页';
+
+  @override
+  String get browserTabMoveToOtherTab => '移动到另一个标签页';
 }

@@ -47,6 +47,7 @@ import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/archive_preview_file.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
@@ -153,6 +154,16 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenStorageSwitcher;
   final Widget? drawer;
 
+  /// Set by [BrowserTabsHost]: scopes this screen's navigation / selection /
+  /// search / sort state to its tab instead of to the container's volId, so
+  /// two tabs on the same vault stay independent. Null (every caller that is
+  /// not a tab host, e.g. decoy mode) keeps the volId-keyed behavior.
+  final int? tabKey;
+
+  /// Directory to open at instead of the container root (new tabs opened on
+  /// a folder). Only read when the screen is first created.
+  final String? initialPath;
+
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -164,6 +175,8 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.wrapAppBarTitle,
     this.onOpenStorageSwitcher,
     this.drawer,
+    this.tabKey,
+    this.initialPath,
   });
 
   @override
@@ -184,10 +197,66 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   // same-named getters (matching the existing _search/_pinsBookmarks/
   // _mountedDocProviderFolders pattern already used in this file) so the
   // hundreds of read call-sites throughout this file don't need to change.
+  /// Scope key for this screen's Riverpod state: its tab key when hosted in
+  /// [BrowserTabsHost], otherwise the container's volId.
+  int get _stateKey => widget.tabKey ?? widget.container.volId;
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  // Null whenever this screen is not inside a BrowserTabsHost (decoy mode).
+  BrowserTabsController? _tabsCtrl;
+  bool _wasActiveTab = true;
+  bool _wasMultiTab = false;
+
+  /// True when this screen is the visible tab (always true outside tabs).
+  /// Hidden tabs stay mounted in an IndexedStack, so anything that is
+  /// app-global (predictive back, system back, auto-lock activity) must be
+  /// gated on this or every hidden tab would react too.
+  bool get _isActiveTab {
+    final t = _tabsCtrl;
+    return t == null || t.activeKey == widget.tabKey;
+  }
+
+  bool get _hasMultipleTabs => _tabsCtrl?.hasMultiple ?? false;
+
+  void _attachTabs() {
+    final t = BrowserTabsScope.maybeOf(context);
+    if (identical(t, _tabsCtrl)) return;
+    _tabsCtrl?.removeListener(_onTabsChanged);
+    _tabsCtrl = t;
+    t?.addListener(_onTabsChanged);
+    _wasActiveTab = _isActiveTab;
+    _wasMultiTab = _hasMultipleTabs;
+  }
+
+  void _onTabsChanged() {
+    final t = _tabsCtrl;
+    if (!mounted || t == null) return;
+    final active = _isActiveTab;
+    final multi = _hasMultipleTabs;
+    final becameActive = active && !_wasActiveTab;
+    final flipped = active != _wasActiveTab || multi != _wasMultiTab;
+    _wasActiveTab = active;
+    _wasMultiTab = multi;
+
+    // PopScope.canPop depends on both flags, so rebuild when they flip.
+    if (flipped) setState(() {});
+
+    final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
+    if (becameActive && nav.pathStack.isNotEmpty && !nav.isLoading) {
+      // Another tab (or an operation it started) may have changed this
+      // directory while it was hidden; hidden tabs skip their own reloads.
+      _loadDirectoryContents(_currentDirPath, refresh: true);
+    }
+    if (active && widget.tabKey != null) {
+      final key = widget.tabKey!;
+      if (t.consumePasteRequest(key)) _paste();
+    }
+  }
+
   FileBrowserNavigationState get _nav =>
-      ref.watch(fileBrowserNavigationProvider(widget.container.volId));
+      ref.watch(fileBrowserNavigationProvider(_stateKey));
   FileBrowserNavigation get _navNotifier =>
-      ref.read(fileBrowserNavigationProvider(widget.container.volId).notifier);
+      ref.read(fileBrowserNavigationProvider(_stateKey).notifier);
 
   List<PathSegment> get _pathStack => _nav.pathStack;
   List<RawEntry> get _currentItems => _nav.currentItems;
@@ -227,6 +296,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _attachTabs();
     if (!_initialized) {
       _initialized = true;
       final rootLabel = context.l10n.rootFolderLabel;
@@ -423,9 +493,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ref.read(fileManagerToolbarServiceProvider);
 
   FileBrowserSearchState get _search =>
-      ref.watch(fileBrowserSearchProvider(widget.container.volId));
+      ref.watch(fileBrowserSearchProvider(_stateKey));
   FileBrowserSearch get _searchNotifier =>
-      ref.read(fileBrowserSearchProvider(widget.container.volId).notifier);
+      ref.read(fileBrowserSearchProvider(_stateKey).notifier);
 
   bool get _searchActive => _search.active;
   String get _searchQuery => _search.query;
@@ -608,6 +678,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
     _navNotifier.setContainerLocked(true);
+    // Inside a tab host the host closes this vault's tabs (and only pops the
+    // route once no tab is left); popping here would take every tab down.
+    if (_tabsCtrl != null) return;
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
@@ -650,6 +723,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _onOperationsChanged() {
     if (!mounted) return;
+    // A hidden tab is refreshed when it becomes active again; rebuilding the
+    // whole (large) screen for every progress tick of every operation would
+    // multiply that cost by the number of open tabs.
+    if (!_isActiveTab) return;
     setState(() {});
 
     final hasActiveTargetingCurrent = _opSvc.activeOperations.any(
@@ -697,6 +774,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void dispose() {
     _disposed = true;
+    _tabsCtrl?.removeListener(_onTabsChanged);
     _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
@@ -1003,6 +1081,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         );
         _setStatus(context.l10n.clipboardVerbMoving);
       },
+      onOpenInNewTab: (_tabsCtrl != null &&
+              entry.isDir &&
+              _archiveContext == null)
+          ? () => _openFolderInNewTab(fullPath)
+          : null,
+      onCopyToOtherTab: (_otherTab != null && _archiveContext == null)
+          ? () => _sendToOtherTab(entry, fullPath, cut: false)
+          : null,
+      onMoveToOtherTab:
+          (_otherTab != null && _archiveContext == null && !_isReadOnly)
+          ? () => _sendToOtherTab(entry, fullPath, cut: true)
+          : null,
       onTogglePin: () async {
         await _pinsBookmarksNotifier.togglePins(widget.container, [
           fullPath,
@@ -1213,6 +1303,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void _signalActivity() => widget.onUserActivity?.call();
   void _onContainerDetached(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
+    if (_tabsCtrl != null) return; // the tab host closes this vault's tabs
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -1255,6 +1346,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
     } catch (e) {
       VeLog.e('FileBrowserScreen', 'Failed to load settings/records', e);
+    }
+    final initialPath = widget.initialPath;
+    if (initialPath != null && initialPath.isNotEmpty && mounted) {
+      // New tab opened on a folder: go straight there (builds the path
+      // stack from the root) instead of listing the root first.
+      await _navigateToPath(initialPath, isDir: true);
+      return;
     }
     await _loadDirectoryContents(_currentDirPath);
   }
@@ -1590,7 +1688,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   bool get _canPreviewFolderBackGesture =>
       !_atRoot && !isSelectionMode && !_searchActive;
-  bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
+  /// Whether this screen should answer predictive-back events: its route is
+  /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a
+  /// WidgetsBindingObserver, so without the tab check the first-registered
+  /// hidden tab would swallow the gesture meant for the visible one.
+  bool get _isOwnRouteCurrent =>
+      (ModalRoute.of(context)?.isCurrent ?? false) && _isActiveTab;
 
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
@@ -1665,23 +1768,23 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   // ── Selection (FileBrowserSelection controller) ──────────────────────────
   Set<RawEntry> get selectedItems =>
-      ref.read(fileBrowserSelectionProvider(widget.container.volId)).items;
+      ref.read(fileBrowserSelectionProvider(_stateKey)).items;
   bool get isSelectionMode => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .read(fileBrowserSelectionProvider(_stateKey))
       .isSelectionMode;
   int get selectedFolderCount => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .read(fileBrowserSelectionProvider(_stateKey))
       .selectedFolderCount;
   int get selectedTotalBytes => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .read(fileBrowserSelectionProvider(_stateKey))
       .selectedTotalBytes;
   bool get hasPendingFolderSizes => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .read(fileBrowserSelectionProvider(_stateKey))
       .hasPendingFolderSizes;
 
   void toggleSelectItem(RawEntry item) {
     ref
-        .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+        .read(fileBrowserSelectionProvider(_stateKey).notifier)
         .toggleSelectItem(item);
     if (selectedFolderCount > 0) {
       fetchFolderSizes(widget.container, _currentDirPath);
@@ -1690,35 +1793,35 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void setSelectedItems(Set<RawEntry> newSelection) {
     ref
-        .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+        .read(fileBrowserSelectionProvider(_stateKey).notifier)
         .setSelectedItems(newSelection);
   }
 
   void exitSelectionMode() => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+      .read(fileBrowserSelectionProvider(_stateKey).notifier)
       .exitSelectionMode();
 
   Future<void> fetchFolderSizes(
     MountedContainer container,
     String currentDirPath,
   ) => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+      .read(fileBrowserSelectionProvider(_stateKey).notifier)
       .fetchFolderSizes(container, currentDirPath);
 
   // ── Sort (FileBrowserSort controller) ─────────────────────────────────────
   SortBy get sortBy =>
-      ref.read(fileBrowserSortProvider(widget.container.volId)).sortBy;
+      ref.read(fileBrowserSortProvider(_stateKey)).sortBy;
   bool get sortAscending =>
-      ref.read(fileBrowserSortProvider(widget.container.volId)).sortAscending;
+      ref.read(fileBrowserSortProvider(_stateKey)).sortAscending;
   FileBrowserSort get _sortNotifier =>
-      ref.read(fileBrowserSortProvider(widget.container.volId).notifier);
+      ref.read(fileBrowserSortProvider(_stateKey).notifier);
 
   void setSort(SortBy by) => ref
-      .read(fileBrowserSortProvider(widget.container.volId).notifier)
+      .read(fileBrowserSortProvider(_stateKey).notifier)
       .setSort(by);
 
   int compareItems(RawEntry ea, RawEntry eb) =>
-      ref.read(fileBrowserSortProvider(widget.container.volId)).compare(ea, eb);
+      ref.read(fileBrowserSortProvider(_stateKey)).compare(ea, eb);
 
   void _handleDirTap(RawEntry entry) {
     _signalActivity();
@@ -2595,6 +2698,79 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ),
     );
     _loadDirectoryContents(_currentDirPath);
+  }
+
+  // ── Cross-tab actions ─────────────────────────────────────────────────────
+
+  /// The tab "to other tab" actions target: the previously used tab, or the
+  /// only other tab. Null outside tabs / with a single tab.
+  BrowserTab? get _otherTab {
+    final t = _tabsCtrl;
+    if (t == null || !t.hasMultiple) return null;
+    final prev = t.previousTab;
+    if (prev != null && prev.key != widget.tabKey) return prev;
+    for (final tab in t.tabs) {
+      if (tab.key != widget.tabKey) return tab;
+    }
+    return null;
+  }
+
+  void _openFolderInNewTab(String fullPath) {
+    final t = _tabsCtrl;
+    if (t == null) return;
+    final key = t.openTab(widget.container, initialPath: fullPath);
+    if (key == null) {
+      _setStatus(
+        context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        error: true,
+      );
+    }
+  }
+
+  /// Stages [entry] on the (global) clipboard, switches to the other tab and
+  /// has that tab paste it into the folder it is showing.
+  void _sendToOtherTab(
+    RawEntry entry,
+    String fullPath, {
+    required bool cut,
+  }) {
+    final t = _tabsCtrl;
+    final other = _otherTab;
+    if (t == null || other == null) return;
+    if (cut && _isReadOnly) {
+      _setStatus(context.l10n.readOnlyCantMove, error: true);
+      return;
+    }
+    _signalActivity();
+    _clip.set(
+      volId: widget.container.volId,
+      displayName: widget.container.displayName,
+      cut: cut,
+      clipItems: [
+        ClipboardItem(
+          path: fullPath,
+          isDir: entry.isDir,
+          sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+          modifiedSecs: entry.modifiedSecs,
+        ),
+      ],
+    );
+    t.activate(other.key);
+    t.requestPaste(other.key);
+  }
+
+  /// Multi-select counterpart of [_sendToOtherTab].
+  void _sendSelectionToOtherTab({required bool cut}) {
+    final t = _tabsCtrl;
+    final other = _otherTab;
+    if (t == null || other == null || selectedItems.isEmpty) return;
+    if (cut && _isReadOnly) {
+      _setStatus(context.l10n.readOnlyCantMove, error: true);
+      return;
+    }
+    _initClipboard(cut: cut); // stages the selection and leaves selection mode
+    t.activate(other.key);
+    t.requestPaste(other.key);
   }
 
   void _initClipboard({required bool cut}) {
@@ -3843,7 +4019,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     List<RawEntry> placeholders,
     Set<String> pendingDeletedNames,
   ) {
-    final sortState = ref.read(fileBrowserSortProvider(widget.container.volId));
+    final sortState = ref.read(fileBrowserSortProvider(_stateKey));
     final showHidden = _toolbarConfig.showHiddenFiles;
     final currentFilter = _currentFilter;
     final searchActive = _searchActive;
@@ -4019,9 +4195,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Widget _buildBrowser(BuildContext context) {
-    ref.watch(fileBrowserSelectionProvider(widget.container.volId));
-    ref.watch(fileBrowserSortProvider(widget.container.volId));
-    ref.watch(fileBrowserNavigationProvider(widget.container.volId));
+    ref.watch(fileBrowserSelectionProvider(_stateKey));
+    ref.watch(fileBrowserSortProvider(_stateKey));
+    ref.watch(fileBrowserNavigationProvider(_stateKey));
     ref.watch(vaultSyncedFolderPathsProvider(widget.container));
 
     final effectiveToolbarUri = widget.container.isLocalStorage
@@ -4061,7 +4237,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         (previous, next) {
           if (previous != null &&
               !next.any((loc) => loc.volId == widget.container.volId)) {
-            if (mounted) {
+            if (mounted && _tabsCtrl == null) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           }
@@ -4070,7 +4246,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     if (_isContainerLocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && Navigator.of(context).canPop()) {
+        if (mounted && _tabsCtrl == null && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       });
@@ -4196,6 +4372,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             setSelectedItems({...selectedItems, ...filteredItems}),
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
+        onCopyToOtherTab: (_otherTab != null && _archiveContext == null)
+            ? () => _sendSelectionToOtherTab(cut: false)
+            : null,
+        onMoveToOtherTab:
+            (_otherTab != null && _archiveContext == null && !_isReadOnly)
+            ? () => _sendSelectionToOtherTab(cut: true)
+            : null,
         onExport: _exportSelectedToStorage,
         onCompressSelected: _compressSelected,
         onExtractSelectedArchive: _extractSelectedArchive,
@@ -4226,7 +4409,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       );
     }
 
-    final bool canPop = _atRoot && !isSelectionMode && !_searchActive;
+    // Hidden tabs never block the system back; the visible tab closes itself
+    // (instead of popping the route) when it is at its root and other tabs
+    // are open.
+    final bool isActiveTab = _isActiveTab;
+    final bool closesTabAtRoot = isActiveTab && _hasMultipleTabs;
+    final bool canPop =
+        !isActiveTab ||
+        (_atRoot && !isSelectionMode && !_searchActive && !closesTabAtRoot);
     final systemOverlayStyle =
         Theme.of(context).appBarTheme.systemOverlayStyle ??
         (Theme.of(context).brightness == Brightness.dark
@@ -4242,13 +4432,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         child: PopScope(
           canPop: canPop,
           onPopInvokedWithResult: (bool didPop, Object? result) {
-            if (didPop) return;
+            if (didPop || !_isActiveTab) return;
             if (isSelectionMode) {
               exitSelectionMode();
             } else if (_searchActive) {
               setState(() => _clearSearch());
             } else if (!_atRoot) {
               _navigateUp();
+            } else if (_hasMultipleTabs && widget.tabKey != null) {
+              _tabsCtrl?.closeTab(widget.tabKey!);
             }
           },
           child: Scaffold(

@@ -24,7 +24,8 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
@@ -73,6 +74,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   MountedContainer? _localStorageContainer;
   MountedContainer? get localStorageContainer => _localStorageContainer;
   bool _pendingLocalStoragePermissionCheck = false;
+  // Live tab list of the file manager route currently on top (null when none).
+  BrowserTabsController? _browserTabs;
   int? _pendingLocalStorageOriginVolId;
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
@@ -112,6 +115,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   // `state.mounted` (see getDisplayItems's doc comment), so pasting
   // between it and a vault, in either direction, always failed to
   // resolve the container it didn't open from.
+  /// Public so MainShell's own file-manager launches can resolve other
+  /// volumes (cross-vault paste, tabs) the same way the dashboard does.
+  MountedContainer? resolveAnyContainer(int volId) =>
+      _resolveAnyContainer(volId);
+
   MountedContainer? _resolveAnyContainer(int volId) {
     if (volId == kDecoyLocalVolId) return _localStorageContainer;
     if (volId <= kExternalStorageBaseVolId) {
@@ -375,6 +383,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       selectedTabIndex: 0,
       onSelectTab: widget.onNavigateTab,
       onSelectContainer: (newContainer) {
+        // Inside the tabbed file manager the drawer switches the *active tab*
+        // instead of replacing the whole route (which would drop every tab).
+        final tabs = _browserTabs;
+        if (tabs != null) {
+          tabs.replaceActive(newContainer);
+          return;
+        }
         if (currentVolId == null) {
           Navigator.push(context, _buildBrowserRoute(newContainer));
         } else {
@@ -387,30 +402,24 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Route<void> _buildBrowserRoute(MountedContainer container) {
-    return MaterialPageRoute<void>(
-      builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
-        container: container,
-        resolveContainer: _resolveAnyContainer,
-        drawer: _buildDrawer(currentVolId: container.volId),
-        showBackButton: true,
-        onUserActivity: () {
-          ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
-        },
-      )),
+    return buildBrowserTabsRoute(
+      container: container,
+      resolveContainer: _resolveAnyContainer,
+      mountedContainers: () =>
+          ref.read(vaultDashboardControllerProvider).mounted,
+      primaryLocalContainer: () => _localStorageContainer,
+      drawerBuilder: (tabs, volId) => _buildDrawer(currentVolId: volId),
+      // Unknown / on-device volIds are ignored by the controller, which
+      // matches the old local-storage route's no-op callback.
+      userActivityFor: (volId) => () => ref
+          .read(vaultDashboardControllerProvider.notifier)
+          .onUserActivityForContainer(volId),
+      onTabsController: (tabs) => _browserTabs = tabs,
     );
   }
 
-  Route<void> _buildLocalStorageRoute(MountedContainer container) {
-    return MaterialPageRoute<void>(
-      builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
-        container: container,
-        resolveContainer: _resolveAnyContainer,
-        drawer: _buildDrawer(currentVolId: container.volId),
-        showBackButton: true,
-        onUserActivity: () {},
-      )),
-    );
-  }
+  Route<void> _buildLocalStorageRoute(MountedContainer container) =>
+      _buildBrowserRoute(container);
 
   Future<void> _openLocalStorage({int? currentVolId}) async {
     if (currentVolId == kDecoyLocalVolId) return;
@@ -515,6 +524,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         displayName: context.l10n.localStorageCardTitle,
       );
       setState(() => _localStorageContainer = container);
+    }
+    final tabs = _browserTabs;
+    if (tabs != null) {
+      tabs.replaceActive(container);
+      return;
     }
     if (currentVolId == null) {
       await Navigator.push(context, _buildLocalStorageRoute(container));

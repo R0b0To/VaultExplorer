@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "速度最快，但文件较大，兼容性最广。ZIP 和 .tar.gz 也使用该方法。",
   "archiveMethodFixedInfo": "{format} 始终使用 {method} 压缩。",
   "archiveMethodMoreInSevenZip": "7-Zip 压缩包支持 LZMA2 和 LZMA。",
-  "archiveMethodStoreNote": "仅存储不进行压缩，因此无需选择压缩方法。"
+  "archiveMethodStoreNote": "仅存储不进行压缩，因此无需选择压缩方法。",
+  "browserTabNew": "新标签页",
+  "browserTabClose": "关闭标签页",
+  "browserTabCloseOthers": "关闭其他标签页",
+  "browserTabDuplicate": "复制标签页",
+  "browserTabSwitchPrevious": "切换到上一个标签页",
+  "browserTabOpenInNewTab": "在新标签页中打开",
+  "browserTabLimitReached": "已达到标签页上限（{max}）",
+  "browserTabCopyToOtherTab": "复制到另一个标签页",
+  "browserTabMoveToOtherTab": "移动到另一个标签页"
 }

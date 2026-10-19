@@ -50,6 +50,11 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onToggleDocProvider;
   final VoidCallback? onSyncSettings;
 
+  /// Tab actions (only wired while the file manager is hosted in tabs).
+  final VoidCallback? onOpenInNewTab;
+  final VoidCallback? onCopyToOtherTab;
+  final VoidCallback? onMoveToOtherTab;
+
   const FileItemActionsSheet({
     super.key,
     required this.entry,
@@ -80,6 +85,9 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEditAudio,
     this.onToggleDocProvider,
     this.onSyncSettings,
+    this.onOpenInNewTab,
+    this.onCopyToOtherTab,
+    this.onMoveToOtherTab,
   });
 
   static Future<void> show(
@@ -112,6 +120,9 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEditAudio,
     VoidCallback? onToggleDocProvider,
     VoidCallback? onSyncSettings,
+    VoidCallback? onOpenInNewTab,
+    VoidCallback? onCopyToOtherTab,
+    VoidCallback? onMoveToOtherTab,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -149,6 +160,9 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEditAudio: onEditAudio,
         onToggleDocProvider: onToggleDocProvider,
         onSyncSettings: onSyncSettings,
+        onOpenInNewTab: onOpenInNewTab,
+        onCopyToOtherTab: onCopyToOtherTab,
+        onMoveToOtherTab: onMoveToOtherTab,
       ),
     );
   }
@@ -430,6 +444,33 @@ class FileItemActionsSheet extends ConsumerWidget {
                           onCut();
                         },
                       ),
+                      if (onOpenInNewTab != null)
+                        _ActionTile(
+                          icon: Icons.tab_rounded,
+                          label: context.l10n.browserTabOpenInNewTab,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onOpenInNewTab!();
+                          },
+                        ),
+                      if (onCopyToOtherTab != null)
+                        _ActionTile(
+                          icon: Icons.copy_all_rounded,
+                          label: context.l10n.browserTabCopyToOtherTab,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onCopyToOtherTab!();
+                          },
+                        ),
+                      if (onMoveToOtherTab != null)
+                        _ActionTile(
+                          icon: Icons.drive_file_move_rounded,
+                          label: context.l10n.browserTabMoveToOtherTab,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onMoveToOtherTab!();
+                          },
+                        ),
                       const SizedBox(height: 8),
                     ],
 

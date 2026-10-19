@@ -12331,4 +12331,33 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Stocker ne compresse pas, il n\'y a donc aucune méthode à choisir.';
+
+  @override
+  String get browserTabNew => 'Nouvel onglet';
+
+  @override
+  String get browserTabClose => 'Fermer l\'onglet';
+
+  @override
+  String get browserTabCloseOthers => 'Fermer les autres onglets';
+
+  @override
+  String get browserTabDuplicate => 'Dupliquer l\'onglet';
+
+  @override
+  String get browserTabSwitchPrevious => 'Passer à l\'onglet précédent';
+
+  @override
+  String get browserTabOpenInNewTab => 'Ouvrir dans un nouvel onglet';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Limite d\'onglets atteinte ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'Copier vers l\'autre onglet';
+
+  @override
+  String get browserTabMoveToOtherTab => 'Déplacer vers l\'autre onglet';
 }

@@ -12224,4 +12224,33 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Armazenar não compacta, então não há método para escolher.';
+
+  @override
+  String get browserTabNew => 'Nova aba';
+
+  @override
+  String get browserTabClose => 'Fechar aba';
+
+  @override
+  String get browserTabCloseOthers => 'Fechar outras abas';
+
+  @override
+  String get browserTabDuplicate => 'Duplicar aba';
+
+  @override
+  String get browserTabSwitchPrevious => 'Alternar para a aba anterior';
+
+  @override
+  String get browserTabOpenInNewTab => 'Abrir em nova aba';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Limite de abas atingido ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'Copiar para a outra aba';
+
+  @override
+  String get browserTabMoveToOtherTab => 'Mover para a outra aba';
 }

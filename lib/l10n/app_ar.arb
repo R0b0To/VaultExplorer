@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "الأسرع، لكن بحجم ملفات أكبر وأوسع دعم. يُستخدم أيضًا في ZIP و.tar.gz.",
   "archiveMethodFixedInfo": "{format} يضغط دائمًا باستخدام {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 وLZMA متاحان في أرشيفات 7-Zip.",
-  "archiveMethodStoreNote": "وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار."
+  "archiveMethodStoreNote": "وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار.",
+  "browserTabNew": "علامة تبويب جديدة",
+  "browserTabClose": "إغلاق علامة التبويب",
+  "browserTabCloseOthers": "إغلاق علامات التبويب الأخرى",
+  "browserTabDuplicate": "تكرار علامة التبويب",
+  "browserTabSwitchPrevious": "التبديل إلى علامة التبويب السابقة",
+  "browserTabOpenInNewTab": "فتح في علامة تبويب جديدة",
+  "browserTabLimitReached": "تم بلوغ حد علامات التبويب ({max})",
+  "browserTabCopyToOtherTab": "نسخ إلى علامة التبويب الأخرى",
+  "browserTabMoveToOtherTab": "نقل إلى علامة التبويب الأخرى"
 }

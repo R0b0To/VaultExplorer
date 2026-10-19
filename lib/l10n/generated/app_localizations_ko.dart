@@ -11549,4 +11549,33 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get archiveMethodStoreNote => '저장은 압축하지 않으므로 선택할 방식이 없습니다.';
+
+  @override
+  String get browserTabNew => '새 탭';
+
+  @override
+  String get browserTabClose => '탭 닫기';
+
+  @override
+  String get browserTabCloseOthers => '다른 탭 닫기';
+
+  @override
+  String get browserTabDuplicate => '탭 복제';
+
+  @override
+  String get browserTabSwitchPrevious => '이전 탭으로 전환';
+
+  @override
+  String get browserTabOpenInNewTab => '새 탭에서 열기';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return '탭 한도에 도달했습니다($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => '다른 탭으로 복사';
+
+  @override
+  String get browserTabMoveToOtherTab => '다른 탭으로 이동';
 }

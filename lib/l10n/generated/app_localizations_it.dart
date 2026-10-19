@@ -12227,4 +12227,33 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Memorizza non comprime, quindi non c\'è alcun metodo da scegliere.';
+
+  @override
+  String get browserTabNew => 'Nuova scheda';
+
+  @override
+  String get browserTabClose => 'Chiudi scheda';
+
+  @override
+  String get browserTabCloseOthers => 'Chiudi altre schede';
+
+  @override
+  String get browserTabDuplicate => 'Duplica scheda';
+
+  @override
+  String get browserTabSwitchPrevious => 'Passa alla scheda precedente';
+
+  @override
+  String get browserTabOpenInNewTab => 'Apri in una nuova scheda';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Limite di schede raggiunto ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'Copia nell\'altra scheda';
+
+  @override
+  String get browserTabMoveToOtherTab => 'Sposta nell\'altra scheda';
 }

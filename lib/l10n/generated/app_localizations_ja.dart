@@ -11550,4 +11550,33 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get archiveMethodStoreNote => '無圧縮では圧縮しないため、選択できる方式はありません。';
+
+  @override
+  String get browserTabNew => '新しいタブ';
+
+  @override
+  String get browserTabClose => 'タブを閉じる';
+
+  @override
+  String get browserTabCloseOthers => '他のタブを閉じる';
+
+  @override
+  String get browserTabDuplicate => 'タブを複製';
+
+  @override
+  String get browserTabSwitchPrevious => '前のタブに切り替え';
+
+  @override
+  String get browserTabOpenInNewTab => '新しいタブで開く';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'タブの上限に達しました（$max）';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'もう一方のタブにコピー';
+
+  @override
+  String get browserTabMoveToOtherTab => 'もう一方のタブに移動';
 }

@@ -13761,5 +13761,46 @@
   "archiveMethodStoreNote": "Store doesn't compress, so there is no method to choose.",
   "@archiveMethodStoreNote": {
     "description": "Note shown instead of the method dropdown when the compression level is Store (no compression)"
+  },
+  "browserTabNew": "New tab",
+  "@browserTabNew": {
+    "description": "Tooltip/title for the file manager's new-tab button and the sheet that lets the user pick where a new tab opens"
+  },
+  "browserTabClose": "Close tab",
+  "@browserTabClose": {
+    "description": "Action that closes one file manager tab"
+  },
+  "browserTabCloseOthers": "Close other tabs",
+  "@browserTabCloseOthers": {
+    "description": "Action that closes every file manager tab except the selected one"
+  },
+  "browserTabDuplicate": "Duplicate tab",
+  "@browserTabDuplicate": {
+    "description": "Action that opens a copy of a file manager tab at the same location in a new tab"
+  },
+  "browserTabSwitchPrevious": "Switch to previous tab",
+  "@browserTabSwitchPrevious": {
+    "description": "Tooltip for the button that flips back to the previously used file manager tab"
+  },
+  "browserTabOpenInNewTab": "Open in new tab",
+  "@browserTabOpenInNewTab": {
+    "description": "Item action that opens the selected folder in a new file manager tab"
+  },
+  "browserTabLimitReached": "Tab limit reached ({max})",
+  "@browserTabLimitReached": {
+    "description": "Message shown when the maximum number of file manager tabs is already open",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "browserTabCopyToOtherTab": "Copy to other tab",
+  "@browserTabCopyToOtherTab": {
+    "description": "Item action that copies the item and pastes it into the other (previous) file manager tab's current folder"
+  },
+  "browserTabMoveToOtherTab": "Move to other tab",
+  "@browserTabMoveToOtherTab": {
+    "description": "Item action that moves the item into the other (previous) file manager tab's current folder"
   }
 }

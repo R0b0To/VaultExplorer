@@ -12315,4 +12315,33 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Режим «Зберегти» не стискає, тому методу для вибору немає.';
+
+  @override
+  String get browserTabNew => 'Нова вкладка';
+
+  @override
+  String get browserTabClose => 'Закрити вкладку';
+
+  @override
+  String get browserTabCloseOthers => 'Закрити інші вкладки';
+
+  @override
+  String get browserTabDuplicate => 'Дублювати вкладку';
+
+  @override
+  String get browserTabSwitchPrevious => 'Перейти на попередню вкладку';
+
+  @override
+  String get browserTabOpenInNewTab => 'Відкрити в новій вкладці';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Досягнуто ліміту вкладок ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'Копіювати в іншу вкладку';
+
+  @override
+  String get browserTabMoveToOtherTab => 'Перемістити в іншу вкладку';
 }

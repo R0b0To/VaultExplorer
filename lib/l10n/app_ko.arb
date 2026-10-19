@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "가장 빠르지만 파일이 더 커지며 호환성이 가장 넓습니다. ZIP과 .tar.gz에서도 사용됩니다.",
   "archiveMethodFixedInfo": "{format} 형식은 항상 {method} 방식으로 압축합니다.",
   "archiveMethodMoreInSevenZip": "LZMA2와 LZMA는 7-Zip 아카이브에서 사용할 수 있습니다.",
-  "archiveMethodStoreNote": "저장은 압축하지 않으므로 선택할 방식이 없습니다."
+  "archiveMethodStoreNote": "저장은 압축하지 않으므로 선택할 방식이 없습니다.",
+  "browserTabNew": "새 탭",
+  "browserTabClose": "탭 닫기",
+  "browserTabCloseOthers": "다른 탭 닫기",
+  "browserTabDuplicate": "탭 복제",
+  "browserTabSwitchPrevious": "이전 탭으로 전환",
+  "browserTabOpenInNewTab": "새 탭에서 열기",
+  "browserTabLimitReached": "탭 한도에 도달했습니다({max})",
+  "browserTabCopyToOtherTab": "다른 탭으로 복사",
+  "browserTabMoveToOtherTab": "다른 탭으로 이동"
 }

@@ -19,6 +19,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onRename;
   final VoidCallback onCopy;
   final VoidCallback onCut;
+  final VoidCallback? onCopyToOtherTab;
+  final VoidCallback? onMoveToOtherTab;
   final VoidCallback onExport;
   final VoidCallback onCompressSelection;
   final VoidCallback onExtractSelectedArchive;
@@ -65,6 +67,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onRename,
     required this.onCopy,
     required this.onCut,
+    this.onCopyToOtherTab,
+    this.onMoveToOtherTab,
     required this.onExport,
     required this.onCompressSelection,
     required this.onExtractSelectedArchive,
@@ -261,6 +265,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'rename') onRename();
                 if (value == 'copy') onCopy();
                 if (value == 'cut') onCut();
+                if (value == 'copy_other_tab') onCopyToOtherTab?.call();
+                if (value == 'cut_other_tab') onMoveToOtherTab?.call();
                 if (value == 'compress') onCompressSelection();
                 if (value == 'export') onExport();
                 if (value == 'encrypt') onEncrypt();
@@ -376,6 +382,29 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(context.l10n.moveAction),
+                      ],
+                    ),
+                  ),
+                if (!isInsideArchive && onCopyToOtherTab != null)
+                  PopupMenuItem<String>(
+                    value: 'copy_other_tab',
+                    child: Row(
+                      children: [
+                        Icon(Icons.copy_all_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.browserTabCopyToOtherTab),
+                      ],
+                    ),
+                  ),
+                if (!isInsideArchive && onMoveToOtherTab != null)
+                  PopupMenuItem<String>(
+                    value: 'cut_other_tab',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(Icons.drive_file_move_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.browserTabMoveToOtherTab),
                       ],
                     ),
                   ),

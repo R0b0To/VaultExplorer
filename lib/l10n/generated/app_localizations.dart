@@ -20388,6 +20388,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Store doesn\'t compress, so there is no method to choose.'**
   String get archiveMethodStoreNote;
+
+  /// Tooltip/title for the file manager's new-tab button and the sheet that lets the user pick where a new tab opens
+  ///
+  /// In en, this message translates to:
+  /// **'New tab'**
+  String get browserTabNew;
+
+  /// Action that closes one file manager tab
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get browserTabClose;
+
+  /// Action that closes every file manager tab except the selected one
+  ///
+  /// In en, this message translates to:
+  /// **'Close other tabs'**
+  String get browserTabCloseOthers;
+
+  /// Action that opens a copy of a file manager tab at the same location in a new tab
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate tab'**
+  String get browserTabDuplicate;
+
+  /// Tooltip for the button that flips back to the previously used file manager tab
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to previous tab'**
+  String get browserTabSwitchPrevious;
+
+  /// Item action that opens the selected folder in a new file manager tab
+  ///
+  /// In en, this message translates to:
+  /// **'Open in new tab'**
+  String get browserTabOpenInNewTab;
+
+  /// Message shown when the maximum number of file manager tabs is already open
+  ///
+  /// In en, this message translates to:
+  /// **'Tab limit reached ({max})'**
+  String browserTabLimitReached(int max);
+
+  /// Item action that copies the item and pastes it into the other (previous) file manager tab's current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to other tab'**
+  String get browserTabCopyToOtherTab;
+
+  /// Item action that moves the item into the other (previous) file manager tab's current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Move to other tab'**
+  String get browserTabMoveToOtherTab;
 }
 
 class _AppLocalizationsDelegate

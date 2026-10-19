@@ -13,7 +13,8 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -304,7 +305,14 @@ class _MainShellState extends ConsumerState<MainShell> {
       ],
     );
 
-    Widget buildDrawer({int? currentVolId}) {
+    MountedContainer? resolveContainer(int volId) {
+      for (final c in _mountedNotifier.value) {
+        if (c.volId == volId) return c;
+      }
+      return _dashboardKey.currentState?.resolveAnyContainer(volId);
+    }
+
+    Widget buildDrawer({int? currentVolId, BrowserTabsController? tabs}) {
       return AppNavigationDrawer(
         currentVolId: currentVolId,
         primaryLocalContainer:
@@ -312,14 +320,22 @@ class _MainShellState extends ConsumerState<MainShell> {
         selectedTabIndex: _index,
         onSelectTab: _onTabTap,
         onSelectContainer: (container) {
+          // Already inside the tabbed file manager: switch the active tab
+          // instead of stacking another file manager route.
+          if (tabs != null) {
+            tabs.replaceActive(container);
+            return;
+          }
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
-                container: container,
-                drawer: buildDrawer(currentVolId: container.volId),
-                showBackButton: true,
-              )),
+            buildBrowserTabsRoute(
+              container: container,
+              resolveContainer: resolveContainer,
+              mountedContainers: () => _mountedNotifier.value,
+              primaryLocalContainer: () =>
+                  _dashboardKey.currentState?.localStorageContainer,
+              drawerBuilder: (t, volId) =>
+                  buildDrawer(currentVolId: volId, tabs: t),
             ),
           );
         },

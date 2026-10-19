@@ -12258,4 +12258,33 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار.';
+
+  @override
+  String get browserTabNew => 'علامة تبويب جديدة';
+
+  @override
+  String get browserTabClose => 'إغلاق علامة التبويب';
+
+  @override
+  String get browserTabCloseOthers => 'إغلاق علامات التبويب الأخرى';
+
+  @override
+  String get browserTabDuplicate => 'تكرار علامة التبويب';
+
+  @override
+  String get browserTabSwitchPrevious => 'التبديل إلى علامة التبويب السابقة';
+
+  @override
+  String get browserTabOpenInNewTab => 'فتح في علامة تبويب جديدة';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'تم بلوغ حد علامات التبويب ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'نسخ إلى علامة التبويب الأخرى';
+
+  @override
+  String get browserTabMoveToOtherTab => 'نقل إلى علامة التبويب الأخرى';
 }

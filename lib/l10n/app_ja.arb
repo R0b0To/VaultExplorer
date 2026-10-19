@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "最速ですがファイルは大きくなります。互換性が最も広く、ZIP や .tar.gz でも使われます。",
   "archiveMethodFixedInfo": "{format} は常に {method} で圧縮します。",
   "archiveMethodMoreInSevenZip": "LZMA2 と LZMA は 7-Zip アーカイブで利用できます。",
-  "archiveMethodStoreNote": "無圧縮では圧縮しないため、選択できる方式はありません。"
+  "archiveMethodStoreNote": "無圧縮では圧縮しないため、選択できる方式はありません。",
+  "browserTabNew": "新しいタブ",
+  "browserTabClose": "タブを閉じる",
+  "browserTabCloseOthers": "他のタブを閉じる",
+  "browserTabDuplicate": "タブを複製",
+  "browserTabSwitchPrevious": "前のタブに切り替え",
+  "browserTabOpenInNewTab": "新しいタブで開く",
+  "browserTabLimitReached": "タブの上限に達しました（{max}）",
+  "browserTabCopyToOtherTab": "もう一方のタブにコピー",
+  "browserTabMoveToOtherTab": "もう一方のタブに移動"
 }

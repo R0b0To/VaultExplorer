@@ -12256,4 +12256,33 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get archiveMethodStoreNote =>
       'Almacenar no comprime, así que no hay método que elegir.';
+
+  @override
+  String get browserTabNew => 'Nueva pestaña';
+
+  @override
+  String get browserTabClose => 'Cerrar pestaña';
+
+  @override
+  String get browserTabCloseOthers => 'Cerrar otras pestañas';
+
+  @override
+  String get browserTabDuplicate => 'Duplicar pestaña';
+
+  @override
+  String get browserTabSwitchPrevious => 'Cambiar a la pestaña anterior';
+
+  @override
+  String get browserTabOpenInNewTab => 'Abrir en una pestaña nueva';
+
+  @override
+  String browserTabLimitReached(int max) {
+    return 'Límite de pestañas alcanzado ($max)';
+  }
+
+  @override
+  String get browserTabCopyToOtherTab => 'Copiar a la otra pestaña';
+
+  @override
+  String get browserTabMoveToOtherTab => 'Mover a la otra pestaña';
 }

@@ -3371,5 +3371,14 @@
   "archiveMethodDeflateDesc": "El más rápido, con archivos más grandes y la mayor compatibilidad. También lo usan ZIP y .tar.gz.",
   "archiveMethodFixedInfo": "{format} siempre comprime con {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 y LZMA están disponibles en archivos 7-Zip.",
-  "archiveMethodStoreNote": "Almacenar no comprime, así que no hay método que elegir."
+  "archiveMethodStoreNote": "Almacenar no comprime, así que no hay método que elegir.",
+  "browserTabNew": "Nueva pestaña",
+  "browserTabClose": "Cerrar pestaña",
+  "browserTabCloseOthers": "Cerrar otras pestañas",
+  "browserTabDuplicate": "Duplicar pestaña",
+  "browserTabSwitchPrevious": "Cambiar a la pestaña anterior",
+  "browserTabOpenInNewTab": "Abrir en una pestaña nueva",
+  "browserTabLimitReached": "Límite de pestañas alcanzado ({max})",
+  "browserTabCopyToOtherTab": "Copiar a la otra pestaña",
+  "browserTabMoveToOtherTab": "Mover a la otra pestaña"
 }

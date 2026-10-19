@@ -1,0 +1,8 @@
+• Added search in settings
+• Redesigned archive UI with split & compression controls (removed ISO/CPIO creation)
+• Fixed archive opening & scroll retention
+• Support folder sharing (packaged as zip)
+• Improved autosync folder renames and deletion safety
+• Enhanced in-app camera (flash & lens switching)
+• Fixed keyboard suggestions during unlock
+• Fixed hold-to-select timing

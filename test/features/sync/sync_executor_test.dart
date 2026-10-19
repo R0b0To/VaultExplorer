@@ -522,13 +522,35 @@ void main() {
       final renameReport = await h.run(r);
 
       expect(renameReport.deletionsBlocked, isFalse, reason: 'renames must not be blocked by mass delete guard');
-      expect(renameReport.deleted, 16, reason: '15 files + 1 old directory deleted');
+      expect(renameReport.copied, 1, reason: 'the folder rename is handled as one move');
+      expect(renameReport.deleted, 0, reason: 'a rename is not propagated as deletions');
       expect(h.target.hasDir('BigFolder'), isFalse);
       expect(h.target.hasDir('RenamedBigFolder'), isTrue);
       for (var i = 1; i <= 15; i++) {
         expect(h.target.read('RenamedBigFolder/file$i.txt'), 'content $i');
         expect(h.target.has('BigFolder/file$i.txt'), isFalse);
       }
+    });
+
+    test('two-way folder rename propagates when copy deletions are disabled', () async {
+      final h = Harness();
+      h.vault.put('BeforeRename/file.txt', 'content');
+
+      final r = rule(direction: SyncDirection.twoWay, deleteOrphans: false);
+      await h.run(r);
+      await h.vault.rename('BeforeRename', 'AfterRename');
+
+      final report = await h.run(r);
+
+      expect(report.failed, 0);
+      expect(report.deletionsBlocked, isFalse);
+      expect(report.deleted, 0);
+      expect(h.vault.hasDir('AfterRename'), isTrue);
+      expect(h.target.hasDir('AfterRename'), isTrue);
+      expect(h.target.hasDir('BeforeRename'), isFalse);
+      expect(h.target.read('AfterRename/file.txt'), 'content');
+      expect(h.ledger.baselineFor('r').keys, contains('AfterRename/file.txt'));
+      expect(h.ledger.baselineFor('r').keys, isNot(contains('BeforeRename/file.txt')));
     });
 
     test('two-way sync creates and propagates empty folders symmetrically', () async {

@@ -1,0 +1,19 @@
+## What's Changed
+
+### Settings & Core Features
+* **Settings Search:** Added a dedicated search bar within the app settings to quickly find and jump to specific configurations.
+* **Folder Sharing:** You can now share entire folders directly from the app. Because Android does not natively support sharing directory trees via the share sheet, folders are automatically packaged as `.zip` files to preserve directory structure.
+* **Camera Enhancements:** Improved hardware camera integration, focusing on reliable flash control and lens switching.
+
+### Archive Management Overhaul
+* **Redesigned Creation Flow:** Modernized the archive creation UI/UX with options to configure compression levels and create split (multi-part) archives where supported.
+* **Cleaned Up Formats:** Removed `.iso` and `.cpio` from archive creation options, keeping mobile workflows focused on practical, widely supported formats.
+* **Reliability & Navigation Fixes:** Resolved issues preventing certain archive types from opening correctly and fixed a bug where the file manager lost its scroll position when entering or exiting an archive.
+
+### Autosync & File Management
+* **Reliable Folder Renames:** Matching folders can now move across local and synced storage without requiring fallback copy-then-delete operations.
+* **Sync Safeguards:** Incomplete directory scans will no longer trigger unsafe file deletions or duplicate empty directories.
+* **Selection Timing:** Adjusted touch-and-hold thresholds for selecting files and folders to prevent accidental clicks or missed selections.
+
+### Security & Bug Fixes
+* **Password Field Privacy:** Fixed an issue where the soft keyboard occasionally reverted to standard text input (enabling autocorrect/suggestions) instead of staying in secure, suggestion-disabled password mode during vault unlock.

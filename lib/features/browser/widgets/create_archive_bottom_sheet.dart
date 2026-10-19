@@ -184,10 +184,6 @@ class _CreateArchiveBottomSheetState
         ? initialSuggested.substring(0, dotIdx)
         : initialSuggested;
     _nameCtrl = TextEditingController(text: stem);
-
-    if (_hasOnlyPrecompressedFiles(widget.selectedEntries)) {
-      _compressionLevel = ArchiveCompressionLevel.store;
-    }
   }
 
   @override
@@ -202,24 +198,6 @@ class _CreateArchiveBottomSheetState
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
-  }
-
-  static bool _hasOnlyPrecompressedFiles(List<RawEntry> entries) {
-    if (entries.isEmpty) return false;
-    const precompressedExtensions = {
-      'mp4', 'mkv', 'avi', 'mov', 'webm', '3gp', 'flv', 'wmv', 'm4v',
-      'mp3', 'm4a', 'aac', 'ogg', 'opus', 'flac', 'wma',
-      'jpg', 'jpeg', 'png', 'webp', 'heic', 'gif',
-      'zip', '7z', 'rar', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'tar.gz', 'apk', 'pdf'
-    };
-    final fileEntries = entries.where((e) => !e.isDir).toList();
-    if (fileEntries.isEmpty) return false;
-    return fileEntries.every((e) {
-      final dot = e.name.lastIndexOf('.');
-      if (dot == -1) return false;
-      final ext = e.name.substring(dot + 1).toLowerCase();
-      return precompressedExtensions.contains(ext);
-    });
   }
 
   void _revalidate() {

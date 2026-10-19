@@ -156,7 +156,7 @@ void main() {
     expect(find.text('Security'), findsNothing);
   });
 
-  testWidgets('Smart media recommendation triggers for media files',
+  testWidgets('Media files keep the normal compression level by default',
       (tester) async {
     final container = _mockContainer();
     final selected = [
@@ -189,8 +189,7 @@ void main() {
     await tester.tap(find.text('Open Sheet'));
     await tester.pumpAndSettle();
 
-   // Store compression level should be auto-selected for pre-compressed media
-    expect(find.text('Store (0) — No compression'), findsOneWidget);
+    expect(find.text('Normal (5) — Balanced'), findsOneWidget);
   });
 
   testWidgets('Password confirmation and strength validation work',

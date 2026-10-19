@@ -128,7 +128,8 @@ class SyncSnapshot {
       rootReadable = true,
       leftovers = const [];
 
-  bool get isComplete => rootReadable && unreadableDirs.isEmpty;
+  bool get isComplete =>
+      rootReadable && unreadableDirs.isEmpty && truncatedDirs.isEmpty;
 
   /// True when [path] lies inside a directory that failed to list.
   bool isUnderUnreadable(String path) {

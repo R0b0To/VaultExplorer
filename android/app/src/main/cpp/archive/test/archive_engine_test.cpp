@@ -38,7 +38,8 @@ void writeEntry(struct archive* a, const std::string& path, const std::string& c
 // Builds a ZIP (optionally AES-256 encrypted, if `passphrase` is non-empty)
 // containing one directory entry plus the given name->content files.
 std::vector<uint8_t> buildZip(const std::vector<std::pair<std::string, std::string>>& files,
-                              const std::string& passphrase = "") {
+                              const std::string& passphrase = "",
+                              bool includeDir = true) {
     struct archive* a = archive_write_new();
     archive_write_set_format_zip(a);
     if (!passphrase.empty()) {
@@ -49,12 +50,14 @@ std::vector<uint8_t> buildZip(const std::vector<std::pair<std::string, std::stri
     size_t used = 0;
     archive_write_open_memory(a, buffer.data(), buffer.size(), &used);
 
-    struct archive_entry* dirEntry = archive_entry_new();
-    archive_entry_set_pathname(dirEntry, "docs/");
-    archive_entry_set_filetype(dirEntry, AE_IFDIR);
-    archive_entry_set_perm(dirEntry, 0755);
-    archive_write_header(a, dirEntry);
-    archive_entry_free(dirEntry);
+    if (includeDir) {
+        struct archive_entry* dirEntry = archive_entry_new();
+        archive_entry_set_pathname(dirEntry, "docs/");
+        archive_entry_set_filetype(dirEntry, AE_IFDIR);
+        archive_entry_set_perm(dirEntry, 0755);
+        archive_write_header(a, dirEntry);
+        archive_entry_free(dirEntry);
+    }
 
     for (const auto& file : files) {
         writeEntry(a, file.first, file.second);
@@ -306,7 +309,8 @@ int main() {
     // a passphrase. ---
     {
         const auto zipBytes = buildZip({{"secret.txt", "top secret payload"}},
-                                       "correct horse battery staple");
+                                       "correct horse battery staple",
+                                       /*includeDir=*/false);
         const auto source = sourceOver(zipBytes);
 
         // Without a password, scan succeeds and lists entries marked as encrypted.

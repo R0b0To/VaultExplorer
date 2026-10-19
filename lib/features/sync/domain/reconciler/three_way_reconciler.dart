@@ -5,7 +5,8 @@ import 'package:vaultexplorer/features/sync/domain/models/sync_rule.dart';
 import 'package:vaultexplorer/features/sync/domain/models/sync_state_record.dart';
 
 /// Content hash of [relPath] on [side], or null if it can't be computed.
-typedef SyncHashResolver = Future<String?> Function(SyncSide side, String relPath);
+typedef SyncHashResolver =
+    Future<String?> Function(SyncSide side, String relPath);
 
 /// Decides, for every path in `vault ∪ target ∪ baseline`, what a sync
 /// run should do. Pure decision logic: no I/O except the injected
@@ -83,6 +84,7 @@ class ThreeWayReconciler {
       hashOf: hashOf,
       stamp: _stamp(now ?? DateTime.now()),
     );
+    await run.detectFolderRenames();
 
     final paths = <String>{
       ...vault.files.keys,
@@ -121,6 +123,11 @@ class _Run {
   final SyncHashResolver hashOf;
   final String stamp;
   final List<SyncAction> actions = [];
+  final Set<String> _handledPaths = {};
+  final Set<String> _renamedOldDirsOnVault = {};
+  final Set<String> _renamedOldDirsOnTarget = {};
+  final Set<String> _renamedNewDirsOnVault = {};
+  final Set<String> _renamedNewDirsOnTarget = {};
 
   _Run({
     required this.reconciler,
@@ -135,9 +142,259 @@ class _Run {
   bool get _canWriteTarget => rule.direction != SyncDirection.targetToVault;
   bool get _canWriteVault => rule.direction != SyncDirection.vaultToTarget;
 
+  /// A missing path is only safe to treat as deleted when that side's scan
+  /// could see the whole tree. A rename into an unreadable or truncated
+  /// subtree otherwise looks like a set of deletions at the old paths.
+  bool _mayHideMissingPaths(SyncSnapshot snapshot) =>
+      !snapshot.rootReadable ||
+      snapshot.unreadableDirs.isNotEmpty ||
+      snapshot.truncatedDirs.isNotEmpty;
+
+  Set<String> _baselineDirs() {
+    final dirs = <String>{};
+    for (final record in baseline.values) {
+      if (record.isDir) {
+        dirs.add(record.relPath);
+      } else {
+        var path = record.relPath;
+        while (path.contains('/')) {
+          path = path.substring(0, path.lastIndexOf('/'));
+          dirs.add(path);
+        }
+      }
+    }
+    return dirs;
+  }
+
+  bool _looksUnexpectedlyEmpty(SyncSnapshot snapshot) {
+    if (snapshot.files.isNotEmpty) return false;
+    if (baseline.length >= reconciler.emptySideMinBaseline) return true;
+
+    // Even a small baseline is suspicious when tracked directories vanished
+    // and new directory paths appeared together: an unreadable renamed
+    // folder would otherwise look like an intentional one-file deletion.
+    if (!baseline.values.any((record) => !record.isDir)) return false;
+    final oldDirs = _baselineDirs();
+    final removedOldDir = oldDirs.any((d) => !snapshot.dirs.contains(d));
+    final addedNewDir = snapshot.dirs.any((d) => !oldDirs.contains(d));
+    return removedOldDir && addedNewDir;
+  }
+
+  bool _hasIncompleteSubtree(SyncSnapshot snapshot, String path) {
+    if (_looksUnexpectedlyEmpty(snapshot) ||
+        snapshot.isUnderUnreadable(path) ||
+        snapshot.isUnderTruncated(path)) {
+      return true;
+    }
+    final prefix = '$path/';
+    return snapshot.unreadableDirs.any((d) => d.startsWith(prefix)) ||
+        snapshot.truncatedDirs.any((d) => d.isEmpty || d.startsWith(prefix));
+  }
+
+  static String _parentPath(String path) {
+    final slash = path.lastIndexOf('/');
+    return slash < 0 ? '' : path.substring(0, slash);
+  }
+
+  static Set<String> _relativePathsUnder(
+    Iterable<String> paths,
+    String directory,
+  ) {
+    final prefix = '$directory/';
+    return paths
+        .where((path) => path.startsWith(prefix))
+        .map((path) => path.substring(prefix.length))
+        .toSet();
+  }
+
+  static List<String> _topLevelDirectories(Iterable<String> paths) {
+    final candidates = paths.toSet();
+    return candidates.where((path) {
+      var slash = path.lastIndexOf('/');
+      while (slash > 0) {
+        if (candidates.contains(path.substring(0, slash))) return false;
+        slash = path.lastIndexOf('/', slash - 1);
+      }
+      return true;
+    }).toList()..sort();
+  }
+
+  Future<void> detectFolderRenames() async {
+    // Rename inference is only safe with complete snapshots. Partial trees
+    // are handled by the deletion and empty-directory guards below.
+    if (!vault.isComplete || !target.isComplete) return;
+
+    if (rule.direction != SyncDirection.vaultToTarget) {
+      await _detectFolderRenamesOnSource(SyncSide.target);
+    }
+    if (rule.direction != SyncDirection.targetToVault) {
+      await _detectFolderRenamesOnSource(SyncSide.vault);
+    }
+  }
+
+  Future<void> _detectFolderRenamesOnSource(SyncSide sourceSide) async {
+    final source = sourceSide == SyncSide.vault ? vault : target;
+    final destinationSide = sourceSide.other;
+    final destination = destinationSide == SyncSide.vault ? vault : target;
+    final baselineDirs = _baselineDirs();
+
+    final oldRoots = _topLevelDirectories(
+      baselineDirs.where(
+        (d) => destination.dirs.contains(d) && !source.dirs.contains(d),
+      ),
+    );
+    final newRoots = _topLevelDirectories(
+      source.dirs
+          .where(
+            (d) => !baselineDirs.contains(d) && !destination.dirs.contains(d),
+          )
+          .where((d) {
+            final oldParent = _parentPath(d);
+            return oldParent.isEmpty ||
+                (source.dirs.contains(oldParent) &&
+                    destination.dirs.contains(oldParent));
+          }),
+    );
+    if (oldRoots.isEmpty || newRoots.isEmpty) return;
+
+    final matchesByOld = <String, List<String>>{};
+    final matchesByNew = <String, int>{};
+    for (final oldRoot in oldRoots) {
+      for (final newRoot in newRoots) {
+        if (_parentPath(oldRoot) != _parentPath(newRoot)) continue;
+        if (destination.files.containsKey(newRoot) ||
+            _ancestorIsFile(newRoot, destination)) {
+          continue;
+        }
+        if (await _sameUnchangedSubtree(
+          oldRoot: oldRoot,
+          newRoot: newRoot,
+          sourceSide: sourceSide,
+          source: source,
+          destination: destination,
+          baselineDirs: baselineDirs,
+        )) {
+          matchesByOld.putIfAbsent(oldRoot, () => []).add(newRoot);
+          matchesByNew[newRoot] = (matchesByNew[newRoot] ?? 0) + 1;
+        }
+      }
+    }
+
+    for (final entry in matchesByOld.entries) {
+      if (entry.value.length != 1) continue;
+      final oldRoot = entry.key;
+      final newRoot = entry.value.single;
+      if (matchesByNew[newRoot] != 1) continue;
+
+      actions.add(
+        SyncAction(
+          kind: destinationSide == SyncSide.vault
+              ? SyncActionKind.moveOnVault
+              : SyncActionKind.moveOnTarget,
+          relPath: newRoot,
+          renameFromPath: oldRoot,
+          isDir: true,
+        ),
+      );
+      for (final suffix in _relativePathsUnder(
+        baseline.values.where((r) => !r.isDir).map((r) => r.relPath),
+        oldRoot,
+      )) {
+        _handledPaths
+          ..add('$oldRoot/$suffix')
+          ..add('$newRoot/$suffix');
+      }
+
+      final oldDirs = baselineDirs.where(
+        (d) => d == oldRoot || d.startsWith('$oldRoot/'),
+      );
+      final newDirs = source.dirs.where(
+        (d) => d == newRoot || d.startsWith('$newRoot/'),
+      );
+      if (destinationSide == SyncSide.vault) {
+        _renamedOldDirsOnVault.addAll(oldDirs);
+        _renamedNewDirsOnVault.addAll(newDirs);
+      } else {
+        _renamedOldDirsOnTarget.addAll(oldDirs);
+        _renamedNewDirsOnTarget.addAll(newDirs);
+      }
+    }
+  }
+
+  Future<bool> _sameUnchangedSubtree({
+    required String oldRoot,
+    required String newRoot,
+    required SyncSide sourceSide,
+    required SyncSnapshot source,
+    required SyncSnapshot destination,
+    required Set<String> baselineDirs,
+  }) async {
+    final oldPrefix = '$oldRoot/';
+    final oldRecords = baseline.values
+        .where((r) => !r.isDir && r.relPath.startsWith(oldPrefix))
+        .toList();
+
+    final expectedFiles = {
+      for (final r in oldRecords) r.relPath.substring(oldPrefix.length),
+    };
+    final destinationFiles = _relativePathsUnder(
+      destination.files.keys,
+      oldRoot,
+    );
+    final sourceFiles = _relativePathsUnder(source.files.keys, newRoot);
+    if (destinationFiles.length != expectedFiles.length ||
+        !destinationFiles.containsAll(expectedFiles) ||
+        sourceFiles.length != expectedFiles.length ||
+        !sourceFiles.containsAll(expectedFiles)) {
+      return false;
+    }
+
+    final expectedDirs = _relativePathsUnder(
+      baselineDirs.where((d) => d.startsWith(oldPrefix)),
+      oldRoot,
+    );
+    final destinationDirs = _relativePathsUnder(destination.dirs, oldRoot);
+    final sourceDirs = _relativePathsUnder(source.dirs, newRoot);
+    if (destinationDirs.length != expectedDirs.length ||
+        !destinationDirs.containsAll(expectedDirs) ||
+        sourceDirs.length != expectedDirs.length ||
+        !sourceDirs.containsAll(expectedDirs)) {
+      return false;
+    }
+
+    for (final record in oldRecords) {
+      final suffix = record.relPath.substring(oldPrefix.length);
+      final oldPath = '$oldRoot/$suffix';
+      final newPath = '$newRoot/$suffix';
+      final destinationState = destination.files[oldPath];
+      final sourceState = source.files[newPath];
+      if (destinationState == null || sourceState == null) return false;
+
+      final destinationBase = _baselineSideState(record, sourceSide.other);
+      final sourceBase = _baselineSideState(record, sourceSide);
+      if (await _changed(
+            sourceSide.other,
+            oldPath,
+            destinationState,
+            destinationBase,
+          ) ||
+          await _changed(sourceSide, newPath, sourceState, sourceBase)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static SyncSideState _baselineSideState(
+    SyncStateRecord record,
+    SyncSide side,
+  ) => side == SyncSide.vault ? record.vault : record.target;
+
   // ── per-path decision ────────────────────────────────────────────────
 
   Future<void> decide(String path) async {
+    if (_handledPaths.contains(path)) return;
+
     final v = vault.files[path];
     final t = target.files[path];
     final b = baseline[path];
@@ -193,6 +450,8 @@ class _Run {
       final vc = await _changed(SyncSide.vault, path, v, b.vault);
       if (vc) {
         actions.add(_toTarget(path, v, null)); // modification beats deletion
+      } else if (_mayHideMissingPaths(target)) {
+        _skip(path, SyncSkipReason.unreadableSubtree, v, null);
       } else {
         actions.add(_delete(path, SyncSide.vault, v, null));
       }
@@ -203,6 +462,8 @@ class _Run {
     final tc = await _changed(SyncSide.target, path, t!, b.target);
     if (tc) {
       actions.add(_toVault(path, null, t));
+    } else if (_mayHideMissingPaths(vault)) {
+      _skip(path, SyncSkipReason.unreadableSubtree, null, t);
     } else {
       actions.add(_delete(path, SyncSide.target, null, t));
     }
@@ -217,7 +478,11 @@ class _Run {
     return false;
   }
 
-  Future<void> _firstSight(String path, SyncSideState? v, SyncSideState? t) async {
+  Future<void> _firstSight(
+    String path,
+    SyncSideState? v,
+    SyncSideState? t,
+  ) async {
     if (v != null && t == null) {
       actions.add(_toTarget(path, v, null));
       return;
@@ -241,7 +506,11 @@ class _Run {
     }
   }
 
-  Future<void> _bothChanged(String path, SyncSideState v, SyncSideState t) async {
+  Future<void> _bothChanged(
+    String path,
+    SyncSideState v,
+    SyncSideState t,
+  ) async {
     final cmp = await _compare(path, v, t, trustSameSize: false);
     if (cmp.same) {
       actions.add(
@@ -268,7 +537,8 @@ class _Run {
     if (cur.size != base.size) return true;
     // No usable timestamp on either end: size is all there is to go on.
     if (cur.mtimeSecs <= 0 || base.mtimeSecs <= 0) return false;
-    if ((cur.mtimeSecs - base.mtimeSecs).abs() <= reconciler.mtimeToleranceSecs) {
+    if ((cur.mtimeSecs - base.mtimeSecs).abs() <=
+        reconciler.mtimeToleranceSecs) {
       return false;
     }
     // Same size but the timestamp moved: a "touch" or a same-size edit.
@@ -321,7 +591,8 @@ class _Run {
   // ── action builders ──────────────────────────────────────────────────
 
   SyncAction _toTarget(String path, SyncSideState? v, SyncSideState? t) {
-    if (!_canWriteTarget) return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
+    if (!_canWriteTarget)
+      return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
     return SyncAction(
       kind: SyncActionKind.copyToTarget,
       relPath: path,
@@ -332,7 +603,8 @@ class _Run {
   }
 
   SyncAction _toVault(String path, SyncSideState? v, SyncSideState? t) {
-    if (!_canWriteVault) return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
+    if (!_canWriteVault)
+      return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
     return SyncAction(
       kind: SyncActionKind.copyToVault,
       relPath: path,
@@ -345,10 +617,17 @@ class _Run {
   /// A deletion that must be mirrored: the file vanished from one side, so
   /// it is removed from [side] -- the side that still has it. (Deleting on
   /// the vault therefore means the *target* lost the file.)
-  SyncAction _delete(String path, SyncSide side, SyncSideState? v, SyncSideState? t) {
+  SyncAction _delete(
+    String path,
+    SyncSide side,
+    SyncSideState? v,
+    SyncSideState? t,
+  ) {
     final canWrite = side == SyncSide.vault ? _canWriteVault : _canWriteTarget;
-    if (!canWrite) return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
-    if (!rule.deleteOrphans) return _skipAction(path, SyncSkipReason.deletionsDisabled, v, t);
+    if (!canWrite)
+      return _skipAction(path, SyncSkipReason.directionBlocked, v, t);
+    if (!rule.deleteOrphans)
+      return _skipAction(path, SyncSkipReason.deletionsDisabled, v, t);
     return SyncAction(
       kind: side == SyncSide.vault
           ? SyncActionKind.deleteOnVault
@@ -369,7 +648,9 @@ class _Run {
       if (strategy == ConflictStrategy.renameConflict) {
         return _keepBoth(path, v, t, winner: winner, propagate: false);
       }
-      return winner == SyncSide.vault ? _toTarget(path, v, t) : _toVault(path, v, t);
+      return winner == SyncSide.vault
+          ? _toTarget(path, v, t)
+          : _toVault(path, v, t);
     }
 
     switch (strategy) {
@@ -421,8 +702,13 @@ class _Run {
     return '$dir$stem ($label Conflict $stamp)$ext';
   }
 
-  void _skip(String path, SyncSkipReason reason, SyncSideState? v, SyncSideState? t, {bool isDir = false}) =>
-      actions.add(_skipAction(path, reason, v, t, isDir: isDir));
+  void _skip(
+    String path,
+    SyncSkipReason reason,
+    SyncSideState? v,
+    SyncSideState? t, {
+    bool isDir = false,
+  }) => actions.add(_skipAction(path, reason, v, t, isDir: isDir));
 
   SyncAction _skipAction(
     String path,
@@ -443,79 +729,179 @@ class _Run {
 
   void reconcileDirectories() {
     final vaultSurvivingFiles = {...vault.files.keys}
-      ..removeAll(actions.where((a) => a.kind == SyncActionKind.deleteOnVault).map((a) => a.relPath));
-    vaultSurvivingFiles.addAll(actions.where((a) => a.kind == SyncActionKind.copyToVault).map((a) => a.relPath));
+      ..removeAll(
+        actions
+            .where((a) => a.kind == SyncActionKind.deleteOnVault)
+            .map((a) => a.relPath),
+      );
+    vaultSurvivingFiles.addAll(
+      actions
+          .where((a) => a.kind == SyncActionKind.copyToVault)
+          .map((a) => a.relPath),
+    );
+    for (final action in actions.where(
+      (a) => a.kind == SyncActionKind.moveOnVault,
+    )) {
+      final from = action.renameFromPath!;
+      if (action.isDir) {
+        final prefix = '$from/';
+        final moved = vault.files.keys
+            .where((path) => path.startsWith(prefix))
+            .map((path) => '${action.relPath}/${path.substring(prefix.length)}')
+            .toList();
+        vaultSurvivingFiles.removeWhere((path) => path.startsWith(prefix));
+        vaultSurvivingFiles.addAll(moved);
+      } else {
+        vaultSurvivingFiles
+          ..remove(from)
+          ..add(action.relPath);
+      }
+    }
 
     final targetSurvivingFiles = {...target.files.keys}
-      ..removeAll(actions.where((a) => a.kind == SyncActionKind.deleteOnTarget).map((a) => a.relPath));
-    targetSurvivingFiles.addAll(actions.where((a) => a.kind == SyncActionKind.copyToTarget).map((a) => a.relPath));
+      ..removeAll(
+        actions
+            .where((a) => a.kind == SyncActionKind.deleteOnTarget)
+            .map((a) => a.relPath),
+      );
+    targetSurvivingFiles.addAll(
+      actions
+          .where((a) => a.kind == SyncActionKind.copyToTarget)
+          .map((a) => a.relPath),
+    );
+    for (final action in actions.where(
+      (a) => a.kind == SyncActionKind.moveOnTarget,
+    )) {
+      final from = action.renameFromPath!;
+      if (action.isDir) {
+        final prefix = '$from/';
+        final moved = target.files.keys
+            .where((path) => path.startsWith(prefix))
+            .map((path) => '${action.relPath}/${path.substring(prefix.length)}')
+            .toList();
+        targetSurvivingFiles.removeWhere((path) => path.startsWith(prefix));
+        targetSurvivingFiles.addAll(moved);
+      } else {
+        targetSurvivingFiles
+          ..remove(from)
+          ..add(action.relPath);
+      }
+    }
 
     bool clashingWithFile(String d, SyncSnapshot snap) {
       return snap.files.containsKey(d) || _ancestorIsFile(d, snap);
     }
 
-    final existingActionPaths = {for (final a in actions) a.relPath};
+    final existingActionPaths = {for (final a in actions) a.relPath}
+      ..addAll(_renamedOldDirsOnVault)
+      ..addAll(_renamedOldDirsOnTarget)
+      ..addAll(_renamedNewDirsOnVault)
+      ..addAll(_renamedNewDirsOnTarget);
 
-    final baselineDirs = <String>{};
-    for (final r in baseline.values) {
-      if (r.isDir) {
-        baselineDirs.add(r.relPath);
-      } else {
-        var p = r.relPath;
-        while (p.contains('/')) {
-          p = p.substring(0, p.lastIndexOf('/'));
-          baselineDirs.add(p);
-        }
-      }
-    }
+    final baselineDirs = _baselineDirs();
 
     if (rule.direction == SyncDirection.vaultToTarget) {
-      final toCreate = vault.dirs.where((d) => !target.dirs.contains(d)).toList()
-        ..sort((a, b) => a.length.compareTo(b.length));
+      final toCreate =
+          vault.dirs.where((d) => !target.dirs.contains(d)).toList()
+            ..sort((a, b) => a.length.compareTo(b.length));
       for (final d in toCreate) {
-        if (existingActionPaths.contains(d) || clashingWithFile(d, target)) continue;
-        actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+        // The directory itself may be visible even when its contents could
+        // not be listed. Don't mirror it as an empty folder until the source
+        // subtree is readable; a later complete scan will create it with its
+        // files.
+        if (_hasIncompleteSubtree(vault, d)) continue;
+        if (existingActionPaths.contains(d) || clashingWithFile(d, target))
+          continue;
+        actions.add(
+          SyncAction(
+            kind: SyncActionKind.createDirOnTarget,
+            relPath: d,
+            isDir: true,
+          ),
+        );
         existingActionPaths.add(d);
       }
 
       if (rule.deleteOrphans) {
-        final toDelete = target.dirs.where((d) => !vault.dirs.contains(d)).toList()
-          ..sort((a, b) => b.length.compareTo(a.length));
+        if (_mayHideMissingPaths(vault)) return;
+        final toDelete =
+            target.dirs.where((d) => !vault.dirs.contains(d)).toList()
+              ..sort((a, b) => b.length.compareTo(a.length));
         final deletedDirs = <String>{};
         for (final d in toDelete) {
           if (existingActionPaths.contains(d)) continue;
-          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d)) continue;
+          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d))
+            continue;
           final prefix = '$d/';
-          final hasFiles = targetSurvivingFiles.any((f) => f.startsWith(prefix));
-          final hasSubdirs = target.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedDirs.contains(other));
+          final hasFiles = targetSurvivingFiles.any(
+            (f) => f.startsWith(prefix),
+          );
+          final hasSubdirs = target.dirs.any(
+            (other) =>
+                other != d &&
+                other.startsWith(prefix) &&
+                !deletedDirs.contains(other),
+          );
           if (!hasFiles && !hasSubdirs) {
-            actions.add(SyncAction(kind: SyncActionKind.deleteDirOnTarget, relPath: d, isDir: true));
+            actions.add(
+              SyncAction(
+                kind: SyncActionKind.deleteDirOnTarget,
+                relPath: d,
+                isDir: true,
+              ),
+            );
             deletedDirs.add(d);
             existingActionPaths.add(d);
           }
         }
       }
     } else if (rule.direction == SyncDirection.targetToVault) {
-      final toCreate = target.dirs.where((d) => !vault.dirs.contains(d)).toList()
-        ..sort((a, b) => a.length.compareTo(b.length));
+      final toCreate =
+          target.dirs.where((d) => !vault.dirs.contains(d)).toList()
+            ..sort((a, b) => a.length.compareTo(b.length));
       for (final d in toCreate) {
-        if (existingActionPaths.contains(d) || clashingWithFile(d, vault)) continue;
-        actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+        // The directory itself may be visible even when its contents could
+        // not be listed. Don't mirror it as an empty folder until the source
+        // subtree is readable; a later complete scan will create it with its
+        // files.
+        if (_hasIncompleteSubtree(target, d)) continue;
+        if (existingActionPaths.contains(d) || clashingWithFile(d, vault))
+          continue;
+        actions.add(
+          SyncAction(
+            kind: SyncActionKind.createDirOnVault,
+            relPath: d,
+            isDir: true,
+          ),
+        );
         existingActionPaths.add(d);
       }
 
       if (rule.deleteOrphans) {
-        final toDelete = vault.dirs.where((d) => !target.dirs.contains(d)).toList()
-          ..sort((a, b) => b.length.compareTo(a.length));
+        if (_mayHideMissingPaths(target)) return;
+        final toDelete =
+            vault.dirs.where((d) => !target.dirs.contains(d)).toList()
+              ..sort((a, b) => b.length.compareTo(a.length));
         final deletedDirs = <String>{};
         for (final d in toDelete) {
           if (existingActionPaths.contains(d)) continue;
           if (vault.isUnderUnreadable(d) || vault.isUnderTruncated(d)) continue;
           final prefix = '$d/';
           final hasFiles = vaultSurvivingFiles.any((f) => f.startsWith(prefix));
-          final hasSubdirs = vault.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedDirs.contains(other));
+          final hasSubdirs = vault.dirs.any(
+            (other) =>
+                other != d &&
+                other.startsWith(prefix) &&
+                !deletedDirs.contains(other),
+          );
           if (!hasFiles && !hasSubdirs) {
-            actions.add(SyncAction(kind: SyncActionKind.deleteDirOnVault, relPath: d, isDir: true));
+            actions.add(
+              SyncAction(
+                kind: SyncActionKind.deleteDirOnVault,
+                relPath: d,
+                isDir: true,
+              ),
+            );
             deletedDirs.add(d);
             existingActionPaths.add(d);
           }
@@ -533,19 +919,34 @@ class _Run {
         final inB = baselineDirs.contains(d);
 
         if (inV && !inT && !inB) {
-          if (!clashingWithFile(d, target)) {
-            actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+          if (!_hasIncompleteSubtree(vault, d) &&
+              !clashingWithFile(d, target)) {
+            actions.add(
+              SyncAction(
+                kind: SyncActionKind.createDirOnTarget,
+                relPath: d,
+                isDir: true,
+              ),
+            );
             existingActionPaths.add(d);
           }
         } else if (!inV && inT && !inB) {
-          if (!clashingWithFile(d, vault)) {
-            actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+          if (!_hasIncompleteSubtree(target, d) &&
+              !clashingWithFile(d, vault)) {
+            actions.add(
+              SyncAction(
+                kind: SyncActionKind.createDirOnVault,
+                relPath: d,
+                isDir: true,
+              ),
+            );
             existingActionPaths.add(d);
           }
         }
       }
 
-      final allDirsReversed = allDirs.toList()..sort((a, b) => b.length.compareTo(a.length));
+      final allDirsReversed = allDirs.toList()
+        ..sort((a, b) => b.length.compareTo(a.length));
       final deletedVaultDirs = <String>{};
       final deletedTargetDirs = <String>{};
 
@@ -556,42 +957,85 @@ class _Run {
         final inB = baselineDirs.contains(d);
 
         if (inV && !inT && inB) {
-          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d)) continue;
+          if (target.isUnderUnreadable(d) || target.isUnderTruncated(d))
+            continue;
           if (rule.deleteOrphans) {
+            if (_mayHideMissingPaths(target)) continue;
             final prefix = '$d/';
-            final hasFiles = vaultSurvivingFiles.any((f) => f.startsWith(prefix));
-            final hasSubdirs = vault.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedVaultDirs.contains(other));
+            final hasFiles = vaultSurvivingFiles.any(
+              (f) => f.startsWith(prefix),
+            );
+            final hasSubdirs = vault.dirs.any(
+              (other) =>
+                  other != d &&
+                  other.startsWith(prefix) &&
+                  !deletedVaultDirs.contains(other),
+            );
             if (!hasFiles && !hasSubdirs) {
-              actions.add(SyncAction(kind: SyncActionKind.deleteDirOnVault, relPath: d, isDir: true));
+              actions.add(
+                SyncAction(
+                  kind: SyncActionKind.deleteDirOnVault,
+                  relPath: d,
+                  isDir: true,
+                ),
+              );
               deletedVaultDirs.add(d);
               existingActionPaths.add(d);
             }
           } else {
             if (!clashingWithFile(d, target)) {
-              actions.add(SyncAction(kind: SyncActionKind.createDirOnTarget, relPath: d, isDir: true));
+              actions.add(
+                SyncAction(
+                  kind: SyncActionKind.createDirOnTarget,
+                  relPath: d,
+                  isDir: true,
+                ),
+              );
               existingActionPaths.add(d);
             }
           }
         } else if (!inV && inT && inB) {
           if (vault.isUnderUnreadable(d) || vault.isUnderTruncated(d)) continue;
           if (rule.deleteOrphans) {
+            if (_mayHideMissingPaths(vault)) continue;
             final prefix = '$d/';
-            final hasFiles = targetSurvivingFiles.any((f) => f.startsWith(prefix));
-            final hasSubdirs = target.dirs.any((other) => other != d && other.startsWith(prefix) && !deletedTargetDirs.contains(other));
+            final hasFiles = targetSurvivingFiles.any(
+              (f) => f.startsWith(prefix),
+            );
+            final hasSubdirs = target.dirs.any(
+              (other) =>
+                  other != d &&
+                  other.startsWith(prefix) &&
+                  !deletedTargetDirs.contains(other),
+            );
             if (!hasFiles && !hasSubdirs) {
-              actions.add(SyncAction(kind: SyncActionKind.deleteDirOnTarget, relPath: d, isDir: true));
+              actions.add(
+                SyncAction(
+                  kind: SyncActionKind.deleteDirOnTarget,
+                  relPath: d,
+                  isDir: true,
+                ),
+              );
               deletedTargetDirs.add(d);
               existingActionPaths.add(d);
             }
           } else {
             if (!clashingWithFile(d, vault)) {
-              actions.add(SyncAction(kind: SyncActionKind.createDirOnVault, relPath: d, isDir: true));
+              actions.add(
+                SyncAction(
+                  kind: SyncActionKind.createDirOnVault,
+                  relPath: d,
+                  isDir: true,
+                ),
+              );
               existingActionPaths.add(d);
             }
           }
         } else if (!inV && !inT && inB) {
           if (baseline[d]?.isDir ?? false) {
-            actions.add(SyncAction(kind: SyncActionKind.forget, relPath: d, isDir: true));
+            actions.add(
+              SyncAction(kind: SyncActionKind.forget, relPath: d, isDir: true),
+            );
             existingActionPaths.add(d);
           }
         }
@@ -630,12 +1074,20 @@ class _Run {
       (baselineCount * reconciler.massDeleteFraction).floor(),
     );
 
-    final delFileOnVault = actions.where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnVault).toList();
-    final delFileOnTarget = actions.where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnTarget).toList();
+    final delFileOnVault = actions
+        .where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnVault)
+        .toList();
+    final delFileOnTarget = actions
+        .where((a) => !a.isDir && a.kind == SyncActionKind.deleteOnTarget)
+        .toList();
 
     // Check for renames/moves so moving/renaming files is not falsely counted as mass deletion:
-    final copyToTargetFiles = actions.where((a) => !a.isDir && a.kind == SyncActionKind.copyToTarget).toList();
-    final copyToVaultFiles = actions.where((a) => !a.isDir && a.kind == SyncActionKind.copyToVault).toList();
+    final copyToTargetFiles = actions
+        .where((a) => !a.isDir && a.kind == SyncActionKind.copyToTarget)
+        .toList();
+    final copyToVaultFiles = actions
+        .where((a) => !a.isDir && a.kind == SyncActionKind.copyToVault)
+        .toList();
 
     int renamedOnTarget = 0;
     final availableTargetCopies = List<SyncAction>.of(copyToTargetFiles);
@@ -643,7 +1095,9 @@ class _Run {
       final delName = del.relPath.split('/').last;
       final delSize = del.targetState?.size ?? 0;
       final matchIdx = availableTargetCopies.indexWhere(
-        (c) => c.relPath.split('/').last == delName && (c.vaultState?.size ?? 0) == delSize,
+        (c) =>
+            c.relPath.split('/').last == delName &&
+            (c.vaultState?.size ?? 0) == delSize,
       );
       if (matchIdx >= 0) {
         renamedOnTarget++;
@@ -657,7 +1111,9 @@ class _Run {
       final delName = del.relPath.split('/').last;
       final delSize = del.vaultState?.size ?? 0;
       final matchIdx = availableVaultCopies.indexWhere(
-        (c) => c.relPath.split('/').last == delName && (c.targetState?.size ?? 0) == delSize,
+        (c) =>
+            c.relPath.split('/').last == delName &&
+            (c.targetState?.size ?? 0) == delSize,
       );
       if (matchIdx >= 0) {
         renamedOnVault++;
@@ -670,13 +1126,14 @@ class _Run {
 
     // Deleting on the vault is driven by what the target *lost*, so an
     // empty target listing is the suspicious case there (and vice versa).
-    final emptyIsSuspicious = baselineCount >= reconciler.emptySideMinBaseline;
+    final targetLooksUnexpectedlyEmpty = _looksUnexpectedlyEmpty(target);
+    final vaultLooksUnexpectedlyEmpty = _looksUnexpectedlyEmpty(vault);
     final blockVault =
         delFileOnVault.isNotEmpty &&
-        ((target.files.isEmpty && emptyIsSuspicious) || netDelOnVault > limit);
+        (targetLooksUnexpectedlyEmpty || netDelOnVault > limit);
     final blockTarget =
         delFileOnTarget.isNotEmpty &&
-        ((vault.files.isEmpty && emptyIsSuspicious) || netDelOnTarget > limit);
+        (vaultLooksUnexpectedlyEmpty || netDelOnTarget > limit);
 
     if (!blockVault && !blockTarget) {
       return SyncPlan(ruleId: rule.id, actions: List.unmodifiable(actions));
@@ -684,9 +1141,19 @@ class _Run {
 
     final guarded = <SyncAction>[
       for (final a in actions)
-        if ((blockVault && (a.kind == SyncActionKind.deleteOnVault || a.kind == SyncActionKind.deleteDirOnVault)) ||
-            (blockTarget && (a.kind == SyncActionKind.deleteOnTarget || a.kind == SyncActionKind.deleteDirOnTarget)))
-          _skipAction(a.relPath, SyncSkipReason.massDeleteGuard, a.vaultState, a.targetState, isDir: a.isDir)
+        if ((blockVault &&
+                (a.kind == SyncActionKind.deleteOnVault ||
+                    a.kind == SyncActionKind.deleteDirOnVault)) ||
+            (blockTarget &&
+                (a.kind == SyncActionKind.deleteOnTarget ||
+                    a.kind == SyncActionKind.deleteDirOnTarget)))
+          _skipAction(
+            a.relPath,
+            SyncSkipReason.massDeleteGuard,
+            a.vaultState,
+            a.targetState,
+            isDir: a.isDir,
+          )
         else
           a,
     ];

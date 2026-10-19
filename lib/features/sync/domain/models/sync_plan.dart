@@ -4,7 +4,8 @@ import 'package:vaultexplorer/features/sync/domain/models/sync_state_record.dart
 enum SyncSide { vault, target }
 
 extension SyncSideX on SyncSide {
-  SyncSide get other => this == SyncSide.vault ? SyncSide.target : SyncSide.vault;
+  SyncSide get other =>
+      this == SyncSide.vault ? SyncSide.target : SyncSide.vault;
 }
 
 enum SyncActionKind {
@@ -32,6 +33,16 @@ enum SyncActionKind {
 
   /// Deletes a directory on vault.
   deleteDirOnVault,
+
+  /// Moves an entry already on target from [SyncAction.renameFromPath] to
+  /// [SyncAction.relPath] on that endpoint. For a directory, its subtree moves
+  /// as one operation.
+  moveOnTarget,
+
+  /// Moves an entry already in the vault from [SyncAction.renameFromPath] to
+  /// [SyncAction.relPath] on that endpoint. For a directory, its subtree moves
+  /// as one operation.
+  moveOnVault,
 
   /// Both sides changed the same file and neither may silently win: the
   /// loser's version is preserved as a "(... Conflict `timestamp`)" copy
@@ -82,6 +93,9 @@ class SyncAction {
   /// rather than a create).
   final bool replacesExisting;
 
+  /// Source path for [SyncActionKind.moveOnTarget] / [moveOnVault].
+  final String? renameFromPath;
+
   /// [SyncActionKind.keepBoth] only: the side whose version keeps
   /// [relPath].
   final SyncSide? winner;
@@ -103,6 +117,7 @@ class SyncAction {
     this.vaultState,
     this.targetState,
     this.replacesExisting = false,
+    this.renameFromPath,
     this.winner,
     this.conflictCopyPath,
     this.propagateConflictCopy = false,
@@ -113,6 +128,8 @@ class SyncAction {
   int get transferBytes => switch (kind) {
     SyncActionKind.copyToTarget => vaultState?.size ?? 0,
     SyncActionKind.copyToVault => targetState?.size ?? 0,
+    SyncActionKind.moveOnTarget => vaultState?.size ?? targetState?.size ?? 0,
+    SyncActionKind.moveOnVault => vaultState?.size ?? targetState?.size ?? 0,
     SyncActionKind.keepBoth =>
       (winner == SyncSide.vault ? vaultState?.size : targetState?.size) ?? 0,
     _ => 0,
@@ -128,6 +145,8 @@ class SyncAction {
   bool get movesData =>
       kind == SyncActionKind.copyToTarget ||
       kind == SyncActionKind.copyToVault ||
+      kind == SyncActionKind.moveOnTarget ||
+      kind == SyncActionKind.moveOnVault ||
       kind == SyncActionKind.keepBoth;
 
   @override

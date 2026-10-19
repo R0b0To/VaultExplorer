@@ -93,13 +93,19 @@ class SyncExecutor {
 
   /// Deletes stray `*.vexp_tmp` files and resolves `*.vexp_old` ones (see
   /// the class comment). Returns how many entries were dealt with.
-  Future<int> cleanupLeftovers(SyncEndpoint endpoint, SyncSnapshot snapshot) async {
+  Future<int> cleanupLeftovers(
+    SyncEndpoint endpoint,
+    SyncSnapshot snapshot,
+  ) async {
     var handled = 0;
     for (final rel in snapshot.leftovers) {
       if (rel.endsWith(kSyncTempSuffix)) {
         if (await endpoint.delete(rel)) handled++;
       } else if (rel.endsWith(kSyncBackupSuffix)) {
-        final original = rel.substring(0, rel.length - kSyncBackupSuffix.length);
+        final original = rel.substring(
+          0,
+          rel.length - kSyncBackupSuffix.length,
+        );
         final ok = snapshot.files.containsKey(original)
             ? await endpoint.delete(rel)
             : await endpoint.rename(rel, original);
@@ -145,6 +151,8 @@ class SyncExecutor {
           cheap.add(a);
         case SyncActionKind.copyToTarget:
         case SyncActionKind.copyToVault:
+        case SyncActionKind.moveOnTarget:
+        case SyncActionKind.moveOnVault:
         case SyncActionKind.keepBoth:
           transfers.add(a);
         case SyncActionKind.deleteSourceAfterImport:
@@ -242,7 +250,9 @@ class SyncExecutor {
                 sourceMtime: action.vaultState?.mtimeSecs ?? 0,
                 token: token,
               );
-              pending.add(_PendingBaseline(action.relPath, vault: action.vaultState));
+              pending.add(
+                _PendingBaseline(action.relPath, vault: action.vaultState),
+              );
               copied++;
             case SyncActionKind.copyToVault:
               await _copyAtomic(
@@ -254,7 +264,45 @@ class SyncExecutor {
                 sourceMtime: action.targetState?.mtimeSecs ?? 0,
                 token: token,
               );
-              pending.add(_PendingBaseline(action.relPath, target: action.targetState));
+              pending.add(
+                _PendingBaseline(action.relPath, target: action.targetState),
+              );
+              copied++;
+            case SyncActionKind.moveOnTarget:
+              final from = action.renameFromPath;
+              if (from == null) throw const _StepFailed('move-incomplete');
+              await _moveWithinEndpoint(
+                endpoint: target,
+                side: SyncSide.target,
+                from: from,
+                to: action.relPath,
+              );
+              if (action.isDir) {
+                _moveLedgerPrefix(ledger, key, from, action.relPath);
+              } else {
+                ledger.remove(key, from);
+                pending.add(
+                  _PendingBaseline(action.relPath, vault: action.vaultState),
+                );
+              }
+              copied++;
+            case SyncActionKind.moveOnVault:
+              final from = action.renameFromPath;
+              if (from == null) throw const _StepFailed('move-incomplete');
+              await _moveWithinEndpoint(
+                endpoint: vault,
+                side: SyncSide.vault,
+                from: from,
+                to: action.relPath,
+              );
+              if (action.isDir) {
+                _moveLedgerPrefix(ledger, key, from, action.relPath);
+              } else {
+                ledger.remove(key, from);
+                pending.add(
+                  _PendingBaseline(action.relPath, target: action.targetState),
+                );
+              }
               copied++;
             case SyncActionKind.keepBoth:
               await _keepBoth(
@@ -350,6 +398,39 @@ class SyncExecutor {
     );
   }
 
+  void _moveLedgerPrefix(
+    SyncLedgerRepository ledger,
+    String ruleId,
+    String from,
+    String to,
+  ) {
+    final prefix = '$from/';
+    final rows = ledger
+        .baselineFor(ruleId)
+        .values
+        .where(
+          (record) =>
+              record.relPath == from || record.relPath.startsWith(prefix),
+        )
+        .toList();
+    for (final record in rows) {
+      final newPath = record.relPath == from
+          ? to
+          : '$to/${record.relPath.substring(prefix.length)}';
+      ledger.remove(ruleId, record.relPath);
+      ledger.put(
+        SyncStateRecord(
+          ruleId: ruleId,
+          relPath: newPath,
+          vault: record.vault,
+          target: record.target,
+          lastSyncedAtMs: record.lastSyncedAtMs,
+          isDir: record.isDir,
+        ),
+      );
+    }
+  }
+
   /// Turns the pending baselines into ledger rows, looking up whichever
   /// side's state isn't already known.
   Future<void> _recordBaselines(
@@ -395,6 +476,33 @@ class SyncExecutor {
     if (still.containsKey(rel)) throw const _StepFailed('delete');
   }
 
+  Future<void> _moveWithinEndpoint({
+    required SyncEndpoint endpoint,
+    required SyncSide side,
+    required String from,
+    required String to,
+  }) async {
+    final fromKey = _key(side, from);
+    final toKey = _key(side, to);
+    inFlightPaths
+      ..add(fromKey)
+      ..add(toKey);
+    try {
+      final slash = to.lastIndexOf('/');
+      if (slash > 0 &&
+          !await endpoint.ensureDirectory(to.substring(0, slash))) {
+        throw const _StepFailed('mkdir');
+      }
+      if (!await endpoint.rename(from, to)) throw const _StepFailed('rename');
+    } finally {
+      inFlightPaths
+        ..remove(fromKey)
+        ..remove(toKey);
+      _recentWrites[fromKey] = _now();
+      _recentWrites[toKey] = _now();
+    }
+  }
+
   /// Runs after the atomic destination swap. A missing digest or mismatch
   /// fails closed and leaves the source untouched.
   Future<bool> _verifyAndDeleteImportedSource({
@@ -409,7 +517,8 @@ class SyncExecutor {
     }
 
     final destinationState = (await destination.stat([rel]))[rel];
-    if (destinationState == null || destinationState.size != sourceBefore.size) {
+    if (destinationState == null ||
+        destinationState.size != sourceBefore.size) {
       throw const _StepFailed('source-verification');
     }
     final destinationHash = await destination.hash(rel, token);

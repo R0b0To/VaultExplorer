@@ -145,7 +145,9 @@ set(LIBMD_LIBRARY "" CACHE STRING "" FORCE)
 # features added in the patch fail at runtime with "Undefined option".
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/archive/patches/libarchive-7zip-encryption.patch"
-    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/apply_patch_once.cmake")
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/apply_patch_once.cmake"
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/rar5_crypt_core.inc"
+    "${CMAKE_CURRENT_LIST_DIR}/archive/patches/rar5_crypt_parse.inc")
 FetchContent_Declare(
     libarchive_upstream
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git

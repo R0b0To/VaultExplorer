@@ -206,6 +206,16 @@ std::string archiveErrorAt(struct archive* a, const char* stage, const char* fal
     return std::string(stage) + ": " + (error ? error : fallback);
 }
 
+// RAR5 solid archives are decoded while skipping (the window has to be primed for the next
+// file), and encrypted ones are decrypted as well, so a skip can fail for real (wrong
+// passphrase, damaged data). Report that at the skip instead of letting the next header
+// fail with an unrelated "no window buffer" error. Scoped to RAR5: other formats keep
+// ignoring skip results as before.
+bool rar5SkipFailed(struct archive* a, int skipResult) {
+    return skipResult < ARCHIVE_WARN &&
+           (archive_format(a) & ARCHIVE_FORMAT_BASE_MASK) == ARCHIVE_FORMAT_RAR_V5;
+}
+
 int openArchiveWithCallbacks(struct archive* a, CallbackState& state, const std::string& passphrase) {
     archive_read_support_format_all(a);
     archive_read_support_filter_all(a);
@@ -306,7 +316,12 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         }
 
         result.entries.push_back(std::move(info));
-        archive_read_data_skip(a);
+        if (rar5SkipFailed(a, archive_read_data_skip(a))) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                              : classifyFailure(a, !passphrase.empty());
+            result.errorMessage = archiveErrorAt(a, "scan/skip", "failed to skip entry data");
+            break;
+        }
         ++index;
     }
 
@@ -358,7 +373,13 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
             found = true;
             break;
         }
-        archive_read_data_skip(a);
+        if (rar5SkipFailed(a, archive_read_data_skip(a))) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                              : classifyFailure(a, !passphrase.empty());
+            result.errorMessage = archiveErrorAt(a, "extract/skip", "failed to skip entry data");
+            archive_read_free(a);
+            return result;
+        }
         ++index;
     }
 
@@ -443,7 +464,13 @@ ArchiveExtractResult archiveExtractEntryToSink(
             found = true;
             break;
         }
-        archive_read_data_skip(a);
+        if (rar5SkipFailed(a, archive_read_data_skip(a))) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                              : classifyFailure(a, !passphrase.empty());
+            result.errorMessage = archiveErrorAt(a, "extract-to-sink/skip", "failed to skip entry data");
+            archive_read_free(a);
+            return result;
+        }
         ++index;
     }
 

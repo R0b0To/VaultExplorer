@@ -59,6 +59,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
   final ValueChanged<BrowserTab>? onDuplicateBrowserTab;
   final ValueChanged<BrowserTab>? onActivateBrowserTab;
   final ValueChanged<bool>? onVerticalScrollActivity;
+  final bool backPreviewOnly;
 
   const VaultDashboard({
     super.key,
@@ -72,6 +73,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
     this.onDuplicateBrowserTab,
     this.onActivateBrowserTab,
     this.onVerticalScrollActivity,
+    this.backPreviewOnly = false,
   });
 
   @override
@@ -180,10 +182,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   @override
   void initState() {
     super.initState();
-    _attachBrowserTabs(widget.browserTabs);
     // Cache the ProviderContainer so asynchronous callbacks (like auto-lock
     // and container unmounting) remain safe even after this widget is unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
+    if (widget.backPreviewOnly) return;
+    _attachBrowserTabs(widget.browserTabs);
     _lockController.configure(
       settings: () => _container.read(appSettingsControllerProvider).settings,
       lockAllMountedContainers: _lockAllMountedContainers,
@@ -1425,6 +1428,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final displayItems = ref
         .read(vaultDashboardControllerProvider.notifier)
         .getDisplayItems();
+
+    if (widget.backPreviewOnly) {
+      return ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: _buildBody(
+          displayItems,
+          state,
+          appSettings,
+          settingsLoaded: !appSettingsState.loading,
+        ),
+      );
+    }
 
     if (widget.mountedNotifier != null) {
       widget.mountedNotifier!.value = List.unmodifiable(state.mounted);

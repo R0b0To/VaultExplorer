@@ -129,6 +129,10 @@ class BrowserTabsController extends ChangeNotifier {
     return null;
   }
 
+  void _insertAfterActive(BrowserTab tab) {
+    _tabs.insert(_tabs.isEmpty ? 0 : activeIndex + 1, tab);
+  }
+
   /// Opens a new tab for [container] (optionally at [initialPath]) and makes
   /// it the active one. Returns the new tab's key, or null when the cap
   /// ([kMaxBrowserTabs]) is reached.
@@ -143,7 +147,7 @@ class BrowserTabsController extends ChangeNotifier {
       container: container,
       initialPath: initialPath,
     );
-    _tabs.add(tab);
+    _insertAfterActive(tab);
     if (activate) {
       _previousKey = _activeKey;
       _activeKey = tab.key;
@@ -163,7 +167,7 @@ class BrowserTabsController extends ChangeNotifier {
     }
 
     final tab = BrowserTab(key: _nextTabKey++);
-    _tabs.add(tab);
+    _insertAfterActive(tab);
     _previousKey = _activeKey;
     _activeKey = tab.key;
     notifyListeners();

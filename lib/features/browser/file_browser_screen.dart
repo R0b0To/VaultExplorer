@@ -165,6 +165,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   final Widget? drawer;
   final ValueChanged<bool>? onDrawerChanged;
   final ValueChanged<bool>? onVerticalScrollActivity;
+  final Widget? dashboardBackPreview;
 
   /// Set by [BrowserTabsHost]: scopes this screen's navigation / selection /
   /// search / sort state to its tab instead of to the container's volId, so
@@ -198,6 +199,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.drawer,
     this.onDrawerChanged,
     this.onVerticalScrollActivity,
+    this.dashboardBackPreview,
     this.tabKey,
     this.tabStrip,
     this.onBackToDashboard,
@@ -218,6 +220,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   double _drawerDragDistance = 0.0;
   bool _isTouchFromEdge = false;
   bool _verticalScrollActive = false;
+  bool _dashboardBackGestureActive = false;
+  double? _dashboardBackGestureProgress;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -339,7 +343,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // PopScope.canPop depends on both flags, so rebuild when they flip.
     if (flipped) setState(() {});
 
-    if (becameInactive) _setVerticalScrollActivity(false);
+    if (becameInactive) {
+      _setVerticalScrollActivity(false);
+      _dashboardBackGestureActive = false;
+      _dashboardBackGestureProgress = null;
+    }
 
     if (becameActive) {
       final visibility = _toolbarConfig.autoHideAppBar
@@ -883,7 +891,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           !(bodyBounds?.contains(event.position) ?? false) ||
           event.position.dy < contentTop ||
           !_isActiveTab ||
-          _backGestureProgress != null;
+          _backGestureProgress != null ||
+          _dashboardBackGestureActive;
     } else {
       _swipeRejected = true;
     }
@@ -1911,17 +1920,34 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _loadDirectoryContents(newPath);
   }
 
-  void _handleBackAtRoot() {
+  bool _handleBackAtRoot() {
     // Only a location opened from Dashboard returns there at its root. Other
     // tabs stay at their root until the user selects another tab or location.
     final tabKey = widget.tabKey;
-    if (tabKey != null) {
-      _tabsCtrl?.returnToDashboardAtRoot(tabKey);
+    if (tabKey == null) return false;
+    return _tabsCtrl?.returnToDashboardAtRoot(tabKey) ?? false;
+  }
+
+  void _setDashboardBackGestureProgress(double? progress) {
+    final next = progress?.clamp(0.0, 1.0).toDouble();
+    if (_dashboardBackGestureProgress == next) return;
+    if (!mounted) {
+      _dashboardBackGestureProgress = next;
+      return;
     }
+    setState(() => _dashboardBackGestureProgress = next);
   }
 
   bool get _canPreviewFolderBackGesture =>
       !_atRoot && !isSelectionMode && !_searchActive;
+
+  bool get _canPreviewDashboardBackGesture {
+    final key = widget.tabKey;
+    if (key == null || !_atRoot || isSelectionMode || _searchActive) {
+      return false;
+    }
+    return _tabsCtrl?.tabForKey(key)?.returnToDashboardOnRoot ?? false;
+  }
 
   /// Whether this screen should answer predictive-back events: its route is
   /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a
@@ -1936,7 +1962,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _isTouchFromEdge = true;
 
     if (!_isOwnRouteCurrent) return false;
-    if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
+    if (backEvent.isButtonEvent) return false;
+    if (_canPreviewDashboardBackGesture) {
+      _dashboardBackGestureActive = true;
+      _setDashboardBackGestureProgress(backEvent.progress);
+      return true;
+    }
+    if (!_canPreviewFolderBackGesture) return false;
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]
         : null;
@@ -1957,6 +1989,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _drawerDragDistance = 0.0;
     _isTouchFromEdge = true;
     if (!_isOwnRouteCurrent) return;
+    if (_dashboardBackGestureActive) {
+      _setDashboardBackGestureProgress(backEvent.progress);
+      return;
+    }
     _navNotifier.updateBackGestureProgress(backEvent.progress);
   }
 
@@ -1964,6 +2000,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void handleCancelBackGesture() {
     _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
+    if (_dashboardBackGestureActive) {
+      _dashboardBackGestureActive = false;
+      _setDashboardBackGestureProgress(null);
+      return;
+    }
     _navNotifier.cancelBackGesture();
   }
 
@@ -1971,6 +2012,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void handleCommitBackGesture() {
     _drawerDragDistance = 0.0;
     if (!_isOwnRouteCurrent) return;
+    if (_dashboardBackGestureActive) {
+      _dashboardBackGestureActive = false;
+      _setDashboardBackGestureProgress(1.0);
+      if (!_handleBackAtRoot()) {
+        _setDashboardBackGestureProgress(null);
+      }
+      return;
+    }
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
     _navigateUp();
@@ -5444,6 +5493,41 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                                                                 opacity:
                                                                     _fadeScrimOpacity(
                                                                       _backGestureProgress!,
+                                                                    ),
+                                                                child: ColoredBox(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).scaffoldBackgroundColor,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    if (_dashboardBackGestureProgress !=
+                                                            null &&
+                                                        widget.dashboardBackPreview !=
+                                                            null)
+                                                      Positioned.fill(
+                                                        child: IgnorePointer(
+                                                          child: Stack(
+                                                            fit:
+                                                                StackFit.expand,
+                                                            children: [
+                                                              if (_dashboardBackGestureProgress! >=
+                                                                  0.18) ...[
+                                                                ColoredBox(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).scaffoldBackgroundColor,
+                                                                ),
+                                                                widget
+                                                                    .dashboardBackPreview!,
+                                                              ],
+                                                              Opacity(
+                                                                opacity:
+                                                                    _fadeScrimOpacity(
+                                                                      _dashboardBackGestureProgress!,
                                                                     ),
                                                                 child: ColoredBox(
                                                                   color: Theme.of(

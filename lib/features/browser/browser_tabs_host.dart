@@ -129,6 +129,7 @@ class BrowserTabsHost extends ConsumerStatefulWidget {
     int index,
     ValueChanged<BrowserTab> onActivateTab,
     ValueChanged<bool> onVerticalScrollActivity,
+    bool backPreviewOnly,
   )?
   dashboardBuilder;
   final VoidCallback? onEmpty;
@@ -172,9 +173,7 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
   final Map<int, Timer> _drawerTickerTimers = {};
   bool _popScheduled = false;
   bool _pageDragActive = false;
-  bool _pageAnimationActive = false;
   bool _pageSyncScheduled = false;
-  int _pageAnimationGeneration = 0;
   int _pagePointerCount = 0;
   int? _lastActiveTabKey;
 
@@ -270,40 +269,19 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
   }
 
   void _schedulePageSync() {
-    if (_pageSyncScheduled || _pageDragActive || _pageAnimationActive) return;
+    if (_pageSyncScheduled || _pageDragActive) return;
     _pageSyncScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pageSyncScheduled = false;
-      if (!mounted ||
-          _pageDragActive ||
-          _pageAnimationActive ||
-          !_pageController.hasClients) {
+      if (!mounted || _pageDragActive || !_pageController.hasClients) {
         return;
       }
       final target = _tabs.activeIndex;
       if (target < 0 || target >= _tabs.length) return;
       final page = _pageController.page;
       if (page != null && (page - target).abs() < 0.001) return;
-      unawaited(_animatePageTo(target));
+      _pageController.jumpToPage(target);
     });
-  }
-
-  Future<void> _animatePageTo(int index) async {
-    if (!_pageController.hasClients) return;
-    final generation = ++_pageAnimationGeneration;
-    _pageAnimationActive = true;
-    try {
-      await _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-      );
-    } finally {
-      if (generation == _pageAnimationGeneration) {
-        _pageAnimationActive = false;
-        _schedulePageSync();
-      }
-    }
   }
 
   void _activateTabFromStrip(BrowserTab tab) {
@@ -311,11 +289,7 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
       (candidate) => candidate.key == tab.key,
     );
     if (index < 0) return;
-    // A direct tab tap should switch immediately. Invalidate an in-flight
-    // controller animation first so its completion cannot resync to the old
-    // target after this jump.
-    _pageAnimationGeneration++;
-    _pageAnimationActive = false;
+    // A direct tab tap switches immediately without a page transition.
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
     }
@@ -481,109 +455,101 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
       onActivateTab: _activateTabFromStrip,
     );
 
-    final hasDashboardTab = tabs.any((tab) => tab.isDashboard);
     final dashboard = widget.dashboardBuilder;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Keep one continuous surface behind the moving pages. Each tab's
-        // Scaffold is transparent while hosted here so its background cannot
-        // cover the shared, pinned chrome during a drag.
-        ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
-        Listener(
-          onPointerDown: _handleTabPointerDown,
-          onPointerUp: _handleTabPointerEnd,
-          onPointerCancel: _handleTabPointerEnd,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handlePageScroll,
-            child: PageView.builder(
-              controller: _pageController,
-              physics: _pageSwipePhysics,
-              clipBehavior: Clip.hardEdge,
-              itemCount: tabs.length,
-              onPageChanged: (index) => _onPageChanged(index, tabs),
-              findChildIndexCallback: (key) {
-                if (key is! ValueKey<int>) return null;
-                final index = tabs.indexWhere((tab) => tab.key == key.value);
-                return index < 0 ? null : index;
-              },
-              itemBuilder: (context, index) {
-                final tab = tabs[index];
-                final pageIsActive = tab.key == activeKey;
-                final Widget page;
-                if (tab.isDashboard) {
-                  page = dashboard == null
-                      ? const SizedBox.expand()
-                      : SkinAreaScope(
-                          area: SkinArea.dashboard,
-                          child: dashboard(
-                            _pagePosition,
-                            index,
-                            _activateTabFromStrip,
-                            (scrolling) => _setTabVerticalScrollActivity(
-                              tab.key,
-                              scrolling,
-                            ),
-                          ),
-                        );
-                } else {
-                  page = FileBrowserScreen(
-                    container: tab.container!,
-                    tabKey: tab.key,
-                    tabStrip: strip,
-                    initialPath: tab.initialPath,
-                    resolveContainer: widget.resolveContainer,
-                    drawer: widget.drawerBuilder?.call(_tabs, tab.volId!),
-                    onDrawerChanged: (isOpen) =>
-                        _onTabDrawerChanged(tab.key, isOpen),
-                    onBackToDashboard: widget.closeRouteWhenEmpty
-                        ? null
-                        : widget.onEmpty,
-                    onSwipeToNewTab: widget.onNewTab ?? _openNewTabSheet,
-                    showBackButton: true,
-                    onVerticalScrollActivity: (scrolling) =>
-                        _setTabVerticalScrollActivity(tab.key, scrolling),
-                    tabPagePosition: _pagePosition,
-                    tabPageIndex: index,
-                    onUserActivity: pageIsActive
-                        ? widget.userActivityFor?.call(tab.volId!)
-                        : null,
-                  );
-                }
-                return _BrowserTabPage(
-                  key: ValueKey<int>(tab.key),
-                  child: TickerMode(
-                    // Let a drawer finish closing after its tab becomes
-                    // inactive; otherwise its animation can reappear later.
-                    enabled:
-                        pageIsActive || _drawerTickerTabKeys.contains(tab.key),
-                    child: page,
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        if (!hasDashboardTab && dashboard != null)
-          TickerMode(
-            enabled: false,
-            child: Offstage(
-              child: SkinAreaScope(
-                area: SkinArea.dashboard,
-                child: dashboard(
-                  _pagePosition,
-                  _tabs.activeIndex,
-                  _activateTabFromStrip,
-                  (scrolling) => _setTabVerticalScrollActivity(
-                    _tabs.dashboardTab?.key ?? -1,
-                    scrolling,
-                  ),
+    final dashboardBackPreview =
+        dashboard != null && _tabs.activeTab?.returnToDashboardOnRoot == true
+        ? IgnorePointer(
+            child: SkinAreaScope(
+              area: SkinArea.dashboard,
+              child: dashboard(
+                _pagePosition,
+                _tabs.activeIndex,
+                _activateTabFromStrip,
+                (scrolling) => _setTabVerticalScrollActivity(
+                  _tabs.dashboardTab?.key ?? -1,
+                  scrolling,
                 ),
+                true,
               ),
             ),
-          ),
-      ],
+          )
+        : null;
+
+    final pageView = Listener(
+      onPointerDown: _handleTabPointerDown,
+      onPointerUp: _handleTabPointerEnd,
+      onPointerCancel: _handleTabPointerEnd,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handlePageScroll,
+        child: PageView.builder(
+          controller: _pageController,
+          physics: _pageSwipePhysics,
+          clipBehavior: Clip.hardEdge,
+          itemCount: tabs.length,
+          onPageChanged: (index) => _onPageChanged(index, tabs),
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<int>) return null;
+            final index = tabs.indexWhere((tab) => tab.key == key.value);
+            return index < 0 ? null : index;
+          },
+          itemBuilder: (context, index) {
+            final tab = tabs[index];
+            final pageIsActive = tab.key == activeKey;
+            final Widget page;
+            if (tab.isDashboard) {
+              page = dashboard == null
+                  ? const SizedBox.expand()
+                  : SkinAreaScope(
+                      area: SkinArea.dashboard,
+                      child: dashboard(
+                        _pagePosition,
+                        index,
+                        _activateTabFromStrip,
+                        (scrolling) =>
+                            _setTabVerticalScrollActivity(tab.key, scrolling),
+                        false,
+                      ),
+                    );
+            } else {
+              page = FileBrowserScreen(
+                container: tab.container!,
+                tabKey: tab.key,
+                tabStrip: strip,
+                initialPath: tab.initialPath,
+                resolveContainer: widget.resolveContainer,
+                drawer: widget.drawerBuilder?.call(_tabs, tab.volId!),
+                onDrawerChanged: (isOpen) =>
+                    _onTabDrawerChanged(tab.key, isOpen),
+                onBackToDashboard: widget.closeRouteWhenEmpty
+                    ? null
+                    : widget.onEmpty,
+                onSwipeToNewTab: widget.onNewTab ?? _openNewTabSheet,
+                showBackButton: true,
+                onVerticalScrollActivity: (scrolling) =>
+                    _setTabVerticalScrollActivity(tab.key, scrolling),
+                dashboardBackPreview: dashboardBackPreview,
+                tabPagePosition: _pagePosition,
+                tabPageIndex: index,
+                onUserActivity: pageIsActive
+                    ? widget.userActivityFor?.call(tab.volId!)
+                    : null,
+              );
+            }
+            return _BrowserTabPage(
+              key: ValueKey<int>(tab.key),
+              child: TickerMode(
+                // Let a drawer finish closing after its tab becomes
+                // inactive; otherwise its animation can reappear later.
+                enabled: pageIsActive || _drawerTickerTabKeys.contains(tab.key),
+                child: page,
+              ),
+            );
+          },
+        ),
+      ),
     );
+
+    return pageView;
   }
 }
 

@@ -444,15 +444,17 @@ class _MainShellState extends ConsumerState<MainShell> {
       int? pageIndex,
       ValueChanged<BrowserTab>? onActivateTab,
       ValueChanged<bool>? onVerticalScrollActivity,
+      bool backPreviewOnly = false,
     ]) => SkinAreaScope(
       area: SkinArea.dashboard,
       child: VaultDashboard(
-        key: _dashboardKey,
-        mountedNotifier: _mountedNotifier,
+        key: backPreviewOnly ? null : _dashboardKey,
+        mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
         onNavigateTab: _onTabTap,
-        browserTabs: _browserTabs,
+        browserTabs: backPreviewOnly ? null : _browserTabs,
         tabPagePosition: pagePosition,
         tabPageIndex: pageIndex,
+        backPreviewOnly: backPreviewOnly,
         onOpenBrowser: _openBrowser,
         onNewBrowserTab: _openNewBrowserTab,
         onDuplicateBrowserTab: _duplicateBrowserTab,
@@ -563,11 +565,13 @@ class _MainShellState extends ConsumerState<MainShell> {
                   index,
                   onActivateTab,
                   onVerticalScrollActivity,
+                  backPreviewOnly,
                 ) => buildDashboardTab(
                   pagePosition,
                   index,
                   onActivateTab,
                   onVerticalScrollActivity,
+                  backPreviewOnly,
                 ),
           onEmpty: () {
             if (mounted && _browserVisible) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,9 +49,9 @@ const double kBrowserTabStripHeight = 40;
 const double kBrowserTabItemWidth = 148;
 
 /// File-manager tab strip with a fixed More menu and a horizontally scrollable
-/// reorderable row of tabs. Tapping a tab activates it; long-press and drag to
-/// reorder. The tab controller retains its horizontal offset while the strip
-/// moves between the Dashboard and file screens.
+/// reorderable row of tabs. Tapping switches tabs; tapping the active tab opens
+/// its operation menu; long-press and drag reorder tabs. The tab controller
+/// retains its horizontal offset while the strip moves between screens.
 class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsController controller;
   final VoidCallback onNewTab;
@@ -138,13 +140,110 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     });
   }
 
-  void _onTabTapped(BrowserTab tab) {
+  void _onTabTapped(BrowserTab tab, BuildContext tabContext) {
     final c = widget.controller;
+    if (c.activeKey == tab.key) {
+      unawaited(_showTabMenu(tab, tabContext));
+      return;
+    }
     final onActivateTab = widget.onActivateTab;
     if (onActivateTab != null) {
       onActivateTab(tab);
     } else {
       c.activate(tab.key);
+    }
+  }
+
+  Future<void> _showTabMenu(BrowserTab tab, BuildContext tabContext) async {
+    if (!tabContext.mounted) return;
+    final tabBox = tabContext.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(tabContext).context.findRenderObject() as RenderBox?;
+    if (tabBox == null ||
+        overlayBox == null ||
+        !tabBox.attached ||
+        !tabBox.hasSize) {
+      return;
+    }
+
+    final topLeft = tabBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final bottomRight = tabBox.localToGlobal(
+      tabBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+    final anchor = Rect.fromLTRB(
+      topLeft.dx,
+      bottomRight.dy,
+      bottomRight.dx,
+      bottomRight.dy,
+    );
+
+    PopupMenuItem<_TabMenuAction> item(
+      _TabMenuAction value,
+      IconData icon,
+      String label, {
+      bool enabled = true,
+    }) {
+      return PopupMenuItem<_TabMenuAction>(
+        value: value,
+        enabled: enabled,
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Text(label),
+          ],
+        ),
+      );
+    }
+
+    final c = widget.controller;
+    final l10n = tabContext.l10n;
+    final choice = await showMenu<_TabMenuAction>(
+      context: tabContext,
+      position: RelativeRect.fromRect(anchor, Offset.zero & overlayBox.size),
+      items: [
+        item(_TabMenuAction.newTab, Icons.add_rounded, l10n.browserTabNew),
+        item(
+          _TabMenuAction.duplicate,
+          Icons.copy_all_rounded,
+          l10n.browserTabDuplicate,
+          enabled: tab.isDashboard || !c.atLimit,
+        ),
+        const PopupMenuDivider(),
+        item(
+          _TabMenuAction.close,
+          Icons.close_rounded,
+          l10n.browserTabClose,
+          enabled: c.length > 1,
+        ),
+        item(
+          _TabMenuAction.closeOthers,
+          Icons.tab_unselected_rounded,
+          l10n.browserTabCloseOthers,
+          enabled: c.length > 1,
+        ),
+        item(
+          _TabMenuAction.closeAll,
+          Icons.clear_all_rounded,
+          l10n.browserTabCloseAll,
+          enabled: c.hasBrowserTabs && c.length > 1,
+        ),
+      ],
+    );
+    if (!mounted || choice == null || c.tabForKey(tab.key) == null) return;
+
+    switch (choice) {
+      case _TabMenuAction.newTab:
+        widget.onNewTab();
+      case _TabMenuAction.close:
+        c.closeTab(tab.key);
+      case _TabMenuAction.closeOthers:
+        c.closeOthers(tab.key);
+      case _TabMenuAction.closeAll:
+        c.closeAll();
+      case _TabMenuAction.duplicate:
+        widget.onDuplicate(tab);
     }
   }
 
@@ -306,14 +405,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                     return ReorderableDelayedDragStartListener(
                       key: ValueKey<int>(tab.key),
                       index: index,
-                      child: SizedBox(
-                        key: itemKey,
-                        width: kBrowserTabItemWidth,
-                        child: _TabItem(
-                          tab: tab,
-                          active: isActive,
-                          activeBackground: activeBackground,
-                          onTap: () => _onTabTapped(tab),
+                      child: Builder(
+                        builder: (tabContext) => SizedBox(
+                          key: itemKey,
+                          width: kBrowserTabItemWidth,
+                          child: _TabItem(
+                            tab: tab,
+                            active: isActive,
+                            activeBackground: activeBackground,
+                            onTap: () => _onTabTapped(tab, tabContext),
+                          ),
                         ),
                       ),
                     );

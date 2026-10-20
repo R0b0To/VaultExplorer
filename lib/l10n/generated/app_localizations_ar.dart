@@ -12297,4 +12297,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'إغلاق الكل';
+
+  @override
+  String get dualPaneEnabledTitle => 'استخدام لوحتين';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      'اعرض علامتي تبويب مفتوحتين جنبًا إلى جنب عندما تكون الشاشة واسعة بما يكفي. يتطلب تفعيل علامات تبويب مدير الملفات.';
 }

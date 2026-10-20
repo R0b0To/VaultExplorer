@@ -13814,5 +13814,13 @@
   "browserTabCloseAll": "Close all",
   "@browserTabCloseAll": {
     "description": "Action in the file manager's tab menu that closes every tab (and with it the file manager)"
+  },
+  "dualPaneEnabledTitle": "Use dual pane",
+  "@dualPaneEnabledTitle": {
+    "description": "Setting that shows two file manager tabs side by side."
+  },
+  "dualPaneEnabledSubtitle": "Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.",
+  "@dualPaneEnabledSubtitle": {
+    "description": "Explains the dual pane file manager setting."
   }
 }

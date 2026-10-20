@@ -154,6 +154,7 @@ class AppSettings {
   bool useOledBlackTheme;
   BrowserLayoutMode defaultLayoutMode;
   bool useBrowserTabs;
+  bool useDualPaneBrowsing;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
@@ -201,6 +202,7 @@ class AppSettings {
     this.appLockScreenLockOnly = false,
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.useBrowserTabs = true,
+    this.useDualPaneBrowsing = false,
     this.containerSortMode = ContainerSortMode.manual,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
@@ -290,6 +292,7 @@ class AppSettings {
     bool? useOledBlackTheme,
     BrowserLayoutMode? defaultLayoutMode,
     bool? useBrowserTabs,
+    bool? useDualPaneBrowsing,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
@@ -345,6 +348,7 @@ class AppSettings {
           appLockScreenLockOnly ?? this.appLockScreenLockOnly,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       useBrowserTabs: useBrowserTabs ?? this.useBrowserTabs,
+      useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
@@ -435,6 +439,7 @@ class AppSettings {
     'appLockScreenLockOnly': appLockScreenLockOnly,
     'extensionPreferences': extensionPreferences,
     'useBrowserTabs': useBrowserTabs,
+    'useDualPaneBrowsing': useDualPaneBrowsing,
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'languageCode': languageCode,
@@ -502,6 +507,7 @@ class AppSettings {
     appLockScreenLockOnly: other.appLockScreenLockOnly,
     extensionPreferences: other.extensionPreferences,
     useBrowserTabs: other.useBrowserTabs,
+    useDualPaneBrowsing: other.useDualPaneBrowsing,
     autoOpenOnUnlock: other.autoOpenOnUnlock,
     htmlEnableJavaScript: other.htmlEnableJavaScript,
     // copyWith can't set a null language through `languageCode` alone.
@@ -588,6 +594,7 @@ class AppSettings {
         BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
         BrowserLayoutMode.list,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
+    useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

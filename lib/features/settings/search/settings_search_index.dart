@@ -443,6 +443,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['tabs', 'multiple locations', 'switch locations'],
   ),
   _e(
+    'file_manager.dual_pane',
+    SettingsDestination.fileManager,
+    (l) => l.dualPaneEnabledTitle,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.dualPaneEnabledSubtitle],
+    keywords: ['split view', 'two panes', 'side by side', 'landscape'],
+  ),
+  _e(
     'file_manager.default_layout',
     SettingsDestination.fileManager,
     (l) => l.defaultFolderLayoutLabel,

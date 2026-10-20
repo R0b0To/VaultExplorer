@@ -58,6 +58,7 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsConfig workspaceConfig;
   final VoidCallback onNewTab;
   final ValueChanged<BrowserTabState> onDuplicate;
+  final TabId? secondaryTabId;
   final String storageKey;
 
   const BrowserTabStrip({
@@ -65,6 +66,7 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
     required this.workspaceConfig,
     required this.onNewTab,
     required this.onDuplicate,
+    this.secondaryTabId,
     this.storageKey = 'browser-tab-strip-scroll-position',
   });
 
@@ -337,6 +339,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   GlobalKey.new,
                 );
                 final isActive = tab.tabId == activeTab?.tabId;
+                final isSecondary =
+                    !isActive && tab.tabId == widget.secondaryTabId;
                 return ReorderableDelayedDragStartListener(
                   key: ValueKey<TabId>(tab.tabId),
                   index: index,
@@ -347,6 +351,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                       child: _TabItem(
                         tab: tab,
                         active: isActive,
+                        secondary: isSecondary,
                         activeBackground: activeBackground,
                         onTap: () => _onTabTapped(tab, tabContext),
                       ),
@@ -372,12 +377,14 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 class _TabItem extends ConsumerWidget {
   final BrowserTabState tab;
   final bool active;
+  final bool secondary;
   final Color activeBackground;
   final VoidCallback onTap;
 
   const _TabItem({
     required this.tab,
     required this.active,
+    required this.secondary,
     required this.activeBackground,
     required this.onTap,
   });
@@ -407,7 +414,12 @@ class _TabItem extends ConsumerWidget {
           );
     final name = tab.container?.displayName ?? context.l10n.dashboardNavLabel;
     final label = folderLabel ?? name;
-    final fg = active ? cs.onSurface : cs.onSurfaceVariant;
+    final secondaryBackground = cs.primary.withValues(alpha: 0.08);
+    final fg = active
+        ? cs.onSurface
+        : secondary
+        ? cs.primary
+        : cs.onSurfaceVariant;
 
     return Tooltip(
       message: folderLabel == null ? name : '$name / $folderLabel',
@@ -416,7 +428,11 @@ class _TabItem extends ConsumerWidget {
       // gesture and shows the label instead of starting a drag.
       triggerMode: TooltipTriggerMode.manual,
       child: Material(
-        color: active ? activeBackground : Colors.transparent,
+        color: active
+            ? activeBackground
+            : secondary
+            ? secondaryBackground
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -430,6 +446,8 @@ class _TabItem extends ConsumerWidget {
               border: Border.all(
                 color: active
                     ? cs.primary.withValues(alpha: 0.5)
+                    : secondary
+                    ? cs.primary.withValues(alpha: 0.25)
                     : Colors.transparent,
                 width: 1,
               ),
@@ -464,7 +482,11 @@ class _TabItem extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: active
+                          ? FontWeight.bold
+                          : secondary
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                       color: fg,
                     ),
                   ),

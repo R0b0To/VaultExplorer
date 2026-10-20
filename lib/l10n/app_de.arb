@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Tab-Limit erreicht ({max})",
   "browserTabCloseToLeft": "Tabs links schließen",
   "browserTabCloseToRight": "Tabs rechts schließen",
-  "browserTabCloseAll": "Alle schließen"
+  "browserTabCloseAll": "Alle schließen",
+  "dualPaneEnabledTitle": "Zwei Bereiche verwenden",
+  "dualPaneEnabledSubtitle": "Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs."
 }

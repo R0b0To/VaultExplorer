@@ -53,6 +53,11 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
     final useBrowserTabs = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
     );
+    final useDualPaneBrowsing = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.useDualPaneBrowsing,
+      ),
+    );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -118,6 +123,41 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             secondary: Icon(
                               Icons.tab_rounded,
                               color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: useDualPaneBrowsing,
+                            onChanged: useBrowserTabs
+                                ? (value) => ref
+                                      .read(
+                                        appSettingsControllerProvider.notifier,
+                                      )
+                                      .updateSettings(
+                                        (settings) => settings.copyWith(
+                                          useDualPaneBrowsing: value,
+                                        ),
+                                      )
+                                : null,
+                            title: Text(
+                              context.l10n.dualPaneEnabledTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.dualPaneEnabledSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_split_rounded,
+                              color: useBrowserTabs
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
                             ),
                           ),
                           OptionPickerTile<BrowserLayoutMode>(

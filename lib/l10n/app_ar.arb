@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "تم بلوغ حد علامات التبويب ({max})",
   "browserTabCloseToLeft": "إغلاق علامات التبويب إلى اليسار",
   "browserTabCloseToRight": "إغلاق علامات التبويب إلى اليمين",
-  "browserTabCloseAll": "إغلاق الكل"
+  "browserTabCloseAll": "إغلاق الكل",
+  "dualPaneEnabledTitle": "استخدام لوحتين",
+  "dualPaneEnabledSubtitle": "اعرض علامتي تبويب مفتوحتين جنبًا إلى جنب عندما تكون الشاشة واسعة بما يكفي. يتطلب تفعيل علامات تبويب مدير الملفات."
 }

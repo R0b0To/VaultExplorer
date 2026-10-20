@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Limite de abas atingido ({max})",
   "browserTabCloseToLeft": "Fechar abas à esquerda",
   "browserTabCloseToRight": "Fechar abas à direita",
-  "browserTabCloseAll": "Fechar tudo"
+  "browserTabCloseAll": "Fechar tudo",
+  "dualPaneEnabledTitle": "Usar painel duplo",
+  "dualPaneEnabledSubtitle": "Mostra duas abas abertas lado a lado quando a tela tiver espaço suficiente. Requer as abas do gerenciador de arquivos."
 }

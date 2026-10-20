@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 
 export 'controllers/file_browser_navigation_controller.dart' show PathSegment;
@@ -44,7 +45,7 @@ class FileBrowserScreen extends StatefulWidget {
 }
 
 class _FileBrowserScreenState extends State<FileBrowserScreen> {
-  final ValueNotifier<PreferredSizeWidget?> _appBar = ValueNotifier(null);
+  final ValueNotifier<BrowserAppBarFactory?> _appBar = ValueNotifier(null);
   final ValueNotifier<Widget?> _floatingAction = ValueNotifier(null);
   final ValueNotifier<Widget?> _bottomBar = ValueNotifier(null);
 
@@ -61,7 +62,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     final screen = Scaffold(
       appBar: _StandaloneBrowserAppBar(
         appBarListenable: _appBar,
-        fallback: const SizedBox(height: kToolbarHeight),
+        fallback: BrowserAppBarFallback(
+          title: widget.container.displayName,
+          showBackButton: widget.showBackButton,
+        ),
       ),
       body: DirectoryContentView(
         container: widget.container,
@@ -103,7 +107,7 @@ class _StandaloneBrowserAppBar extends StatelessWidget
     required this.fallback,
   });
 
-  final ValueListenable<PreferredSizeWidget?> appBarListenable;
+  final ValueListenable<BrowserAppBarFactory?> appBarListenable;
   final Widget fallback;
 
   @override
@@ -112,9 +116,10 @@ class _StandaloneBrowserAppBar extends StatelessWidget
   @override
   Widget build(BuildContext context) => SizedBox(
     height: kToolbarHeight,
-    child: ValueListenableBuilder<PreferredSizeWidget?>(
+    child: ValueListenableBuilder<BrowserAppBarFactory?>(
       valueListenable: appBarListenable,
-      builder: (context, appBar, _) => appBar ?? fallback,
+      builder: (context, appBarFactory, _) =>
+          appBarFactory?.call(context) ?? fallback,
     ),
   );
 }

@@ -17,9 +17,11 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_navigati
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/adaptive_browser_app_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -38,6 +40,12 @@ String browserTabDuplicatePath(FileBrowserNavigationState nav) {
   }
   return nav.currentDirPath;
 }
+
+PreferredSizeWidget _buildDashboardBrowserAppBar(BuildContext context) =>
+    const DashboardAppBar();
+
+final BrowserAppBarFactory _dashboardBrowserAppBarFactory =
+    _buildDashboardBrowserAppBar;
 
 typedef BrowserHomeBuilder =
     Widget Function({
@@ -138,23 +146,28 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final ProviderSubscription<BrowserTabsState> _workspaceSubscription;
   late final VaultEngineEvents _vaultEvents;
   late final PageController _pageController;
-  late final ValueNotifier<PreferredSizeWidget?> _activeAppBar;
-  late final ValueNotifier<PreferredSizeWidget?> _selectionAppBar;
+  late final ValueNotifier<BrowserAppBarFactory?> _activeAppBar;
+  late final ValueNotifier<BrowserAppBarFactory?> _selectionAppBar;
   late final ValueNotifier<Widget?> _activeFloatingAction;
   late final ValueNotifier<Widget?> _activeBottomBar;
   late final AnimationController _appBarVisibilityController;
-  final Map<TabId, ValueChanged<PreferredSizeWidget>> _appBarCallbacks = {};
-  final Map<TabId, PreferredSizeWidget> _appBarsByTab = {};
-  final Map<TabId, PreferredSizeWidget?> _selectionAppBarsByTab = {};
+  final Map<TabId, ValueChanged<BrowserAppBarFactory>> _appBarCallbacks = {};
+  final Map<TabId, BrowserAppBarFactory> _appBarsByTab = {};
+  final Map<TabId, BrowserAppBarFactory?> _selectionAppBarsByTab = {};
   final Map<TabId, Widget?> _floatingActionsByTab = {};
   final Map<TabId, Widget?> _bottomBarsByTab = {};
+  final Map<TabId, GlobalKey> _directoryViewKeys = {};
+  final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
   bool _drawerOpenOrDragging = false;
   bool _edgeDrawerGestureActive = false;
   bool _restoreAppBarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _lastTabSwipeEligible = false;
+  bool? _wasDualPane;
+  List<TabId>? _dualPaneTabIds;
   double _lastTabNextOverscroll = 0;
+  int? _pageViewDrivenActiveIndex;
   TabId? _lastActiveTabId;
 
   BrowserTabsState get _workspaceState =>
@@ -172,8 +185,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final initialState = ref.read(browserTabsProvider(_workspace));
     _lastActiveTabId = initialState.activeTabId;
     _pageController = PageController(initialPage: initialState.activeIndex);
-    _activeAppBar = ValueNotifier<PreferredSizeWidget?>(null);
-    _selectionAppBar = ValueNotifier<PreferredSizeWidget?>(null);
+    _activeAppBar = ValueNotifier<BrowserAppBarFactory?>(
+      initialState.activeTab?.isDashboard == true
+          ? _dashboardBrowserAppBarFactory
+          : null,
+    );
+    _selectionAppBar = ValueNotifier<BrowserAppBarFactory?>(null);
     _activeFloatingAction = ValueNotifier<Widget?>(null);
     _activeBottomBar = ValueNotifier<Widget?>(null);
     _appBarVisibilityController = AnimationController(
@@ -212,6 +229,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   }
 
   void _onTabsChanged(BrowserTabsState? previous, BrowserTabsState next) {
+    final pageViewChangedActiveTab =
+        previous?.activeTabId != next.activeTabId &&
+        next.activeIndex == _pageViewDrivenActiveIndex;
+    if (pageViewChangedActiveTab) _pageViewDrivenActiveIndex = null;
+
     if (_isPureTabReorder(previous, next)) {
       if (_pageController.hasClients) {
         final target = next.activeIndex;
@@ -224,7 +246,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       } else {
         _schedulePageSync();
       }
-    } else {
+    } else if (!pageViewChangedActiveTab) {
       _schedulePageSync();
     }
 
@@ -234,15 +256,34 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _selectionAppBarsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
     _floatingActionsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
     _bottomBarsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
+    _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     final activeTabId = next.activeTabId;
     if (_lastActiveTabId != activeTabId) {
       _lastActiveTabId = activeTabId;
-      _activeAppBar.value = activeTabId == null
-          ? null
-          : _appBarsByTab[activeTabId];
-      _activeFloatingAction.value = activeTabId == null
-          ? null
-          : _floatingActionsByTab[activeTabId];
+      final nextTab = next.activeTab;
+      if (activeTabId == null) {
+        _activeAppBar.value = null;
+      } else if (nextTab?.isDashboard == true) {
+        _activeAppBar.value = _dashboardBrowserAppBarFactory;
+      } else {
+        // Reuse the current chrome until a newly mounted directory viewport
+        // has published its toolbar. Publishing null here briefly replaces
+        // the Dashboard or previous directory toolbar with the generic
+        // fallback, which is the visible flash during vault navigation.
+        final nextAppBar = _appBarsByTab[activeTabId];
+        if (nextAppBar != null) _activeAppBar.value = nextAppBar;
+      }
+      _selectionAppBar.value = _selectionAppBarFor(activeTabId);
+      if (activeTabId == null) {
+        _activeFloatingAction.value = null;
+      } else if (_floatingActionsByTab.containsKey(activeTabId)) {
+        // Keep the current action until an unvisited tab has finished loading
+        // its toolbar configuration and publishes its own FAB. Switching
+        // through a transient null here makes Scaffold animate the FAB away
+        // and back in, which reads as a flash in the dual-pane layout.
+        _activeFloatingAction.value = _floatingActionsByTab[activeTabId];
+      }
       _activeBottomBar.value = activeTabId == null
           ? null
           : _bottomBarsByTab[activeTabId];
@@ -302,7 +343,119 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
   void _onPageChanged(int index) {
     if (index < 0 || index >= _workspaceState.tabs.length) return;
+    if (index == _workspaceState.activeIndex) return;
+    _pageViewDrivenActiveIndex = index;
     _workspaceActions.activateIndex(index);
+  }
+
+  void _focusTab(TabId tabId) {
+    if (_workspaceState.activeTabId == tabId) return;
+    _workspaceActions.activate(tabId);
+  }
+
+  void _handleBackToDashboard() {
+    final activeTabId = _workspaceState.activeTabId;
+    if (activeTabId == null) return;
+    if (_workspaceActions.returnToDashboardAtRoot(activeTabId)) return;
+    if (_workspace.includeDashboardTab) {
+      _workspaceActions.replaceActiveWithDashboard();
+      return;
+    }
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+  }
+
+  Widget _buildTabContent(BrowserTabState tab, {required bool isActive}) {
+    if (tab.isDashboard) {
+      return KeyedSubtree(
+        key: _dashboardViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+        child:
+            widget.homeBuilder?.call(
+              workspace: _workspace,
+              onFloatingActionChanged: _floatingActionCallbackFor(tab.tabId),
+              onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
+            ) ??
+            const SizedBox.expand(),
+      );
+    }
+    return SkinAreaScope(
+      area: SkinArea.files,
+      child: DirectoryContentView(
+        key: _directoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+        container: tab.container!,
+        tabId: tab.tabId,
+        workspaceConfig: _workspace,
+        initialPath: tab.initialPath,
+        resolveContainer: widget.resolveContainer,
+        showBackButton: true,
+        onUserActivity: isActive
+            ? widget.userActivityFor?.call(tab.volId!)
+            : null,
+        onAppBarChanged: _appBarCallbackFor(tab.tabId),
+        onSelectionAppBarChanged: _selectionAppBarCallbackFor(tab.tabId),
+        onFloatingActionChanged: _floatingActionCallbackFor(tab.tabId),
+        onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
+      ),
+    );
+  }
+
+  Widget _buildDualPaneViewport(
+    BrowserTabState tab, {
+    required bool isActive,
+    required bool autoHideAppBar,
+  }) {
+    return Expanded(
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.vertical) {
+            _handleAppBarScroll(
+              notification,
+              enabled: autoHideAppBar,
+              active: isActive,
+            );
+          }
+          // Each pane owns its scroll notifications. In particular, its
+          // horizontal overscroll must not trigger the tab-strip edge action.
+          return true;
+        },
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _focusTab(tab.tabId),
+          child: TickerMode(
+            enabled: true,
+            child: _buildTabContent(tab, isActive: isActive),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<TabId> _resolveDualPaneTabIds(
+    List<BrowserTabState> tabs,
+    TabId? activeTabId,
+  ) {
+    final activeIndex = tabs.indexWhere((tab) => tab.tabId == activeTabId);
+    final currentPair = _dualPaneTabIds;
+    final pairStillOpen =
+        currentPair != null &&
+        currentPair.length == 2 &&
+        tabs.any((tab) => tab.tabId == currentPair[0]) &&
+        tabs.any((tab) => tab.tabId == currentPair[1]);
+    final activeIsInPair = currentPair?.contains(activeTabId) ?? false;
+    if (!pairStillOpen || !activeIsInPair) {
+      final firstIndex = activeIndex >= tabs.length - 1
+          ? tabs.length - 2
+          : activeIndex.clamp(0, tabs.length - 2).toInt();
+      _dualPaneTabIds = [tabs[firstIndex].tabId, tabs[firstIndex + 1].tabId];
+    } else {
+      final pair = currentPair;
+      final firstPairIndex = tabs.indexWhere((tab) => tab.tabId == pair[0]);
+      final secondPairIndex = tabs.indexWhere((tab) => tab.tabId == pair[1]);
+      if (firstPairIndex > secondPairIndex) {
+        _dualPaneTabIds = [pair[1], pair[0]];
+      }
+    }
+    return _dualPaneTabIds!;
   }
 
   void _onDrawerChanged(bool isOpen) {
@@ -441,44 +594,48 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
   }
 
-  ValueChanged<PreferredSizeWidget> _appBarCallbackFor(TabId tabId) =>
+  ValueChanged<BrowserAppBarFactory> _appBarCallbackFor(TabId tabId) =>
       _appBarCallbacks.putIfAbsent(
         tabId,
-        () => (appBar) {
-          if (!mounted || _workspaceState.activeTabId != tabId) return;
-          _appBarsByTab[tabId] = appBar;
-          _activeAppBar.value = appBar;
+        () => (appBarFactory) {
+          if (!mounted) return;
+          _appBarsByTab[tabId] = appBarFactory;
+          if (_workspaceState.activeTabId == tabId) {
+            _activeAppBar.value = appBarFactory;
+          }
         },
       );
 
-  ValueChanged<PreferredSizeWidget?> _selectionAppBarCallbackFor(TabId tabId) =>
-      (appBar) {
-        if (!mounted) return;
-        _selectionAppBarsByTab[tabId] = appBar;
-        if (_workspaceState.activeTabId == tabId) {
-          // The visible tab's preference decides whether the aggregate
-          // selection UI belongs in the stationary app bar or bottom slot.
-          _selectionAppBar.value = appBar;
-          return;
-        }
-        final aggregate = ref.read(aggregatedTabsSelectionProvider(_workspace));
-        if (!aggregate.hasSelection) {
-          _selectionAppBar.value = null;
-          return;
-        }
-        if (appBar != null) {
-          _selectionAppBar.value = appBar;
-          return;
-        }
-        for (final entry in aggregate.itemsByTab.entries) {
-          if (entry.value.isEmpty) continue;
-          final candidate = _selectionAppBarsByTab[entry.key];
-          if (candidate != null) {
-            _selectionAppBar.value = candidate;
-            return;
-          }
-        }
-      };
+  BrowserAppBarFactory? _selectionAppBarFor(TabId? activeTabId) {
+    if (activeTabId != null &&
+        _selectionAppBarsByTab.containsKey(activeTabId)) {
+      final activeSelectionAppBar = _selectionAppBarsByTab[activeTabId];
+      if (activeSelectionAppBar != null) return activeSelectionAppBar;
+    }
+
+    final aggregate = ref.read(aggregatedTabsSelectionProvider(_workspace));
+    if (!aggregate.hasSelection) return null;
+    for (final entry in aggregate.itemsByTab.entries) {
+      if (entry.value.isEmpty) continue;
+      final candidate = _selectionAppBarsByTab[entry.key];
+      if (candidate != null) return candidate;
+    }
+    return null;
+  }
+
+  ValueChanged<BrowserAppBarFactory?> _selectionAppBarCallbackFor(
+    TabId tabId,
+  ) => (appBar) {
+    if (!mounted) return;
+    _selectionAppBarsByTab[tabId] = appBar;
+    if (_workspaceState.activeTabId == tabId) {
+      // The visible tab's preference decides whether the aggregate
+      // selection UI belongs in the stationary app bar or bottom slot.
+      _selectionAppBar.value = appBar ?? _selectionAppBarFor(tabId);
+      return;
+    }
+    _selectionAppBar.value = _selectionAppBarFor(_workspaceState.activeTabId);
+  };
 
   ValueChanged<Widget?> _floatingActionCallbackFor(TabId tabId) => (action) {
     _floatingActionsByTab[tabId] = action;
@@ -597,6 +754,31 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final tabsEnabled = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
     );
+    final useDualPaneBrowsing = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.useDualPaneBrowsing,
+      ),
+    );
+    final orientation = MediaQuery.of(context).orientation;
+    final minDualPaneWidth = orientation == Orientation.landscape
+        ? 640.0
+        : 720.0;
+    final availableWidth =
+        MediaQuery.sizeOf(context).width -
+        MediaQuery.paddingOf(context).horizontal;
+    final dualPaneForTabStrip =
+        tabsEnabled &&
+        useDualPaneBrowsing &&
+        tabs.length > 1 &&
+        availableWidth >= minDualPaneWidth;
+    final dualPaneTabIds = dualPaneForTabStrip
+        ? _resolveDualPaneTabIds(tabs, activeTabId)
+        : null;
+    final secondaryTabId = dualPaneTabIds == null
+        ? null
+        : dualPaneTabIds.first == activeTabId
+        ? dualPaneTabIds.last
+        : dualPaneTabIds.first;
     final systemBackGestureInsetLeft = MediaQuery.of(
       context,
     ).systemGestureInsets.left;
@@ -604,6 +786,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       workspaceConfig: _workspace,
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
       onDuplicate: widget.onDuplicate ?? _duplicate,
+      secondaryTabId: secondaryTabId,
     );
     final drawer = activeTab == null
         ? null
@@ -641,86 +824,109 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 child: AdaptiveBrowserAppBar(
                   workspaceConfig: _workspace,
                   appBarListenable: _activeAppBar,
-                  fallback: const SizedBox(height: kToolbarHeight),
+                  fallback: BrowserAppBarFallback(
+                    title: activeTab?.container?.displayName ?? '',
+                    preferBackButton: !tabsEnabled,
+                    onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
+                  ),
                   selectionAppBarListenable: _selectionAppBar,
                 ),
               ),
             ),
             if (tabsEnabled && tabs.isNotEmpty) strip,
             Expanded(
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) => _handleAppBarScroll(
-                  notification,
-                  enabled: autoHideAppBar,
-                  active: activeTabId != null,
-                ),
-                child: PageView.builder(
-                  controller: _pageController,
-                  clipBehavior: Clip.hardEdge,
-                  physics:
+              child: LayoutBuilder(
+                builder: (context, viewportConstraints) {
+                  final orientation = MediaQuery.of(context).orientation;
+                  final minDualPaneWidth = orientation == Orientation.landscape
+                      ? 640.0
+                      : 720.0;
+                  final dualPane =
                       tabsEnabled &&
-                          !_drawerOpenOrDragging &&
-                          !_edgeDrawerGestureActive
-                      ? const PageScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
-                        )
-                      : const NeverScrollableScrollPhysics(),
-                  itemCount: tabs.length,
-                  onPageChanged: _onPageChanged,
-                  findChildIndexCallback: (key) {
-                    if (key is! ValueKey<TabId>) return null;
-                    final index = tabs.indexWhere(
-                      (tab) => tab.tabId == key.value,
-                    );
-                    return index < 0 ? null : index;
-                  },
-                  itemBuilder: (context, index) {
-                    final tab = tabs[index];
-                    final pageIsActive = tab.tabId == activeTabId;
-                    final Widget page;
-                    if (tab.isDashboard) {
-                      page =
-                          widget.homeBuilder?.call(
-                            workspace: _workspace,
-                            onFloatingActionChanged: _floatingActionCallbackFor(
-                              tab.tabId,
-                            ),
-                            onBottomBarChanged: _bottomBarCallbackFor(
-                              tab.tabId,
-                            ),
-                          ) ??
-                          const SizedBox.expand();
-                    } else {
-                      page = SkinAreaScope(
-                        area: SkinArea.files,
-                        child: DirectoryContentView(
-                          key: ValueKey<TabId>(tab.tabId),
-                          container: tab.container!,
-                          tabId: tab.tabId,
-                          workspaceConfig: _workspace,
-                          initialPath: tab.initialPath,
-                          resolveContainer: widget.resolveContainer,
-                          showBackButton: true,
-                          onUserActivity: pageIsActive
-                              ? widget.userActivityFor?.call(tab.volId!)
-                              : null,
-                          onAppBarChanged: _appBarCallbackFor(tab.tabId),
-                          onSelectionAppBarChanged: _selectionAppBarCallbackFor(
-                            tab.tabId,
-                          ),
-                          onFloatingActionChanged: _floatingActionCallbackFor(
-                            tab.tabId,
-                          ),
-                          onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
-                        ),
-                      );
+                      useDualPaneBrowsing &&
+                      tabs.length > 1 &&
+                      viewportConstraints.maxWidth >= minDualPaneWidth;
+
+                  if (_wasDualPane != dualPane) {
+                    final wasDualPane = _wasDualPane;
+                    _wasDualPane = dualPane;
+                    if (wasDualPane == true && !dualPane) {
+                      _schedulePageSync();
                     }
-                    return _BrowserTabPage(
-                      key: ValueKey<TabId>(tab.tabId),
-                      child: TickerMode(enabled: pageIsActive, child: page),
+                  }
+
+                  if (dualPane) {
+                    final pair = _resolveDualPaneTabIds(tabs, activeTabId);
+                    final firstTab = tabs.firstWhere(
+                      (tab) => tab.tabId == pair[0],
                     );
-                  },
-                ),
+                    final secondTab = tabs.firstWhere(
+                      (tab) => tab.tabId == pair[1],
+                    );
+                    return Row(
+                      children: [
+                        _buildDualPaneViewport(
+                          firstTab,
+                          isActive: firstTab.tabId == activeTabId,
+                          autoHideAppBar: autoHideAppBar,
+                        ),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
+                        _buildDualPaneViewport(
+                          secondTab,
+                          isActive: secondTab.tabId == activeTabId,
+                          autoHideAppBar: autoHideAppBar,
+                        ),
+                      ],
+                    );
+                  }
+
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (notification) => _handleAppBarScroll(
+                      notification,
+                      enabled: autoHideAppBar,
+                      active: activeTabId != null,
+                    ),
+                    child: PageView.builder(
+                      controller: _pageController,
+                      clipBehavior: Clip.hardEdge,
+                      physics:
+                          tabsEnabled &&
+                              !_drawerOpenOrDragging &&
+                              !_edgeDrawerGestureActive
+                          ? const PageScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            )
+                          : const NeverScrollableScrollPhysics(),
+                      itemCount: tabs.length,
+                      onPageChanged: _onPageChanged,
+                      findChildIndexCallback: (key) {
+                        if (key is! ValueKey<TabId>) return null;
+                        final index = tabs.indexWhere(
+                          (tab) => tab.tabId == key.value,
+                        );
+                        return index < 0 ? null : index;
+                      },
+                      itemBuilder: (context, index) {
+                        final tab = tabs[index];
+                        final pageIsActive = tab.tabId == activeTabId;
+                        return _BrowserTabPage(
+                          key: ValueKey<TabId>(tab.tabId),
+                          child: TickerMode(
+                            enabled: pageIsActive,
+                            child: _buildTabContent(
+                              tab,
+                              isActive: pageIsActive,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               ),
             ),
           ],

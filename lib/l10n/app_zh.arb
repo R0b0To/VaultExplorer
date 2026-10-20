@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "已达到标签页上限（{max}）",
   "browserTabCloseToLeft": "关闭左侧标签页",
   "browserTabCloseToRight": "关闭右侧标签页",
-  "browserTabCloseAll": "关闭所有"
+  "browserTabCloseAll": "关闭所有",
+  "dualPaneEnabledTitle": "使用双栏视图",
+  "dualPaneEnabledSubtitle": "屏幕足够宽时并排显示两个已打开的标签页。需要启用文件管理器标签页。"
 }

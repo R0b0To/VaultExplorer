@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Досягнуто ліміту вкладок ({max})",
   "browserTabCloseToLeft": "Закрити вкладки ліворуч",
   "browserTabCloseToRight": "Закрити вкладки праворуч",
-  "browserTabCloseAll": "Закрити всі"
+  "browserTabCloseAll": "Закрити всі",
+  "dualPaneEnabledTitle": "Використовувати дві панелі",
+  "dualPaneEnabledSubtitle": "Показувати дві відкриті вкладки поруч, якщо екран достатньо широкий. Потрібно ввімкнути вкладки файлового менеджера."
 }

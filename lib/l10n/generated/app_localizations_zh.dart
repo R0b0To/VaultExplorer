@@ -11406,4 +11406,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => '关闭所有';
+
+  @override
+  String get dualPaneEnabledTitle => '使用双栏视图';
+
+  @override
+  String get dualPaneEnabledSubtitle => '屏幕足够宽时并排显示两个已打开的标签页。需要启用文件管理器标签页。';
 }

@@ -12267,4 +12267,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'Alle schließen';
+
+  @override
+  String get dualPaneEnabledTitle => 'Zwei Bereiche verwenden';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      'Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs.';
 }

@@ -312,10 +312,32 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     final active = state.activeTab;
+    final tabsEnabled = ref
+        .read(appSettingsControllerProvider)
+        .settings
+        .useBrowserTabs;
     if (active == null) {
       if (actions.openTab(container) == null) {
         _showBrowserTabLimit();
         return;
+      }
+    } else if (!tabsEnabled && active.isDashboard) {
+      // In single-tab mode keep the Dashboard as a hidden tab so root-back
+      // returns to it. Reuse the existing browser tab on subsequent opens to
+      // avoid accumulating invisible tabs while the tab strip is disabled.
+      final existingBrowserTab = state.tabs
+          .where((tab) => !tab.isDashboard)
+          .firstOrNull;
+      if (existingBrowserTab == null) {
+        if (actions.openTab(container) == null) {
+          _showBrowserTabLimit();
+          return;
+        }
+      } else {
+        actions.activate(existingBrowserTab.tabId);
+        if (existingBrowserTab.volId != container.volId) {
+          actions.replaceActive(container);
+        }
       }
     } else if (active.isDashboard || active.volId != container.volId) {
       // Regular navigation from the sidebar or Dashboard stays in the current

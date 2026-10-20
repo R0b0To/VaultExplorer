@@ -20460,6 +20460,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close all'**
   String get browserTabCloseAll;
+
+  /// Setting that shows two file manager tabs side by side.
+  ///
+  /// In en, this message translates to:
+  /// **'Use dual pane'**
+  String get dualPaneEnabledTitle;
+
+  /// Explains the dual pane file manager setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.'**
+  String get dualPaneEnabledSubtitle;
 }
 
 class _AppLocalizationsDelegate

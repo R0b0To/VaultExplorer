@@ -12081,4 +12081,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'Close all';
+
+  @override
+  String get dualPaneEnabledTitle => 'Use dual pane';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      'Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.';
 }

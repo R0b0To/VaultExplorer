@@ -11588,4 +11588,11 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'すべて閉じる';
+
+  @override
+  String get dualPaneEnabledTitle => '2ペイン表示を使用';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      '画面に十分な幅があるとき、開いている2つのタブを並べて表示します。ファイルマネージャーのタブが必要です。';
 }

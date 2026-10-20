@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Limite d'onglets atteinte ({max})",
   "browserTabCloseToLeft": "Fermer les onglets à gauche",
   "browserTabCloseToRight": "Fermer les onglets à droite",
-  "browserTabCloseAll": "Fermer tout"
+  "browserTabCloseAll": "Fermer tout",
+  "dualPaneEnabledTitle": "Utiliser le double volet",
+  "dualPaneEnabledSubtitle": "Affiche deux onglets ouverts côte à côte lorsque l’écran est assez large. Nécessite les onglets du gestionnaire de fichiers."
 }

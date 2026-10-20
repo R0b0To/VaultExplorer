@@ -12266,4 +12266,11 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'Chiudi tutto';
+
+  @override
+  String get dualPaneEnabledTitle => 'Usa doppio riquadro';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      'Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file.';
 }

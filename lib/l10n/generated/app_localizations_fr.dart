@@ -12371,4 +12371,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get browserTabCloseAll => 'Fermer tout';
+
+  @override
+  String get dualPaneEnabledTitle => 'Utiliser le double volet';
+
+  @override
+  String get dualPaneEnabledSubtitle =>
+      'Affiche deux onglets ouverts côte à côte lorsque l’écran est assez large. Nécessite les onglets du gestionnaire de fichiers.';
 }

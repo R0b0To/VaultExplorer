@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "탭 한도에 도달했습니다({max})",
   "browserTabCloseToLeft": "왼쪽 탭 닫기",
   "browserTabCloseToRight": "오른쪽 탭 닫기",
-  "browserTabCloseAll": "모두 닫기"
+  "browserTabCloseAll": "모두 닫기",
+  "dualPaneEnabledTitle": "이중 창 사용",
+  "dualPaneEnabledSubtitle": "화면 폭이 충분하면 열린 탭 두 개를 나란히 표시합니다. 파일 관리자 탭이 필요합니다."
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -24,7 +23,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 PreferredSizeWidget buildBrowserAppBar(
   BuildContext context, {
-  required WidgetRef ref,
+  required AppSettingsService appSettingsService,
   required MountedContainer container,
   required List<PathSegment> pathStack,
   required ValueChanged<int> onJumpTo,
@@ -237,9 +236,7 @@ PreferredSizeWidget buildBrowserAppBar(
         );
         return;
       }
-      final settings = await ref
-          .read(appSettingsServiceProvider)
-          .loadSettings();
+      final settings = await appSettingsService.loadSettings();
       if (context.mounted) {
         await onShowOpenWithDialog(entry.name, path, ext, settings);
       }
@@ -624,16 +621,35 @@ PreferredSizeWidget buildBrowserAppBar(
         final scaffold = Scaffold.maybeOf(ctx);
         final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
 
-        // If a sidebar drawer is present, ALWAYS show the hamburger icon so
-        // the user can open the sidebar from any subfolder depth.
-        // Folder-up navigation is handled by system back gesture, breadcrumbs, and title menu.
         if (fullScreenDrawer != null || scaffold?.hasDrawer == true) {
+          // In single-location mode there is no tab strip to return to the
+          // Dashboard, so the toolbar back action walks up folders and then
+          // returns to the Dashboard at the container root. The drawer remains
+          // available through its edge gesture.
+          if (onBackAtRoot != null) {
+            return IconButton(
+              icon: Icon(
+                Icons.arrow_back,
+                color: Theme.of(ctx).appBarTheme.foregroundColor,
+              ),
+              tooltip: ctx.l10n.backToDashboardTooltip,
+              onPressed: () {
+                if (pathStack.length > 1 && onNavigateUp != null) {
+                  onNavigateUp();
+                } else {
+                  onBackAtRoot();
+                }
+              },
+            );
+          }
+
+          // With tabs enabled, the drawer remains the primary leading action.
           return IconButton(
             icon: Icon(
               Icons.menu_rounded,
               color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
-            tooltip: context.l10n.storageLocationsTitle,
+            tooltip: ctx.l10n.storageLocationsTitle,
             onPressed: () {
               if (fullScreenDrawer != null) {
                 fullScreenDrawer.openDrawer();
@@ -650,7 +666,7 @@ PreferredSizeWidget buildBrowserAppBar(
               Icons.arrow_back,
               color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
-            tooltip: context.l10n.backToDashboardTooltip,
+            tooltip: ctx.l10n.backToDashboardTooltip,
             onPressed: () {
               if (pathStack.length > 1 && onNavigateUp != null) {
                 onNavigateUp();
@@ -669,7 +685,7 @@ PreferredSizeWidget buildBrowserAppBar(
               Icons.menu_rounded,
               color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
-            tooltip: context.l10n.storageLocationsTitle,
+            tooltip: ctx.l10n.storageLocationsTitle,
             onPressed: onOpenStorageSwitcher,
           );
         }

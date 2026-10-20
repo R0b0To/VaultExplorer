@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Limite di schede raggiunto ({max})",
   "browserTabCloseToLeft": "Chiudi schede a sinistra",
   "browserTabCloseToRight": "Chiudi schede a destra",
-  "browserTabCloseAll": "Chiudi tutto"
+  "browserTabCloseAll": "Chiudi tutto",
+  "dualPaneEnabledTitle": "Usa doppio riquadro",
+  "dualPaneEnabledSubtitle": "Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file."
 }

@@ -1155,9 +1155,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         ),
       ),
     );
-    if (widget.embedded && dashboardIsActive) {
+    if (widget.embedded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !dashboardIsActive) return;
+        if (!mounted) return;
         widget.onFloatingActionChanged?.call(dashboardFloatingAction);
         widget.onBottomBarChanged?.call(
           state.showUndoBar ? dashboardBottomBar : null,

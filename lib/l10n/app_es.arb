@@ -3383,5 +3383,7 @@
   "browserTabLimitReached": "Límite de pestañas alcanzado ({max})",
   "browserTabCloseToLeft": "Cerrar pestañas a la izquierda",
   "browserTabCloseToRight": "Cerrar pestañas a la derecha",
-  "browserTabCloseAll": "Cerrar todo"
+  "browserTabCloseAll": "Cerrar todo",
+  "dualPaneEnabledTitle": "Usar doble panel",
+  "dualPaneEnabledSubtitle": "Muestra dos pestañas abiertas en paralelo cuando la pantalla tenga suficiente espacio. Requiere las pestañas del gestor de archivos."
 }

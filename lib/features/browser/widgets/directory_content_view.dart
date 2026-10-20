@@ -72,6 +72,7 @@ import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.dart';
@@ -148,6 +149,12 @@ typedef _SelectedBrowserEntry = ({
   bool insideArchive,
 });
 
+typedef _BrowserAppBarBuilder =
+    PreferredSizeWidget Function(
+      BuildContext context, {
+      required bool selectionMode,
+    });
+
 /// Stateful directory viewport. It owns only location-specific content and
 /// delegates app bar, tab strip, FAB, and bottom chrome to its host.
 class DirectoryContentView extends ConsumerStatefulWidget {
@@ -173,8 +180,8 @@ class DirectoryContentView extends ConsumerStatefulWidget {
   /// Directory to open at instead of the container root (new tabs opened on
   /// a folder). Only read when the screen is first created.
   final String? initialPath;
-  final ValueChanged<PreferredSizeWidget>? onAppBarChanged;
-  final ValueChanged<PreferredSizeWidget?>? onSelectionAppBarChanged;
+  final ValueChanged<BrowserAppBarFactory>? onAppBarChanged;
+  final ValueChanged<BrowserAppBarFactory?>? onSelectionAppBarChanged;
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
   final ScrollController? scrollController;
@@ -209,6 +216,34 @@ class DirectoryContentView extends ConsumerStatefulWidget {
 /// and owns the surrounding Scaffold and app bar.
 class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     with WidgetsBindingObserver {
+  _BrowserAppBarBuilder? _latestAppBarBuilder;
+  int? _regularAppBarSignature;
+  BrowserAppBarFactory? _regularAppBarFactory;
+  int? _selectionAppBarSignature;
+  BrowserAppBarFactory? _selectionAppBarFactory;
+
+  BrowserAppBarFactory _appBarFactoryFor({
+    required int signature,
+    required bool selectionMode,
+  }) {
+    if (selectionMode) {
+      if (_selectionAppBarSignature == signature &&
+          _selectionAppBarFactory != null) {
+        return _selectionAppBarFactory!;
+      }
+      _selectionAppBarSignature = signature;
+      return _selectionAppBarFactory = (context) =>
+          _latestAppBarBuilder!(context, selectionMode: true);
+    }
+
+    if (_regularAppBarSignature == signature && _regularAppBarFactory != null) {
+      return _regularAppBarFactory!;
+    }
+    _regularAppBarSignature = signature;
+    return _regularAppBarFactory = (context) =>
+        _latestAppBarBuilder!(context, selectionMode: false);
+  }
+
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -436,6 +471,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
+  bool _toolbarConfigReady = false;
+  int? _lastBuiltFloatingActionSignature;
+  int? _lastPublishedFloatingActionSignature;
+  Widget? _lastBuiltFloatingAction;
+  List<RawEntry>? _itemsUsedForFloatingActionSignature;
+  int _cachedFloatingActionItemsSignature = 0;
+
+  int _floatingActionItemsSignature() {
+    final items = _currentItems;
+    if (identical(items, _itemsUsedForFloatingActionSignature)) {
+      return _cachedFloatingActionItemsSignature;
+    }
+    _itemsUsedForFloatingActionSignature = items;
+    _cachedFloatingActionItemsSignature = Object.hashAll(
+      items.map(
+        (entry) => Object.hash(
+          entry.name,
+          entry.isDir,
+          entry.sizeBytes,
+          entry.modifiedSecs,
+          entry.isPlaceholder,
+        ),
+      ),
+    );
+    return _cachedFloatingActionItemsSignature;
+  }
+
   FileBrowserPinsBookmarksState get _pinsBookmarks =>
       ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
   FileBrowserPinsBookmarks get _pinsBookmarksNotifier => ref.read(
@@ -1232,6 +1294,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         setState(() {
           _appSettings = appSettings;
           _toolbarConfig = toolbarConfig;
+          _toolbarConfigReady = true;
           _containerRecord = record;
           _applyResolvedThumbnails(toolbarConfig);
         });
@@ -1255,6 +1318,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       }
     } catch (e) {
       VeLog.e('FileBrowserScreen', 'Failed to load settings/records', e);
+      if (mounted) {
+        setState(() => _toolbarConfigReady = true);
+      }
     }
     final initialPath = widget.initialPath;
     if (initialPath != null && initialPath.isNotEmpty && mounted) {
@@ -1273,6 +1339,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (!mounted) return;
     setState(() {
       _toolbarConfig = config;
+      _toolbarConfigReady = true;
       _containerRecord = record;
       _applyResolvedThumbnails(config);
     });
@@ -1589,9 +1656,25 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   bool _handleBackAtRoot() {
-    // A browser tab owns its location, including its root. Back at the root
-    // must not switch the user to another tab implicitly.
-    return false;
+    final workspace = widget.workspaceConfig;
+    final tabId = _tabId;
+    if (workspace == null || tabId == null) return false;
+    if (ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      // With tabs enabled, the location remains in its tab at the root.
+      return false;
+    }
+
+    final tabs = ref.read(browserTabsProvider(workspace).notifier);
+    if (tabs.returnToDashboardAtRoot(tabId)) return true;
+    if (workspace.includeDashboardTab) {
+      tabs.replaceActiveWithDashboard();
+      return true;
+    }
+
+    final navigator = Navigator.of(context);
+    if (!navigator.canPop()) return false;
+    navigator.pop();
+    return true;
   }
 
   bool get _canPreviewFolderBackGesture =>
@@ -1731,36 +1814,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     return unique;
   }
 
-  bool _isSelectedEntryPinned(RawEntry entry) {
-    final matches = _selectedBrowserEntries
-        .where((item) => item.entry == entry)
-        .toList();
-    if (matches.isEmpty) return _isPinned(entry);
-    return matches.any((item) {
-      final state = ref.read(
-        fileBrowserPinsBookmarksProvider(item.container.volId),
-      );
-      return isPinned(entry, item.currentDirPath, state.pinnedPaths);
-    });
-  }
-
-  bool _isSelectedEntryBookmarked(RawEntry entry) {
-    final matches = _selectedBrowserEntries
-        .where((item) => item.entry == entry)
-        .toList();
-    if (matches.isEmpty) return _isBookmark(entry);
-    return matches.any((item) {
-      final state = ref.read(
-        fileBrowserPinsBookmarksProvider(item.container.volId),
-      );
-      return isBookmark(entry, item.currentDirPath, state.bookmarkPaths);
-    });
-  }
-
   int get _selectedBrowserEntryCount => _selectedBrowserEntries.length;
-
-  bool get _selectionHasReadOnlySource =>
-      _selectedBrowserEntries.any((item) => item.container.readOnly);
 
   int get _allSelectedTotalBytes {
     final keys =
@@ -2795,17 +2849,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           .read(fileBrowserSelectionProvider(stateKey).notifier)
           .toggleSelectItem(selectedEntry);
     }
-  }
-
-  void _openSelectedFolderInNewTab() {
-    final selected = _singleSelectedFolderForNewTab;
-    if (selected == null) return;
-    _openFolderInNewTab(
-      selected.container,
-      fullPathOf(selected.entry, selected.currentDirPath),
-      stateKey: selected.stateKey,
-      selectedEntry: selected.entry,
-    );
   }
 
   void _initClipboard({required bool cut}) {
@@ -4122,29 +4165,42 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
-  Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
-    final hasLocalMedia = _currentItems
+  Map<FileManagerAction, WidgetBuilder> _buildActionBuilders({
+    required bool searchActive,
+    required bool isReadOnly,
+    required bool hasArchiveContext,
+    required String currentDirPath,
+    required List<RawEntry> currentItems,
+    required BrowserLayoutMode layoutMode,
+    required String? currentFilter,
+    required FileManagerToolbarConfig toolbarConfig,
+    required FileBrowserSearch searchNotifier,
+    required FileBrowserNavigation navigationNotifier,
+    required SortBy sortBy,
+    required bool sortAscending,
+  }) {
+    final hasLocalMedia = currentItems
         .where((e) => !e.isDir)
         .map((e) => e.name)
         .any(_isSupportedMedia);
-    final hasSubfolders = _currentItems.any((e) => e.isDir);
+    final hasSubfolders = currentItems.any((e) => e.isDir);
     final canPlayMedia = hasLocalMedia || hasSubfolders;
     return {
       FileManagerAction.search: (context) => IconButton(
         icon: Icon(
-          _searchActive ? Icons.search_off_rounded : Icons.search_rounded,
+          searchActive ? Icons.search_off_rounded : Icons.search_rounded,
         ),
-        tooltip: _searchActive
+        tooltip: searchActive
             ? context.l10n.closeSearchTooltip
             : context.l10n.searchInThisFolderTooltip,
-        onPressed: () => _searchNotifier.toggleActive(),
+        onPressed: () => searchNotifier.toggleActive(),
       ),
       FileManagerAction.add: (context) => AddItemMenuButton(
-        isReadOnly: _isReadOnly,
-        hasArchiveContext: _archiveContext != null,
+        isReadOnly: isReadOnly,
+        hasArchiveContext: hasArchiveContext,
         container: widget.container,
-        currentDirPath: _currentDirPath,
-        currentItems: _currentItems,
+        currentDirPath: currentDirPath,
+        currentItems: currentItems,
         onSetStatus: _setStatus,
         onExtractArchive: _extractArchive,
         onSignalActivity: _signalActivity,
@@ -4158,11 +4214,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
-        layoutMode: _layoutMode,
+        layoutMode: layoutMode,
         onLayoutModeChanged: _onLayoutModeChanged,
-        gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
+        gridAspectRatio: toolbarConfig.getGridAspectRatioForFolder(
           widget.container.uri,
-          _currentDirPath,
+          currentDirPath,
         ),
         onGridAspectRatioChanged: _onGridAspectRatioChanged,
       ),
@@ -4172,8 +4228,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onSortChanged: _onSortChanged,
       ),
       FileManagerAction.filter: (context) => FilterMenuButton(
-        currentFilter: _currentFilter,
-        onFilterChanged: (value) => _navNotifier.setFilter(value),
+        currentFilter: currentFilter,
+        onFilterChanged: (value) => navigationNotifier.setFilter(value),
         hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.playMedia: (context) => IconButton(
@@ -4384,6 +4440,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   Widget _buildBrowser(BuildContext context) {
+    final useBrowserTabs = ref.watch(
+      appSettingsControllerProvider.select(
+        (settings) => settings.settings.useBrowserTabs,
+      ),
+    );
     ref.watch(fileBrowserSelectionProvider(_stateKey));
     if (_isActiveTab) {
       for (final tab in _workspaceTabs) {
@@ -4406,6 +4467,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (previous?.config != next.config) {
           setState(() {
             _toolbarConfig = next.config;
+            _toolbarConfigReady = true;
             // The app-wide thumbnail default (or the Local Storage slot) may
             // be what changed, and this browser may be following it.
             _applyResolvedThumbnails(next.config);
@@ -4501,12 +4563,100 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         MediaQuery.of(context).orientation == Orientation.landscape;
     final useFab = _toolbarConfig.useFabForToolbar;
     final showActionBar = !_searchActive && !useFab;
-    final actionBuilders = _buildActionBuilders();
+    final selectedForBar = _selectedBrowserEntries;
+    final workspace = widget.workspaceConfig;
+    final appBarNavigation = _nav;
+    final appBarSearch = _search;
+    final appBarPathStack = List<PathSegment>.unmodifiable(
+      appBarNavigation.pathStack,
+    );
+    final appBarCurrentDirPath = appBarNavigation.currentDirPath;
+    final appBarCurrentFilter = appBarNavigation.currentFilter;
+    final appBarFreeSpace = appBarNavigation.freeSpace;
+    final appBarArchiveContext = appBarNavigation.archiveContext;
+    final appBarAtRoot = appBarNavigation.atRoot;
+    final appBarSearchActive = appBarSearch.active;
+    final appBarToolbarConfig = _toolbarConfig;
+    final appBarCurrentItems = List<RawEntry>.unmodifiable(_currentItems);
+    final appBarLayoutMode = appBarNavigation.layoutMode;
+    final appBarSort = ref.read(fileBrowserSortProvider(_stateKey));
+    final appBarSearchNotifier = _searchNotifier;
+    final appBarNavigationNotifier = _navNotifier;
+    final appBarMountedDocProviderFolders = _mountedDocProviderFolders;
+    final appBarPinnedPaths = _pinnedPaths;
+    final appBarBookmarkPaths = _bookmarkPaths;
+    final appBarSettingsService = ref.read(appSettingsServiceProvider);
+    final appBarSingleSelectedFolderForNewTab = _singleSelectedFolderForNewTab;
+    final appBarSelectionCount = selectedForBar.length;
+    final appBarSelectionHasReadOnlySource = selectedForBar.any(
+      (item) => item.container.readOnly,
+    );
+    final appBarSelectedTotalBytes = selectedForBar.isEmpty
+        ? 0
+        : _allSelectedTotalBytes;
+    final appBarHasPendingFolderSizes = selectedForBar.isNotEmpty
+        ? _anySelectedFolderSizePending
+        : false;
+    final appBarPinsByVolId = <int, Set<String>>{};
+    final appBarBookmarksByVolId = <int, List<String>>{};
+    for (final item in selectedForBar) {
+      appBarPinsByVolId.putIfAbsent(
+        item.container.volId,
+        () => ref
+            .read(fileBrowserPinsBookmarksProvider(item.container.volId))
+            .pinnedPaths,
+      );
+      appBarBookmarksByVolId.putIfAbsent(
+        item.container.volId,
+        () => ref
+            .read(fileBrowserPinsBookmarksProvider(item.container.volId))
+            .bookmarkPaths,
+      );
+    }
+    bool appBarIsFolderMounted(RawEntry entry) => isFolderMounted(
+      entry,
+      appBarCurrentDirPath,
+      appBarMountedDocProviderFolders,
+    );
+    bool appBarIsPinned(RawEntry entry) {
+      final matches = selectedForBar.where((item) => item.entry == entry);
+      if (matches.isEmpty) {
+        return isPinned(entry, appBarCurrentDirPath, appBarPinnedPaths);
+      }
+      return matches.any((item) {
+        final paths = appBarPinsByVolId[item.container.volId];
+        return paths != null && isPinned(entry, item.currentDirPath, paths);
+      });
+    }
+
+    bool appBarIsBookmarked(RawEntry entry) {
+      final matches = selectedForBar.where((item) => item.entry == entry);
+      if (matches.isEmpty) {
+        return isBookmark(entry, appBarCurrentDirPath, appBarBookmarkPaths);
+      }
+      return matches.any((item) {
+        final paths = appBarBookmarksByVolId[item.container.volId];
+        return paths != null && isBookmark(entry, item.currentDirPath, paths);
+      });
+    }
+
+    final actionBuilders = _buildActionBuilders(
+      searchActive: appBarSearchActive,
+      isReadOnly: widget.container.readOnly,
+      hasArchiveContext: appBarArchiveContext != null,
+      currentDirPath: appBarCurrentDirPath,
+      currentItems: appBarCurrentItems,
+      layoutMode: appBarLayoutMode,
+      currentFilter: appBarCurrentFilter,
+      toolbarConfig: appBarToolbarConfig,
+      searchNotifier: appBarSearchNotifier,
+      navigationNotifier: appBarNavigationNotifier,
+      sortBy: appBarSort.sortBy,
+      sortAscending: appBarSort.sortAscending,
+    );
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
-    final selectedForBar = _selectedBrowserEntries;
-    final workspace = widget.workspaceConfig;
     final localSelectionIsNonEmpty = ref
         .read(fileBrowserSelectionProvider(_stateKey))
         .items
@@ -4521,6 +4671,26 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final selectionBarVisible =
         _isActiveTab &&
         (aggregateSelection?.hasSelection ?? _selectedBrowserEntryCount > 0);
+    final selectionInBottomBar =
+        selectionBarVisible && _toolbarConfig.bottomSelectionBar;
+    final hasBookmarkBarViewportSlot =
+        widget.workspaceConfig != null && !isLandscape && !selectionInBottomBar;
+    final showBookmarkBarInViewport =
+        hasBookmarkBarViewportSlot && showBookmarkBar;
+    final showBookmarkBarInBottomBar =
+        widget.workspaceConfig == null && showBookmarkBar;
+
+    Widget buildHorizontalBookmarkBar() => BookmarkBar(
+      bookmarkPaths: _bookmarkPaths,
+      axis: Axis.horizontal,
+      onTapItem: (path) {
+        final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
+        _navigateToPath(path, isDir: isDir);
+      },
+      onRemoveBookmark: (path) =>
+          _pinsBookmarksNotifier.removeBookmark(widget.container, path),
+    );
+
     final selectedForBarSet = {for (final item in selectedForBar) item.entry};
     final selectedVolIds = selectedForBar
         .map((item) => item.container.volId)
@@ -4547,7 +4717,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         selectedForBar.isNotEmpty &&
         selectedForBar.every((item) => item.container.isLocalStorage);
 
-    final hasBottomNavBar = !isLandscape && (showActionBar || showBookmarkBar);
+    final hasBottomNavBar =
+        !isLandscape && (showActionBar || showBookmarkBarInBottomBar);
     final bottomSystemInset = hasBottomNavBar
         ? 0.0
         : MediaQuery.paddingOf(context).bottom;
@@ -4576,12 +4747,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                   : 0.0) +
               fabClearance);
 
-    PreferredSizeWidget buildAppBar({required bool selectionMode}) {
+    PreferredSizeWidget buildAppBar(
+      BuildContext appBarContext, {
+      required bool selectionMode,
+    }) {
       return buildBrowserAppBar(
-        context,
-        ref: ref,
+        appBarContext,
+        appSettingsService: appBarSettingsService,
         container: widget.container,
-        pathStack: _pathStack,
+        pathStack: appBarPathStack,
         onJumpTo: _jumpTo,
         filteredItems: filteredItems,
         dirCount: dirCount,
@@ -4589,13 +4763,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         isSelectionMode: selectionMode,
         selectedItems: selectionMode ? selectedForBarSet : const {},
         selectedCountOverride: selectionMode
-            ? aggregateSelection?.count ?? _selectedBrowserEntryCount
+            ? aggregateSelection?.count ?? appBarSelectionCount
             : null,
         singleSelectionInCurrentTab: singleSelectionInCurrentTab,
         allowRenameAction:
             allSelectionInOneTab &&
             allSelectionOutsideArchives &&
-            !_selectionHasReadOnlySource,
+            !appBarSelectionHasReadOnlySource,
         allowShareAction: selectedInOneContainer && allSelectionOutsideArchives,
         allowCompressAction:
             selectedInOneContainer && allSelectionOutsideArchives,
@@ -4604,36 +4778,48 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         allowExtractAction: canExtractCurrentSelection,
         allowPinBookmarkActions: allSelectionOutsideArchives,
         hideVaultOnlyActionsOverride: hideVaultOnlyActionsForSelection,
-        isReadOnly: selectionMode ? _selectionHasReadOnlySource : _isReadOnly,
-        searchActive: _searchActive,
-        currentDirPath: _currentDirPath,
-        currentFilter: _currentFilter,
-        freeSpace: _freeSpace,
+        isReadOnly: selectionMode
+            ? appBarSelectionHasReadOnlySource
+            : widget.container.readOnly,
+        searchActive: appBarSearchActive,
+        currentDirPath: appBarCurrentDirPath,
+        currentFilter: appBarCurrentFilter,
+        freeSpace: appBarFreeSpace,
         selectedTotalBytes: selectionMode
-            ? aggregateSelection?.bytes ?? _allSelectedTotalBytes
+            ? aggregateSelection?.bytes ?? appBarSelectedTotalBytes
             : 0,
         hasPendingFolderSizes: selectionMode
             ? aggregateSelection?.hasPendingFolderSizes ??
-                  _anySelectedFolderSizePending
+                  appBarHasPendingFolderSizes
             : false,
         toolbarConfig: useFab
-            ? _toolbarConfig.copyWith(hidden: FileManagerAction.values.toSet())
-            : _toolbarConfig,
+            ? appBarToolbarConfig.copyWith(
+                hidden: FileManagerAction.values.toSet(),
+              )
+            : appBarToolbarConfig,
         actionBuilders: actionBuilders,
-        isFolderMounted: _isFolderMounted,
-        isPinned: _isSelectedEntryPinned,
-        isBookmark: _isSelectedEntryBookmarked,
+        isFolderMounted: appBarIsFolderMounted,
+        isPinned: appBarIsPinned,
+        isBookmark: appBarIsBookmarked,
         isInsideArchive: selectionMode
             ? selectedForBar.any((item) => item.insideArchive)
-            : _archiveContext != null,
+            : appBarArchiveContext != null,
         onExitSelectionMode: exitSelectionMode,
         onSelectAll: () =>
             setSelectedItems({...selectedItems, ...filteredItems}),
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
-        onOpenInNewTab: _singleSelectedFolderForNewTab == null
+        onOpenInNewTab: appBarSingleSelectedFolderForNewTab == null
             ? null
-            : _openSelectedFolderInNewTab,
+            : () {
+                final selected = appBarSingleSelectedFolderForNewTab;
+                _openFolderInNewTab(
+                  selected.container,
+                  fullPathOf(selected.entry, selected.currentDirPath),
+                  stateKey: selected.stateKey,
+                  selectedEntry: selected.entry,
+                );
+              },
         onExport: _exportSelectedToStorage,
         onCompressSelected: _compressSelected,
         onExtractSelectedArchive: _extractSelectedArchive,
@@ -4656,9 +4842,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onEditAudio: _editAudio,
         onSettingsClosed: _loadToolbarConfig,
         isFiltered: isFiltered,
-        onPaste: _isReadOnly ? null : _paste,
-        onNavigateUp: _atRoot ? null : _navigateUp,
-        onBackAtRoot: widget.workspaceConfig != null && _tabId != null
+        onPaste: widget.container.readOnly ? null : _paste,
+        onNavigateUp: appBarAtRoot ? null : _navigateUp,
+        onBackAtRoot:
+            widget.workspaceConfig != null && _tabId != null && !useBrowserTabs
             ? _handleBackAtRoot
             : null,
         showBackButton: widget.showBackButton,
@@ -4669,10 +4856,80 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final selectionInTopBar =
         selectedForBar.isNotEmpty && !_toolbarConfig.bottomSelectionBar;
-    if (widget.onAppBarChanged != null && _isActiveTab) {
+    // App-bar factories are hoisted into the shell. Recreating the closure on
+    // every directory build makes its ValueListenable rebuild the AppBar for
+    // unrelated viewport work (scrolling, thumbnails, banners), which appears
+    // as a toolbar flash. Keep one factory per visible app-bar state and have
+    // it delegate to the latest snapshot captured by this mounted view.
+    final appBarEntriesSignature = identityHashCode(filteredItems);
+    final selectedEntriesSignature = Object.hashAll(
+      selectedForBar.map(
+        (item) => Object.hash(
+          item.stateKey,
+          item.container.volId,
+          item.currentDirPath,
+          item.entry.name,
+          item.entry.isDir,
+          item.entry.sizeBytes,
+          item.insideArchive,
+          item.container.readOnly,
+        ),
+      ),
+    );
+    final appBarPathSignature = Object.hashAll(
+      appBarPathStack.map(
+        (segment) =>
+            Object.hash(segment.label, segment.fatPath, segment.isArchiveRoot),
+      ),
+    );
+    final appBarSignature = Object.hash(
+      Object.hash(
+        widget.container.volId,
+        widget.container.displayName,
+        widget.container.uri,
+        appBarPathSignature,
+        appBarCurrentDirPath,
+        appBarCurrentFilter,
+        appBarFreeSpace,
+        appBarSearchActive,
+        dirCount,
+        fileCount,
+        isFiltered,
+        appBarEntriesSignature,
+        appBarLayoutMode,
+        appBarSort.sortBy,
+        appBarSort.sortAscending,
+      ),
+      Object.hash(
+        appBarArchiveContext == null,
+        appBarToolbarConfig.showStatsBar,
+        appBarToolbarConfig.useFabForToolbar,
+        Object.hashAll(appBarToolbarConfig.visible),
+        Object.hashAll(appBarToolbarConfig.hidden),
+        Object.hashAll(appBarMountedDocProviderFolders),
+        Object.hashAll(appBarPinnedPaths.toList()..sort()),
+        Object.hashAll(appBarBookmarkPaths),
+        selectedEntriesSignature,
+        aggregateSelection?.count,
+        aggregateSelection?.bytes,
+        aggregateSelection?.hasPendingFolderSizes,
+        selectionInTopBar,
+        useBrowserTabs,
+      ),
+    );
+    _latestAppBarBuilder = buildAppBar;
+    final regularAppBarFactory = _appBarFactoryFor(
+      signature: appBarSignature,
+      selectionMode: selectionInTopBar,
+    );
+    final selectionAppBarFactory = _appBarFactoryFor(
+      signature: Object.hash(appBarSignature, true),
+      selectionMode: true,
+    );
+    if (widget.onAppBarChanged != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_isActiveTab) return;
-        widget.onAppBarChanged!(buildAppBar(selectionMode: selectionInTopBar));
+        if (!mounted) return;
+        widget.onAppBarChanged!(regularAppBarFactory);
       });
     }
     if (widget.onSelectionAppBarChanged != null &&
@@ -4689,7 +4946,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         widget.onSelectionAppBarChanged!(
           selectedForBar.isEmpty || _toolbarConfig.bottomSelectionBar
               ? null
-              : buildAppBar(selectionMode: true),
+              : selectionAppBarFactory,
         );
       });
     }
@@ -4705,23 +4962,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? AppSystemUI.transparentDark
             : SystemUiOverlayStyle.dark);
     final Widget? browserBottomBar =
-        (!isLandscape && (showActionBar || showBookmarkBar))
+        (!isLandscape && (showActionBar || showBookmarkBarInBottomBar))
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (showBookmarkBar)
-                BookmarkBar(
-                  bookmarkPaths: _bookmarkPaths,
-                  axis: Axis.horizontal,
-                  onTapItem: (path) {
-                    final isDir =
-                        !path.split('/').last.contains('.') ||
-                        path.endsWith('/');
-                    _navigateToPath(path, isDir: isDir);
-                  },
-                  onRemoveBookmark: (path) => _pinsBookmarksNotifier
-                      .removeBookmark(widget.container, path),
-                ),
+              if (showBookmarkBarInBottomBar) buildHorizontalBookmarkBar(),
               if (showActionBar)
                 FileManagerActionBar(
                   axis: Axis.horizontal,
@@ -4731,8 +4976,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ],
           )
         : null;
-    final selectionInBottomBar =
-        selectionBarVisible && _toolbarConfig.bottomSelectionBar;
     final embeddedBottomBar = selectionInBottomBar
         ? Material(
             color: Theme.of(context).colorScheme.surfaceContainer,
@@ -4745,7 +4988,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                   context: context,
                   removeTop: true,
                   removeBottom: true,
-                  child: buildAppBar(selectionMode: true),
+                  child: buildAppBar(context, selectionMode: true),
                 ),
               ),
             ),
@@ -4758,44 +5001,84 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       });
     }
 
-    final toolbarActions = useFab
-        ? _buildFabToolbar(bottomOffset: 0)
-              .whereType<Positioned>()
-              .map((positioned) => positioned.child)
-              .whereType<Widget>()
-              .toList(growable: false)
-        : const <Widget>[];
-    final embeddedFloatingAction = !hasClipboardFab && toolbarActions.isEmpty
-        ? null
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (hasClipboardFab)
-                ClipboardFab(
-                  onPaste: _isReadOnly ? null : _paste,
-                  heroTag: 'browser_clipboard_fab_${widget.container.volId}',
-                ),
-              if (hasClipboardFab && toolbarActions.isNotEmpty)
-                const SizedBox(height: 12),
-              if (toolbarActions.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var index = 0; index < toolbarActions.length; index++)
-                      if (index == 0)
-                        toolbarActions[index]
-                      else ...[
-                        const SizedBox(width: 12),
-                        toolbarActions[index],
+    final currentItemsSignature = _floatingActionItemsSignature();
+    final floatingActionSignature = Object.hash(
+      _toolbarConfigReady,
+      _toolbarConfig,
+      useFab,
+      hasClipboardFab,
+      selectionBarVisible,
+      _searchActive,
+      _currentDirPath,
+      _currentFilter,
+      _archiveContext?.hashCode,
+      _layoutMode,
+      sortBy,
+      sortAscending,
+      Object.hashAll(_toolbarConfig.visible),
+      currentItemsSignature,
+      showBookmarkBarInViewport,
+      widget.container.readOnly,
+    );
+    if (_lastBuiltFloatingActionSignature != floatingActionSignature) {
+      _lastBuiltFloatingActionSignature = floatingActionSignature;
+      final toolbarActions = useFab
+          ? _buildFabToolbar(bottomOffset: 0)
+                .whereType<Positioned>()
+                .map((positioned) => positioned.child)
+                .whereType<Widget>()
+                .toList(growable: false)
+          : const <Widget>[];
+      _lastBuiltFloatingAction = !hasClipboardFab && toolbarActions.isEmpty
+          ? null
+          : AnimatedPadding(
+              duration: AppMotion.short2,
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(
+                bottom: showBookmarkBarInViewport ? 48 : 0,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (hasClipboardFab)
+                    ClipboardFab(
+                      onPaste: _isReadOnly ? null : _paste,
+                      heroTag:
+                          'browser_clipboard_fab_${widget.container.volId}',
+                    ),
+                  if (hasClipboardFab && toolbarActions.isNotEmpty)
+                    const SizedBox(height: 12),
+                  if (toolbarActions.isNotEmpty)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (
+                          var index = 0;
+                          index < toolbarActions.length;
+                          index++
+                        )
+                          if (index == 0)
+                            toolbarActions[index]
+                          else ...[
+                            const SizedBox(width: 12),
+                            toolbarActions[index],
+                          ],
                       ],
-                  ],
-                ),
-            ],
-          );
-    if (widget.onFloatingActionChanged != null && _isActiveTab) {
+                    ),
+                ],
+              ),
+            );
+    }
+    final embeddedFloatingAction = _lastBuiltFloatingAction;
+    if (widget.onFloatingActionChanged != null && _toolbarConfigReady) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_isActiveTab) return;
+        if (!mounted ||
+            _lastBuiltFloatingActionSignature != floatingActionSignature ||
+            _lastPublishedFloatingActionSignature == floatingActionSignature) {
+          return;
+        }
+        _lastPublishedFloatingActionSignature = floatingActionSignature;
         widget.onFloatingActionChanged!(embeddedFloatingAction);
       });
     }
@@ -5164,6 +5447,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                         ],
                       ),
                     ),
+                    if (hasBookmarkBarViewportSlot)
+                      AnimatedSize(
+                        duration: AppMotion.short2,
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.bottomCenter,
+                        child: showBookmarkBar
+                            ? buildHorizontalBookmarkBar()
+                            : const SizedBox.shrink(),
+                      ),
                   ],
                 ),
               ],

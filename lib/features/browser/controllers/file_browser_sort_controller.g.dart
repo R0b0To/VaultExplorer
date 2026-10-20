@@ -16,7 +16,7 @@ final class FileBrowserSortProvider
     extends $NotifierProvider<FileBrowserSort, FileBrowserSortState> {
   FileBrowserSortProvider._({
     required FileBrowserSortFamily super.from,
-    required int super.argument,
+    required TabId super.argument,
   }) : super(
          retry: null,
          name: r'fileBrowserSortProvider',
@@ -58,7 +58,7 @@ final class FileBrowserSortProvider
   }
 }
 
-String _$fileBrowserSortHash() => r'1446e097b4e916a1fb478944165ac1dab2f17e94';
+String _$fileBrowserSortHash() => r'9f8dd24657a8b71cfa250d581bf4c96440073e25';
 
 final class FileBrowserSortFamily extends $Family
     with
@@ -67,7 +67,7 @@ final class FileBrowserSortFamily extends $Family
           FileBrowserSortState,
           FileBrowserSortState,
           FileBrowserSortState,
-          int
+          TabId
         > {
   FileBrowserSortFamily._()
     : super(
@@ -78,18 +78,18 @@ final class FileBrowserSortFamily extends $Family
         isAutoDispose: true,
       );
 
-  FileBrowserSortProvider call(int volId) =>
-      FileBrowserSortProvider._(argument: volId, from: this);
+  FileBrowserSortProvider call(TabId tabId) =>
+      FileBrowserSortProvider._(argument: tabId, from: this);
 
   @override
   String toString() => r'fileBrowserSortProvider';
 }
 
 abstract class _$FileBrowserSort extends $Notifier<FileBrowserSortState> {
-  late final _$args = ref.$arg as int;
-  int get volId => _$args;
+  late final _$args = ref.$arg as TabId;
+  TabId get tabId => _$args;
 
-  FileBrowserSortState build(int volId);
+  FileBrowserSortState build(TabId tabId);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

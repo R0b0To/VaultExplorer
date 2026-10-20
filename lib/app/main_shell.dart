@@ -19,7 +19,7 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
-import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
@@ -87,15 +87,21 @@ class _MainShellState extends ConsumerState<MainShell> {
   // providers they watch) before the user could see the dashboard.
   final Set<int> _builtTabs = {0};
   MountedContainer? _browserInitialContainer;
-  BrowserTabsController? _browserTabs;
-  bool _browserVisible = false;
+  BrowserTabsConfig? _browserWorkspace;
 
-  bool get _isBrowserContentVisible {
-    if (_index != 0) return false;
-    final tabs = _browserTabs;
-    if (tabs != null && !tabs.isEmpty) return true;
-    return _browserVisible;
+  BrowserTabsState? get _browserWorkspaceState {
+    final workspace = _browserWorkspace;
+    return workspace == null ? null : ref.read(browserTabsProvider(workspace));
   }
+
+  BrowserTabs? get _browserWorkspaceActions {
+    final workspace = _browserWorkspace;
+    return workspace == null
+        ? null
+        : ref.read(browserTabsProvider(workspace).notifier);
+  }
+
+  bool get _isBrowserContentVisible => _index == 0;
 
   @override
   void initState() {
@@ -235,7 +241,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void dispose() {
     _mountedNotifier.dispose();
-    _browserTabs?.removeListener(_onBrowserTabsUpdated);
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
     );
@@ -252,26 +257,25 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _onTabTap(int newIndex) {
-    final wasNavigating = _index != newIndex || _isBrowserContentVisible;
+    var returningToHome = false;
     if (newIndex == 0) {
-      final tabs = _browserTabs;
-      final dashboardTab = tabs?.dashboardTab;
-      if (dashboardTab != null) {
-        tabs!.activate(dashboardTab.key);
+      final workspace = _browserWorkspaceState;
+      final home = workspace?.tabs.where((tab) => tab.isDashboard).firstOrNull;
+      returningToHome =
+          _index != 0 || workspace?.activeTab?.isDashboard != true;
+      if (home != null) {
+        _browserWorkspaceActions?.activate(home.tabId);
       } else {
-        tabs?.replaceActiveWithDashboard();
+        _browserWorkspaceActions?.openDashboardTab();
       }
     }
-    if (wasNavigating || _index != newIndex || _isBrowserContentVisible) {
+    if (_index != newIndex) {
       setState(() {
         _index = newIndex;
         _builtTabs.add(newIndex);
-        _browserVisible = false;
       });
-      if (newIndex == 0) {
-        _dashboardKey.currentState?.reloadDashboard();
-      }
     }
+    if (returningToHome) _dashboardKey.currentState?.reloadDashboard();
   }
 
   void _showBrowserTabLimit() {
@@ -284,35 +288,36 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _openBrowser(MountedContainer container) {
-    final tabs = _browserTabs;
-    if (tabs == null) {
-      setState(() {
-        _browserInitialContainer = container;
-        _browserVisible = true;
-        _index = 0;
-      });
+    final state = _browserWorkspaceState;
+    final actions = _browserWorkspaceActions;
+    if (state == null || actions == null) {
+      // The browser workspace is mounted from the first frame with a pinned
+      // Home tab, so an open request before its first build is a lifecycle bug.
+      // Queue the request for the workspace's initialization callback.
+      setState(() => _browserInitialContainer = container);
       return;
     }
 
-    final active = tabs.activeTab;
+    final active = state.activeTab;
     final tabsEnabled = ref
         .read(appSettingsControllerProvider)
         .settings
         .useBrowserTabs;
     if (active?.isDashboard == true) {
-      // Dashboard is a location in the tab strip. Opening a vault from it
-      // navigates that same tab to the vault; Back at the vault root returns
-      // to Dashboard in this tab.
-      tabs.replaceActive(container, returnToDashboardOnRoot: true);
+      // Home is a real, pinned workspace page. Opening a vault adds a folder
+      // page beside it, so root Back returns to Home without special tab data.
+      if (actions.openTab(container) == null) {
+        _showBrowserTabLimit();
+        return;
+      }
     } else if (active?.volId != container.volId && !tabsEnabled) {
-      tabs.replaceActive(container);
+      actions.replaceActive(container);
     } else if (active?.volId != container.volId &&
-        tabs.openTab(container) == null) {
+        actions.openTab(container) == null) {
       _showBrowserTabLimit();
       return;
     }
     setState(() {
-      _browserVisible = true;
       _index = 0;
       _builtTabs.add(0);
     });
@@ -424,26 +429,17 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
   }
 
-  void _onBrowserTabsChanged(BrowserTabsController? tabs) {
-    _browserTabs?.removeListener(_onBrowserTabsUpdated);
-    _browserTabs = tabs;
-    tabs?.addListener(_onBrowserTabsUpdated);
+  void _onBrowserWorkspaceChanged(BrowserTabsConfig? workspace) {
+    _browserWorkspace = workspace;
+    final pending = _browserInitialContainer;
+    if (workspace != null && pending != null) {
+      _browserInitialContainer = null;
+      ref.read(browserTabsProvider(workspace).notifier).openTab(pending);
+      _index = 0;
+    }
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
-    });
-  }
-
-  void _onBrowserTabsUpdated() {
-    final active = _browserTabs?.activeTab;
-    if (!mounted || active == null) return;
-    // Dashboard and file locations share one tab pager. Keep the host visible
-    // for either kind of location so changing tabs can follow the finger.
-    const shouldShowBrowser = true;
-    if (_browserVisible == shouldShowBrowser) return;
-    setState(() {
-      _browserVisible = shouldShowBrowser;
-      _index = 0;
     });
   }
 
@@ -451,13 +447,15 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
     }
-    final tabs = _browserTabs;
-    if (tabs == null) return;
-    final active = tabs.activeTab;
+    final workspace = _browserWorkspace;
+    final state = _browserWorkspaceState;
+    final actions = _browserWorkspaceActions;
+    if (workspace == null || state == null || actions == null) return;
+    final active = state.activeTab;
     if (active == null) return;
     final nav = active.isDashboard
         ? null
-        : ref.read(fileBrowserNavigationProvider(active.key));
+        : ref.read(fileBrowserNavigationProvider(active.tabId));
     final choice = await BrowserNewTabSheet.show(
       context,
       currentContainer: active.container,
@@ -467,60 +465,42 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {
-      tabs.openDashboardTab();
+      actions.openDashboardTab();
       return;
     }
     final path = choice.path;
-    final key = tabs.openTab(
+    final tabId = actions.openTab(
       choice.container!,
       initialPath: path == null || path.isEmpty ? null : path,
     );
-    if (key == null) {
+    if (tabId == null) {
       _showBrowserTabLimit();
       return;
     }
-    setState(() => _browserVisible = true);
+    setState(() => _index = 0);
   }
 
-  void _duplicateBrowserTab(BrowserTab tab) {
+  void _duplicateBrowserTab(BrowserTabState tab) {
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
     }
-    final tabs = _browserTabs;
+    final actions = _browserWorkspaceActions;
     final container = tab.container;
-    if (tabs == null) return;
+    if (actions == null) return;
     if (tab.isDashboard) {
-      tabs.openDashboardTab();
+      actions.openDashboardTab();
       return;
     }
     if (container == null) return;
-    final nav = ref.read(fileBrowserNavigationProvider(tab.key));
+    final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
     final path = browserTabDuplicatePath(nav);
-    if (tabs.openTab(container, initialPath: path.isEmpty ? null : path) ==
+    if (actions.openTab(container, initialPath: path.isEmpty ? null : path) ==
         null) {
       _showBrowserTabLimit();
       return;
     }
-    setState(() => _browserVisible = true);
+    setState(() => _index = 0);
   }
-
-  List<_NavDestination> _destinations(BuildContext context) => [
-    _NavDestination(
-      icon: Icons.lock_outline_rounded,
-      selectedIcon: Icons.lock_rounded,
-      label: context.l10n.navBarVaultsLabel,
-    ),
-    _NavDestination(
-      icon: Icons.build_outlined,
-      selectedIcon: Icons.build_rounded,
-      label: context.l10n.navBarToolsLabel,
-    ),
-    _NavDestination(
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings_rounded,
-      label: context.l10n.settingsTooltip,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -534,53 +514,57 @@ class _MainShellState extends ConsumerState<MainShell> {
       ),
       (previous, enabled) {
         if (enabled || previous == false) return;
-        final tabs = _browserTabs;
-        final activeKey = tabs?.activeKey ?? -1;
-        if (activeKey >= 0) tabs!.closeOthers(activeKey);
+        final activeTabId = _browserWorkspaceState?.activeTabId;
+        if (activeTabId != null) {
+          _browserWorkspaceActions?.closeOthers(activeTabId);
+        }
       },
     );
+    final workspace = _browserWorkspace;
+    if (workspace != null) {
+      ref.listen(
+        browserTabsProvider(workspace).select((state) => state.activeTabId),
+        (previous, next) {
+          if (mounted && previous != next) setState(() {});
+        },
+      );
+    }
     final tabsEnabled = ref.watch(
       appSettingsControllerProvider.select(
         (state) => state.settings.useBrowserTabs,
       ),
     );
 
-    final cs = Theme.of(context).colorScheme;
-
-    final destinations = _destinations(context);
     final isHidden = _hideDashboard || _handlingQuickCapture;
 
-    Widget buildDashboardTab([
-      ValueListenable<double>? pagePosition,
-      int? pageIndex,
-      ValueChanged<BrowserTab>? onActivateTab,
-      ValueChanged<bool>? onVerticalScrollActivity,
+    Widget buildDashboardTab({
       bool backPreviewOnly = false,
-    ]) => SkinAreaScope(
+      bool embedded = false,
+      BrowserTabsConfig? workspaceConfig,
+      ValueChanged<Widget?>? onFloatingActionChanged,
+      ValueChanged<Widget?>? onBottomBarChanged,
+    }) => SkinAreaScope(
       area: SkinArea.dashboard,
       child: VaultDashboard(
         key: backPreviewOnly ? null : _dashboardKey,
         mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
         onNavigateTab: _onTabTap,
-        browserTabs: backPreviewOnly ? null : _browserTabs,
-        tabPagePosition: pagePosition,
-        tabPageIndex: pageIndex,
+        workspaceConfig: backPreviewOnly ? null : workspaceConfig,
         backPreviewOnly: backPreviewOnly,
+        embedded: embedded,
+        onFloatingActionChanged: onFloatingActionChanged,
+        onBottomBarChanged: onBottomBarChanged,
         onOpenBrowser: _openBrowser,
-        onNewBrowserTab: _openNewBrowserTab,
-        onDuplicateBrowserTab: _duplicateBrowserTab,
-        onActivateBrowserTab: onActivateTab,
-        onVerticalScrollActivity: onVerticalScrollActivity,
       ),
     );
 
-    final dashboardHosted =
-        _browserTabs != null && _browserTabs!.tabs.isNotEmpty;
     final body = IndexedStack(
-      index: _index,
+      index: _index == 0 ? 0 : _index - 1,
       children: [
-        // Each tab is its own page with its own colors; see SkinAreaScope.
-        dashboardHosted ? const SizedBox.expand() : buildDashboardTab(),
+        // The browser workspace owns the single Dashboard page. Keeping an
+        // empty slot here preserves the app destination index without building
+        // a second, hidden Dashboard route.
+        const SizedBox.expand(),
         if (_builtTabs.contains(1))
           SkinAreaScope(
             area: SkinArea.tools,
@@ -608,15 +592,18 @@ class _MainShellState extends ConsumerState<MainShell> {
       return _dashboardKey.currentState?.resolveAnyContainer(volId);
     }
 
-    Widget buildDrawer({int? currentVolId, BrowserTabsController? tabs}) {
+    Widget buildDrawer({int? currentVolId, BrowserTabsConfig? workspace}) {
+      final workspaceActions = workspace == null
+          ? null
+          : ref.read(browserTabsProvider(workspace).notifier);
       return AppNavigationDrawer(
         currentVolId: currentVolId,
         primaryLocalContainer:
             _dashboardKey.currentState?.localStorageContainer,
-        onOpenInNewTab: tabs == null || !tabsEnabled
+        onOpenInNewTab: workspaceActions == null || !tabsEnabled
             ? null
             : (container) {
-                if (tabs.openTab(container) == null && mounted) {
+                if (workspaceActions.openTab(container) == null && mounted) {
                   showAppSnackBar(
                     context,
                     message: context.l10n.browserTabLimitReached(
@@ -628,16 +615,8 @@ class _MainShellState extends ConsumerState<MainShell> {
               },
         selectedTabIndex: _index,
         onSelectTab: _onTabTap,
-        keepBrowserTabsOnNavigate: tabs != null,
-        onSelectContainer: (container) {
-          // Already inside the tabbed file manager: switch the active tab
-          // instead of stacking another file manager route.
-          if (tabs != null) {
-            tabs.replaceActive(container);
-            return;
-          }
-          _openBrowser(container);
-        },
+        keepBrowserTabsOnNavigate: workspaceActions != null,
+        onSelectContainer: _openBrowser,
         onUnlockVault: _openVaultFromDrawer,
         onAddVault: () {
           _onTabTap(0);
@@ -649,53 +628,46 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     final browserContentVisible = _isBrowserContentVisible;
-    final Widget persistentBrowser = Offstage(
-      offstage: !browserContentVisible,
-      child: SkinAreaScope(
-        area: SkinArea.files,
-        child: BrowserTabsHost(
-          key: const ValueKey('main-shell-browser-tabs-host'),
-          initialContainer: _browserInitialContainer,
-          resolveContainer: resolveContainer,
-          mountedContainers: () => _mountedNotifier.value,
-          primaryLocalContainer: () =>
-              _dashboardKey.currentState?.localStorageContainer,
-          drawerBuilder: (tabs, volId) =>
-              buildDrawer(currentVolId: volId, tabs: tabs),
-          closeRouteWhenEmpty: false,
-          includeDashboardTab: true,
-          dashboardBuilder: _browserTabs == null
-              ? null
-              : (
-                  pagePosition,
-                  index,
-                  onActivateTab,
-                  onVerticalScrollActivity,
-                  backPreviewOnly,
-                ) => buildDashboardTab(
-                  pagePosition,
-                  index,
-                  onActivateTab,
-                  onVerticalScrollActivity,
-                  backPreviewOnly,
+    final Widget persistentBrowser = TickerMode(
+      enabled: browserContentVisible,
+      child: Offstage(
+        offstage: !browserContentVisible,
+        child: SkinAreaScope(
+          area: SkinArea.files,
+          child: BrowserTabsShell(
+            key: const ValueKey('main-shell-browser-tabs-host'),
+            initialContainer: null,
+            resolveContainer: resolveContainer,
+            mountedContainers: () => _mountedNotifier.value,
+            primaryLocalContainer: () =>
+                _dashboardKey.currentState?.localStorageContainer,
+            drawerBuilder: (workspace, volId) =>
+                buildDrawer(currentVolId: volId, workspace: workspace),
+            closeRouteWhenEmpty: false,
+            includeDashboardTab: true,
+            homeBuilder:
+                ({
+                  required workspace,
+                  required onFloatingActionChanged,
+                  required onBottomBarChanged,
+                }) => buildDashboardTab(
+                  embedded: true,
+                  workspaceConfig: workspace,
+                  onFloatingActionChanged: onFloatingActionChanged,
+                  onBottomBarChanged: onBottomBarChanged,
                 ),
-          onEmpty: () {
-            if (mounted && _browserVisible) {
-              setState(() => _browserVisible = false);
-            }
-          },
-          onTabsController: _onBrowserTabsChanged,
-          onNewTab: _openNewBrowserTab,
-          onDuplicate: _duplicateBrowserTab,
+            onEmpty: null,
+            onWorkspaceChanged: _onBrowserWorkspaceChanged,
+            onNewTab: _openNewBrowserTab,
+            onDuplicate: _duplicateBrowserTab,
+          ),
         ),
       ),
     );
     final Widget appBody = Stack(
       fit: StackFit.expand,
       children: [
-        // The live Dashboard page is hosted in the tab pager. Keep the shell's
-        // app destinations mounted without painting them under that pager.
-        Offstage(offstage: browserContentVisible, child: body),
+        Offstage(offstage: _index == 0, child: body),
         persistentBrowser,
       ],
     );
@@ -721,7 +693,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         : scaffold;
 
     final dashboardLocationIsActive =
-        _browserTabs?.activeTab?.isDashboard ?? false;
+        _browserWorkspaceState?.activeTab?.isDashboard ?? false;
     return PopScope(
       canPop:
           _index == 0 && (!browserContentVisible || dashboardLocationIsActive),
@@ -732,138 +704,6 @@ class _MainShellState extends ConsumerState<MainShell> {
         _onTabTap(0);
       },
       child: content,
-    );
-  }
-}
-
-class _NavDestination {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  const _NavDestination({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-  });
-}
-
-class _NavRail extends StatelessWidget {
-  final List<_NavDestination> destinations;
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-  const _NavRail({
-    required this.destinations,
-    required this.selectedIndex,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return NavigationRail(
-      backgroundColor: cs.surfaceContainer,
-      groupAlignment: 0.0,
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onTap,
-      labelType: NavigationRailLabelType.all,
-      useIndicator: true,
-      indicatorColor: cs.secondaryContainer,
-      indicatorShape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      selectedIconTheme: IconThemeData(
-        color: cs.onSecondaryContainer,
-        size: 22,
-      ),
-      unselectedIconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 22),
-      selectedLabelTextStyle: textTheme.labelSmall?.copyWith(
-        color: cs.onSecondaryContainer,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelTextStyle: textTheme.labelSmall?.copyWith(
-        color: cs.onSurfaceVariant,
-        fontWeight: FontWeight.w500,
-      ),
-      destinations: [
-        for (final d in destinations)
-          NavigationRailDestination(
-            icon: Icon(d.icon),
-            selectedIcon: Icon(d.selectedIcon),
-            label: Text(d.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-      ],
-    );
-  }
-}
-
-class _MainBottomBarItem extends StatelessWidget {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _MainBottomBarItem({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final color = selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        splashFactory: NoSplash.splashFactory,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: selected ? cs.secondaryContainer : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  selected ? selectedIcon : icon,
-                  color: color,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

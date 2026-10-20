@@ -27,6 +27,7 @@ import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'file_browser_search_controller.g.dart';
 
@@ -54,7 +55,7 @@ class FileBrowserSearch extends _$FileBrowserSearch {
   int _generation = 0;
 
   @override
-  FileBrowserSearchState build(int volId) {
+  FileBrowserSearchState build(TabId tabId) {
     ref.onDispose(() => _debounceTimer?.cancel());
     return _emptySearch;
   }
@@ -98,7 +99,9 @@ class FileBrowserSearch extends _$FileBrowserSearch {
   void removeDeletedPaths(Set<String> deletedFullPaths, String searchRootPath) {
     if (deletedFullPaths.isEmpty || state.deepSearchResults.isEmpty) return;
     final updated = state.deepSearchResults
-        .where((e) => !deletedFullPaths.contains(joinPath(e.name, searchRootPath)))
+        .where(
+          (e) => !deletedFullPaths.contains(joinPath(e.name, searchRootPath)),
+        )
         .toList();
     if (updated.length == state.deepSearchResults.length) return;
     state = (
@@ -297,7 +300,9 @@ class FileBrowserSearch extends _$FileBrowserSearch {
         final nameMatches = entry.name.toLowerCase().contains(query);
         if (nameMatches) {
           results.add(_toResultEntry(entry, relativePrefix));
-        } else if (!entry.isDir && archiveContext == null && isVaultItemFileName(entry.name)) {
+        } else if (!entry.isDir &&
+            archiveContext == null &&
+            isVaultItemFileName(entry.name)) {
           // Only for real vault-backed browsing: an in-memory archive isn't
           // read through VaultItemsService/MountedContainer, and a vault
           // item file living inside one is exotic enough not to be worth a
@@ -321,20 +326,25 @@ class FileBrowserSearch extends _$FileBrowserSearch {
           final batch = contentCandidates.skip(i).take(batchSize).toList();
           final matches = await Future.wait(
             batch.map((entry) {
-              final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
+              final fullPath = dirPath.isEmpty
+                  ? entry.name
+                  : '$dirPath/${entry.name}';
               return _vaultItemContentMatches(container, fullPath, query);
             }),
           );
           if (generation != _generation) return;
           for (var b = 0; b < batch.length; b++) {
-            if (matches[b]) results.add(_toResultEntry(batch[b], relativePrefix));
+            if (matches[b])
+              results.add(_toResultEntry(batch[b], relativePrefix));
           }
         }
       }
 
       for (final sub in subdirs) {
         if (generation != _generation) return;
-        final subRelPrefix = relativePrefix.isEmpty ? sub.name : '$relativePrefix/${sub.name}';
+        final subRelPrefix = relativePrefix.isEmpty
+            ? sub.name
+            : '$relativePrefix/${sub.name}';
         final subFullPath = dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
         await _scanDirectoryForQuery(
           subFullPath,
@@ -351,16 +361,20 @@ class FileBrowserSearch extends _$FileBrowserSearch {
         );
       }
     } catch (e) {
-      VeLog.e('FileBrowserSearch', 'Deep search failed at ${VeLog.censorUri(dirPath)}', e);
+      VeLog.e(
+        'FileBrowserSearch',
+        'Deep search failed at ${VeLog.censorUri(dirPath)}',
+        e,
+      );
     }
   }
 
   RawEntry _toResultEntry(RawEntry entry, String relativePrefix) => RawEntry(
-        name: relativePrefix.isEmpty ? entry.name : '$relativePrefix/${entry.name}',
-        isDir: entry.isDir,
-        sizeBytes: entry.sizeBytes,
-        modifiedSecs: entry.modifiedSecs,
-      );
+    name: relativePrefix.isEmpty ? entry.name : '$relativePrefix/${entry.name}',
+    isDir: entry.isDir,
+    sizeBytes: entry.sizeBytes,
+    modifiedSecs: entry.modifiedSecs,
+  );
 
   /// Whether the Item Vault entry at [fullPath] matches [query] by one of
   /// [kVaultItemSearchableFieldKeys] rather than by its file name -- e.g.
@@ -372,7 +386,9 @@ class FileBrowserSearch extends _$FileBrowserSearch {
     String fullPath,
     String query,
   ) async {
-    final item = await ref.read(vaultItemsServiceProvider).loadItem(container, fullPath);
+    final item = await ref
+        .read(vaultItemsServiceProvider)
+        .loadItem(container, fullPath);
     if (item == null) return false;
     for (final key in kVaultItemSearchableFieldKeys) {
       final value = item.fields[key];

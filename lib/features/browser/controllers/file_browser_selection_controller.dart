@@ -1,11 +1,6 @@
-// Selection Controller from the migration plan's Phase 4 worked example
-// ("FileBrowserSelectionController ... Replaces any custom selection
-// mixins"). Was SelectionMixin<FileBrowserScreen>, mixed directly into
-// _FileBrowserScreenState. Family-keyed by the container's volId: one
-// FileBrowserScreen instance handles every directory within a single
-// mounted container via its own _pathStack (there's no per-directory
-// screen push), so volId is the right scope -- selection persists across
-// folders within one browsing session and is isolated between containers.
+// Selection state is scoped to a browser tab while hosted, and to the
+// container's volId in standalone mode. That keeps tabs on the same vault
+// independent while preserving selection across folders in each tab.
 //
 // Deliberately autoDispose (the default, no `keepAlive`): selection is
 // screen-session state, not app-wide state that should survive after the
@@ -21,6 +16,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'file_browser_selection_controller.g.dart';
 
@@ -39,7 +35,7 @@ class FileBrowserSelection extends _$FileBrowserSelection {
   bool _fetchingFolderSizes = false;
 
   @override
-  FileBrowserSelectionState build(int volId) => _emptySelection;
+  FileBrowserSelectionState build(TabId tabId) => _emptySelection;
 
   void toggleSelectItem(RawEntry item) {
     final items = {...state.items};

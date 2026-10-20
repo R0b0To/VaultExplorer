@@ -7,6 +7,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'file_browser_sort_controller.g.dart';
 
@@ -17,7 +18,7 @@ const _defaultSortState = (sortBy: SortBy.name, sortAscending: true);
 @riverpod
 class FileBrowserSort extends _$FileBrowserSort {
   @override
-  FileBrowserSortState build(int volId) => _defaultSortState;
+  FileBrowserSortState build(TabId tabId) => _defaultSortState;
 
   void setSort(SortBy by) {
     if (state.sortBy == by) {

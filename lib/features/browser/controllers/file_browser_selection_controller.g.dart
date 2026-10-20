@@ -16,7 +16,7 @@ final class FileBrowserSelectionProvider
     extends $NotifierProvider<FileBrowserSelection, FileBrowserSelectionState> {
   FileBrowserSelectionProvider._({
     required FileBrowserSelectionFamily super.from,
-    required int super.argument,
+    required TabId super.argument,
   }) : super(
          retry: null,
          name: r'fileBrowserSelectionProvider',
@@ -59,7 +59,7 @@ final class FileBrowserSelectionProvider
 }
 
 String _$fileBrowserSelectionHash() =>
-    r'25343d62cb83242a44db42046e71ae719837a46d';
+    r'cc0a0826a87c05d7ab217954f7a5c4bb377c9667';
 
 final class FileBrowserSelectionFamily extends $Family
     with
@@ -68,7 +68,7 @@ final class FileBrowserSelectionFamily extends $Family
           FileBrowserSelectionState,
           FileBrowserSelectionState,
           FileBrowserSelectionState,
-          int
+          TabId
         > {
   FileBrowserSelectionFamily._()
     : super(
@@ -79,8 +79,8 @@ final class FileBrowserSelectionFamily extends $Family
         isAutoDispose: true,
       );
 
-  FileBrowserSelectionProvider call(int volId) =>
-      FileBrowserSelectionProvider._(argument: volId, from: this);
+  FileBrowserSelectionProvider call(TabId tabId) =>
+      FileBrowserSelectionProvider._(argument: tabId, from: this);
 
   @override
   String toString() => r'fileBrowserSelectionProvider';
@@ -88,10 +88,10 @@ final class FileBrowserSelectionFamily extends $Family
 
 abstract class _$FileBrowserSelection
     extends $Notifier<FileBrowserSelectionState> {
-  late final _$args = ref.$arg as int;
-  int get volId => _$args;
+  late final _$args = ref.$arg as TabId;
+  TabId get tabId => _$args;
 
-  FileBrowserSelectionState build(int volId);
+  FileBrowserSelectionState build(TabId tabId);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

@@ -16,7 +16,7 @@ final class FileBrowserSearchProvider
     extends $NotifierProvider<FileBrowserSearch, FileBrowserSearchState> {
   FileBrowserSearchProvider._({
     required FileBrowserSearchFamily super.from,
-    required int super.argument,
+    required TabId super.argument,
   }) : super(
          retry: null,
          name: r'fileBrowserSearchProvider',
@@ -58,7 +58,7 @@ final class FileBrowserSearchProvider
   }
 }
 
-String _$fileBrowserSearchHash() => r'f6996cb5df70d9fa9ca263d0f992653abbbe5ae3';
+String _$fileBrowserSearchHash() => r'c8353f0ea2ae0ae0252859a7ced80afac660f805';
 
 final class FileBrowserSearchFamily extends $Family
     with
@@ -67,7 +67,7 @@ final class FileBrowserSearchFamily extends $Family
           FileBrowserSearchState,
           FileBrowserSearchState,
           FileBrowserSearchState,
-          int
+          TabId
         > {
   FileBrowserSearchFamily._()
     : super(
@@ -78,18 +78,18 @@ final class FileBrowserSearchFamily extends $Family
         isAutoDispose: true,
       );
 
-  FileBrowserSearchProvider call(int volId) =>
-      FileBrowserSearchProvider._(argument: volId, from: this);
+  FileBrowserSearchProvider call(TabId tabId) =>
+      FileBrowserSearchProvider._(argument: tabId, from: this);
 
   @override
   String toString() => r'fileBrowserSearchProvider';
 }
 
 abstract class _$FileBrowserSearch extends $Notifier<FileBrowserSearchState> {
-  late final _$args = ref.$arg as int;
-  int get volId => _$args;
+  late final _$args = ref.$arg as TabId;
+  TabId get tabId => _$args;
 
-  FileBrowserSearchState build(int volId);
+  FileBrowserSearchState build(TabId tabId);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

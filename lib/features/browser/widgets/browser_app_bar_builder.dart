@@ -13,7 +13,8 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
+import 'package:vaultexplorer/features/browser/file_browser_screen.dart'
+    show PathSegment;
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
@@ -76,7 +77,8 @@ PreferredSizeWidget buildBrowserAppBar(
     AppSettings settings,
   )
   onShowOpenWithDialog,
-  required Future<void> Function(RawEntry entry) onShowFolderDocumentProviderSheet,
+  required Future<void> Function(RawEntry entry)
+  onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
   void Function(RawEntry entry)? onSyncSettings,
   VoidCallback? onSyncRoot,
@@ -95,12 +97,14 @@ PreferredSizeWidget buildBrowserAppBar(
 }) {
   final allItems = filteredItems;
   final cs = Theme.of(context).colorScheme;
-  final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+  final isLandscape =
+      MediaQuery.of(context).orientation == Orientation.landscape;
   final showActionBar = !searchActive;
 
   if (isSelectionMode) {
     final selectedCount = selectedCountOverride ?? selectedItems.length;
-    final single = selectedCount == 1 &&
+    final single =
+        selectedCount == 1 &&
         selectedItems.length == 1 &&
         singleSelectionInCurrentTab;
     final singleFile = single && !selectedItems.first.isDir;
@@ -114,25 +118,30 @@ PreferredSizeWidget buildBrowserAppBar(
     // no-op implementation.
     final hideVaultOnlyActions =
         hideVaultOnlyActionsOverride ?? container.isLocalStorage;
-    final singleArchiveSelected = singleFile &&
+    final singleArchiveSelected =
+        singleFile &&
         ArchiveService.isOpenableAsArchive(
           ArchiveService.splitPartExtension(selectedItems.first.name) ??
               (selectedItems.first.name.contains('.')
                   ? selectedItems.first.name.split('.').last.toLowerCase()
                   : ''),
         );
-    final showPinOption = allowPinBookmarkActions &&
-        selectedItems.any((item) => !isPinned(item));
-    final showUnpinOption = allowPinBookmarkActions &&
-        selectedItems.any((item) => isPinned(item));
-    final showBookmarkOption = allowPinBookmarkActions &&
+    final showPinOption =
+        allowPinBookmarkActions && selectedItems.any((item) => !isPinned(item));
+    final showUnpinOption =
+        allowPinBookmarkActions && selectedItems.any((item) => isPinned(item));
+    final showBookmarkOption =
+        allowPinBookmarkActions &&
         selectedItems.any((item) => !isBookmark(item));
-    final showUnbookmarkOption = allowPinBookmarkActions &&
+    final showUnbookmarkOption =
+        allowPinBookmarkActions &&
         selectedItems.any((item) => isBookmark(item));
-    final showEncryptOption = selectedItems
-        .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
-    final showDecryptOption = selectedItems
-        .any((item) => !item.isDir && isAppEncryptedFileName(item.name));
+    final showEncryptOption = selectedItems.any(
+      (item) => !item.isDir && !isAppEncryptedFileName(item.name),
+    );
+    final showDecryptOption = selectedItems.any(
+      (item) => !item.isDir && isAppEncryptedFileName(item.name),
+    );
     // Vault items (passwords, secure notes, etc.) are internal structured
     // records rather than real files -- like doOpenWithApp/doRename below,
     // they're excluded from what counts as "shareable". Unlike those two,
@@ -152,19 +161,25 @@ PreferredSizeWidget buildBrowserAppBar(
 
     // A folder is shareable (it goes out as a zip) in every kind of
     // container, and isVaultItemFile is already false for folders.
-    final showShareOption = allowShareAction &&
+    final showShareOption =
+        allowShareAction &&
         !isInsideArchive &&
         selectedItems.any((item) => !isVaultItemFile(item));
-    final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
-    final showEditVideoOption = singleFile && MediaViewerConstants.isVideo(selectedItems.first.name);
-    final showEditAudioOption = onEditAudio != null &&
+    final showEditImageOption =
+        singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
+    final showEditVideoOption =
+        singleFile && MediaViewerConstants.isVideo(selectedItems.first.name);
+    final showEditAudioOption =
+        onEditAudio != null &&
         singleFile &&
         MediaViewerConstants.isAudio(selectedItems.first.name);
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
         ? (totalBytes > 0
-              ? context.l10n.sizeCalculatingWithBytesLabel(formatBytes(totalBytes))
+              ? context.l10n.sizeCalculatingWithBytesLabel(
+                  formatBytes(totalBytes),
+                )
               : context.l10n.sizeCalculatingLabel)
         : formatBytes(totalBytes);
 
@@ -178,26 +193,32 @@ PreferredSizeWidget buildBrowserAppBar(
         currentDirPath: currentDirPath,
       );
     }
+
     void doRename() {
       final entries = selectedItems.toList();
       for (final entry in entries) {
         final parts = entry.name.split('.');
         final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
         if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-          onSetStatus(context.l10n.editSecureItemsToRenameMessage, error: false);
+          onSetStatus(
+            context.l10n.editSecureItemsToRenameMessage,
+            error: false,
+          );
           onExitSelectionMode();
           return;
         }
       }
-      unawaited(BrowserDialogs.showRename(
-        context,
-        container: container,
-        oldEntries: entries,
-        existingEntries: allItems,
-        currentDirPath: currentDirPath,
-        onSuccess: () => onDirectoryReload(currentDirPath),
-        readOnly: isReadOnly,
-      ));
+      unawaited(
+        BrowserDialogs.showRename(
+          context,
+          container: container,
+          oldEntries: entries,
+          existingEntries: allItems,
+          currentDirPath: currentDirPath,
+          onSuccess: () => onDirectoryReload(currentDirPath),
+          readOnly: isReadOnly,
+        ),
+      );
       onExitSelectionMode();
     }
 
@@ -210,10 +231,15 @@ PreferredSizeWidget buildBrowserAppBar(
       final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
       onExitSelectionMode();
       if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-        onSetStatus(context.l10n.vaultItemsCannotBeOpenedExternallyMessage, error: true);
+        onSetStatus(
+          context.l10n.vaultItemsCannotBeOpenedExternallyMessage,
+          error: true,
+        );
         return;
       }
-      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+      final settings = await ref
+          .read(appSettingsServiceProvider)
+          .loadSettings();
       if (context.mounted) {
         await onShowOpenWithDialog(entry.name, path, ext, settings);
       }
@@ -231,21 +257,27 @@ PreferredSizeWidget buildBrowserAppBar(
 
     Future<void> doEditImage() async {
       final entry = selectedItems.first;
-      final path = currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      final path = currentDirPath.isEmpty
+          ? entry.name
+          : '$currentDirPath/${entry.name}';
       onExitSelectionMode();
       await onEditImage(entry.name, path);
     }
 
     Future<void> doEditVideo() async {
       final entry = selectedItems.first;
-      final path = currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      final path = currentDirPath.isEmpty
+          ? entry.name
+          : '$currentDirPath/${entry.name}';
       onExitSelectionMode();
       await onEditVideo(path);
     }
 
     Future<void> doEditAudio() async {
       final entry = selectedItems.first;
-      final path = currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      final path = currentDirPath.isEmpty
+          ? entry.name
+          : '$currentDirPath/${entry.name}';
       onExitSelectionMode();
       await onEditAudio?.call(path);
     }
@@ -363,7 +395,6 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
   final hasParents = pathStack.length > 1;
-  final canSync = !container.isLocalStorage && !isInsideArchive && onSyncRoot != null;
 
   Widget buildReadOnlyBadge() {
     return Tooltip(
@@ -377,7 +408,11 @@ PreferredSizeWidget buildBrowserAppBar(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
+            Icon(
+              Icons.lock_outline_rounded,
+              size: 11,
+              color: cs.onSurfaceVariant,
+            ),
             const SizedBox(width: 3),
             Text(
               context.l10n.readOnlyBadgeAbbreviation,
@@ -410,6 +445,7 @@ PreferredSizeWidget buildBrowserAppBar(
       )..layout();
       return painter.width;
     }
+
     if (measure(fullPath) <= maxWidth) {
       return fullPath;
     }
@@ -431,9 +467,10 @@ PreferredSizeWidget buildBrowserAppBar(
 
   Widget buildTitleHeader() {
     final textTheme = Theme.of(context).textTheme;
-    final style = textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
+    final style =
+        textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
         const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
-   if (!hasParents) {
+    if (!hasParents) {
       if (onOpenStorageSwitcher == null) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
@@ -487,8 +524,10 @@ PreferredSizeWidget buildBrowserAppBar(
     return LayoutBuilder(
       builder: (context, constraints) {
         final reservedSpace = 22.0 + (isReadOnly ? 46.0 : 0.0) + 12.0;
-        final availableWidth =
-            (constraints.maxWidth - reservedSpace).clamp(60.0, 2000.0);
+        final availableWidth = (constraints.maxWidth - reservedSpace).clamp(
+          60.0,
+          2000.0,
+        );
         final displayTitle = _buildLeftTruncatedPath(
           container.displayName,
           pathStack,
@@ -540,23 +579,33 @@ PreferredSizeWidget buildBrowserAppBar(
                 final label = isRoot ? container.displayName : segment.label;
                 final IconData icon = isRoot
                     ? Icons.home_rounded
-                    : (segment.isArchiveRoot ? Icons.archive_rounded : Icons.folder_rounded);
+                    : (segment.isArchiveRoot
+                          ? Icons.archive_rounded
+                          : Icons.folder_rounded);
                 final Color iconColor = isRoot
                     ? cs.primary
-                    : (segment.isArchiveRoot ? const Color(0xFFFF8F00) : cs.secondary);
+                    : (segment.isArchiveRoot
+                          ? const Color(0xFFFF8F00)
+                          : cs.secondary);
                 return MenuItemButton(
                   onPressed: isCurrent ? null : () => onJumpTo(i),
                   leadingIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (i > 0) SizedBox(width: (i - 1) * 12.0),
-                      Icon(icon, size: 18, color: isCurrent ? cs.primary : iconColor),
+                      Icon(
+                        icon,
+                        size: 18,
+                        color: isCurrent ? cs.primary : iconColor,
+                      ),
                     ],
                   ),
                   child: Text(
                     label,
                     style: TextStyle(
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isCurrent
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: isCurrent ? cs.primary : cs.onSurface,
                     ),
                   ),
@@ -569,7 +618,7 @@ PreferredSizeWidget buildBrowserAppBar(
     );
   }
 
- return AppBar(
+  return AppBar(
     leading: Builder(
       builder: (ctx) {
         final scaffold = Scaffold.maybeOf(ctx);
@@ -674,7 +723,8 @@ Widget buildBrowserAppBarStatsSubtitle(
       context.l10n.statsFolderCount(0),
       context.l10n.statsFileCount(0),
     ],
-    if (freeSpace != null && freeSpace >= 0) context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
+    if (freeSpace != null && freeSpace >= 0)
+      context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
     if (isFiltered) context.l10n.filteredLabel,
   ];
   return Text(

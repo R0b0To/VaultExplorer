@@ -10,7 +10,8 @@ import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart'
 import 'async_thumbnail_controller.dart';
 
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
-export 'async_thumbnail_controller.dart' show ThumbnailFetchFn, ThumbnailSyncLookup;
+export 'async_thumbnail_controller.dart'
+    show ThumbnailFetchFn, ThumbnailSyncLookup;
 
 /// Generic async thumbnail loader.
 ///
@@ -62,17 +63,25 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
 }
 
 class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
+  bool _tickerEnabled = true;
+
   AsyncThumbnailLoaderProvider get _provider => asyncThumbnailLoaderProvider(
-        widget.container.volId,
-        widget.container.mountedAt,
-        widget.filePath,
-        widget.quality,
-      );
+    widget.container.volId,
+    widget.container.mountedAt,
+    widget.filePath,
+    widget.quality,
+  );
 
   @override
   void initState() {
     super.initState();
-    _ensureLoaded();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (_tickerEnabled) _ensureLoaded();
   }
 
   @override
@@ -93,12 +102,15 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
         oldWidget.quality != widget.quality ||
         oldWidget.container.volId != widget.container.volId ||
         oldWidget.container.mountedAt != widget.container.mountedAt) {
-      _ensureLoaded();
+      if (_tickerEnabled) _ensureLoaded();
     }
   }
 
   void _ensureLoaded() {
-    ref.read(_provider.notifier).ensureLoaded(
+    if (!_tickerEnabled) return;
+    ref
+        .read(_provider.notifier)
+        .ensureLoaded(
           container: widget.container,
           fetchFn: widget.fetchFn,
           cache: widget.cache,
@@ -111,6 +123,10 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
 
   @override
   Widget build(BuildContext context) {
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (!_tickerEnabled) {
+      return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
+    }
     // Arming on every build, not just on mount. `ensureLoaded` is a no-op
     // for a provider instance that has already started, so this costs
     // nothing in the normal case -- but the provider is autoDispose and

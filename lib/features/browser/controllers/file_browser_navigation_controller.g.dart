@@ -17,7 +17,7 @@ final class FileBrowserNavigationProvider
         $NotifierProvider<FileBrowserNavigation, FileBrowserNavigationState> {
   FileBrowserNavigationProvider._({
     required FileBrowserNavigationFamily super.from,
-    required int super.argument,
+    required TabId super.argument,
   }) : super(
          retry: null,
          name: r'fileBrowserNavigationProvider',
@@ -60,7 +60,7 @@ final class FileBrowserNavigationProvider
 }
 
 String _$fileBrowserNavigationHash() =>
-    r'b8a907093ed624336f4f303aec387831eaeba440';
+    r'1bf352daca1f9f8d54c775089f452dda943d7955';
 
 final class FileBrowserNavigationFamily extends $Family
     with
@@ -69,7 +69,7 @@ final class FileBrowserNavigationFamily extends $Family
           FileBrowserNavigationState,
           FileBrowserNavigationState,
           FileBrowserNavigationState,
-          int
+          TabId
         > {
   FileBrowserNavigationFamily._()
     : super(
@@ -80,8 +80,8 @@ final class FileBrowserNavigationFamily extends $Family
         isAutoDispose: true,
       );
 
-  FileBrowserNavigationProvider call(int volId) =>
-      FileBrowserNavigationProvider._(argument: volId, from: this);
+  FileBrowserNavigationProvider call(TabId tabId) =>
+      FileBrowserNavigationProvider._(argument: tabId, from: this);
 
   @override
   String toString() => r'fileBrowserNavigationProvider';
@@ -89,10 +89,10 @@ final class FileBrowserNavigationFamily extends $Family
 
 abstract class _$FileBrowserNavigation
     extends $Notifier<FileBrowserNavigationState> {
-  late final _$args = ref.$arg as int;
-  int get volId => _$args;
+  late final _$args = ref.$arg as TabId;
+  TabId get tabId => _$args;
 
-  FileBrowserNavigationState build(int volId);
+  FileBrowserNavigationState build(TabId tabId);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

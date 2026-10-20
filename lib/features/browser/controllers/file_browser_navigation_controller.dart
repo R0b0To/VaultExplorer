@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -53,6 +54,7 @@ class FileBrowserNavigationState {
   final String? currentFilter;
   final ArchiveContext? archiveContext;
   final bool isContainerLocked;
+  final bool needsRefresh;
 
   // Back gesture preview state
   final double? backGestureProgress;
@@ -73,6 +75,7 @@ class FileBrowserNavigationState {
     this.currentFilter,
     this.archiveContext,
     this.isContainerLocked = false,
+    this.needsRefresh = false,
     this.backGestureProgress,
     this.backGesturePreviewItems,
     this.backGesturePreviewLayoutMode,
@@ -87,8 +90,8 @@ class FileBrowserNavigationState {
   String? get archiveRootPath => archiveContext == null
       ? null
       : (archiveContext!.pathStackEntryIndex < pathStack.length
-          ? pathStack[archiveContext!.pathStackEntryIndex].fatPath
-          : null);
+            ? pathStack[archiveContext!.pathStackEntryIndex].fatPath
+            : null);
 
   FileBrowserNavigationState copyWith({
     List<PathSegment>? pathStack,
@@ -106,6 +109,7 @@ class FileBrowserNavigationState {
     ArchiveContext? archiveContext,
     bool clearArchiveContext = false,
     bool? isContainerLocked,
+    bool? needsRefresh,
     double? backGestureProgress,
     List<RawEntry>? backGesturePreviewItems,
     BrowserLayoutMode? backGesturePreviewLayoutMode,
@@ -118,16 +122,20 @@ class FileBrowserNavigationState {
       currentItems: currentItems ?? this.currentItems,
       isLoading: isLoading ?? this.isLoading,
       isListingTruncated: isListingTruncated ?? this.isListingTruncated,
-      statusMessage:
-          clearStatusMessage ? null : (statusMessage ?? this.statusMessage),
+      statusMessage: clearStatusMessage
+          ? null
+          : (statusMessage ?? this.statusMessage),
       statusIsError: statusIsError ?? this.statusIsError,
       freeSpace: clearFreeSpace ? null : (freeSpace ?? this.freeSpace),
       layoutMode: layoutMode ?? this.layoutMode,
-      currentFilter:
-          clearCurrentFilter ? null : (currentFilter ?? this.currentFilter),
-      archiveContext:
-          clearArchiveContext ? null : (archiveContext ?? this.archiveContext),
+      currentFilter: clearCurrentFilter
+          ? null
+          : (currentFilter ?? this.currentFilter),
+      archiveContext: clearArchiveContext
+          ? null
+          : (archiveContext ?? this.archiveContext),
       isContainerLocked: isContainerLocked ?? this.isContainerLocked,
+      needsRefresh: needsRefresh ?? this.needsRefresh,
       backGestureProgress: clearBackGesturePreview
           ? null
           : (backGestureProgress ?? this.backGestureProgress),
@@ -153,7 +161,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   ArchiveContext? _liveArchiveContext;
 
   @override
-  FileBrowserNavigationState build(int volId) {
+  FileBrowserNavigationState build(TabId tabId) {
     ref.onDispose(() {
       _liveArchiveContext?.dispose();
     });
@@ -174,7 +182,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
             items: state.currentItems.isNotEmpty
                 ? List<RawEntry>.of(state.currentItems)
                 : null,
-          )
+          ),
         ],
         layoutMode: layoutMode,
       );
@@ -211,6 +219,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     state = state.copyWith(isContainerLocked: locked);
   }
 
+  void markNeedsRefresh() {
+    if (state.needsRefresh) return;
+    state = state.copyWith(needsRefresh: true);
+  }
+
   void setFreeSpace(int? freeSpace) {
     state = state.copyWith(
       freeSpace: freeSpace,
@@ -225,10 +238,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     unawaited(() async {
       try {
-        final raw = await ref.read(vaultFileIoApiProvider).listDirectory(
-              container,
-              parentSegment.fatPath,
-            );
+        final raw = await ref
+            .read(vaultFileIoApiProvider)
+            .listDirectory(container, parentSegment.fatPath);
         if (raw != null) {
           final parsed = raw
               .where((f) => !f.startsWith('System:'))
@@ -237,7 +249,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
           parentSegment.items = parsed;
         }
       } catch (e) {
-        VeLog.w('FileBrowserNavigation', 'Parent prefetch failed at ${VeLog.censorUri(parentSegment.fatPath)}', e);
+        VeLog.w(
+          'FileBrowserNavigation',
+          'Parent prefetch failed at ${VeLog.censorUri(parentSegment.fatPath)}',
+          e,
+        );
       }
     }());
   }
@@ -280,11 +296,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     }
 
     try {
-      final items = await ref.read(vaultFileIoApiProvider).listDirectory(
-            container,
-            path,
-            refresh: refresh,
-          );
+      final items = await ref
+          .read(vaultFileIoApiProvider)
+          .listDirectory(container, path, refresh: refresh);
 
       if (!ref.mounted ||
           generation != _loadGeneration ||
@@ -293,7 +307,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       }
 
       final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-      final parsed = items
+      final parsed =
+          items
               ?.where((f) => !f.startsWith('System:'))
               .map(RawEntry.parse)
               .toList() ??
@@ -309,6 +324,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         currentItems: parsed,
         isListingTruncated: isTruncated,
         isLoading: false,
+        needsRefresh: false,
       );
 
       // Ensure the level directly above has items cached for the back gesture
@@ -316,16 +332,20 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
       // Async update for free space info
       unawaited(
-        ref.read(vaultFileIoApiProvider).getSpaceInfo(container).then((space) {
-          if (ref.mounted &&
-              generation == _loadGeneration &&
-              space != null &&
-              space.length > 1 &&
-              space[0] > 0 &&
-              space[1] >= 0) {
-            state = state.copyWith(freeSpace: space[1]);
-          }
-        }).catchError((_) {}),
+        ref
+            .read(vaultFileIoApiProvider)
+            .getSpaceInfo(container)
+            .then((space) {
+              if (ref.mounted &&
+                  generation == _loadGeneration &&
+                  space != null &&
+                  space.length > 1 &&
+                  space[0] > 0 &&
+                  space[1] >= 0) {
+                state = state.copyWith(freeSpace: space[1]);
+              }
+            })
+            .catchError((_) {}),
       );
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
@@ -356,6 +376,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       isListingTruncated: false,
       isLoading: false,
       layoutMode: layoutMode ?? state.layoutMode,
+      needsRefresh: false,
     );
   }
 
@@ -381,8 +402,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final parentPreviewItems = state.currentItems.isNotEmpty
         ? List<RawEntry>.of(state.currentItems)
         : (state.pathStack.isNotEmpty && state.pathStack.last.items != null
-            ? List<RawEntry>.of(state.pathStack.last.items!)
-            : null);
+              ? List<RawEntry>.of(state.pathStack.last.items!)
+              : null);
 
     state = state.copyWith(isLoading: true);
 
@@ -408,14 +429,16 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       }
 
       final newStack = List<PathSegment>.from(state.pathStack)
-        ..add(PathSegment(
-          archiveName,
-          fullPath,
-          isArchiveRoot: true,
-          layoutMode: layoutMode ?? state.layoutMode,
-          previewItems: parentPreviewItems,
-          previewLayoutMode: state.layoutMode,
-        ));
+        ..add(
+          PathSegment(
+            archiveName,
+            fullPath,
+            isArchiveRoot: true,
+            layoutMode: layoutMode ?? state.layoutMode,
+            previewItems: parentPreviewItems,
+            previewLayoutMode: state.layoutMode,
+          ),
+        );
 
       state = state.copyWith(
         archiveContext: ctx,
@@ -462,8 +485,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final parentPreviewItems = state.currentItems.isNotEmpty
         ? List<RawEntry>.of(state.currentItems)
         : (state.pathStack.isNotEmpty && state.pathStack.last.items != null
-            ? List<RawEntry>.of(state.pathStack.last.items!)
-            : null);
+              ? List<RawEntry>.of(state.pathStack.last.items!)
+              : null);
 
     // 2. Create child segment
     final newSegment = PathSegment(
@@ -616,7 +639,10 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final currentSegment = state.pathStack.last;
     final atRootAfterBack = state.pathStack.length == 2;
     final effectiveLayoutMode =
-        layoutMode ?? currentSegment.previewLayoutMode ?? targetSegment.layoutMode ?? state.layoutMode;
+        layoutMode ??
+        currentSegment.previewLayoutMode ??
+        targetSegment.layoutMode ??
+        state.layoutMode;
 
     final previewItems = currentSegment.previewItems ?? targetSegment.items;
 

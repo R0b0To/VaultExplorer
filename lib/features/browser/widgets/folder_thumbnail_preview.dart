@@ -55,6 +55,7 @@ class _FolderThumbnailPreviewState
   Uint8List? _previewBytes;
   int _token = 0;
   Timer? _debounce;
+  bool _tickerEnabled = false;
 
   String get _cacheKey => '${widget.container.uri}:${widget.folderPath}';
 
@@ -70,8 +71,21 @@ class _FolderThumbnailPreviewState
     super.initState();
     if (FolderThumbnailPreview._sessionCache.containsKey(_cacheKey)) {
       _previewBytes = FolderThumbnailPreview._sessionCache[_cacheKey];
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = TickerMode.valuesOf(context).enabled;
+    if (_tickerEnabled == enabled) return;
+    _tickerEnabled = enabled;
+    if (enabled) {
+      if (_previewBytes == null) _scheduleScan();
     } else {
-      _scheduleScan();
+      _token++;
+      _debounce?.cancel();
+      _debounce = null;
     }
   }
 
@@ -101,7 +115,11 @@ class _FolderThumbnailPreviewState
   }
 
   void _scheduleScan() {
-    if (widget.cacheMode == ThumbnailCacheMode.disabled) return;
+    if (!_tickerEnabled ||
+        widget.cacheMode == ThumbnailCacheMode.disabled ||
+        _previewBytes != null) {
+      return;
+    }
     _debounce?.cancel();
     _debounce = Timer(FolderThumbnailPreview.scanDebounce, _scan);
   }
@@ -117,6 +135,7 @@ class _FolderThumbnailPreviewState
   }
 
   Future<void> _scan() async {
+    if (!_tickerEnabled) return;
     final token = ++_token;
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
@@ -127,7 +146,13 @@ class _FolderThumbnailPreviewState
     } catch (_) {
       raw = null;
     }
-    if (!mounted || token != _token || raw == null || raw.isEmpty) return;
+    if (!mounted ||
+        !_tickerEnabled ||
+        token != _token ||
+        raw == null ||
+        raw.isEmpty) {
+      return;
+    }
 
     final candidates = <String>[];
     for (final line in raw) {
@@ -162,7 +187,7 @@ class _FolderThumbnailPreviewState
         mode: widget.cacheMode,
         quality: widget.quality,
       );
-      if (!mounted || token != _token) return;
+      if (!mounted || !_tickerEnabled || token != _token) return;
       if (bytes != null && bytes.isNotEmpty) {
         hit = bytes;
         break;
@@ -183,7 +208,7 @@ class _FolderThumbnailPreviewState
             priority: TaskPriority.background,
           );
           acquired = true;
-          if (!mounted || token != _token) return;
+          if (!mounted || !_tickerEnabled || token != _token) return;
 
           hit = await fileIoApi.getImageThumbnail(
             widget.container,
@@ -199,17 +224,23 @@ class _FolderThumbnailPreviewState
               widget.quality,
             );
             if (widget.cacheMode != ThumbnailCacheMode.disabled) {
-              unawaited(thumbnailCache.store(
-                container: widget.container,
-                filePath: firstPath,
-                data: hit,
-                mode: widget.cacheMode,
-                quality: widget.quality,
-              ));
+              unawaited(
+                thumbnailCache.store(
+                  container: widget.container,
+                  filePath: firstPath,
+                  data: hit,
+                  mode: widget.cacheMode,
+                  quality: widget.quality,
+                ),
+              );
             }
           }
         } catch (e) {
-          VeLog.w('FolderThumbnailPreview', 'Thumbnail fetch failed for ${VeLog.censorName(firstPath)}', e);
+          VeLog.w(
+            'FolderThumbnailPreview',
+            'Thumbnail fetch failed for ${VeLog.censorName(firstPath)}',
+            e,
+          );
         } finally {
           if (acquired) {
             ThumbnailConcurrency.imageLimiter.release(completer);
@@ -218,7 +249,7 @@ class _FolderThumbnailPreviewState
       }
     }
 
-    if (!mounted || token != _token) return;
+    if (!mounted || !_tickerEnabled || token != _token) return;
 
     if (hit != null && hit.isNotEmpty) {
       _storeCache(_cacheKey, hit);
@@ -237,17 +268,15 @@ class _FolderThumbnailPreviewState
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular((size * 0.14) - 0.8),
-        child: Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-        ),
+        child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (!_tickerEnabled) return Center(child: widget.child);
     if (widget.cacheMode == ThumbnailCacheMode.disabled) {
       return Center(child: widget.child);
     }

@@ -8,9 +8,10 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 /// Leading icon for a location row in the new-tab picker.
@@ -54,18 +55,16 @@ const double kBrowserTabItemWidth = 148;
 /// controller retains its horizontal offset while the strip moves between
 /// screens.
 class BrowserTabStrip extends ConsumerStatefulWidget {
-  final BrowserTabsController controller;
+  final BrowserTabsConfig workspaceConfig;
   final VoidCallback onNewTab;
-  final ValueChanged<BrowserTab> onDuplicate;
-  final ValueChanged<BrowserTab>? onActivateTab;
+  final ValueChanged<BrowserTabState> onDuplicate;
   final String storageKey;
 
   const BrowserTabStrip({
     super.key,
-    required this.controller,
+    required this.workspaceConfig,
     required this.onNewTab,
     required this.onDuplicate,
-    this.onActivateTab,
     this.storageKey = 'browser-tab-strip-scroll-position',
   });
 
@@ -75,15 +74,17 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
 
 class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   late final ScrollController _scrollController;
-  final Map<int, GlobalKey> _tabItemKeys = {};
-  int? _lastActiveKey;
+  final Map<TabId, GlobalKey> _tabItemKeys = {};
+  TabId? _lastActiveTabId;
   int? _lastActiveIndex;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController(
-      initialScrollOffset: widget.controller.tabStripScrollOffset,
+      initialScrollOffset: ref
+          .read(browserTabsProvider(widget.workspaceConfig))
+          .tabStripScrollOffset,
       keepScrollOffset: false,
     )..addListener(_rememberScrollOffset);
     _scrollActiveIntoView(force: true);
@@ -104,25 +105,30 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
   void _rememberScrollOffset() {
     if (!_scrollController.hasClients) return;
-    widget.controller.setTabStripScrollOffset(
-      _scrollController.position.pixels,
-    );
+    ref
+        .read(browserTabsProvider(widget.workspaceConfig).notifier)
+        .setTabStripScrollOffset(_scrollController.position.pixels);
   }
 
   void _scrollActiveIntoView({bool force = false}) {
-    final active = widget.controller.activeKey;
-    final activeIndex = widget.controller.activeIndex;
-    if (!force && active == _lastActiveKey && activeIndex == _lastActiveIndex) {
+    final state = ref.read(browserTabsProvider(widget.workspaceConfig));
+    final active = state.activeTabId;
+    final activeIndex = state.activeIndex;
+    if (!force &&
+        active == _lastActiveTabId &&
+        activeIndex == _lastActiveIndex) {
       return;
     }
-    _lastActiveKey = active;
+    _lastActiveTabId = active;
     _lastActiveIndex = activeIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           !_scrollController.hasClients ||
-          widget.controller.activeKey != active) {
+          ref.read(browserTabsProvider(widget.workspaceConfig)).activeTabId !=
+              active) {
         return;
       }
+      if (active == null) return;
       if (activeIndex == 0) {
         final position = _scrollController.position;
         if ((position.pixels - position.minScrollExtent).abs() > 0.5) {
@@ -141,21 +147,21 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     });
   }
 
-  void _onTabTapped(BrowserTab tab, BuildContext tabContext) {
-    final c = widget.controller;
-    if (c.activeKey == tab.key) {
+  void _onTabTapped(BrowserTabState tab, BuildContext tabContext) {
+    final state = ref.read(browserTabsProvider(widget.workspaceConfig));
+    if (state.activeTabId == tab.tabId) {
       unawaited(_showTabMenu(tab, tabContext));
       return;
     }
-    final onActivateTab = widget.onActivateTab;
-    if (onActivateTab != null) {
-      onActivateTab(tab);
-    } else {
-      c.activate(tab.key);
-    }
+    ref
+        .read(browserTabsProvider(widget.workspaceConfig).notifier)
+        .activate(tab.tabId);
   }
 
-  Future<void> _showTabMenu(BrowserTab tab, BuildContext tabContext) async {
+  Future<void> _showTabMenu(
+    BrowserTabState tab,
+    BuildContext tabContext,
+  ) async {
     if (!tabContext.mounted) return;
     final tabBox = tabContext.findRenderObject() as RenderBox?;
     final overlayBox =
@@ -198,9 +204,12 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       );
     }
 
-    final c = widget.controller;
+    final state = ref.read(browserTabsProvider(widget.workspaceConfig));
+    final actions = ref.read(
+      browserTabsProvider(widget.workspaceConfig).notifier,
+    );
     final l10n = tabContext.l10n;
-    final tabIndex = c.tabs.indexWhere((entry) => entry.key == tab.key);
+    final tabIndex = state.tabs.indexWhere((entry) => entry.tabId == tab.tabId);
     final choice = await showMenu<_TabMenuAction>(
       context: tabContext,
       position: RelativeRect.fromRect(anchor, Offset.zero & overlayBox.size),
@@ -209,13 +218,13 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.close,
           Icons.close_rounded,
           l10n.browserTabClose,
-          enabled: c.length > 1,
+          enabled: state.tabs.length > 1 && !tab.isDashboard,
         ),
         item(
           _TabMenuAction.closeOthers,
           Icons.tab_unselected_rounded,
           l10n.browserTabCloseOthers,
-          enabled: c.length > 1,
+          enabled: state.tabs.length > 1,
         ),
         item(
           _TabMenuAction.closeToLeft,
@@ -227,28 +236,35 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.closeToRight,
           Icons.arrow_forward_rounded,
           l10n.browserTabCloseToRight,
-          enabled: tabIndex >= 0 && tabIndex < c.length - 1,
+          enabled: tabIndex >= 0 && tabIndex < state.tabs.length - 1,
         ),
         const PopupMenuDivider(),
         item(
           _TabMenuAction.duplicate,
           Icons.copy_all_rounded,
           l10n.browserTabDuplicate,
-          enabled: tab.isDashboard || !c.atLimit,
+          enabled: tab.isDashboard || !state.atLimit,
         ),
       ],
     );
-    if (!mounted || choice == null || c.tabForKey(tab.key) == null) return;
+    if (!mounted ||
+        choice == null ||
+        !ref
+            .read(browserTabsProvider(widget.workspaceConfig))
+            .tabs
+            .any((entry) => entry.tabId == tab.tabId)) {
+      return;
+    }
 
     switch (choice) {
       case _TabMenuAction.close:
-        c.closeTab(tab.key);
+        actions.closeTab(tab.tabId);
       case _TabMenuAction.closeOthers:
-        c.closeOthers(tab.key);
+        actions.closeOthers(tab.tabId);
       case _TabMenuAction.closeToLeft:
-        c.closeToLeft(tab.key);
+        actions.closeToLeft(tab.tabId);
       case _TabMenuAction.closeToRight:
-        c.closeToRight(tab.key);
+        actions.closeToRight(tab.tabId);
       case _TabMenuAction.duplicate:
         widget.onDuplicate(tab);
     }
@@ -262,103 +278,99 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     if (!tabsEnabled) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
-    final c = widget.controller;
+    final tabs = ref.watch(browserTabsListProvider(widget.workspaceConfig));
+    final activeTab = ref.watch(
+      activeBrowserTabProvider(widget.workspaceConfig),
+    );
+    final actions = ref.read(
+      browserTabsProvider(widget.workspaceConfig).notifier,
+    );
+    final liveTabIds = tabs.map((tab) => tab.tabId).toSet();
+    _tabItemKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _scrollActiveIntoView();
 
-    return ListenableBuilder(
-      listenable: c,
-      builder: (context, _) {
-        final tabs = c.tabs;
-        final liveTabKeys = tabs.map((tab) => tab.key).toSet();
-        _tabItemKeys.removeWhere((key, _) => !liveTabKeys.contains(key));
-        _scrollActiveIntoView();
+    final stripBackground = cs.surfaceContainer;
+    final activeBackground = cs.surfaceContainerHighest;
 
-        final stripBackground = cs.surfaceContainer;
-        final activeBackground = cs.surfaceContainerHighest;
-
-        return Container(
-          height: kBrowserTabStripHeight,
-          decoration: BoxDecoration(
-            color: stripBackground,
-            border: Border(
-              bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: ReorderableListView.builder(
-                  key: PageStorageKey<String>(widget.storageKey),
-                  scrollController: _scrollController,
-                  itemExtent: kBrowserTabItemWidth,
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.hardEdge,
-                  buildDefaultDragHandles: false,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 3,
-                    vertical: 3,
-                  ),
-                  itemCount: tabs.length,
-                  onReorderStart: (_) => HapticFeedback.mediumImpact(),
-                  onReorderItem: c.moveTab,
-                  proxyDecorator: (child, index, animation) {
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        final t = Curves.easeInOut.transform(animation.value);
-                        return Material(
-                          elevation: 6 * t,
-                          color: activeBackground,
-                          shadowColor: cs.shadow.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                          child: child,
-                        );
-                      },
+    return Container(
+      height: kBrowserTabStripHeight,
+      decoration: BoxDecoration(
+        color: stripBackground,
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ReorderableListView.builder(
+              key: PageStorageKey<String>(widget.storageKey),
+              scrollController: _scrollController,
+              itemExtent: kBrowserTabItemWidth,
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.hardEdge,
+              buildDefaultDragHandles: false,
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+              itemCount: tabs.length,
+              onReorderStart: (_) => HapticFeedback.mediumImpact(),
+              onReorderItem: actions.reorderTabs,
+              proxyDecorator: (child, index, animation) {
+                return AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, child) {
+                    final t = Curves.easeInOut.transform(animation.value);
+                    return Material(
+                      elevation: 6 * t,
+                      color: activeBackground,
+                      shadowColor: cs.shadow.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(8),
                       child: child,
                     );
                   },
-                  itemBuilder: (context, index) {
-                    final tab = tabs[index];
-                    final itemKey = _tabItemKeys.putIfAbsent(
-                      tab.key,
-                      GlobalKey.new,
-                    );
-                    final isActive = tab.key == c.activeKey;
-                    return ReorderableDelayedDragStartListener(
-                      key: ValueKey<int>(tab.key),
-                      index: index,
-                      child: Builder(
-                        builder: (tabContext) => SizedBox(
-                          key: itemKey,
-                          width: kBrowserTabItemWidth,
-                          child: _TabItem(
-                            tab: tab,
-                            active: isActive,
-                            activeBackground: activeBackground,
-                            onTap: () => _onTabTapped(tab, tabContext),
-                          ),
-                        ),
+                  child: child,
+                );
+              },
+              itemBuilder: (context, index) {
+                final tab = tabs[index];
+                final itemKey = _tabItemKeys.putIfAbsent(
+                  tab.tabId,
+                  GlobalKey.new,
+                );
+                final isActive = tab.tabId == activeTab?.tabId;
+                return ReorderableDelayedDragStartListener(
+                  key: ValueKey<TabId>(tab.tabId),
+                  index: index,
+                  child: Builder(
+                    builder: (tabContext) => SizedBox(
+                      key: itemKey,
+                      width: kBrowserTabItemWidth,
+                      child: _TabItem(
+                        tab: tab,
+                        active: isActive,
+                        activeBackground: activeBackground,
+                        onTap: () => _onTabTapped(tab, tabContext),
                       ),
-                    );
-                  },
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_rounded, size: 20),
-                visualDensity: VisualDensity.compact,
-                tooltip: context.l10n.browserTabNew,
-                onPressed: widget.onNewTab,
-              ),
-              const SizedBox(width: 4),
-            ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        );
-      },
+          IconButton(
+            icon: const Icon(Icons.add_rounded, size: 20),
+            visualDensity: VisualDensity.compact,
+            tooltip: context.l10n.browserTabNew,
+            onPressed: widget.onNewTab,
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
     );
   }
 }
 
 class _TabItem extends ConsumerWidget {
-  final BrowserTab tab;
+  final BrowserTabState tab;
   final bool active;
   final Color activeBackground;
   final VoidCallback onTap;
@@ -380,7 +392,7 @@ class _TabItem extends ConsumerWidget {
     final folderLabel = tab.isDashboard
         ? null
         : ref.watch(
-            fileBrowserNavigationProvider(tab.key).select(
+            fileBrowserNavigationProvider(tab.tabId).select(
               (s) => s.pathStack.length <= 1 ? null : s.pathStack.last.label,
             ),
           );
@@ -389,7 +401,9 @@ class _TabItem extends ConsumerWidget {
     final selectedCount = tab.isDashboard
         ? 0
         : ref.watch(
-            fileBrowserSelectionProvider(tab.key).select((s) => s.items.length),
+            fileBrowserSelectionProvider(
+              tab.tabId,
+            ).select((s) => s.items.length),
           );
     final name = tab.container?.displayName ?? context.l10n.dashboardNavLabel;
     final label = folderLabel ?? name;

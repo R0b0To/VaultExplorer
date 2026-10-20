@@ -12333,6 +12333,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Stocker ne compresse pas, il n\'y a donc aucune méthode à choisir.';
 
   @override
+  String get browserTabsEnabledTitle =>
+      'Utiliser les onglets du gestionnaire de fichiers';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Gardez plusieurs emplacements ouverts et passez de l’un à l’autre.';
+
+  @override
   String get browserTabNew => 'Nouvel onglet';
 
   @override
@@ -12356,8 +12364,5 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'Copier vers l\'autre onglet';
-
-  @override
-  String get browserTabMoveToOtherTab => 'Déplacer vers l\'autre onglet';
+  String get browserTabCloseAll => 'Fermer tout';
 }

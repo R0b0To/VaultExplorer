@@ -164,23 +164,40 @@ void main() {
       c.dispose();
     });
 
-    test('paste request is delivered once, only to the requested tab', () {
+    test('moveTab reorders tabs and keeps the active tab active', () {
       final c = BrowserTabsController(_container(1));
       final a = c.activeKey;
       final b = c.openTab(_container(2))!;
-      c.requestPaste(b);
-      expect(c.consumePasteRequest(a), isFalse);
-      expect(c.consumePasteRequest(b), isTrue);
-      expect(c.consumePasteRequest(b), isFalse);
+      final d = c.openTab(_container(3))!;
+      c.activate(b);
+      c.moveTab(0, 2); // a goes to the end
+      expect(c.tabs.map((t) => t.key), [b, d, a]);
+      expect(c.activeKey, b);
+      expect(c.activeIndex, 0);
       c.dispose();
     });
 
-    test('paste request is dropped when its tab closes', () {
+    test('moveTab ignores no-op and out-of-range moves', () {
       final c = BrowserTabsController(_container(1));
-      final b = c.openTab(_container(2))!;
-      c.requestPaste(b);
-      c.closeTab(b);
-      expect(c.consumePasteRequest(b), isFalse);
+      c.openTab(_container(2));
+      var n = 0;
+      c.addListener(() => n++);
+      final before = c.tabs.map((t) => t.key).toList();
+      c.moveTab(0, 0);
+      c.moveTab(-1, 1);
+      c.moveTab(0, 5);
+      c.moveTab(7, 0);
+      expect(c.tabs.map((t) => t.key), before);
+      expect(n, 0);
+      c.dispose();
+    });
+
+    test('closeAll empties the controller', () {
+      final c = BrowserTabsController(_container(1));
+      c.openTab(_container(2));
+      c.closeAll();
+      expect(c.isEmpty, isTrue);
+      expect(c.activeKey, -1);
       c.dispose();
     });
 

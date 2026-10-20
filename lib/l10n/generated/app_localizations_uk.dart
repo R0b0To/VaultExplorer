@@ -12317,6 +12317,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Режим «Зберегти» не стискає, тому методу для вибору немає.';
 
   @override
+  String get browserTabsEnabledTitle =>
+      'Використовувати вкладки файлового менеджера';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Залишайте відкритими кілька розташувань і перемикайтеся між ними.';
+
+  @override
   String get browserTabNew => 'Нова вкладка';
 
   @override
@@ -12340,8 +12348,5 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'Копіювати в іншу вкладку';
-
-  @override
-  String get browserTabMoveToOtherTab => 'Перемістити в іншу вкладку';
+  String get browserTabCloseAll => 'Закрити всі';
 }

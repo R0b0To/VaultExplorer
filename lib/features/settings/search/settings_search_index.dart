@@ -8,8 +8,8 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 /// `Text` uses; nothing needs to change in the settings screens themselves.
 /// Titles, sections and details are all localised getters, so search works in
 /// every language the app ships.
-final List<SettingsSearchEntry> kSettingsSearchEntries =
-    List.unmodifiable(<SettingsSearchEntry>[
+final List<SettingsSearchEntry>
+kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
   // ───────────────────────────── Security & privacy ──────────────────────────
   _e(
     'security.master_password',
@@ -123,7 +123,14 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     (l) => l.emergencyPanicTitle,
     scrollTo: false,
     details: [(l) => l.emergencyPanicSubtitle],
-    keywords: ['panic', 'wipe', 'duress', 'kill switch', 'lockdown', 'emergency'],
+    keywords: [
+      'panic',
+      'wipe',
+      'duress',
+      'kill switch',
+      'lockdown',
+      'emergency',
+    ],
   ),
   _e(
     'quick_capture.screen',
@@ -211,10 +218,7 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     'emergency.duress',
     SettingsDestination.emergency,
     (l) => l.sectionDuressUnlock,
-    details: [
-      (l) => l.duressPasswordTitle,
-      (l) => l.duressPatternTitle,
-    ],
+    details: [(l) => l.duressPasswordTitle, (l) => l.duressPatternTitle],
     keywords: ['decoy', 'fake password', 'coercion', 'duress', 'hidden'],
   ),
   _e(
@@ -348,7 +352,13 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     SettingsDestination.storage,
     (l) => l.androidFileProviderTitle,
     details: [(l) => l.androidFileProviderSubtitle],
-    keywords: ['documents provider', 'saf', 'files app', 'expose', 'storage access framework'],
+    keywords: [
+      'documents provider',
+      'saf',
+      'files app',
+      'expose',
+      'storage access framework',
+    ],
   ),
   _e(
     'storage.share_sheet',
@@ -406,24 +416,32 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     'file_handling.javascript',
     SettingsDestination.fileHandling,
     (l) => l.enableJsHtmlTitle,
-    details: [
-      (l) => l.jsEnabledSubtitle,
-      (l) => l.jsDisabledSubtitle,
-    ],
+    details: [(l) => l.jsEnabledSubtitle, (l) => l.jsDisabledSubtitle],
     keywords: ['javascript', 'html', 'web', 'script', 'browser'],
   ),
   _e(
     'file_handling.file_associations',
     SettingsDestination.fileHandling,
     (l) => l.fileAssociationsHeader,
-    details: [
-      (l) => l.defaultActionsHeader,
-      (l) => l.noFileAssociationsYet,
+    details: [(l) => l.defaultActionsHeader, (l) => l.noFileAssociationsYet],
+    keywords: [
+      'open with',
+      'default app',
+      'extension',
+      'associations',
+      'file types',
     ],
-    keywords: ['open with', 'default app', 'extension', 'associations', 'file types'],
   ),
 
   // ─────────────────────────────── File manager ──────────────────────────────
+  _e(
+    'file_manager.tabs',
+    SettingsDestination.fileManager,
+    (l) => l.browserTabsEnabledTitle,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.browserTabsEnabledSubtitle],
+    keywords: ['tabs', 'multiple locations', 'switch locations'],
+  ),
   _e(
     'file_manager.default_layout',
     SettingsDestination.fileManager,
@@ -694,11 +712,7 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     SettingsDestination.appearance,
     (l) => l.appThemeLabel,
     section: (l) => l.appThemeLabel,
-    details: [
-      (l) => l.systemDefault,
-      (l) => l.lightTheme,
-      (l) => l.darkTheme,
-    ],
+    details: [(l) => l.systemDefault, (l) => l.lightTheme, (l) => l.darkTheme],
     keywords: ['dark mode', 'light mode', 'night', 'color scheme', 'theme'],
   ),
   _e(
@@ -715,7 +729,15 @@ final List<SettingsSearchEntry> kSettingsSearchEntries =
     SettingsDestination.appearance,
     (l) => l.skinAppSkin,
     section: (l) => l.appThemeLabel,
-    keywords: ['skin', 'colors', 'customize', 'look', 'oled', 'amoled', 'black'],
+    keywords: [
+      'skin',
+      'colors',
+      'customize',
+      'look',
+      'oled',
+      'amoled',
+      'black',
+    ],
   ),
   _e(
     'appearance.language',

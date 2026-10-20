@@ -12260,6 +12260,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار.';
 
   @override
+  String get browserTabsEnabledTitle => 'استخدام علامات تبويب مدير الملفات';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'أبقِ مواقع متعددة مفتوحة وانتقل بينها.';
+
+  @override
   String get browserTabNew => 'علامة تبويب جديدة';
 
   @override
@@ -12283,8 +12290,5 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'نسخ إلى علامة التبويب الأخرى';
-
-  @override
-  String get browserTabMoveToOtherTab => 'نقل إلى علامة التبويب الأخرى';
+  String get browserTabCloseAll => 'إغلاق الكل';
 }

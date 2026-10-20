@@ -20389,6 +20389,18 @@ abstract class AppLocalizations {
   /// **'Store doesn\'t compress, so there is no method to choose.'**
   String get archiveMethodStoreNote;
 
+  /// Setting that enables or disables tabs in the file manager
+  ///
+  /// In en, this message translates to:
+  /// **'Use file manager tabs'**
+  String get browserTabsEnabledTitle;
+
+  /// Explains the effect of enabling file manager tabs
+  ///
+  /// In en, this message translates to:
+  /// **'Keep multiple locations open and switch between them.'**
+  String get browserTabsEnabledSubtitle;
+
   /// Tooltip/title for the file manager's new-tab button and the sheet that lets the user pick where a new tab opens
   ///
   /// In en, this message translates to:
@@ -20431,17 +20443,11 @@ abstract class AppLocalizations {
   /// **'Tab limit reached ({max})'**
   String browserTabLimitReached(int max);
 
-  /// Item action that copies the item and pastes it into the other (previous) file manager tab's current folder
+  /// Action in the file manager's tab menu that closes every tab (and with it the file manager)
   ///
   /// In en, this message translates to:
-  /// **'Copy to other tab'**
-  String get browserTabCopyToOtherTab;
-
-  /// Item action that moves the item into the other (previous) file manager tab's current folder
-  ///
-  /// In en, this message translates to:
-  /// **'Move to other tab'**
-  String get browserTabMoveToOtherTab;
+  /// **'Close all'**
+  String get browserTabCloseAll;
 }
 
 class _AppLocalizationsDelegate

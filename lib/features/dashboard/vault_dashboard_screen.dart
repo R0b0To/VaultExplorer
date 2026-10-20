@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +26,9 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
@@ -35,6 +38,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sh
 import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
@@ -47,18 +51,48 @@ const _kLogTag = 'VaultDashboardScreen';
 class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
   final ValueChanged<int>? onNavigateTab;
-  const VaultDashboard({super.key, this.mountedNotifier, this.onNavigateTab});
+  final BrowserTabsController? browserTabs;
+  final ValueListenable<double>? tabPagePosition;
+  final int? tabPageIndex;
+  final ValueChanged<MountedContainer>? onOpenBrowser;
+  final VoidCallback? onNewBrowserTab;
+  final ValueChanged<BrowserTab>? onDuplicateBrowserTab;
+  final ValueChanged<BrowserTab>? onActivateBrowserTab;
+  final ValueChanged<bool>? onVerticalScrollActivity;
+
+  const VaultDashboard({
+    super.key,
+    this.mountedNotifier,
+    this.onNavigateTab,
+    this.browserTabs,
+    this.tabPagePosition,
+    this.tabPageIndex,
+    this.onOpenBrowser,
+    this.onNewBrowserTab,
+    this.onDuplicateBrowserTab,
+    this.onActivateBrowserTab,
+    this.onVerticalScrollActivity,
+  });
 
   @override
   ConsumerState<VaultDashboard> createState() => VaultDashboardState();
 }
 
-class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBindingObserver {
-  SessionLockController get _lockController => ref.read(sessionLockControllerProvider);
+class VaultDashboardState extends ConsumerState<VaultDashboard>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  SessionLockController get _lockController =>
+      ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _dashboardSwipeBodyKey = GlobalKey();
   bool _isFabVisible = true;
+  bool _verticalScrollActive = false;
   double _drawerDragDistance = 0.0;
   bool _isTouchFromEdge = false;
+  int _dashboardPointerCount = 0;
+  int? _dashboardSwipePointer;
+  Offset? _dashboardSwipeStart;
+  int? _dashboardSwipeStartTabIndex;
+  bool _dashboardSwipeRejected = false;
   bool _isEnforcingLock = false;
   late final ProviderContainer _container;
 
@@ -76,6 +110,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   bool _pendingLocalStoragePermissionCheck = false;
   // Live tab list of the file manager route currently on top (null when none).
   BrowserTabsController? _browserTabs;
+  late final AnimationController _dashboardAppBarAnimController =
+      AnimationController(vsync: this, duration: AppMotion.short2, value: 1.0)
+        ..addListener(_onDashboardAppBarAnimationChanged);
   int? _pendingLocalStorageOriginVolId;
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
@@ -85,7 +122,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Future<void> _checkStorageAccess() async {
-    final hasAccess = await ref.read(vaultLifecycleApiProvider).hasAllFilesAccess();
+    final hasAccess = await ref
+        .read(vaultLifecycleApiProvider)
+        .hasAllFilesAccess();
     if (!mounted) return;
     if (!hasAccess) {
       setState(() => _localStorageContainer = null);
@@ -95,14 +134,19 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final root = await const DecoyLocalRepository().primaryRoot();
     if (!mounted) return;
     setState(() {
-      _localStorageContainer = buildLocalStorageContainer(rootPath: root.path, displayName: displayName);
+      _localStorageContainer = buildLocalStorageContainer(
+        rootPath: root.path,
+        displayName: displayName,
+      );
     });
   }
 
   Future<void> _handleAppResume() async {
     await _checkStorageAccess();
     if (!mounted || !_pendingLocalStoragePermissionCheck) return;
-    await _finishLocalStoragePermissionRequest(_localStoragePermissionRequestId);
+    await _finishLocalStoragePermissionRequest(
+      _localStoragePermissionRequestId,
+    );
   }
 
   // Resolves either a real, currently-mounted vault OR the cached local
@@ -123,7 +167,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   MountedContainer? _resolveAnyContainer(int volId) {
     if (volId == kDecoyLocalVolId) return _localStorageContainer;
     if (volId <= kExternalStorageBaseVolId) {
-      return ref.read(externalStorageLocationsProvider.notifier).resolveContainer(volId);
+      return ref
+          .read(externalStorageLocationsProvider.notifier)
+          .resolveContainer(volId);
     }
     for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
       if (c.volId == volId) return c;
@@ -131,9 +177,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     return null;
   }
 
- @override
+  @override
   void initState() {
     super.initState();
+    _attachBrowserTabs(widget.browserTabs);
     // Cache the ProviderContainer so asynchronous callbacks (like auto-lock
     // and container unmounting) remain safe even after this widget is unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
@@ -149,8 +196,260 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     _checkStorageAccess();
   }
 
-   @override
+  @override
+  void didUpdateWidget(covariant VaultDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.browserTabs != widget.browserTabs) {
+      _attachBrowserTabs(widget.browserTabs);
+    }
+  }
+
+  void _attachBrowserTabs(BrowserTabsController? tabs) {
+    final attachedTabs = tabs ?? widget.browserTabs;
+    if (identical(attachedTabs, _browserTabs)) return;
+    _browserTabs?.removeListener(_onBrowserTabsChanged);
+    _browserTabs?.appBarVisibility.removeListener(
+      _onDashboardAppBarVisibilityChanged,
+    );
+    _browserTabs = attachedTabs;
+    attachedTabs?.addListener(_onBrowserTabsChanged);
+    attachedTabs?.appBarVisibility.addListener(
+      _onDashboardAppBarVisibilityChanged,
+    );
+    _syncDashboardAppBarFromTabs();
+  }
+
+  void _onBrowserTabsChanged() {
+    // Stop an in-flight Dashboard animation when the active location changes;
+    // the newly active screen's visibility becomes the shared value.
+    _dashboardAppBarAnimController.stop();
+    if (_browserTabs?.activeTab?.isDashboard != true) {
+      _setVerticalScrollActivity(false);
+    }
+    _syncDashboardAppBarFromTabs();
+  }
+
+  void _onDashboardAppBarVisibilityChanged() {
+    _syncDashboardAppBarFromTabs();
+  }
+
+  void _syncDashboardAppBarFromTabs() {
+    final tabs = _browserTabs;
+    if (tabs == null) return;
+    final visibility = tabs.appBarVisibility.value;
+    if ((_dashboardAppBarAnimController.value - visibility).abs() > 0.001) {
+      _dashboardAppBarAnimController.value = visibility;
+    }
+  }
+
+  void _setVerticalScrollActivity(bool scrolling) {
+    if (_verticalScrollActive == scrolling) return;
+    _verticalScrollActive = scrolling;
+    widget.onVerticalScrollActivity?.call(scrolling);
+  }
+
+  Widget _pinDashboardChrome(Widget child) {
+    final pagePosition = widget.tabPagePosition;
+    final pageIndex = widget.tabPageIndex;
+    final tabs = widget.browserTabs ?? _browserTabs;
+    if (pagePosition == null ||
+        pageIndex == null ||
+        tabs?.activeTab?.isDashboard == false) {
+      return child;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => ValueListenableBuilder<double>(
+        valueListenable: pagePosition,
+        child: child,
+        builder: (context, position, child) {
+          final direction = Directionality.of(context) == TextDirection.rtl
+              ? -1.0
+              : 1.0;
+          return Transform.translate(
+            offset: Offset(
+              (position - pageIndex) * constraints.maxWidth * direction,
+              0,
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  void _onDashboardAppBarAnimationChanged() {
+    final tabs = _browserTabs;
+    if (tabs != null && tabs.activeTab?.isDashboard != true) return;
+    tabs?.setAppBarVisibility(_dashboardAppBarAnimController.value);
+  }
+
+  bool _handleDashboardScrollNotification(
+    ScrollNotification notification, {
+    required bool autoHideAppBar,
+    required BrowserTabsController? tabs,
+  }) {
+    if (notification.metrics.axis != Axis.vertical ||
+        (tabs != null && tabs.activeTab?.isDashboard != true)) {
+      return false;
+    }
+
+    void setProgress(double value) {
+      final progress = value.clamp(0.0, 1.0).toDouble();
+      if (_dashboardAppBarAnimController.value != progress) {
+        _dashboardAppBarAnimController.value = progress;
+      }
+      tabs?.setAppBarVisibility(progress);
+    }
+
+    if (!autoHideAppBar) {
+      if (_dashboardAppBarAnimController.value != 1.0) setProgress(1.0);
+      return false;
+    }
+
+    final canScroll = notification.metrics.maxScrollExtent > 0.0;
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0.0;
+      final pixels = notification.metrics.pixels;
+      if (canScroll && pixels <= 0.0 && delta <= 0.0) {
+        setProgress(1.0);
+      } else if (delta != 0.0) {
+        setProgress(
+          _dashboardAppBarAnimController.value - (delta / kToolbarHeight),
+        );
+      }
+    } else if (notification is OverscrollNotification) {
+      final overscroll = notification.overscroll;
+      if (overscroll != 0.0) {
+        setProgress(
+          _dashboardAppBarAnimController.value - (overscroll / kToolbarHeight),
+        );
+      }
+    } else if (notification is ScrollEndNotification) {
+      final pixels = notification.metrics.pixels;
+      if (canScroll && pixels <= 0.0) {
+        if (_dashboardAppBarAnimController.value != 1.0) {
+          _dashboardAppBarAnimController.animateTo(
+            1.0,
+            duration: AppMotion.short2,
+            curve: Curves.easeOutCubic,
+          );
+        }
+      } else if (_dashboardAppBarAnimController.value > 0.0 &&
+          _dashboardAppBarAnimController.value < 1.0) {
+        _dashboardAppBarAnimController.animateTo(
+          _dashboardAppBarAnimController.value >= 0.5 ? 1.0 : 0.0,
+          duration: AppMotion.short2,
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+    return false;
+  }
+
+  void _handleDashboardPointerDown(PointerDownEvent event) {
+    _lockController.scheduleAutoLock();
+    _container
+        .read(vaultDashboardControllerProvider.notifier)
+        .resetAllAutoCloseTimers();
+    _dashboardPointerCount++;
+    if (_dashboardPointerCount != 1) {
+      _dashboardSwipeRejected = true;
+      return;
+    }
+
+    final edgeInset = math.max(
+      72.0,
+      MediaQuery.systemGestureInsetsOf(context).left,
+    );
+    _isTouchFromEdge = event.position.dx <= edgeInset;
+    _drawerDragDistance = 0.0;
+    _dashboardSwipePointer = event.pointer;
+    _dashboardSwipeStart = event.position;
+    _dashboardSwipeStartTabIndex = _browserTabs?.activeIndex;
+    final bodyRenderObject = _dashboardSwipeBodyKey.currentContext
+        ?.findRenderObject();
+    final bodyBounds = bodyRenderObject is RenderBox
+        ? (bodyRenderObject.localToGlobal(Offset.zero) & bodyRenderObject.size)
+        : null;
+    _dashboardSwipeRejected =
+        _isTouchFromEdge || !(bodyBounds?.contains(event.position) ?? false);
+  }
+
+  void _handleDashboardPointerMove(PointerMoveEvent event) {
+    final start = _dashboardSwipeStart;
+    if (event.pointer != _dashboardSwipePointer ||
+        start == null ||
+        _dashboardSwipeRejected) {
+      return;
+    }
+    if (_dashboardPointerCount != 1) {
+      _dashboardSwipeRejected = true;
+      return;
+    }
+    final offset = event.position - start;
+    if (offset.distance < 14.0) return;
+    if (offset.dx.abs() <= offset.dy.abs()) {
+      _dashboardSwipeRejected = true;
+      return;
+    }
+    _drawerDragDistance = offset.dx;
+  }
+
+  void _handleDashboardPointerUp(PointerEvent event, {bool cancelled = false}) {
+    if (event.pointer == _dashboardSwipePointer) {
+      if (!cancelled &&
+          !_dashboardSwipeRejected &&
+          _dashboardPointerCount == 1) {
+        _finishHorizontalSwipe(
+          tabsEnabled: ref
+              .read(appSettingsControllerProvider)
+              .settings
+              .useBrowserTabs,
+        );
+      } else {
+        _drawerDragDistance = 0.0;
+      }
+      _dashboardSwipePointer = null;
+      _dashboardSwipeStart = null;
+      _dashboardSwipeStartTabIndex = null;
+      _dashboardSwipeRejected = false;
+    }
+    _dashboardPointerCount = math.max(0, _dashboardPointerCount - 1);
+  }
+
+  void _finishHorizontalSwipe({required bool tabsEnabled}) {
+    final distance = _drawerDragDistance;
+    _drawerDragDistance = 0.0;
+    if (_isTouchFromEdge || distance.abs() < 60.0) return;
+
+    final tabs = _browserTabs;
+    if (tabsEnabled && tabs != null && tabs.length > 0) {
+      final startIndex = _dashboardSwipeStartTabIndex ?? tabs.activeIndex;
+      if (distance < 0.0 && startIndex == tabs.length - 1) {
+        (widget.onNewBrowserTab ?? _openDashboardNewTab)();
+        return;
+      }
+      if (distance > 0.0 && startIndex == 0) {
+        _scaffoldKey.currentState?.openDrawer();
+        return;
+      }
+      // The host PageView handles tab changes so a drag can be released or
+      // cancelled while its neighboring page tracks the gesture.
+      return;
+    }
+
+    if (distance > 0.0) _scaffoldKey.currentState?.openDrawer();
+  }
+
+  @override
   void dispose() {
+    _browserTabs?.removeListener(_onBrowserTabsChanged);
+    _browserTabs?.appBarVisibility.removeListener(
+      _onDashboardAppBarVisibilityChanged,
+    );
+    _dashboardAppBarAnimController
+      ..removeListener(_onDashboardAppBarAnimationChanged)
+      ..dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -165,13 +464,80 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     _lockController.handleAppLifecycleState(state);
   }
 
-   Future<void> _openExternalStorage(ExternalStorageLocation loc) async {
+  Future<void> _openExternalStorage(ExternalStorageLocation loc) async {
     final container = buildExternalStorageContainer(
       rootPath: loc.resolvedUri,
       displayName: loc.displayName,
       volId: loc.volId,
     );
-    await Navigator.push(context, _buildLocalStorageRoute(container));
+    await _openBrowser(container);
+  }
+
+  Future<void> _openDashboardNewTab() async {
+    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      return;
+    }
+    final tabs = widget.browserTabs ?? _browserTabs;
+    if (tabs == null) return;
+    final active = tabs.activeTab;
+    if (active == null) return;
+    final nav = active.isDashboard
+        ? null
+        : ref.read(fileBrowserNavigationProvider(active.key));
+    final choice = await BrowserNewTabSheet.show(
+      context,
+      currentContainer: active.container,
+      currentDirPath: nav == null ? '' : browserTabDuplicatePath(nav),
+      mountedVaults: ref.read(vaultDashboardControllerProvider).mounted,
+      primaryLocalContainer: _localStorageContainer,
+    );
+    if (!mounted || choice == null) return;
+    if (choice.container == null) {
+      tabs.openDashboardTab();
+      return;
+    }
+    final key = tabs.openTab(
+      choice.container!,
+      initialPath: (choice.path == null || choice.path!.isEmpty)
+          ? null
+          : choice.path,
+    );
+    if (key == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+  }
+
+  void _duplicateDashboardTab(BrowserTab tab) {
+    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      return;
+    }
+    final tabs = widget.browserTabs ?? _browserTabs;
+    final container = tab.container;
+    if (tabs == null) return;
+    if (tab.isDashboard) {
+      tabs.openDashboardTab();
+      return;
+    }
+    if (container == null) return;
+    final nav = ref.read(fileBrowserNavigationProvider(tab.key));
+    final path = browserTabDuplicatePath(nav);
+    final key = tabs.openTab(
+      container,
+      initialPath: path.isEmpty ? null : path,
+    );
+    if (key == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
   }
 
   void _promptRenameExternalStorage(ExternalStorageLocation loc) {
@@ -186,12 +552,17 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           decoration: InputDecoration(labelText: context.l10n.displayNameTitle),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
               final text = ctrl.text.trim();
               if (text.isNotEmpty) {
-                ref.read(externalStorageLocationsProvider.notifier).renameLocation(loc.id, text);
+                ref
+                    .read(externalStorageLocationsProvider.notifier)
+                    .renameLocation(loc.id, text);
               }
               Navigator.pop(ctx);
             },
@@ -207,12 +578,19 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.removeStorageLocationTitle),
-        content: Text(context.l10n.removeStorageLocationConfirm(loc.displayName)),
+        content: Text(
+          context.l10n.removeStorageLocationConfirm(loc.displayName),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
+          ),
           FilledButton(
             onPressed: () {
-              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
+              ref
+                  .read(externalStorageLocationsProvider.notifier)
+                  .removeLocation(loc.id);
               Navigator.pop(ctx);
             },
             child: Text(context.l10n.remove),
@@ -223,7 +601,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Future<void> _enforceAppLock() async {
-    VeLog.i(_kLogTag, '_enforceAppLock: called (isEnforcingLock=$_isEnforcingLock)');
+    VeLog.i(
+      _kLogTag,
+      '_enforceAppLock: called (isEnforcingLock=$_isEnforcingLock)',
+    );
     if (!mounted || _isEnforcingLock) return;
     _isEnforcingLock = true;
     try {
@@ -234,14 +615,20 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       navigator.popUntil((route) => route.isFirst);
 
       if (mode == DisguiseMode.decoy) {
-        VeLog.i(_kLogTag, '_enforceAppLock: decoy mode active, disabling secure screen instead of locking');
+        VeLog.i(
+          _kLogTag,
+          '_enforceAppLock: decoy mode active, disabling secure screen instead of locking',
+        );
         await _container.read(secureScreenPolicyProvider).disableForDecoy();
         return;
       }
 
       final settings = _container.read(appSettingsControllerProvider).settings;
       if (settings.useMasterPassword && settings.masterPasswordHash != null) {
-        VeLog.i(_kLogTag, '_enforceAppLock: master password set -> pushing LockGateScreen');
+        VeLog.i(
+          _kLogTag,
+          '_enforceAppLock: master password set -> pushing LockGateScreen',
+        );
         navigator.pushAndRemoveUntil(
           PageRouteBuilder(
             pageBuilder: (_, _, _) => const LockGateScreen(),
@@ -251,7 +638,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           (route) => false,
         );
       } else {
-        VeLog.d(_kLogTag, '_enforceAppLock: no master password set, nothing to push');
+        VeLog.d(
+          _kLogTag,
+          '_enforceAppLock: no master password set, nothing to push',
+        );
         _container.read(sessionLockControllerProvider).notifyAppUnlocked();
       }
     } finally {
@@ -263,7 +653,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final state = _container.read(vaultDashboardControllerProvider);
     final mountedList = state.mounted;
     final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(vaultDashboardControllerProvider.notifier);
+    final controller = _container.read(
+      vaultDashboardControllerProvider.notifier,
+    );
 
     VeLog.i(
       _kLogTag,
@@ -281,7 +673,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         continue;
       }
       if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(_kLogTag, '_lockAllMountedContainers: volId=${c.volId} guard busy, skipping');
+        VeLog.d(
+          _kLogTag,
+          '_lockAllMountedContainers: volId=${c.volId} guard busy, skipping',
+        );
         continue;
       }
       try {
@@ -305,7 +700,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final state = _container.read(vaultDashboardControllerProvider);
     final mountedList = state.mounted;
     final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(vaultDashboardControllerProvider.notifier);
+    final controller = _container.read(
+      vaultDashboardControllerProvider.notifier,
+    );
 
     final targets = mountedList
         .where((c) => state.records[c.uri]?.autoCloseImmediately == true)
@@ -320,7 +717,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
     for (final c in targets) {
       if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(_kLogTag, '_lockImmediateOverrideContainers: volId=${c.volId} guard busy, skipping');
+        VeLog.d(
+          _kLogTag,
+          '_lockImmediateOverrideContainers: volId=${c.volId} guard busy, skipping',
+        );
         continue;
       }
       try {
@@ -346,7 +746,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final state = _container.read(vaultDashboardControllerProvider);
     final mountedList = state.mounted;
     final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(vaultDashboardControllerProvider.notifier);
+    final controller = _container.read(
+      vaultDashboardControllerProvider.notifier,
+    );
 
     final targets = mountedList
         .where((c) => state.records[c.uri]?.autoCloseScreenLockOnly == true)
@@ -361,7 +763,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
     for (final c in targets) {
       if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(_kLogTag, '_lockScreenLockOnlyContainers: volId=${c.volId} guard busy, skipping');
+        VeLog.d(
+          _kLogTag,
+          '_lockScreenLockOnlyContainers: volId=${c.volId} guard busy, skipping',
+        );
         continue;
       }
       try {
@@ -373,21 +778,45 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
-  Widget _buildDrawer({int? currentVolId}) {
+  /// Opens [container] in an additional file-manager tab (long-press menu of
+  /// the drawer's vaults and storages).
+  void _openInNewTab(BrowserTabsController tabs, MountedContainer container) {
+    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      return;
+    }
+    if (tabs.openTab(container) == null && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+    }
+  }
+
+  Widget _buildDrawer({int? currentVolId, BrowserTabsController? tabs}) {
     return AppNavigationDrawer(
       currentVolId: currentVolId,
+      onOpenInNewTab:
+          tabs == null ||
+              !ref.read(appSettingsControllerProvider).settings.useBrowserTabs
+          ? null
+          : (container) => _openInNewTab(tabs, container),
       primaryLocalContainer: _localStorageContainer,
-      onOpenLocalStorage: () => unawaited(
-        _openLocalStorage(currentVolId: currentVolId),
-      ),
+      onOpenLocalStorage: () =>
+          unawaited(_openLocalStorage(currentVolId: currentVolId)),
       selectedTabIndex: 0,
       onSelectTab: widget.onNavigateTab,
+      keepBrowserTabsOnNavigate: widget.onOpenBrowser != null && tabs != null,
       onSelectContainer: (newContainer) {
         // Inside the tabbed file manager the drawer switches the *active tab*
         // instead of replacing the whole route (which would drop every tab).
         final tabs = _browserTabs;
         if (tabs != null) {
-          tabs.replaceActive(newContainer);
+          if (widget.onOpenBrowser != null) {
+            widget.onOpenBrowser!(newContainer);
+          } else {
+            tabs.replaceActive(newContainer);
+          }
           return;
         }
         if (currentVolId == null) {
@@ -408,13 +837,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       mountedContainers: () =>
           ref.read(vaultDashboardControllerProvider).mounted,
       primaryLocalContainer: () => _localStorageContainer,
-      drawerBuilder: (tabs, volId) => _buildDrawer(currentVolId: volId),
+      drawerBuilder: (tabs, volId) =>
+          _buildDrawer(currentVolId: volId, tabs: tabs),
       // Unknown / on-device volIds are ignored by the controller, which
       // matches the old local-storage route's no-op callback.
-      userActivityFor: (volId) => () => ref
-          .read(vaultDashboardControllerProvider.notifier)
-          .onUserActivityForContainer(volId),
-      onTabsController: (tabs) => _browserTabs = tabs,
+      userActivityFor: (volId) =>
+          () => ref
+              .read(vaultDashboardControllerProvider.notifier)
+              .onUserActivityForContainer(volId),
+      onTabsController: _attachBrowserTabs,
     );
   }
 
@@ -506,7 +937,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       confirmLabel: context.l10n.hide,
     );
     if (!mounted || !shouldHide) return;
-    await ref.read(appSettingsControllerProvider.notifier).updateSettings(
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings(
           (settings) => settings.copyWith(showStorageLocationsInDrawer: false),
         );
   }
@@ -524,6 +957,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         displayName: context.l10n.localStorageCardTitle,
       );
       setState(() => _localStorageContainer = container);
+    }
+    if (widget.onOpenBrowser != null) {
+      widget.onOpenBrowser!(container);
+      return;
     }
     final tabs = _browserTabs;
     if (tabs != null) {
@@ -553,12 +990,16 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     if (uri != null) {
       final record = state.records[uri];
       if (record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-        rememberedPassword = await ref.read(containerRepositoryProvider).getPassword(uri);
+        rememberedPassword = await ref
+            .read(containerRepositoryProvider)
+            .getPassword(uri);
       }
     }
     final record = uri != null ? state.records[uri] : null;
-    final docProvider = record?.documentProvider ?? state.appSettings.defaultDocumentProvider;
-    final autoMountFolders = record?.documentProviderFolders
+    final docProvider =
+        record?.documentProvider ?? state.appSettings.defaultDocumentProvider;
+    final autoMountFolders =
+        record?.documentProviderFolders
             .where((f) => f.autoMount)
             .map((f) => f.path)
             .toList() ??
@@ -571,29 +1012,44 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UnlockSheet(
-            onMounted: (container, {record}) {
-              ref.read(vaultDashboardControllerProvider.notifier).onContainerMounted(container, record: record);
-              newlyMountedContainer = container;
-            },
-            openBrowserRoute: autoOpen ? (container) => _buildBrowserRoute(container) : null,
-            initialUri: uri,
-            initialName: name,
-            prefillPassword: rememberedPassword,
-            documentProvider: docProvider,
-            autoMountFolders: autoMountFolders,
-            mountedUris: state.mounted.map((c) => c.uri).toList(),
-          )),
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.dashboard,
+            child: UnlockSheet(
+              onMounted: (container, {record}) {
+                ref
+                    .read(vaultDashboardControllerProvider.notifier)
+                    .onContainerMounted(container, record: record);
+                newlyMountedContainer = container;
+                if (autoOpen && widget.onOpenBrowser != null) {
+                  widget.onOpenBrowser!(container);
+                }
+              },
+              openBrowserRoute: autoOpen && widget.onOpenBrowser == null
+                  ? (container) => _buildBrowserRoute(container)
+                  : null,
+              initialUri: uri,
+              initialName: name,
+              prefillPassword: rememberedPassword,
+              documentProvider: docProvider,
+              autoMountFolders: autoMountFolders,
+              mountedUris: state.mounted.map((c) => c.uri).toList(),
+            ),
+          ),
         ),
       );
       if (mounted) {
         await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
         if (newlyMountedContainer != null) {
-          ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(newlyMountedContainer!.volId);
+          ref
+              .read(vaultDashboardControllerProvider.notifier)
+              .refreshContainerSpace(newlyMountedContainer!.volId);
         }
       }
     } finally {
-      if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
+      if (mounted)
+        ref
+            .read(vaultDashboardControllerProvider.notifier)
+            .setActionInFlight(false);
     }
   }
 
@@ -603,8 +1059,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
 
     String? rememberedPassword;
-    if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-      rememberedPassword = await ref.read(containerRepositoryProvider).getPassword(existingRecord.uri);
+    if (existingRecord != null &&
+        existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+      rememberedPassword = await ref
+          .read(containerRepositoryProvider)
+          .getPassword(existingRecord.uri);
     }
     final autoOpen = state.appSettings.autoOpenOnUnlock;
 
@@ -614,35 +1073,59 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UsbUnlockSheet(
-            onMounted: (container, {record}) {
-              ref.read(vaultDashboardControllerProvider.notifier).onContainerMounted(container, record: record);
-              newlyMountedContainer = container;
-            },
-            onReconnected: (container, migratedRecord, oldUri) {
-              ref.read(vaultDashboardControllerProvider.notifier).onUsbContainerReconnected(container, migratedRecord, oldUri);
-              newlyMountedContainer = container;
-            },
-            openBrowserRoute: autoOpen ? (container) => _buildBrowserRoute(container) : null,
-            documentProvider: existingRecord?.documentProvider ?? state.appSettings.defaultDocumentProvider,
-            autoMountFolders: existingRecord?.documentProviderFolders
-                    .where((f) => f.autoMount)
-                    .map((f) => f.path)
-                    .toList() ??
-                const <String>[],
-            existingRecord: existingRecord,
-            prefillPassword: rememberedPassword,
-          )),
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.dashboard,
+            child: UsbUnlockSheet(
+              onMounted: (container, {record}) {
+                ref
+                    .read(vaultDashboardControllerProvider.notifier)
+                    .onContainerMounted(container, record: record);
+                newlyMountedContainer = container;
+                if (autoOpen && widget.onOpenBrowser != null) {
+                  widget.onOpenBrowser!(container);
+                }
+              },
+              onReconnected: (container, migratedRecord, oldUri) {
+                ref
+                    .read(vaultDashboardControllerProvider.notifier)
+                    .onUsbContainerReconnected(
+                      container,
+                      migratedRecord,
+                      oldUri,
+                    );
+                newlyMountedContainer = container;
+              },
+              openBrowserRoute: autoOpen && widget.onOpenBrowser == null
+                  ? (container) => _buildBrowserRoute(container)
+                  : null,
+              documentProvider:
+                  existingRecord?.documentProvider ??
+                  state.appSettings.defaultDocumentProvider,
+              autoMountFolders:
+                  existingRecord?.documentProviderFolders
+                      .where((f) => f.autoMount)
+                      .map((f) => f.path)
+                      .toList() ??
+                  const <String>[],
+              existingRecord: existingRecord,
+              prefillPassword: rememberedPassword,
+            ),
+          ),
         ),
       );
       if (mounted) {
         await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
         if (newlyMountedContainer != null) {
-          ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(newlyMountedContainer!.volId);
+          ref
+              .read(vaultDashboardControllerProvider.notifier)
+              .refreshContainerSpace(newlyMountedContainer!.volId);
         }
       }
     } finally {
-      if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
+      if (mounted)
+        ref
+            .read(vaultDashboardControllerProvider.notifier)
+            .setActionInFlight(false);
     }
   }
 
@@ -652,9 +1135,17 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: const UsbCreateContainerSheet())),
+      MaterialPageRoute(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: const UsbCreateContainerSheet(),
+        ),
+      ),
     ).whenComplete(() {
-      if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
+      if (mounted)
+        ref
+            .read(vaultDashboardControllerProvider.notifier)
+            .setActionInFlight(false);
     });
   }
 
@@ -666,13 +1157,21 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: const CreateContainerSheet())),
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.dashboard,
+            child: const CreateContainerSheet(),
+          ),
+        ),
       );
       if (mounted) {
         await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
       }
     } finally {
-      if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
+      if (mounted)
+        ref
+            .read(vaultDashboardControllerProvider.notifier)
+            .setActionInFlight(false);
     }
   }
 
@@ -683,23 +1182,30 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
     bool hasUsb = false;
     try {
-      final devices = await ref.read(vaultLifecycleApiProvider).listUsbDevices();
+      final devices = await ref
+          .read(vaultLifecycleApiProvider)
+          .listUsbDevices();
       hasUsb = devices.isNotEmpty;
     } catch (e) {
       VeLog.w(_kLogTag, 'USB device enumeration failed', e);
     }
 
     if (!mounted) return;
-    ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
+    ref
+        .read(vaultDashboardControllerProvider.notifier)
+        .setActionInFlight(false);
     HapticFeedback.lightImpact();
 
     final cs = Theme.of(context).colorScheme;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: isLandscape,
-      constraints: isLandscape ? BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.5) : null,
+      constraints: isLandscape
+          ? BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.5)
+          : null,
       builder: (sheetContext) => AppBottomSheet(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -709,7 +1215,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               padding: const EdgeInsets.only(left: 4, bottom: 4),
               child: Text(
                 context.l10n.addAVaultTitle,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 4),
@@ -761,7 +1269,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     );
   }
 
-  void _showContainerConfig({required String uri, required String currentLabel}) {
+  void _showContainerConfig({
+    required String uri,
+    required String currentLabel,
+  }) {
     HapticFeedback.mediumImpact();
     final state = ref.read(vaultDashboardControllerProvider);
     final existing = state.records[uri];
@@ -776,26 +1287,34 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: ContainerConfigScreen(
-          uri: uri,
-          currentLabel: currentLabel,
-          existingRecord: existing,
-          appSettings: state.appSettings,
-          mountedContainer: mountedContainer,
-          onSaved: (record) =>
-              ref.read(vaultDashboardControllerProvider.notifier).updateContainerRecord(uri, record),
-        )),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: ContainerConfigScreen(
+            uri: uri,
+            currentLabel: currentLabel,
+            existingRecord: existing,
+            appSettings: state.appSettings,
+            mountedContainer: mountedContainer,
+            onSaved: (record) => ref
+                .read(vaultDashboardControllerProvider.notifier)
+                .updateContainerRecord(uri, record),
+          ),
+        ),
       ),
     );
   }
 
   Future<void> _openBrowser(MountedContainer container) async {
-    await Navigator.push(
-      context,
-      _buildBrowserRoute(container),
-    );
+    final openBrowser = widget.onOpenBrowser;
+    if (openBrowser != null) {
+      openBrowser(container);
+      return;
+    }
+    await Navigator.push(context, _buildBrowserRoute(container));
     if (mounted) {
-      ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(container.volId);
+      ref
+          .read(vaultDashboardControllerProvider.notifier)
+          .refreshContainerSpace(container.volId);
     }
   }
 
@@ -823,10 +1342,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       );
       return;
     }
-    ref.read(vaultDashboardControllerProvider.notifier).handleSwipeToRemove(
-          item.uri,
-          (item as LockedVaultItem).record,
-        );
+    ref
+        .read(vaultDashboardControllerProvider.notifier)
+        .handleSwipeToRemove(item.uri, (item as LockedVaultItem).record);
   }
 
   Widget _buildBody(
@@ -843,18 +1361,24 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       buildDefaultDragHandles: false,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
       itemCount: displayItems.length,
-      onReorderItem: (oldIndex, newIndex) =>
-          ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
+      onReorderItem: (oldIndex, newIndex) => ref
+          .read(vaultDashboardControllerProvider.notifier)
+          .handleReorder(oldIndex, newIndex),
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
           animation: animation,
           builder: (context, child) {
             final animValue = Curves.easeInOut.transform(animation.value);
-            final elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
+            final elevation = Tween<double>(
+              begin: 0,
+              end: 8,
+            ).transform(animValue);
             return Material(
               elevation: elevation,
               color: Colors.transparent,
-              shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
+              shadowColor: Theme.of(
+                context,
+              ).colorScheme.shadow.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(AppRadius.xl),
               child: child,
             );
@@ -873,11 +1397,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           onOpen: () => openItem(item),
           onEdit: () => _requestEdit(item),
           onDelete: () => _requestDelete(item),
-          onLocked: (volId) =>
-              ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
+          onLocked: (volId) => ref
+              .read(vaultDashboardControllerProvider.notifier)
+              .onContainerLocked(volId),
           isRemoving: state.animatingOutUris.contains(item.uri),
           isInserting: state.animatingInUris.contains(item.uri),
-          dragEnabled: appSettings.containerSortMode == ContainerSortMode.manual,
+          dragEnabled:
+              appSettings.containerSortMode == ContainerSortMode.manual,
         );
       },
     );
@@ -894,8 +1420,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
     final appSettingsState = ref.watch(appSettingsControllerProvider);
+    final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
     final appSettings = appSettingsState.settings;
-    final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
+    final displayItems = ref
+        .read(vaultDashboardControllerProvider.notifier)
+        .getDisplayItems();
 
     if (widget.mountedNotifier != null) {
       widget.mountedNotifier!.value = List.unmodifiable(state.mounted);
@@ -903,101 +1432,157 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
+    final browserTabs = widget.browserTabs ?? _browserTabs;
+    final dashboardIsActive = browserTabs?.activeTab?.isDashboard ?? true;
+    final autoHideAppBar = toolbarSettings.config.autoHideAppBar;
+    final dashboardTabStrip =
+        browserTabs == null ||
+            browserTabs.isEmpty ||
+            !appSettings.useBrowserTabs
+        ? null
+        : BrowserTabStrip(
+            controller: browserTabs,
+            storageKey: 'browser-tab-strip-scroll-position',
+            onNewTab: widget.onNewBrowserTab ?? _openDashboardNewTab,
+            onDuplicate: widget.onDuplicateBrowserTab ?? _duplicateDashboardTab,
+            onActivateTab: widget.onActivateBrowserTab,
+          );
 
-     return Listener(
+    return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (event) {
-        _lockController.scheduleAutoLock();
-        _container.read(vaultDashboardControllerProvider.notifier).resetAllAutoCloseTimers();
-        final edgeInset = math.max(
-          72.0,
-          MediaQuery.systemGestureInsetsOf(context).left,
-        );
-        _isTouchFromEdge = event.position.dx <= edgeInset;
-        _drawerDragDistance = 0.0;
-      },
+      onPointerDown: _handleDashboardPointerDown,
+      onPointerMove: _handleDashboardPointerMove,
+      onPointerUp: _handleDashboardPointerUp,
+      onPointerCancel: (event) =>
+          _handleDashboardPointerUp(event, cancelled: true),
       child: Scaffold(
         key: _scaffoldKey,
+        backgroundColor: widget.tabPagePosition == null
+            ? null
+            : Colors.transparent,
         drawerEnableOpenDragGesture: false,
-        drawer: _buildDrawer(),
-        appBar: AppBar(
-          leading: Builder(
-            builder: (ctx) => IconButton(
-              icon: Icon(
-                Icons.menu_rounded,
-                color: Theme.of(ctx).appBarTheme.foregroundColor,
-              ),
-              tooltip: context.l10n.storageLocationsTitle,
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-            ),
-          ),
-          title: Text(
-            context.l10n.appNameVaultExplorer,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          actions: const [
-            AppBarAuthenticatorButton(),
-            AppBarTransferButton(),
-            SizedBox(width: 4),
-          ],
-        ),
-        body: NotificationListener<UserScrollNotification>(
-          onNotification: (notification) {
-            final direction = notification.direction;
-            if (direction == ScrollDirection.forward) {
-              if (!_isFabVisible) setState(() => _isFabVisible = true);
-            } else if (direction == ScrollDirection.reverse) {
-              if (_isFabVisible) setState(() => _isFabVisible = false);
-            }
-            return false;
-          },
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            dragStartBehavior: DragStartBehavior.down,
-            onHorizontalDragStart: (details) {
-              final edgeInset = math.max(
-                72.0,
-                MediaQuery.systemGestureInsetsOf(context).left,
-              );
-              if (_isTouchFromEdge || details.globalPosition.dx <= edgeInset) {
-                _isTouchFromEdge = true;
-                _drawerDragDistance = 0.0;
-                return;
-              }
-              _drawerDragDistance = 0.0;
-            },
-            onHorizontalDragUpdate: (details) {
-              if (_isTouchFromEdge) {
-                _drawerDragDistance = 0.0;
-                return;
-              }
-              _drawerDragDistance += details.primaryDelta ?? 0.0;
-              if (_drawerDragDistance > 60.0) {
-                _scaffoldKey.currentState?.openDrawer();
-                _drawerDragDistance = 0.0;
-                _isTouchFromEdge = true;
-              }
-            },
-            onHorizontalDragEnd: (_) {
-              _drawerDragDistance = 0.0;
-            },
-            onHorizontalDragCancel: () {
-              _drawerDragDistance = 0.0;
-            },
-            child: Column(
-              children: [
-                // Auto-sync progress / attention; takes no space when idle.
-                const SyncStatusBanner(),
-                Expanded(
-                  child: _buildBody(
-                    displayItems,
-                    state,
-                    appSettings,
-                    settingsLoaded: !appSettingsState.loading,
+        drawer: _buildDrawer(tabs: browserTabs),
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _pinDashboardChrome(
+                ClipRect(
+                  child: AnimatedBuilder(
+                    animation: _dashboardAppBarAnimController,
+                    builder: (context, _) {
+                      final factor = !autoHideAppBar
+                          ? 1.0
+                          : _dashboardAppBarAnimController.value;
+                      if (factor == 0.0) return const SizedBox.shrink();
+                      if (!dashboardIsActive) {
+                        return SizedBox(height: kToolbarHeight * factor);
+                      }
+                      return Align(
+                        alignment: Alignment.bottomCenter,
+                        heightFactor: factor,
+                        child: SizedBox(
+                          height: kToolbarHeight,
+                          child: MediaQuery.removePadding(
+                            context: context,
+                            removeTop: true,
+                            child: AppBar(
+                              primary: false,
+                              leading: Builder(
+                                builder: (ctx) => IconButton(
+                                  icon: Icon(
+                                    Icons.menu_rounded,
+                                    color: Theme.of(
+                                      ctx,
+                                    ).appBarTheme.foregroundColor,
+                                  ),
+                                  tooltip: context.l10n.storageLocationsTitle,
+                                  onPressed: () =>
+                                      Scaffold.of(ctx).openDrawer(),
+                                ),
+                              ),
+                              title: Text(
+                                context.l10n.appNameVaultExplorer,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              actions: const [
+                                AppBarAuthenticatorButton(),
+                                AppBarTransferButton(),
+                                SizedBox(width: 4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
+              ),
+              if (dashboardTabStrip != null)
+                dashboardIsActive
+                    ? SizedBox(
+                        height: kBrowserTabStripHeight,
+                        child: _pinDashboardChrome(dashboardTabStrip),
+                      )
+                    : const SizedBox(height: kBrowserTabStripHeight),
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.axis == Axis.vertical) {
+                      if (notification is ScrollStartNotification) {
+                        _setVerticalScrollActivity(true);
+                      } else if (notification is ScrollEndNotification) {
+                        _setVerticalScrollActivity(false);
+                      }
+                    }
+                    _handleDashboardScrollNotification(
+                      notification,
+                      autoHideAppBar: autoHideAppBar,
+                      tabs: browserTabs,
+                    );
+                    if (notification is UserScrollNotification &&
+                        notification.metrics.axis == Axis.vertical) {
+                      final direction = notification.direction;
+                      if (direction == ScrollDirection.forward) {
+                        if (!_isFabVisible)
+                          setState(() => _isFabVisible = true);
+                      } else if (direction == ScrollDirection.reverse) {
+                        if (_isFabVisible)
+                          setState(() => _isFabVisible = false);
+                      }
+                    }
+                    return false;
+                  },
+                  child: KeyedSubtree(
+                    key: _dashboardSwipeBodyKey,
+                    child: Column(
+                      children: [
+                        // Auto-sync progress / attention; takes no space when idle.
+                        _pinDashboardChrome(
+                          Visibility(
+                            visible: dashboardIsActive,
+                            maintainSize: true,
+                            maintainAnimation: true,
+                            maintainState: true,
+                            child: const SyncStatusBanner(),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildBody(
+                            displayItems,
+                            state,
+                            appSettings,
+                            settingsLoaded: !appSettingsState.loading,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         floatingActionButton: AnimatedSlide(
@@ -1033,7 +1618,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             physics: const NeverScrollableScrollPhysics(),
             child: Container(
               height: undoBarHeight,
-              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset > 0 ? bottomInset : 16.0),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                bottomInset > 0 ? bottomInset : 16.0,
+              ),
               child: AnimatedSlide(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
@@ -1043,7 +1633,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
                   opacity: state.showUndoBar ? 1.0 : 0.0,
                   child: _FloatingUndoBar(
                     label: state.recentlyDeletedRecord?.label ?? '',
-                    onUndo: () => ref.read(vaultDashboardControllerProvider.notifier).handleUndo(),
+                    onUndo: () => ref
+                        .read(vaultDashboardControllerProvider.notifier)
+                        .handleUndo(),
                   ),
                 ),
               ),

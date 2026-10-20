@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} sempre compacta com {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 e LZMA estão disponíveis em arquivos 7-Zip.",
   "archiveMethodStoreNote": "Armazenar não compacta, então não há método para escolher.",
+  "browserTabsEnabledTitle": "Usar abas do gerenciador de arquivos",
+  "browserTabsEnabledSubtitle": "Mantenha vários locais abertos e alterne entre eles.",
   "browserTabNew": "Nova aba",
   "browserTabClose": "Fechar aba",
   "browserTabCloseOthers": "Fechar outras abas",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Alternar para a aba anterior",
   "browserTabOpenInNewTab": "Abrir em nova aba",
   "browserTabLimitReached": "Limite de abas atingido ({max})",
-  "browserTabCopyToOtherTab": "Copiar para a outra aba",
-  "browserTabMoveToOtherTab": "Mover para a outra aba"
+  "browserTabCloseAll": "Fechar tudo"
 }

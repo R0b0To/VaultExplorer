@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} は常に {method} で圧縮します。",
   "archiveMethodMoreInSevenZip": "LZMA2 と LZMA は 7-Zip アーカイブで利用できます。",
   "archiveMethodStoreNote": "無圧縮では圧縮しないため、選択できる方式はありません。",
+  "browserTabsEnabledTitle": "ファイルマネージャーのタブを使用",
+  "browserTabsEnabledSubtitle": "複数の場所を開いたまま切り替えられます。",
   "browserTabNew": "新しいタブ",
   "browserTabClose": "タブを閉じる",
   "browserTabCloseOthers": "他のタブを閉じる",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "前のタブに切り替え",
   "browserTabOpenInNewTab": "新しいタブで開く",
   "browserTabLimitReached": "タブの上限に達しました（{max}）",
-  "browserTabCopyToOtherTab": "もう一方のタブにコピー",
-  "browserTabMoveToOtherTab": "もう一方のタブに移動"
+  "browserTabCloseAll": "すべて閉じる"
 }

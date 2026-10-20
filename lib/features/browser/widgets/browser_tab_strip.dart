@@ -1,4 +1,4 @@
-import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -8,9 +8,10 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
-/// Leading icon for a tab / location row: the vault's format initials, or a
-/// phone / SD-card glyph for on-device storage.
+/// Leading icon for a location row in the new-tab picker.
 class BrowserLocationIcon extends StatelessWidget {
   final MountedContainer container;
   final Color color;
@@ -39,24 +40,30 @@ class BrowserLocationIcon extends StatelessWidget {
   }
 }
 
-/// Horizontal strip of file-manager tabs shown above the browser toolbar when
-/// more than one tab is open. Tapping a tab activates it, the trailing buttons
-/// flip to the previously used tab and open a new one, and a long-press opens
-/// a small menu (duplicate / close / close others).
+enum _TabMenuAction { newTab, close, closeOthers, closeAll, duplicate }
+
+/// Height of the strip; matches the text editor's tab strip.
+const double kBrowserTabStripHeight = 40;
+const double kBrowserTabItemWidth = 148;
+
+/// File-manager tab strip with a fixed More menu and a horizontally scrollable
+/// reorderable row of tabs. Tapping a tab activates it; long-press and drag to
+/// reorder. The tab controller retains its horizontal offset while the strip
+/// moves between the Dashboard and file screens.
 class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsController controller;
   final VoidCallback onNewTab;
   final ValueChanged<BrowserTab> onDuplicate;
-
-  /// Shorter strip for landscape, where vertical space is scarce.
-  final bool compact;
+  final ValueChanged<BrowserTab>? onActivateTab;
+  final String storageKey;
 
   const BrowserTabStrip({
     super.key,
     required this.controller,
     required this.onNewTab,
     required this.onDuplicate,
-    this.compact = false,
+    this.onActivateTab,
+    this.storageKey = 'browser-tab-strip-scroll-position',
   });
 
   @override
@@ -64,11 +71,20 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
 }
 
 class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
-  final Map<int, GlobalKey> _chipKeys = {};
+  late final ScrollController _scrollController;
+  final Map<int, GlobalKey> _tabItemKeys = {};
   int? _lastActiveKey;
+  int? _lastActiveIndex;
 
-  GlobalKey _keyFor(int tabKey) =>
-      _chipKeys.putIfAbsent(tabKey, () => GlobalKey());
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.controller.tabStripScrollOffset,
+      keepScrollOffset: false,
+    )..addListener(_rememberScrollOffset);
+    _scrollActiveIntoView(force: true);
+  }
 
   @override
   void didUpdateWidget(covariant BrowserTabStrip oldWidget) {
@@ -77,207 +93,336 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _scrollActiveIntoView();
+  void dispose() {
+    _scrollController.removeListener(_rememberScrollOffset);
+    _scrollController.dispose();
+    super.dispose();
   }
 
-  void _scrollActiveIntoView() {
+  void _rememberScrollOffset() {
+    if (!_scrollController.hasClients) return;
+    widget.controller.setTabStripScrollOffset(
+      _scrollController.position.pixels,
+    );
+  }
+
+  void _scrollActiveIntoView({bool force = false}) {
     final active = widget.controller.activeKey;
-    if (active == _lastActiveKey) return;
+    final activeIndex = widget.controller.activeIndex;
+    if (!force && active == _lastActiveKey && activeIndex == _lastActiveIndex) {
+      return;
+    }
     _lastActiveKey = active;
+    _lastActiveIndex = activeIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _chipKeys[active]?.currentContext;
-      if (ctx == null || !ctx.mounted) return;
+      if (!mounted ||
+          !_scrollController.hasClients ||
+          widget.controller.activeKey != active) {
+        return;
+      }
+      if (activeIndex == 0) {
+        final position = _scrollController.position;
+        if ((position.pixels - position.minScrollExtent).abs() > 0.5) {
+          _scrollController.jumpTo(position.minScrollExtent);
+        }
+        return;
+      }
+      final itemContext = _tabItemKeys[active]?.currentContext;
+      if (itemContext == null) return;
       Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 180),
+        itemContext,
         alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
       );
     });
   }
 
-  Future<void> _showTabMenu(BuildContext chipContext, BrowserTab tab) async {
-    final box = chipContext.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(chipContext).context.findRenderObject() as RenderBox?;
-    if (box == null || overlay == null) return;
-    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
-    final bottomRight = box.localToGlobal(
-      box.size.bottomRight(Offset.zero),
-      ancestor: overlay,
-    );
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(topLeft, bottomRight),
-      Offset.zero & overlay.size,
-    );
-    final l10n = chipContext.l10n;
+  void _onTabTapped(BrowserTab tab) {
     final c = widget.controller;
-    final choice = await showMenu<String>(
-      context: chipContext,
-      position: position,
-      items: [
-        if (!c.atLimit)
-          PopupMenuItem<String>(
-            value: 'duplicate',
-            child: Text(l10n.browserTabDuplicate),
-          ),
-        PopupMenuItem<String>(
-          value: 'close',
-          child: Text(l10n.browserTabClose),
-        ),
-        if (c.hasMultiple)
-          PopupMenuItem<String>(
-            value: 'others',
-            child: Text(l10n.browserTabCloseOthers),
-          ),
-      ],
-    );
+    final onActivateTab = widget.onActivateTab;
+    if (onActivateTab != null) {
+      onActivateTab(tab);
+    } else {
+      c.activate(tab.key);
+    }
+  }
+
+  void _onMenuAction(_TabMenuAction choice) {
+    final c = widget.controller;
+    final active = c.activeTab;
+    if (active == null) return;
     switch (choice) {
-      case 'duplicate':
-        widget.onDuplicate(tab);
-      case 'close':
-        c.closeTab(tab.key);
-      case 'others':
-        c.closeOthers(tab.key);
+      case _TabMenuAction.newTab:
+        widget.onNewTab();
+      case _TabMenuAction.close:
+        c.closeTab(active.key);
+      case _TabMenuAction.closeOthers:
+        c.closeOthers(active.key);
+      case _TabMenuAction.closeAll:
+        c.closeAll();
+      case _TabMenuAction.duplicate:
+        widget.onDuplicate(active);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final tabsEnabled = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
+    );
+    if (!tabsEnabled) return const SizedBox.shrink();
+
     final cs = Theme.of(context).colorScheme;
     final c = widget.controller;
-    final tabs = c.tabs;
-    _chipKeys.removeWhere((k, _) => !tabs.any((t) => t.key == k));
 
-    return Material(
-      color: cs.surfaceContainerLow,
-      child: SizedBox(
-        height: widget.compact ? 38 : 44,
-        child: Row(
-          children: [
-            Expanded(
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: widget.compact ? 3 : 6,
-                ),
-                itemCount: tabs.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 6),
-                itemBuilder: (context, i) {
-                  final tab = tabs[i];
-                  return _TabChip(
-                    key: _keyFor(tab.key),
-                    tab: tab,
-                    active: tab.key == c.activeKey,
-                    onTap: () => c.activate(tab.key),
-                    onClose: () => c.closeTab(tab.key),
-                    onLongPress: (chipContext) => _showTabMenu(chipContext, tab),
-                  );
-                },
-              ),
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final tabs = c.tabs;
+        final active = c.activeTab;
+        final liveTabKeys = tabs.map((tab) => tab.key).toSet();
+        _tabItemKeys.removeWhere((key, _) => !liveTabKeys.contains(key));
+        _scrollActiveIntoView();
+
+        final stripBackground = cs.surfaceContainer;
+        final activeBackground = cs.surfaceContainerHighest;
+
+        return Container(
+          height: kBrowserTabStripHeight,
+          decoration: BoxDecoration(
+            color: stripBackground,
+            border: Border(
+              bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
             ),
-            IconButton(
-              tooltip: context.l10n.browserTabSwitchPrevious,
-              icon: const Icon(Icons.swap_horiz_rounded),
-              visualDensity: VisualDensity.compact,
-              onPressed: c.hasMultiple ? c.swapToPrevious : null,
-            ),
-            IconButton(
-              tooltip: context.l10n.browserTabNew,
-              icon: const Icon(Icons.add_rounded),
-              visualDensity: VisualDensity.compact,
-              onPressed: widget.onNewTab,
-            ),
-            const SizedBox(width: 4),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TabChip extends ConsumerWidget {
-  final BrowserTab tab;
-  final bool active;
-  final VoidCallback onTap;
-  final VoidCallback onClose;
-  final void Function(BuildContext chipContext) onLongPress;
-
-  const _TabChip({
-    super.key,
-    required this.tab,
-    required this.active,
-    required this.onTap,
-    required this.onClose,
-    required this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    // Folder name once the tab has navigated into a directory, otherwise the
-    // vault / storage name. Watching only this derived string keeps the chip
-    // from rebuilding on every directory-listing or selection change.
-    final folderLabel = ref.watch(
-      fileBrowserNavigationProvider(tab.key).select(
-        (s) => s.pathStack.length <= 1 ? null : s.pathStack.last.label,
-      ),
-    );
-    final name = tab.container.displayName;
-    final label = folderLabel ?? name;
-
-    final fg = active ? cs.onSecondaryContainer : cs.onSurfaceVariant;
-
-    return Tooltip(
-      message: folderLabel == null ? name : '$name / $folderLabel',
-      child: Material(
-        color: active ? cs.secondaryContainer : Colors.transparent,
-        shape: StadiumBorder(
-          side: active
-              ? BorderSide.none
-              : BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Builder(
-          builder: (chipContext) => InkWell(
-            onTap: onTap,
-            onLongPress: () => onLongPress(chipContext),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 200, minWidth: 72),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 12, right: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    BrowserLocationIcon(container: tab.container, color: fg),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelLarge?.copyWith(
-                          color: fg,
-                          fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                        ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                child: PopupMenuButton<_TabMenuAction>(
+                  tooltip: context.l10n.moreOptionsTooltip,
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  onSelected: _onMenuAction,
+                  itemBuilder: (context) => [
+                    PopupMenuItem<_TabMenuAction>(
+                      value: _TabMenuAction.newTab,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.add_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(context.l10n.browserTabNew),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 2),
-                    InkResponse(
-                      onTap: onClose,
-                      radius: 16,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(Icons.close_rounded, size: 16, color: fg),
+                    const PopupMenuDivider(),
+                    PopupMenuItem<_TabMenuAction>(
+                      value: _TabMenuAction.duplicate,
+                      enabled:
+                          active != null && (active.isDashboard || !c.atLimit),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.copy_all_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(context.l10n.browserTabDuplicate),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<_TabMenuAction>(
+                      value: _TabMenuAction.close,
+                      enabled: active != null && c.length > 1,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.close_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(context.l10n.browserTabClose),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<_TabMenuAction>(
+                      value: _TabMenuAction.closeOthers,
+                      enabled: active != null && c.length > 1,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tab_unselected_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(context.l10n.browserTabCloseOthers),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<_TabMenuAction>(
+                      value: _TabMenuAction.closeAll,
+                      enabled: c.hasBrowserTabs && c.length > 1,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.clear_all_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(context.l10n.browserTabCloseAll),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
+              Expanded(
+                child: ReorderableListView.builder(
+                  key: PageStorageKey<String>(widget.storageKey),
+                  scrollController: _scrollController,
+                  itemExtent: kBrowserTabItemWidth,
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.hardEdge,
+                  buildDefaultDragHandles: false,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 3,
+                  ),
+                  itemCount: tabs.length,
+                  onReorderStart: (_) => HapticFeedback.mediumImpact(),
+                  onReorderItem: c.moveTab,
+                  proxyDecorator: (child, index, animation) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        final t = Curves.easeInOut.transform(animation.value);
+                        return Material(
+                          elevation: 6 * t,
+                          color: activeBackground,
+                          shadowColor: cs.shadow.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                          child: child,
+                        );
+                      },
+                      child: child,
+                    );
+                  },
+                  itemBuilder: (context, index) {
+                    final tab = tabs[index];
+                    final itemKey = _tabItemKeys.putIfAbsent(
+                      tab.key,
+                      GlobalKey.new,
+                    );
+                    final isActive = tab.key == c.activeKey;
+                    return ReorderableDelayedDragStartListener(
+                      key: ValueKey<int>(tab.key),
+                      index: index,
+                      child: SizedBox(
+                        key: itemKey,
+                        width: kBrowserTabItemWidth,
+                        child: _TabItem(
+                          tab: tab,
+                          active: isActive,
+                          activeBackground: activeBackground,
+                          onTap: () => _onTabTapped(tab),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TabItem extends ConsumerWidget {
+  final BrowserTab tab;
+  final bool active;
+  final Color activeBackground;
+  final VoidCallback onTap;
+
+  const _TabItem({
+    required this.tab,
+    required this.active,
+    required this.activeBackground,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+
+    // Folder name once the tab has navigated into a directory, otherwise the
+    // vault / storage name. Watching only this derived string keeps the tab
+    // from rebuilding on every directory-listing or selection change.
+    final folderLabel = tab.isDashboard
+        ? null
+        : ref.watch(
+            fileBrowserNavigationProvider(tab.key).select(
+              (s) => s.pathStack.length <= 1 ? null : s.pathStack.last.label,
+            ),
+          );
+    // Items selected in this tab. Selections in different tabs add up when
+    // the user copies / cuts, so each tab shows what it is contributing.
+    final selectedCount = tab.isDashboard
+        ? 0
+        : ref.watch(
+            fileBrowserSelectionProvider(tab.key).select((s) => s.items.length),
+          );
+    final name = tab.container?.displayName ?? context.l10n.dashboardNavLabel;
+    final label = folderLabel ?? name;
+    final fg = active ? cs.onSurface : cs.onSurfaceVariant;
+
+    return Tooltip(
+      message: folderLabel == null ? name : '$name / $folderLabel',
+      child: Material(
+        color: active ? activeBackground : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: active
+                    ? cs.primary.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selectedCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$selectedCount',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onPrimary,
+                      ),
+                    ),
+                  ),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                      color: fg,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

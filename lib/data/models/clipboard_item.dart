@@ -10,18 +10,23 @@ import 'package:flutter/foundation.dart';
 /// [sizeBytes]    — byte size for files; 0 for directories (resolved lazily
 ///                  by [FileOperationService] during the space pre-flight).
 /// [modifiedSecs] — last-modified time in Unix seconds (UTC).
+/// [volId]        — volume this item lives on when it differs from the
+///                  clipboard's `sourceVolId` (items staged together from
+///                  several file-manager tabs); null = the clipboard's volume.
 @immutable
 class ClipboardItem {
   final String path;
   final bool isDir;
   final int sizeBytes;
   final int modifiedSecs;
+  final int? volId;
 
   const ClipboardItem({
     required this.path,
     required this.isDir,
     this.sizeBytes = 0,
     this.modifiedSecs = 0,
+    this.volId,
   });
 
   /// The leaf name of this item (last path segment).
@@ -37,6 +42,7 @@ class ClipboardItem {
     'isDir': isDir,
     'sizeBytes': sizeBytes,
     'modifiedSecs': modifiedSecs,
+    if (volId != null) 'volId': volId,
   };
 
   factory ClipboardItem.fromJson(Map<String, dynamic> j) => ClipboardItem(
@@ -44,6 +50,7 @@ class ClipboardItem {
     isDir: j['isDir'] as bool? ?? false,
     sizeBytes: j['sizeBytes'] as int? ?? 0,
     modifiedSecs: j['modifiedSecs'] as int? ?? 0,
+    volId: j['volId'] as int?,
   );
 
   ClipboardItem copyWith({
@@ -51,12 +58,14 @@ class ClipboardItem {
     bool? isDir,
     int? sizeBytes,
     int? modifiedSecs,
+    int? volId,
   }) =>
       ClipboardItem(
         path: path ?? this.path,
         isDir: isDir ?? this.isDir,
         sizeBytes: sizeBytes ?? this.sizeBytes,
         modifiedSecs: modifiedSecs ?? this.modifiedSecs,
+        volId: volId ?? this.volId,
       );
 
   @override
@@ -66,10 +75,11 @@ class ClipboardItem {
           other.path == path &&
           other.isDir == isDir &&
           other.sizeBytes == sizeBytes &&
-          other.modifiedSecs == modifiedSecs;
+          other.modifiedSecs == modifiedSecs &&
+          other.volId == volId;
 
   @override
-  int get hashCode => Object.hash(path, isDir, sizeBytes, modifiedSecs);
+  int get hashCode => Object.hash(path, isDir, sizeBytes, modifiedSecs, volId);
 
   @override
   String toString() =>

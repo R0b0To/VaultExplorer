@@ -12230,6 +12230,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Speichern komprimiert nicht, daher gibt es keine Methode zur Auswahl.';
 
   @override
+  String get browserTabsEnabledTitle => 'Dateimanager-Tabs verwenden';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Mehrere Speicherorte geöffnet lassen und zwischen ihnen wechseln.';
+
+  @override
   String get browserTabNew => 'Neuer Tab';
 
   @override
@@ -12253,8 +12260,5 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'In anderen Tab kopieren';
-
-  @override
-  String get browserTabMoveToOtherTab => 'In anderen Tab verschieben';
+  String get browserTabCloseAll => 'Alle schließen';
 }

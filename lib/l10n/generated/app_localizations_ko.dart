@@ -11551,6 +11551,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get archiveMethodStoreNote => '저장은 압축하지 않으므로 선택할 방식이 없습니다.';
 
   @override
+  String get browserTabsEnabledTitle => '파일 관리자 탭 사용';
+
+  @override
+  String get browserTabsEnabledSubtitle => '여러 위치를 열어 두고 서로 전환합니다.';
+
+  @override
   String get browserTabNew => '새 탭';
 
   @override
@@ -11574,8 +11580,5 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => '다른 탭으로 복사';
-
-  @override
-  String get browserTabMoveToOtherTab => '다른 탭으로 이동';
+  String get browserTabCloseAll => '모두 닫기';
 }

@@ -12229,6 +12229,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Memorizza non comprime, quindi non c\'è alcun metodo da scegliere.';
 
   @override
+  String get browserTabsEnabledTitle => 'Usa le schede del gestore file';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Mantieni aperte più posizioni e passa dall’una all’altra.';
+
+  @override
   String get browserTabNew => 'Nuova scheda';
 
   @override
@@ -12252,8 +12259,5 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'Copia nell\'altra scheda';
-
-  @override
-  String get browserTabMoveToOtherTab => 'Sposta nell\'altra scheda';
+  String get browserTabCloseAll => 'Chiudi tutto';
 }

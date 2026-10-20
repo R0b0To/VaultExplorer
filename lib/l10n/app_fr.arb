@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} compresse toujours avec {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 et LZMA sont disponibles dans les archives 7-Zip.",
   "archiveMethodStoreNote": "Stocker ne compresse pas, il n'y a donc aucune méthode à choisir.",
+  "browserTabsEnabledTitle": "Utiliser les onglets du gestionnaire de fichiers",
+  "browserTabsEnabledSubtitle": "Gardez plusieurs emplacements ouverts et passez de l’un à l’autre.",
   "browserTabNew": "Nouvel onglet",
   "browserTabClose": "Fermer l'onglet",
   "browserTabCloseOthers": "Fermer les autres onglets",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Passer à l'onglet précédent",
   "browserTabOpenInNewTab": "Ouvrir dans un nouvel onglet",
   "browserTabLimitReached": "Limite d'onglets atteinte ({max})",
-  "browserTabCopyToOtherTab": "Copier vers l'autre onglet",
-  "browserTabMoveToOtherTab": "Déplacer vers l'autre onglet"
+  "browserTabCloseAll": "Fermer tout"
 }

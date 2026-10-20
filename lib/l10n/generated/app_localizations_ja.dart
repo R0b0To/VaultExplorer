@@ -11552,6 +11552,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get archiveMethodStoreNote => '無圧縮では圧縮しないため、選択できる方式はありません。';
 
   @override
+  String get browserTabsEnabledTitle => 'ファイルマネージャーのタブを使用';
+
+  @override
+  String get browserTabsEnabledSubtitle => '複数の場所を開いたまま切り替えられます。';
+
+  @override
   String get browserTabNew => '新しいタブ';
 
   @override
@@ -11575,8 +11581,5 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'もう一方のタブにコピー';
-
-  @override
-  String get browserTabMoveToOtherTab => 'もう一方のタブに移動';
+  String get browserTabCloseAll => 'すべて閉じる';
 }

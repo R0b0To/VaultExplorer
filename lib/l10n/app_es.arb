@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} siempre comprime con {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 y LZMA están disponibles en archivos 7-Zip.",
   "archiveMethodStoreNote": "Almacenar no comprime, así que no hay método que elegir.",
+  "browserTabsEnabledTitle": "Usar pestañas del gestor de archivos",
+  "browserTabsEnabledSubtitle": "Mantén varias ubicaciones abiertas y cambia entre ellas.",
   "browserTabNew": "Nueva pestaña",
   "browserTabClose": "Cerrar pestaña",
   "browserTabCloseOthers": "Cerrar otras pestañas",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Cambiar a la pestaña anterior",
   "browserTabOpenInNewTab": "Abrir en una pestaña nueva",
   "browserTabLimitReached": "Límite de pestañas alcanzado ({max})",
-  "browserTabCopyToOtherTab": "Copiar a la otra pestaña",
-  "browserTabMoveToOtherTab": "Mover a la otra pestaña"
+  "browserTabCloseAll": "Cerrar todo"
 }

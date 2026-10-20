@@ -13762,6 +13762,14 @@
   "@archiveMethodStoreNote": {
     "description": "Note shown instead of the method dropdown when the compression level is Store (no compression)"
   },
+  "browserTabsEnabledTitle": "Use file manager tabs",
+  "@browserTabsEnabledTitle": {
+    "description": "Setting that enables or disables tabs in the file manager"
+  },
+  "browserTabsEnabledSubtitle": "Keep multiple locations open and switch between them.",
+  "@browserTabsEnabledSubtitle": {
+    "description": "Explains the effect of enabling file manager tabs"
+  },
   "browserTabNew": "New tab",
   "@browserTabNew": {
     "description": "Tooltip/title for the file manager's new-tab button and the sheet that lets the user pick where a new tab opens"
@@ -13795,12 +13803,8 @@
       }
     }
   },
-  "browserTabCopyToOtherTab": "Copy to other tab",
-  "@browserTabCopyToOtherTab": {
-    "description": "Item action that copies the item and pastes it into the other (previous) file manager tab's current folder"
-  },
-  "browserTabMoveToOtherTab": "Move to other tab",
-  "@browserTabMoveToOtherTab": {
-    "description": "Item action that moves the item into the other (previous) file manager tab's current folder"
+  "browserTabCloseAll": "Close all",
+  "@browserTabCloseAll": {
+    "description": "Action in the file manager's tab menu that closes every tab (and with it the file manager)"
   }
 }

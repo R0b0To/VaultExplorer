@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
-/// Hard cap on simultaneously open file-manager tabs. Every open tab keeps its
-/// whole `FileBrowserScreen` (scroll positions, path stack, selection, archive
-/// context) alive in an `IndexedStack`, so this bounds the memory cost.
+/// Hard cap on simultaneously open file-manager tabs. Every file tab keeps its
+/// whole `FileBrowserScreen` alive in an `IndexedStack`; the Dashboard root
+/// tab is excluded from this limit.
 const int kMaxBrowserTabs = 5;
 
 /// Tab state keys start well above any real `volId` (vaults are >= 0, local /
@@ -13,25 +13,30 @@ const int kMaxBrowserTabs = 5;
 const int _kTabKeyBase = 1 << 20;
 int _nextTabKey = _kTabKeyBase;
 
-/// One open tab: a stable [key] that scopes all of the file browser's
-/// per-screen Riverpod state (navigation, selection, search, sort), plus the
-/// container it browses and, optionally, the directory it should open at.
+/// One open location: a stable [key] that scopes a file browser's per-screen
+/// Riverpod state, or a Dashboard location when [container] is null.
 @immutable
 class BrowserTab {
   final int key;
-  final MountedContainer container;
+  final MountedContainer? container;
 
   /// Directory (FAT path inside [container]) the tab opens at; null/empty =
   /// the container root. Only read when the tab's screen is first created.
   final String? initialPath;
 
+  /// Whether Back at this location's root should return to Dashboard. Set
+  /// when this tab was created by opening a vault from a Dashboard tab.
+  final bool returnToDashboardOnRoot;
+
   const BrowserTab({
     required this.key,
-    required this.container,
+    this.container,
     this.initialPath,
+    this.returnToDashboardOnRoot = false,
   });
 
-  int get volId => container.volId;
+  bool get isDashboard => container == null;
+  int? get volId => container?.volId;
 }
 
 /// State holder for the file manager's tab strip. Plain [ChangeNotifier]
@@ -40,27 +45,55 @@ class BrowserTab {
 /// [BrowserTabsScope], so there is no global state to reset and nothing for
 /// code outside a tab host to accidentally observe.
 class BrowserTabsController extends ChangeNotifier {
-  BrowserTabsController(MountedContainer initial, {String? initialPath})
-    : _tabs = [
-        BrowserTab(
-          key: _nextTabKey++,
-          container: initial,
-          initialPath: initialPath,
-        ),
-      ] {
-    _activeKey = _tabs.first.key;
+  BrowserTabsController(
+    MountedContainer? initial, {
+    String? initialPath,
+    bool includeDashboardTab = false,
+  }) : _tabs = [] {
+    BrowserTab? dashboard;
+    if (includeDashboardTab) {
+      dashboard = BrowserTab(key: _nextTabKey++);
+      _tabs.add(dashboard);
+    }
+    if (initial == null && dashboard == null) {
+      throw ArgumentError(
+        'A browser tab controller needs an initial location or Dashboard tab.',
+      );
+    }
+    if (initial != null) {
+      final firstFileTab = BrowserTab(
+        key: _nextTabKey++,
+        container: initial,
+        initialPath: initialPath,
+      );
+      _tabs.add(firstFileTab);
+      _activeKey = firstFileTab.key;
+      _previousKey = dashboard?.key;
+    } else {
+      _activeKey = dashboard!.key;
+      _previousKey = null;
+    }
   }
 
   final List<BrowserTab> _tabs;
+  final ValueNotifier<double> appBarVisibility = ValueNotifier<double>(1.0);
+  double _tabStripScrollOffset = 0.0;
   late int _activeKey;
   int? _previousKey;
-  int? _pasteRequestKey;
 
   List<BrowserTab> get tabs => List.unmodifiable(_tabs);
   int get length => _tabs.length;
   bool get isEmpty => _tabs.isEmpty;
   bool get hasMultiple => _tabs.length > 1;
-  bool get atLimit => _tabs.length >= kMaxBrowserTabs;
+  int get fileTabCount => _tabs.where((tab) => !tab.isDashboard).length;
+  bool get hasBrowserTabs => fileTabCount > 0;
+  bool get atLimit => fileTabCount >= kMaxBrowserTabs;
+  double get tabStripScrollOffset => _tabStripScrollOffset;
+
+  void setTabStripScrollOffset(double value) {
+    if (!value.isFinite) return;
+    _tabStripScrollOffset = value < 0.0 ? 0.0 : value;
+  }
 
   /// Key of the visible tab, or -1 when no tabs are open.
   int get activeKey => _tabs.isEmpty ? -1 : _activeKey;
@@ -71,6 +104,13 @@ class BrowserTabsController extends ChangeNotifier {
   }
 
   BrowserTab? get activeTab => _tabs.isEmpty ? null : _tabs[activeIndex];
+
+  BrowserTab? get dashboardTab {
+    for (final tab in _tabs) {
+      if (tab.isDashboard) return tab;
+    }
+    return null;
+  }
 
   /// The tab the user was on before the current one, if it is still open.
   BrowserTab? get previousTab {
@@ -112,22 +152,70 @@ class BrowserTabsController extends ChangeNotifier {
     return tab.key;
   }
 
+  /// Opens another Dashboard location and makes it active. Dashboard tabs do
+  /// not count toward the file-tab limit. The Dashboard is a unique location,
+  /// so this activates its existing tab rather than creating a duplicate.
+  int openDashboardTab() {
+    final existing = dashboardTab;
+    if (existing != null) {
+      activate(existing.key);
+      return existing.key;
+    }
+
+    final tab = BrowserTab(key: _nextTabKey++);
+    _tabs.add(tab);
+    _previousKey = _activeKey;
+    _activeKey = tab.key;
+    notifyListeners();
+    return tab.key;
+  }
+
   /// Replaces the *active* tab with a fresh tab on [container]. A fresh key
   /// (rather than mutating the old tab) means no navigation / selection /
   /// search state from the previous location can leak into the new one.
-  void replaceActive(MountedContainer container, {String? initialPath}) {
+  void replaceActive(
+    MountedContainer container, {
+    String? initialPath,
+    bool returnToDashboardOnRoot = false,
+  }) {
     if (_tabs.isEmpty) return;
     final index = activeIndex;
     final replacement = BrowserTab(
       key: _nextTabKey++,
       container: container,
       initialPath: initialPath,
+      returnToDashboardOnRoot: returnToDashboardOnRoot,
     );
     final oldKey = _tabs[index].key;
     _tabs[index] = replacement;
     _activeKey = replacement.key;
     if (_previousKey == oldKey) _previousKey = null;
-    if (_pasteRequestKey == oldKey) _pasteRequestKey = null;
+    notifyListeners();
+  }
+
+  /// Returns to the Dashboard in this tab if [key] is the active tab and it
+  /// was opened from Dashboard. Other locations keep their root as the Back
+  /// boundary.
+  bool returnToDashboardAtRoot(int key) {
+    final tab = tabForKey(key);
+    if (tab == null || key != _activeKey || !tab.returnToDashboardOnRoot) {
+      return false;
+    }
+    replaceActiveWithDashboard();
+    return true;
+  }
+
+  /// Replaces the active file location with the Dashboard location while
+  /// keeping the same tab slot. Used when navigating back to Dashboard from
+  /// the root of a vault opened in the Dashboard tab.
+  void replaceActiveWithDashboard() {
+    if (_tabs.isEmpty || activeTab?.isDashboard == true) return;
+    final index = activeIndex;
+    final oldKey = _tabs[index].key;
+    final replacement = BrowserTab(key: _nextTabKey++);
+    _tabs[index] = replacement;
+    _activeKey = replacement.key;
+    if (_previousKey == oldKey) _previousKey = null;
     notifyListeners();
   }
 
@@ -157,7 +245,10 @@ class BrowserTabsController extends ChangeNotifier {
 
   void closeTab(int key) {
     final index = _tabs.indexWhere((t) => t.key == key);
-    if (index < 0) return;
+    // Keep one location available at all times. In particular, closing the
+    // last Dashboard tab would leave later vault navigation without a tab to
+    // return to.
+    if (index < 0 || _tabs.length <= 1) return;
     _removeAt(index);
     notifyListeners();
   }
@@ -171,7 +262,40 @@ class BrowserTabsController extends ChangeNotifier {
       ..add(keep);
     _activeKey = keep.key;
     _previousKey = null;
-    _pasteRequestKey = null;
+    notifyListeners();
+  }
+
+  /// Closes all file tabs, keeping the Dashboard root tab when present.
+  void closeAll() {
+    if (_tabs.length <= 1 || !hasBrowserTabs) return;
+    // Prefer Dashboard as the surviving location, matching the existing
+    // Close all behavior. Hosts without a Dashboard tab retain the active
+    // location instead of ending up with an empty tab strip.
+    final survivor = activeTab?.isDashboard == true
+        ? activeTab
+        : dashboardTab ?? activeTab;
+    if (survivor == null) return;
+    _tabs
+      ..clear()
+      ..add(survivor);
+    _activeKey = survivor.key;
+    _previousKey = null;
+    notifyListeners();
+  }
+
+  /// Moves the tab at [oldIndex] to [newIndex] (drag-to-reorder in the
+  /// strip). Both indices are positions in [tabs]; the active tab stays
+  /// active because it is tracked by key, not by position.
+  void moveTab(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex ||
+        oldIndex < 0 ||
+        oldIndex >= _tabs.length ||
+        newIndex < 0 ||
+        newIndex >= _tabs.length) {
+      return;
+    }
+    final moved = _tabs.removeAt(oldIndex);
+    _tabs.insert(newIndex, moved);
     notifyListeners();
   }
 
@@ -188,25 +312,8 @@ class BrowserTabsController extends ChangeNotifier {
     return closed;
   }
 
-  /// Asks the tab with [key] to run its paste action the next time it
-  /// observes the controller (used by "copy/move to other tab" after the
-  /// clipboard has been staged and the tab activated).
-  void requestPaste(int key) {
-    if (tabForKey(key) == null) return;
-    _pasteRequestKey = key;
-    notifyListeners();
-  }
-
-  /// Returns true exactly once per [requestPaste] for [key].
-  bool consumePasteRequest(int key) {
-    if (_pasteRequestKey != key) return false;
-    _pasteRequestKey = null;
-    return true;
-  }
-
   void _removeAt(int index) {
     final removed = _tabs.removeAt(index);
-    if (_pasteRequestKey == removed.key) _pasteRequestKey = null;
     if (_tabs.isEmpty) {
       _previousKey = null;
       return;
@@ -225,6 +332,18 @@ class BrowserTabsController extends ChangeNotifier {
       _activeKey = _tabs[slot].key;
     }
     _previousKey = null;
+  }
+
+  void setAppBarVisibility(double value) {
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    if ((appBarVisibility.value - clamped).abs() < 0.001) return;
+    appBarVisibility.value = clamped;
+  }
+
+  @override
+  void dispose() {
+    appBarVisibility.dispose();
+    super.dispose();
   }
 }
 

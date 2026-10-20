@@ -24,12 +24,12 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   /// Holds no vault-related options (the app-wide vault thumbnail default and
   /// its "reset all vaults" action live in App settings), so the decoy file
   /// manager can open this same screen without exposing anything about vaults.
-  const FileManagerToolbarSettingsScreen({
-    super.key,
-    this.containerUri,
-  });
+  const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
 
-  static String _layoutModeLabel(BrowserLayoutMode mode, AppLocalizations l10n) {
+  static String _layoutModeLabel(
+    BrowserLayoutMode mode,
+    AppLocalizations l10n,
+  ) {
     switch (mode) {
       case BrowserLayoutMode.list:
         return l10n.layoutModeColumnedList;
@@ -49,6 +49,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
     final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
     final defaultLayoutMode = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.defaultLayoutMode),
+    );
+    final useBrowserTabs = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
     );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -78,7 +81,10 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 800),
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     children: [
                       // ==========================================
                       // 1. GENERAL BROWSER LAYOUT & BARS
@@ -86,7 +92,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.browserLayoutSectionHeader),
                       SectionCard(
                         children: [
-                             OptionPickerTile<BrowserLayoutMode>(
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: useBrowserTabs,
+                            onChanged: (value) => ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings(
+                                  (settings) =>
+                                      settings.copyWith(useBrowserTabs: value),
+                                ),
+                            title: Text(
+                              context.l10n.browserTabsEnabledTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.browserTabsEnabledSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.tab_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          OptionPickerTile<BrowserLayoutMode>(
                             label: context.l10n.defaultFolderLayoutLabel,
                             value: defaultLayoutMode,
                             options: BrowserLayoutMode.values.map((mode) {
@@ -106,108 +140,192 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               return SelectOption(
                                 value: mode,
                                 label: mode.getLocalizedLabel(context.l10n),
-                                subtitle: mode.getLocalizedDescription(context.l10n),
+                                subtitle: mode.getLocalizedDescription(
+                                  context.l10n,
+                                ),
                               );
                             }).toList(),
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setLongFileNameDisplayMode(v),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.rememberPerFolderLayout,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setRememberPerFolderLayout(v),
                             title: Text(
                               context.l10n.rememberPerFolderLayoutLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.rememberPerFolderLayoutDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.folder_special_outlined, color: cs.primary),
+                            secondary: Icon(
+                              Icons.folder_special_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.resetSizeOnLayoutChange,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setResetSizeOnLayoutChange(v),
                             title: Text(
                               context.l10n.resetSizeOnLayoutChangeLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.resetSizeOnLayoutChangeDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.zoom_out_map_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.zoom_out_map_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showHiddenFiles,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowHiddenFiles(v),
                             title: Text(
                               context.l10n.showHiddenFilesLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showHiddenFilesDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.visibility_outlined, color: cs.primary),
+                            secondary: Icon(
+                              Icons.visibility_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showBreadcrumbBar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowBreadcrumbBar(v),
                             title: Text(
                               context.l10n.showBreadcrumbBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showBreadcrumbBarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.linear_scale_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.linear_scale_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showStatsBar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowStatsBar(v),
                             title: Text(
                               context.l10n.showStatsBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showStatsBarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.analytics_outlined, color: cs.primary),
+                            secondary: Icon(
+                              Icons.analytics_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.autoHideAppBar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setAutoHideAppBar(v),
                             title: Text(
                               context.l10n.autoHideAppBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.autoHideAppBarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.vertical_align_top_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.vertical_align_top_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                         ],
                       ),
@@ -220,15 +338,25 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: Icon(Icons.tune_rounded, color: cs.primary),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            leading: Icon(
+                              Icons.tune_rounded,
+                              color: cs.primary,
+                            ),
                             title: Text(
                               context.l10n.toolbarLayoutSectionHeader,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               '${state.config.order.length - state.config.hidden.length} / ${state.config.order.length}',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => Navigator.push(
@@ -236,42 +364,70 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               MaterialPageRoute(
                                 builder: (_) => SkinAreaScope(
                                   area: SkinArea.settings,
-                                  child: FileManagerToolbarActionsScreen(containerUri: containerUri),
+                                  child: FileManagerToolbarActionsScreen(
+                                    containerUri: containerUri,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.useFabForToolbar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setUseFabForToolbar(v),
                             title: Text(
                               context.l10n.useFabForToolbarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.useFabForToolbarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.smart_button_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.smart_button_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.bottomSelectionBar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setBottomSelectionBar(v),
                             title: Text(
                               context.l10n.bottomSelectionBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.bottomSelectionBarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.vertical_align_bottom_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.vertical_align_bottom_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                         ],
                       ),
@@ -284,32 +440,55 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showBookmarkBar,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowBookmarkBar(v),
                             title: Text(
                               context.l10n.showBookmarkBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showBookmarkBarDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.star_rounded, color: cs.secondary),
+                            secondary: Icon(
+                              Icons.star_rounded,
+                              color: cs.secondary,
+                            ),
                           ),
                           if (state.record != null)
                             ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              leading: Icon(Icons.bookmarks_outlined, color: cs.secondary),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 4,
+                              ),
+                              leading: Icon(
+                                Icons.bookmarks_outlined,
+                                color: cs.secondary,
+                              ),
                               title: Text(
                                 context.l10n.reorderBookmarksTitle,
-                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               subtitle: Text(
                                 '${state.record!.bookmarkPaths.length}',
-                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
                               ),
                               trailing: const Icon(Icons.chevron_right_rounded),
                               onTap: () => Navigator.push(
@@ -317,7 +496,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 MaterialPageRoute(
                                   builder: (_) => SkinAreaScope(
                                     area: SkinArea.settings,
-                                    child: FileManagerBookmarksScreen(containerUri: containerUri),
+                                    child: FileManagerBookmarksScreen(
+                                      containerUri: containerUri,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -335,16 +516,25 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           ThumbnailSettingsTiles(
-                            cacheMode: state.config.localStorageThumbnailCacheMode,
+                            cacheMode:
+                                state.config.localStorageThumbnailCacheMode,
                             quality: state.config.localStorageThumbnailQuality,
                             cacheModeLabel: context.l10n.cacheModeLabel,
                             qualityLabel: context.l10n.thumbnailQualityLabel,
                             isLocalStorage: true,
                             onCacheModeChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setLocalStorageThumbnailCacheMode(v),
                             onQualityChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setLocalStorageThumbnailQuality(v),
                           ),
                         ],
@@ -358,48 +548,84 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(
                         children: [
-                         SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showListThumbnails,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowListThumbnails(v),
                             title: Text(
                               context.l10n.showMediaThumbnailsLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showMediaThumbnailsDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.image_outlined, color: cs.primary),
+                            secondary: Icon(
+                              Icons.image_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showItemActionsMenu,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowItemActionsMenu(v),
                             title: Text(
                               context.l10n.showItemActionsMenuLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showItemActionsMenuDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.more_vert_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.more_vert_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: Icon(Icons.view_column_rounded, color: cs.primary),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            leading: Icon(
+                              Icons.view_column_rounded,
+                              color: cs.primary,
+                            ),
                             title: Text(
                               context.l10n.detailedListViewColumnsSectionHeader,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               '${state.config.detailColumnsOrder.length - state.config.hiddenDetailColumns.length} / ${state.config.detailColumnsOrder.length}',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => Navigator.push(
@@ -407,7 +633,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               MaterialPageRoute(
                                 builder: (_) => SkinAreaScope(
                                   area: SkinArea.settings,
-                                  child: FileManagerDetailColumnsScreen(containerUri: containerUri),
+                                  child: FileManagerDetailColumnsScreen(
+                                    containerUri: containerUri,
+                                  ),
                                 ),
                               ),
                             ),
@@ -421,20 +649,33 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showGridFileNames,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setShowGridFileNames(v),
                             title: Text(
                               context.l10n.showFileNamesLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.showFileNamesDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.label_outlined, color: cs.primary),
+                            secondary: Icon(
+                              Icons.label_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                           OptionPickerTile<GridAspectRatio>(
                             label: context.l10n.gridAspectRatioLabel,
@@ -446,7 +687,11 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               );
                             }).toList(),
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setGridAspectRatio(v),
                           ),
                           OptionPickerTile<GridCornerStyle>(
@@ -459,7 +704,11 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               );
                             }).toList(),
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setGridCornerStyle(v),
                           ),
                           SliderSettingTile(
@@ -468,14 +717,19 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             value: state.config.gridSpacing,
                             min: FileManagerToolbarConfig.minGridSpacing,
                             max: FileManagerToolbarConfig.maxGridSpacing,
-                            divisions: (FileManagerToolbarConfig.maxGridSpacing -
+                            divisions:
+                                (FileManagerToolbarConfig.maxGridSpacing -
                                     FileManagerToolbarConfig.minGridSpacing) ~/
                                 2,
                             valueLabel: (v) => v == 0
                                 ? context.l10n.gridSpacingNone
                                 : context.l10n.gridSpacingValue(v),
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setGridSpacing(v),
                           ),
                         ],
@@ -489,24 +743,39 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                            leading: Icon(Icons.palette_outlined, color: cs.primary),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            leading: Icon(
+                              Icons.palette_outlined,
+                              color: cs.primary,
+                            ),
                             title: Text(
                               context.l10n.fileSkinEntryTitle,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
-                              state.config.skin.matchingPreset?.getLocalizedLabel(context.l10n) ??
+                              state.config.skin.matchingPreset
+                                      ?.getLocalizedLabel(context.l10n) ??
                                   context.l10n.fileSkinPresetCustom,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => SkinAreaScope(
                                   area: SkinArea.settings,
-                                  child: FileManagerSkinScreen(containerUri: containerUri),
+                                  child: FileManagerSkinScreen(
+                                    containerUri: containerUri,
+                                  ),
                                 ),
                               ),
                             ),
@@ -519,15 +788,24 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionCard(
                         children: [
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                            leading: Icon(Icons.tune_rounded, color: cs.primary),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            leading: Icon(
+                              Icons.tune_rounded,
+                              color: cs.primary,
+                            ),
                             title: Text(
                               context.l10n.mediaPlayerControlsTitle,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               '${context.l10n.playbackSettingsTitle}, ${context.l10n.toolbarLayoutSectionHeader}, ${context.l10n.advancedOptionsTitle}',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () {
@@ -536,39 +814,60 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 MaterialPageRoute(
                                   builder: (_) => SkinAreaScope(
                                     area: SkinArea.settings,
-                                    child: const MediaViewerToolbarSettingsScreen(),
+                                    child:
+                                        const MediaViewerToolbarSettingsScreen(),
                                   ),
                                 ),
                               );
                             },
                           ),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.autoStartPlaylistMode,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setAutoStartPlaylistMode(v),
                             title: Text(
                               context.l10n.autoStartPlaylistModeLabel,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: Text(
                               context.l10n.autoStartPlaylistModeDesc,
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                            secondary: Icon(Icons.playlist_play_rounded, color: cs.primary),
+                            secondary: Icon(
+                              Icons.playlist_play_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           OptionPickerTile<PlaylistTransitionEffect>(
-                            label: context.l10n.playlistTransitionAnimationLabel,
+                            label:
+                                context.l10n.playlistTransitionAnimationLabel,
                             value: state.config.playlistTransitionEffect,
-                            options: PlaylistTransitionEffect.values.map((effect) {
+                            options: PlaylistTransitionEffect.values.map((
+                              effect,
+                            ) {
                               return SelectOption(
                                 value: effect,
                                 label: effect.getLocalizedLabel(context.l10n),
                               );
                             }).toList(),
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .setPlaylistTransitionEffect(v),
                           ),
                         ],
@@ -614,7 +913,9 @@ class FileManagerToolbarActionsScreen extends ConsumerWidget {
               buildDefaultDragHandles: false,
               itemCount: state.config.order.length,
               onReorderItem: (oldIndex, newIndex) => ref
-                  .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                  .read(
+                    fileManagerToolbarSettingsProvider(containerUri).notifier,
+                  )
                   .reorderActions(oldIndex, newIndex),
               itemBuilder: (context, i) {
                 final action = state.config.order[i];
@@ -626,28 +927,39 @@ class FileManagerToolbarActionsScreen extends ConsumerWidget {
                     color: cs.surfaceContainerHigh,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(i == 0 ? 20 : 4),
-                      bottom: Radius.circular(i == state.config.order.length - 1 ? 20 : 4),
+                      bottom: Radius.circular(
+                        i == state.config.order.length - 1 ? 20 : 4,
+                      ),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 2,
+                      ),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: visible ? cs.primaryContainer.withValues(alpha: 0.5) : cs.surfaceContainerHighest,
+                          color: visible
+                              ? cs.primaryContainer.withValues(alpha: 0.5)
+                              : cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           action.icon,
                           size: 20,
-                          color: visible ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                          color: visible
+                              ? cs.primary
+                              : cs.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                       ),
                       title: Text(
                         action.getLocalizedLabel(context.l10n),
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: visible ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          color: visible
+                              ? cs.onSurface
+                              : cs.onSurfaceVariant.withValues(alpha: 0.6),
                         ),
                       ),
                       trailing: Row(
@@ -656,7 +968,11 @@ class FileManagerToolbarActionsScreen extends ConsumerWidget {
                           Switch(
                             value: visible,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .toggleActionVisible(action, v),
                           ),
                           const SizedBox(width: 4),
@@ -665,10 +981,16 @@ class FileManagerToolbarActionsScreen extends ConsumerWidget {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                                color: cs.surfaceContainerHighest.withValues(
+                                  alpha: 0.5,
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.drag_handle_rounded, color: cs.onSurfaceVariant, size: 20),
+                              child: Icon(
+                                Icons.drag_handle_rounded,
+                                color: cs.onSurfaceVariant,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -716,7 +1038,9 @@ class FileManagerDetailColumnsScreen extends ConsumerWidget {
               buildDefaultDragHandles: false,
               itemCount: state.config.detailColumnsOrder.length,
               onReorderItem: (oldIndex, newIndex) => ref
-                  .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                  .read(
+                    fileManagerToolbarSettingsProvider(containerUri).notifier,
+                  )
                   .reorderDetailColumns(oldIndex, newIndex),
               itemBuilder: (context, i) {
                 final col = state.config.detailColumnsOrder[i];
@@ -728,28 +1052,41 @@ class FileManagerDetailColumnsScreen extends ConsumerWidget {
                     color: cs.surfaceContainerHigh,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(i == 0 ? 20 : 4),
-                      bottom: Radius.circular(i == state.config.detailColumnsOrder.length - 1 ? 20 : 4),
+                      bottom: Radius.circular(
+                        i == state.config.detailColumnsOrder.length - 1
+                            ? 20
+                            : 4,
+                      ),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 2,
+                      ),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: visible ? cs.primaryContainer.withValues(alpha: 0.5) : cs.surfaceContainerHighest,
+                          color: visible
+                              ? cs.primaryContainer.withValues(alpha: 0.5)
+                              : cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           col.icon,
                           size: 20,
-                          color: visible ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                          color: visible
+                              ? cs.primary
+                              : cs.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                       ),
                       title: Text(
                         col.getLocalizedLabel(context.l10n),
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: visible ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          color: visible
+                              ? cs.onSurface
+                              : cs.onSurfaceVariant.withValues(alpha: 0.6),
                         ),
                       ),
                       trailing: Row(
@@ -758,7 +1095,11 @@ class FileManagerDetailColumnsScreen extends ConsumerWidget {
                           Switch(
                             value: visible,
                             onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
                                 .toggleDetailColumnVisible(col, v),
                           ),
                           const SizedBox(width: 4),
@@ -767,10 +1108,16 @@ class FileManagerDetailColumnsScreen extends ConsumerWidget {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                                color: cs.surfaceContainerHighest.withValues(
+                                  alpha: 0.5,
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.drag_handle_rounded, color: cs.onSurfaceVariant, size: 20),
+                              child: Icon(
+                                Icons.drag_handle_rounded,
+                                color: cs.onSurfaceVariant,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],
@@ -833,19 +1180,32 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                     ),
                   )
                 : ReorderableListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     buildDefaultDragHandles: false,
                     itemCount: bookmarks.length,
                     onReorderItem: (oldIndex, newIndex) => ref
-                        .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                        .read(
+                          fileManagerToolbarSettingsProvider(
+                            containerUri,
+                          ).notifier,
+                        )
                         .reorderBookmarks(oldIndex, newIndex),
                     itemBuilder: (context, i) {
                       final path = bookmarks[i];
                       final name = path.split('/').last;
                       final isDir = _isFolder(path);
-                      final ext = name.contains('.') ? name.split('.').last : '';
-                      final icon = isDir ? Icons.folder_rounded : (vaultIconForExt(ext) ?? iconForFile(name));
-                      final iconColor = isDir ? cs.secondary : (vaultColorForExt(ext) ?? colorForFile(name));
+                      final ext = name.contains('.')
+                          ? name.split('.').last
+                          : '';
+                      final icon = isDir
+                          ? Icons.folder_rounded
+                          : (vaultIconForExt(ext) ?? iconForFile(name));
+                      final iconColor = isDir
+                          ? cs.secondary
+                          : (vaultColorForExt(ext) ?? colorForFile(name));
 
                       return Padding(
                         key: ValueKey(path),
@@ -854,11 +1214,16 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                           color: cs.surfaceContainerHigh,
                           borderRadius: BorderRadius.vertical(
                             top: Radius.circular(i == 0 ? 20 : 4),
-                            bottom: Radius.circular(i == bookmarks.length - 1 ? 20 : 4),
+                            bottom: Radius.circular(
+                              i == bookmarks.length - 1 ? 20 : 4,
+                            ),
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 2,
+                            ),
                             leading: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
@@ -869,7 +1234,9 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                             ),
                             title: Text(
                               name,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -877,9 +1244,17 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: Icon(Icons.close_rounded, size: 20, color: cs.error),
+                                  icon: Icon(
+                                    Icons.close_rounded,
+                                    size: 20,
+                                    color: cs.error,
+                                  ),
                                   onPressed: () => ref
-                                      .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                      .read(
+                                        fileManagerToolbarSettingsProvider(
+                                          containerUri,
+                                        ).notifier,
+                                      )
                                       .removeBookmark(path),
                                   tooltip: context.l10n.unbookmarkAction,
                                 ),
@@ -889,10 +1264,15 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      color: cs.surfaceContainerHighest
+                                          .withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: Icon(Icons.drag_handle_rounded, color: cs.onSurfaceVariant, size: 20),
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      color: cs.onSurfaceVariant,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ],

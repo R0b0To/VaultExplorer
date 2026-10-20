@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} comprime sempre con {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 e LZMA sono disponibili negli archivi 7-Zip.",
   "archiveMethodStoreNote": "Memorizza non comprime, quindi non c'è alcun metodo da scegliere.",
+  "browserTabsEnabledTitle": "Usa le schede del gestore file",
+  "browserTabsEnabledSubtitle": "Mantieni aperte più posizioni e passa dall’una all’altra.",
   "browserTabNew": "Nuova scheda",
   "browserTabClose": "Chiudi scheda",
   "browserTabCloseOthers": "Chiudi altre schede",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Passa alla scheda precedente",
   "browserTabOpenInNewTab": "Apri in una nuova scheda",
   "browserTabLimitReached": "Limite di schede raggiunto ({max})",
-  "browserTabCopyToOtherTab": "Copia nell'altra scheda",
-  "browserTabMoveToOtherTab": "Sposta nell'altra scheda"
+  "browserTabCloseAll": "Chiudi tutto"
 }

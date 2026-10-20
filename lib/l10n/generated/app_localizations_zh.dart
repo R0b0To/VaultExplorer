@@ -11370,6 +11370,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get archiveMethodStoreNote => '仅存储不进行压缩，因此无需选择压缩方法。';
 
   @override
+  String get browserTabsEnabledTitle => '使用文件管理器标签页';
+
+  @override
+  String get browserTabsEnabledSubtitle => '保持多个位置处于打开状态并在它们之间切换。';
+
+  @override
   String get browserTabNew => '新标签页';
 
   @override
@@ -11393,8 +11399,5 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => '复制到另一个标签页';
-
-  @override
-  String get browserTabMoveToOtherTab => '移动到另一个标签页';
+  String get browserTabCloseAll => '关闭所有';
 }

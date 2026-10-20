@@ -52,8 +52,6 @@ class FileItemActionsSheet extends ConsumerWidget {
 
   /// Tab actions (only wired while the file manager is hosted in tabs).
   final VoidCallback? onOpenInNewTab;
-  final VoidCallback? onCopyToOtherTab;
-  final VoidCallback? onMoveToOtherTab;
 
   const FileItemActionsSheet({
     super.key,
@@ -86,8 +84,6 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onToggleDocProvider,
     this.onSyncSettings,
     this.onOpenInNewTab,
-    this.onCopyToOtherTab,
-    this.onMoveToOtherTab,
   });
 
   static Future<void> show(
@@ -121,8 +117,6 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onToggleDocProvider,
     VoidCallback? onSyncSettings,
     VoidCallback? onOpenInNewTab,
-    VoidCallback? onCopyToOtherTab,
-    VoidCallback? onMoveToOtherTab,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -161,8 +155,6 @@ class FileItemActionsSheet extends ConsumerWidget {
         onToggleDocProvider: onToggleDocProvider,
         onSyncSettings: onSyncSettings,
         onOpenInNewTab: onOpenInNewTab,
-        onCopyToOtherTab: onCopyToOtherTab,
-        onMoveToOtherTab: onMoveToOtherTab,
       ),
     );
   }
@@ -332,6 +324,17 @@ class FileItemActionsSheet extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (onOpenInNewTab != null)
+                      _ActionTile(
+                        icon: Icons.tab_rounded,
+                        label: context.l10n.browserTabOpenInNewTab,
+                        onTap: () {
+                          Navigator.pop(context);
+                          onOpenInNewTab!();
+                        },
+                      ),
+                    if (onOpenInNewTab != null) const SizedBox(height: 8),
+
                     // Archive entries are virtual, read-only entries. The
                     // sole file operation available here is staging one for
                     // extraction into a real destination.
@@ -444,33 +447,6 @@ class FileItemActionsSheet extends ConsumerWidget {
                           onCut();
                         },
                       ),
-                      if (onOpenInNewTab != null)
-                        _ActionTile(
-                          icon: Icons.tab_rounded,
-                          label: context.l10n.browserTabOpenInNewTab,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onOpenInNewTab!();
-                          },
-                        ),
-                      if (onCopyToOtherTab != null)
-                        _ActionTile(
-                          icon: Icons.copy_all_rounded,
-                          label: context.l10n.browserTabCopyToOtherTab,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onCopyToOtherTab!();
-                          },
-                        ),
-                      if (onMoveToOtherTab != null)
-                        _ActionTile(
-                          icon: Icons.drive_file_move_rounded,
-                          label: context.l10n.browserTabMoveToOtherTab,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onMoveToOtherTab!();
-                          },
-                        ),
                       const SizedBox(height: 8),
                     ],
 

@@ -12044,6 +12044,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Store doesn\'t compress, so there is no method to choose.';
 
   @override
+  String get browserTabsEnabledTitle => 'Use file manager tabs';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Keep multiple locations open and switch between them.';
+
+  @override
   String get browserTabNew => 'New tab';
 
   @override
@@ -12067,8 +12074,5 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'Copy to other tab';
-
-  @override
-  String get browserTabMoveToOtherTab => 'Move to other tab';
+  String get browserTabCloseAll => 'Close all';
 }

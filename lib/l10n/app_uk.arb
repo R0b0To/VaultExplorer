@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} завжди стискає за допомогою {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 і LZMA доступні в архівах 7-Zip.",
   "archiveMethodStoreNote": "Режим «Зберегти» не стискає, тому методу для вибору немає.",
+  "browserTabsEnabledTitle": "Використовувати вкладки файлового менеджера",
+  "browserTabsEnabledSubtitle": "Залишайте відкритими кілька розташувань і перемикайтеся між ними.",
   "browserTabNew": "Нова вкладка",
   "browserTabClose": "Закрити вкладку",
   "browserTabCloseOthers": "Закрити інші вкладки",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Перейти на попередню вкладку",
   "browserTabOpenInNewTab": "Відкрити в новій вкладці",
   "browserTabLimitReached": "Досягнуто ліміту вкладок ({max})",
-  "browserTabCopyToOtherTab": "Копіювати в іншу вкладку",
-  "browserTabMoveToOtherTab": "Перемістити в іншу вкладку"
+  "browserTabCloseAll": "Закрити всі"
 }

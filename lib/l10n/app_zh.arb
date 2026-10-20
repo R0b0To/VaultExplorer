@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} 始终使用 {method} 压缩。",
   "archiveMethodMoreInSevenZip": "7-Zip 压缩包支持 LZMA2 和 LZMA。",
   "archiveMethodStoreNote": "仅存储不进行压缩，因此无需选择压缩方法。",
+  "browserTabsEnabledTitle": "使用文件管理器标签页",
+  "browserTabsEnabledSubtitle": "保持多个位置处于打开状态并在它们之间切换。",
   "browserTabNew": "新标签页",
   "browserTabClose": "关闭标签页",
   "browserTabCloseOthers": "关闭其他标签页",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "切换到上一个标签页",
   "browserTabOpenInNewTab": "在新标签页中打开",
   "browserTabLimitReached": "已达到标签页上限（{max}）",
-  "browserTabCopyToOtherTab": "复制到另一个标签页",
-  "browserTabMoveToOtherTab": "移动到另一个标签页"
+  "browserTabCloseAll": "关闭所有"
 }

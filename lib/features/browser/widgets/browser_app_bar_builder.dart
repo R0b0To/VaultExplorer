@@ -31,6 +31,15 @@ PreferredSizeWidget buildBrowserAppBar(
   required int fileCount,
   required bool isSelectionMode,
   required Set<RawEntry> selectedItems,
+  int? selectedCountOverride,
+  bool singleSelectionInCurrentTab = true,
+  bool allowRenameAction = true,
+  bool allowShareAction = true,
+  bool allowCompressAction = true,
+  bool allowExportAction = true,
+  bool allowExtractAction = true,
+  bool allowPinBookmarkActions = true,
+  bool? hideVaultOnlyActionsOverride,
   required bool isReadOnly,
   required bool searchActive,
   required String currentDirPath,
@@ -47,8 +56,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onSelectAll,
   required VoidCallback onCopy,
   required VoidCallback onCut,
-  VoidCallback? onCopyToOtherTab,
-  VoidCallback? onMoveToOtherTab,
+  VoidCallback? onOpenInNewTab,
   required VoidCallback onExport,
   required VoidCallback onCompressSelected,
   required VoidCallback onExtractSelectedArchive,
@@ -78,6 +86,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required bool isFiltered,
   required VoidCallback? onPaste,
   VoidCallback? onNavigateUp,
+  VoidCallback? onBackAtRoot,
   bool isInsideArchive = false,
   bool showBackButton = true,
   Widget Function(Widget title)? wrapTitle,
@@ -89,7 +98,10 @@ PreferredSizeWidget buildBrowserAppBar(
   final showActionBar = !searchActive;
 
   if (isSelectionMode) {
-    final single = selectedItems.length == 1;
+    final selectedCount = selectedCountOverride ?? selectedItems.length;
+    final single = selectedCount == 1 &&
+        selectedItems.length == 1 &&
+        singleSelectionInCurrentTab;
     final singleFile = single && !selectedItems.first.isDir;
     final singleFolder = single && selectedItems.first.isDir;
     final folderDocProviderMounted =
@@ -99,7 +111,8 @@ PreferredSizeWidget buildBrowserAppBar(
     // local-storage folder (see LocalStorageContainerX.isLocalStorage), so
     // both actions are hidden there rather than threaded through a second
     // no-op implementation.
-    final hideVaultOnlyActions = container.isLocalStorage;
+    final hideVaultOnlyActions =
+        hideVaultOnlyActionsOverride ?? container.isLocalStorage;
     final singleArchiveSelected = singleFile &&
         ArchiveService.isOpenableAsArchive(
           ArchiveService.splitPartExtension(selectedItems.first.name) ??
@@ -107,10 +120,14 @@ PreferredSizeWidget buildBrowserAppBar(
                   ? selectedItems.first.name.split('.').last.toLowerCase()
                   : ''),
         );
-    final showPinOption = selectedItems.any((item) => !isPinned(item));
-    final showUnpinOption = selectedItems.any((item) => isPinned(item));
-    final showBookmarkOption = selectedItems.any((item) => !isBookmark(item));
-    final showUnbookmarkOption = selectedItems.any((item) => isBookmark(item));
+    final showPinOption = allowPinBookmarkActions &&
+        selectedItems.any((item) => !isPinned(item));
+    final showUnpinOption = allowPinBookmarkActions &&
+        selectedItems.any((item) => isPinned(item));
+    final showBookmarkOption = allowPinBookmarkActions &&
+        selectedItems.any((item) => !isBookmark(item));
+    final showUnbookmarkOption = allowPinBookmarkActions &&
+        selectedItems.any((item) => isBookmark(item));
     final showEncryptOption = selectedItems
         .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
     final showDecryptOption = selectedItems
@@ -134,8 +151,9 @@ PreferredSizeWidget buildBrowserAppBar(
 
     // A folder is shareable (it goes out as a zip) in every kind of
     // container, and isVaultItemFile is already false for folders.
-    final showShareOption =
-        !isInsideArchive && selectedItems.any((item) => !isVaultItemFile(item));
+    final showShareOption = allowShareAction &&
+        !isInsideArchive &&
+        selectedItems.any((item) => !isVaultItemFile(item));
     final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
     final showEditVideoOption = singleFile && MediaViewerConstants.isVideo(selectedItems.first.name);
     final showEditAudioOption = onEditAudio != null &&
@@ -239,7 +257,7 @@ PreferredSizeWidget buildBrowserAppBar(
 
     if (!isLandscape) {
       return SelectionAppBar(
-        selectedCount: selectedItems.length,
+        selectedCount: selectedCount,
         selectionLabel: sizeLabel,
         singleSelected: single,
         singleFileSelected: singleFile,
@@ -264,12 +282,15 @@ PreferredSizeWidget buildBrowserAppBar(
         onClose: onExitSelectionMode,
         onSelectAll: onSelectAll,
         onRename: doRename,
+        allowRenameAction: allowRenameAction,
         onCopy: onCopy,
         onCut: onCut,
-        onCopyToOtherTab: onCopyToOtherTab,
-        onMoveToOtherTab: onMoveToOtherTab,
+        onOpenInNewTab: onOpenInNewTab,
         onExport: onExport,
+        allowExportAction: allowExportAction,
+        allowExtractAction: allowExtractAction,
         onCompressSelection: onCompressSelected,
+        allowCompressAction: allowCompressAction,
         onExtractSelectedArchive: onExtractSelectedArchive,
         onDelete: onDelete,
         onOpenWithApp: doOpenWithApp,
@@ -287,7 +308,7 @@ PreferredSizeWidget buildBrowserAppBar(
       );
     }
     return SelectionAppBarWide(
-      selectedCount: selectedItems.length,
+      selectedCount: selectedCount,
       selectionLabel: sizeLabel,
       singleFileSelected: singleFile,
       singleFolderSelected: singleFolder,
@@ -308,12 +329,15 @@ PreferredSizeWidget buildBrowserAppBar(
       onClose: onExitSelectionMode,
       onSelectAll: onSelectAll,
       onRename: doRename,
+      allowRenameAction: allowRenameAction,
       onCopy: onCopy,
       onCut: onCut,
-      onCopyToOtherTab: onCopyToOtherTab,
-      onMoveToOtherTab: onMoveToOtherTab,
+      onOpenInNewTab: onOpenInNewTab,
       onExport: onExport,
+      allowExportAction: allowExportAction,
+      allowExtractAction: allowExtractAction,
       onCompressSelection: onCompressSelected,
+      allowCompressAction: allowCompressAction,
       onExtractSelectedArchive: onExtractSelectedArchive,
       onDelete: onDelete,
       onOpenWithApp: doOpenWithApp,
@@ -573,6 +597,8 @@ PreferredSizeWidget buildBrowserAppBar(
             onPressed: () {
               if (pathStack.length > 1 && onNavigateUp != null) {
                 onNavigateUp();
+              } else if (onBackAtRoot != null) {
+                onBackAtRoot();
               } else {
                 Navigator.of(ctx).pop();
               }

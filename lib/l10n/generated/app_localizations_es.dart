@@ -12258,6 +12258,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Almacenar no comprime, así que no hay método que elegir.';
 
   @override
+  String get browserTabsEnabledTitle => 'Usar pestañas del gestor de archivos';
+
+  @override
+  String get browserTabsEnabledSubtitle =>
+      'Mantén varias ubicaciones abiertas y cambia entre ellas.';
+
+  @override
   String get browserTabNew => 'Nueva pestaña';
 
   @override
@@ -12281,8 +12288,5 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get browserTabCopyToOtherTab => 'Copiar a la otra pestaña';
-
-  @override
-  String get browserTabMoveToOtherTab => 'Mover a la otra pestaña';
+  String get browserTabCloseAll => 'Cerrar todo';
 }

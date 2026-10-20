@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,6 +73,8 @@ import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart'
+    show kBrowserTabStripHeight;
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart';
@@ -138,6 +140,14 @@ double _fadeScrimOpacity(double progress) {
   return 0.0;
 }
 
+typedef _SelectedBrowserEntry = ({
+  int stateKey,
+  MountedContainer container,
+  String currentDirPath,
+  RawEntry entry,
+  bool insideArchive,
+});
+
 class FileBrowserScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final MountedContainer? Function(int volId)? resolveContainer;
@@ -153,6 +163,8 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   final Widget Function(Widget title)? wrapAppBarTitle;
   final VoidCallback? onOpenStorageSwitcher;
   final Widget? drawer;
+  final ValueChanged<bool>? onDrawerChanged;
+  final ValueChanged<bool>? onVerticalScrollActivity;
 
   /// Set by [BrowserTabsHost]: scopes this screen's navigation / selection /
   /// search / sort state to its tab instead of to the container's volId, so
@@ -160,9 +172,18 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   /// not a tab host, e.g. decoy mode) keeps the volId-keyed behavior.
   final int? tabKey;
 
+  /// Tab strip to show directly under the app bar while this screen is the
+  /// visible one of several tabs (see [BrowserTabsHost]). Built by the host
+  /// because the strip's actions (new tab, duplicate) live there.
+  final Widget? tabStrip;
+  final VoidCallback? onBackToDashboard;
+  final VoidCallback? onSwipeToNewTab;
+
   /// Directory to open at instead of the container root (new tabs opened on
   /// a folder). Only read when the screen is first created.
   final String? initialPath;
+  final ValueListenable<double>? tabPagePosition;
+  final int? tabPageIndex;
 
   const FileBrowserScreen({
     super.key,
@@ -175,8 +196,15 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.wrapAppBarTitle,
     this.onOpenStorageSwitcher,
     this.drawer,
+    this.onDrawerChanged,
+    this.onVerticalScrollActivity,
     this.tabKey,
+    this.tabStrip,
+    this.onBackToDashboard,
+    this.onSwipeToNewTab,
     this.initialPath,
+    this.tabPagePosition,
+    this.tabPageIndex,
   });
 
   @override
@@ -186,8 +214,10 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _browserBodyKey = GlobalKey();
   double _drawerDragDistance = 0.0;
   bool _isTouchFromEdge = false;
+  bool _verticalScrollActive = false;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -218,12 +248,79 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   bool get _hasMultipleTabs => _tabsCtrl?.hasMultiple ?? false;
 
+  Widget _pinTabChrome(Widget child) {
+    final pagePosition = widget.tabPagePosition;
+    final pageIndex = widget.tabPageIndex;
+    if (pagePosition == null || pageIndex == null || !_isActiveTab) {
+      return child;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => ValueListenableBuilder<double>(
+        valueListenable: pagePosition,
+        child: child,
+        builder: (context, position, child) {
+          final direction = Directionality.of(context) == TextDirection.rtl
+              ? -1.0
+              : 1.0;
+          return Transform.translate(
+            offset: Offset(
+              (position - pageIndex) * constraints.maxWidth * direction,
+              0,
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  void _finishHorizontalSwipe() {
+    final distance = _drawerDragDistance;
+    _drawerDragDistance = 0.0;
+    if (!_isActiveTab ||
+        _isTouchFromEdge ||
+        _backGestureProgress != null ||
+        distance.abs() < 60.0) {
+      return;
+    }
+
+    final tabs = _tabsCtrl;
+    if (tabs != null && tabs.length > 0) {
+      final startIndex = _swipeStartTabIndex ?? tabs.activeIndex;
+      if (distance < 0.0 && startIndex == tabs.length - 1) {
+        widget.onSwipeToNewTab?.call();
+        return;
+      }
+      if (distance > 0.0 && startIndex == 0) {
+        _scaffoldKey.currentState?.openDrawer();
+        return;
+      }
+      // PageView owns in-range navigation so the page follows the pointer
+      // and can settle back to the current tab when the drag is cancelled.
+      return;
+    }
+
+    if (distance > 0.0 && widget.drawer != null) {
+      _scaffoldKey.currentState?.openDrawer();
+    }
+  }
+
+  void _onAppBarAnimationChanged() {
+    final tabs = _tabsCtrl;
+    if (_isActiveTab && tabs != null) {
+      tabs.setAppBarVisibility(_appBarAnimController.value);
+    }
+  }
+
   void _attachTabs() {
     final t = BrowserTabsScope.maybeOf(context);
     if (identical(t, _tabsCtrl)) return;
     _tabsCtrl?.removeListener(_onTabsChanged);
     _tabsCtrl = t;
     t?.addListener(_onTabsChanged);
+    if (t != null) {
+      _appBarAnimController.value = t.appBarVisibility.value;
+    }
     _wasActiveTab = _isActiveTab;
     _wasMultiTab = _hasMultipleTabs;
   }
@@ -234,6 +331,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final active = _isActiveTab;
     final multi = _hasMultipleTabs;
     final becameActive = active && !_wasActiveTab;
+    final becameInactive = !active && _wasActiveTab;
     final flipped = active != _wasActiveTab || multi != _wasMultiTab;
     _wasActiveTab = active;
     _wasMultiTab = multi;
@@ -241,15 +339,23 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // PopScope.canPop depends on both flags, so rebuild when they flip.
     if (flipped) setState(() {});
 
+    if (becameInactive) _setVerticalScrollActivity(false);
+
+    if (becameActive) {
+      final visibility = _toolbarConfig.autoHideAppBar
+          ? t.appBarVisibility.value
+          : 1.0;
+      _appBarAnimController.value = visibility;
+      if (!_toolbarConfig.autoHideAppBar) {
+        t.setAppBarVisibility(visibility);
+      }
+    }
+
     final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
     if (becameActive && nav.pathStack.isNotEmpty && !nav.isLoading) {
       // Another tab (or an operation it started) may have changed this
       // directory while it was hidden; hidden tabs skip their own reloads.
       _loadDirectoryContents(_currentDirPath, refresh: true);
-    }
-    if (active && widget.tabKey != null) {
-      final key = widget.tabKey!;
-      if (t.consumePasteRequest(key)) _paste();
     }
   }
 
@@ -348,6 +454,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is ScrollStartNotification) {
+      _setVerticalScrollActivity(true);
+    } else if (notification is ScrollEndNotification) {
+      _setVerticalScrollActivity(false);
+    }
     // Freeze app bar collapse while 2 fingers are on screen so it doesn't fight pinch gestures
     if (_isMultiTouch || _pointerCount >= 2) return false;
 
@@ -461,6 +572,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     return false;
   }
 
+  void _setVerticalScrollActivity(bool scrolling) {
+    if (_verticalScrollActive == scrolling) return;
+    _verticalScrollActive = scrolling;
+    widget.onVerticalScrollActivity?.call(scrolling);
+  }
+
   Future<void> _saveExtensionPreference(String ext, String preference) async {
     final cleanExt = ext.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
     if (cleanExt.isEmpty) return;
@@ -533,6 +650,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _resolvedThumbnailCacheMode = resolved.cacheMode;
     _resolvedThumbnailQuality = resolved.quality;
   }
+
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   FileBrowserPinsBookmarksState get _pinsBookmarks =>
       ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
@@ -691,8 +809,39 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   int _pointerCount = 0;
   bool _isMultiTouch = false;
+  int? _swipePointer;
+  int? _swipeStartTabIndex;
+  Offset? _swipeStartPosition;
+  bool _swipeRecognized = false;
+  bool _swipeRejected = false;
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    final start = _swipeStartPosition;
+    if (event.pointer != _swipePointer || start == null || _swipeRejected) {
+      return;
+    }
+    if (_pointerCount != 1 ||
+        _isMultiTouch ||
+        !_isActiveTab ||
+        _backGestureProgress != null) {
+      _swipeRejected = true;
+      return;
+    }
+
+    final offset = event.position - start;
+    if (!_swipeRecognized) {
+      if (offset.distance < 14.0) return;
+      if (offset.dx.abs() <= offset.dy.abs()) {
+        _swipeRejected = true;
+        return;
+      }
+      _swipeRecognized = true;
+    }
+    _drawerDragDistance = offset.dx;
+  }
 
   void _handlePointerDown(PointerDownEvent event) {
+    final isFirstPointer = _pointerCount == 0;
     _pointerCount++;
     if (_pointerCount >= 2) {
       _isMultiTouch = true;
@@ -703,9 +852,54 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     );
     _isTouchFromEdge = event.position.dx <= edgeInset;
     _drawerDragDistance = 0.0;
+    if (isFirstPointer) {
+      _swipePointer = event.pointer;
+      _swipeStartTabIndex = _tabsCtrl?.activeIndex;
+      _swipeStartPosition = event.position;
+      _swipeRecognized = false;
+      final bodyRenderObject = _browserBodyKey.currentContext
+          ?.findRenderObject();
+      final bodyBounds = bodyRenderObject is RenderBox
+          ? (bodyRenderObject.localToGlobal(Offset.zero) &
+                bodyRenderObject.size)
+          : null;
+      final appBarFactor = (!_toolbarConfig.autoHideAppBar || _searchActive)
+          ? 1.0
+          : _appBarAnimController.value;
+      final tabsEnabled = ref
+          .read(appSettingsControllerProvider)
+          .settings
+          .useBrowserTabs;
+      final tabsStripHeight = widget.tabStrip != null && tabsEnabled
+          ? kBrowserTabStripHeight
+          : 0.0;
+      final contentTop =
+          (bodyBounds?.top ?? 0.0) +
+          MediaQuery.paddingOf(context).top +
+          (kToolbarHeight * appBarFactor) +
+          tabsStripHeight;
+      _swipeRejected =
+          _isTouchFromEdge ||
+          !(bodyBounds?.contains(event.position) ?? false) ||
+          event.position.dy < contentTop ||
+          !_isActiveTab ||
+          _backGestureProgress != null;
+    } else {
+      _swipeRejected = true;
+    }
   }
 
   void _handlePointerUp(PointerEvent event) {
+    if (event.pointer == _swipePointer) {
+      if (_swipeRecognized && !_swipeRejected && _pointerCount == 1) {
+        _finishHorizontalSwipe();
+      }
+      _swipePointer = null;
+      _swipeStartTabIndex = null;
+      _swipeStartPosition = null;
+      _swipeRecognized = false;
+      _swipeRejected = false;
+    }
     _pointerCount = math.max(0, _pointerCount - 1);
     if (_pointerCount < 2) {
       _isMultiTouch = false;
@@ -719,6 +913,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _pointerCount = 0;
     _isMultiTouch = false;
     _drawerDragDistance = 0.0;
+    _swipePointer = null;
+    _swipeStartTabIndex = null;
+    _swipeStartPosition = null;
+    _swipeRecognized = false;
+    _swipeRejected = false;
   }
 
   void _onOperationsChanged() {
@@ -762,6 +961,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void initState() {
     super.initState();
+    _appBarAnimController.addListener(_onAppBarAnimationChanged);
     _opSvc = ref.read(fileOperationServiceProvider);
     _vaultEvents = ref.read(vaultEngineEventsProvider);
 
@@ -779,6 +979,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
+    _appBarAnimController.removeListener(_onAppBarAnimationChanged);
     _appBarAnimController.dispose();
     _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
@@ -982,7 +1183,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _signalActivity();
     HapticFeedback.selectionClick();
     final fullPath = _fullPathOf(entry);
-    final extension = ArchiveService.splitPartExtension(entry.name) ??
+    final extension =
+        ArchiveService.splitPartExtension(entry.name) ??
         (entry.name.contains('.')
             ? entry.name.split('.').last.toLowerCase()
             : '');
@@ -1081,17 +1283,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         );
         _setStatus(context.l10n.clipboardVerbMoving);
       },
-      onOpenInNewTab: (_tabsCtrl != null &&
+      onOpenInNewTab:
+          (_tabsCtrl != null &&
+              ref.read(appSettingsControllerProvider).settings.useBrowserTabs &&
               entry.isDir &&
               _archiveContext == null)
-          ? () => _openFolderInNewTab(fullPath)
-          : null,
-      onCopyToOtherTab: (_otherTab != null && _archiveContext == null)
-          ? () => _sendToOtherTab(entry, fullPath, cut: false)
-          : null,
-      onMoveToOtherTab:
-          (_otherTab != null && _archiveContext == null && !_isReadOnly)
-          ? () => _sendToOtherTab(entry, fullPath, cut: true)
+          ? () => _openFolderInNewTab(
+              widget.container,
+              fullPath,
+              stateKey: _stateKey,
+              selectedEntry: selectedItems.contains(entry) ? entry : null,
+            )
           : null,
       onTogglePin: () async {
         await _pinsBookmarksNotifier.togglePins(widget.container, [
@@ -1141,16 +1343,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         // path to hand out and is shared through its own channel instead.
         final localPath = p.join(widget.container.uri, fullPath);
         final ok = widget.container.isRawLocal
-            ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
-                [localPath],
-                directoryPaths: entry.isDir ? [localPath] : const [],
-              )
-            : await ref.read(vaultFileIoApiProvider).shareFiles(
-                widget.container,
-                [fullPath],
-                directoryPaths: entry.isDir ? [fullPath] : const [],
-                skipExtensions: _vaultItemExtensions,
-              );
+            ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles([
+                localPath,
+              ], directoryPaths: entry.isDir ? [localPath] : const [])
+            : await ref
+                  .read(vaultFileIoApiProvider)
+                  .shareFiles(
+                    widget.container,
+                    [fullPath],
+                    directoryPaths: entry.isDir ? [fullPath] : const [],
+                    skipExtensions: _vaultItemExtensions,
+                  );
         if (!ok && mounted) {
           _setStatus(context.l10n.couldNotShareFiles, error: true);
         }
@@ -1269,13 +1472,24 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _toggleBookmarkSelected({required bool bookmark}) async {
     _signalActivity();
-    final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
-    await _pinsBookmarksNotifier.toggleBookmarks(
-      widget.container,
-      pathsToToggle,
-      bookmark: bookmark,
-    );
-    final count = pathsToToggle.length;
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    final groups = <int, List<_SelectedBrowserEntry>>{};
+    for (final item in selected) {
+      groups.putIfAbsent(item.container.volId, () => []).add(item);
+    }
+    for (final group in groups.values) {
+      final container = group.first.container;
+      final paths = group
+          .map((item) => fullPathOf(item.entry, item.currentDirPath))
+          .toSet()
+          .toList();
+      await ref
+          .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
+          .toggleBookmarks(container, paths, bookmark: bookmark);
+    }
+    final count = selected.length;
     _setStatus(
       bookmark
           ? context.l10n.bookmarkedCount(count)
@@ -1286,13 +1500,24 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _togglePinSelected({required bool pin}) async {
     _signalActivity();
-    final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
-    await _pinsBookmarksNotifier.togglePins(
-      widget.container,
-      pathsToToggle,
-      pin: pin,
-    );
-    final count = pathsToToggle.length;
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    final groups = <int, List<_SelectedBrowserEntry>>{};
+    for (final item in selected) {
+      groups.putIfAbsent(item.container.volId, () => []).add(item);
+    }
+    for (final group in groups.values) {
+      final container = group.first.container;
+      final paths = group
+          .map((item) => fullPathOf(item.entry, item.currentDirPath))
+          .toSet()
+          .toList();
+      await ref
+          .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
+          .togglePins(container, paths, pin: pin);
+    }
+    final count = selected.length;
     _setStatus(
       pin ? context.l10n.pinnedCount(count) : context.l10n.unpinnedCount(count),
     );
@@ -1686,8 +1911,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _loadDirectoryContents(newPath);
   }
 
+  void _handleBackAtRoot() {
+    // Only a location opened from Dashboard returns there at its root. Other
+    // tabs stay at their root until the user selects another tab or location.
+    final tabKey = widget.tabKey;
+    if (tabKey != null) {
+      _tabsCtrl?.returnToDashboardAtRoot(tabKey);
+    }
+  }
+
   bool get _canPreviewFolderBackGesture =>
       !_atRoot && !isSelectionMode && !_searchActive;
+
   /// Whether this screen should answer predictive-back events: its route is
   /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a
   /// WidgetsBindingObserver, so without the tab check the first-registered
@@ -1769,18 +2004,125 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   // ── Selection (FileBrowserSelection controller) ──────────────────────────
   Set<RawEntry> get selectedItems =>
       ref.read(fileBrowserSelectionProvider(_stateKey)).items;
-  bool get isSelectionMode => ref
-      .read(fileBrowserSelectionProvider(_stateKey))
-      .isSelectionMode;
-  int get selectedFolderCount => ref
-      .read(fileBrowserSelectionProvider(_stateKey))
-      .selectedFolderCount;
-  int get selectedTotalBytes => ref
-      .read(fileBrowserSelectionProvider(_stateKey))
-      .selectedTotalBytes;
-  bool get hasPendingFolderSizes => ref
-      .read(fileBrowserSelectionProvider(_stateKey))
-      .hasPendingFolderSizes;
+  bool get isSelectionMode => _tabsCtrl == null
+      ? ref.read(fileBrowserSelectionProvider(_stateKey)).isSelectionMode
+      : _selectedBrowserEntries.isNotEmpty;
+  int get selectedFolderCount =>
+      ref.read(fileBrowserSelectionProvider(_stateKey)).selectedFolderCount;
+  int get selectedTotalBytes =>
+      ref.read(fileBrowserSelectionProvider(_stateKey)).selectedTotalBytes;
+  bool get hasPendingFolderSizes =>
+      ref.read(fileBrowserSelectionProvider(_stateKey)).hasPendingFolderSizes;
+
+  List<_SelectedBrowserEntry> get _selectedBrowserEntries {
+    final tabs = _tabsCtrl;
+    if (tabs == null) {
+      final selection = ref.read(fileBrowserSelectionProvider(_stateKey));
+      final navigation = ref.read(fileBrowserNavigationProvider(_stateKey));
+      return [
+        for (final entry in selection.items)
+          (
+            stateKey: _stateKey,
+            container: widget.container,
+            currentDirPath: navigation.currentDirPath,
+            entry: entry,
+            insideArchive: navigation.archiveContext != null,
+          ),
+      ];
+    }
+
+    return [
+      for (final tab in tabs.tabs)
+        if (!tab.isDashboard)
+          for (final entry
+              in ref.read(fileBrowserSelectionProvider(tab.key)).items)
+            (
+              stateKey: tab.key,
+              container: tab.container!,
+              currentDirPath: ref
+                  .read(fileBrowserNavigationProvider(tab.key))
+                  .currentDirPath,
+              entry: entry,
+              insideArchive:
+                  ref
+                      .read(fileBrowserNavigationProvider(tab.key))
+                      .archiveContext !=
+                  null,
+            ),
+    ];
+  }
+
+  List<_SelectedBrowserEntry> get _uniqueSelectedBrowserEntries {
+    final seen = <(int, String)>{};
+    final unique = <_SelectedBrowserEntry>[];
+    for (final item in _selectedBrowserEntries) {
+      final path = fullPathOf(item.entry, item.currentDirPath);
+      if (seen.add((item.container.volId, path))) unique.add(item);
+    }
+    return unique;
+  }
+
+  bool _isSelectedEntryPinned(RawEntry entry) {
+    final matches = _selectedBrowserEntries
+        .where((item) => item.entry == entry)
+        .toList();
+    if (matches.isEmpty) return _isPinned(entry);
+    return matches.any((item) {
+      final state = ref.read(
+        fileBrowserPinsBookmarksProvider(item.container.volId),
+      );
+      return isPinned(entry, item.currentDirPath, state.pinnedPaths);
+    });
+  }
+
+  bool _isSelectedEntryBookmarked(RawEntry entry) {
+    final matches = _selectedBrowserEntries
+        .where((item) => item.entry == entry)
+        .toList();
+    if (matches.isEmpty) return _isBookmark(entry);
+    return matches.any((item) {
+      final state = ref.read(
+        fileBrowserPinsBookmarksProvider(item.container.volId),
+      );
+      return isBookmark(entry, item.currentDirPath, state.bookmarkPaths);
+    });
+  }
+
+  int get _selectedBrowserEntryCount => _selectedBrowserEntries.length;
+
+  bool get _selectionBarVisible =>
+      _isActiveTab && _selectedBrowserEntryCount > 0;
+
+  bool get _selectionHasReadOnlySource =>
+      _selectedBrowserEntries.any((item) => item.container.readOnly);
+
+  int get _allSelectedTotalBytes {
+    final keys =
+        _tabsCtrl?.tabs
+            .where((tab) => !tab.isDashboard)
+            .map((tab) => tab.key)
+            .toList() ??
+        [_stateKey];
+    return keys.fold<int>(
+      0,
+      (total, key) =>
+          total +
+          ref.read(fileBrowserSelectionProvider(key)).selectedTotalBytes,
+    );
+  }
+
+  bool get _anySelectedFolderSizePending {
+    final keys =
+        _tabsCtrl?.tabs
+            .where((tab) => !tab.isDashboard)
+            .map((tab) => tab.key)
+            .toList() ??
+        [_stateKey];
+    return keys.any(
+      (key) =>
+          ref.read(fileBrowserSelectionProvider(key)).hasPendingFolderSizes,
+    );
+  }
 
   void toggleSelectItem(RawEntry item) {
     ref
@@ -1797,9 +2139,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         .setSelectedItems(newSelection);
   }
 
-  void exitSelectionMode() => ref
-      .read(fileBrowserSelectionProvider(_stateKey).notifier)
-      .exitSelectionMode();
+  void exitSelectionMode() {
+    final tabs = _tabsCtrl;
+    if (tabs == null) {
+      ref
+          .read(fileBrowserSelectionProvider(_stateKey).notifier)
+          .exitSelectionMode();
+      return;
+    }
+    for (final tab in tabs.tabs) {
+      if (tab.isDashboard) continue;
+      ref
+          .read(fileBrowserSelectionProvider(tab.key).notifier)
+          .exitSelectionMode();
+    }
+  }
 
   Future<void> fetchFolderSizes(
     MountedContainer container,
@@ -1809,16 +2163,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       .fetchFolderSizes(container, currentDirPath);
 
   // ── Sort (FileBrowserSort controller) ─────────────────────────────────────
-  SortBy get sortBy =>
-      ref.read(fileBrowserSortProvider(_stateKey)).sortBy;
+  SortBy get sortBy => ref.read(fileBrowserSortProvider(_stateKey)).sortBy;
   bool get sortAscending =>
       ref.read(fileBrowserSortProvider(_stateKey)).sortAscending;
   FileBrowserSort get _sortNotifier =>
       ref.read(fileBrowserSortProvider(_stateKey).notifier);
 
-  void setSort(SortBy by) => ref
-      .read(fileBrowserSortProvider(_stateKey).notifier)
-      .setSort(by);
+  void setSort(SortBy by) =>
+      ref.read(fileBrowserSortProvider(_stateKey).notifier).setSort(by);
 
   int compareItems(RawEntry ea, RawEntry eb) =>
       ref.read(fileBrowserSortProvider(_stateKey)).compare(ea, eb);
@@ -1855,7 +2207,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final fullPath = _fullPathOf(entry);
     final parts = entry.name.split('.');
-    final ext = ArchiveService.splitPartExtension(entry.name) ??
+    final ext =
+        ArchiveService.splitPartExtension(entry.name) ??
         (parts.length > 1
             ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
             : '');
@@ -1916,10 +2269,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SkinAreaScope(area: SkinArea.files, child: ArchiveFileViewer(
-                    bytes: extractResult!.data!,
-                    fileName: entry.name,
-                  )),
+                  builder: (_) => SkinAreaScope(
+                    area: SkinArea.files,
+                    child: ArchiveFileViewer(
+                      bytes: extractResult!.data!,
+                      fileName: entry.name,
+                    ),
+                  ),
                 ),
               );
             } else if (extractResult != null) {
@@ -2398,7 +2754,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         ),
       );
       _loadDirectoryContents(_currentDirPath);
-      } else if (choice.action == 'media') {
+    } else if (choice.action == 'media') {
       if (choice.remember && cleanExt.isNotEmpty) {
         await _saveExtensionPreference(cleanExt, 'media');
       }
@@ -2623,10 +2979,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   /// the whole action, so sharing five photos alongside one accidentally
   /// co-selected password entry still shares the five photos.
   Future<void> _shareSelected() async {
-    final entries = selectedItems.toList();
+    final entries = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
     exitSelectionMode();
 
-    final shareable = entries.where((e) {
+    final shareable = entries.where((item) {
+      final e = item.entry;
       if (e.isDir) return true;
       final parts = e.name.split('.');
       final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
@@ -2639,6 +2998,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
       return;
     }
+    final containers = shareable.map((item) => item.container.volId).toSet();
+    if (containers.length != 1) {
+      if (mounted) {
+        _setStatus(context.l10n.couldNotShareFiles, error: true);
+      }
+      return;
+    }
+    final source = shareable.first.container;
+    final paths = shareable
+        .map((item) => fullPathOf(item.entry, item.currentDirPath))
+        .toList();
+    final directoryPaths = shareable
+        .where((item) => item.entry.isDir)
+        .map((item) => fullPathOf(item.entry, item.currentDirPath))
+        .toList();
 
     _signalActivity();
     try {
@@ -2648,27 +3022,34 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       // A SAF tree is *not* that: it has no real path, so (unlike
       // _openFileWithApp, which keys on isLocalStorage) it goes through
       // VaultFileIoApi.shareFiles' SAF channel along with the vault containers.
-      final ok = widget.container.isRawLocal
+      final ok = source.isRawLocal
           ? await ref
                 .read(vaultLocalShareApiProvider)
                 .shareLocalFiles(
                   shareable
-                      .map((e) => p.join(widget.container.uri, _fullPathOf(e)))
+                      .map(
+                        (item) => p.join(
+                          source.uri,
+                          fullPathOf(item.entry, item.currentDirPath),
+                        ),
+                      )
                       .toList(),
                   directoryPaths: shareable
-                      .where((e) => e.isDir)
-                      .map((e) => p.join(widget.container.uri, _fullPathOf(e)))
+                      .where((item) => item.entry.isDir)
+                      .map(
+                        (item) => p.join(
+                          source.uri,
+                          fullPathOf(item.entry, item.currentDirPath),
+                        ),
+                      )
                       .toList(),
                 )
           : await ref
                 .read(vaultFileIoApiProvider)
                 .shareFiles(
-                  widget.container,
-                  shareable.map(_fullPathOf).toList(),
-                  directoryPaths: shareable
-                      .where((e) => e.isDir)
-                      .map(_fullPathOf)
-                      .toList(),
+                  source,
+                  paths,
+                  directoryPaths: directoryPaths,
                   skipExtensions: _vaultItemExtensions,
                 );
       if (!ok && mounted) {
@@ -2702,95 +3083,90 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   // ── Cross-tab actions ─────────────────────────────────────────────────────
 
-  /// The tab "to other tab" actions target: the previously used tab, or the
-  /// only other tab. Null outside tabs / with a single tab.
-  BrowserTab? get _otherTab {
-    final t = _tabsCtrl;
-    if (t == null || !t.hasMultiple) return null;
-    final prev = t.previousTab;
-    if (prev != null && prev.key != widget.tabKey) return prev;
-    for (final tab in t.tabs) {
-      if (tab.key != widget.tabKey) return tab;
+  /// A single selected folder (outside archives) can be opened in a new tab
+  /// straight from the selection bar, so a long-press on a folder offers it
+  /// too, not only the item's 3-dot sheet.
+  _SelectedBrowserEntry? get _singleSelectedFolderForNewTab {
+    if (_tabsCtrl == null ||
+        !ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      return null;
     }
-    return null;
+    final selected = _selectedBrowserEntries;
+    if (selected.length != 1 ||
+        !selected.single.entry.isDir ||
+        selected.single.insideArchive) {
+      return null;
+    }
+    return selected.single;
   }
 
-  void _openFolderInNewTab(String fullPath) {
+  void _openFolderInNewTab(
+    MountedContainer container,
+    String fullPath, {
+    int? stateKey,
+    RawEntry? selectedEntry,
+  }) {
     final t = _tabsCtrl;
-    if (t == null) return;
-    final key = t.openTab(widget.container, initialPath: fullPath);
+    if (t == null ||
+        !ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+      return;
+    }
+    final key = t.openTab(container, initialPath: fullPath);
     if (key == null) {
       _setStatus(
         context.l10n.browserTabLimitReached(kMaxBrowserTabs),
         error: true,
       );
+    } else if (stateKey != null && selectedEntry != null) {
+      ref
+          .read(fileBrowserSelectionProvider(stateKey).notifier)
+          .toggleSelectItem(selectedEntry);
     }
   }
 
-  /// Stages [entry] on the (global) clipboard, switches to the other tab and
-  /// has that tab paste it into the folder it is showing.
-  void _sendToOtherTab(
-    RawEntry entry,
-    String fullPath, {
-    required bool cut,
-  }) {
-    final t = _tabsCtrl;
-    final other = _otherTab;
-    if (t == null || other == null) return;
-    if (cut && _isReadOnly) {
-      _setStatus(context.l10n.readOnlyCantMove, error: true);
-      return;
-    }
-    _signalActivity();
-    _clip.set(
-      volId: widget.container.volId,
-      displayName: widget.container.displayName,
-      cut: cut,
-      clipItems: [
-        ClipboardItem(
-          path: fullPath,
-          isDir: entry.isDir,
-          sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
-          modifiedSecs: entry.modifiedSecs,
-        ),
-      ],
+  void _openSelectedFolderInNewTab() {
+    final selected = _singleSelectedFolderForNewTab;
+    if (selected == null) return;
+    _openFolderInNewTab(
+      selected.container,
+      fullPathOf(selected.entry, selected.currentDirPath),
+      stateKey: selected.stateKey,
+      selectedEntry: selected.entry,
     );
-    t.activate(other.key);
-    t.requestPaste(other.key);
-  }
-
-  /// Multi-select counterpart of [_sendToOtherTab].
-  void _sendSelectionToOtherTab({required bool cut}) {
-    final t = _tabsCtrl;
-    final other = _otherTab;
-    if (t == null || other == null || selectedItems.isEmpty) return;
-    if (cut && _isReadOnly) {
-      _setStatus(context.l10n.readOnlyCantMove, error: true);
-      return;
-    }
-    _initClipboard(cut: cut); // stages the selection and leaves selection mode
-    t.activate(other.key);
-    t.requestPaste(other.key);
   }
 
   void _initClipboard({required bool cut}) {
-    if (cut && _isReadOnly) {
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    if (selected.isEmpty) return;
+    if (cut && selected.any((item) => item.container.readOnly)) {
       _setStatus(context.l10n.readOnlyCantMove, error: true);
       return;
     }
     _signalActivity();
-    final clipItems = selectedItems.map((entry) {
-      final path = _fullPathOf(entry);
-      return ClipboardItem(
-        path: path,
-        isDir: entry.isDir,
-        sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
-        modifiedSecs: entry.modifiedSecs,
+    final primary = selected.first.container;
+    final seen = <(int, String)>{};
+    final clipItems = <ClipboardItem>[];
+    for (final item in selected) {
+      final path = fullPathOf(item.entry, item.currentDirPath);
+      if (!seen.add((item.container.volId, path))) continue;
+      clipItems.add(
+        ClipboardItem(
+          path: path,
+          isDir: item.entry.isDir,
+          sizeBytes: item.entry.isDir ? 0 : item.entry.sizeBytes,
+          modifiedSecs: item.entry.modifiedSecs,
+          volId: item.container.volId == primary.volId
+              ? null
+              : item.container.volId,
+        ),
       );
-    }).toList();
+    }
+
     _clip.set(
-      volId: widget.container.volId,
-      displayName: widget.container.displayName,
+      volId: primary.volId,
+      displayName: primary.displayName,
       cut: cut,
       clipItems: clipItems,
     );
@@ -2898,7 +3274,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         passphrase: clip.passphrase,
         encryptFilenames: clip.encryptFilenames,
         deleteSourceAfter: options.deleteSourceAfter,
-        compressionLevel: clip.compressionLevel ?? ArchiveCompressionLevel.normal,
+        compressionLevel:
+            clip.compressionLevel ?? ArchiveCompressionLevel.normal,
         compressionMethod: clip.compressionMethod,
         splitSizeBytes: options.splitSizeBytes,
         l10n: context.l10n,
@@ -2967,34 +3344,95 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // _fadeScrimOpacity's file for the media-scan equivalent of this
     // note) -- this is just "show the sheet if asked, then hand back to
     // the widget for listener binding", same as before.
-    final items = List<ClipboardItem>.from(clip.items);
+    // Items staged from several tabs can live on different volumes; they are
+    // transferred as one operation per source volume. A normal clipboard has
+    // a single group, which behaves exactly as before.
     final isCut = clip.isCutOperation;
-    final op = await ref
-        .read(fileBrowserOperationsControllerProvider)
-        .pasteStandardTransfer(
-          destContainer: widget.container,
-          srcContainer: srcContainer,
-          destDirPath: _currentDirPath,
-          items: items,
-          isCut: isCut,
-          isCrossContainer: isCrossContainer,
-          resolveConflicts: (conflicts) async {
-            if (!mounted) return null;
-            return ConflictResolutionSheet.show(
-              context,
-              conflicts: conflicts,
-              caseSensitive: namesAreCaseSensitive(widget.container),
-            );
-          },
-          l10n: context.l10n,
+    final groups = <int, List<ClipboardItem>>{};
+    for (final item in clip.items) {
+      groups.putIfAbsent(item.volId ?? srcVolId, () => []).add(item);
+    }
+    final groupContainers = <int, MountedContainer>{srcVolId: srcContainer!};
+    final remainingItems = <(int, ClipboardItem)>[];
+    for (final group in groups.entries) {
+      final groupVolId = group.key;
+      final groupIsCross = groupVolId != widget.container.volId;
+      MountedContainer? groupSrc;
+      if (!groupIsCross) {
+        groupSrc = widget.container;
+      } else if (groupVolId == srcVolId) {
+        groupSrc = srcContainer;
+      } else {
+        groupSrc = widget.resolveContainer?.call(groupVolId);
+      }
+      if (groupSrc == null) {
+        _setStatus(
+          context.l10n.crossContainerPasteRequiresBothMounted,
+          error: true,
+          autoClear: const Duration(seconds: 6),
         );
-    if (!mounted || op == null) return;
-    _clip.clear();
-    _bindOpListener(op);
+        remainingItems.addAll(group.value.map((item) => (groupVolId, item)));
+        continue;
+      }
+      groupContainers[groupVolId] = groupSrc;
+      final op = await ref
+          .read(fileBrowserOperationsControllerProvider)
+          .pasteStandardTransfer(
+            destContainer: widget.container,
+            srcContainer: groupSrc,
+            destDirPath: _currentDirPath,
+            items: List<ClipboardItem>.from(group.value),
+            isCut: isCut,
+            isCrossContainer: groupIsCross,
+            resolveConflicts: (conflicts) async {
+              if (!mounted) return null;
+              return ConflictResolutionSheet.show(
+                context,
+                conflicts: conflicts,
+                caseSensitive: namesAreCaseSensitive(widget.container),
+              );
+            },
+            l10n: context.l10n,
+          );
+      if (!mounted) return;
+      if (op == null) {
+        remainingItems.addAll(group.value.map((item) => (groupVolId, item)));
+        continue;
+      }
+      _bindOpListener(op);
+    }
+    if (remainingItems.isEmpty) {
+      _clip.clear();
+    } else {
+      final remainingSourceVolId = remainingItems.first.$1;
+      final remainingSource = groupContainers[remainingSourceVolId];
+      _clip.set(
+        volId: remainingSourceVolId,
+        displayName:
+            remainingSource?.displayName ??
+            clip.sourceDisplayName ??
+            widget.container.displayName,
+        cut: isCut,
+        clipItems: [
+          for (final (volId, item) in remainingItems)
+            ClipboardItem(
+              path: item.path,
+              isDir: item.isDir,
+              sizeBytes: item.sizeBytes,
+              modifiedSecs: item.modifiedSecs,
+              volId: volId == remainingSourceVolId ? null : volId,
+            ),
+        ],
+      );
+    }
   }
 
   void _batchDelete() {
-    if (_isReadOnly) {
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    if (selected.isEmpty) return;
+    if (selected.any((item) => item.container.readOnly)) {
       _setStatus(context.l10n.readOnlyCantDelete, error: true);
       return;
     }
@@ -3002,35 +3440,73 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _signalActivity();
     BrowserDialogs.showBatchDelete(
       context,
-      toDelete: List<RawEntry>.from(selectedItems),
-      onConfirmed: (entries) {
-        final clipItems = entries.map((e) {
-          final path = _fullPathOf(e);
-          return ClipboardItem(path: path, isDir: e.isDir);
-        }).toList();
-        final op = _opSvc.enqueueDelete(
-          container: widget.container,
-          items: clipItems,
-          locationLabel: _currentDirPath,
-          l10n: context.l10n,
-        );
+      toDelete: selected.map((item) => item.entry).toList(),
+      onConfirmed: (_) {
         exitSelectionMode();
-        void listener() {
-          if (!mounted) {
-            op.removeListener(listener);
-            return;
-          }
-          final done =
-              op.status != FileOperationStatus.running &&
-              op.status != FileOperationStatus.pending;
-          if (!done) return;
-          op.removeListener(listener);
-          _finishBatchDelete(op);
+        final groups = <(int, int, String), List<_SelectedBrowserEntry>>{};
+        for (final item in selected) {
+          groups
+              .putIfAbsent((
+                item.container.volId,
+                item.stateKey,
+                item.currentDirPath,
+              ), () => [])
+              .add(item);
         }
-
-        op.addListener(listener);
+        for (final group in groups.values) {
+          final container = group.first.container;
+          final seenPaths = <String>{};
+          final items = <ClipboardItem>[];
+          for (final item in group) {
+            final path = fullPathOf(item.entry, item.currentDirPath);
+            if (seenPaths.add(path)) {
+              items.add(ClipboardItem(path: path, isDir: item.entry.isDir));
+            }
+          }
+          if (items.isEmpty) continue;
+          final op = _opSvc.enqueueDelete(
+            container: container,
+            items: items,
+            locationLabel: group.first.currentDirPath,
+            l10n: context.l10n,
+          );
+          _bindGroupedDeleteListener(op, container);
+        }
       },
     );
+  }
+
+  void _bindGroupedDeleteListener(
+    FileOperation op,
+    MountedContainer container,
+  ) {
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (!done) return;
+      op.removeListener(listener);
+      unawaited(() async {
+        final deletedPaths = op.itemStatuses
+            .where((status) => status.result == FileItemResult.success)
+            .map((status) => status.item.path)
+            .toSet();
+        await ref
+            .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
+            .removeDeletedPaths(container, deletedPaths);
+        if (!mounted) return;
+        if (container.volId == widget.container.volId) {
+          await _loadDirectoryContents(_currentDirPath, refresh: true);
+        }
+        if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
+      }());
+    }
+
+    op.addListener(listener);
   }
 
   Future<void> _finishBatchDelete(FileOperation op) async {
@@ -3062,19 +3538,31 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _exportSelectedToStorage() {
     _signalActivity();
-    final items = selectedItems.map((e) {
-      final path = _fullPathOf(e);
-      return ClipboardItem(path: path, isDir: e.isDir, sizeBytes: e.sizeBytes);
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    if (selected.isEmpty ||
+        selected.map((item) => item.container.volId).toSet().length != 1) {
+      return;
+    }
+    final source = selected.first.container;
+    final items = selected.map((item) {
+      final path = fullPathOf(item.entry, item.currentDirPath);
+      return ClipboardItem(
+        path: path,
+        isDir: item.entry.isDir,
+        sizeBytes: item.entry.sizeBytes,
+      );
     }).toList();
     if (items.isEmpty) return;
     exitSelectionMode();
     final op = _opSvc.enqueueExport(
-      source: widget.container,
+      source: source,
       items: items,
       performExport: (opId) => ref
           .read(vaultFileIoApiProvider)
           .exportSelectedToFolder(
-            widget.container,
+            source,
             items
                 .map((i) => <String, dynamic>{'path': i.path, 'isDir': i.isDir})
                 .toList(),
@@ -3111,8 +3599,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _compressSelected() async {
-    final entries = selectedItems.toList();
-    if (entries.isEmpty) return;
+    final selected = _uniqueSelectedBrowserEntries
+        .where((item) => !item.insideArchive)
+        .toList();
+    if (selected.isEmpty ||
+        selected.map((item) => item.container.volId).toSet().length != 1) {
+      return;
+    }
+    final entries = selected.map((item) => item.entry).toList();
+    final source = selected.first.container;
     final currentDirPath = _currentDirPath;
     final existingEntries = _currentItems;
     String stem(RawEntry e) {
@@ -3123,7 +3618,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
     final suggestedName = entries.length == 1
         ? '${stem(entries.first)}.zip'
-        : '${currentDirPath.isEmpty ? widget.container.displayName : currentDirPath.split('/').last}.zip';
+        : '${currentDirPath.isEmpty ? source.displayName : currentDirPath.split('/').last}.zip';
     exitSelectionMode();
     if (!mounted) return;
     BrowserDialogs.showCreateArchive(
@@ -3135,38 +3630,40 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       selectedEntries: entries,
       freeSpace: _freeSpace,
       readOnly: _isReadOnly,
-      onCreate: (
-        destPath,
-        format,
-        passphrase,
-        encryptFilenames,
-        compressionLevel,
-        compressionMethod,
-      ) async {
-        final clipItems = entries.map((e) {
-          final path = _fullPathOf(e);
-          return ClipboardItem(
-            path: path,
-            isDir: e.isDir,
-            sizeBytes: e.isDir ? 0 : e.sizeBytes,
-            modifiedSecs: e.modifiedSecs,
-          );
-        }).toList();
+      onCreate:
+          (
+            destPath,
+            format,
+            passphrase,
+            encryptFilenames,
+            compressionLevel,
+            compressionMethod,
+          ) async {
+            final clipItems = selected.map((item) {
+              final entry = item.entry;
+              final path = fullPathOf(entry, item.currentDirPath);
+              return ClipboardItem(
+                path: path,
+                isDir: entry.isDir,
+                sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+                modifiedSecs: entry.modifiedSecs,
+              );
+            }).toList();
 
-        final archiveName = destPath.split('/').last;
-        _clip.setArchiveCreate(
-          volId: widget.container.volId,
-          displayName: widget.container.displayName,
-          clipItems: clipItems,
-          archiveName: archiveName,
-          format: format,
-          passphrase: passphrase,
-          encryptFilenames: encryptFilenames,
-          compressionLevel: compressionLevel,
-          compressionMethod: compressionMethod,
-        );
-        _setStatus('${context.l10n.verbArchiving}: $archiveName');
-      },
+            final archiveName = destPath.split('/').last;
+            _clip.setArchiveCreate(
+              volId: source.volId,
+              displayName: source.displayName,
+              clipItems: clipItems,
+              archiveName: archiveName,
+              format: format,
+              passphrase: passphrase,
+              encryptFilenames: encryptFilenames,
+              compressionLevel: compressionLevel,
+              compressionMethod: compressionMethod,
+            );
+            _setStatus('${context.l10n.verbArchiving}: $archiveName');
+          },
     );
   }
 
@@ -3236,7 +3733,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // ── Outside archive: stage full archive file for extraction ─────────
     if (selectedItems.length != 1) return;
     final entry = selectedItems.first;
-    final ext = ArchiveService.splitPartExtension(entry.name) ??
+    final ext =
+        ArchiveService.splitPartExtension(entry.name) ??
         (entry.name.contains('.')
             ? entry.name.split('.').last.toLowerCase()
             : '');
@@ -3311,38 +3809,39 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   Future<void> _decryptSelected() => _runQuickCrypto(CryptoDirection.decrypt);
 
   Future<void> _runQuickCrypto(CryptoDirection direction) async {
-    final files = selectedItems.where((e) {
-      if (e.isDir) return false;
-      final isEncrypted = isAppEncryptedFileName(e.name);
+    final files = _uniqueSelectedBrowserEntries.where((item) {
+      if (item.insideArchive || item.entry.isDir) return false;
+      final isEncrypted = isAppEncryptedFileName(item.entry.name);
       return direction == CryptoDirection.encrypt ? !isEncrypted : isEncrypted;
     }).toList();
     exitSelectionMode();
     if (files.isEmpty) return;
 
-    final isLocal = widget.container.isLocalStorage;
-
-    final sources = files.map((e) {
-      final relPath = _fullPathOf(e);
-      if (isLocal) {
-        final absPath = p.join(widget.container.uri, relPath);
+    final sources = files.map((item) {
+      final source = item.container;
+      final entry = item.entry;
+      final relPath = fullPathOf(entry, item.currentDirPath);
+      if (source.isLocalStorage) {
+        final absPath = p.join(source.uri, relPath);
         return CryptoSourceItem.external(
-          displayName: e.name,
+          displayName: entry.name,
           externalUri: Uri.file(absPath).toString(),
         );
       } else {
         return CryptoSourceItem.vault(
-          displayName: e.name,
-          container: widget.container,
+          displayName: entry.name,
+          container: source,
           relativePath: relPath,
         );
       }
     }).toList();
 
+    final destinationIsLocal = widget.container.isLocalStorage;
     final folderLabel = _currentDirPath.isEmpty
         ? widget.container.displayName
         : '${widget.container.displayName} / ${_currentDirPath.split('/').last}';
 
-    final destination = isLocal
+    final destination = destinationIsLocal
         ? CryptoDestination.external(
             displayName: folderLabel,
             externalPath: _currentDirPath.isEmpty
@@ -3358,12 +3857,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: SingleFileCryptoSheet(
-          initialSources: sources,
-          initialDestination: destination,
-          initialDirection: direction,
-          allowEditingSelection: false,
-        )),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.tools,
+          child: SingleFileCryptoSheet(
+            initialSources: sources,
+            initialDestination: destination,
+            initialDirection: direction,
+            allowEditingSelection: false,
+          ),
+        ),
       ),
     );
     if (!mounted) return;
@@ -3870,8 +4372,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
               : widget.container.uri;
           ref
               .read(
-                fileManagerToolbarSettingsProvider(effectiveToolbarUri)
-                    .notifier,
+                fileManagerToolbarSettingsProvider(
+                  effectiveToolbarUri,
+                ).notifier,
               )
               .applyImportedConfig(_toolbarConfig);
         }
@@ -4196,6 +4699,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Widget _buildBrowser(BuildContext context) {
     ref.watch(fileBrowserSelectionProvider(_stateKey));
+    if (_isActiveTab) {
+      for (final tab in _tabsCtrl?.tabs ?? const <BrowserTab>[]) {
+        if (!tab.isDashboard && tab.key != _stateKey) {
+          ref.watch(fileBrowserSelectionProvider(tab.key));
+        }
+      }
+    }
     ref.watch(fileBrowserSortProvider(_stateKey));
     ref.watch(fileBrowserNavigationProvider(_stateKey));
     ref.watch(vaultSyncedFolderPathsProvider(widget.container));
@@ -4310,6 +4820,32 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
+    final selectedForBar = _selectedBrowserEntries;
+    final selectedForBarSet = {for (final item in selectedForBar) item.entry};
+    final selectedVolIds = selectedForBar
+        .map((item) => item.container.volId)
+        .toSet();
+    final allSelectionInOneTab =
+        selectedForBar.isNotEmpty &&
+        selectedForBar.every((item) => item.stateKey == _stateKey);
+    final allSelectionOutsideArchives = selectedForBar.every(
+      (item) => !item.insideArchive,
+    );
+    final selectedInOneContainer = selectedVolIds.length == 1;
+    final canExtractCurrentSelection =
+        selectedForBar.isNotEmpty &&
+        selectedForBar.every(
+          (item) =>
+              item.stateKey == _stateKey &&
+              (item.insideArchive || selectedForBar.length == 1),
+        );
+    final singleSelectionInCurrentTab =
+        selectedForBar.length == 1 &&
+        selectedForBar.single.stateKey == _stateKey &&
+        !selectedForBar.single.insideArchive;
+    final hideVaultOnlyActionsForSelection =
+        selectedForBar.isNotEmpty &&
+        selectedForBar.every((item) => item.container.isLocalStorage);
 
     final hasBottomNavBar = !isLandscape && (showActionBar || showBookmarkBar);
     final bottomSystemInset = hasBottomNavBar
@@ -4319,7 +4855,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
     final bool hasClipboardFab =
-        !isSelectionMode &&
+        !_selectionBarVisible &&
         !_searchActive &&
         ref.watch(crossContainerClipboardProvider).hasItems;
     final bool hasFabToolbar = useFab && !_searchActive;
@@ -4335,7 +4871,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final double bannerBottomOffset = _searchActive
         ? 0.0
         : (baseBottomOffset +
-              ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
+              ((_selectionBarVisible && _toolbarConfig.bottomSelectionBar)
                   ? kToolbarHeight
                   : 0.0) +
               fabClearance);
@@ -4351,34 +4887,50 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         dirCount: dirCount,
         fileCount: fileCount,
         isSelectionMode: selectionMode,
-        selectedItems: selectionMode ? selectedItems : const {},
-        isReadOnly: _isReadOnly,
+        selectedItems: selectionMode ? selectedForBarSet : const {},
+        selectedCountOverride: selectionMode
+            ? _selectedBrowserEntryCount
+            : null,
+        singleSelectionInCurrentTab: singleSelectionInCurrentTab,
+        allowRenameAction:
+            allSelectionInOneTab &&
+            allSelectionOutsideArchives &&
+            !_selectionHasReadOnlySource,
+        allowShareAction: selectedInOneContainer && allSelectionOutsideArchives,
+        allowCompressAction:
+            selectedInOneContainer && allSelectionOutsideArchives,
+        allowExportAction:
+            selectedInOneContainer && allSelectionOutsideArchives,
+        allowExtractAction: canExtractCurrentSelection,
+        allowPinBookmarkActions: allSelectionOutsideArchives,
+        hideVaultOnlyActionsOverride: hideVaultOnlyActionsForSelection,
+        isReadOnly: selectionMode ? _selectionHasReadOnlySource : _isReadOnly,
         searchActive: _searchActive,
         currentDirPath: _currentDirPath,
         currentFilter: _currentFilter,
         freeSpace: _freeSpace,
-        selectedTotalBytes: selectionMode ? selectedTotalBytes : 0,
-        hasPendingFolderSizes: selectionMode ? hasPendingFolderSizes : false,
+        selectedTotalBytes: selectionMode ? _allSelectedTotalBytes : 0,
+        hasPendingFolderSizes: selectionMode
+            ? _anySelectedFolderSizePending
+            : false,
         toolbarConfig: useFab
             ? _toolbarConfig.copyWith(hidden: FileManagerAction.values.toSet())
             : _toolbarConfig,
         actionBuilders: actionBuilders,
         isFolderMounted: _isFolderMounted,
-        isPinned: _isPinned,
-        isBookmark: _isBookmark,
-        isInsideArchive: _archiveContext != null,
+        isPinned: _isSelectedEntryPinned,
+        isBookmark: _isSelectedEntryBookmarked,
+        isInsideArchive: selectionMode
+            ? selectedForBar.any((item) => item.insideArchive)
+            : _archiveContext != null,
         onExitSelectionMode: exitSelectionMode,
         onSelectAll: () =>
             setSelectedItems({...selectedItems, ...filteredItems}),
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
-        onCopyToOtherTab: (_otherTab != null && _archiveContext == null)
-            ? () => _sendSelectionToOtherTab(cut: false)
-            : null,
-        onMoveToOtherTab:
-            (_otherTab != null && _archiveContext == null && !_isReadOnly)
-            ? () => _sendSelectionToOtherTab(cut: true)
-            : null,
+        onOpenInNewTab: _singleSelectedFolderForNewTab == null
+            ? null
+            : _openSelectedFolderInNewTab,
         onExport: _exportSelectedToStorage,
         onCompressSelected: _compressSelected,
         onExtractSelectedArchive: _extractSelectedArchive,
@@ -4403,166 +4955,143 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         isFiltered: isFiltered,
         onPaste: _isReadOnly ? null : _paste,
         onNavigateUp: _atRoot ? null : _navigateUp,
+        onBackAtRoot: _tabsCtrl != null && widget.tabKey != null
+            ? _handleBackAtRoot
+            : null,
         showBackButton: widget.showBackButton,
         wrapTitle: widget.wrapAppBarTitle,
         onOpenStorageSwitcher: widget.onOpenStorageSwitcher,
       );
     }
 
-    // Hidden tabs never block the system back; the visible tab closes itself
-    // (instead of popping the route) when it is at its root and other tabs
-    // are open.
+    // Hidden tabs never block system back. The active tab handles folder-up;
+    // at its root it returns to Dashboard when available and keeps the file
+    // tab open.
     final bool isActiveTab = _isActiveTab;
-    final bool closesTabAtRoot = isActiveTab && _hasMultipleTabs;
+    final bool atBrowserRoot =
+        _atRoot && !_selectionBarVisible && !_searchActive;
     final bool canPop =
-        !isActiveTab ||
-        (_atRoot && !isSelectionMode && !_searchActive && !closesTabAtRoot);
+        !isActiveTab || (atBrowserRoot && widget.tabKey == null);
     final systemOverlayStyle =
         Theme.of(context).appBarTheme.systemOverlayStyle ??
         (Theme.of(context).brightness == Brightness.dark
             ? AppSystemUI.transparentDark
             : SystemUiOverlayStyle.dark);
+    final Widget? browserBottomBar =
+        (!isLandscape && (showActionBar || showBookmarkBar))
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showBookmarkBar)
+                BookmarkBar(
+                  bookmarkPaths: _bookmarkPaths,
+                  axis: Axis.horizontal,
+                  onTapItem: (path) {
+                    final isDir =
+                        !path.split('/').last.contains('.') ||
+                        path.endsWith('/');
+                    _navigateToPath(path, isDir: isDir);
+                  },
+                  onRemoveBookmark: (path) => _pinsBookmarksNotifier
+                      .removeBookmark(widget.container, path),
+                ),
+              if (showActionBar)
+                FileManagerActionBar(
+                  axis: Axis.horizontal,
+                  actions: _toolbarConfig.visible,
+                  builders: actionBuilders,
+                ),
+            ],
+          )
+        : null;
+    final Widget? pinnedBrowserBottomBar = browserBottomBar == null
+        ? null
+        : _isActiveTab
+        ? _pinTabChrome(browserBottomBar)
+        : IgnorePointer(child: Opacity(opacity: 0, child: browserBottomBar));
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: systemOverlayStyle,
       child: Listener(
         onPointerDown: _handlePointerDown,
+        onPointerMove: _handlePointerMove,
         onPointerUp: _handlePointerUp,
         onPointerCancel: _handlePointerCancel,
         child: PopScope(
           canPop: canPop,
           onPopInvokedWithResult: (bool didPop, Object? result) {
             if (didPop || !_isActiveTab) return;
-            if (isSelectionMode) {
+            if (_selectionBarVisible) {
               exitSelectionMode();
             } else if (_searchActive) {
               setState(() => _clearSearch());
             } else if (!_atRoot) {
               _navigateUp();
-            } else if (_hasMultipleTabs && widget.tabKey != null) {
-              _tabsCtrl?.closeTab(widget.tabKey!);
+            } else if (_atRoot) {
+              _handleBackAtRoot();
             }
           },
           child: Scaffold(
             key: _scaffoldKey,
+            backgroundColor: widget.tabPagePosition == null
+                ? null
+                : Colors.transparent,
+            onDrawerChanged: widget.onDrawerChanged,
             resizeToAvoidBottomInset: false,
             drawerEnableOpenDragGesture: false,
             drawer: widget.drawer,
-            bottomNavigationBar:
-                (!isLandscape && (showActionBar || showBookmarkBar))
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (showBookmarkBar)
-                        BookmarkBar(
-                          bookmarkPaths: _bookmarkPaths,
-                          axis: Axis.horizontal,
-                          onTapItem: (path) {
-                            final isDir =
-                                !path.split('/').last.contains('.') ||
-                                path.endsWith('/');
-                            _navigateToPath(path, isDir: isDir);
-                          },
-                          onRemoveBookmark: (path) => _pinsBookmarksNotifier
-                              .removeBookmark(widget.container, path),
-                        ),
-                      if (!isLandscape && showActionBar)
-                        FileManagerActionBar(
-                          axis: Axis.horizontal,
-                          actions: _toolbarConfig.visible,
-                          builders: actionBuilders,
-                        ),
-                    ],
-                  )
-                : null,
+            bottomNavigationBar: pinnedBrowserBottomBar,
             body: Stack(
               children: [
                 SafeArea(
+                  key: _browserBodyKey,
                   bottom: false,
                   child: NotificationListener<ScrollNotification>(
                     onNotification: _handleScrollNotification,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      dragStartBehavior: DragStartBehavior.start,
-                      onHorizontalDragStart: widget.drawer == null
-                          ? null
-                          : (details) {
-                              final edgeInset = math.max(
-                                72.0,
-                                MediaQuery.systemGestureInsetsOf(context).left,
-                              );
-                              if (_isMultiTouch ||
-                                  _isTouchFromEdge ||
-                                  details.globalPosition.dx <= edgeInset ||
-                                  _backGestureProgress != null) {
-                                _isTouchFromEdge = true;
-                                _drawerDragDistance = 0.0;
-                                return;
-                              }
-                              _drawerDragDistance = 0.0;
-                            },
-                      onHorizontalDragUpdate: widget.drawer == null
-                          ? null
-                          : (details) {
-                              if (_isMultiTouch ||
-                                  _isTouchFromEdge ||
-                                  _backGestureProgress != null ||
-                                  widget.drawer == null) {
-                                _drawerDragDistance = 0.0;
-                                return;
-                              }
-                              _drawerDragDistance +=
-                                  details.primaryDelta ?? 0.0;
-                              if (_drawerDragDistance > 60.0) {
-                                _scaffoldKey.currentState?.openDrawer();
-                                _drawerDragDistance = 0.0;
-                                _isTouchFromEdge = true;
-                              }
-                            },
-                      onHorizontalDragEnd: widget.drawer == null
-                          ? null
-                          : (_) {
-                              _drawerDragDistance = 0.0;
-                            },
-                      onHorizontalDragCancel: widget.drawer == null
-                          ? null
-                          : () {
-                              _drawerDragDistance = 0.0;
-                            },
                       child: Stack(
                         children: [
                           Column(
                             children: [
-                              ClipRect(
-                                key: const Key('browser_app_bar_clip_rect'),
-                                child: AnimatedBuilder(
-                                  animation: _appBarAnimController,
-                                  builder: (context, _) {
-                                    // Follow current status: if it was hidden, stay hidden
-                                    final factor =
-                                        (!_toolbarConfig.autoHideAppBar ||
-                                            _searchActive)
-                                        ? 1.0
-                                        : _appBarAnimController.value;
-                                    if (factor == 0.0) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return Align(
-                                      key: const Key('browser_app_bar_align'),
-                                      alignment: Alignment.bottomCenter,
-                                      heightFactor: factor,
-                                      child: SizedBox(
-                                        height: kToolbarHeight,
-                                        child: MediaQuery.removePadding(
-                                          context: context,
-                                          removeTop: true,
-                                          child: buildAppBar(
-                                            selectionMode: false,
+                              _pinTabChrome(
+                                ClipRect(
+                                  key: const Key('browser_app_bar_clip_rect'),
+                                  child: AnimatedBuilder(
+                                    animation: _appBarAnimController,
+                                    builder: (context, _) {
+                                      // Follow current status: if it was hidden,
+                                      // stay hidden on every tab.
+                                      final factor =
+                                          (!_toolbarConfig.autoHideAppBar ||
+                                              _searchActive)
+                                          ? 1.0
+                                          : _appBarAnimController.value;
+                                      if (factor == 0.0) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      if (!_isActiveTab) {
+                                        return SizedBox(
+                                          height: kToolbarHeight * factor,
+                                        );
+                                      }
+                                      return Align(
+                                        key: const Key('browser_app_bar_align'),
+                                        alignment: Alignment.bottomCenter,
+                                        heightFactor: factor,
+                                        child: SizedBox(
+                                          height: kToolbarHeight,
+                                          child: MediaQuery.removePadding(
+                                            context: context,
+                                            removeTop: true,
+                                            child: buildAppBar(
+                                              selectionMode: false,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                               Expanded(
@@ -4596,19 +5125,47 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                                         Expanded(
                                           child: Column(
                                             children: [
+                                              if (widget.tabStrip != null)
+                                                _isActiveTab
+                                                    ? SizedBox(
+                                                        height:
+                                                            kBrowserTabStripHeight,
+                                                        child: _pinTabChrome(
+                                                          widget.tabStrip!,
+                                                        ),
+                                                      )
+                                                    : const SizedBox(
+                                                        height:
+                                                            kBrowserTabStripHeight,
+                                                      ),
                                               if (_toolbarConfig
                                                   .showBreadcrumbBar) ...[
-                                                BreadcrumbBar(
-                                                  stack: _pathStack,
-                                                  onTap: _jumpTo,
-                                                ),
+                                                _isActiveTab
+                                                    ? _pinTabChrome(
+                                                        BreadcrumbBar(
+                                                          stack: _pathStack,
+                                                          onTap: _jumpTo,
+                                                        ),
+                                                      )
+                                                    : const SizedBox(
+                                                        height: 40,
+                                                      ),
                                               ],
                                               if (!widget
                                                       .container
                                                       .isLocalStorage &&
                                                   _archiveContext == null)
-                                                const SyncStatusBanner(),
-                                             
+                                                _pinTabChrome(
+                                                  Visibility(
+                                                    visible: _isActiveTab,
+                                                    maintainSize: true,
+                                                    maintainAnimation: true,
+                                                    maintainState: true,
+                                                    child:
+                                                        const SyncStatusBanner(),
+                                                  ),
+                                                ),
+
                                               Expanded(
                                                 child: Stack(
                                                   children: [
@@ -4996,14 +5553,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                             ..._buildFabToolbar(
                               bottomOffset:
                                   baseBottomOffset +
-                                  ((isSelectionMode &&
+                                  ((_selectionBarVisible &&
                                           _toolbarConfig.bottomSelectionBar)
                                       ? kToolbarHeight
                                       : 0.0),
                             ),
 
                           // ── Clipboard Paste FAB ────────────────────────────────────────────────
-                          if (!isSelectionMode && !_searchActive)
+                          if (!_selectionBarVisible && !_searchActive)
                             Positioned(
                               right: 16.0 + MediaQuery.paddingOf(context).right,
                               bottom: useFab
@@ -5025,57 +5582,68 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.short2,
-                    layoutBuilder: (currentChild, previousChildren) => Stack(
-                      alignment: Alignment.topCenter,
-                      children: [
-                        ...previousChildren,
-                        if (currentChild != null) currentChild,
-                      ],
-                    ),
-                    transitionBuilder: (child, animation) {
-                      return SlideTransition(
-                        position:
-                            Tween<Offset>(
-                              begin: const Offset(0.0, -1.0),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
-                                reverseCurve: Curves.easeInCubic,
-                              ),
-                            ),
-                        child: FadeTransition(opacity: animation, child: child),
-                      );
-                    },
-                    child:
-                        (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
-                        ? Material(
-                            key: const ValueKey(
-                              'browser_selection_app_bar_overlay',
-                            ),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainer,
-                            elevation: 0.0,
-                            child: SafeArea(
-                              bottom: false,
-                              child: SizedBox(
-                                height: kToolbarHeight,
-                                child: MediaQuery.removePadding(
-                                  context: context,
-                                  removeTop: true,
-                                  child: buildAppBar(selectionMode: true),
+                  child: _isActiveTab
+                      ? _pinTabChrome(
+                          AnimatedSwitcher(
+                            duration: AppMotion.short2,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  alignment: Alignment.topCenter,
+                                  children: [
+                                    ...previousChildren,
+                                    if (currentChild != null) currentChild,
+                                  ],
                                 ),
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(
-                            key: ValueKey('no_selection_top_bar'),
+                            transitionBuilder: (child, animation) {
+                              return SlideTransition(
+                                position:
+                                    Tween<Offset>(
+                                      begin: const Offset(0.0, -1.0),
+                                      end: Offset.zero,
+                                    ).animate(
+                                      CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeOutCubic,
+                                        reverseCurve: Curves.easeInCubic,
+                                      ),
+                                    ),
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child:
+                                (_selectionBarVisible &&
+                                    !_toolbarConfig.bottomSelectionBar)
+                                ? Material(
+                                    key: const ValueKey(
+                                      'browser_selection_app_bar_overlay',
+                                    ),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainer,
+                                    elevation: 0.0,
+                                    child: SafeArea(
+                                      bottom: false,
+                                      child: SizedBox(
+                                        height: kToolbarHeight,
+                                        child: MediaQuery.removePadding(
+                                          context: context,
+                                          removeTop: true,
+                                          child: buildAppBar(
+                                            selectionMode: true,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('no_selection_top_bar'),
+                                  ),
                           ),
-                  ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
 
                 // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
@@ -5093,61 +5661,73 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                   bottom: MediaQuery.of(context).viewInsets.bottom,
                   left: 0,
                   right: 0,
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.short2,
-                    layoutBuilder: (currentChild, previousChildren) => Stack(
-                      alignment: Alignment.bottomCenter,
-                      children: [
-                        ...previousChildren,
-                        if (currentChild != null) currentChild,
-                      ],
-                    ),
-                    transitionBuilder: (child, animation) {
-                      return SlideTransition(
-                        position:
-                            Tween<Offset>(
-                              begin: const Offset(0.0, 1.0),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
-                                reverseCurve: Curves.easeInCubic,
-                              ),
-                            ),
-                        child: FadeTransition(opacity: animation, child: child),
-                      );
-                    },
-                    child:
-                        (isSelectionMode && _toolbarConfig.bottomSelectionBar)
-                        ? Material(
-                            key: const ValueKey(
-                              'browser_selection_bottom_bar_overlay',
-                            ),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainer,
-                            elevation: 4.0,
-                            child: SafeArea(
-                              top: false,
-                              bottom:
-                                  !(!isLandscape &&
-                                      (showActionBar || showBookmarkBar)),
-                              child: SizedBox(
-                                height: kToolbarHeight,
-                                child: MediaQuery.removePadding(
-                                  context: context,
-                                  removeTop: true,
-                                  removeBottom: true,
-                                  child: buildAppBar(selectionMode: true),
+                  child: _isActiveTab
+                      ? _pinTabChrome(
+                          AnimatedSwitcher(
+                            duration: AppMotion.short2,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  alignment: Alignment.bottomCenter,
+                                  children: [
+                                    ...previousChildren,
+                                    if (currentChild != null) currentChild,
+                                  ],
                                 ),
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(
-                            key: ValueKey('no_selection_bottom_bar'),
+                            transitionBuilder: (child, animation) {
+                              return SlideTransition(
+                                position:
+                                    Tween<Offset>(
+                                      begin: const Offset(0.0, 1.0),
+                                      end: Offset.zero,
+                                    ).animate(
+                                      CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeOutCubic,
+                                        reverseCurve: Curves.easeInCubic,
+                                      ),
+                                    ),
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child:
+                                (_selectionBarVisible &&
+                                    _toolbarConfig.bottomSelectionBar)
+                                ? Material(
+                                    key: const ValueKey(
+                                      'browser_selection_bottom_bar_overlay',
+                                    ),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainer,
+                                    elevation: 4.0,
+                                    child: SafeArea(
+                                      top: false,
+                                      bottom:
+                                          !(!isLandscape &&
+                                              (showActionBar ||
+                                                  showBookmarkBar)),
+                                      child: SizedBox(
+                                        height: kToolbarHeight,
+                                        child: MediaQuery.removePadding(
+                                          context: context,
+                                          removeTop: true,
+                                          removeBottom: true,
+                                          child: buildAppBar(
+                                            selectionMode: true,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('no_selection_bottom_bar'),
+                                  ),
                           ),
-                  ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),

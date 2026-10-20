@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} komprimiert immer mit {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 und LZMA sind in 7-Zip-Archiven verfügbar.",
   "archiveMethodStoreNote": "Speichern komprimiert nicht, daher gibt es keine Methode zur Auswahl.",
+  "browserTabsEnabledTitle": "Dateimanager-Tabs verwenden",
+  "browserTabsEnabledSubtitle": "Mehrere Speicherorte geöffnet lassen und zwischen ihnen wechseln.",
   "browserTabNew": "Neuer Tab",
   "browserTabClose": "Tab schließen",
   "browserTabCloseOthers": "Andere Tabs schließen",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "Zum vorherigen Tab wechseln",
   "browserTabOpenInNewTab": "In neuem Tab öffnen",
   "browserTabLimitReached": "Tab-Limit erreicht ({max})",
-  "browserTabCopyToOtherTab": "In anderen Tab kopieren",
-  "browserTabMoveToOtherTab": "In anderen Tab verschieben"
+  "browserTabCloseAll": "Alle schließen"
 }

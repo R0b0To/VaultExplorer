@@ -17,12 +17,17 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
+  final bool allowRenameAction;
   final VoidCallback onCopy;
   final VoidCallback onCut;
-  final VoidCallback? onCopyToOtherTab;
-  final VoidCallback? onMoveToOtherTab;
+
+  /// Set only for a single selected folder while the file manager is in tabs.
+  final VoidCallback? onOpenInNewTab;
   final VoidCallback onExport;
+  final bool allowExportAction;
+  final bool allowExtractAction;
   final VoidCallback onCompressSelection;
+  final bool allowCompressAction;
   final VoidCallback onExtractSelectedArchive;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
@@ -65,12 +70,15 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
+    this.allowRenameAction = true,
     required this.onCopy,
     required this.onCut,
-    this.onCopyToOtherTab,
-    this.onMoveToOtherTab,
+    this.onOpenInNewTab,
     required this.onExport,
+    this.allowExportAction = true,
+    this.allowExtractAction = true,
     required this.onCompressSelection,
+    this.allowCompressAction = true,
     required this.onExtractSelectedArchive,
     required this.onDelete,
     required this.onOpenWithApp,
@@ -106,7 +114,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final bool showExtractButton = singleArchiveSelected || isInsideArchive;
+    final bool showExtractButton =
+        allowExtractAction && (singleArchiveSelected || isInsideArchive);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -135,7 +144,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
 
         final bool showCopy = !isInsideArchive && availableSlots >= 1;
         final bool showCut = !isInsideArchive && availableSlots >= 2;
-        final bool showRename = !isInsideArchive && availableSlots >= 3;
+        final bool showRename =
+            !isInsideArchive && allowRenameAction && availableSlots >= 3;
 
           return AppBar(
           backgroundColor: cs.surfaceContainer,
@@ -258,6 +268,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
               icon: const Icon(Icons.more_vert_rounded),
               tooltip: context.l10n.moreOptionsTooltip,
               onSelected: (value) {
+                if (value == 'open_in_new_tab') onOpenInNewTab?.call();
                 if (value == 'open_with_app') onOpenWithApp();
                 if (value == 'edit_image') onEditImage();
                 if (value == 'edit_video') onEditVideo();
@@ -265,8 +276,6 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'rename') onRename();
                 if (value == 'copy') onCopy();
                 if (value == 'cut') onCut();
-                if (value == 'copy_other_tab') onCopyToOtherTab?.call();
-                if (value == 'cut_other_tab') onMoveToOtherTab?.call();
                 if (value == 'compress') onCompressSelection();
                 if (value == 'export') onExport();
                 if (value == 'encrypt') onEncrypt();
@@ -281,6 +290,17 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
               },
               itemBuilder: (context) => [
                 // 1. Consumption
+                if (onOpenInNewTab != null)
+                  PopupMenuItem<String>(
+                    value: 'open_in_new_tab',
+                    child: Row(
+                      children: [
+                        Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.browserTabOpenInNewTab),
+                      ],
+                    ),
+                  ),
                 if (singleFileSelected)
                   PopupMenuItem<String>(
                     value: 'open_with_app',
@@ -342,7 +362,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
 
                 // 2. Core File Operations (if overflowed)
-                if (!isInsideArchive && !showRename)
+                if (!isInsideArchive && allowRenameAction && !showRename)
                   PopupMenuItem<String>(
                     value: 'rename',
                     enabled: !readOnly,
@@ -385,30 +405,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (!isInsideArchive && onCopyToOtherTab != null)
-                  PopupMenuItem<String>(
-                    value: 'copy_other_tab',
-                    child: Row(
-                      children: [
-                        Icon(Icons.copy_all_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                        const SizedBox(width: 12),
-                        Text(context.l10n.browserTabCopyToOtherTab),
-                      ],
-                    ),
-                  ),
-                if (!isInsideArchive && onMoveToOtherTab != null)
-                  PopupMenuItem<String>(
-                    value: 'cut_other_tab',
-                    enabled: !readOnly,
-                    child: Row(
-                      children: [
-                        Icon(Icons.drive_file_move_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                        const SizedBox(width: 12),
-                        Text(context.l10n.browserTabMoveToOtherTab),
-                      ],
-                    ),
-                  ),
-                if (!isInsideArchive)
+                if (!isInsideArchive && allowCompressAction)
                   PopupMenuItem<String>(
                     value: 'compress',
                     enabled: !readOnly,
@@ -426,7 +423,9 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
 
                 // 3. Vault & Integrations
-                if (!hideVaultOnlyActions && !isInsideArchive)
+                if (allowExportAction &&
+                    !hideVaultOnlyActions &&
+                    !isInsideArchive)
                   PopupMenuItem<String>(
                     value: 'export',
                     child: Row(

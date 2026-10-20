@@ -4,51 +4,56 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 
 /// Where a new tab should open: a container and, optionally, a directory in
 /// it (null = the container root).
-typedef BrowserNewTabChoice = ({MountedContainer container, String? path});
+typedef BrowserNewTabChoice = ({MountedContainer? container, String? path});
 
 /// Bottom sheet listing every place a new tab can open: a copy of the current
 /// location, each unlocked vault, this device's storage and any added
 /// external storage. Returns the picked [BrowserNewTabChoice] (or null when
 /// dismissed).
 class BrowserNewTabSheet extends ConsumerWidget {
-  final MountedContainer currentContainer;
+  final MountedContainer? currentContainer;
   final String currentDirPath;
   final List<MountedContainer> mountedVaults;
   final MountedContainer? primaryLocalContainer;
+  final bool allowDashboard;
 
   const BrowserNewTabSheet({
     super.key,
-    required this.currentContainer,
+    this.currentContainer,
     required this.currentDirPath,
     required this.mountedVaults,
     required this.primaryLocalContainer,
+    this.allowDashboard = true,
   });
 
   static Future<BrowserNewTabChoice?> show(
     BuildContext context, {
-    required MountedContainer currentContainer,
+    MountedContainer? currentContainer,
     required String currentDirPath,
     required List<MountedContainer> mountedVaults,
     required MountedContainer? primaryLocalContainer,
+    bool allowDashboard = true,
   }) {
     return showModalBottomSheet<BrowserNewTabChoice>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
       ),
       builder: (_) => BrowserNewTabSheet(
         currentContainer: currentContainer,
         currentDirPath: currentDirPath,
         mountedVaults: mountedVaults,
         primaryLocalContainer: primaryLocalContainer,
+        allowDashboard: allowDashboard,
       ),
     );
   }
@@ -64,9 +69,18 @@ class BrowserNewTabSheet extends ConsumerWidget {
       Navigator.pop<BrowserNewTabChoice>(context, (container: c, path: path));
     }
 
-    final duplicateSubtitle = currentDirPath.isEmpty
-        ? currentContainer.displayName
-        : '${currentContainer.displayName} / $currentDirPath';
+    void pickDashboard() {
+      Navigator.pop<BrowserNewTabChoice>(context, (
+        container: null,
+        path: null,
+      ));
+    }
+
+    final duplicateSubtitle = currentContainer == null
+        ? null
+        : currentDirPath.isEmpty
+        ? currentContainer!.displayName
+        : '${currentContainer!.displayName} / $currentDirPath';
 
     return SafeArea(
       child: ConstrainedBox(
@@ -87,21 +101,31 @@ class BrowserNewTabSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            ListTile(
-              leading: BrowserLocationIcon(
-                container: currentContainer,
-                color: cs.primary,
-                size: 24,
+            if (allowDashboard)
+              ListTile(
+                leading: Icon(Icons.dashboard_rounded, color: cs.primary),
+                title: Text(context.l10n.dashboardNavLabel),
+                onTap: pickDashboard,
               ),
-              title: Text(context.l10n.browserTabDuplicate),
-              subtitle: Text(
-                duplicateSubtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            if (allowDashboard && currentContainer != null)
+              const Divider(height: 16),
+            if (currentContainer != null) ...[
+              ListTile(
+                leading: BrowserLocationIcon(
+                  container: currentContainer!,
+                  color: cs.primary,
+                  size: 24,
+                ),
+                title: Text(context.l10n.browserTabDuplicate),
+                subtitle: Text(
+                  duplicateSubtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => pick(currentContainer!, currentDirPath),
               ),
-              onTap: () => pick(currentContainer, currentDirPath),
-            ),
-            const Divider(height: 16),
+              const Divider(height: 16),
+            ],
             for (final vault in mountedVaults)
               ListTile(
                 leading: BrowserLocationIcon(

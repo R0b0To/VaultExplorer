@@ -3372,6 +3372,8 @@
   "archiveMethodFixedInfo": "{format} يضغط دائمًا باستخدام {method}.",
   "archiveMethodMoreInSevenZip": "LZMA2 وLZMA متاحان في أرشيفات 7-Zip.",
   "archiveMethodStoreNote": "وضع التخزين لا يضغط، لذا لا توجد طريقة للاختيار.",
+  "browserTabsEnabledTitle": "استخدام علامات تبويب مدير الملفات",
+  "browserTabsEnabledSubtitle": "أبقِ مواقع متعددة مفتوحة وانتقل بينها.",
   "browserTabNew": "علامة تبويب جديدة",
   "browserTabClose": "إغلاق علامة التبويب",
   "browserTabCloseOthers": "إغلاق علامات التبويب الأخرى",
@@ -3379,6 +3381,5 @@
   "browserTabSwitchPrevious": "التبديل إلى علامة التبويب السابقة",
   "browserTabOpenInNewTab": "فتح في علامة تبويب جديدة",
   "browserTabLimitReached": "تم بلوغ حد علامات التبويب ({max})",
-  "browserTabCopyToOtherTab": "نسخ إلى علامة التبويب الأخرى",
-  "browserTabMoveToOtherTab": "نقل إلى علامة التبويب الأخرى"
+  "browserTabCloseAll": "إغلاق الكل"
 }

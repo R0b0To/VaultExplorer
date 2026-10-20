@@ -27,12 +27,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
+  final bool allowRenameAction;
   final VoidCallback onCopy;
   final VoidCallback onCut;
-  final VoidCallback? onCopyToOtherTab;
-  final VoidCallback? onMoveToOtherTab;
+
+  /// Set only for a single selected folder while the file manager is in tabs.
+  final VoidCallback? onOpenInNewTab;
   final VoidCallback onExport;
+  final bool allowExportAction;
+  final bool allowExtractAction;
   final VoidCallback onCompressSelection;
+  final bool allowCompressAction;
   final VoidCallback onExtractSelectedArchive;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
@@ -77,12 +82,15 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
+    this.allowRenameAction = true,
     required this.onCopy,
     required this.onCut,
-    this.onCopyToOtherTab,
-    this.onMoveToOtherTab,
+    this.onOpenInNewTab,
     required this.onExport,
+    this.allowExportAction = true,
+    this.allowExtractAction = true,
     required this.onCompressSelection,
+    this.allowCompressAction = true,
     required this.onExtractSelectedArchive,
     required this.onDelete,
     required this.onOpenWithApp,
@@ -111,7 +119,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final bool showExtractButton = singleArchiveSelected || isInsideArchive;
+    final bool showExtractButton =
+        allowExtractAction && (singleArchiveSelected || isInsideArchive);
 
     return AppBar(
       leading: IconButton(
@@ -175,7 +184,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
             onPressed: onCut,
           ),
-        if (!isInsideArchive)
+        if (!isInsideArchive && allowRenameAction)
           IconButton(
             icon: Icon(
               Icons.drive_file_rename_outline_rounded,
@@ -199,6 +208,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
           onSelected: (value) {
             if (value == 'select_all') onSelectAll();
             if (value == 'share') onShare();
+            if (value == 'open_in_new_tab') onOpenInNewTab?.call();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'edit_image') onEditImage();
             if (value == 'edit_video') onEditVideo();
@@ -214,10 +224,19 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'bookmark') onBookmark();
             if (value == 'unbookmark') onUnbookmark();
             if (value == 'file_info') onFileInfo?.call();
-            if (value == 'copy_other_tab') onCopyToOtherTab?.call();
-            if (value == 'cut_other_tab') onMoveToOtherTab?.call();
           },
           itemBuilder: (context) => [
+            if (onOpenInNewTab != null)
+              PopupMenuItem<String>(
+                value: 'open_in_new_tab',
+                child: Row(
+                  children: [
+                    Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.browserTabOpenInNewTab),
+                  ],
+                ),
+              ),
             // 1. Selection Utility
             PopupMenuItem<String>(
               value: 'select_all',
@@ -226,30 +245,6 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   Icon(Icons.select_all_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                   const SizedBox(width: 12),
                   Text(context.l10n.selectAllAction),
-                ],
-              ),
-            ),
-
-            if (!isInsideArchive && onCopyToOtherTab != null)
-            PopupMenuItem<String>(
-              value: 'copy_other_tab',
-              child: Row(
-                children: [
-                  Icon(Icons.copy_all_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                  const SizedBox(width: 12),
-                  Text(context.l10n.browserTabCopyToOtherTab),
-                ],
-              ),
-            ),
-            if (!isInsideArchive && onMoveToOtherTab != null)
-            PopupMenuItem<String>(
-              value: 'cut_other_tab',
-              enabled: !readOnly,
-              child: Row(
-                children: [
-                  Icon(Icons.drive_file_move_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                  const SizedBox(width: 12),
-                  Text(context.l10n.browserTabMoveToOtherTab),
                 ],
               ),
             ),
@@ -316,7 +311,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
               ),
 
             // 3. Core Archive Operations
-            if (!isInsideArchive)
+            if (!isInsideArchive && allowCompressAction)
               PopupMenuItem<String>(
                 value: 'compress',
                 enabled: !readOnly,
@@ -334,7 +329,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
               ),
 
             // 4. Vault & System Integrations
-            if (!hideVaultOnlyActions && !isInsideArchive)
+            if (allowExportAction &&
+                !hideVaultOnlyActions &&
+                !isInsideArchive)
               PopupMenuItem<String>(
                 value: 'export',
                 child: Row(

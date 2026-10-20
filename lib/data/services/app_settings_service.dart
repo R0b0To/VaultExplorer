@@ -153,6 +153,7 @@ class AppSettings {
   bool useDynamicColor;
   bool useOledBlackTheme;
   BrowserLayoutMode defaultLayoutMode;
+  bool useBrowserTabs;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
@@ -199,6 +200,7 @@ class AppSettings {
     this.appLockAfterMins = 0,
     this.appLockScreenLockOnly = false,
     this.defaultLayoutMode = BrowserLayoutMode.list,
+    this.useBrowserTabs = true,
     this.containerSortMode = ContainerSortMode.manual,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
@@ -287,6 +289,7 @@ class AppSettings {
     bool? useDynamicColor,
     bool? useOledBlackTheme,
     BrowserLayoutMode? defaultLayoutMode,
+    bool? useBrowserTabs,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
@@ -341,6 +344,7 @@ class AppSettings {
       appLockScreenLockOnly:
           appLockScreenLockOnly ?? this.appLockScreenLockOnly,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
+      useBrowserTabs: useBrowserTabs ?? this.useBrowserTabs,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
@@ -430,6 +434,7 @@ class AppSettings {
     'appLockAfterMins': appLockAfterMins,
     'appLockScreenLockOnly': appLockScreenLockOnly,
     'extensionPreferences': extensionPreferences,
+    'useBrowserTabs': useBrowserTabs,
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'languageCode': languageCode,
@@ -496,6 +501,7 @@ class AppSettings {
     appLockAfterMins: other.appLockAfterMins,
     appLockScreenLockOnly: other.appLockScreenLockOnly,
     extensionPreferences: other.extensionPreferences,
+    useBrowserTabs: other.useBrowserTabs,
     autoOpenOnUnlock: other.autoOpenOnUnlock,
     htmlEnableJavaScript: other.htmlEnableJavaScript,
     // copyWith can't set a null language through `languageCode` alone.
@@ -581,6 +587,7 @@ class AppSettings {
     defaultLayoutMode:
         BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
         BrowserLayoutMode.list,
+    useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

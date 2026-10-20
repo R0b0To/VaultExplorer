@@ -132,6 +132,8 @@ typedef BrowserTabsHost = BrowserTabsShell;
 
 class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     with SingleTickerProviderStateMixin {
+  static const double _newTabSwipeThreshold = 72;
+
   late final BrowserTabsConfig _workspace;
   late final ProviderSubscription<BrowserTabsState> _workspaceSubscription;
   late final VaultEngineEvents _vaultEvents;
@@ -150,6 +152,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _drawerOpenOrDragging = false;
   bool _edgeDrawerGestureActive = false;
   bool _restoreAppBarScheduled = false;
+  bool _newTabPromptScheduled = false;
+  bool _lastTabSwipeEligible = false;
+  double _lastTabNextOverscroll = 0;
   TabId? _lastActiveTabId;
 
   BrowserTabsState get _workspaceState =>
@@ -315,7 +320,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     required bool enabled,
     required bool active,
   }) {
-    if (notification.metrics.axis != Axis.vertical || !active) return false;
+    if (notification.metrics.axis == Axis.horizontal) {
+      _handleNewTabSwipe(notification);
+      return false;
+    }
+    if (!active) return false;
 
     if (!enabled) {
       if (_appBarVisibilityController.value != 1.0) {
@@ -367,6 +376,69 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       }
     }
     return false;
+  }
+
+  void _handleNewTabSwipe(ScrollNotification notification) {
+    if (_newTabPromptScheduled) return;
+
+    if (notification is ScrollStartNotification) {
+      final state = _workspaceState;
+      final tabsEnabled = ref
+          .read(appSettingsControllerProvider)
+          .settings
+          .useBrowserTabs;
+      _lastTabSwipeEligible =
+          notification.dragDetails != null &&
+          tabsEnabled &&
+          state.activeIndex >= 0 &&
+          state.activeIndex == state.tabs.length - 1;
+      _lastTabNextOverscroll = 0;
+      return;
+    }
+    if (!_lastTabSwipeEligible) {
+      if (notification is ScrollEndNotification) {
+        _lastTabNextOverscroll = 0;
+        _lastTabSwipeEligible = false;
+      }
+      return;
+    }
+
+    if (notification is OverscrollNotification &&
+        notification.metrics.extentAfter <= 0 &&
+        notification.overscroll > 0) {
+      // At the final page, a positive horizontal overscroll means the user
+      // tried to move forward to a tab that does not exist yet.
+      _lastTabNextOverscroll += notification.overscroll;
+    } else if (notification is ScrollUpdateNotification &&
+        notification.metrics.extentAfter <= 0 &&
+        (notification.scrollDelta ?? 0) > 0) {
+      // Bouncing scroll physics reports the out-of-range movement as updates
+      // rather than OverscrollNotifications.
+      _lastTabNextOverscroll += notification.scrollDelta!;
+    } else if (notification is ScrollEndNotification) {
+      final shouldPrompt =
+          _lastTabNextOverscroll >= _newTabSwipeThreshold &&
+          !_drawerOpenOrDragging &&
+          !_edgeDrawerGestureActive;
+      _lastTabNextOverscroll = 0;
+      _lastTabSwipeEligible = false;
+      if (shouldPrompt && !_newTabPromptScheduled) {
+        _newTabPromptScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            _newTabPromptScheduled = false;
+            return;
+          }
+          unawaited(
+            _openNewTabSheet().whenComplete(() {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _newTabPromptScheduled = false;
+              });
+            }),
+          );
+        });
+      }
+    }
   }
 
   ValueChanged<PreferredSizeWidget> _appBarCallbackFor(TabId tabId) =>
@@ -586,11 +658,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                   controller: _pageController,
                   clipBehavior: Clip.hardEdge,
                   physics:
-                      hasMultipleTabs &&
-                          tabsEnabled &&
+                      tabsEnabled &&
                           !_drawerOpenOrDragging &&
                           !_edgeDrawerGestureActive
-                      ? const PageScrollPhysics()
+                      ? const PageScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics(),
+                        )
                       : const NeverScrollableScrollPhysics(),
                   itemCount: tabs.length,
                   onPageChanged: _onPageChanged,

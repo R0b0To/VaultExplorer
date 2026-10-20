@@ -164,7 +164,6 @@ class DirectoryContentView extends ConsumerStatefulWidget {
   final bool showBackButton;
   final Widget Function(Widget title)? wrapAppBarTitle;
   final VoidCallback? onOpenStorageSwitcher;
-  final Widget? dashboardBackPreview;
 
   /// Session identity supplied by the workspace. Standalone screens allocate
   /// an independent identity rather than borrowing the container's slot.
@@ -190,7 +189,6 @@ class DirectoryContentView extends ConsumerStatefulWidget {
     this.showBackButton = true,
     this.wrapAppBarTitle,
     this.onOpenStorageSwitcher,
-    this.dashboardBackPreview,
     this.tabId,
     this.workspaceConfig,
     this.initialPath,
@@ -211,8 +209,6 @@ class DirectoryContentView extends ConsumerStatefulWidget {
 /// and owns the surrounding Scaffold and app bar.
 class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     with WidgetsBindingObserver {
-  bool _dashboardBackGestureActive = false;
-  double? _dashboardBackGestureProgress;
   // ── Navigation (FileBrowserNavigation controller) ────────────────────────
   // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
   // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
@@ -258,18 +254,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final active = next.activeTabId == _tabId;
     final multi = next.hasMultiple;
     final becameActive = active && !_wasActiveTab;
-    final becameInactive = !active && _wasActiveTab;
     final flipped = active != _wasActiveTab || multi != _wasMultiTab;
     _wasActiveTab = active;
     _wasMultiTab = multi;
 
     // PopScope.canPop depends on both flags, so rebuild when they flip.
     if (flipped) setState(() {});
-
-    if (becameInactive) {
-      _dashboardBackGestureActive = false;
-      _dashboardBackGestureProgress = null;
-    }
 
     final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
     if (becameActive && nav.needsRefresh && nav.pathStack.isNotEmpty) {
@@ -1599,35 +1589,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   bool _handleBackAtRoot() {
-    // Only a location opened from Dashboard returns there at its root. Other
-    // tabs stay at their root until the user selects another tab or location.
-    final tabId = _tabId;
-    if (tabId == null) return false;
-    return widget.workspaceConfig == null
-        ? false
-        : _workspaceNotifier.returnToDashboardAtRoot(tabId);
-  }
-
-  void _setDashboardBackGestureProgress(double? progress) {
-    final next = progress?.clamp(0.0, 1.0).toDouble();
-    if (_dashboardBackGestureProgress == next) return;
-    if (!mounted) {
-      _dashboardBackGestureProgress = next;
-      return;
-    }
-    setState(() => _dashboardBackGestureProgress = next);
+    // A browser tab owns its location, including its root. Back at the root
+    // must not switch the user to another tab implicitly.
+    return false;
   }
 
   bool get _canPreviewFolderBackGesture =>
       !_atRoot && !isSelectionMode && !_searchActive;
-
-  bool get _canPreviewDashboardBackGesture {
-    final tabId = _tabId;
-    if (tabId == null || !_atRoot || isSelectionMode || _searchActive) {
-      return false;
-    }
-    return _workspaceTabs.any((tab) => tab.isDashboard);
-  }
 
   /// Whether this screen should answer predictive-back events: its route is
   /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a
@@ -1640,11 +1608,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent) return false;
-    if (_canPreviewDashboardBackGesture) {
-      _dashboardBackGestureActive = true;
-      _setDashboardBackGestureProgress(backEvent.progress);
-      return true;
-    }
     if (!_canPreviewFolderBackGesture) return false;
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]
@@ -1664,35 +1627,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return;
-    if (_dashboardBackGestureActive) {
-      _setDashboardBackGestureProgress(backEvent.progress);
-      return;
-    }
     _navNotifier.updateBackGestureProgress(backEvent.progress);
   }
 
   @override
   void handleCancelBackGesture() {
     if (!_isOwnRouteCurrent) return;
-    if (_dashboardBackGestureActive) {
-      _dashboardBackGestureActive = false;
-      _setDashboardBackGestureProgress(null);
-      return;
-    }
     _navNotifier.cancelBackGesture();
   }
 
   @override
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
-    if (_dashboardBackGestureActive) {
-      _dashboardBackGestureActive = false;
-      _setDashboardBackGestureProgress(1.0);
-      if (!_handleBackAtRoot()) {
-        _setDashboardBackGestureProgress(null);
-      }
-      return;
-    }
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
     _navigateUp();
@@ -1812,9 +1758,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   int get _selectedBrowserEntryCount => _selectedBrowserEntries.length;
-
-  bool get _selectionBarVisible =>
-      _isActiveTab && _selectedBrowserEntryCount > 0;
 
   bool get _selectionHasReadOnlySource =>
       _selectedBrowserEntries.any((item) => item.container.readOnly);
@@ -4575,6 +4518,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         : localSelectionIsNonEmpty
         ? ref.read(aggregatedTabsSelectionProvider(workspace))
         : null;
+    final selectionBarVisible =
+        _isActiveTab &&
+        (aggregateSelection?.hasSelection ?? _selectedBrowserEntryCount > 0);
     final selectedForBarSet = {for (final item in selectedForBar) item.entry};
     final selectedVolIds = selectedForBar
         .map((item) => item.container.volId)
@@ -4609,7 +4555,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
     final bool hasClipboardFab =
-        !_selectionBarVisible &&
+        !selectionBarVisible &&
         !_searchActive &&
         ref.watch(crossContainerClipboardProvider).hasItems;
     final bool hasFabToolbar = useFab && !_searchActive;
@@ -4625,7 +4571,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final double bannerBottomOffset = _searchActive
         ? 0.0
         : (baseBottomOffset +
-              ((_selectionBarVisible && _toolbarConfig.bottomSelectionBar)
+              ((selectionBarVisible && _toolbarConfig.bottomSelectionBar)
                   ? kToolbarHeight
                   : 0.0) +
               fabClearance);
@@ -4741,19 +4687,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           return;
         }
         widget.onSelectionAppBarChanged!(
-          selectedForBar.isEmpty ? null : buildAppBar(selectionMode: true),
+          selectedForBar.isEmpty || _toolbarConfig.bottomSelectionBar
+              ? null
+              : buildAppBar(selectionMode: true),
         );
       });
     }
 
-    // Hidden tabs never block system back. The active tab handles folder-up;
-    // at its root it returns to Dashboard when available and keeps the file
-    // tab open.
+    // Hidden tabs never block system back. Active tabs handle folder-up; at
+    // the root, a workspace tab remains on its current storage location.
     final bool isActiveTab = _isActiveTab;
     final bool atBrowserRoot = _atRoot && !isSelectionMode && !_searchActive;
-    final bool hasDashboardTab = _workspaceTabs.any((tab) => tab.isDashboard);
-    final bool canPop =
-        isActiveTab && atBrowserRoot && (_tabId == null || !hasDashboardTab);
+    final bool canPop = isActiveTab && atBrowserRoot && _tabId == null;
     final systemOverlayStyle =
         Theme.of(context).appBarTheme.systemOverlayStyle ??
         (Theme.of(context).brightness == Brightness.dark
@@ -4787,7 +4732,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           )
         : null;
     final selectionInBottomBar =
-        _selectionBarVisible && _toolbarConfig.bottomSelectionBar;
+        selectionBarVisible && _toolbarConfig.bottomSelectionBar;
     final embeddedBottomBar = selectionInBottomBar
         ? Material(
             color: Theme.of(context).colorScheme.surfaceContainer,
@@ -4813,11 +4758,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       });
     }
 
-    final toolbarActions = _buildFabToolbar(bottomOffset: 0)
-        .whereType<Positioned>()
-        .map((positioned) => positioned.child)
-        .whereType<Widget>()
-        .toList(growable: false);
+    final toolbarActions = useFab
+        ? _buildFabToolbar(bottomOffset: 0)
+              .whereType<Positioned>()
+              .map((positioned) => positioned.child)
+              .whereType<Widget>()
+              .toList(growable: false)
+        : const <Widget>[];
     final embeddedFloatingAction = !hasClipboardFab && toolbarActions.isEmpty
         ? null
         : Column(
@@ -5127,39 +5074,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                     Opacity(
                                                       opacity: _fadeScrimOpacity(
                                                         _backGestureProgress!,
-                                                      ),
-                                                      child: ColoredBox(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).scaffoldBackgroundColor,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          if (_dashboardBackGestureProgress !=
-                                                  null &&
-                                              widget.dashboardBackPreview !=
-                                                  null)
-                                            Positioned.fill(
-                                              child: IgnorePointer(
-                                                child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    if (_dashboardBackGestureProgress! >=
-                                                        0.18) ...[
-                                                      ColoredBox(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).scaffoldBackgroundColor,
-                                                      ),
-                                                      widget
-                                                          .dashboardBackPreview!,
-                                                    ],
-                                                    Opacity(
-                                                      opacity: _fadeScrimOpacity(
-                                                        _dashboardBackGestureProgress!,
                                                       ),
                                                       child: ColoredBox(
                                                         color: Theme.of(

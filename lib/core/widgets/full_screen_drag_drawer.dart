@@ -3,24 +3,30 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-/// A modal drawer that can be pulled from anywhere in its content area.
+/// A modal drawer that can be pulled from its content area or screen edge.
 ///
 /// The listener observes the drag without claiming the gesture arena, allowing
 /// nested vertical scrollables to keep their normal behavior. Callers can
-/// disable full-screen opening while a horizontal pager can handle the swipe.
+/// limit opening to the left edge while a horizontal pager handles other swipes.
 class FullScreenDragDrawer extends StatefulWidget {
   const FullScreenDragDrawer({
     super.key,
     required this.child,
     required this.drawer,
     this.canOpenFromAnywhere = true,
+    this.edgeGestureTop = 0,
+    this.backGestureInsetLeft = 24,
     this.onDrawerChanged,
+    this.onEdgeGestureChanged,
   });
 
   final Widget child;
   final Widget? drawer;
   final bool canOpenFromAnywhere;
+  final double edgeGestureTop;
+  final double backGestureInsetLeft;
   final ValueChanged<bool>? onDrawerChanged;
+  final ValueChanged<bool>? onEdgeGestureChanged;
 
   @override
   State<FullScreenDragDrawer> createState() => _FullScreenDragDrawerState();
@@ -29,6 +35,7 @@ class FullScreenDragDrawer extends StatefulWidget {
 class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     with SingleTickerProviderStateMixin {
   static const double _defaultDrawerWidth = 304.0;
+  static const double _drawerEdgeWidth = 24.0;
   static const double _dragSlop = 8.0;
   static const double _flingVelocity = 650.0;
   static const Duration _settleDuration = Duration(milliseconds: 220);
@@ -41,6 +48,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   LocalHistoryEntry? _historyEntry;
   _DrawerPointerDrag? _pointerDrag;
   bool _reportedOpen = false;
+  bool _edgeGestureActive = false;
 
   @override
   void dispose() {
@@ -108,6 +116,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   void _handlePointerDown(PointerDownEvent event) {
     if (_pointerDrag != null) {
       _pointerDrag = null;
+      _setEdgeGestureActive(false);
       if (_controller.value < 0.5) {
         _closeDrawer();
       } else {
@@ -118,8 +127,24 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     }
     if (widget.drawer == null) return;
 
+    // Leave the OS back-gesture strip to the platform. In particular, a
+    // canceled predictive-back gesture must not briefly animate this drawer.
+    if (event.position.dx <= widget.backGestureInsetLeft) return;
+
     final startValue = _controller.value;
-    if (startValue <= 0.001 && !widget.canOpenFromAnywhere) return;
+    final startsAtOpenEdge =
+        event.position.dx <= widget.backGestureInsetLeft + _drawerEdgeWidth &&
+        event.position.dy >= widget.edgeGestureTop;
+    if (startValue <= 0.001 &&
+        !widget.canOpenFromAnywhere &&
+        !startsAtOpenEdge) {
+      return;
+    }
+    if (startValue <= 0.001 &&
+        !widget.canOpenFromAnywhere &&
+        startsAtOpenEdge) {
+      _setEdgeGestureActive(true);
+    }
 
     final velocityTracker = VelocityTracker.withKind(event.kind)
       ..addPosition(event.timeStamp, event.position);
@@ -141,12 +166,14 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
       if (delta.distance < _dragSlop) return;
       if (delta.dx.abs() <= delta.dy.abs()) {
         _pointerDrag = null;
+        _setEdgeGestureActive(false);
         return;
       }
       // A closed drawer only opens on a rightward swipe. When it is already
       // visible, either direction can adjust the drawer and cancel its motion.
       if (drag.startValue <= 0.001 && delta.dx <= 0.0) {
         _pointerDrag = null;
+        _setEdgeGestureActive(false);
         return;
       }
       drag.isDragging = true;
@@ -171,7 +198,10 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
       drag.velocityTracker.addPosition(event.timeStamp, event.position);
     }
     _pointerDrag = null;
-    if (!drag.isDragging) return;
+    if (!drag.isDragging) {
+      _setEdgeGestureActive(false);
+      return;
+    }
 
     final velocity = cancelled
         ? 0.0
@@ -191,6 +221,13 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     } else {
       _closeDrawer();
     }
+    _setEdgeGestureActive(false);
+  }
+
+  void _setEdgeGestureActive(bool active) {
+    if (_edgeGestureActive == active) return;
+    _edgeGestureActive = active;
+    widget.onEdgeGestureChanged?.call(active);
   }
 
   @override

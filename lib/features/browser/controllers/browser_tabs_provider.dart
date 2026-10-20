@@ -8,15 +8,15 @@ import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'browser_tabs_provider.g.dart';
 
-/// Hard cap on simultaneously open file-manager tabs. Dashboard tabs do not
-/// count toward this limit.
+/// Hard cap on all simultaneously open browser tabs, including Dashboard.
 const int kMaxBrowserTabs = 5;
 
 sealed class BrowserTabKind {
   const BrowserTabKind();
 }
 
-/// The workspace home page. It is pinned at index zero and cannot be closed.
+/// The unique workspace Dashboard page. It cannot be closed directly and can
+/// occupy the active tab's slot when the user navigates Home.
 final class HomeTab extends BrowserTabKind {
   const HomeTab();
 }
@@ -119,7 +119,7 @@ class BrowserTabsState {
 
   bool get hasMultiple => tabs.length > 1;
   int get fileTabCount => tabs.where((tab) => !tab.isDashboard).length;
-  bool get atLimit => fileTabCount >= kMaxBrowserTabs;
+  bool get atLimit => tabs.length >= kMaxBrowserTabs;
 
   BrowserTabsState copyWith({
     List<BrowserTabState>? tabs,
@@ -206,6 +206,10 @@ class BrowserTabs extends _$BrowserTabs {
       activate(existing.tabId);
       return existing.tabId;
     }
+    if (state.atLimit) {
+      replaceActiveWithDashboard();
+      return state.activeTabId ?? state.tabs.first.tabId;
+    }
     final tab = BrowserTabState.home(tabId: TabId.allocate());
     final tabs = [...state.tabs];
     tabs.insert(0, tab);
@@ -221,7 +225,6 @@ class BrowserTabs extends _$BrowserTabs {
     if (state.tabs.isEmpty || state.activeIndex < 0) return;
     final tabs = [...state.tabs];
     final index = state.activeIndex;
-    if (tabs[index].isDashboard) return;
     final oldId = tabs[index].tabId;
     final replacement = BrowserTabState.folder(
       tabId: TabId.allocate(),
@@ -245,7 +248,29 @@ class BrowserTabs extends _$BrowserTabs {
   }
 
   void replaceActiveWithDashboard() {
-    openDashboardTab();
+    final activeTab = state.activeTab;
+    if (activeTab == null) {
+      if (state.tabs.isEmpty) openDashboardTab();
+      return;
+    }
+    if (activeTab.isDashboard) return;
+
+    final activeTabId = activeTab.tabId;
+    final removedDashboardIds = state.tabs
+        .where((tab) => tab.isDashboard)
+        .map((tab) => tab.tabId)
+        .toSet();
+    final tabs = state.tabs.where((tab) => !tab.isDashboard).toList();
+    final activeIndex = tabs.indexWhere((tab) => tab.tabId == activeTabId);
+    if (activeIndex < 0) return;
+
+    final dashboard = BrowserTabState.home(tabId: TabId.allocate());
+    tabs[activeIndex] = dashboard;
+    state = state.copyWith(
+      tabs: List.unmodifiable(tabs),
+      activeTabId: dashboard.tabId,
+      clearPreviousTabId: removedDashboardIds.contains(state.previousTabId),
+    );
   }
 
   void activate(TabId tabId) {

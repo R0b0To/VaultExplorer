@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -50,6 +49,21 @@ class _MainShellState extends ConsumerState<MainShell> {
   );
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
+  MountedContainer? _cachedLocalStorageContainer;
+
+  MountedContainer? get _primaryLocalStorageContainer {
+    final dashboard = _dashboardKey.currentState;
+    return dashboard == null
+        ? _cachedLocalStorageContainer
+        : dashboard.localStorageContainer;
+  }
+
+  void _cacheDashboardLocalStorageContainer() {
+    final dashboard = _dashboardKey.currentState;
+    if (dashboard != null) {
+      _cachedLocalStorageContainer = dashboard.localStorageContainer;
+    }
+  }
 
   // Cached synchronously while the widget is mounted
   late final _secureScreenPolicy = ref.read(secureScreenPolicyProvider);
@@ -260,13 +274,12 @@ class _MainShellState extends ConsumerState<MainShell> {
     var returningToHome = false;
     if (newIndex == 0) {
       final workspace = _browserWorkspaceState;
-      final home = workspace?.tabs.where((tab) => tab.isDashboard).firstOrNull;
       returningToHome =
           _index != 0 || workspace?.activeTab?.isDashboard != true;
-      if (home != null) {
-        _browserWorkspaceActions?.activate(home.tabId);
-      } else {
+      if (workspace?.activeTab == null) {
         _browserWorkspaceActions?.openDashboardTab();
+      } else {
+        _browserWorkspaceActions?.replaceActiveWithDashboard();
       }
     }
     if (_index != newIndex) {
@@ -288,12 +301,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _openBrowser(MountedContainer container) {
+    _cacheDashboardLocalStorageContainer();
     final state = _browserWorkspaceState;
     final actions = _browserWorkspaceActions;
     if (state == null || actions == null) {
-      // The browser workspace is mounted from the first frame with a pinned
-      // Home tab, so an open request before its first build is a lifecycle bug.
-      // Queue the request for the workspace's initialization callback.
+      // Queue an early open request until the browser workspace has created
+      // its initial Dashboard tab and published its controller.
       setState(() => _browserInitialContainer = container);
       return;
     }
@@ -304,12 +317,9 @@ class _MainShellState extends ConsumerState<MainShell> {
         .settings
         .useBrowserTabs;
     if (active?.isDashboard == true) {
-      // Home is a real, pinned workspace page. Opening a vault adds a folder
-      // page beside it, so root Back returns to Home without special tab data.
-      if (actions.openTab(container) == null) {
-        _showBrowserTabLimit();
-        return;
-      }
+      // The Dashboard is the current workspace page. Opening a vault replaces
+      // it in place so the user can browse without an extra, implicit tab.
+      actions.replaceActive(container);
     } else if (active?.volId != container.volId && !tabsEnabled) {
       actions.replaceActive(container);
     } else if (active?.volId != container.volId &&
@@ -453,6 +463,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (workspace == null || state == null || actions == null) return;
     final active = state.activeTab;
     if (active == null) return;
+    _cacheDashboardLocalStorageContainer();
     final nav = active.isDashboard
         ? null
         : ref.read(fileBrowserNavigationProvider(active.tabId));
@@ -461,11 +472,11 @@ class _MainShellState extends ConsumerState<MainShell> {
       currentContainer: active.container,
       currentDirPath: nav == null ? '' : browserTabDuplicatePath(nav),
       mountedVaults: _mountedNotifier.value,
-      primaryLocalContainer: _dashboardKey.currentState?.localStorageContainer,
+      primaryLocalContainer: _primaryLocalStorageContainer,
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {
-      actions.openDashboardTab();
+      actions.replaceActiveWithDashboard();
       return;
     }
     final path = choice.path;
@@ -589,7 +600,12 @@ class _MainShellState extends ConsumerState<MainShell> {
       for (final c in _mountedNotifier.value) {
         if (c.volId == volId) return c;
       }
-      return _dashboardKey.currentState?.resolveAnyContainer(volId);
+      final fromDashboard = _dashboardKey.currentState?.resolveAnyContainer(
+        volId,
+      );
+      if (fromDashboard != null) return fromDashboard;
+      final localStorage = _cachedLocalStorageContainer;
+      return localStorage?.volId == volId ? localStorage : null;
     }
 
     Widget buildDrawer({int? currentVolId, BrowserTabsConfig? workspace}) {
@@ -598,8 +614,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           : ref.read(browserTabsProvider(workspace).notifier);
       return AppNavigationDrawer(
         currentVolId: currentVolId,
-        primaryLocalContainer:
-            _dashboardKey.currentState?.localStorageContainer,
+        primaryLocalContainer: _primaryLocalStorageContainer,
         onOpenInNewTab: workspaceActions == null || !tabsEnabled
             ? null
             : (container) {
@@ -639,8 +654,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             initialContainer: null,
             resolveContainer: resolveContainer,
             mountedContainers: () => _mountedNotifier.value,
-            primaryLocalContainer: () =>
-                _dashboardKey.currentState?.localStorageContainer,
+            primaryLocalContainer: () => _primaryLocalStorageContainer,
             drawerBuilder: (workspace, volId) =>
                 buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
@@ -656,7 +670,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   onFloatingActionChanged: onFloatingActionChanged,
                   onBottomBarChanged: onBottomBarChanged,
                 ),
-            onEmpty: null,
+            onEmpty: () => _browserWorkspaceActions?.openDashboardTab(),
             onWorkspaceChanged: _onBrowserWorkspaceChanged,
             onNewTab: _openNewBrowserTab,
             onDuplicate: _duplicateBrowserTab,

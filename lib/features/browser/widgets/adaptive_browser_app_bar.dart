@@ -32,36 +32,35 @@ class AdaptiveBrowserAppBar extends ConsumerWidget
     final aggregateSelection = ref.watch(
       aggregatedTabsSelectionProvider(workspaceConfig),
     );
-    if (aggregateSelection.hasSelection) {
-      return SizedBox(
-        height: kToolbarHeight,
-        child: SkinAreaScope(
-          area: SkinArea.files,
-          child: ValueListenableBuilder<PreferredSizeWidget?>(
-            valueListenable: selectionAppBarListenable,
-            builder: (context, appBar, _) => appBar ?? const DashboardAppBar(),
+    return ValueListenableBuilder<PreferredSizeWidget?>(
+      valueListenable: selectionAppBarListenable,
+      builder: (context, selectionAppBar, _) {
+        if (aggregateSelection.hasSelection && selectionAppBar != null) {
+          return SizedBox(
+            height: kToolbarHeight,
+            child: SkinAreaScope(area: SkinArea.files, child: selectionAppBar),
+          );
+        }
+        if (activeTab?.isDashboard == true) {
+          return const SizedBox(
+            height: kToolbarHeight,
+            child: SkinAreaScope(
+              area: SkinArea.dashboard,
+              child: DashboardAppBar(),
+            ),
+          );
+        }
+        return SizedBox(
+          height: kToolbarHeight,
+          child: SkinAreaScope(
+            area: SkinArea.files,
+            child: ValueListenableBuilder<PreferredSizeWidget?>(
+              valueListenable: appBarListenable,
+              builder: (context, appBar, _) => appBar ?? fallback,
+            ),
           ),
-        ),
-      );
-    }
-    if (activeTab?.isDashboard == true) {
-      return const SizedBox(
-        height: kToolbarHeight,
-        child: SkinAreaScope(
-          area: SkinArea.dashboard,
-          child: DashboardAppBar(),
-        ),
-      );
-    }
-    return SizedBox(
-      height: kToolbarHeight,
-      child: SkinAreaScope(
-        area: SkinArea.files,
-        child: ValueListenableBuilder<PreferredSizeWidget?>(
-          valueListenable: appBarListenable,
-          builder: (context, appBar, _) => appBar ?? fallback,
-        ),
-      ),
+        );
+      },
     );
   }
 }

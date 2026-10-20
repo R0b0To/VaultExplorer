@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -144,6 +143,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
   final Map<TabId, Widget?> _floatingActionsByTab = {};
   final Map<TabId, Widget?> _bottomBarsByTab = {};
   bool _popScheduled = false;
+  bool _drawerOpenOrDragging = false;
+  bool _edgeDrawerGestureActive = false;
   TabId? _lastActiveTabId;
 
   BrowserTabsState get _workspaceState =>
@@ -257,6 +258,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     _workspaceActions.activateIndex(index);
   }
 
+  void _onDrawerChanged(bool isOpen) {
+    if (!mounted || _drawerOpenOrDragging == isOpen) return;
+    setState(() => _drawerOpenOrDragging = isOpen);
+  }
+
+  void _onEdgeDrawerGestureChanged(bool active) {
+    if (!mounted || _edgeDrawerGestureActive == active) return;
+    setState(() => _edgeDrawerGestureActive = active);
+  }
+
   ValueChanged<PreferredSizeWidget> _appBarCallbackFor(TabId tabId) =>
       _appBarCallbacks.putIfAbsent(
         tabId,
@@ -271,6 +282,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
       (appBar) {
         if (!mounted) return;
         _selectionAppBarsByTab[tabId] = appBar;
+        if (_workspaceState.activeTabId == tabId) {
+          // The visible tab's preference decides whether the aggregate
+          // selection UI belongs in the stationary app bar or bottom slot.
+          _selectionAppBar.value = appBar;
+          return;
+        }
         final aggregate = ref.read(aggregatedTabsSelectionProvider(_workspace));
         if (!aggregate.hasSelection) {
           _selectionAppBar.value = null;
@@ -329,7 +346,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {
-      _workspaceActions.openDashboardTab();
+      _workspaceActions.replaceActiveWithDashboard();
       return;
     }
     final path = choice.path;
@@ -386,10 +403,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
 
     final activeTab = ref.watch(activeBrowserTabProvider(_workspace));
     final activeTabId = activeTab?.tabId;
+    final isFirstTab = tabs.first.tabId == activeTabId;
     final hasMultipleTabs = ref.watch(hasActiveBrowserTabsProvider(_workspace));
     final tabsEnabled = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
     );
+    final systemBackGestureInsetLeft = MediaQuery.of(
+      context,
+    ).systemGestureInsets.left;
     final strip = BrowserTabStrip(
       workspaceConfig: _workspace,
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
@@ -418,7 +439,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
               child: PageView.builder(
                 controller: _pageController,
                 clipBehavior: Clip.hardEdge,
-                physics: hasMultipleTabs && tabsEnabled
+                physics:
+                    hasMultipleTabs &&
+                        tabsEnabled &&
+                        !_drawerOpenOrDragging &&
+                        !_edgeDrawerGestureActive
                     ? const PageScrollPhysics()
                     : const NeverScrollableScrollPhysics(),
                 itemCount: tabs.length,
@@ -492,9 +517,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
 
     return FullScreenDragDrawer(
       drawer: drawer,
-      // Leave horizontal gestures to PageView whenever tab swiping is
-      // available. The stationary app bar still opens the drawer directly.
-      canOpenFromAnywhere: !(tabsEnabled && hasMultipleTabs),
+      onDrawerChanged: _onDrawerChanged,
+      onEdgeGestureChanged: _onEdgeDrawerGestureChanged,
+      // Reserve the left edge of the viewport for drawer opening while the
+      // PageView keeps native swipes everywhere else.
+      canOpenFromAnywhere: !(tabsEnabled && hasMultipleTabs) || isFirstTab,
+      edgeGestureTop:
+          MediaQuery.paddingOf(context).top +
+          kToolbarHeight +
+          (tabsEnabled && tabs.isNotEmpty ? kBrowserTabStripHeight : 0),
+      backGestureInsetLeft: systemBackGestureInsetLeft < 24
+          ? 24
+          : systemBackGestureInsetLeft,
       child: shell,
     );
   }

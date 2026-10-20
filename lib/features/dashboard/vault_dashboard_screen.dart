@@ -494,12 +494,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           if (widget.onOpenBrowser != null) {
             widget.onOpenBrowser!(newContainer);
           } else {
-            final state = _workspaceState;
-            if (state?.activeTab?.isDashboard == true) {
-              workspaceActions.openTab(newContainer);
-            } else {
-              workspaceActions.replaceActive(newContainer);
-            }
+            workspaceActions.replaceActive(newContainer);
           }
           return;
         }
@@ -648,11 +643,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final tabs = _workspaceState;
     final actions = _workspaceActions;
     if (tabs != null && actions != null) {
-      if (tabs.activeTab?.isDashboard == true) {
-        actions.openTab(container);
-      } else {
-        actions.replaceActive(container);
-      }
+      actions.replaceActive(container);
       return;
     }
     if (currentVolId == null) {

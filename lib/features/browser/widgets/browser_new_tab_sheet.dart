@@ -14,21 +14,16 @@ import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 /// it (null = the container root).
 typedef BrowserNewTabChoice = ({MountedContainer? container, String? path});
 
-/// Bottom sheet listing every place a new tab can open: a copy of the current
-/// location, each unlocked vault, this device's storage and any added
-/// external storage. Returns the picked [BrowserNewTabChoice] (or null when
-/// dismissed).
+/// Bottom sheet listing places a new tab can open: each unlocked vault, this
+/// device's storage and any added external storage. Returns the picked
+/// [BrowserNewTabChoice] (or null when dismissed).
 class BrowserNewTabSheet extends ConsumerWidget {
-  final MountedContainer? currentContainer;
-  final String currentDirPath;
   final List<MountedContainer> mountedVaults;
   final MountedContainer? primaryLocalContainer;
   final bool allowDashboard;
 
   const BrowserNewTabSheet({
     super.key,
-    this.currentContainer,
-    required this.currentDirPath,
     required this.mountedVaults,
     required this.primaryLocalContainer,
     this.allowDashboard = true,
@@ -37,7 +32,6 @@ class BrowserNewTabSheet extends ConsumerWidget {
   static Future<BrowserNewTabChoice?> show(
     BuildContext context, {
     MountedContainer? currentContainer,
-    required String currentDirPath,
     required List<MountedContainer> mountedVaults,
     required MountedContainer? primaryLocalContainer,
     bool allowDashboard = true,
@@ -79,8 +73,6 @@ class BrowserNewTabSheet extends ConsumerWidget {
         ),
       ),
       builder: (_) => BrowserNewTabSheet(
-        currentContainer: currentContainer,
-        currentDirPath: currentDirPath,
         mountedVaults: mountedVaults,
         primaryLocalContainer: localContainer,
         allowDashboard: allowDashboard,
@@ -105,12 +97,6 @@ class BrowserNewTabSheet extends ConsumerWidget {
         path: null,
       ));
     }
-
-    final duplicateSubtitle = currentContainer == null
-        ? null
-        : currentDirPath.isEmpty
-        ? currentContainer!.displayName
-        : '${currentContainer!.displayName} / $currentDirPath';
 
     return SafeArea(
       child: ConstrainedBox(
@@ -137,25 +123,11 @@ class BrowserNewTabSheet extends ConsumerWidget {
                 title: Text(context.l10n.dashboardNavLabel),
                 onTap: pickDashboard,
               ),
-            if (allowDashboard && currentContainer != null)
+            if (allowDashboard &&
+                (mountedVaults.isNotEmpty ||
+                    local != null ||
+                    externals.isNotEmpty))
               const Divider(height: 16),
-            if (currentContainer != null) ...[
-              ListTile(
-                leading: BrowserLocationIcon(
-                  container: currentContainer!,
-                  color: cs.primary,
-                  size: 24,
-                ),
-                title: Text(context.l10n.browserTabDuplicate),
-                subtitle: Text(
-                  duplicateSubtitle!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onTap: () => pick(currentContainer!, currentDirPath),
-              ),
-              const Divider(height: 16),
-            ],
             for (final vault in mountedVaults)
               ListTile(
                 leading: BrowserLocationIcon(

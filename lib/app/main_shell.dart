@@ -457,26 +457,21 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
     }
-    final workspace = _browserWorkspace;
-    final state = _browserWorkspaceState;
     final actions = _browserWorkspaceActions;
-    if (workspace == null || state == null || actions == null) return;
-    final active = state.activeTab;
-    if (active == null) return;
+    if (actions == null) return;
     _cacheDashboardLocalStorageContainer();
-    final nav = active.isDashboard
-        ? null
-        : ref.read(fileBrowserNavigationProvider(active.tabId));
     final choice = await BrowserNewTabSheet.show(
       context,
-      currentContainer: active.container,
-      currentDirPath: nav == null ? '' : browserTabDuplicatePath(nav),
       mountedVaults: _mountedNotifier.value,
       primaryLocalContainer: _primaryLocalStorageContainer,
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {
-      actions.replaceActiveWithDashboard();
+      if (actions.openNewDashboardTab() == null) {
+        _showBrowserTabLimit();
+        return;
+      }
+      setState(() => _index = 0);
       return;
     }
     final path = choice.path;

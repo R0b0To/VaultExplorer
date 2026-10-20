@@ -333,20 +333,17 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
-    final nav = active.isDashboard
-        ? null
-        : ref.read(fileBrowserNavigationProvider(active.tabId));
     final choice = await BrowserNewTabSheet.show(
       context,
-      currentContainer: active.container,
-      currentDirPath: nav == null ? '' : browserTabDuplicatePath(nav),
       mountedVaults: widget.mountedContainers(),
       primaryLocalContainer: widget.primaryLocalContainer(),
       allowDashboard: widget.includeDashboardTab,
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {
-      _workspaceActions.replaceActiveWithDashboard();
+      if (_workspaceActions.openNewDashboardTab() == null) {
+        _showLimitReached();
+      }
       return;
     }
     final path = choice.path;

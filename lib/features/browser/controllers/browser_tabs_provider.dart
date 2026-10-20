@@ -15,10 +15,13 @@ sealed class BrowserTabKind {
   const BrowserTabKind();
 }
 
-/// The unique workspace Dashboard page. It cannot be closed directly and can
-/// occupy the active tab's slot when the user navigates Home.
+/// A Dashboard page. The workspace keeps one Dashboard instance because its
+/// view state is shared; a New Tab request activates it when it already exists.
+/// A Dashboard created from New Tab can be closed like an ordinary tab.
 final class HomeTab extends BrowserTabKind {
-  const HomeTab();
+  const HomeTab({this.pinned = false});
+
+  final bool pinned;
 }
 
 /// A folder location in a mounted vault or storage container.
@@ -36,7 +39,8 @@ class BrowserTabState {
   final TabId tabId;
   final BrowserTabKind kind;
 
-  const BrowserTabState.home({required this.tabId}) : kind = const HomeTab();
+  BrowserTabState.home({required this.tabId, bool pinned = false})
+    : kind = HomeTab(pinned: pinned);
 
   BrowserTabState.folder({
     required this.tabId,
@@ -45,6 +49,10 @@ class BrowserTabState {
   }) : kind = FolderTab(container: container, initialPath: initialPath);
 
   bool get isDashboard => kind is HomeTab;
+  bool get isPinnedDashboard => switch (kind) {
+    HomeTab(:final pinned) => pinned,
+    FolderTab() => false,
+  };
   MountedContainer? get container => switch (kind) {
     HomeTab() => null,
     FolderTab(:final container) => container,
@@ -144,7 +152,7 @@ class BrowserTabs extends _$BrowserTabs {
     final tabs = <BrowserTabState>[];
     BrowserTabState? dashboard;
     if (config.includeDashboardTab) {
-      dashboard = BrowserTabState.home(tabId: TabId.allocate());
+      dashboard = BrowserTabState.home(tabId: TabId.allocate(), pinned: true);
       tabs.add(dashboard);
     }
     if (config.initialContainer == null && dashboard == null) {
@@ -201,16 +209,18 @@ class BrowserTabs extends _$BrowserTabs {
   }
 
   TabId openDashboardTab() {
-    final existing = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    final existing =
+        state.tabs.where((tab) => tab.isPinnedDashboard).firstOrNull ??
+        state.tabs.where((tab) => tab.isDashboard).firstOrNull;
     if (existing != null) {
-      activate(existing.tabId);
+      _activateSingleDashboard(existing);
       return existing.tabId;
     }
     if (state.atLimit) {
       replaceActiveWithDashboard();
       return state.activeTabId ?? state.tabs.first.tabId;
     }
-    final tab = BrowserTabState.home(tabId: TabId.allocate());
+    final tab = BrowserTabState.home(tabId: TabId.allocate(), pinned: true);
     final tabs = [...state.tabs];
     tabs.insert(0, tab);
     state = state.copyWith(
@@ -219,6 +229,58 @@ class BrowserTabs extends _$BrowserTabs {
       activeTabId: tab.tabId,
     );
     return tab.tabId;
+  }
+
+  /// Creates a Dashboard tab if none exists, otherwise activates the existing
+  /// one. Keeping Dashboard singular avoids mounting its shared view state in
+  /// multiple PageView children at once.
+  TabId? openNewDashboardTab() {
+    final existing =
+        state.tabs.where((tab) => tab.isPinnedDashboard).firstOrNull ??
+        state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    if (existing != null) {
+      _activateSingleDashboard(existing);
+      return existing.tabId;
+    }
+    if (state.atLimit) return null;
+    final tab = BrowserTabState.home(tabId: TabId.allocate());
+    final tabs = [...state.tabs];
+    tabs.insert(tabs.isEmpty ? 0 : state.activeIndex + 1, tab);
+    state = state.copyWith(
+      tabs: List.unmodifiable(tabs),
+      previousTabId: state.activeTabId,
+      activeTabId: tab.tabId,
+    );
+    return tab.tabId;
+  }
+
+  void _activateSingleDashboard(BrowserTabState dashboard) {
+    final duplicateIds = state.tabs
+        .where((tab) => tab.isDashboard && tab.tabId != dashboard.tabId)
+        .map((tab) => tab.tabId)
+        .toSet();
+    if (duplicateIds.isEmpty) {
+      activate(dashboard.tabId);
+      return;
+    }
+
+    final previousCandidate = state.activeTabId == dashboard.tabId
+        ? state.previousTabId
+        : state.activeTabId;
+    final previousTabId =
+        previousCandidate != null &&
+            previousCandidate != dashboard.tabId &&
+            !duplicateIds.contains(previousCandidate)
+        ? previousCandidate
+        : null;
+    state = BrowserTabsState(
+      tabs: List.unmodifiable(
+        state.tabs.where((tab) => !duplicateIds.contains(tab.tabId)),
+      ),
+      activeTabId: dashboard.tabId,
+      previousTabId: previousTabId,
+      tabStripScrollOffset: state.tabStripScrollOffset,
+    );
   }
 
   void replaceActive(MountedContainer container, {String? initialPath}) {
@@ -253,23 +315,26 @@ class BrowserTabs extends _$BrowserTabs {
       if (state.tabs.isEmpty) openDashboardTab();
       return;
     }
-    if (activeTab.isDashboard) return;
+    if (activeTab.isDashboard) {
+      _activateSingleDashboard(activeTab);
+      return;
+    }
 
-    final activeTabId = activeTab.tabId;
     final removedDashboardIds = state.tabs
         .where((tab) => tab.isDashboard)
         .map((tab) => tab.tabId)
         .toSet();
     final tabs = state.tabs.where((tab) => !tab.isDashboard).toList();
-    final activeIndex = tabs.indexWhere((tab) => tab.tabId == activeTabId);
+    final activeIndex = tabs.indexWhere((tab) => tab.tabId == activeTab.tabId);
     if (activeIndex < 0) return;
-
     final dashboard = BrowserTabState.home(tabId: TabId.allocate());
     tabs[activeIndex] = dashboard;
     state = state.copyWith(
       tabs: List.unmodifiable(tabs),
       activeTabId: dashboard.tabId,
-      clearPreviousTabId: removedDashboardIds.contains(state.previousTabId),
+      clearPreviousTabId:
+          state.previousTabId == activeTab.tabId ||
+          removedDashboardIds.contains(state.previousTabId),
     );
   }
 
@@ -296,14 +361,14 @@ class BrowserTabs extends _$BrowserTabs {
   void closeTab(TabId tabId) {
     final index = state.tabs.indexWhere((tab) => tab.tabId == tabId);
     if (index < 0) return;
-    if (state.tabs[index].isDashboard) return;
+    if (state.tabs[index].isPinnedDashboard) return;
     _removeAt(index);
   }
 
   void closeOthers(TabId tabId) {
     final keep = tabForKey(tabId);
     if (keep == null) return;
-    final home = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    final home = state.tabs.where((tab) => tab.isPinnedDashboard).firstOrNull;
     final tabs = home != null && home.tabId != keep.tabId
         ? List<BrowserTabState>.unmodifiable([home, keep])
         : List<BrowserTabState>.unmodifiable([keep]);
@@ -321,7 +386,9 @@ class BrowserTabs extends _$BrowserTabs {
               ? state.tabs.take(index).map((tab) => tab.tabId).toSet()
               : state.tabs.skip(index + 1).map((tab) => tab.tabId).toSet())
           ..removeWhere(
-            (id) => state.tabs.any((tab) => tab.tabId == id && tab.isDashboard),
+            (id) => state.tabs.any(
+              (tab) => tab.tabId == id && tab.isPinnedDashboard,
+            ),
           );
     if (removed.isEmpty) return;
     final tabs = state.tabs
@@ -339,7 +406,7 @@ class BrowserTabs extends _$BrowserTabs {
   }
 
   void closeAll() {
-    final home = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    final home = state.tabs.where((tab) => tab.isPinnedDashboard).firstOrNull;
     if (home != null) {
       state = BrowserTabsState(
         tabs: List.unmodifiable([home]),
@@ -358,8 +425,8 @@ class BrowserTabs extends _$BrowserTabs {
         newIndex >= state.tabs.length) {
       return;
     }
-    if (state.tabs[oldIndex].isDashboard) return;
-    if (state.tabs.firstOrNull?.isDashboard == true && newIndex == 0) {
+    if (state.tabs[oldIndex].isPinnedDashboard) return;
+    if (state.tabs.firstOrNull?.isPinnedDashboard == true && newIndex == 0) {
       newIndex = 1;
     }
     final tabs = [...state.tabs];

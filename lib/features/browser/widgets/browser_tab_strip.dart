@@ -218,7 +218,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.close,
           Icons.close_rounded,
           l10n.browserTabClose,
-          enabled: state.tabs.length > 1 && !tab.isDashboard,
+          enabled: state.tabs.length > 1 && !tab.isPinnedDashboard,
         ),
         item(
           _TabMenuAction.closeOthers,
@@ -243,7 +243,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.duplicate,
           Icons.copy_all_rounded,
           l10n.browserTabDuplicate,
-          enabled: tab.isDashboard || !state.atLimit,
+          enabled: !tab.isDashboard && !state.atLimit,
         ),
       ],
     );

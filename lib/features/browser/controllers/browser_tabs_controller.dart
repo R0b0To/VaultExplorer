@@ -88,6 +88,11 @@ class BrowserTabsController extends ChangeNotifier {
 
   int openDashboardTab() => _legacyKey(_notifier.openDashboardTab());
 
+  int? openNewDashboardTab() {
+    final tabId = _notifier.openNewDashboardTab();
+    return tabId == null ? null : _legacyKey(tabId);
+  }
+
   void replaceActive(MountedContainer container, {String? initialPath}) =>
       _notifier.replaceActive(container, initialPath: initialPath);
 

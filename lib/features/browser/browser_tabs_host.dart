@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
@@ -20,6 +21,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dar
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 /// Directory a duplicated / newly opened tab should start in for [nav]'s
 /// current location. Inside an archive the "directory" is a virtual path in
@@ -128,7 +130,8 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
 /// Compatibility name retained for existing route builders and integrations.
 typedef BrowserTabsHost = BrowserTabsShell;
 
-class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
+class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
+    with SingleTickerProviderStateMixin {
   late final BrowserTabsConfig _workspace;
   late final ProviderSubscription<BrowserTabsState> _workspaceSubscription;
   late final VaultEngineEvents _vaultEvents;
@@ -137,6 +140,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
   late final ValueNotifier<PreferredSizeWidget?> _selectionAppBar;
   late final ValueNotifier<Widget?> _activeFloatingAction;
   late final ValueNotifier<Widget?> _activeBottomBar;
+  late final AnimationController _appBarVisibilityController;
   final Map<TabId, ValueChanged<PreferredSizeWidget>> _appBarCallbacks = {};
   final Map<TabId, PreferredSizeWidget> _appBarsByTab = {};
   final Map<TabId, PreferredSizeWidget?> _selectionAppBarsByTab = {};
@@ -145,6 +149,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
   bool _popScheduled = false;
   bool _drawerOpenOrDragging = false;
   bool _edgeDrawerGestureActive = false;
+  bool _restoreAppBarScheduled = false;
   TabId? _lastActiveTabId;
 
   BrowserTabsState get _workspaceState =>
@@ -166,6 +171,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     _selectionAppBar = ValueNotifier<PreferredSizeWidget?>(null);
     _activeFloatingAction = ValueNotifier<Widget?>(null);
     _activeBottomBar = ValueNotifier<Widget?>(null);
+    _appBarVisibilityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
     _workspaceSubscription = ref.listenManual<BrowserTabsState>(
       browserTabsProvider(_workspace),
       _onTabsChanged,
@@ -187,6 +197,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     _selectionAppBar.dispose();
     _activeFloatingAction.dispose();
     _activeBottomBar.dispose();
+    _appBarVisibilityController.dispose();
     super.dispose();
   }
 
@@ -196,7 +207,21 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
   }
 
   void _onTabsChanged(BrowserTabsState? previous, BrowserTabsState next) {
-    _schedulePageSync();
+    if (_isPureTabReorder(previous, next)) {
+      if (_pageController.hasClients) {
+        final target = next.activeIndex;
+        final current = _pageController.page;
+        if (current == null || (current - target).abs() > 0.01) {
+          // Keep the active tab's logical page selected in the same frame as
+          // the reordered list, so PageView never paints the old index's tab.
+          _pageController.jumpToPage(target);
+        }
+      } else {
+        _schedulePageSync();
+      }
+    } else {
+      _schedulePageSync();
+    }
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
     _appBarCallbacks.removeWhere((id, _) => !liveTabIds.contains(id));
@@ -239,6 +264,23 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     }
   }
 
+  bool _isPureTabReorder(BrowserTabsState? previous, BrowserTabsState next) {
+    if (previous == null ||
+        previous.tabs.length != next.tabs.length ||
+        previous.activeTabId != next.activeTabId) {
+      return false;
+    }
+    final nextIds = next.tabs.map((tab) => tab.tabId).toSet();
+    if (nextIds.length != previous.tabs.length ||
+        !previous.tabs.every((tab) => nextIds.contains(tab.tabId))) {
+      return false;
+    }
+    for (var index = 0; index < previous.tabs.length; index++) {
+      if (previous.tabs[index].tabId != next.tabs[index].tabId) return true;
+    }
+    return false;
+  }
+
   void _schedulePageSync() {
     if (_workspaceState.tabs.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -253,8 +295,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
     });
   }
 
-  void _onPageChanged(int index, List<BrowserTabState> tabs) {
-    if (index < 0 || index >= tabs.length) return;
+  void _onPageChanged(int index) {
+    if (index < 0 || index >= _workspaceState.tabs.length) return;
     _workspaceActions.activateIndex(index);
   }
 
@@ -266,6 +308,65 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
   void _onEdgeDrawerGestureChanged(bool active) {
     if (!mounted || _edgeDrawerGestureActive == active) return;
     setState(() => _edgeDrawerGestureActive = active);
+  }
+
+  bool _handleAppBarScroll(
+    ScrollNotification notification, {
+    required bool enabled,
+    required bool active,
+  }) {
+    if (notification.metrics.axis != Axis.vertical || !active) return false;
+
+    if (!enabled) {
+      if (_appBarVisibilityController.value != 1.0) {
+        _appBarVisibilityController.animateTo(
+          1.0,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return false;
+    }
+
+    void setProgress(double value) {
+      _appBarVisibilityController.value = value.clamp(0.0, 1.0).toDouble();
+    }
+
+    final metrics = notification.metrics;
+    final canScroll = metrics.maxScrollExtent > 0.0;
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0.0;
+      if (canScroll && metrics.pixels <= 0.0 && delta <= 0.0) {
+        setProgress(1.0);
+      } else if (delta != 0.0) {
+        setProgress(
+          _appBarVisibilityController.value - (delta / kToolbarHeight),
+        );
+      }
+    } else if (notification is OverscrollNotification) {
+      if (notification.overscroll != 0.0) {
+        setProgress(
+          _appBarVisibilityController.value -
+              (notification.overscroll / kToolbarHeight),
+        );
+      }
+    } else if (notification is ScrollEndNotification) {
+      if (canScroll && metrics.pixels <= 0.0) {
+        _appBarVisibilityController.animateTo(
+          1.0,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      } else if (_appBarVisibilityController.value > 0.0 &&
+          _appBarVisibilityController.value < 1.0) {
+        _appBarVisibilityController.animateTo(
+          _appBarVisibilityController.value >= 0.5 ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+    return false;
   }
 
   ValueChanged<PreferredSizeWidget> _appBarCallbackFor(TabId tabId) =>
@@ -400,6 +501,25 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
 
     final activeTab = ref.watch(activeBrowserTabProvider(_workspace));
     final activeTabId = activeTab?.tabId;
+    final activeContainer = activeTab?.container;
+    final toolbarSettingsUri =
+        activeContainer == null || activeContainer.isLocalStorage
+        ? null
+        : activeContainer.uri;
+    final autoHideAppBar = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        toolbarSettingsUri,
+      ).select((settings) => settings.config.autoHideAppBar),
+    );
+    if (!autoHideAppBar &&
+        _appBarVisibilityController.value != 1.0 &&
+        !_restoreAppBarScheduled) {
+      _restoreAppBarScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreAppBarScheduled = false;
+        if (mounted) _appBarVisibilityController.value = 1.0;
+      });
+    }
     final isFirstTab = tabs.first.tabId == activeTabId;
     final hasMultipleTabs = ref.watch(hasActiveBrowserTabsProvider(_workspace));
     final tabsEnabled = ref.watch(
@@ -419,83 +539,115 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
             _workspace,
             activeTab.isDashboard ? null : activeTab.volId,
           );
+    double browserChromeBottom() {
+      final visibleAppBarHeight =
+          (autoHideAppBar ? _appBarVisibilityController.value : 1.0) *
+          kToolbarHeight;
+      final visibleTabStripHeight = tabsEnabled && tabs.isNotEmpty
+          ? kBrowserTabStripHeight
+          : 0.0;
+      return MediaQuery.paddingOf(context).top +
+          visibleAppBarHeight +
+          visibleTabStripHeight;
+    }
 
     final shell = Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            AdaptiveBrowserAppBar(
-              workspaceConfig: _workspace,
-              appBarListenable: _activeAppBar,
-              fallback: const SizedBox(height: kToolbarHeight),
-              selectionAppBarListenable: _selectionAppBar,
+            ClipRect(
+              child: AnimatedBuilder(
+                animation: _appBarVisibilityController,
+                builder: (context, child) => Align(
+                  alignment: Alignment.bottomCenter,
+                  heightFactor: autoHideAppBar
+                      ? _appBarVisibilityController.value
+                      : 1.0,
+                  child: SizedBox(height: kToolbarHeight, child: child),
+                ),
+                child: AdaptiveBrowserAppBar(
+                  workspaceConfig: _workspace,
+                  appBarListenable: _activeAppBar,
+                  fallback: const SizedBox(height: kToolbarHeight),
+                  selectionAppBarListenable: _selectionAppBar,
+                ),
+              ),
             ),
             if (tabsEnabled && tabs.isNotEmpty) strip,
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                clipBehavior: Clip.hardEdge,
-                physics:
-                    hasMultipleTabs &&
-                        tabsEnabled &&
-                        !_drawerOpenOrDragging &&
-                        !_edgeDrawerGestureActive
-                    ? const PageScrollPhysics()
-                    : const NeverScrollableScrollPhysics(),
-                itemCount: tabs.length,
-                onPageChanged: (index) => _onPageChanged(index, tabs),
-                findChildIndexCallback: (key) {
-                  if (key is! ValueKey<TabId>) return null;
-                  final index = tabs.indexWhere(
-                    (tab) => tab.tabId == key.value,
-                  );
-                  return index < 0 ? null : index;
-                },
-                itemBuilder: (context, index) {
-                  final tab = tabs[index];
-                  final pageIsActive = tab.tabId == activeTabId;
-                  final Widget page;
-                  if (tab.isDashboard) {
-                    page =
-                        widget.homeBuilder?.call(
-                          workspace: _workspace,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) => _handleAppBarScroll(
+                  notification,
+                  enabled: autoHideAppBar,
+                  active: activeTabId != null,
+                ),
+                child: PageView.builder(
+                  controller: _pageController,
+                  clipBehavior: Clip.hardEdge,
+                  physics:
+                      hasMultipleTabs &&
+                          tabsEnabled &&
+                          !_drawerOpenOrDragging &&
+                          !_edgeDrawerGestureActive
+                      ? const PageScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
+                  itemCount: tabs.length,
+                  onPageChanged: _onPageChanged,
+                  findChildIndexCallback: (key) {
+                    if (key is! ValueKey<TabId>) return null;
+                    final index = tabs.indexWhere(
+                      (tab) => tab.tabId == key.value,
+                    );
+                    return index < 0 ? null : index;
+                  },
+                  itemBuilder: (context, index) {
+                    final tab = tabs[index];
+                    final pageIsActive = tab.tabId == activeTabId;
+                    final Widget page;
+                    if (tab.isDashboard) {
+                      page =
+                          widget.homeBuilder?.call(
+                            workspace: _workspace,
+                            onFloatingActionChanged: _floatingActionCallbackFor(
+                              tab.tabId,
+                            ),
+                            onBottomBarChanged: _bottomBarCallbackFor(
+                              tab.tabId,
+                            ),
+                          ) ??
+                          const SizedBox.expand();
+                    } else {
+                      page = SkinAreaScope(
+                        area: SkinArea.files,
+                        child: DirectoryContentView(
+                          key: ValueKey<TabId>(tab.tabId),
+                          container: tab.container!,
+                          tabId: tab.tabId,
+                          workspaceConfig: _workspace,
+                          initialPath: tab.initialPath,
+                          resolveContainer: widget.resolveContainer,
+                          showBackButton: true,
+                          onUserActivity: pageIsActive
+                              ? widget.userActivityFor?.call(tab.volId!)
+                              : null,
+                          onAppBarChanged: _appBarCallbackFor(tab.tabId),
+                          onSelectionAppBarChanged: _selectionAppBarCallbackFor(
+                            tab.tabId,
+                          ),
                           onFloatingActionChanged: _floatingActionCallbackFor(
                             tab.tabId,
                           ),
                           onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
-                        ) ??
-                        const SizedBox.expand();
-                  } else {
-                    page = SkinAreaScope(
-                      area: SkinArea.files,
-                      child: DirectoryContentView(
-                        key: ValueKey<TabId>(tab.tabId),
-                        container: tab.container!,
-                        tabId: tab.tabId,
-                        workspaceConfig: _workspace,
-                        initialPath: tab.initialPath,
-                        resolveContainer: widget.resolveContainer,
-                        showBackButton: true,
-                        onUserActivity: pageIsActive
-                            ? widget.userActivityFor?.call(tab.volId!)
-                            : null,
-                        onAppBarChanged: _appBarCallbackFor(tab.tabId),
-                        onSelectionAppBarChanged: _selectionAppBarCallbackFor(
-                          tab.tabId,
                         ),
-                        onFloatingActionChanged: _floatingActionCallbackFor(
-                          tab.tabId,
-                        ),
-                        onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
-                      ),
+                      );
+                    }
+                    return _BrowserTabPage(
+                      key: ValueKey<TabId>(tab.tabId),
+                      child: TickerMode(enabled: pageIsActive, child: page),
                     );
-                  }
-                  return _BrowserTabPage(
-                    key: ValueKey<TabId>(tab.tabId),
-                    child: TickerMode(enabled: pageIsActive, child: page),
-                  );
-                },
+                  },
+                ),
               ),
             ),
           ],
@@ -516,13 +668,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell> {
       drawer: drawer,
       onDrawerChanged: _onDrawerChanged,
       onEdgeGestureChanged: _onEdgeDrawerGestureChanged,
+      edgeGestureTop: browserChromeBottom(),
+      edgeGestureTopBuilder: browserChromeBottom,
+      canStartGestureAt: (position) => position.dy >= browserChromeBottom(),
       // Reserve the left edge of the viewport for drawer opening while the
       // PageView keeps native swipes everywhere else.
       canOpenFromAnywhere: !(tabsEnabled && hasMultipleTabs) || isFirstTab,
-      edgeGestureTop:
-          MediaQuery.paddingOf(context).top +
-          kToolbarHeight +
-          (tabsEnabled && tabs.isNotEmpty ? kBrowserTabStripHeight : 0),
       backGestureInsetLeft: systemBackGestureInsetLeft < 24
           ? 24
           : systemBackGestureInsetLeft,

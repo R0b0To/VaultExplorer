@@ -15,6 +15,8 @@ class FullScreenDragDrawer extends StatefulWidget {
     required this.drawer,
     this.canOpenFromAnywhere = true,
     this.edgeGestureTop = 0,
+    this.edgeGestureTopBuilder,
+    this.canStartGestureAt,
     this.backGestureInsetLeft = 24,
     this.onDrawerChanged,
     this.onEdgeGestureChanged,
@@ -24,6 +26,8 @@ class FullScreenDragDrawer extends StatefulWidget {
   final Widget? drawer;
   final bool canOpenFromAnywhere;
   final double edgeGestureTop;
+  final double Function()? edgeGestureTopBuilder;
+  final bool Function(Offset position)? canStartGestureAt;
   final double backGestureInsetLeft;
   final ValueChanged<bool>? onDrawerChanged;
   final ValueChanged<bool>? onEdgeGestureChanged;
@@ -132,9 +136,15 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     if (event.position.dx <= widget.backGestureInsetLeft) return;
 
     final startValue = _controller.value;
+    if (startValue <= 0.001 &&
+        widget.canStartGestureAt?.call(event.position) == false) {
+      return;
+    }
+    final edgeGestureTop =
+        widget.edgeGestureTopBuilder?.call() ?? widget.edgeGestureTop;
     final startsAtOpenEdge =
         event.position.dx <= widget.backGestureInsetLeft + _drawerEdgeWidth &&
-        event.position.dy >= widget.edgeGestureTop;
+        event.position.dy >= edgeGestureTop;
     if (startValue <= 0.001 &&
         !widget.canOpenFromAnywhere &&
         !startsAtOpenEdge) {

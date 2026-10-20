@@ -312,20 +312,15 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     final active = state.activeTab;
-    final tabsEnabled = ref
-        .read(appSettingsControllerProvider)
-        .settings
-        .useBrowserTabs;
-    if (active?.isDashboard == true) {
-      // The Dashboard is the current workspace page. Opening a vault replaces
-      // it in place so the user can browse without an extra, implicit tab.
+    if (active == null) {
+      if (actions.openTab(container) == null) {
+        _showBrowserTabLimit();
+        return;
+      }
+    } else if (active.isDashboard || active.volId != container.volId) {
+      // Regular navigation from the sidebar or Dashboard stays in the current
+      // tab. The drawer's explicit long-press action owns new-tab creation.
       actions.replaceActive(container);
-    } else if (active?.volId != container.volId && !tabsEnabled) {
-      actions.replaceActive(container);
-    } else if (active?.volId != container.volId &&
-        actions.openTab(container) == null) {
-      _showBrowserTabLimit();
-      return;
     }
     setState(() {
       _index = 0;

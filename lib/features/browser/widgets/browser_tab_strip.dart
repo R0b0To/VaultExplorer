@@ -218,7 +218,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.close,
           Icons.close_rounded,
           l10n.browserTabClose,
-          enabled: state.tabs.length > 1 && !tab.isPinnedDashboard,
+          enabled: state.tabs.length > 1,
         ),
         item(
           _TabMenuAction.closeOthers,
@@ -411,6 +411,10 @@ class _TabItem extends ConsumerWidget {
 
     return Tooltip(
       message: folderLabel == null ? name : '$name / $folderLabel',
+      // Long-press belongs to ReorderableDelayedDragStartListener above this
+      // tab. Letting Tooltip use its default long-press trigger consumes the
+      // gesture and shows the label instead of starting a drag.
+      triggerMode: TooltipTriggerMode.manual,
       child: Material(
         color: active ? activeBackground : Colors.transparent,
         borderRadius: BorderRadius.circular(8),

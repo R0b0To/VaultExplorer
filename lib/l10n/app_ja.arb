@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "前のタブに切り替え",
   "browserTabOpenInNewTab": "新しいタブで開く",
   "browserTabLimitReached": "タブの上限に達しました（{max}）",
+  "browserTabCloseToLeft": "左側のタブを閉じる",
+  "browserTabCloseToRight": "右側のタブを閉じる",
   "browserTabCloseAll": "すべて閉じる"
 }

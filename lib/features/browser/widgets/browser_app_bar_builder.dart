@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -572,18 +573,25 @@ PreferredSizeWidget buildBrowserAppBar(
     leading: Builder(
       builder: (ctx) {
         final scaffold = Scaffold.maybeOf(ctx);
+        final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
 
         // If a sidebar drawer is present, ALWAYS show the hamburger icon so
         // the user can open the sidebar from any subfolder depth.
         // Folder-up navigation is handled by system back gesture, breadcrumbs, and title menu.
-        if (scaffold?.hasDrawer == true) {
+        if (fullScreenDrawer != null || scaffold?.hasDrawer == true) {
           return IconButton(
             icon: Icon(
               Icons.menu_rounded,
               color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
             tooltip: context.l10n.storageLocationsTitle,
-            onPressed: () => scaffold!.openDrawer(),
+            onPressed: () {
+              if (fullScreenDrawer != null) {
+                fullScreenDrawer.openDrawer();
+              } else {
+                scaffold!.openDrawer();
+              }
+            },
           );
         }
 

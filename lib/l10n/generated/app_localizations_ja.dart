@@ -11581,5 +11581,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => '左側のタブを閉じる';
+
+  @override
+  String get browserTabCloseToRight => '右側のタブを閉じる';
+
+  @override
   String get browserTabCloseAll => 'すべて閉じる';
 }

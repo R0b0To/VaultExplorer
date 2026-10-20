@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Passa alla scheda precedente",
   "browserTabOpenInNewTab": "Apri in una nuova scheda",
   "browserTabLimitReached": "Limite di schede raggiunto ({max})",
+  "browserTabCloseToLeft": "Chiudi schede a sinistra",
+  "browserTabCloseToRight": "Chiudi schede a destra",
   "browserTabCloseAll": "Chiudi tutto"
 }

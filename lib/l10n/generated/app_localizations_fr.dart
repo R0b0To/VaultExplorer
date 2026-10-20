@@ -12364,5 +12364,11 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => 'Fermer les onglets à gauche';
+
+  @override
+  String get browserTabCloseToRight => 'Fermer les onglets à droite';
+
+  @override
   String get browserTabCloseAll => 'Fermer tout';
 }

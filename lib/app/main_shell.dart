@@ -12,6 +12,8 @@ import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/data/models/vault_list_item.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -21,12 +23,15 @@ import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controll
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
+import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
+import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final bool hideDashboardUntilShareHandled;
@@ -313,6 +318,112 @@ class _MainShellState extends ConsumerState<MainShell> {
     });
   }
 
+  void _openVaultFromDrawer(VaultListItem item) {
+    switch (item) {
+      case MountedVaultItem(:final container):
+        _openBrowser(container);
+      case LockedVaultItem(:final record):
+        // Reuse the dashboard's unlock flow when its location is mounted.
+        // If the Dashboard tab was closed, present the same flow from the
+        // shell instead of switching to Dashboard just to reach its widget.
+        final dashboard = _dashboardKey.currentState;
+        if (dashboard != null) {
+          dashboard.openItem(item);
+        } else {
+          unawaited(_showDrawerUnlock(record));
+        }
+    }
+  }
+
+  Future<void> _showDrawerUnlock(ContainerRecord record) async {
+    final state = ref.read(vaultDashboardControllerProvider);
+    if (state.mounted.any((container) => container.uri == record.uri)) {
+      showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
+      return;
+    }
+    if (state.actionInFlight) return;
+
+    final controller = ref.read(vaultDashboardControllerProvider.notifier);
+    final repository = ref.read(containerRepositoryProvider);
+    final navigator = Navigator.of(context);
+    controller.setActionInFlight(true);
+
+    MountedContainer? newlyMountedContainer;
+    try {
+      final rememberedPassword =
+          record.unlockMethod == ContainerUnlockMethod.rememberPassword
+          ? await repository.getPassword(record.uri)
+          : null;
+      if (!mounted) return;
+
+      final autoOpen = state.appSettings.autoOpenOnUnlock;
+      if (record.isUsbSource) {
+        await navigator.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => SkinAreaScope(
+              area: SkinArea.dashboard,
+              child: UsbUnlockSheet(
+                existingRecord: record,
+                prefillPassword: rememberedPassword,
+                documentProvider: record.documentProvider,
+                autoMountFolders: record.documentProviderFolders
+                    .where((folder) => folder.autoMount)
+                    .map((folder) => folder.path)
+                    .toList(),
+                onMounted: (container, {record}) {
+                  controller.onContainerMounted(container, record: record);
+                  newlyMountedContainer = container;
+                  if (autoOpen && mounted) _openBrowser(container);
+                },
+                onReconnected: (container, migratedRecord, oldUri) {
+                  controller.onUsbContainerReconnected(
+                    container,
+                    migratedRecord,
+                    oldUri,
+                  );
+                  newlyMountedContainer = container;
+                },
+              ),
+            ),
+          ),
+        );
+      } else {
+        await navigator.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => SkinAreaScope(
+              area: SkinArea.dashboard,
+              child: UnlockSheet(
+                initialUri: record.uri,
+                initialName: record.label,
+                prefillPassword: rememberedPassword,
+                documentProvider: record.documentProvider,
+                autoMountFolders: record.documentProviderFolders
+                    .where((folder) => folder.autoMount)
+                    .map((folder) => folder.path)
+                    .toList(),
+                mountedUris: state.mounted
+                    .map((container) => container.uri)
+                    .toList(),
+                onMounted: (container, {record}) {
+                  controller.onContainerMounted(container, record: record);
+                  newlyMountedContainer = container;
+                  if (autoOpen && mounted) _openBrowser(container);
+                },
+              ),
+            ),
+          ),
+        );
+      }
+
+      await controller.loadAll();
+      if (newlyMountedContainer != null) {
+        await controller.refreshContainerSpace(newlyMountedContainer!.volId);
+      }
+    } finally {
+      controller.setActionInFlight(false);
+    }
+  }
+
   void _onBrowserTabsChanged(BrowserTabsController? tabs) {
     _browserTabs?.removeListener(_onBrowserTabsUpdated);
     _browserTabs = tabs;
@@ -527,12 +638,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           }
           _openBrowser(container);
         },
-        onUnlockVault: (item) {
-          _onTabTap(0);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _dashboardKey.currentState?.openItem(item);
-          });
-        },
+        onUnlockVault: _openVaultFromDrawer,
         onAddVault: () {
           _onTabTap(0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -595,6 +701,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
 
     final Widget scaffold = Scaffold(
+      // Tools and Settings have no horizontal pager, so let a drawer drag
+      // start anywhere in their content, too.
       drawerEdgeDragWidth: double.maxFinite,
       drawerEnableOpenDragGesture: _index != 0,
       drawer: isHidden ? null : buildDrawer(),

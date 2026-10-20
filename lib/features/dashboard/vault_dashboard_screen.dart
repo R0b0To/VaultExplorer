@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -432,16 +433,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         (widget.onNewBrowserTab ?? _openDashboardNewTab)();
         return;
       }
-      if (distance > 0.0 && startIndex == 0) {
-        _scaffoldKey.currentState?.openDrawer();
-        return;
-      }
       // The host PageView handles tab changes so a drag can be released or
       // cancelled while its neighboring page tracks the gesture.
       return;
     }
-
-    if (distance > 0.0) _scaffoldKey.currentState?.openDrawer();
   }
 
   @override
@@ -981,23 +976,17 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   }
 
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
-    final state = ref.read(vaultDashboardControllerProvider);
+    final dashboardController = _container.read(
+      vaultDashboardControllerProvider.notifier,
+    );
+    final state = _container.read(vaultDashboardControllerProvider);
     if (uri != null && state.mounted.any((c) => c.uri == uri)) {
       showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
       return;
     }
     if (state.actionInFlight) return;
-    ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
+    dashboardController.setActionInFlight(true);
 
-    String? rememberedPassword;
-    if (uri != null) {
-      final record = state.records[uri];
-      if (record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-        rememberedPassword = await ref
-            .read(containerRepositoryProvider)
-            .getPassword(uri);
-      }
-    }
     final record = uri != null ? state.records[uri] : null;
     final docProvider =
         record?.documentProvider ?? state.appSettings.defaultDocumentProvider;
@@ -1011,6 +1000,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
 
     MountedContainer? newlyMountedContainer;
     try {
+      String? rememberedPassword;
+      if (uri != null &&
+          record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+        rememberedPassword = await _container
+            .read(containerRepositoryProvider)
+            .getPassword(uri);
+      }
       if (!mounted) return;
       await Navigator.push(
         context,
@@ -1019,9 +1015,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             area: SkinArea.dashboard,
             child: UnlockSheet(
               onMounted: (container, {record}) {
-                ref
-                    .read(vaultDashboardControllerProvider.notifier)
-                    .onContainerMounted(container, record: record);
+                dashboardController.onContainerMounted(
+                  container,
+                  record: record,
+                );
                 newlyMountedContainer = container;
                 if (autoOpen && widget.onOpenBrowser != null) {
                   widget.onOpenBrowser!(container);
@@ -1040,38 +1037,40 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           ),
         ),
       );
-      if (mounted) {
-        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-        if (newlyMountedContainer != null) {
-          ref
-              .read(vaultDashboardControllerProvider.notifier)
-              .refreshContainerSpace(newlyMountedContainer!.volId);
-        }
+      await dashboardController.loadAll();
+      if (newlyMountedContainer != null) {
+        await dashboardController.refreshContainerSpace(
+          newlyMountedContainer!.volId,
+        );
       }
     } finally {
-      if (mounted)
-        ref
-            .read(vaultDashboardControllerProvider.notifier)
-            .setActionInFlight(false);
+      // Opening a vault can replace the dashboard tab while this route is
+      // still open. The shared controller outlives that widget, so always
+      // release the guard even if the dashboard itself has been disposed.
+      dashboardController.setActionInFlight(false);
     }
   }
 
   Future<void> _showUsbUnlockSheet({ContainerRecord? existingRecord}) async {
-    final state = ref.read(vaultDashboardControllerProvider);
+    final dashboardController = _container.read(
+      vaultDashboardControllerProvider.notifier,
+    );
+    final state = _container.read(vaultDashboardControllerProvider);
     if (state.actionInFlight) return;
-    ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
+    dashboardController.setActionInFlight(true);
 
-    String? rememberedPassword;
-    if (existingRecord != null &&
-        existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-      rememberedPassword = await ref
-          .read(containerRepositoryProvider)
-          .getPassword(existingRecord.uri);
-    }
     final autoOpen = state.appSettings.autoOpenOnUnlock;
 
     MountedContainer? newlyMountedContainer;
     try {
+      String? rememberedPassword;
+      if (existingRecord != null &&
+          existingRecord.unlockMethod ==
+              ContainerUnlockMethod.rememberPassword) {
+        rememberedPassword = await _container
+            .read(containerRepositoryProvider)
+            .getPassword(existingRecord.uri);
+      }
       if (!mounted) return;
       await Navigator.push(
         context,
@@ -1080,22 +1079,21 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             area: SkinArea.dashboard,
             child: UsbUnlockSheet(
               onMounted: (container, {record}) {
-                ref
-                    .read(vaultDashboardControllerProvider.notifier)
-                    .onContainerMounted(container, record: record);
+                dashboardController.onContainerMounted(
+                  container,
+                  record: record,
+                );
                 newlyMountedContainer = container;
                 if (autoOpen && widget.onOpenBrowser != null) {
                   widget.onOpenBrowser!(container);
                 }
               },
               onReconnected: (container, migratedRecord, oldUri) {
-                ref
-                    .read(vaultDashboardControllerProvider.notifier)
-                    .onUsbContainerReconnected(
-                      container,
-                      migratedRecord,
-                      oldUri,
-                    );
+                dashboardController.onUsbContainerReconnected(
+                  container,
+                  migratedRecord,
+                  oldUri,
+                );
                 newlyMountedContainer = container;
               },
               openBrowserRoute: autoOpen && widget.onOpenBrowser == null
@@ -1116,19 +1114,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           ),
         ),
       );
-      if (mounted) {
-        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-        if (newlyMountedContainer != null) {
-          ref
-              .read(vaultDashboardControllerProvider.notifier)
-              .refreshContainerSpace(newlyMountedContainer!.volId);
-        }
+      await dashboardController.loadAll();
+      if (newlyMountedContainer != null) {
+        await dashboardController.refreshContainerSpace(
+          newlyMountedContainer!.volId,
+        );
       }
     } finally {
-      if (mounted)
-        ref
-            .read(vaultDashboardControllerProvider.notifier)
-            .setActionInFlight(false);
+      dashboardController.setActionInFlight(false);
     }
   }
 
@@ -1463,7 +1456,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             onActivateTab: widget.onActivateBrowserTab,
           );
 
-    return Listener(
+    final isDrawerHosted = FullScreenDragDrawerScope.maybeOf(context) != null;
+    final Widget screen = Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: _handleDashboardPointerDown,
       onPointerMove: _handleDashboardPointerMove,
@@ -1476,7 +1470,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             ? null
             : Colors.transparent,
         drawerEnableOpenDragGesture: false,
-        drawer: _buildDrawer(tabs: browserTabs),
+        drawer: null,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -1512,8 +1506,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
                                     ).appBarTheme.foregroundColor,
                                   ),
                                   tooltip: context.l10n.storageLocationsTitle,
-                                  onPressed: () =>
-                                      Scaffold.of(ctx).openDrawer(),
+                                  onPressed: () {
+                                    final drawer =
+                                        FullScreenDragDrawerScope.maybeOf(ctx);
+                                    if (drawer != null) {
+                                      drawer.openDrawer();
+                                    } else {
+                                      Scaffold.of(ctx).openDrawer();
+                                    }
+                                  },
                                 ),
                               ),
                               title: Text(
@@ -1658,6 +1659,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           ),
         ),
       ),
+    );
+
+    if (isDrawerHosted) return screen;
+    return FullScreenDragDrawer(
+      drawer: _buildDrawer(tabs: browserTabs),
+      child: screen,
     );
   }
 }

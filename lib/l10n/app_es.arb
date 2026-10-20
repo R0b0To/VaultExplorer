@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Cambiar a la pestaña anterior",
   "browserTabOpenInNewTab": "Abrir en una pestaña nueva",
   "browserTabLimitReached": "Límite de pestañas alcanzado ({max})",
+  "browserTabCloseToLeft": "Cerrar pestañas a la izquierda",
+  "browserTabCloseToRight": "Cerrar pestañas a la derecha",
   "browserTabCloseAll": "Cerrar todo"
 }

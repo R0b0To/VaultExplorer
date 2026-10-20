@@ -42,16 +42,17 @@ class BrowserLocationIcon extends StatelessWidget {
   }
 }
 
-enum _TabMenuAction { newTab, close, closeOthers, closeAll, duplicate }
+enum _TabMenuAction { close, closeOthers, closeToLeft, closeToRight, duplicate }
 
 /// Height of the strip; matches the text editor's tab strip.
 const double kBrowserTabStripHeight = 40;
 const double kBrowserTabItemWidth = 148;
 
-/// File-manager tab strip with a fixed More menu and a horizontally scrollable
-/// reorderable row of tabs. Tapping switches tabs; tapping the active tab opens
-/// its operation menu; long-press and drag reorder tabs. The tab controller
-/// retains its horizontal offset while the strip moves between screens.
+/// File-manager tab strip with a horizontally scrollable reorderable row of
+/// tabs and a fixed new-tab button. Tapping switches tabs; tapping the active
+/// tab opens its operation menu; long-press and drag reorder tabs. The tab
+/// controller retains its horizontal offset while the strip moves between
+/// screens.
 class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsController controller;
   final VoidCallback onNewTab;
@@ -199,18 +200,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
     final c = widget.controller;
     final l10n = tabContext.l10n;
+    final tabIndex = c.tabs.indexWhere((entry) => entry.key == tab.key);
     final choice = await showMenu<_TabMenuAction>(
       context: tabContext,
       position: RelativeRect.fromRect(anchor, Offset.zero & overlayBox.size),
       items: [
-        item(_TabMenuAction.newTab, Icons.add_rounded, l10n.browserTabNew),
-        item(
-          _TabMenuAction.duplicate,
-          Icons.copy_all_rounded,
-          l10n.browserTabDuplicate,
-          enabled: tab.isDashboard || !c.atLimit,
-        ),
-        const PopupMenuDivider(),
         item(
           _TabMenuAction.close,
           Icons.close_rounded,
@@ -224,44 +218,39 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           enabled: c.length > 1,
         ),
         item(
-          _TabMenuAction.closeAll,
-          Icons.clear_all_rounded,
-          l10n.browserTabCloseAll,
-          enabled: c.hasBrowserTabs && c.length > 1,
+          _TabMenuAction.closeToLeft,
+          Icons.arrow_back_rounded,
+          l10n.browserTabCloseToLeft,
+          enabled: tabIndex > 0,
+        ),
+        item(
+          _TabMenuAction.closeToRight,
+          Icons.arrow_forward_rounded,
+          l10n.browserTabCloseToRight,
+          enabled: tabIndex >= 0 && tabIndex < c.length - 1,
+        ),
+        const PopupMenuDivider(),
+        item(
+          _TabMenuAction.duplicate,
+          Icons.copy_all_rounded,
+          l10n.browserTabDuplicate,
+          enabled: tab.isDashboard || !c.atLimit,
         ),
       ],
     );
     if (!mounted || choice == null || c.tabForKey(tab.key) == null) return;
 
     switch (choice) {
-      case _TabMenuAction.newTab:
-        widget.onNewTab();
       case _TabMenuAction.close:
         c.closeTab(tab.key);
       case _TabMenuAction.closeOthers:
         c.closeOthers(tab.key);
-      case _TabMenuAction.closeAll:
-        c.closeAll();
+      case _TabMenuAction.closeToLeft:
+        c.closeToLeft(tab.key);
+      case _TabMenuAction.closeToRight:
+        c.closeToRight(tab.key);
       case _TabMenuAction.duplicate:
         widget.onDuplicate(tab);
-    }
-  }
-
-  void _onMenuAction(_TabMenuAction choice) {
-    final c = widget.controller;
-    final active = c.activeTab;
-    if (active == null) return;
-    switch (choice) {
-      case _TabMenuAction.newTab:
-        widget.onNewTab();
-      case _TabMenuAction.close:
-        c.closeTab(active.key);
-      case _TabMenuAction.closeOthers:
-        c.closeOthers(active.key);
-      case _TabMenuAction.closeAll:
-        c.closeAll();
-      case _TabMenuAction.duplicate:
-        widget.onDuplicate(active);
     }
   }
 
@@ -279,7 +268,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       listenable: c,
       builder: (context, _) {
         final tabs = c.tabs;
-        final active = c.activeTab;
         final liveTabKeys = tabs.map((tab) => tab.key).toSet();
         _tabItemKeys.removeWhere((key, _) => !liveTabKeys.contains(key));
         _scrollActiveIntoView();
@@ -297,73 +285,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           ),
           child: Row(
             children: [
-              SizedBox(
-                width: 44,
-                child: PopupMenuButton<_TabMenuAction>(
-                  tooltip: context.l10n.moreOptionsTooltip,
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.more_vert_rounded, size: 20),
-                  onSelected: _onMenuAction,
-                  itemBuilder: (context) => [
-                    PopupMenuItem<_TabMenuAction>(
-                      value: _TabMenuAction.newTab,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.add_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Text(context.l10n.browserTabNew),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem<_TabMenuAction>(
-                      value: _TabMenuAction.duplicate,
-                      enabled:
-                          active != null && (active.isDashboard || !c.atLimit),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.copy_all_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Text(context.l10n.browserTabDuplicate),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<_TabMenuAction>(
-                      value: _TabMenuAction.close,
-                      enabled: active != null && c.length > 1,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.close_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Text(context.l10n.browserTabClose),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<_TabMenuAction>(
-                      value: _TabMenuAction.closeOthers,
-                      enabled: active != null && c.length > 1,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.tab_unselected_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Text(context.l10n.browserTabCloseOthers),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<_TabMenuAction>(
-                      value: _TabMenuAction.closeAll,
-                      enabled: c.hasBrowserTabs && c.length > 1,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.clear_all_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Text(context.l10n.browserTabCloseAll),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Expanded(
                 child: ReorderableListView.builder(
                   key: PageStorageKey<String>(widget.storageKey),
@@ -421,6 +342,13 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   },
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.add_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+                tooltip: context.l10n.browserTabNew,
+                onPressed: widget.onNewTab,
+              ),
+              const SizedBox(width: 4),
             ],
           ),
         );

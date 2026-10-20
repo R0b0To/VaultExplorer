@@ -269,12 +269,34 @@ class BrowserTabsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Closes tabs before [key] while keeping that location active.
+  void closeToLeft(int key) => _closeOnSide(key, closeLeft: true);
+
+  /// Closes tabs after [key] while keeping that location active.
+  void closeToRight(int key) => _closeOnSide(key, closeLeft: false);
+
+  void _closeOnSide(int key, {required bool closeLeft}) {
+    final index = _tabs.indexWhere((tab) => tab.key == key);
+    if (index < 0) return;
+    final removedKeys = closeLeft
+        ? _tabs.take(index).map((tab) => tab.key).toSet()
+        : _tabs.skip(index + 1).map((tab) => tab.key).toSet();
+    if (removedKeys.isEmpty) return;
+
+    _tabs.removeWhere((tab) => removedKeys.contains(tab.key));
+    if (removedKeys.contains(_activeKey)) _activeKey = key;
+    if (_previousKey != null && removedKeys.contains(_previousKey)) {
+      _previousKey = null;
+    }
+    if (_previousKey == _activeKey) _previousKey = null;
+    notifyListeners();
+  }
+
   /// Closes all file tabs, keeping the Dashboard root tab when present.
+  /// Kept for callers that need bulk cleanup; the tab menu exposes the more
+  /// precise close-to-left/right operations instead.
   void closeAll() {
     if (_tabs.length <= 1 || !hasBrowserTabs) return;
-    // Prefer Dashboard as the surviving location, matching the existing
-    // Close all behavior. Hosts without a Dashboard tab retain the active
-    // location instead of ending up with an empty tab strip.
     final survivor = activeTab?.isDashboard == true
         ? activeTab
         : dashboardTab ?? activeTab;

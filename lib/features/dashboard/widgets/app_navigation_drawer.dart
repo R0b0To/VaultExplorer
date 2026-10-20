@@ -593,7 +593,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     Navigator.of(context).canPop()) {
                                   Navigator.of(context).pop();
                                 }
-                                onSelectTab?.call(0);
+                                if (!keepBrowserTabsOnNavigate) {
+                                  onSelectTab?.call(0);
+                                }
                                 WidgetsBinding.instance.addPostFrameCallback((
                                   _,
                                 ) {

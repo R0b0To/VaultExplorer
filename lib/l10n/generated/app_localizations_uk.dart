@@ -12348,5 +12348,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => 'Закрити вкладки ліворуч';
+
+  @override
+  String get browserTabCloseToRight => 'Закрити вкладки праворуч';
+
+  @override
   String get browserTabCloseAll => 'Закрити всі';
 }

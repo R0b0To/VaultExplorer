@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Alternar para a aba anterior",
   "browserTabOpenInNewTab": "Abrir em nova aba",
   "browserTabLimitReached": "Limite de abas atingido ({max})",
+  "browserTabCloseToLeft": "Fechar abas à esquerda",
+  "browserTabCloseToRight": "Fechar abas à direita",
   "browserTabCloseAll": "Fechar tudo"
 }

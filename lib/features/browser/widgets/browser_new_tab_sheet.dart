@@ -1,10 +1,13 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 
 /// Where a new tab should open: a container and, optionally, a directory in
@@ -38,7 +41,34 @@ class BrowserNewTabSheet extends ConsumerWidget {
     required List<MountedContainer> mountedVaults,
     required MountedContainer? primaryLocalContainer,
     bool allowDashboard = true,
-  }) {
+  }) async {
+    var localContainer = primaryLocalContainer;
+    if (localContainer == null &&
+        currentContainer?.isPrimaryLocalStorage == true) {
+      localContainer = currentContainer;
+    }
+    if (localContainer == null) {
+      try {
+        final providerContainer = ProviderScope.containerOf(
+          context,
+          listen: false,
+        );
+        final hasAccess = await providerContainer
+            .read(vaultLifecycleApiProvider)
+            .hasAllFilesAccess();
+        if (hasAccess) {
+          final root = await const DecoyLocalRepository().primaryRoot();
+          if (!context.mounted) return null;
+          localContainer = buildLocalStorageContainer(
+            rootPath: root.path,
+            displayName: context.l10n.localStorageCardTitle,
+          );
+        }
+      } catch (_) {
+        // The picker remains usable when local storage is unavailable.
+      }
+    }
+    if (!context.mounted) return null;
     return showModalBottomSheet<BrowserNewTabChoice>(
       context: context,
       isScrollControlled: true,
@@ -52,7 +82,7 @@ class BrowserNewTabSheet extends ConsumerWidget {
         currentContainer: currentContainer,
         currentDirPath: currentDirPath,
         mountedVaults: mountedVaults,
-        primaryLocalContainer: primaryLocalContainer,
+        primaryLocalContainer: localContainer,
         allowDashboard: allowDashboard,
       ),
     );

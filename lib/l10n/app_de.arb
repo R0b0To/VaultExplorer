@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Zum vorherigen Tab wechseln",
   "browserTabOpenInNewTab": "In neuem Tab öffnen",
   "browserTabLimitReached": "Tab-Limit erreicht ({max})",
+  "browserTabCloseToLeft": "Tabs links schließen",
+  "browserTabCloseToRight": "Tabs rechts schließen",
   "browserTabCloseAll": "Alle schließen"
 }

@@ -20443,6 +20443,18 @@ abstract class AppLocalizations {
   /// **'Tab limit reached ({max})'**
   String browserTabLimitReached(int max);
 
+  /// Action that closes file manager tabs to the left of the selected tab
+  ///
+  /// In en, this message translates to:
+  /// **'Close tabs to the left'**
+  String get browserTabCloseToLeft;
+
+  /// Action that closes file manager tabs to the right of the selected tab
+  ///
+  /// In en, this message translates to:
+  /// **'Close tabs to the right'**
+  String get browserTabCloseToRight;
+
   /// Action in the file manager's tab menu that closes every tab (and with it the file manager)
   ///
   /// In en, this message translates to:

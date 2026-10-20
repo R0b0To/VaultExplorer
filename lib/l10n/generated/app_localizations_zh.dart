@@ -11399,5 +11399,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => '关闭左侧标签页';
+
+  @override
+  String get browserTabCloseToRight => '关闭右侧标签页';
+
+  @override
   String get browserTabCloseAll => '关闭所有';
 }

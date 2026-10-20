@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_controller.dart';
@@ -67,7 +68,7 @@ Route<void> buildBrowserTabsRoute({
   required MountedContainer? Function(int volId) resolveContainer,
   required List<MountedContainer> Function() mountedContainers,
   required MountedContainer? Function() primaryLocalContainer,
-  Widget Function(BrowserTabsController tabs, int currentVolId)? drawerBuilder,
+  Widget Function(BrowserTabsController tabs, int? currentVolId)? drawerBuilder,
   VoidCallback? Function(int volId)? userActivityFor,
   ValueChanged<BrowserTabsController?>? onTabsController,
   bool closeRouteWhenEmpty = true,
@@ -110,7 +111,7 @@ class BrowserTabsHost extends ConsumerStatefulWidget {
 
   /// Builds the navigation drawer for a tab on [currentVolId]. The drawer's
   /// "switch vault" actions should call `tabs.replaceActive` while hosted.
-  final Widget Function(BrowserTabsController tabs, int currentVolId)?
+  final Widget Function(BrowserTabsController tabs, int? currentVolId)?
   drawerBuilder;
 
   /// Returns the auto-lock activity callback for the tab on [volId]. Only
@@ -176,6 +177,7 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
   bool _pageSyncScheduled = false;
   int _pagePointerCount = 0;
   int? _lastActiveTabKey;
+  int _lastTabCount = 0;
 
   @override
   void initState() {
@@ -185,6 +187,7 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
       includeDashboardTab: widget.includeDashboardTab,
     );
     _lastActiveTabKey = _tabs.activeKey;
+    _lastTabCount = _tabs.length;
     _pageController = PageController(initialPage: _tabs.activeIndex);
     _pagePosition = ValueNotifier(_tabs.activeIndex.toDouble());
     _pageController.addListener(_updatePagePosition);
@@ -229,6 +232,17 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
   }
 
   void _onTabsChanged() {
+    final tabCount = _tabs.length;
+    final tabsWereRemoved = tabCount < _lastTabCount;
+    _lastTabCount = tabCount;
+    if (tabsWereRemoved &&
+        !_pageDragActive &&
+        tabCount > 0 &&
+        _pageController.hasClients) {
+      // A shorter PageView can leave its old page outside the new extent for
+      // a frame. Move to the surviving tab before painting that empty range.
+      _pageController.jumpToPage(_tabs.activeIndex);
+    }
     _schedulePageSync();
     final liveTabKeys = _tabs.tabs.map((tab) => tab.key).toSet();
     final activeKey = _tabs.activeKey;
@@ -517,7 +531,6 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
                 tabStrip: strip,
                 initialPath: tab.initialPath,
                 resolveContainer: widget.resolveContainer,
-                drawer: widget.drawerBuilder?.call(_tabs, tab.volId!),
                 onDrawerChanged: (isOpen) =>
                     _onTabDrawerChanged(tab.key, isOpen),
                 onBackToDashboard: widget.closeRouteWhenEmpty
@@ -549,7 +562,28 @@ class _BrowserTabsHostState extends ConsumerState<BrowserTabsHost> {
       ),
     );
 
-    return pageView;
+    final activeTab = _tabs.activeTab;
+    final drawer = activeTab == null
+        ? null
+        : widget.drawerBuilder?.call(
+            _tabs,
+            activeTab.isDashboard ? null : activeTab.volId,
+          );
+
+    return FullScreenDragDrawer(
+      drawer: drawer,
+      canOpenFromAnywhere: _tabs.activeIndex == 0,
+      onDrawerChanged: (isOpen) {
+        final tab = _tabs.activeTab;
+        if (tab != null && !tab.isDashboard) {
+          _onTabDrawerChanged(tab.key, isOpen);
+        }
+      },
+      child: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: pageView,
+      ),
+    );
   }
 }
 

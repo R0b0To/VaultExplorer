@@ -11580,5 +11580,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => '왼쪽 탭 닫기';
+
+  @override
+  String get browserTabCloseToRight => '오른쪽 탭 닫기';
+
+  @override
   String get browserTabCloseAll => '모두 닫기';
 }

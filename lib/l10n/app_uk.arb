@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Перейти на попередню вкладку",
   "browserTabOpenInNewTab": "Відкрити в новій вкладці",
   "browserTabLimitReached": "Досягнуто ліміту вкладок ({max})",
+  "browserTabCloseToLeft": "Закрити вкладки ліворуч",
+  "browserTabCloseToRight": "Закрити вкладки праворуч",
   "browserTabCloseAll": "Закрити всі"
 }

@@ -12259,5 +12259,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => 'Chiudi schede a sinistra';
+
+  @override
+  String get browserTabCloseToRight => 'Chiudi schede a destra';
+
+  @override
   String get browserTabCloseAll => 'Chiudi tutto';
 }

@@ -12290,5 +12290,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => 'إغلاق علامات التبويب إلى اليسار';
+
+  @override
+  String get browserTabCloseToRight => 'إغلاق علامات التبويب إلى اليمين';
+
+  @override
   String get browserTabCloseAll => 'إغلاق الكل';
 }

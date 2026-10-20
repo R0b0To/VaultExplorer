@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "Passer à l'onglet précédent",
   "browserTabOpenInNewTab": "Ouvrir dans un nouvel onglet",
   "browserTabLimitReached": "Limite d'onglets atteinte ({max})",
+  "browserTabCloseToLeft": "Fermer les onglets à gauche",
+  "browserTabCloseToRight": "Fermer les onglets à droite",
   "browserTabCloseAll": "Fermer tout"
 }

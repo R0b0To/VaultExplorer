@@ -3381,5 +3381,7 @@
   "browserTabSwitchPrevious": "التبديل إلى علامة التبويب السابقة",
   "browserTabOpenInNewTab": "فتح في علامة تبويب جديدة",
   "browserTabLimitReached": "تم بلوغ حد علامات التبويب ({max})",
+  "browserTabCloseToLeft": "إغلاق علامات التبويب إلى اليسار",
+  "browserTabCloseToRight": "إغلاق علامات التبويب إلى اليمين",
   "browserTabCloseAll": "إغلاق الكل"
 }

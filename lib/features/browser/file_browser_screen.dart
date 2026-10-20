@@ -103,6 +103,7 @@ import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -295,17 +296,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         widget.onSwipeToNewTab?.call();
         return;
       }
-      if (distance > 0.0 && startIndex == 0) {
-        _scaffoldKey.currentState?.openDrawer();
-        return;
-      }
       // PageView owns in-range navigation so the page follows the pointer
       // and can settle back to the current tab when the drag is cancelled.
       return;
-    }
-
-    if (distance > 0.0 && widget.drawer != null) {
-      _scaffoldKey.currentState?.openDrawer();
     }
   }
 
@@ -2053,9 +2046,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   // ── Selection (FileBrowserSelection controller) ──────────────────────────
   Set<RawEntry> get selectedItems =>
       ref.read(fileBrowserSelectionProvider(_stateKey)).items;
-  bool get isSelectionMode => _tabsCtrl == null
-      ? ref.read(fileBrowserSelectionProvider(_stateKey)).isSelectionMode
-      : _selectedBrowserEntries.isNotEmpty;
+  // The action bar can aggregate selected items across tabs, but each tab
+  // enters selection mode only after the user selects something in that tab.
+  bool get isSelectionMode =>
+      ref.read(fileBrowserSelectionProvider(_stateKey)).isSelectionMode;
   int get selectedFolderCount =>
       ref.read(fileBrowserSelectionProvider(_stateKey)).selectedFolderCount;
   int get selectedTotalBytes =>
@@ -2240,6 +2234,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   /// so both entry points into selection feel the same.
   void _handleIconTap(RawEntry entry) {
     _signalActivity();
+    if (!isSelectionMode && _selectedBrowserEntryCount > 0) {
+      if (entry.isDir) {
+        _handleDirTap(entry);
+      } else {
+        unawaited(_handleFileTap(entry));
+      }
+      return;
+    }
     HapticFeedback.selectionClick();
     toggleSelectItem(entry);
   }
@@ -5017,8 +5019,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // at its root it returns to Dashboard when available and keeps the file
     // tab open.
     final bool isActiveTab = _isActiveTab;
-    final bool atBrowserRoot =
-        _atRoot && !_selectionBarVisible && !_searchActive;
+    final bool atBrowserRoot = _atRoot && !isSelectionMode && !_searchActive;
     final bool canPop =
         !isActiveTab || (atBrowserRoot && widget.tabKey == null);
     final systemOverlayStyle =
@@ -5059,7 +5060,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         ? _pinTabChrome(browserBottomBar)
         : IgnorePointer(child: Opacity(opacity: 0, child: browserBottomBar));
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    final isDrawerHosted = FullScreenDragDrawerScope.maybeOf(context) != null;
+    final Widget screen = AnnotatedRegion<SystemUiOverlayStyle>(
       value: systemOverlayStyle,
       child: Listener(
         onPointerDown: _handlePointerDown,
@@ -5070,7 +5072,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           canPop: canPop,
           onPopInvokedWithResult: (bool didPop, Object? result) {
             if (didPop || !_isActiveTab) return;
-            if (_selectionBarVisible) {
+            if (isSelectionMode) {
               exitSelectionMode();
             } else if (_searchActive) {
               setState(() => _clearSearch());
@@ -5088,7 +5090,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             onDrawerChanged: widget.onDrawerChanged,
             resizeToAvoidBottomInset: false,
             drawerEnableOpenDragGesture: false,
-            drawer: widget.drawer,
+            drawer: null,
             bottomNavigationBar: pinnedBrowserBottomBar,
             body: Stack(
               children: [
@@ -5818,6 +5820,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           ),
         ),
       ),
+    );
+
+    if (isDrawerHosted || widget.drawer == null) return screen;
+    return FullScreenDragDrawer(
+      drawer: widget.drawer,
+      onDrawerChanged: widget.onDrawerChanged,
+      child: screen,
     );
   }
 }

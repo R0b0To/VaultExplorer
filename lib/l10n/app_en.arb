@@ -13803,6 +13803,14 @@
       }
     }
   },
+  "browserTabCloseToLeft": "Close tabs to the left",
+  "@browserTabCloseToLeft": {
+    "description": "Action that closes file manager tabs to the left of the selected tab"
+  },
+  "browserTabCloseToRight": "Close tabs to the right",
+  "@browserTabCloseToRight": {
+    "description": "Action that closes file manager tabs to the right of the selected tab"
+  },
   "browserTabCloseAll": "Close all",
   "@browserTabCloseAll": {
     "description": "Action in the file manager's tab menu that closes every tab (and with it the file manager)"

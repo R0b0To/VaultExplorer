@@ -12288,5 +12288,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get browserTabCloseToLeft => 'Cerrar pestañas a la izquierda';
+
+  @override
+  String get browserTabCloseToRight => 'Cerrar pestañas a la derecha';
+
+  @override
   String get browserTabCloseAll => 'Cerrar todo';
 }

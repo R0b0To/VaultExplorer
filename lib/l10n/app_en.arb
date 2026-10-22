@@ -9860,11 +9860,11 @@
   },
   "showItemActionsMenuLabel": "Show 3-Dot Item Menus",
   "@showItemActionsMenuLabel": {
-    "description": "Setting label to show 3-dot action buttons on items in list views"
+    "description": "Setting label to show 3-dot action buttons on items in list, grid and masonry views"
   },
-  "showItemActionsMenuDesc": "Display a 3-dot action button on files and folders in list views",
+  "showItemActionsMenuDesc": "Display a 3-dot action button on files and folders in list, grid and masonry views",
   "@showItemActionsMenuDesc": {
-    "description": "Setting description to show 3-dot action buttons on items in list views"
+    "description": "Setting description to show 3-dot action buttons on items in list, grid and masonry views"
   },
   "gridAspectRatioLabel": "Grid Aspect Ratio",
   "@gridAspectRatioLabel": {

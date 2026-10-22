@@ -380,6 +380,38 @@ class _MainShellState extends ConsumerState<MainShell> {
     });
   }
 
+  /// Drawer "Local storage" tap. With all-files access this opens the
+  /// container directly. Without it there is no container, and the tap used
+  /// to do nothing; the grant prompt has to be shown instead. That flow lives
+  /// in the Dashboard, which is not always built: its tab may have been
+  /// closed, and dual-pane browsing mounts only the two visible tabs. In that
+  /// case the Dashboard tab is brought back first (without touching the other
+  /// tabs) and the flow starts once it has mounted.
+  Future<void> _openLocalStorageFromDrawer({
+    int? currentVolId,
+    BrowserTabs? workspaceActions,
+  }) async {
+    final primary = _primaryLocalStorageContainer;
+    if (primary != null) {
+      _openBrowser(primary);
+      return;
+    }
+
+    var dashboard = _dashboardKey.currentState;
+    if (dashboard == null) {
+      final actions = workspaceActions ?? _browserWorkspaceActions;
+      if (actions == null) return;
+      actions.openDashboardTab();
+      // A tab switch takes a frame or two to build the page.
+      for (var frame = 0; frame < 5 && dashboard == null; frame++) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        dashboard = _dashboardKey.currentState;
+      }
+    }
+    await dashboard?.openLocalStorage(currentVolId: currentVolId);
+  }
+
   void _openVaultFromDrawer(VaultListItem item) {
     switch (item) {
       case MountedVaultItem(:final container):
@@ -677,6 +709,12 @@ class _MainShellState extends ConsumerState<MainShell> {
         onSelectTab: _onTabTap,
         keepBrowserTabsOnNavigate: workspaceActions != null,
         onSelectContainer: _openBrowser,
+        onOpenLocalStorage: () => unawaited(
+          _openLocalStorageFromDrawer(
+            currentVolId: currentVolId,
+            workspaceActions: workspaceActions,
+          ),
+        ),
         onUnlockVault: _openVaultFromDrawer,
         onAddVault: () {
           _onTabTap(0);

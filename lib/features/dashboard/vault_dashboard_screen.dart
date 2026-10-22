@@ -99,6 +99,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
 
+  /// Opens Local storage, first walking the person through granting
+  /// all-files access when it is missing. Exposed so the app shell's drawer
+  /// can use the same flow as the dashboard's own.
+  Future<void> openLocalStorage({int? currentVolId}) =>
+      _openLocalStorage(currentVolId: currentVolId);
+
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
   }

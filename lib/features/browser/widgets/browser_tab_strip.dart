@@ -437,62 +437,81 @@ class _TabItem extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Stack(
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: active
-                    ? cs.primary.withValues(alpha: 0.5)
-                    : secondary
-                    ? cs.primary.withValues(alpha: 0.25)
-                    : Colors.transparent,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (selectedCount > 0)
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$selectedCount',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: cs.onPrimary,
+            children: [
+              Container(
+                constraints: const BoxConstraints(maxWidth: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selectedCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$selectedCount',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimary,
+                          ),
+                        ),
+                      ),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: active
+                              ? FontWeight.bold
+                              : secondary
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: fg,
+                        ),
                       ),
                     ),
-                  ),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: active
-                          ? FontWeight.bold
+                  ],
+                ),
+              ),
+              // Underline marking the active tab (full strength) and the
+              // dual-pane secondary tab (faint). Inset past the 8px corner
+              // radius so it sits on the straight part of the bottom edge.
+              // The "off" colour keeps the primary RGB at zero alpha so the
+              // fade does not pass through a dark tint.
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 0,
+                height: 2.5,
+                child: IgnorePointer(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? cs.primary
                           : secondary
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      color: fg,
+                          ? cs.primary.withValues(alpha: 0.4)
+                          : cs.primary.withValues(alpha: 0),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

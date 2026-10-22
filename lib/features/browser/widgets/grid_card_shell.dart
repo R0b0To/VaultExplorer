@@ -88,6 +88,11 @@ class GridCardShell extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
+
+  /// Whether the 3-dots button is offered at all. Mirrors the list layout's
+  /// `showItemActionsMenu` setting; the button also needs [onMoreTap] and is
+  /// hidden while selecting and on placeholders.
+  final bool showMoreButton;
   final bool isPinned;
   final bool isBookmark;
   final bool isDocumentProviderMounted;
@@ -118,6 +123,7 @@ class GridCardShell extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onMoreTap,
+    this.showMoreButton = true,
     this.isPinned = false,
     this.isBookmark = false,
     this.isDocumentProviderMounted = false,
@@ -227,6 +233,43 @@ class GridCardShell extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        if (showMoreButton &&
+            onMoreTap != null &&
+            !isSelectionMode &&
+            !isPlaceholder)
+          // Top-right is free here: the selection check and the placeholder
+          // spinner, the other occupants of this corner, both exclude it.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Dense grids have tiny tiles; a full-size button would hide
+              // too much of the thumbnail.
+              final compact = constraints.maxWidth < 100;
+              final size = compact ? 22.0 : 28.0;
+              return Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.all(compact ? 3 : 4),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh.withValues(alpha: 0.82),
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox(
+                      width: size,
+                      height: size,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        iconSize: compact ? 16 : 18,
+                        color: cs.onSurface,
+                        icon: const Icon(Icons.more_vert_rounded),
+                        onPressed: onMoreTap,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
       ],
     );

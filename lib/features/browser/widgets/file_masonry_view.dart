@@ -55,6 +55,10 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
+
+  /// Whether cards show the 3-dots actions button (the same toggle the list
+  /// layout uses).
+  final bool showItemActionsMenu;
   final ValueChanged<Set<RawEntry>>? onSelectionChanged;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
@@ -86,6 +90,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.showItemActionsMenu = true,
     this.onSelectionChanged,
     this.searchQuery,
     this.mountedFolderPaths = const {},
@@ -551,6 +556,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       // Selection is owned by HoldRangeSelectContainer's hold recognizer
       // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
       onLongPress: () {},
+      showMoreButton: widget.showItemActionsMenu,
+      onMoreTap: (widget.isSelectionMode ||
+              entry.isPlaceholder ||
+              widget.onFileLongMenu == null)
+          ? null
+          : () => widget.onFileLongMenu!(entry),
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
@@ -684,9 +695,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       // Selection is owned by HoldRangeSelectContainer's hold recognizer
       // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
       onLongPress: () {},
-      onMoreTap: (widget.isSelectionMode || entry.isPlaceholder)
+      showMoreButton: widget.showItemActionsMenu,
+      onMoreTap: (widget.isSelectionMode ||
+              entry.isPlaceholder ||
+              widget.onFileLongMenu == null)
           ? null
-          : () => widget.onFileLongMenu?.call(entry),
+          : () => widget.onFileLongMenu!(entry),
       preview: previewWidget,
       label: displayName,
       searchQuery: widget.searchQuery,

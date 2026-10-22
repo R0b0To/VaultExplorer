@@ -839,14 +839,19 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                       itemBuilder: (context, index) {
                         final tab = tabs[index];
                         final pageIsActive = tab.tabId == activeTabId;
+                        // Whether the page's tickers run (thumbnail loading,
+                        // folder previews) follows what is on screen, not
+                        // which tab is active: the active tab only changes
+                        // once a swipe passes the half-way point, which used
+                        // to blank the leaving page and delay the entering
+                        // one for half the transition.
                         return _BrowserTabPage(
                           key: ValueKey<TabId>(tab.tabId),
-                          child: TickerMode(
-                            enabled: pageIsActive,
-                            child: _buildTabContent(
-                              tab,
-                              isActive: pageIsActive,
-                            ),
+                          controller: _pageController,
+                          index: index,
+                          child: _buildTabContent(
+                            tab,
+                            isActive: pageIsActive,
                           ),
                         );
                       },
@@ -890,10 +895,22 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 /// PageView lazily keeps only its nearby pages alive. Each browser tab owns
 /// navigation and selection state, so retain its subtree after it scrolls out
 /// of view.
+///
+/// It also decides whether the page's tickers are enabled. That has to follow
+/// the page's position in the viewport rather than the active tab: during a
+/// swipe both the leaving and the entering page are partly visible, and both
+/// must keep painting their thumbnails until the leaving one is fully gone.
 class _BrowserTabPage extends StatefulWidget {
+  final PageController controller;
+  final int index;
   final Widget child;
 
-  const _BrowserTabPage({super.key, required this.child});
+  const _BrowserTabPage({
+    super.key,
+    required this.controller,
+    required this.index,
+    required this.child,
+  });
 
   @override
   State<_BrowserTabPage> createState() => _BrowserTabPageState();
@@ -901,12 +918,67 @@ class _BrowserTabPage extends StatefulWidget {
 
 class _BrowserTabPageState extends State<_BrowserTabPage>
     with AutomaticKeepAliveClientMixin<_BrowserTabPage> {
+  /// A neighbour at rest sits exactly one page away; the small slack keeps
+  /// floating-point noise at the end of a settle from counting as "visible".
+  static const double _visibleSpan = 0.999;
+
+  late bool _onScreen;
+
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScrolled);
+    _onScreen = _computeOnScreen();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BrowserTabPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onScrolled);
+      widget.controller.addListener(_onScrolled);
+    }
+    // A reorder or close can move this page to another index without any
+    // scrolling, so re-evaluate here too.
+    _onScreen = _computeOnScreen();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScrolled);
+    super.dispose();
+  }
+
+  bool _computeOnScreen() {
+    final controller = widget.controller;
+    // Before the first layout there is no scroll position yet; the initial
+    // page is the one being shown. `PageController.page` is avoided on
+    // purpose: it asserts that content dimensions exist, which is not yet
+    // true when a page is built during the viewport's first layout.
+    var page = controller.initialPage.toDouble();
+    if (controller.hasClients) {
+      final position = controller.position;
+      if (position.hasPixels &&
+          position.hasViewportDimension &&
+          position.viewportDimension > 0) {
+        page = position.pixels / position.viewportDimension;
+      }
+    }
+    return (page - widget.index).abs() < _visibleSpan;
+  }
+
+  void _onScrolled() {
+    final onScreen = _computeOnScreen();
+    if (onScreen == _onScreen || !mounted) return;
+    setState(() => _onScreen = onScreen);
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
-    return widget.child;
+    return TickerMode(enabled: _onScreen, child: widget.child);
   }
 }

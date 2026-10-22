@@ -12919,16 +12919,16 @@ abstract class AppLocalizations {
   /// **'Keeps the full name, slowly scrolling it back and forth so all of it stays readable.'**
   String get longFileNameMarqueeDesc;
 
-  /// Setting label to show 3-dot action buttons on items in list views
+  /// Setting label to show 3-dot action buttons on items in list, grid and masonry views
   ///
   /// In en, this message translates to:
   /// **'Show 3-Dot Item Menus'**
   String get showItemActionsMenuLabel;
 
-  /// Setting description to show 3-dot action buttons on items in list views
+  /// Setting description to show 3-dot action buttons on items in list, grid and masonry views
   ///
   /// In en, this message translates to:
-  /// **'Display a 3-dot action button on files and folders in list views'**
+  /// **'Display a 3-dot action button on files and folders in list, grid and masonry views'**
   String get showItemActionsMenuDesc;
 
   /// Label for the gallery grid card aspect ratio picker

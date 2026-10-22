@@ -16,6 +16,20 @@ class _CancelledException implements Exception {
 
 // ── FileOperationService ──────────────────────────────────────────────────────
 
+/// Published by [FileOperationService] once an operation has finished changing
+/// the contents of a volume, so every view of that volume (not only the one
+/// that started the operation) can bring its listing up to date.
+class VolumeContentChange {
+  const VolumeContentChange({required this.volId, required this.opId});
+
+  /// The volume whose contents changed.
+  final int volId;
+
+  /// The operation that changed it. A view that started that operation already
+  /// updates itself and can use this to skip the notification.
+  final int opId;
+}
+
 class FileOperationService extends ChangeNotifier {
   FileOperationService._(
     this._engineEvents,
@@ -70,6 +84,24 @@ class FileOperationService extends ChangeNotifier {
   final VaultEngineEvents _engineEvents;
   final VaultFileIoApi _fileIoApi;
   final VaultLifecycleApi _lifecycleApi;
+
+  final ListenerRegistry<VolumeContentChange> _volumeContentChanged =
+      ListenerRegistry<VolumeContentChange>();
+
+  /// Subscribes to [VolumeContentChange]s. Unlike a scan of [operations], this
+  /// cannot miss an operation that its initiator dismisses before another
+  /// listener gets to look at it.
+  void addVolumeContentChangedListener(
+    void Function(VolumeContentChange change) listener,
+  ) => _volumeContentChanged.add(listener);
+
+  void removeVolumeContentChangedListener(
+    void Function(VolumeContentChange change) listener,
+  ) => _volumeContentChanged.remove(listener);
+
+  void _publishVolumeContentChanged(FileOperation op, int volId) {
+    _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: op.id));
+  }
 
   void _beginBatches(Iterable<int> volIds) {
     for (final volId in volIds.toSet()) {
@@ -1827,6 +1859,8 @@ class FileOperationService extends ChangeNotifier {
         _unbindOperationListener(op);
         notifyListeners();
         _syncNotificationProgress();
+        // After the native batch is closed, so other views list the final state.
+        _publishVolumeContentChanged(op, container.volId);
       }
     }
   }
@@ -1877,6 +1911,7 @@ class FileOperationService extends ChangeNotifier {
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
+      _publishVolumeContentChanged(op, container.volId);
     }
   }
 

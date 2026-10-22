@@ -57,6 +57,7 @@ import 'package:vaultexplorer/features/browser/widgets/archive_paste_options_she
 import 'package:vaultexplorer/features/browser/widgets/file_browser_doc_provider_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
+import 'package:vaultexplorer/features/browser/file_browser_listing.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -562,17 +563,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// the main visible-list build) -- pulled out once here since all four
   /// were identical and needed to stay that way.
   int _compareOverall(RawEntry ea, RawEntry eb) {
-    if (_pinnedPaths.isNotEmpty) {
-      final aPinned = _isPinned(ea);
-      final bPinned = _isPinned(eb);
-      if (aPinned != bPinned) {
-        return aPinned ? -1 : 1;
-      }
-    }
-    if (ea.isDir != eb.isDir) {
-      return ea.isDir ? -1 : 1;
-    }
-    return compareItems(ea, eb);
+    final sort = ref.read(fileBrowserSortProvider(_stateKey));
+    return compareBrowserEntries(
+      ea,
+      eb,
+      currentDirPath: _currentDirPath,
+      pinnedPaths: _pinnedPaths,
+      sortBy: sort.sortBy,
+      sortAscending: sort.sortAscending,
+    );
   }
 
   /// Whether [item] should be shown in the current directory listing --
@@ -595,20 +594,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     RawEntry item,
     String query, {
     bool skipQueryCheck = false,
-  }) {
-    if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
-      return false;
-    }
-    if (!skipQueryCheck) {
-      final name = item.name;
-      if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
-    }
-    if (item.isDir) {
-      if (query.isEmpty && _currentFilter != null) return false;
-      return true;
-    }
-    return _matchesFilter(item.name);
-  }
+  }) => isVisibleInListing(
+    item,
+    query: query,
+    showHidden: _toolbarConfig.showHiddenFiles,
+    typeFilter: _currentFilter,
+    skipQueryCheck: skipQueryCheck,
+  );
 
   /// Search-aware view of [localItems] (the current directory's listing,
   /// already merged with placeholders/pending-deletes where the caller
@@ -629,31 +621,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   List<RawEntry> _searchAwareVisibleItems(
     List<RawEntry> localItems,
     String query,
-  ) {
-    if (!_searchActive || query.isEmpty) {
-      return localItems
-          .where((item) => _isVisibleInCurrentListing(item, query))
-          .toList();
-    }
-    if (_isDeepSearch) {
-      return _deepSearchResults
-          .where(
-            (item) =>
-                _isVisibleInCurrentListing(item, query, skipQueryCheck: true),
-          )
-          .toList();
-    }
-    final instant = localItems
-        .where((item) => _isVisibleInCurrentListing(item, query))
-        .toList();
-    final instantLowerNames = instant.map((e) => e.lowercaseName).toSet();
-    final contentOnlyMatches = _deepSearchResults.where(
-      (item) =>
-          !instantLowerNames.contains(item.lowercaseName) &&
-          _isVisibleInCurrentListing(item, query, skipQueryCheck: true),
-    );
-    return [...instant, ...contentOnlyMatches];
-  }
+  ) => searchAwareVisibleItems(
+    localItems,
+    query: query,
+    searchActive: _searchActive,
+    deepSearch: _isDeepSearch,
+    deepSearchResults: _deepSearchResults,
+    showHidden: _toolbarConfig.showHiddenFiles,
+    typeFilter: _currentFilter,
+  );
 
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
@@ -705,6 +681,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Delete operations this viewport started. It reconciles its own listing
+  /// when they finish, so [_onVolumeContentChanged] must not do it twice.
+  final Set<int> _ownedOpIds = <int>{};
+
+  /// A finished operation changed this volume. The viewport that started it
+  /// already updates itself; every other viewport of the same volume (the
+  /// other pane in dual-pane browsing, or a background tab) is stale and
+  /// refreshes here, or is flagged to refresh when it comes back on screen.
+  void _onVolumeContentChanged(VolumeContentChange change) {
+    if (_ownedOpIds.remove(change.opId)) return;
+    if (_disposed || !mounted || change.volId != widget.container.volId) {
+      return;
+    }
+    if (!_isVisibleTab) {
+      _navNotifier.markNeedsRefresh();
+      return;
+    }
+    final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
+    // Still on the first load: that load already reads the new state.
+    if (nav.pathStack.isEmpty) return;
+    FolderThumbnailPreview.clearSessionCache();
+    _loadDirectoryContents(nav.currentDirPath, refresh: true);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -715,6 +715,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _vaultEvents = ref.read(vaultEngineEventsProvider);
 
     _opSvc.addListener(_onOperationsChanged);
+    _opSvc.addVolumeContentChangedListener(_onVolumeContentChanged);
     _workspaceSubscription = ref.listenManual<BrowserTabsState>(
       browserTabsProvider(widget.workspaceConfig),
       _onWorkspaceChanged,
@@ -736,6 +737,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
+    _opSvc.removeVolumeContentChangedListener(_onVolumeContentChanged);
     if (widget.scrollController == null) _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
     _vaultEvents.removeContainerLockedListener(_onContainerLockedEvent);
@@ -984,6 +986,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               locationLabel: _currentDirPath,
               l10n: context.l10n,
             );
+            _ownedOpIds.add(op.id);
             void listener() {
               if (!mounted) {
                 op.removeListener(listener);
@@ -3208,6 +3211,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             locationLabel: group.first.currentDirPath,
             l10n: context.l10n,
           );
+          _ownedOpIds.add(op.id);
           _bindGroupedDeleteListener(op, container);
         }
       },
@@ -4257,102 +4261,31 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     };
   }
 
-  List<RawEntry>? _cachedFilteredItems;
-  int _cachedDirCount = 0;
-  int _cachedFileCount = 0;
+  final BrowserListingCache _listingCache = BrowserListingCache();
 
-  List<RawEntry>? _memoCurrentItems;
-  String? _memoDirPath;
-  String? _memoQuery;
-  bool? _memoSearchActive;
-  bool? _memoIsDeepSearch;
-  List<RawEntry>? _memoDeepSearchResults;
-  String? _memoFilter;
-  bool? _memoShowHidden;
-  SortBy? _memoSortBy;
-  bool? _memoSortAscending;
-  int? _memoPlaceholdersLen;
-  int? _memoPendingDeletedLen;
-  int? _memoPinnedPathsLen;
-
-  ({List<RawEntry> items, int dirCount, int fileCount})
-  _getFilteredAndSortedItems(
+  BrowserListing _getFilteredAndSortedItems(
     String query,
     List<RawEntry> placeholders,
     Set<String> pendingDeletedNames,
   ) {
     final sortState = ref.read(fileBrowserSortProvider(_stateKey));
-    final showHidden = _toolbarConfig.showHiddenFiles;
-    final currentFilter = _currentFilter;
-    final searchActive = _searchActive;
-    final isDeep = _isDeepSearch;
-    final deepResults = _deepSearchResults;
-    final pinnedLen = _pinnedPaths.length;
-
-    final isCacheValid =
-        _cachedFilteredItems != null &&
-        identical(_memoCurrentItems, _currentItems) &&
-        _memoDirPath == _currentDirPath &&
-        _memoQuery == query &&
-        _memoSearchActive == searchActive &&
-        _memoIsDeepSearch == isDeep &&
-        identical(_memoDeepSearchResults, deepResults) &&
-        _memoFilter == currentFilter &&
-        _memoShowHidden == showHidden &&
-        _memoSortBy == sortState.sortBy &&
-        _memoSortAscending == sortState.sortAscending &&
-        _memoPlaceholdersLen == placeholders.length &&
-        _memoPendingDeletedLen == pendingDeletedNames.length &&
-        _memoPinnedPathsLen == pinnedLen;
-
-    if (isCacheValid) {
-      return (
-        items: _cachedFilteredItems!,
-        dirCount: _cachedDirCount,
-        fileCount: _cachedFileCount,
-      );
-    }
-
-    final visibleCurrentItems = _currentItems.where(
-      (e) => !pendingDeletedNames.contains(e.name),
+    return _listingCache.resolve(
+      BrowserListingInputs(
+        items: _currentItems,
+        placeholders: placeholders,
+        pendingDeletedNames: pendingDeletedNames,
+        query: query,
+        searchActive: _searchActive,
+        deepSearch: _isDeepSearch,
+        deepSearchResults: _deepSearchResults,
+        showHidden: _toolbarConfig.showHiddenFiles,
+        typeFilter: _currentFilter,
+        currentDirPath: _currentDirPath,
+        pinnedPaths: _pinnedPaths,
+        sortBy: sortState.sortBy,
+        sortAscending: sortState.sortAscending,
+      ),
     );
-    final existingNamesLower = visibleCurrentItems
-        .map((e) => e.lowercaseName)
-        .toSet();
-    final uniquePlaceholders = placeholders.where(
-      (p) => !existingNamesLower.contains(p.lowercaseName),
-    );
-    final combinedItems = [...visibleCurrentItems, ...uniquePlaceholders];
-    final filteredItems = _searchAwareVisibleItems(
-      combinedItems,
-      query,
-    ).toList()..sort(_compareOverall);
-
-    int dirCount = 0;
-    for (final item in filteredItems) {
-      if (item.isDir) dirCount++;
-    }
-    final fileCount = filteredItems.length - dirCount;
-
-    _cachedFilteredItems = filteredItems;
-    _cachedDirCount = dirCount;
-    _cachedFileCount = fileCount;
-
-    _memoCurrentItems = _currentItems;
-    _memoDirPath = _currentDirPath;
-    _memoQuery = query;
-    _memoSearchActive = searchActive;
-    _memoIsDeepSearch = isDeep;
-    _memoDeepSearchResults = deepResults;
-    _memoFilter = currentFilter;
-    _memoShowHidden = showHidden;
-    _memoSortBy = sortState.sortBy;
-    _memoSortAscending = sortState.sortAscending;
-    _memoPlaceholdersLen = placeholders.length;
-    _memoPendingDeletedLen = pendingDeletedNames.length;
-    _memoPinnedPathsLen = pinnedLen;
-
-    return (items: filteredItems, dirCount: dirCount, fileCount: fileCount);
   }
 
   List<Widget> _buildFabToolbar({required double bottomOffset}) {
@@ -4546,17 +4479,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               }
               return true;
             }),
-          )..sort((ea, eb) {
-            final aPinned = isPinned(ea, previewDirPath, _pinnedPaths);
-            final bPinned = isPinned(eb, previewDirPath, _pinnedPaths);
-            if (aPinned != bPinned) {
-              return aPinned ? -1 : 1;
-            }
-            if (ea.isDir != eb.isDir) {
-              return ea.isDir ? -1 : 1;
-            }
-            return compareItems(ea, eb);
-          }))
+          )..sort(
+            (ea, eb) => compareBrowserEntries(
+              ea,
+              eb,
+              currentDirPath: previewDirPath,
+              pinnedPaths: _pinnedPaths,
+              sortBy: sortBy,
+              sortAscending: sortAscending,
+            ),
+          ))
         : null;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;

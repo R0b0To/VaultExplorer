@@ -12367,7 +12367,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get pressBackAgainToExit => 'Натисніть «назад» ще раз, щоб вийти';
 
   @override
-  String get tabEdgeSwipeLabel => 'Свайп за межі першої або останньої вкладки';
+  String get tabEdgeSwipeLabel => 'Жест свайпу між вкладками';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12383,6 +12383,20 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Свайп за межі останньої вкладки веде до першої, а за межі першої — до останньої. Бічне меню відкривається від лівого краю екрана або кнопкою меню.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Без дій на краях';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Свайп за межі першої або останньої вкладки нічого не робить. Бічне меню відкривається від лівого краю екрана або кнопкою меню, а нові вкладки — зі смуги вкладок.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'Не перемикати вкладки свайпом';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Перемикайте вкладки лише зі смуги вкладок. Проведіть праворуч будь-де, щоб відкрити бічне меню, і ліворуч будь-де, щоб відкрити нову вкладку, ніби кожна вкладка перша.';
 
   @override
   String get appBarAtBottomLabel => 'Показувати панель унизу';

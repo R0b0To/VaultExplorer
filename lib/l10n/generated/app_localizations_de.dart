@@ -12279,8 +12279,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pressBackAgainToExit => 'Zum Beenden erneut zurück drücken';
 
   @override
-  String get tabEdgeSwipeLabel =>
-      'Wischen über den ersten oder letzten Tab hinaus';
+  String get tabEdgeSwipeLabel => 'Wischgeste zwischen Tabs';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12296,6 +12295,20 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Wischen über den letzten Tab hinaus führt zum ersten, über den ersten hinaus zum letzten. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Keine Aktion an den Enden';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Wischen über den ersten oder letzten Tab hinaus bewirkt nichts. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche, neue Tabs über die Tab-Leiste.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'Nicht zwischen Tabs wischen';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Tabs nur über die Tab-Leiste wechseln. Überall nach rechts wischen öffnet das Seitenmenü, überall nach links einen neuen Tab – als wäre jeder Tab der erste.';
 
   @override
   String get appBarAtBottomLabel => 'App-Leiste unten anzeigen';

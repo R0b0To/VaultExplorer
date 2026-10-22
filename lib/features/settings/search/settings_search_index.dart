@@ -458,11 +458,15 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     details: [
       (l) => l.tabEdgeSwipeDrawerAndNewTabDesc,
       (l) => l.tabEdgeSwipeLoopDesc,
+      (l) => l.tabEdgeSwipeNoEdgeActionsDesc,
+      (l) => l.tabEdgeSwipeNoTabSwipingDesc,
     ],
     keywords: [
       'loop',
       'wrap around',
       'swipe',
+      'gesture',
+      'disable swipe',
       'tabs',
       'new tab',
       'side menu',

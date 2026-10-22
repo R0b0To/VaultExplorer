@@ -20479,10 +20479,10 @@ abstract class AppLocalizations {
   /// **'Press back again to exit'**
   String get pressBackAgainToExit;
 
-  /// Setting title for what swiping sideways past the first or last file manager tab does.
+  /// Setting title for how swiping sideways between file manager tabs behaves, and what swiping past the first or last tab does.
   ///
   /// In en, this message translates to:
-  /// **'Swiping past the first or last tab'**
+  /// **'Tab swipe gesture'**
   String get tabEdgeSwipeLabel;
 
   /// Option: swiping past the first tab opens the side menu and swiping past the last tab opens a new tab.
@@ -20508,6 +20508,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.'**
   String get tabEdgeSwipeLoopDesc;
+
+  /// Option: swiping past the first or last tab does nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No action at the ends'**
+  String get tabEdgeSwipeNoEdgeActionsLabel;
+
+  /// Explains the option that turns off the actions at the first and last tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Swiping past the first or last tab does nothing. Open the side menu from the left screen edge or the menu button, and new tabs from the tab strip.'**
+  String get tabEdgeSwipeNoEdgeActionsDesc;
+
+  /// Option: swiping does not change tabs, and every tab acts like the first one.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t swipe between tabs'**
+  String get tabEdgeSwipeNoTabSwipingLabel;
+
+  /// Explains the option that turns off swiping between tabs. A right swipe anywhere opens the side menu and a left swipe anywhere opens a new tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch tabs from the tab strip only. Swipe right anywhere to open the side menu and left anywhere to open a new tab, as if every tab were the first.'**
+  String get tabEdgeSwipeNoTabSwipingDesc;
 
   /// Setting title for showing the app bar at the bottom of the screen instead of the top.
   ///

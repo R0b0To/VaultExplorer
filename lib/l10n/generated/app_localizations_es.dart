@@ -12307,8 +12307,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pressBackAgainToExit => 'Pulsa atrás de nuevo para salir';
 
   @override
-  String get tabEdgeSwipeLabel =>
-      'Deslizar más allá de la primera o la última pestaña';
+  String get tabEdgeSwipeLabel => 'Gesto de deslizamiento entre pestañas';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12324,6 +12323,20 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Al deslizar más allá de la última pestaña pasas a la primera, y más allá de la primera pasas a la última. Abre el menú lateral desde el borde izquierdo de la pantalla o con el botón de menú.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Sin acción en los extremos';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Deslizar más allá de la primera o la última pestaña no hace nada. Abre el menú lateral desde el borde izquierdo de la pantalla o con el botón de menú, y las pestañas nuevas desde la barra de pestañas.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'No deslizar entre pestañas';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Cambia de pestaña solo desde la barra de pestañas. Desliza a la derecha en cualquier parte para abrir el menú lateral y a la izquierda para abrir una pestaña nueva, como si cada pestaña fuera la primera.';
 
   @override
   String get appBarAtBottomLabel => 'Mostrar la barra superior abajo';

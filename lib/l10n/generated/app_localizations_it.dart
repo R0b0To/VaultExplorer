@@ -12278,8 +12278,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get pressBackAgainToExit => 'Premi di nuovo indietro per uscire';
 
   @override
-  String get tabEdgeSwipeLabel =>
-      'Scorrimento oltre la prima o l’ultima scheda';
+  String get tabEdgeSwipeLabel => 'Gesto di scorrimento tra schede';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12295,6 +12294,20 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Scorrendo oltre l’ultima scheda si passa alla prima, e oltre la prima si passa all’ultima. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Nessuna azione agli estremi';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Scorrere oltre la prima o l’ultima scheda non fa nulla. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu, e le nuove schede dalla barra delle schede.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'Non scorrere tra le schede';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Cambia scheda solo dalla barra delle schede. Scorri verso destra ovunque per aprire il menu laterale e verso sinistra ovunque per aprire una nuova scheda, come se ogni scheda fosse la prima.';
 
   @override
   String get appBarAtBottomLabel => 'Mostra la barra superiore in basso';

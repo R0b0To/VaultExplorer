@@ -12093,7 +12093,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pressBackAgainToExit => 'Press back again to exit';
 
   @override
-  String get tabEdgeSwipeLabel => 'Swiping past the first or last tab';
+  String get tabEdgeSwipeLabel => 'Tab swipe gesture';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel => 'Open side menu / new tab';
@@ -12108,6 +12108,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'No action at the ends';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Swiping past the first or last tab does nothing. Open the side menu from the left screen edge or the menu button, and new tabs from the tab strip.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'Don’t swipe between tabs';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Switch tabs from the tab strip only. Swipe right anywhere to open the side menu and left anywhere to open a new tab, as if every tab were the first.';
 
   @override
   String get appBarAtBottomLabel => 'Show app bar at bottom';

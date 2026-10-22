@@ -11600,7 +11600,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pressBackAgainToExit => 'もう一度戻るを押すと終了します';
 
   @override
-  String get tabEdgeSwipeLabel => '最初または最後のタブを越えてスワイプしたとき';
+  String get tabEdgeSwipeLabel => 'タブのスワイプ操作';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel => 'サイドメニュー / 新しいタブ';
@@ -11615,6 +11615,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       '最後のタブを越えてスワイプすると最初のタブへ、最初のタブを越えると最後のタブへ移動します。サイドメニューは画面の左端またはメニューボタンから開きます。';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => '端では何もしない';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      '最初または最後のタブを越えてスワイプしても何も起こりません。サイドメニューは画面の左端またはメニューボタンから、新しいタブはタブバーから開きます。';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'タブ間をスワイプしない';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'タブの切り替えはタブバーからのみ行います。どこでも右にスワイプするとサイドメニューが、左にスワイプすると新しいタブが開きます。すべてのタブが最初のタブであるかのように動作します。';
 
   @override
   String get appBarAtBottomLabel => 'アプリバーを下に表示';

@@ -11417,7 +11417,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pressBackAgainToExit => '再按一次返回键退出';
 
   @override
-  String get tabEdgeSwipeLabel => '滑过第一个或最后一个标签页时';
+  String get tabEdgeSwipeLabel => '标签页滑动手势';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel => '打开侧边菜单 / 新建标签页';
@@ -11432,6 +11432,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       '滑过最后一个标签页会回到第一个，滑过第一个则跳到最后一个。可从屏幕左边缘或菜单按钮打开侧边菜单。';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => '两端不执行操作';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      '滑过第一个或最后一个标签页不会有任何反应。可从屏幕左边缘或菜单按钮打开侧边菜单，从标签栏新建标签页。';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => '不通过滑动切换标签页';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      '只能从标签栏切换标签页。在任意位置向右滑动可打开侧边菜单，向左滑动可新建标签页，就像每个标签页都是第一个一样。';
 
   @override
   String get appBarAtBottomLabel => '将应用栏显示在底部';

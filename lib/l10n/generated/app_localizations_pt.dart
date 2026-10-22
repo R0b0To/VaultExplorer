@@ -12275,7 +12275,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get pressBackAgainToExit => 'Pressione voltar novamente para sair';
 
   @override
-  String get tabEdgeSwipeLabel => 'Deslizar além da primeira ou da última aba';
+  String get tabEdgeSwipeLabel => 'Gesto de deslizar entre abas';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12291,6 +12291,20 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Deslizar além da última aba leva à primeira, e além da primeira leva à última. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Nenhuma ação nas extremidades';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Deslizar além da primeira ou da última aba não faz nada. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu, e novas abas pela barra de abas.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'Não deslizar entre abas';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Troque de aba somente pela barra de abas. Deslize para a direita em qualquer lugar para abrir o menu lateral e para a esquerda para abrir uma nova aba, como se cada aba fosse a primeira.';
 
   @override
   String get appBarAtBottomLabel => 'Mostrar barra superior embaixo';

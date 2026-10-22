@@ -11599,7 +11599,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pressBackAgainToExit => '한 번 더 뒤로 가기를 누르면 종료됩니다';
 
   @override
-  String get tabEdgeSwipeLabel => '첫 번째 또는 마지막 탭을 넘어 스와이프할 때';
+  String get tabEdgeSwipeLabel => '탭 스와이프 동작';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel => '사이드 메뉴 열기 / 새 탭';
@@ -11614,6 +11614,20 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       '마지막 탭을 넘어 스와이프하면 첫 번째 탭으로, 첫 번째 탭을 넘어 스와이프하면 마지막 탭으로 이동합니다. 사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로 엽니다.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => '가장자리에서 동작 없음';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      '첫 번째 또는 마지막 탭을 넘어 스와이프해도 아무 일도 일어나지 않습니다. 사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로, 새 탭은 탭 바에서 엽니다.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => '탭 간 스와이프 안 함';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      '탭 전환은 탭 바에서만 합니다. 어디서든 오른쪽으로 스와이프하면 사이드 메뉴가, 왼쪽으로 스와이프하면 새 탭이 열립니다. 모든 탭이 첫 번째 탭인 것처럼 동작합니다.';
 
   @override
   String get appBarAtBottomLabel => '앱 바를 아래에 표시';

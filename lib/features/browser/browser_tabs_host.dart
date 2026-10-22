@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -12,6 +13,7 @@ import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
@@ -155,6 +157,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   static const double _loopFlingMinOverscroll = 12;
   static const double _loopFlingVelocity = 800;
 
+  /// With tab swiping off, a left swipe anywhere offers a new tab. It has to be
+  /// quick (a slow drag is a long-press drag selecting items, say) and mostly
+  /// horizontal, and it is given up on if the finger goes back the other way.
+  static const Duration _newTabSwipeMaxDuration = Duration(milliseconds: 700);
+  static const double _newTabSwipeBackoff = 40;
+
   late final BrowserTabsConfig _workspace;
   late final ProviderSubscription<BrowserTabsState> _workspaceSubscription;
   late final VaultEngineEvents _vaultEvents;
@@ -187,6 +195,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _edgeSwipeStartedAtLast = false;
   double _edgeOverscrollForward = 0;
   double _edgeOverscrollBackward = 0;
+
+  /// Whether a left swipe anywhere offers a new tab (the "no tab swiping"
+  /// setting). Kept up to date by the build.
+  bool _newTabSwipeAnywhere = false;
+  int _pointersDown = 0;
+  Duration _lastPointerEventTime = Duration.zero;
+  int? _newTabSwipePointer;
+  Offset _newTabSwipeStart = Offset.zero;
+  Duration _newTabSwipeStartTime = Duration.zero;
   bool? _wasDualPane;
   List<TabId>? _dualPaneTabIds;
   int? _pageViewDrivenActiveIndex;
@@ -539,6 +556,64 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     return false;
   }
 
+  void _onBrowserPointerDown(PointerDownEvent event) {
+    // The count only goes wrong if a finger's end was never seen (the layout
+    // changed under it); nothing has been heard for a while then, so start over.
+    if (_pointersDown > 0 &&
+        event.timeStamp - _lastPointerEventTime > const Duration(seconds: 3)) {
+      _pointersDown = 0;
+    }
+    _lastPointerEventTime = event.timeStamp;
+    _pointersDown++;
+    // A second finger (pinching to zoom the grid, say) is not a swipe.
+    final startsSwipe =
+        _pointersDown == 1 &&
+        _newTabSwipeAnywhere &&
+        !_newTabPromptScheduled &&
+        !_drawerOpenOrDragging &&
+        !_edgeDrawerGestureActive;
+    _newTabSwipePointer = startsSwipe ? event.pointer : null;
+    if (startsSwipe) {
+      _newTabSwipeStart = event.position;
+      _newTabSwipeStartTime = event.timeStamp;
+    }
+  }
+
+  void _onBrowserPointerMove(PointerMoveEvent event) {
+    _lastPointerEventTime = event.timeStamp;
+    if (event.pointer != _newTabSwipePointer) return;
+    if (_drawerOpenOrDragging ||
+        _edgeDrawerGestureActive ||
+        event.position.dx - _newTabSwipeStart.dx > _newTabSwipeBackoff) {
+      _newTabSwipePointer = null;
+    }
+  }
+
+  void _onBrowserPointerUp(PointerUpEvent event) {
+    _lastPointerEventTime = event.timeStamp;
+    if (_pointersDown > 0) _pointersDown--;
+    if (event.pointer != _newTabSwipePointer) return;
+    _newTabSwipePointer = null;
+    if (!_newTabSwipeAnywhere ||
+        _drawerOpenOrDragging ||
+        _edgeDrawerGestureActive) {
+      return;
+    }
+    final delta = event.position - _newTabSwipeStart;
+    final elapsed = event.timeStamp - _newTabSwipeStartTime;
+    final isLeftSwipe =
+        delta.dx <= -_newTabSwipeThreshold &&
+        delta.dx.abs() >= delta.dy.abs() * 2 &&
+        elapsed <= _newTabSwipeMaxDuration;
+    if (isLeftSwipe) _scheduleNewTabPrompt();
+  }
+
+  void _onBrowserPointerCancel(PointerCancelEvent event) {
+    _lastPointerEventTime = event.timeStamp;
+    if (_pointersDown > 0) _pointersDown--;
+    if (event.pointer == _newTabSwipePointer) _newTabSwipePointer = null;
+  }
+
   void _resetEdgeSwipe() {
     _edgeSwipeEligible = false;
     _edgeSwipeStartedAtFirst = false;
@@ -552,18 +627,19 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// past the last one (the first tab's right swipe belongs to the drawer), or
   /// wrap around to the tab at the other end.
   void _handleTabEdgeSwipe(ScrollNotification notification) {
+    // Something underneath (a media carousel, say) took the horizontal drag, so
+    // it is not a swipe for the browser to act on.
+    if (notification is ScrollStartNotification) _newTabSwipePointer = null;
     if (_newTabPromptScheduled || _loopScheduled) return;
 
     if (notification is ScrollStartNotification) {
       final state = _workspaceState;
-      final tabsEnabled = ref
-          .read(appSettingsControllerProvider)
-          .settings
-          .useBrowserTabs;
+      final settings = ref.read(appSettingsControllerProvider).settings;
       _resetEdgeSwipe();
       _edgeSwipeEligible =
           notification.dragDetails != null &&
-          tabsEnabled &&
+          settings.useBrowserTabs &&
+          settings.tabEdgeSwipe.hasEdgeActions &&
           state.activeIndex >= 0;
       if (_edgeSwipeEligible) {
         _edgeSwipeStartedAtFirst = state.activeIndex == 0;
@@ -820,6 +896,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         hasMultipleTabs &&
         !dualPaneForTabStrip &&
         tabEdgeSwipe.loops;
+    // Without tab swiping every tab acts like the first one: the side menu
+    // opens from any tab, and a left swipe anywhere offers a new tab.
+    final tabSwipingOff = tabsEnabled && !tabEdgeSwipe.swipesBetweenTabs;
+    _newTabSwipeAnywhere = tabSwipingOff;
     final dualPaneTabIds = dualPaneForTabStrip
         ? _resolveDualPaneTabIds(tabs, activeTabId)
         : null;
@@ -965,53 +1045,61 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                       }
 
                       _publishVisibleTabs(const <TabId>{});
-                      return NotificationListener<ScrollNotification>(
-                        onNotification: (notification) => _handleAppBarScroll(
-                          notification,
-                          enabled: autoHideAppBar,
-                          active: activeTabId != null,
-                        ),
-                        child: FadeTransition(
-                          opacity: _loopFade,
-                          child: PageView.builder(
-                            controller: _pageController,
-                            clipBehavior: Clip.hardEdge,
-                            physics:
-                                tabsEnabled &&
-                                    !_drawerOpenOrDragging &&
-                                    !_edgeDrawerGestureActive
-                                ? const PageScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
-                                  )
-                                : const NeverScrollableScrollPhysics(),
-                            itemCount: tabs.length,
-                            onPageChanged: _onPageChanged,
-                            findChildIndexCallback: (key) {
-                              if (key is! ValueKey<TabId>) return null;
-                              final index = tabs.indexWhere(
-                                (tab) => tab.tabId == key.value,
-                              );
-                              return index < 0 ? null : index;
-                            },
-                            itemBuilder: (context, index) {
-                              final tab = tabs[index];
-                              final pageIsActive = tab.tabId == activeTabId;
-                              // Whether the page's tickers run (thumbnail loading,
-                              // folder previews) follows what is on screen, not
-                              // which tab is active: the active tab only changes
-                              // once a swipe passes the half-way point, which used
-                              // to blank the leaving page and delay the entering
-                              // one for half the transition.
-                              return _BrowserTabPage(
-                                key: ValueKey<TabId>(tab.tabId),
-                                controller: _pageController,
-                                index: index,
-                                child: _buildTabContent(
-                                  tab,
-                                  isActive: pageIsActive,
-                                ),
-                              );
-                            },
+                      return Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerDown: _onBrowserPointerDown,
+                        onPointerMove: _onBrowserPointerMove,
+                        onPointerUp: _onBrowserPointerUp,
+                        onPointerCancel: _onBrowserPointerCancel,
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (notification) => _handleAppBarScroll(
+                            notification,
+                            enabled: autoHideAppBar,
+                            active: activeTabId != null,
+                          ),
+                          child: FadeTransition(
+                            opacity: _loopFade,
+                            child: PageView.builder(
+                              controller: _pageController,
+                              clipBehavior: Clip.hardEdge,
+                              physics:
+                                  tabsEnabled &&
+                                      tabEdgeSwipe.swipesBetweenTabs &&
+                                      !_drawerOpenOrDragging &&
+                                      !_edgeDrawerGestureActive
+                                  ? const PageScrollPhysics(
+                                      parent: AlwaysScrollableScrollPhysics(),
+                                    )
+                                  : const NeverScrollableScrollPhysics(),
+                              itemCount: tabs.length,
+                              onPageChanged: _onPageChanged,
+                              findChildIndexCallback: (key) {
+                                if (key is! ValueKey<TabId>) return null;
+                                final index = tabs.indexWhere(
+                                  (tab) => tab.tabId == key.value,
+                                );
+                                return index < 0 ? null : index;
+                              },
+                              itemBuilder: (context, index) {
+                                final tab = tabs[index];
+                                final pageIsActive = tab.tabId == activeTabId;
+                                // Whether the page's tickers run (thumbnail loading,
+                                // folder previews) follows what is on screen, not
+                                // which tab is active: the active tab only changes
+                                // once a swipe passes the half-way point, which used
+                                // to blank the leaving page and delay the entering
+                                // one for half the transition.
+                                return _BrowserTabPage(
+                                  key: ValueKey<TabId>(tab.tabId),
+                                  controller: _pageController,
+                                  index: index,
+                                  child: _buildTabContent(
+                                    tab,
+                                    isActive: pageIsActive,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       );
@@ -1087,9 +1175,19 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       // Reserve the left edge of the viewport for drawer opening while the
       // PageView keeps native swipes everywhere else. On the first tab a right
       // swipe may open it from anywhere, unless that swipe is what loops the
-      // tabs round to the last one.
+      // tabs round to the last one or the person turned that action off. With
+      // tab swiping off there is no pager to keep out of the way.
       canOpenFromAnywhere:
-          !(tabsEnabled && hasMultipleTabs) || (isFirstTab && !loopTabs),
+          !(tabsEnabled && hasMultipleTabs) ||
+          tabSwipingOff ||
+          (isFirstTab &&
+              switch (tabEdgeSwipe) {
+                BrowserTabEdgeSwipe.drawerAndNewTab => true,
+                // Side by side there is no pager to loop, so the swipe is free.
+                BrowserTabEdgeSwipe.loop => !loopTabs,
+                BrowserTabEdgeSwipe.noEdgeActions ||
+                BrowserTabEdgeSwipe.noTabSwiping => false,
+              }),
       backGestureInsetLeft: systemBackGestureInsetLeft < 24
           ? 24
           : systemBackGestureInsetLeft,

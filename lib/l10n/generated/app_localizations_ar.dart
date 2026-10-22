@@ -12309,7 +12309,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
 
   @override
-  String get tabEdgeSwipeLabel => 'السحب بعد أول علامة تبويب أو آخرها';
+  String get tabEdgeSwipeLabel => 'إيماءة السحب بين علامات التبويب';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12325,6 +12325,20 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'السحب بعد آخر علامة تبويب ينقلك إلى الأولى، والسحب بعد الأولى ينقلك إلى الأخيرة. افتح القائمة الجانبية من حافة الشاشة أو من زر القائمة.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'لا إجراء عند الأطراف';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'السحب بعد أول علامة تبويب أو آخرها لا يفعل شيئًا. افتح القائمة الجانبية من حافة الشاشة أو من زر القائمة، وافتح علامات تبويب جديدة من شريط علامات التبويب.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel => 'عدم السحب بين علامات التبويب';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'بدّل علامات التبويب من شريط علامات التبويب فقط. اسحب لليمين في أي مكان لفتح القائمة الجانبية ولليسار لفتح علامة تبويب جديدة، وكأن كل علامة تبويب هي الأولى.';
 
   @override
   String get appBarAtBottomLabel => 'عرض شريط التطبيق في الأسفل';

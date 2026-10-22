@@ -12384,8 +12384,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Appuyez à nouveau sur retour pour quitter';
 
   @override
-  String get tabEdgeSwipeLabel =>
-      'Balayage au-delà du premier ou du dernier onglet';
+  String get tabEdgeSwipeLabel => 'Geste de balayage entre onglets';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
@@ -12401,6 +12400,21 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get tabEdgeSwipeLoopDesc =>
       'Balayer au-delà du dernier onglet mène au premier, et au-delà du premier mène au dernier. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu.';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsLabel => 'Aucune action aux extrémités';
+
+  @override
+  String get tabEdgeSwipeNoEdgeActionsDesc =>
+      'Balayer au-delà du premier ou du dernier onglet ne fait rien. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu, et les nouveaux onglets depuis la barre d’onglets.';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingLabel =>
+      'Ne pas balayer entre les onglets';
+
+  @override
+  String get tabEdgeSwipeNoTabSwipingDesc =>
+      'Changez d’onglet uniquement depuis la barre d’onglets. Balayez vers la droite n’importe où pour ouvrir le menu latéral et vers la gauche n’importe où pour ouvrir un nouvel onglet, comme si chaque onglet était le premier.';
 
   @override
   String get appBarAtBottomLabel => 'Afficher la barre supérieure en bas';

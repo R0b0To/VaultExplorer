@@ -7,7 +7,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -90,8 +90,12 @@ void main() {
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: FileBrowserScreen(
-          container: container,
+        home: BrowserTabsShell(
+          initialContainer: container,
+          appRoot: true,
+          resolveContainer: (volId) => volId == container.volId ? container : null,
+          mountedContainers: () => const <MountedContainer>[],
+          primaryLocalContainer: () => container,
         ),
       ),
     );

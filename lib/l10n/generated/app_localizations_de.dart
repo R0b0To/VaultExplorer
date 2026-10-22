@@ -12274,4 +12274,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs.';
+
+  @override
+  String get pressBackAgainToExit => 'Zum Beenden erneut zurück drücken';
 }

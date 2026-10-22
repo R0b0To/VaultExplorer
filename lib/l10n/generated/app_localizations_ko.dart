@@ -11594,4 +11594,7 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       '화면 폭이 충분하면 열린 탭 두 개를 나란히 표시합니다. 파일 관리자 탭이 필요합니다.';
+
+  @override
+  String get pressBackAgainToExit => '한 번 더 뒤로 가기를 누르면 종료됩니다';
 }

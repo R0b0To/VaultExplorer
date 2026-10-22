@@ -926,7 +926,8 @@ being Unlocked or Locked is unrelated to which launcher identity is active.
 
 While the decoy identity is active, `DecoyArchiveExplorerScreen` hosts
 `DecoyFileManagerScreen`, which reuses the *same* file-browser UI
-(`FileBrowserScreen` and everything under `features/browser/`) that browses
+(`BrowserTabsShell`, hosted as the app root, and everything under
+`features/browser/`) that browses
 an unlocked vault — toolbar, settings, bookmarks, thumbnails, the native
 PDF/media viewers, and the image/text editors all work identically, just
 pointed at real device storage instead of a vault. `local_file_io_backend.dart`
@@ -1013,6 +1014,30 @@ Assorted decisions worth knowing before touching the relevant code, each
 with its evidence file(s) so you can read the reasoning in place rather
 than take this summary on faith:
 
+- **The file browser is a workspace of tabs hosted by one shell**
+  (`lib/features/browser/`). `BrowserTabs` (`browser_tabs_provider.dart`) owns
+  the tab list, the active tab and the back-history of one workspace, keyed by
+  a `BrowserTabsConfig`. A tab is a `HomeTab` (the Dashboard) or a `FolderTab`,
+  identified by a process-unique `TabId` that is never reused and that also
+  keys every per-tab provider (navigation, selection, sort, search).
+  `BrowserTabsShell` (`browser_tabs_host.dart`) is the only owner of window
+  chrome (app bar, tab strip, drawer, FAB, bottom bar), the pager and the
+  dual-pane layout. Each `DirectoryContentView` (one viewport per folder tab)
+  hands its app bar, FAB and bottom bar to `BrowserChromeHub`
+  (`browser_chrome_hub.dart`), which exposes the active tab's to the shell, and
+  learns from the hub which tabs are on screen. *Active* (focused) decides who
+  gets back, chrome and auto-lock activity; *visible* (active, or the second
+  pane in dual-pane) decides who must keep its listing fresh. Decoy mode hosts
+  the same shell with `appRoot: true`: no Home tab, closing the last tab
+  reopens the primary storage, and back at the root leaves the app. There is no
+  separate standalone browser screen. System back returns the person to where
+  they started (`resolveBrowserBack` in `browser_back_policy.dart`): selection
+  and search first, then folder depth; at the root of a tab opened from a Home
+  tile (`BrowserTabOrigin.home`) it shows Home again, while a tab opened from
+  the drawer, a folder action or a menu stops at its root. On Home, the first
+  back asks for a second press and only then leaves the app, with or without
+  other tabs open. Tests: `browser_tabs_provider_test.dart`,
+  `browser_chrome_hub_test.dart`, `browser_back_policy_test.dart`.
 - **Thumbnail/full-res concurrency is priority-tiered, not FIFO, and
   playback-aware** (`priority_task_queue.dart`, `full_res_image_cache.dart`)
   — see §3.4.

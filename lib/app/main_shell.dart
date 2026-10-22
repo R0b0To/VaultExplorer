@@ -19,6 +19,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
@@ -101,6 +102,11 @@ class _MainShellState extends ConsumerState<MainShell> {
   // providers they watch) before the user could see the dashboard.
   final Set<int> _builtTabs = {0};
   MountedContainer? _browserInitialContainer;
+  BrowserTabOrigin _browserInitialOrigin = BrowserTabOrigin.other;
+
+  /// Back on Home asks for a second press before leaving the app.
+  bool _exitArmed = false;
+  Timer? _exitArmTimer;
   BrowserTabsConfig? _browserWorkspace;
 
   BrowserTabsState? get _browserWorkspaceState {
@@ -254,6 +260,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
@@ -300,14 +307,33 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  void _openBrowser(MountedContainer container) {
+  void _armExit() {
+    _exitArmTimer?.cancel();
+    setState(() => _exitArmed = true);
+    showAppSnackBar(
+      context,
+      message: context.l10n.pressBackAgainToExit,
+      tone: AppBannerTone.info,
+    );
+    _exitArmTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _exitArmed = false);
+    });
+  }
+
+  void _openBrowser(
+    MountedContainer container, {
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+  }) {
     _cacheDashboardLocalStorageContainer();
     final state = _browserWorkspaceState;
     final actions = _browserWorkspaceActions;
     if (state == null || actions == null) {
       // Queue an early open request until the browser workspace has created
       // its initial Dashboard tab and published its controller.
-      setState(() => _browserInitialContainer = container);
+      setState(() {
+        _browserInitialContainer = container;
+        _browserInitialOrigin = origin;
+      });
       return;
     }
 
@@ -317,7 +343,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         .settings
         .useBrowserTabs;
     if (active == null) {
-      if (actions.openTab(container) == null) {
+      if (actions.openTab(container, origin: origin) == null) {
         _showBrowserTabLimit();
         return;
       }
@@ -329,20 +355,24 @@ class _MainShellState extends ConsumerState<MainShell> {
           .where((tab) => !tab.isDashboard)
           .firstOrNull;
       if (existingBrowserTab == null) {
-        if (actions.openTab(container) == null) {
+        if (actions.openTab(container, origin: origin) == null) {
           _showBrowserTabLimit();
           return;
         }
       } else {
         actions.activate(existingBrowserTab.tabId);
         if (existingBrowserTab.volId != container.volId) {
-          actions.replaceActive(container);
+          actions.replaceActive(container, origin: origin);
+        } else {
+          // The same storage reopened: the latest way it was opened decides
+          // where back at its root goes.
+          actions.setOrigin(existingBrowserTab.tabId, origin);
         }
       }
     } else if (active.isDashboard || active.volId != container.volId) {
       // Regular navigation from the sidebar or Dashboard stays in the current
       // tab. The drawer's explicit long-press action owns new-tab creation.
-      actions.replaceActive(container);
+      actions.replaceActive(container, origin: origin);
     }
     setState(() {
       _index = 0;
@@ -461,7 +491,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     final pending = _browserInitialContainer;
     if (workspace != null && pending != null) {
       _browserInitialContainer = null;
-      ref.read(browserTabsProvider(workspace).notifier).openTab(pending);
+      ref
+          .read(browserTabsProvider(workspace).notifier)
+          .openTab(pending, origin: _browserInitialOrigin);
+      _browserInitialOrigin = BrowserTabOrigin.other;
       _index = 0;
     }
     if (!mounted) return;
@@ -720,11 +753,19 @@ class _MainShellState extends ConsumerState<MainShell> {
 
     final dashboardLocationIsActive =
         _browserWorkspaceState?.activeTab?.isDashboard ?? false;
+    final atHome =
+        _index == 0 && (!browserContentVisible || dashboardLocationIsActive);
     return PopScope(
-      canPop:
-          _index == 0 && (!browserContentVisible || dashboardLocationIsActive),
+      // Leaving the app from Home takes two backs: the first arms the exit and
+      // says so, the second (within the window) lets the system leave. This
+      // holds with or without other tabs open, because hidden tabs never veto.
+      canPop: atHome && _exitArmed,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop || (browserContentVisible && !dashboardLocationIsActive)) {
+        if (didPop) return;
+        // The focused folder tab handles back itself.
+        if (browserContentVisible && !dashboardLocationIsActive) return;
+        if (atHome) {
+          _armExit();
           return;
         }
         _onTabTap(0);

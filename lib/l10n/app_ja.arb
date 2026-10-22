@@ -3385,5 +3385,6 @@
   "browserTabCloseToRight": "右側のタブを閉じる",
   "browserTabCloseAll": "すべて閉じる",
   "dualPaneEnabledTitle": "2ペイン表示を使用",
-  "dualPaneEnabledSubtitle": "画面に十分な幅があるとき、開いている2つのタブを並べて表示します。ファイルマネージャーのタブが必要です。"
+  "dualPaneEnabledSubtitle": "画面に十分な幅があるとき、開いている2つのタブを並べて表示します。ファイルマネージャーのタブが必要です。",
+  "pressBackAgainToExit": "もう一度戻るを押すと終了します"
 }

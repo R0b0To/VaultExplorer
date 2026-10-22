@@ -12088,4 +12088,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.';
+
+  @override
+  String get pressBackAgainToExit => 'Press back again to exit';
 }

@@ -22,6 +22,7 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
@@ -49,7 +50,10 @@ class VaultDashboard extends ConsumerStatefulWidget {
   final bool embedded;
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
-  final ValueChanged<MountedContainer>? onOpenBrowser;
+  /// Opens [container] in the browser. Home tiles and unlock flows pass
+  /// [BrowserTabOrigin.home] so that back at the root returns here.
+  final void Function(MountedContainer container, {BrowserTabOrigin origin})?
+  onOpenBrowser;
   final bool backPreviewOnly;
 
   const VaultDashboard({
@@ -702,7 +706,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
                 );
                 newlyMountedContainer = container;
                 if (autoOpen && widget.onOpenBrowser != null) {
-                  widget.onOpenBrowser!(container);
+                  widget.onOpenBrowser!(
+                    container,
+                    origin: BrowserTabOrigin.home,
+                  );
                 }
               },
               openBrowserRoute: autoOpen && widget.onOpenBrowser == null
@@ -766,7 +773,10 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
                 );
                 newlyMountedContainer = container;
                 if (autoOpen && widget.onOpenBrowser != null) {
-                  widget.onOpenBrowser!(container);
+                  widget.onOpenBrowser!(
+                    container,
+                    origin: BrowserTabOrigin.home,
+                  );
                 }
               },
               onReconnected: (container, migratedRecord, oldUri) {
@@ -984,7 +994,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   Future<void> _openBrowser(MountedContainer container) async {
     final openBrowser = widget.onOpenBrowser;
     if (openBrowser != null) {
-      openBrowser(container);
+      openBrowser(container, origin: BrowserTabOrigin.home);
       return;
     }
     await Navigator.push(context, _buildBrowserRoute(container));

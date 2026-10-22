@@ -8,9 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
-import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
@@ -47,7 +45,10 @@ import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/archive_preview_file.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
+import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
@@ -172,18 +173,15 @@ class DirectoryContentView extends ConsumerStatefulWidget {
   final Widget Function(Widget title)? wrapAppBarTitle;
   final VoidCallback? onOpenStorageSwitcher;
 
-  /// Session identity supplied by the workspace. Standalone screens allocate
-  /// an independent identity rather than borrowing the container's slot.
-  final TabId? tabId;
-  final BrowserTabsConfig? workspaceConfig;
+  /// Session identity supplied by the workspace that hosts this viewport.
+  /// Every viewport belongs to a workspace; decoy mode hosts its own, flagged
+  /// [BrowserTabsConfig.appRoot].
+  final TabId tabId;
+  final BrowserTabsConfig workspaceConfig;
 
   /// Directory to open at instead of the container root (new tabs opened on
   /// a folder). Only read when the screen is first created.
   final String? initialPath;
-  final ValueChanged<BrowserAppBarFactory>? onAppBarChanged;
-  final ValueChanged<BrowserAppBarFactory?>? onSelectionAppBarChanged;
-  final ValueChanged<Widget?>? onFloatingActionChanged;
-  final ValueChanged<Widget?>? onBottomBarChanged;
   final ScrollController? scrollController;
 
   const DirectoryContentView({
@@ -196,13 +194,9 @@ class DirectoryContentView extends ConsumerStatefulWidget {
     this.showBackButton = true,
     this.wrapAppBarTitle,
     this.onOpenStorageSwitcher,
-    this.tabId,
-    this.workspaceConfig,
+    required this.tabId,
+    required this.workspaceConfig,
     this.initialPath,
-    this.onAppBarChanged,
-    this.onSelectionAppBarChanged,
-    this.onFloatingActionChanged,
-    this.onBottomBarChanged,
     this.scrollController,
   });
 
@@ -211,9 +205,9 @@ class DirectoryContentView extends ConsumerStatefulWidget {
       _DirectoryContentViewState();
 }
 
-/// Standalone browser entry point used by decoy mode and other routes that do
-/// not have a browser shell. The tab host uses [DirectoryContentView] directly
-/// and owns the surrounding Scaffold and app bar.
+/// State of one directory viewport. The hosting `BrowserTabsShell` owns the
+/// window chrome (app bar, tab strip, drawer, FAB, bottom bar); this state
+/// only publishes the pieces it builds.
 class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     with WidgetsBindingObserver {
   _BrowserAppBarBuilder? _latestAppBarBuilder;
@@ -253,42 +247,52 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   // same-named getters (matching the existing _search/_pinsBookmarks/
   // _mountedDocProviderFolders pattern already used in this file) so the
   // hundreds of read call-sites throughout this file don't need to change.
-  TabId? get _tabId => widget.tabId;
-  late final TabId _standaloneSessionId = TabId.allocate();
-  TabId get _stateKey => _tabId ?? _standaloneSessionId;
+  TabId get _tabId => widget.tabId;
+  TabId get _stateKey => widget.tabId;
 
   // ── Workspace state ──────────────────────────────────────────────────────
   bool _wasActiveTab = true;
   bool _wasMultiTab = false;
+  bool _wasVisibleTab = true;
   ProviderSubscription<BrowserTabsState>? _workspaceSubscription;
 
-  BrowserTabsState? get _workspaceState {
-    final config = widget.workspaceConfig;
-    return config == null ? null : ref.read(browserTabsProvider(config));
-  }
+  BrowserTabsState get _workspaceState =>
+      ref.read(browserTabsProvider(widget.workspaceConfig));
+
+  /// Where this viewport contributes its app bar, FAB and bottom bar, and
+  /// where it learns which tabs are on screen.
+  late final BrowserChromeHub _chrome = ref.read(
+    browserChromeProvider(widget.workspaceConfig),
+  );
 
   BrowserTabs get _workspaceNotifier =>
-      ref.read(browserTabsProvider(widget.workspaceConfig!).notifier);
+      ref.read(browserTabsProvider(widget.workspaceConfig).notifier);
 
-  List<BrowserTabState> get _workspaceTabs => _workspaceState?.tabs ?? const [];
+  List<BrowserTabState> get _workspaceTabs => _workspaceState.tabs;
 
-  /// True when this screen is the visible tab (always true outside tabs).
+  /// True when this viewport is the active (focused) tab.
   /// Hidden tabs stay mounted in PageView's keep-alive cache, so anything that is
   /// app-global (predictive back, system back, auto-lock activity) must be
   /// gated on this or every hidden tab would react too.
-  bool get _isActiveTab {
-    final config = widget.workspaceConfig;
-    if (config == null) return true;
-    return ref.read(activeBrowserTabProvider(config))?.tabId == _tabId;
-  }
+  bool get _isActiveTab =>
+      ref.read(activeBrowserTabProvider(widget.workspaceConfig))?.tabId ==
+      _tabId;
 
-  bool get _hasMultipleTabs => _workspaceState?.hasMultiple ?? false;
+  /// True when this viewport is on screen: the active tab, or the second pane
+  /// in dual-pane browsing. An on-screen pane must keep its listing fresh even
+  /// while the other pane has focus; focus alone only decides who gets back,
+  /// chrome and activity.
+  bool get _isVisibleTab => _isVisibleWhen(active: _isActiveTab);
+
+  bool _isVisibleWhen({required bool active}) =>
+      active || _chrome.visibleTabs.value.contains(widget.tabId);
+
+  bool get _hasMultipleTabs => _workspaceState.hasMultiple;
 
   void _onWorkspaceChanged(BrowserTabsState? previous, BrowserTabsState next) {
     if (!mounted) return;
     final active = next.activeTabId == _tabId;
     final multi = next.hasMultiple;
-    final becameActive = active && !_wasActiveTab;
     final flipped = active != _wasActiveTab || multi != _wasMultiTab;
     _wasActiveTab = active;
     _wasMultiTab = multi;
@@ -296,11 +300,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // PopScope.canPop depends on both flags, so rebuild when they flip.
     if (flipped) setState(() {});
 
+    _syncVisibility(active: active);
+  }
+
+  void _onVisibleTabsChanged() => _syncVisibility(active: _isActiveTab);
+
+  /// Refreshes a stale listing the moment this viewport comes on screen.
+  /// Operations targeting this location may have completed while it was off
+  /// screen; its cached list is kept until then, and refreshed once before it
+  /// is presented again.
+  void _syncVisibility({required bool active}) {
+    if (!mounted) return;
+    final visible = _isVisibleWhen(active: active);
+    final becameVisible = visible && !_wasVisibleTab;
+    _wasVisibleTab = visible;
+    if (!becameVisible) return;
     final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
-    if (becameActive && nav.needsRefresh && nav.pathStack.isNotEmpty) {
-      // Operations targeting this location may have completed while the tab
-      // was inactive. Keep its cached list until activation, then refresh it
-      // once before presenting it again.
+    if (nav.needsRefresh && nav.pathStack.isNotEmpty) {
       _loadDirectoryContents(_currentDirPath, refresh: true);
     }
   }
@@ -642,12 +658,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
     _navNotifier.setContainerLocked(true);
-    // Inside a tab host the host closes this vault's tabs (and only pops the
-    // route once no tab is left); popping here would take every tab down.
-    if (widget.workspaceConfig != null) return;
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
+    // The hosting shell closes this vault's tabs and leaves the route once
+    // none remain; this viewport only needs to stop touching the vault.
   }
 
   DateTime? _lastOpReloadTime;
@@ -664,10 +676,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                 _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
               )),
     );
-    // Inactive viewports do not rebuild for transfer progress. Record that
-    // their listing may be stale and refresh lazily when the user activates
-    // the tab.
-    if (!_isActiveTab) {
+    // Viewports that are off screen do not rebuild for transfer progress.
+    // Record that their listing may be stale and refresh lazily when they
+    // come back on screen.
+    if (!_isVisibleTab) {
       if (hasActiveTargetingCurrent) _navNotifier.markNeedsRefresh();
       return;
     }
@@ -703,24 +715,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _vaultEvents = ref.read(vaultEngineEventsProvider);
 
     _opSvc.addListener(_onOperationsChanged);
-    final workspace = widget.workspaceConfig;
-    if (workspace != null) {
-      _workspaceSubscription = ref.listenManual<BrowserTabsState>(
-        browserTabsProvider(workspace),
-        _onWorkspaceChanged,
-      );
-      _wasActiveTab = _isActiveTab;
-      _wasMultiTab = _hasMultipleTabs;
-    }
+    _workspaceSubscription = ref.listenManual<BrowserTabsState>(
+      browserTabsProvider(widget.workspaceConfig),
+      _onWorkspaceChanged,
+    );
+    _wasActiveTab = _isActiveTab;
+    _wasMultiTab = _hasMultipleTabs;
+    _wasVisibleTab = _isVisibleTab;
+    _chrome.visibleTabs.addListener(_onVisibleTabsChanged);
     WidgetsBinding.instance.addObserver(this);
     _vaultEvents.addContainerLockedListener(_onContainerLockedEvent);
-    _vaultEvents.addUsbContainerDetachedListener(_onContainerDetached);
   }
 
   @override
   void dispose() {
     _disposed = true;
     _workspaceSubscription?.close();
+    _chrome.visibleTabs.removeListener(_onVisibleTabsChanged);
     _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
@@ -728,7 +739,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (widget.scrollController == null) _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
     _vaultEvents.removeContainerLockedListener(_onContainerLockedEvent);
-    _vaultEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     super.dispose();
   }
 
@@ -1028,8 +1038,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _setStatus(context.l10n.clipboardVerbMoving);
       },
       onOpenInNewTab:
-          (widget.workspaceConfig != null &&
-              ref.read(appSettingsControllerProvider).settings.useBrowserTabs &&
+          (ref.read(appSettingsControllerProvider).settings.useBrowserTabs &&
               entry.isDir &&
               _archiveContext == null)
           ? () => _openFolderInNewTab(
@@ -1270,14 +1279,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   bool get _isReadOnly => widget.container.readOnly;
   void _signalActivity() => widget.onUserActivity?.call();
-  void _onContainerDetached(int volId) {
-    if (_disposed || volId != widget.container.volId || !mounted) return;
-    if (widget.workspaceConfig != null) {
-      return; // the workspace closes every tab referencing this volume
-    }
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
   Future<void> _initSettingsAndContents() async {
     _navNotifier.setLoading(true);
     _pinsBookmarksNotifier.load(widget.container);
@@ -1655,17 +1656,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _loadDirectoryContents(newPath);
   }
 
+  /// Back arrow in the toolbar at the root. It is an explicit control, so it
+  /// keeps going to Home (or closing the route) whatever the tab's origin;
+  /// system back uses [_resolveBack] instead.
   bool _handleBackAtRoot() {
     final workspace = widget.workspaceConfig;
-    final tabId = _tabId;
-    if (workspace == null || tabId == null) return false;
+    // An app-root workspace (decoy mode) has nothing beneath it: at the root
+    // the system leaves the app (see canPop in build).
+    if (workspace.appRoot) return false;
     if (ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       // With tabs enabled, the location remains in its tab at the root.
       return false;
     }
 
     final tabs = ref.read(browserTabsProvider(workspace).notifier);
-    if (tabs.returnToDashboardAtRoot(tabId)) return true;
+    if (tabs.returnToDashboardAtRoot(_tabId)) return true;
     if (workspace.includeDashboardTab) {
       tabs.replaceActiveWithDashboard();
       return true;
@@ -1675,6 +1680,46 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (!navigator.canPop()) return false;
     navigator.pop();
     return true;
+  }
+
+  BrowserTabOrigin get _tabOrigin =>
+      _workspaceState.tabs
+          .where((tab) => tab.tabId == _tabId)
+          .firstOrNull
+          ?.origin ??
+      BrowserTabOrigin.other;
+
+  /// What system back does right now, read from live state.
+  BrowserBackAction _resolveBack() => resolveBrowserBack(
+    selectionMode: isSelectionMode,
+    searchActive: _searchActive,
+    atRoot: _atRoot,
+    origin: _tabOrigin,
+    appRoot: widget.workspaceConfig.appRoot,
+    hostsHome: widget.workspaceConfig.includeDashboardTab,
+    tabsEnabled: ref.read(appSettingsControllerProvider).settings.useBrowserTabs,
+  );
+
+  void _onSystemBack() {
+    switch (_resolveBack()) {
+      case BrowserBackAction.exitSelection:
+        exitSelectionMode();
+      case BrowserBackAction.clearSearch:
+        setState(() => _clearSearch());
+      case BrowserBackAction.navigateUp:
+        _navigateUp();
+      case BrowserBackAction.returnHome:
+        final tabs = _workspaceNotifier;
+        if (!tabs.returnToDashboardAtRoot(_tabId)) {
+          tabs.replaceActiveWithDashboard();
+        }
+      case BrowserBackAction.popRoute:
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) navigator.pop();
+      case BrowserBackAction.stay:
+      case BrowserBackAction.leave:
+        break;
+    }
   }
 
   bool get _canPreviewFolderBackGesture =>
@@ -1767,22 +1812,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ref.read(fileBrowserSelectionProvider(_stateKey)).hasPendingFolderSizes;
 
   List<_SelectedBrowserEntry> get _selectedBrowserEntries {
-    final tabs = _workspaceState?.tabs;
-    if (tabs == null) {
-      final selection = ref.read(fileBrowserSelectionProvider(_stateKey));
-      final navigation = ref.read(fileBrowserNavigationProvider(_stateKey));
-      return [
-        for (final entry in selection.items)
-          (
-            stateKey: _stateKey,
-            container: widget.container,
-            currentDirPath: navigation.currentDirPath,
-            entry: entry,
-            insideArchive: navigation.archiveContext != null,
-          ),
-      ];
-    }
-
+    final tabs = _workspaceState.tabs;
     return [
       for (final tab in tabs)
         if (!tab.isDashboard)
@@ -1817,12 +1847,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   int get _selectedBrowserEntryCount => _selectedBrowserEntries.length;
 
   int get _allSelectedTotalBytes {
-    final keys =
-        _workspaceState?.tabs
-            .where((tab) => !tab.isDashboard)
-            .map((tab) => tab.tabId)
-            .toList() ??
-        [_stateKey];
+    final keys = _workspaceState.tabs
+        .where((tab) => !tab.isDashboard)
+        .map((tab) => tab.tabId)
+        .toList();
     return keys.fold<int>(
       0,
       (total, key) =>
@@ -1832,12 +1860,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   bool get _anySelectedFolderSizePending {
-    final keys =
-        _workspaceState?.tabs
-            .where((tab) => !tab.isDashboard)
-            .map((tab) => tab.tabId)
-            .toList() ??
-        [_stateKey];
+    final keys = _workspaceState.tabs
+        .where((tab) => !tab.isDashboard)
+        .map((tab) => tab.tabId)
+        .toList();
     return keys.any(
       (key) =>
           ref.read(fileBrowserSelectionProvider(key)).hasPendingFolderSizes,
@@ -1860,14 +1886,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   void exitSelectionMode() {
-    final tabs = _workspaceState?.tabs;
-    if (tabs == null) {
-      ref
-          .read(fileBrowserSelectionProvider(_stateKey).notifier)
-          .exitSelectionMode();
-      return;
-    }
-    for (final tab in tabs) {
+    for (final tab in _workspaceState.tabs) {
       if (tab.isDashboard) continue;
       ref
           .read(fileBrowserSelectionProvider(tab.tabId).notifier)
@@ -2815,8 +2834,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// straight from the selection bar, so a long-press on a folder offers it
   /// too, not only the item's 3-dot sheet.
   _SelectedBrowserEntry? get _singleSelectedFolderForNewTab {
-    if (widget.workspaceConfig == null ||
-        !ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return null;
     }
     final selected = _selectedBrowserEntries;
@@ -2834,8 +2852,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     TabId? stateKey,
     RawEntry? selectedEntry,
   }) {
-    if (widget.workspaceConfig == null ||
-        !ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
+    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
     }
     final tabId = _workspaceNotifier.openTab(container, initialPath: fullPath);
@@ -2921,7 +2938,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         final keepVisible = _opNeedsAttention(op);
 
         if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
-          if (_isActiveTab) {
+          if (_isVisibleTab) {
             _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
               if (!keepVisible) _opSvc.dismiss(op.id);
             });
@@ -3221,7 +3238,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             .removeDeletedPaths(container, deletedPaths);
         if (!mounted) return;
         if (container.volId == widget.container.volId) {
-          if (_isActiveTab) {
+          if (_isVisibleTab) {
             await _loadDirectoryContents(_currentDirPath, refresh: true);
           } else {
             _navNotifier.markNeedsRefresh();
@@ -3257,7 +3274,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       deletedPaths,
     );
     if (!mounted) return;
-    if (_isActiveTab) {
+    if (_isVisibleTab) {
       await _loadDirectoryContents(_currentDirPath, refresh: true);
     } else {
       _navNotifier.markNeedsRefresh();
@@ -4489,27 +4506,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _loadDirectoryContents(_currentDirPath, refresh: true);
       }
     });
-    if (widget.container.isExternalStorage) {
-      ref.listen<List<ExternalStorageLocation>>(
-        externalStorageLocationsProvider,
-        (previous, next) {
-          if (previous != null &&
-              !next.any((loc) => loc.volId == widget.container.volId)) {
-            if (mounted && widget.workspaceConfig == null) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            }
-          }
-        },
-      );
-    }
+    // The hosting shell closes a vault's tabs when it locks, detaches, or its
+    // external storage disappears, and leaves the route once none remain.
     if (_isContainerLocked) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            widget.workspaceConfig == null &&
-            Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
-      });
       return const ColoredBox(color: Colors.black, child: SizedBox.expand());
     }
     final query = _searchQuery.trim().toLowerCase();
@@ -4661,9 +4660,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         .read(fileBrowserSelectionProvider(_stateKey))
         .items
         .isNotEmpty;
-    final aggregateSelection = workspace == null
-        ? null
-        : _isActiveTab
+    final aggregateSelection = _isActiveTab
         ? ref.watch(aggregatedTabsSelectionProvider(workspace))
         : localSelectionIsNonEmpty
         ? ref.read(aggregatedTabsSelectionProvider(workspace))
@@ -4673,12 +4670,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         (aggregateSelection?.hasSelection ?? _selectedBrowserEntryCount > 0);
     final selectionInBottomBar =
         selectionBarVisible && _toolbarConfig.bottomSelectionBar;
-    final hasBookmarkBarViewportSlot =
-        widget.workspaceConfig != null && !isLandscape && !selectionInBottomBar;
+    final hasBookmarkBarViewportSlot = !isLandscape && !selectionInBottomBar;
     final showBookmarkBarInViewport =
         hasBookmarkBarViewportSlot && showBookmarkBar;
-    final showBookmarkBarInBottomBar =
-        widget.workspaceConfig == null && showBookmarkBar;
 
     Widget buildHorizontalBookmarkBar() => BookmarkBar(
       bookmarkPaths: _bookmarkPaths,
@@ -4717,8 +4711,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         selectedForBar.isNotEmpty &&
         selectedForBar.every((item) => item.container.isLocalStorage);
 
-    final hasBottomNavBar =
-        !isLandscape && (showActionBar || showBookmarkBarInBottomBar);
+    final hasBottomNavBar = !isLandscape && showActionBar;
     final bottomSystemInset = hasBottomNavBar
         ? 0.0
         : MediaQuery.paddingOf(context).bottom;
@@ -4844,10 +4837,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         isFiltered: isFiltered,
         onPaste: widget.container.readOnly ? null : _paste,
         onNavigateUp: appBarAtRoot ? null : _navigateUp,
-        onBackAtRoot:
-            widget.workspaceConfig != null && _tabId != null && !useBrowserTabs
-            ? _handleBackAtRoot
-            : null,
+        onBackAtRoot: !useBrowserTabs ? _handleBackAtRoot : null,
         showBackButton: widget.showBackButton,
         wrapTitle: widget.wrapAppBarTitle,
         onOpenStorageSwitcher: widget.onOpenStorageSwitcher,
@@ -4856,7 +4846,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final selectionInTopBar =
         selectedForBar.isNotEmpty && !_toolbarConfig.bottomSelectionBar;
-    // App-bar factories are hoisted into the shell. Recreating the closure on
+    // App-bar factories are handed to the chrome hub. Recreating the closure on
     // every directory build makes its ValueListenable rebuild the AppBar for
     // unrelated viewport work (scrolling, thumbnails, banners), which appears
     // as a toolbar flash. Keep one factory per visible app-bar state and have
@@ -4926,14 +4916,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       signature: Object.hash(appBarSignature, true),
       selectionMode: true,
     );
-    if (widget.onAppBarChanged != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        widget.onAppBarChanged!(regularAppBarFactory);
-      });
-    }
-    if (widget.onSelectionAppBarChanged != null &&
-        (_isActiveTab || localSelectionIsNonEmpty)) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _chrome.setAppBar(widget.tabId, regularAppBarFactory);
+    });
+    if (_isActiveTab || localSelectionIsNonEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             (!_isActiveTab &&
@@ -4943,7 +4930,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                     .isEmpty)) {
           return;
         }
-        widget.onSelectionAppBarChanged!(
+        _chrome.setSelectionAppBar(
+          widget.tabId,
           selectedForBar.isEmpty || _toolbarConfig.bottomSelectionBar
               ? null
               : selectionAppBarFactory,
@@ -4951,28 +4939,27 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       });
     }
 
-    // Hidden tabs never block system back. Active tabs handle folder-up; at
-    // the root, a workspace tab remains on its current storage location.
+    // Only the focused tab has a say in back. It vetoes the system unless the
+    // policy says there is nothing left for the browser to do (decoy at its
+    // root). Hidden tabs never veto, so Home can hand back to the app shell,
+    // which asks for a second back before exiting.
     final bool isActiveTab = _isActiveTab;
-    final bool atBrowserRoot = _atRoot && !isSelectionMode && !_searchActive;
-    final bool canPop = isActiveTab && atBrowserRoot && _tabId == null;
+    final bool canPop =
+        !isActiveTab || _resolveBack() == BrowserBackAction.leave;
     final systemOverlayStyle =
         Theme.of(context).appBarTheme.systemOverlayStyle ??
         (Theme.of(context).brightness == Brightness.dark
             ? AppSystemUI.transparentDark
             : SystemUiOverlayStyle.dark);
-    final Widget? browserBottomBar =
-        (!isLandscape && (showActionBar || showBookmarkBarInBottomBar))
+    final Widget? browserBottomBar = (!isLandscape && showActionBar)
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (showBookmarkBarInBottomBar) buildHorizontalBookmarkBar(),
-              if (showActionBar)
-                FileManagerActionBar(
-                  axis: Axis.horizontal,
-                  actions: _toolbarConfig.visible,
-                  builders: actionBuilders,
-                ),
+              FileManagerActionBar(
+                axis: Axis.horizontal,
+                actions: _toolbarConfig.visible,
+                builders: actionBuilders,
+              ),
             ],
           )
         : null;
@@ -4994,10 +4981,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ),
           )
         : browserBottomBar;
-    if (widget.onBottomBarChanged != null && _isActiveTab) {
+    if (_isActiveTab) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_isActiveTab) return;
-        widget.onBottomBarChanged!(embeddedBottomBar);
+        _chrome.setBottomBar(widget.tabId, embeddedBottomBar);
       });
     }
 
@@ -5071,7 +5058,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             );
     }
     final embeddedFloatingAction = _lastBuiltFloatingAction;
-    if (widget.onFloatingActionChanged != null && _toolbarConfigReady) {
+    if (_toolbarConfigReady) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             _lastBuiltFloatingActionSignature != floatingActionSignature ||
@@ -5079,7 +5066,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           return;
         }
         _lastPublishedFloatingActionSignature = floatingActionSignature;
-        widget.onFloatingActionChanged!(embeddedFloatingAction);
+        _chrome.setFloatingAction(widget.tabId, embeddedFloatingAction);
       });
     }
 
@@ -5471,15 +5458,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         canPop: canPop,
         onPopInvokedWithResult: (bool didPop, Object? result) {
           if (didPop || !_isActiveTab) return;
-          if (isSelectionMode) {
-            exitSelectionMode();
-          } else if (_searchActive) {
-            setState(() => _clearSearch());
-          } else if (!_atRoot) {
-            _navigateUp();
-          } else if (_atRoot) {
-            _handleBackAtRoot();
-          }
+          _onSystemBack();
         },
         child: browserBody,
       ),

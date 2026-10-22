@@ -14,14 +14,15 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/adaptive_browser_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
-import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -41,12 +42,6 @@ String browserTabDuplicatePath(FileBrowserNavigationState nav) {
   return nav.currentDirPath;
 }
 
-PreferredSizeWidget _buildDashboardBrowserAppBar(BuildContext context) =>
-    const DashboardAppBar();
-
-final BrowserAppBarFactory _dashboardBrowserAppBarFactory =
-    _buildDashboardBrowserAppBar;
-
 typedef BrowserHomeBuilder =
     Widget Function({
       required BrowserTabsConfig workspace,
@@ -55,7 +50,7 @@ typedef BrowserHomeBuilder =
     });
 
 /// Builds the route that shows the file manager with tab support. Replaces
-/// pushing a bare [FileBrowserScreen]: with a single tab it looks and behaves
+/// pushing a bare directory viewport: with a single tab it looks and behaves
 /// the same, and opening more tabs reveals the tab strip.
 Route<void> buildBrowserTabsRoute({
   required MountedContainer container,
@@ -114,6 +109,14 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   final VoidCallback? onNewTab;
   final ValueChanged<BrowserTabState>? onDuplicate;
 
+  /// How every directory viewport in this shell should look.
+  final BrowserViewportOptions viewportOptions;
+
+  /// True when this shell is the app's root surface (decoy mode): there is no
+  /// route beneath it, so closing the last tab reopens
+  /// [primaryLocalContainer] and back at the root leaves the app.
+  final bool appRoot;
+
   const BrowserTabsShell({
     super.key,
     this.initialContainer,
@@ -129,6 +132,8 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
     this.onEmpty,
     this.onNewTab,
     this.onDuplicate,
+    this.viewportOptions = const BrowserViewportOptions(),
+    this.appRoot = false,
   });
 
   @override
@@ -146,16 +151,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final ProviderSubscription<BrowserTabsState> _workspaceSubscription;
   late final VaultEngineEvents _vaultEvents;
   late final PageController _pageController;
-  late final ValueNotifier<BrowserAppBarFactory?> _activeAppBar;
-  late final ValueNotifier<BrowserAppBarFactory?> _selectionAppBar;
-  late final ValueNotifier<Widget?> _activeFloatingAction;
-  late final ValueNotifier<Widget?> _activeBottomBar;
+  late final ProviderSubscription<BrowserChromeHub> _chromeSubscription;
   late final AnimationController _appBarVisibilityController;
-  final Map<TabId, ValueChanged<BrowserAppBarFactory>> _appBarCallbacks = {};
-  final Map<TabId, BrowserAppBarFactory> _appBarsByTab = {};
-  final Map<TabId, BrowserAppBarFactory?> _selectionAppBarsByTab = {};
-  final Map<TabId, Widget?> _floatingActionsByTab = {};
-  final Map<TabId, Widget?> _bottomBarsByTab = {};
   final Map<TabId, GlobalKey> _directoryViewKeys = {};
   final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
@@ -168,12 +165,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   List<TabId>? _dualPaneTabIds;
   double _lastTabNextOverscroll = 0;
   int? _pageViewDrivenActiveIndex;
-  TabId? _lastActiveTabId;
 
   BrowserTabsState get _workspaceState =>
       ref.read(browserTabsProvider(_workspace));
   BrowserTabs get _workspaceActions =>
       ref.read(browserTabsProvider(_workspace).notifier);
+
+  /// What the tabs have contributed to the window chrome. Held alive for the
+  /// lifetime of this shell; viewports reach the same instance through the
+  /// provider.
+  BrowserChromeHub get _chrome => _chromeSubscription.read();
 
   @override
   void initState() {
@@ -181,18 +182,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _workspace = BrowserTabsConfig.create(
       initialContainer: widget.initialContainer,
       includeDashboardTab: widget.includeDashboardTab,
+      appRoot: widget.appRoot,
     );
     final initialState = ref.read(browserTabsProvider(_workspace));
-    _lastActiveTabId = initialState.activeTabId;
     _pageController = PageController(initialPage: initialState.activeIndex);
-    _activeAppBar = ValueNotifier<BrowserAppBarFactory?>(
-      initialState.activeTab?.isDashboard == true
-          ? _dashboardBrowserAppBarFactory
-          : null,
+    _chromeSubscription = ref.listenManual<BrowserChromeHub>(
+      browserChromeProvider(_workspace),
+      (_, _) {},
     );
-    _selectionAppBar = ValueNotifier<BrowserAppBarFactory?>(null);
-    _activeFloatingAction = ValueNotifier<Widget?>(null);
-    _activeBottomBar = ValueNotifier<Widget?>(null);
     _appBarVisibilityController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -215,10 +212,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _vaultEvents.removeUsbContainerDetachedListener(_onVolumeGone);
     _workspaceSubscription.close();
     _pageController.dispose();
-    _activeAppBar.dispose();
-    _selectionAppBar.dispose();
-    _activeFloatingAction.dispose();
-    _activeBottomBar.dispose();
+    _chromeSubscription.close();
     _appBarVisibilityController.dispose();
     super.dispose();
   }
@@ -251,49 +245,21 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
-    _appBarCallbacks.removeWhere((id, _) => !liveTabIds.contains(id));
-    _appBarsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
-    _selectionAppBarsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
-    _floatingActionsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
-    _bottomBarsByTab.removeWhere((id, _) => !liveTabIds.contains(id));
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
-    final activeTabId = next.activeTabId;
-    if (_lastActiveTabId != activeTabId) {
-      _lastActiveTabId = activeTabId;
-      final nextTab = next.activeTab;
-      if (activeTabId == null) {
-        _activeAppBar.value = null;
-      } else if (nextTab?.isDashboard == true) {
-        _activeAppBar.value = _dashboardBrowserAppBarFactory;
-      } else {
-        // Reuse the current chrome until a newly mounted directory viewport
-        // has published its toolbar. Publishing null here briefly replaces
-        // the Dashboard or previous directory toolbar with the generic
-        // fallback, which is the visible flash during vault navigation.
-        final nextAppBar = _appBarsByTab[activeTabId];
-        if (nextAppBar != null) _activeAppBar.value = nextAppBar;
-      }
-      _selectionAppBar.value = _selectionAppBarFor(activeTabId);
-      if (activeTabId == null) {
-        _activeFloatingAction.value = null;
-      } else if (_floatingActionsByTab.containsKey(activeTabId)) {
-        // Keep the current action until an unvisited tab has finished loading
-        // its toolbar configuration and publishes its own FAB. Switching
-        // through a transient null here makes Scaffold animate the FAB away
-        // and back in, which reads as a flash in the dual-pane layout.
-        _activeFloatingAction.value = _floatingActionsByTab[activeTabId];
-      }
-      _activeBottomBar.value = activeTabId == null
-          ? null
-          : _bottomBarsByTab[activeTabId];
-    }
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _popScheduled = false;
         if (_workspaceState.tabs.isNotEmpty) return;
+        if (widget.appRoot) {
+          // Nothing lies beneath an app-root browser (decoy mode), so closing
+          // the last tab reopens the primary location instead of leaving.
+          final fallback = widget.primaryLocalContainer();
+          if (fallback != null) _workspaceActions.openTab(fallback);
+          return;
+        }
         if (!widget.closeRouteWhenEmpty) {
           widget.onEmpty?.call();
           return;
@@ -372,8 +338,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         child:
             widget.homeBuilder?.call(
               workspace: _workspace,
-              onFloatingActionChanged: _floatingActionCallbackFor(tab.tabId),
-              onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
+              onFloatingActionChanged: (action) =>
+                  _chrome.setFloatingAction(tab.tabId, action),
+              onBottomBarChanged: (bar) => _chrome.setBottomBar(tab.tabId, bar),
             ) ??
             const SizedBox.expand(),
       );
@@ -387,14 +354,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         workspaceConfig: _workspace,
         initialPath: tab.initialPath,
         resolveContainer: widget.resolveContainer,
-        showBackButton: true,
+        thumbnailCacheMode: widget.viewportOptions.thumbnailCacheMode,
+        thumbnailQuality: widget.viewportOptions.thumbnailQuality,
+        showBackButton: widget.viewportOptions.showBackButton,
+        wrapAppBarTitle: widget.viewportOptions.wrapAppBarTitle,
+        onOpenStorageSwitcher: widget.viewportOptions.onOpenStorageSwitcher,
         onUserActivity: isActive
             ? widget.userActivityFor?.call(tab.volId!)
             : null,
-        onAppBarChanged: _appBarCallbackFor(tab.tabId),
-        onSelectionAppBarChanged: _selectionAppBarCallbackFor(tab.tabId),
-        onFloatingActionChanged: _floatingActionCallbackFor(tab.tabId),
-        onBottomBarChanged: _bottomBarCallbackFor(tab.tabId),
       ),
     );
   }
@@ -456,6 +423,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       }
     }
     return _dualPaneTabIds!;
+  }
+
+  /// Tells the tabs which of them are on screen besides the active one. The
+  /// layout decides this (dual-pane depends on the width actually available),
+  /// so it is published from the layout pass; the hub ignores repeats.
+  void _publishVisibleTabs(Set<TabId> visible) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _chrome.setVisibleTabs(visible);
+    });
   }
 
   void _onDrawerChanged(bool isOpen) {
@@ -593,61 +570,6 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       }
     }
   }
-
-  ValueChanged<BrowserAppBarFactory> _appBarCallbackFor(TabId tabId) =>
-      _appBarCallbacks.putIfAbsent(
-        tabId,
-        () => (appBarFactory) {
-          if (!mounted) return;
-          _appBarsByTab[tabId] = appBarFactory;
-          if (_workspaceState.activeTabId == tabId) {
-            _activeAppBar.value = appBarFactory;
-          }
-        },
-      );
-
-  BrowserAppBarFactory? _selectionAppBarFor(TabId? activeTabId) {
-    if (activeTabId != null &&
-        _selectionAppBarsByTab.containsKey(activeTabId)) {
-      final activeSelectionAppBar = _selectionAppBarsByTab[activeTabId];
-      if (activeSelectionAppBar != null) return activeSelectionAppBar;
-    }
-
-    final aggregate = ref.read(aggregatedTabsSelectionProvider(_workspace));
-    if (!aggregate.hasSelection) return null;
-    for (final entry in aggregate.itemsByTab.entries) {
-      if (entry.value.isEmpty) continue;
-      final candidate = _selectionAppBarsByTab[entry.key];
-      if (candidate != null) return candidate;
-    }
-    return null;
-  }
-
-  ValueChanged<BrowserAppBarFactory?> _selectionAppBarCallbackFor(
-    TabId tabId,
-  ) => (appBar) {
-    if (!mounted) return;
-    _selectionAppBarsByTab[tabId] = appBar;
-    if (_workspaceState.activeTabId == tabId) {
-      // The visible tab's preference decides whether the aggregate
-      // selection UI belongs in the stationary app bar or bottom slot.
-      _selectionAppBar.value = appBar ?? _selectionAppBarFor(tabId);
-      return;
-    }
-    _selectionAppBar.value = _selectionAppBarFor(_workspaceState.activeTabId);
-  };
-
-  ValueChanged<Widget?> _floatingActionCallbackFor(TabId tabId) => (action) {
-    _floatingActionsByTab[tabId] = action;
-    if (!mounted || _workspaceState.activeTabId != tabId) return;
-    _activeFloatingAction.value = action;
-  };
-
-  ValueChanged<Widget?> _bottomBarCallbackFor(TabId tabId) => (bottomBar) {
-    _bottomBarsByTab[tabId] = bottomBar;
-    if (!mounted || _workspaceState.activeTabId != tabId) return;
-    _activeBottomBar.value = bottomBar;
-  };
 
   void _showLimitReached() {
     showAppSnackBar(
@@ -815,6 +737,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               child: AnimatedBuilder(
                 animation: _appBarVisibilityController,
                 builder: (context, child) => Align(
+                  key: const Key('browser_app_bar_align'),
                   alignment: Alignment.bottomCenter,
                   heightFactor: autoHideAppBar
                       ? _appBarVisibilityController.value
@@ -823,13 +746,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 ),
                 child: AdaptiveBrowserAppBar(
                   workspaceConfig: _workspace,
-                  appBarListenable: _activeAppBar,
+                  appBarListenable: _chrome.appBar,
                   fallback: BrowserAppBarFallback(
                     title: activeTab?.container?.displayName ?? '',
+                    showBackButton: widget.viewportOptions.showBackButton,
                     preferBackButton: !tabsEnabled,
                     onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
                   ),
-                  selectionAppBarListenable: _selectionAppBar,
+                  selectionAppBarListenable: _chrome.selectionAppBar,
                 ),
               ),
             ),
@@ -863,6 +787,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                     final secondTab = tabs.firstWhere(
                       (tab) => tab.tabId == pair[1],
                     );
+                    _publishVisibleTabs({pair[0], pair[1]});
                     return Row(
                       children: [
                         _buildDualPaneViewport(
@@ -884,6 +809,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                     );
                   }
 
+                  _publishVisibleTabs(const <TabId>{});
                   return NotificationListener<ScrollNotification>(
                     onNotification: (notification) => _handleAppBarScroll(
                       notification,
@@ -933,11 +859,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         ),
       ),
       floatingActionButton: ValueListenableBuilder<Widget?>(
-        valueListenable: _activeFloatingAction,
+        valueListenable: _chrome.floatingAction,
         builder: (context, action, _) => action ?? const SizedBox.shrink(),
       ),
       bottomNavigationBar: ValueListenableBuilder<Widget?>(
-        valueListenable: _activeBottomBar,
+        valueListenable: _chrome.bottomBar,
         builder: (context, bottomBar, _) =>
             bottomBar ?? const SizedBox.shrink(),
       ),

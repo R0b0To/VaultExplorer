@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'browser_tabs_provider.g.dart';
@@ -24,10 +25,15 @@ final class HomeTab extends BrowserTabKind {
 /// A folder location in a mounted vault or storage container.
 @immutable
 final class FolderTab extends BrowserTabKind {
-  const FolderTab({required this.container, this.initialPath});
+  const FolderTab({
+    required this.container,
+    this.initialPath,
+    this.origin = BrowserTabOrigin.other,
+  });
 
   final MountedContainer container;
   final String? initialPath;
+  final BrowserTabOrigin origin;
 }
 
 /// A single location in a browser workspace.
@@ -42,7 +48,12 @@ class BrowserTabState {
     required this.tabId,
     required MountedContainer container,
     String? initialPath,
-  }) : kind = FolderTab(container: container, initialPath: initialPath);
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+  }) : kind = FolderTab(
+         container: container,
+         initialPath: initialPath,
+         origin: origin,
+       );
 
   bool get isDashboard => kind is HomeTab;
   MountedContainer? get container => switch (kind) {
@@ -55,15 +66,17 @@ class BrowserTabState {
   };
   int? get volId => container?.volId;
 
-  /// Compatibility accessor for older integrations. Production widgets key by
-  /// [tabId] directly; keep legacy integer keys in a reserved range.
-  @Deprecated('Use tabId.')
-  int get key => (1 << 20) + tabId.value;
+  /// Where this tab was opened from. Home tabs have no origin of their own.
+  BrowserTabOrigin get origin => switch (kind) {
+    HomeTab() => BrowserTabOrigin.other,
+    FolderTab(:final origin) => origin,
+  };
 }
 
-/// Unique per hosted browser route. Keeping the initial route data in this
-/// family argument lets each route own an auto-disposed Riverpod engine while
-/// retaining a lightweight compatibility controller for existing widgets.
+/// Identifies one workspace: each hosted browser route (or the decoy root)
+/// owns an auto-disposed [BrowserTabs] engine keyed by this value, which also
+/// carries that route's initial data and policy. Equality is by [sessionId],
+/// so the same workspace always resolves to the same engine.
 @immutable
 class BrowserTabsConfig {
   static int _nextSessionId = 1;
@@ -73,23 +86,38 @@ class BrowserTabsConfig {
   final String? initialPath;
   final bool includeDashboardTab;
 
+  /// True when this workspace is the app's root surface (decoy mode): no route
+  /// lies beneath it. Closing the last tab reopens the primary location instead
+  /// of leaving, and back at the root of the visible tab leaves the app.
+  final bool appRoot;
+
   const BrowserTabsConfig._({
     required this.sessionId,
     required this.initialContainer,
     this.initialPath,
     this.includeDashboardTab = false,
+    this.appRoot = false,
   });
 
   factory BrowserTabsConfig.create({
     MountedContainer? initialContainer,
     String? initialPath,
     bool includeDashboardTab = false,
+    bool appRoot = false,
   }) => BrowserTabsConfig._(
     sessionId: _nextSessionId++,
     initialContainer: initialContainer,
     initialPath: initialPath,
     includeDashboardTab: includeDashboardTab,
+    appRoot: appRoot,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is BrowserTabsConfig && other.sessionId == sessionId;
+
+  @override
+  int get hashCode => sessionId.hashCode;
 }
 
 @immutable
@@ -183,12 +211,14 @@ class BrowserTabs extends _$BrowserTabs {
     MountedContainer container, {
     String? initialPath,
     bool activate = true,
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
   }) {
     if (state.atLimit) return null;
     final tab = BrowserTabState.folder(
       tabId: TabId.allocate(),
       container: container,
       initialPath: initialPath,
+      origin: origin,
     );
     final tabs = [...state.tabs];
     tabs.insert(tabs.isEmpty ? 0 : state.activeIndex + 1, tab);
@@ -271,7 +301,11 @@ class BrowserTabs extends _$BrowserTabs {
     );
   }
 
-  void replaceActive(MountedContainer container, {String? initialPath}) {
+  void replaceActive(
+    MountedContainer container, {
+    String? initialPath,
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+  }) {
     if (state.tabs.isEmpty || state.activeIndex < 0) return;
     final tabs = [...state.tabs];
     final index = state.activeIndex;
@@ -280,6 +314,7 @@ class BrowserTabs extends _$BrowserTabs {
       tabId: TabId.allocate(),
       container: container,
       initialPath: initialPath,
+      origin: origin,
     );
     tabs[index] = replacement;
     state = state.copyWith(
@@ -287,6 +322,24 @@ class BrowserTabs extends _$BrowserTabs {
       activeTabId: replacement.tabId,
       clearPreviousTabId: state.previousTabId == oldId,
     );
+  }
+
+  /// Records where a folder tab was (re)opened from, for tabs that are reused
+  /// rather than recreated. The latest open wins.
+  void setOrigin(TabId tabId, BrowserTabOrigin origin) {
+    final index = state.tabs.indexWhere((tab) => tab.tabId == tabId);
+    if (index < 0) return;
+    final tab = state.tabs[index];
+    final container = tab.container;
+    if (container == null || tab.origin == origin) return;
+    final tabs = [...state.tabs];
+    tabs[index] = BrowserTabState.folder(
+      tabId: tab.tabId,
+      container: container,
+      initialPath: tab.initialPath,
+      origin: origin,
+    );
+    state = state.copyWith(tabs: List.unmodifiable(tabs));
   }
 
   bool returnToDashboardAtRoot(TabId tabId) {

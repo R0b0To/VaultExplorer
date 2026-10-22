@@ -18,7 +18,9 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/browser/widgets/storage_locations_drawer.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_share_import_flow.dart';
@@ -38,7 +40,6 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   static const _repo = DecoyLocalRepository();
   bool _checkingAccess = true;
   bool _hasAccess = false;
-  MountedContainer? _container;
   MountedContainer? _primaryContainer;
   Future<void>? _accessCheckFuture;
 
@@ -130,7 +131,6 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       setState(() {
         _checkingAccess = false;
         _hasAccess = false;
-        _container = null;
         _primaryContainer = null;
         _deferBrowserForShare = false;
       });
@@ -146,7 +146,6 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       _checkingAccess = false;
       _hasAccess = true;
       _primaryContainer = container;
-      _container = container;
       _deferBrowserForShare = pendingShare != null;
     });
     if (pendingShare != null) {
@@ -158,7 +157,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
     IncomingShareRequest request, {
     bool isColdStart = false,
   }) {
-    final container = _container;
+    final container = _primaryContainer;
     if (!mounted || container == null) return;
     final mySeq = ++_shareSeq;
     if (_activeShareRoute != null && _activeShareRoute!.isActive) {
@@ -223,31 +222,43 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       );
     }
 
-   final container = _container;
-    final primary = _primaryContainer ?? container;
+    final container = _primaryContainer;
     if (container == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return SkinAreaScope(
       area: SkinArea.files,
-      child: FileBrowserScreen(
-      key: ValueKey(container.volId),
-      container: container,
-      resolveContainer: (volId) {
-        if (volId == kDecoyLocalVolId) return _primaryContainer ?? _container;
-        return ref.read(externalStorageLocationsProvider.notifier).resolveContainer(volId);
-      },
-      onUserActivity: () {},
-      showBackButton: false,
-      wrapAppBarTitle: (title) => HiddenVaultTrigger(child: title),
-      drawer: StorageLocationsDrawer(
-        activeVolId: container.volId,
-        primaryLocalContainer: primary,
-        onSelected: (newContainer) {
-          setState(() => _container = newContainer);
+      child: BrowserTabsShell(
+        initialContainer: container,
+        appRoot: true,
+        resolveContainer: (volId) {
+          if (volId == kDecoyLocalVolId) return _primaryContainer;
+          return ref
+              .read(externalStorageLocationsProvider.notifier)
+              .resolveContainer(volId);
         },
+        // No vaults are unlocked in decoy mode; the new-tab sheet offers the
+        // primary storage and the person's external locations.
+        mountedContainers: () => const <MountedContainer>[],
+        primaryLocalContainer: () => _primaryContainer,
+        viewportOptions: BrowserViewportOptions(
+          showBackButton: false,
+          wrapAppBarTitle: (title) => HiddenVaultTrigger(child: title),
+        ),
+        drawerBuilder: (workspace, currentVolId) => StorageLocationsDrawer(
+          activeVolId: currentVolId ?? container.volId,
+          primaryLocalContainer: _primaryContainer,
+          onSelected: (selected) {
+            // Same rule as the main shell: picking the storage the active tab
+            // already shows leaves it alone instead of resetting it to root.
+            final active = ref.read(browserTabsProvider(workspace)).activeTab;
+            if (active?.volId == selected.volId) return;
+            ref
+                .read(browserTabsProvider(workspace).notifier)
+                .replaceActive(selected);
+          },
+        ),
       ),
-    ),
     );
   }
 }

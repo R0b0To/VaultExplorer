@@ -12273,4 +12273,7 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file.';
+
+  @override
+  String get pressBackAgainToExit => 'Premi di nuovo indietro per uscire';
 }

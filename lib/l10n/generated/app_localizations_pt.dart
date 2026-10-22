@@ -12270,4 +12270,7 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'Mostra duas abas abertas lado a lado quando a tela tiver espaço suficiente. Requer as abas do gerenciador de arquivos.';
+
+  @override
+  String get pressBackAgainToExit => 'Pressione voltar novamente para sair';
 }

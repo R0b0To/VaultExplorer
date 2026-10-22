@@ -3385,5 +3385,6 @@
   "browserTabCloseToRight": "Fermer les onglets à droite",
   "browserTabCloseAll": "Fermer tout",
   "dualPaneEnabledTitle": "Utiliser le double volet",
-  "dualPaneEnabledSubtitle": "Affiche deux onglets ouverts côte à côte lorsque l’écran est assez large. Nécessite les onglets du gestionnaire de fichiers."
+  "dualPaneEnabledSubtitle": "Affiche deux onglets ouverts côte à côte lorsque l’écran est assez large. Nécessite les onglets du gestionnaire de fichiers.",
+  "pressBackAgainToExit": "Appuyez à nouveau sur retour pour quitter"
 }

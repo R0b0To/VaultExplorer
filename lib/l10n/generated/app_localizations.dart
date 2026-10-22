@@ -20472,6 +20472,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.'**
   String get dualPaneEnabledSubtitle;
+
+  /// Hint shown on the first back press on Home. A second press within a couple of seconds exits the app
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get pressBackAgainToExit;
 }
 
 class _AppLocalizationsDelegate

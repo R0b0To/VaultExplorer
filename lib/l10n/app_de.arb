@@ -3385,5 +3385,6 @@
   "browserTabCloseToRight": "Tabs rechts schließen",
   "browserTabCloseAll": "Alle schließen",
   "dualPaneEnabledTitle": "Zwei Bereiche verwenden",
-  "dualPaneEnabledSubtitle": "Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs."
+  "dualPaneEnabledSubtitle": "Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs.",
+  "pressBackAgainToExit": "Zum Beenden erneut zurück drücken"
 }

@@ -11412,4 +11412,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dualPaneEnabledSubtitle => '屏幕足够宽时并排显示两个已打开的标签页。需要启用文件管理器标签页。';
+
+  @override
+  String get pressBackAgainToExit => '再按一次返回键退出';
 }

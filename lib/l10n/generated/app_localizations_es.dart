@@ -12302,4 +12302,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'Muestra dos pestañas abiertas en paralelo cuando la pantalla tenga suficiente espacio. Requiere las pestañas del gestor de archivos.';
+
+  @override
+  String get pressBackAgainToExit => 'Pulsa atrás de nuevo para salir';
 }

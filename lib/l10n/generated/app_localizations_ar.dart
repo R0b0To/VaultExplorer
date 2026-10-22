@@ -12304,4 +12304,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get dualPaneEnabledSubtitle =>
       'اعرض علامتي تبويب مفتوحتين جنبًا إلى جنب عندما تكون الشاشة واسعة بما يكفي. يتطلب تفعيل علامات تبويب مدير الملفات.';
+
+  @override
+  String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
 }

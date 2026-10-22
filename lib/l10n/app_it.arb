@@ -3385,5 +3385,6 @@
   "browserTabCloseToRight": "Chiudi schede a destra",
   "browserTabCloseAll": "Chiudi tutto",
   "dualPaneEnabledTitle": "Usa doppio riquadro",
-  "dualPaneEnabledSubtitle": "Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file."
+  "dualPaneEnabledSubtitle": "Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file.",
+  "pressBackAgainToExit": "Premi di nuovo indietro per uscire"
 }

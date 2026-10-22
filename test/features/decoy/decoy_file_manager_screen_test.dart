@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_file_manager_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -67,7 +67,7 @@ void main() {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();
 
-      expect(find.byType(FileBrowserScreen), findsNothing);
+      expect(find.byType(BrowserTabsShell), findsNothing);
       expect(find.byIcon(Icons.folder_off_outlined), findsOneWidget);
       expect(find.byIcon(Icons.lock_open_rounded), findsOneWidget);
     });
@@ -85,13 +85,13 @@ void main() {
       expect(requestAccessCalled, isTrue);
     });
 
-    testWidgets('mounts FileBrowserScreen when storage access is granted', (tester) async {
+    testWidgets('mounts the tabbed browser shell when storage access is granted', (tester) async {
       hasAccess = true;
       await tester.pumpWidget(buildTestWidget());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(FileBrowserScreen), findsOneWidget);
+      expect(find.byType(BrowserTabsShell), findsOneWidget);
     });
   });
 

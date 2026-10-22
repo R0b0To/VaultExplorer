@@ -13822,5 +13822,9 @@
   "dualPaneEnabledSubtitle": "Show two open tabs side by side when the screen is wide enough. Requires file manager tabs.",
   "@dualPaneEnabledSubtitle": {
     "description": "Explains the dual pane file manager setting."
+  },
+  "pressBackAgainToExit": "Press back again to exit",
+  "@pressBackAgainToExit": {
+    "description": "Hint shown on the first back press on Home. A second press within a couple of seconds exits the app"
   }
 }

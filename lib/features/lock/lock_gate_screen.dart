@@ -4,7 +4,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/app/main_shell.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_controller.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
@@ -48,12 +49,14 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   void _goToDecoyContainer(MountedContainer container) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => SkinAreaScope(area: SkinArea.files, child: FileBrowserScreen(
-          container: container,
+        builder: (_) => SkinAreaScope(area: SkinArea.files, child: BrowserTabsShell(
+          initialContainer: container,
+          appRoot: true,
           resolveContainer: (volId) =>
               volId == container.volId ? container : null,
-          onUserActivity: () {},
-          showBackButton: false,
+          mountedContainers: () => const <MountedContainer>[],
+          primaryLocalContainer: () => container,
+          viewportOptions: const BrowserViewportOptions(showBackButton: false),
         )),
       ),
     );

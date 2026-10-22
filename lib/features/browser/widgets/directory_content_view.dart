@@ -935,6 +935,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     );
   }
 
+  /// Narrows the selection to just [entry]. Selection-based handlers
+  /// (`_exportSelectedToStorage`, `_runQuickCrypto`, ...) aggregate the
+  /// selection across ALL tabs, so any selection held in other tabs is cleared
+  /// first; otherwise the item sheet could act on items the user never picked.
+  void _selectOnly(RawEntry entry) {
+    exitSelectionMode();
+    setSelectedItems({entry});
+  }
+
   void _showItemActionsSheet(RawEntry entry) {
     _signalActivity();
     HapticFeedback.selectionClick();
@@ -1139,6 +1148,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               !widget.container.isLocalStorage &&
               _archiveContext == null
           ? () => _showSyncSettings(entry)
+          : null,
+      // Selection-bar parity: same handlers and same visibility rules as
+      // browser_app_bar_builder.dart (export is vault-only; encrypt/decrypt
+      // apply to files only, by whether the name is already app-encrypted).
+      onExport: !widget.container.isLocalStorage && _archiveContext == null
+          ? () {
+              _selectOnly(entry);
+              _exportSelectedToStorage();
+            }
+          : null,
+      onEncrypt:
+          _archiveContext == null &&
+              !entry.isDir &&
+              !isAppEncryptedFileName(entry.name)
+          ? () async {
+              _selectOnly(entry);
+              await _encryptSelected();
+            }
+          : null,
+      onDecrypt:
+          _archiveContext == null &&
+              !entry.isDir &&
+              isAppEncryptedFileName(entry.name)
+          ? () async {
+              _selectOnly(entry);
+              await _decryptSelected();
+            }
           : null,
     );
   }

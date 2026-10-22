@@ -50,6 +50,11 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onToggleDocProvider;
   final VoidCallback? onSyncSettings;
 
+  /// Selection-bar parity actions (vault export + quick encrypt/decrypt).
+  final VoidCallback? onExport;
+  final VoidCallback? onEncrypt;
+  final VoidCallback? onDecrypt;
+
   /// Tab actions (only wired while the file manager is hosted in tabs).
   final VoidCallback? onOpenInNewTab;
 
@@ -83,6 +88,9 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEditAudio,
     this.onToggleDocProvider,
     this.onSyncSettings,
+    this.onExport,
+    this.onEncrypt,
+    this.onDecrypt,
     this.onOpenInNewTab,
   });
 
@@ -116,6 +124,9 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEditAudio,
     VoidCallback? onToggleDocProvider,
     VoidCallback? onSyncSettings,
+    VoidCallback? onExport,
+    VoidCallback? onEncrypt,
+    VoidCallback? onDecrypt,
     VoidCallback? onOpenInNewTab,
   }) {
     return showModalBottomSheet(
@@ -154,6 +165,9 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEditAudio: onEditAudio,
         onToggleDocProvider: onToggleDocProvider,
         onSyncSettings: onSyncSettings,
+        onExport: onExport,
+        onEncrypt: onEncrypt,
+        onDecrypt: onDecrypt,
         onOpenInNewTab: onOpenInNewTab,
       ),
     );
@@ -229,6 +243,76 @@ class FileItemActionsSheet extends ConsumerWidget {
     return Center(
       child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
     );
+  }
+
+  /// Horizontal row of the four primary actions (Share, Copy, Move, Delete).
+  ///
+  /// Each button is a Flexible child under `spaceAround`: it takes its natural
+  /// width (>= 64dp, so the touch target is always >= 48x48dp) and shrinks, with
+  /// an ellipsized label, rather than overflowing on narrow screens or with
+  /// long localized labels.
+  Widget _buildQuickActions(BuildContext context, ColorScheme cs) {
+    final l10n = context.l10n;
+    final actions = <Widget>[
+      if (onShare != null)
+        _QuickActionButton(
+          icon: Icons.share_rounded,
+          label: l10n.shareAction,
+          onTap: () {
+            Navigator.pop(context);
+            onShare!();
+          },
+        ),
+      _QuickActionButton(
+        icon: Icons.copy_rounded,
+        label: l10n.copyAction,
+        onTap: () {
+          Navigator.pop(context);
+          onCopy();
+        },
+      ),
+      _QuickActionButton(
+        icon: Icons.cut_rounded,
+        label: l10n.moveAction,
+        enabled: !isReadOnly,
+        onTap: () {
+          Navigator.pop(context);
+          onCut();
+        },
+      ),
+      // Destructive: red accent. The confirmation dialog lives in the
+      // `onDelete` callback supplied by the caller and is untouched.
+      _QuickActionButton(
+        icon: Icons.delete_outline_rounded,
+        label: l10n.delete,
+        color: cs.error,
+        enabled: !isReadOnly,
+        onTap: () {
+          Navigator.pop(context);
+          onDelete();
+        },
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [for (final action in actions) Flexible(child: action)],
+      ),
+    );
+  }
+
+  /// Joins the non-empty action groups with a small gap, so a group whose
+  /// callbacks are all null/not applicable never leaves a stray spacer behind.
+  static List<Widget> _withGroupSpacing(List<List<Widget>> groups) {
+    final result = <Widget>[];
+    for (final group in groups) {
+      if (group.isEmpty) continue;
+      if (result.isNotEmpty) result.add(const SizedBox(height: 8));
+      result.addAll(group);
+    }
+    return result;
   }
 
   @override
@@ -318,165 +402,147 @@ class FileItemActionsSheet extends ConsumerWidget {
             ),
             const Divider(height: 16),
 
-            // Actions list
+            // Primary actions: horizontal quick row. Archive entries are
+            // virtual, read-only entries, so none of these apply there.
+            if (!isInsideArchive) ...[
+              _buildQuickActions(context, cs),
+              Divider(
+                height: 16,
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ],
+
+            // Secondary actions list
             Flexible(
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onOpenInNewTab != null)
-                      _ActionTile(
-                        icon: Icons.tab_rounded,
-                        label: context.l10n.browserTabOpenInNewTab,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onOpenInNewTab!();
-                        },
-                      ),
-                    if (onOpenInNewTab != null) const SizedBox(height: 8),
+                  children: _withGroupSpacing([
+                    // Tabs
+                    [
+                      if (onOpenInNewTab != null)
+                        _ActionTile(
+                          icon: Icons.tab_rounded,
+                          label: context.l10n.browserTabOpenInNewTab,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onOpenInNewTab!();
+                          },
+                        ),
+                    ],
 
                     // Archive entries are virtual, read-only entries. The
                     // sole file operation available here is staging one for
                     // extraction into a real destination.
-                    if (onExtract != null)
-                      _ActionTile(
-                        icon: Icons.unarchive_outlined,
-                        label: context.l10n.extract,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onExtract!();
-                        },
-                      ),
-                    if (onExtract != null) const SizedBox(height: 8),
-
-                    if (!isInsideArchive && onArchive != null)
-                      _ActionTile(
-                        icon: Icons.archive_outlined,
-                        label: context.l10n.archiveSelectionAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onArchive!();
-                        },
-                      ),
-                    if (!isInsideArchive && onArchive != null)
-                      const SizedBox(height: 8),
-
-                    // Group 1: Consumption & Sharing
-                    if (!isInsideArchive && onOpenWith != null)
-                      _ActionTile(
-                        icon: Icons.open_in_new_rounded,
-                        label: context.l10n.openWithAppAction,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onOpenWith!();
-                        },
-                      ),
-                    if (!isInsideArchive && onShare != null)
-                      _ActionTile(
-                        icon: Icons.share_rounded,
-                        label: context.l10n.shareAction,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onShare!();
-                        },
-                      ),
-                    if (!isInsideArchive && onEditImage != null)
-                      _ActionTile(
-                        icon: Icons.edit_outlined,
-                        label: context.l10n.editImageAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onEditImage!();
-                        },
-                      ),
-                    if (!isInsideArchive && onEditVideo != null)
-                      _ActionTile(
-                        icon: Icons.content_cut_rounded,
-                        label: context.l10n.videoEditorEditAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onEditVideo!();
-                        },
-                      ),
-                    if (!isInsideArchive && onEditAudio != null)
-                      _ActionTile(
-                        icon: Icons.graphic_eq_rounded,
-                        label: context.l10n.audioEditorEditAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onEditAudio!();
-                        },
-                      ),
-                    if (!isInsideArchive &&
-                        (onOpenWith != null ||
-                            onShare != null ||
-                            onEditImage != null ||
-                            onEditVideo != null ||
-                            onEditAudio != null))
-                      const SizedBox(height: 8),
-
-                    // Group 2: Core File Operations
-                    if (!isInsideArchive) ...[
-                      _ActionTile(
-                        icon: Icons.drive_file_rename_outline_rounded,
-                        label: context.l10n.renameAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onRename();
-                        },
-                      ),
-                      _ActionTile(
-                        icon: Icons.copy_rounded,
-                        label: context.l10n.copyAction,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onCopy();
-                        },
-                      ),
-                      _ActionTile(
-                        icon: Icons.cut_rounded,
-                        label: context.l10n.moveAction,
-                        enabled: !isReadOnly,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onCut();
-                        },
-                      ),
-                      const SizedBox(height: 8),
+                    [
+                      if (onExtract != null)
+                        _ActionTile(
+                          icon: Icons.unarchive_outlined,
+                          label: context.l10n.extract,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onExtract!();
+                          },
+                        ),
                     ],
 
-                    // Group 3: Shortcuts & Integrations
-                    if (!isInsideArchive) ...[
-                      _ActionTile(
-                        icon: isPinned
-                            ? Icons.push_pin_outlined
-                            : Icons.push_pin_rounded,
-                        label: isPinned
-                            ? context.l10n.unpinAction
-                            : context.l10n.pinAction,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onTogglePin();
-                        },
-                      ),
-                      _ActionTile(
-                        icon: isBookmark
-                            ? Icons.star_outline_rounded
-                            : Icons.star_rounded,
-                        label: isBookmark
-                            ? context.l10n.unbookmarkAction
-                            : context.l10n.bookmarkAction,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onToggleBookmark();
-                        },
-                      ),
-                      if (onToggleDocProvider != null)
+                    // Consumption & editing
+                    [
+                      if (!isInsideArchive && onOpenWith != null)
+                        _ActionTile(
+                          icon: Icons.open_in_new_rounded,
+                          label: context.l10n.openWithAppAction,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onOpenWith!();
+                          },
+                        ),
+                      if (!isInsideArchive && onEditImage != null)
+                        _ActionTile(
+                          icon: Icons.edit_outlined,
+                          label: context.l10n.editImageAction,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onEditImage!();
+                          },
+                        ),
+                      if (!isInsideArchive && onEditVideo != null)
+                        _ActionTile(
+                          icon: Icons.content_cut_rounded,
+                          label: context.l10n.videoEditorEditAction,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onEditVideo!();
+                          },
+                        ),
+                      if (!isInsideArchive && onEditAudio != null)
+                        _ActionTile(
+                          icon: Icons.graphic_eq_rounded,
+                          label: context.l10n.audioEditorEditAction,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onEditAudio!();
+                          },
+                        ),
+                    ],
+
+                    // Rename & archive
+                    [
+                      if (!isInsideArchive)
+                        _ActionTile(
+                          icon: Icons.drive_file_rename_outline_rounded,
+                          label: context.l10n.renameAction,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onRename();
+                          },
+                        ),
+                      if (!isInsideArchive && onArchive != null)
+                        _ActionTile(
+                          icon: Icons.archive_outlined,
+                          label: context.l10n.archiveSelectionAction,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onArchive!();
+                          },
+                        ),
+                    ],
+
+                    // Vault, crypto & integrations (same order as the selection bar)
+                    [
+                      if (!isInsideArchive && onExport != null)
+                        _ActionTile(
+                          icon: Icons.drive_folder_upload_rounded,
+                          label: context.l10n.exportToDeviceAction,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onExport!();
+                          },
+                        ),
+                      if (!isInsideArchive && onEncrypt != null)
+                        _ActionTile(
+                          icon: Icons.lock_outline_rounded,
+                          label: context.l10n.cryptoDirectionEncrypt,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onEncrypt!();
+                          },
+                        ),
+                      if (!isInsideArchive && onDecrypt != null)
+                        _ActionTile(
+                          icon: Icons.lock_open_rounded,
+                          label: context.l10n.cryptoDirectionDecrypt,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onDecrypt!();
+                          },
+                        ),
+                      if (!isInsideArchive && onToggleDocProvider != null)
                         _ActionTile(
                           icon: isDocumentProviderMounted
                               ? Icons.folder_shared_rounded
@@ -489,7 +555,7 @@ class FileItemActionsSheet extends ConsumerWidget {
                             onToggleDocProvider!();
                           },
                         ),
-                      if (onSyncSettings != null)
+                      if (!isInsideArchive && onSyncSettings != null)
                         _ActionTile(
                           icon: Icons.sync_rounded,
                           label: context.l10n.autoSyncMenuAction,
@@ -498,33 +564,38 @@ class FileItemActionsSheet extends ConsumerWidget {
                             onSyncSettings!();
                           },
                         ),
-                      const SizedBox(height: 10),
                     ],
 
-                    // Group 4: Destructive Action (Safely isolated in a soft tinted container)
-                    if (!isInsideArchive)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
+                    // Pins & bookmarks
+                    [
+                      if (!isInsideArchive) ...[
+                        _ActionTile(
+                          icon: isPinned
+                              ? Icons.push_pin_outlined
+                              : Icons.push_pin_rounded,
+                          label: isPinned
+                              ? context.l10n.unpinAction
+                              : context.l10n.pinAction,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onTogglePin();
+                          },
                         ),
-                        child: Material(
-                          color: cs.errorContainer.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          clipBehavior: Clip.antiAlias,
-                          child: _ActionTile(
-                            icon: Icons.delete_outline_rounded,
-                            label: context.l10n.delete,
-                            color: cs.error,
-                            enabled: !isReadOnly,
-                            onTap: () {
-                              Navigator.pop(context);
-                              onDelete();
-                            },
-                          ),
+                        _ActionTile(
+                          icon: isBookmark
+                              ? Icons.star_outline_rounded
+                              : Icons.star_rounded,
+                          label: isBookmark
+                              ? context.l10n.unbookmarkAction
+                              : context.l10n.bookmarkAction,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onToggleBookmark();
+                          },
                         ),
-                      ),
-                  ],
+                      ],
+                    ],
+                  ]),
                 ),
               ),
             ),
@@ -795,6 +866,63 @@ class _ActionTile extends StatelessWidget {
       ),
       enabled: enabled,
       onTap: enabled ? onTap : null,
+    );
+  }
+}
+
+/// Icon-over-label button used by the horizontal quick-action row.
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+  final bool enabled;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final effectiveColor = enabled
+        ? (color ?? cs.onSurface)
+        : cs.onSurfaceVariant.withValues(alpha: 0.38);
+
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        // >= 48x48dp touch target.
+        constraints: const BoxConstraints(minWidth: 64, minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: effectiveColor, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: textTheme.labelSmall?.copyWith(
+                  color: effectiveColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

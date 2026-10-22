@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -731,133 +732,149 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final shell = Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            ClipRect(
-              child: AnimatedBuilder(
-                animation: _appBarVisibilityController,
-                builder: (context, child) => Align(
-                  key: const Key('browser_app_bar_align'),
-                  alignment: Alignment.bottomCenter,
-                  heightFactor: autoHideAppBar
-                      ? _appBarVisibilityController.value
-                      : 1.0,
-                  child: SizedBox(height: kToolbarHeight, child: child),
-                ),
-                child: AdaptiveBrowserAppBar(
-                  workspaceConfig: _workspace,
-                  appBarListenable: _chrome.appBar,
-                  fallback: BrowserAppBarFallback(
-                    title: activeTab?.container?.displayName ?? '',
-                    showBackButton: widget.viewportOptions.showBackButton,
-                    preferBackButton: !tabsEnabled,
-                    onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
+            Column(
+              children: [
+                ClipRect(
+                  child: AnimatedBuilder(
+                    animation: _appBarVisibilityController,
+                    builder: (context, child) => Align(
+                      key: const Key('browser_app_bar_align'),
+                      alignment: Alignment.bottomCenter,
+                      heightFactor: autoHideAppBar
+                          ? _appBarVisibilityController.value
+                          : 1.0,
+                      child: SizedBox(height: kToolbarHeight, child: child),
+                    ),
+                    child: AdaptiveBrowserAppBar(
+                      workspaceConfig: _workspace,
+                      appBarListenable: _chrome.appBar,
+                      fallback: BrowserAppBarFallback(
+                        title: activeTab?.container?.displayName ?? '',
+                        showBackButton: widget.viewportOptions.showBackButton,
+                        preferBackButton: !tabsEnabled,
+                        onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
+                      ),
+                    ),
                   ),
-                  selectionAppBarListenable: _chrome.selectionAppBar,
                 ),
-              ),
-            ),
-            if (tabsEnabled && tabs.isNotEmpty) strip,
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, viewportConstraints) {
-                  final orientation = MediaQuery.of(context).orientation;
-                  final minDualPaneWidth = orientation == Orientation.landscape
-                      ? 640.0
-                      : 720.0;
-                  final dualPane =
-                      tabsEnabled &&
-                      useDualPaneBrowsing &&
-                      tabs.length > 1 &&
-                      viewportConstraints.maxWidth >= minDualPaneWidth;
-
-                  if (_wasDualPane != dualPane) {
-                    final wasDualPane = _wasDualPane;
-                    _wasDualPane = dualPane;
-                    if (wasDualPane == true && !dualPane) {
-                      _schedulePageSync();
-                    }
-                  }
-
-                  if (dualPane) {
-                    final pair = _resolveDualPaneTabIds(tabs, activeTabId);
-                    final firstTab = tabs.firstWhere(
-                      (tab) => tab.tabId == pair[0],
-                    );
-                    final secondTab = tabs.firstWhere(
-                      (tab) => tab.tabId == pair[1],
-                    );
-                    _publishVisibleTabs({pair[0], pair[1]});
-                    return Row(
-                      children: [
-                        _buildDualPaneViewport(
-                          firstTab,
-                          isActive: firstTab.tabId == activeTabId,
-                          autoHideAppBar: autoHideAppBar,
-                        ),
-                        VerticalDivider(
-                          width: 1,
-                          thickness: 1,
-                          color: Theme.of(context).dividerColor,
-                        ),
-                        _buildDualPaneViewport(
-                          secondTab,
-                          isActive: secondTab.tabId == activeTabId,
-                          autoHideAppBar: autoHideAppBar,
-                        ),
-                      ],
-                    );
-                  }
-
-                  _publishVisibleTabs(const <TabId>{});
-                  return NotificationListener<ScrollNotification>(
-                    onNotification: (notification) => _handleAppBarScroll(
-                      notification,
-                      enabled: autoHideAppBar,
-                      active: activeTabId != null,
-                    ),
-                    child: PageView.builder(
-                      controller: _pageController,
-                      clipBehavior: Clip.hardEdge,
-                      physics:
+                if (tabsEnabled && tabs.isNotEmpty) strip,
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, viewportConstraints) {
+                      final orientation = MediaQuery.of(context).orientation;
+                      final minDualPaneWidth = orientation == Orientation.landscape
+                          ? 640.0
+                          : 720.0;
+                      final dualPane =
                           tabsEnabled &&
-                              !_drawerOpenOrDragging &&
-                              !_edgeDrawerGestureActive
-                          ? const PageScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            )
-                          : const NeverScrollableScrollPhysics(),
-                      itemCount: tabs.length,
-                      onPageChanged: _onPageChanged,
-                      findChildIndexCallback: (key) {
-                        if (key is! ValueKey<TabId>) return null;
-                        final index = tabs.indexWhere(
-                          (tab) => tab.tabId == key.value,
+                          useDualPaneBrowsing &&
+                          tabs.length > 1 &&
+                          viewportConstraints.maxWidth >= minDualPaneWidth;
+
+                      if (_wasDualPane != dualPane) {
+                        final wasDualPane = _wasDualPane;
+                        _wasDualPane = dualPane;
+                        if (wasDualPane == true && !dualPane) {
+                          _schedulePageSync();
+                        }
+                      }
+
+                      if (dualPane) {
+                        final pair = _resolveDualPaneTabIds(tabs, activeTabId);
+                        final firstTab = tabs.firstWhere(
+                          (tab) => tab.tabId == pair[0],
                         );
-                        return index < 0 ? null : index;
-                      },
-                      itemBuilder: (context, index) {
-                        final tab = tabs[index];
-                        final pageIsActive = tab.tabId == activeTabId;
-                        // Whether the page's tickers run (thumbnail loading,
-                        // folder previews) follows what is on screen, not
-                        // which tab is active: the active tab only changes
-                        // once a swipe passes the half-way point, which used
-                        // to blank the leaving page and delay the entering
-                        // one for half the transition.
-                        return _BrowserTabPage(
-                          key: ValueKey<TabId>(tab.tabId),
+                        final secondTab = tabs.firstWhere(
+                          (tab) => tab.tabId == pair[1],
+                        );
+                        _publishVisibleTabs({pair[0], pair[1]});
+                        return Row(
+                          children: [
+                            _buildDualPaneViewport(
+                              firstTab,
+                              isActive: firstTab.tabId == activeTabId,
+                              autoHideAppBar: autoHideAppBar,
+                            ),
+                            VerticalDivider(
+                              width: 1,
+                              thickness: 1,
+                              color: Theme.of(context).dividerColor,
+                            ),
+                            _buildDualPaneViewport(
+                              secondTab,
+                              isActive: secondTab.tabId == activeTabId,
+                              autoHideAppBar: autoHideAppBar,
+                            ),
+                          ],
+                        );
+                      }
+
+                      _publishVisibleTabs(const <TabId>{});
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (notification) => _handleAppBarScroll(
+                          notification,
+                          enabled: autoHideAppBar,
+                          active: activeTabId != null,
+                        ),
+                        child: PageView.builder(
                           controller: _pageController,
-                          index: index,
-                          child: _buildTabContent(
-                            tab,
-                            isActive: pageIsActive,
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                          clipBehavior: Clip.hardEdge,
+                          physics:
+                              tabsEnabled &&
+                                  !_drawerOpenOrDragging &&
+                                  !_edgeDrawerGestureActive
+                              ? const PageScrollPhysics(
+                                  parent: AlwaysScrollableScrollPhysics(),
+                                )
+                              : const NeverScrollableScrollPhysics(),
+                          itemCount: tabs.length,
+                          onPageChanged: _onPageChanged,
+                          findChildIndexCallback: (key) {
+                            if (key is! ValueKey<TabId>) return null;
+                            final index = tabs.indexWhere(
+                              (tab) => tab.tabId == key.value,
+                            );
+                            return index < 0 ? null : index;
+                          },
+                          itemBuilder: (context, index) {
+                            final tab = tabs[index];
+                            final pageIsActive = tab.tabId == activeTabId;
+                            // Whether the page's tickers run (thumbnail loading,
+                            // folder previews) follows what is on screen, not
+                            // which tab is active: the active tab only changes
+                            // once a swipe passes the half-way point, which used
+                            // to blank the leaving page and delay the entering
+                            // one for half the transition.
+                            return _BrowserTabPage(
+                              key: ValueKey<TabId>(tab.tabId),
+                              controller: _pageController,
+                              index: index,
+                              child: _buildTabContent(
+                                tab,
+                                isActive: pageIsActive,
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            // The selection app bar floats above the top of the browser
+            // rather than taking the (auto-hiding) app bar's slot, so it is
+            // visible when that slot is collapsed and nothing shifts.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _SelectionBarOverlay(
+                workspaceConfig: _workspace,
+                selectionAppBarListenable: _chrome.selectionAppBar,
               ),
             ),
           ],
@@ -888,6 +905,49 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           ? 24
           : systemBackGestureInsetLeft,
       child: shell,
+    );
+  }
+}
+
+/// The selection app bar, laid over the top of the browser.
+///
+/// Selecting while the app bar has auto-hidden must still show the selection
+/// actions, and must not push the list down. So the bar is an overlay: it
+/// covers the app bar slot when that is visible and the top of the content
+/// when it is collapsed, and the layout underneath never changes.
+class _SelectionBarOverlay extends ConsumerWidget {
+  const _SelectionBarOverlay({
+    required this.workspaceConfig,
+    required this.selectionAppBarListenable,
+  });
+
+  final BrowserTabsConfig workspaceConfig;
+  final ValueListenable<BrowserAppBarFactory?> selectionAppBarListenable;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasSelection = ref.watch(
+      aggregatedTabsSelectionProvider(
+        workspaceConfig,
+      ).select((selection) => selection.hasSelection),
+    );
+    return ValueListenableBuilder<BrowserAppBarFactory?>(
+      valueListenable: selectionAppBarListenable,
+      builder: (context, selectionAppBar, _) {
+        if (!hasSelection || selectionAppBar == null) {
+          return const SizedBox.shrink();
+        }
+        return SizedBox(
+          key: const Key('browser_selection_app_bar_overlay'),
+          height: kToolbarHeight,
+          child: SkinAreaScope(
+            area: SkinArea.files,
+            child: Builder(
+              builder: (appBarContext) => selectionAppBar(appBarContext),
+            ),
+          ),
+        );
+      },
     );
   }
 }

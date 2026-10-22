@@ -91,7 +91,8 @@ class GridCardShell extends StatelessWidget {
 
   /// Whether the 3-dots button is offered at all. Mirrors the list layout's
   /// `showItemActionsMenu` setting; the button also needs [onMoreTap] and is
-  /// hidden while selecting and on placeholders.
+  /// hidden while selecting and on placeholders. It sits at the end of the
+  /// file name row, or in the preview's corner when the name is hidden.
   final bool showMoreButton;
   final bool isPinned;
   final bool isBookmark;
@@ -140,6 +141,14 @@ class GridCardShell extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
+
+    // The button lives in the name row. That row keeps a slot for it even
+    // while the icon is hidden (selecting, placeholders), so the name does
+    // not shift and a masonry card does not change height. With no name row
+    // (names hidden over thumbnails) it falls back to the preview's corner.
+    final offersMore = showMoreButton && onMoreTap != null;
+    final moreSlotInFooter = offersMore && showFileName;
+    final moreVisible = offersMore && !isSelectionMode && !isPlaceholder;
 
     Widget previewStack = Stack(
       fit: StackFit.expand,
@@ -234,10 +243,7 @@ class GridCardShell extends StatelessWidget {
               ),
             ),
           ),
-        if (showMoreButton &&
-            onMoreTap != null &&
-            !isSelectionMode &&
-            !isPlaceholder)
+        if (moreVisible && !showFileName)
           // Top-right is free here: the selection check and the placeholder
           // spinner, the other occupants of this corner, both exclude it.
           LayoutBuilder(
@@ -274,23 +280,60 @@ class GridCardShell extends StatelessWidget {
       ],
     );
 
-    Widget footer = Container(
-      alignment: Alignment.center,
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      child: FileNameLabel(
-        text: label,
-        query: searchQuery,
-        mode: longFileNameMode,
-        style: skin.nameStyle(
-          textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
-          isDir: isFolder,
+    final nameLabel = FileNameLabel(
+      text: label,
+      query: searchQuery,
+      mode: longFileNameMode,
+      style: skin.nameStyle(
+        textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: cs.onSurface,
         ),
+        isDir: isFolder,
       ),
     );
+
+    Widget footer = moreSlotInFooter
+        ? LayoutBuilder(
+            builder: (context, constraints) {
+              // Dense grids have narrow cards; keep the button from eating
+              // the name.
+              final compact = constraints.maxWidth < 100;
+              final size = compact ? 24.0 : 28.0;
+              return Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  compact ? 8 : 10,
+                  compact ? 4 : 3,
+                  2,
+                  compact ? 4 : 3,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Center(child: nameLabel)),
+                    SizedBox(
+                      width: size,
+                      height: size,
+                      child: moreVisible
+                          ? IconButton(
+                              padding: EdgeInsets.zero,
+                              iconSize: compact ? 18 : 20,
+                              color: cs.onSurfaceVariant,
+                              icon: const Icon(Icons.more_vert_rounded),
+                              onPressed: onMoreTap,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              );
+            },
+          )
+        : Container(
+            alignment: Alignment.center,
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: nameLabel,
+          );
 
     Widget body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

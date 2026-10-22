@@ -9,6 +9,10 @@ import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart'
 
 /// Stationary app-bar slot for the browser shell. Home chrome is built by the
 /// shell; the active directory viewport supplies its context-aware actions.
+///
+/// The selection app bar is not shown here: it lives in an overlay above the
+/// browser (see the shell) so that selecting never depends on, or resizes, the
+/// auto-hiding slot this widget fills.
 class AdaptiveBrowserAppBar extends ConsumerWidget
     implements PreferredSizeWidget {
   const AdaptiveBrowserAppBar({
@@ -16,13 +20,11 @@ class AdaptiveBrowserAppBar extends ConsumerWidget
     required this.workspaceConfig,
     required this.appBarListenable,
     required this.fallback,
-    required this.selectionAppBarListenable,
   });
 
   final BrowserTabsConfig workspaceConfig;
   final ValueListenable<BrowserAppBarFactory?> appBarListenable;
   final Widget fallback;
-  final ValueListenable<BrowserAppBarFactory?> selectionAppBarListenable;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -30,44 +32,25 @@ class AdaptiveBrowserAppBar extends ConsumerWidget
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeTab = ref.watch(activeBrowserTabProvider(workspaceConfig));
-    final aggregateSelection = ref.watch(
-      aggregatedTabsSelectionProvider(workspaceConfig),
-    );
-    return ValueListenableBuilder<BrowserAppBarFactory?>(
-      valueListenable: selectionAppBarListenable,
-      builder: (context, selectionAppBar, _) {
-        if (aggregateSelection.hasSelection && selectionAppBar != null) {
-          return SizedBox(
-            height: kToolbarHeight,
-            child: SkinAreaScope(
-              area: SkinArea.files,
-              child: Builder(
-                builder: (appBarContext) => selectionAppBar(appBarContext),
-              ),
-            ),
-          );
-        }
-        if (activeTab?.isDashboard == true) {
-          return const SizedBox(
-            height: kToolbarHeight,
-            child: SkinAreaScope(
-              area: SkinArea.dashboard,
-              child: DashboardAppBar(),
-            ),
-          );
-        }
-        return SizedBox(
-          height: kToolbarHeight,
-          child: SkinAreaScope(
-            area: SkinArea.files,
-            child: ValueListenableBuilder<BrowserAppBarFactory?>(
-              valueListenable: appBarListenable,
-              builder: (context, appBarFactory, _) =>
-                  appBarFactory?.call(context) ?? fallback,
-            ),
-          ),
-        );
-      },
+    if (activeTab?.isDashboard == true) {
+      return const SizedBox(
+        height: kToolbarHeight,
+        child: SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: DashboardAppBar(),
+        ),
+      );
+    }
+    return SizedBox(
+      height: kToolbarHeight,
+      child: SkinAreaScope(
+        area: SkinArea.files,
+        child: ValueListenableBuilder<BrowserAppBarFactory?>(
+          valueListenable: appBarListenable,
+          builder: (context, appBarFactory, _) =>
+              appBarFactory?.call(context) ?? fallback,
+        ),
+      ),
     );
   }
 }

@@ -40,6 +40,14 @@ MountedContainer _testContainer(int volId) => MountedContainer(
       containerFormat: 'veracrypt',
     );
 
+/// The app bar slot is always in the tree; collapsed means its height factor
+/// has gone to (almost) zero.
+void _expectAppBarCollapsed(WidgetTester tester) {
+  final finder = find.byKey(const Key('browser_app_bar_align'));
+  expect(finder, findsOneWidget);
+  expect(tester.widget<Align>(finder).heightFactor, lessThan(0.1));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -221,7 +229,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(alignFinder, findsNothing);
+    _expectAppBarCollapsed(tester);
 
     // Record position of the first visible file tile before selection
     final fileTileFinder = find.byType(FileTile).first;
@@ -237,7 +245,7 @@ void main() {
     expect(overlayFinder, findsOneWidget);
 
     // Normal app bar slot in the Column did NOT expand (stays collapsed)
-    expect(alignFinder, findsNothing);
+    _expectAppBarCollapsed(tester);
 
     // Content must NOT have shifted down (zero layout shift!)
     final Offset posAfter = tester.getTopLeft(fileTileFinder);
@@ -321,7 +329,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(alignFinder, findsNothing);
+    _expectAppBarCollapsed(tester);
 
     // Tap subfolder to navigate into it
     dirListing = [
@@ -334,7 +342,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // App bar must STILL be collapsed (not reset to visible!)
-    expect(alignFinder, findsNothing);
+    _expectAppBarCollapsed(tester);
 
     // Navigate back to root via breadcrumb home button
     final homeFinder = find.byIcon(Icons.home_outlined);
@@ -344,7 +352,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // App bar must STILL be collapsed after returning to parent folder
-    expect(alignFinder, findsNothing);
+    _expectAppBarCollapsed(tester);
 
     // Conscious action: user scrolls up to reveal it
     await tester.drag(verticalListFinder, const Offset(0, 200));

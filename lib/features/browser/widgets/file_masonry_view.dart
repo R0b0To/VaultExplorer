@@ -557,9 +557,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
       onLongPress: () {},
       showMoreButton: widget.showItemActionsMenu,
-      onMoreTap: (widget.isSelectionMode ||
-              entry.isPlaceholder ||
-              widget.onFileLongMenu == null)
+      // Hidden by the shell while selecting / on placeholders, but still
+      // passed so the name row keeps its slot for the button.
+      onMoreTap: widget.onFileLongMenu == null
           ? null
           : () => widget.onFileLongMenu!(entry),
       preview: entry.isPlaceholder
@@ -696,9 +696,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       // (400 ms, wins the arena before this 500 ms one); intentionally a no-op.
       onLongPress: () {},
       showMoreButton: widget.showItemActionsMenu,
-      onMoreTap: (widget.isSelectionMode ||
-              entry.isPlaceholder ||
-              widget.onFileLongMenu == null)
+      // Hidden by the shell while selecting / on placeholders, but still
+      // passed so the name row keeps its slot for the button.
+      onMoreTap: widget.onFileLongMenu == null
           ? null
           : () => widget.onFileLongMenu!(entry),
       preview: previewWidget,

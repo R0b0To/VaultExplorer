@@ -252,23 +252,11 @@ Widget buildShell({
       expect(tester.getSize(find.byType(Card)).height, heightBefore);
     });
 
-    testWidgets('falls back to the preview corner when the name is hidden', (
-      tester,
-    ) async {
-      var menuTaps = 0;
-      await tester.pumpWidget(
-        shell(showFileName: false, onMoreTap: () => menuTaps++),
-      );
+    testWidgets('is hidden when the file name is hidden', (tester) async {
+      await tester.pumpWidget(shell(showFileName: false, onMoreTap: () {}));
 
-      expect(moreIcon, findsOneWidget);
-      // No name row exists, so it is overlaid on the preview, top right.
-      final icon = tester.getCenter(moreIcon);
-      final card = tester.getRect(find.byType(Card));
-      expect(icon.dy, lessThan(card.center.dy));
-      expect(icon.dx, greaterThan(card.center.dx));
-
-      await tester.tap(moreIcon);
-      expect(menuTaps, 1);
+      expect(find.text('Item'), findsNothing);
+      expect(moreIcon, findsNothing);
     });
   });
 }

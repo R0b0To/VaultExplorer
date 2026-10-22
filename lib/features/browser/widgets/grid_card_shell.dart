@@ -92,7 +92,7 @@ class GridCardShell extends StatelessWidget {
   /// Whether the 3-dots button is offered at all. Mirrors the list layout's
   /// `showItemActionsMenu` setting; the button also needs [onMoreTap] and is
   /// hidden while selecting and on placeholders. It sits at the end of the
-  /// file name row, or in the preview's corner when the name is hidden.
+  /// file name row, so it is hidden whenever the name is ([showFileName]).
   final bool showMoreButton;
   final bool isPinned;
   final bool isBookmark;
@@ -142,13 +142,12 @@ class GridCardShell extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
 
-    // The button lives in the name row. That row keeps a slot for it even
-    // while the icon is hidden (selecting, placeholders), so the name does
-    // not shift and a masonry card does not change height. With no name row
-    // (names hidden over thumbnails) it falls back to the preview's corner.
-    final offersMore = showMoreButton && onMoreTap != null;
-    final moreSlotInFooter = offersMore && showFileName;
-    final moreVisible = offersMore && !isSelectionMode && !isPlaceholder;
+    // The button lives in the name row, so it goes away with the name. The
+    // row keeps a slot for it even while the icon is hidden (selecting,
+    // placeholders), so the name does not shift and a masonry card does not
+    // change height.
+    final hasMoreSlot = showFileName && showMoreButton && onMoreTap != null;
+    final moreVisible = hasMoreSlot && !isSelectionMode && !isPlaceholder;
 
     Widget previewStack = Stack(
       fit: StackFit.expand,
@@ -243,40 +242,6 @@ class GridCardShell extends StatelessWidget {
               ),
             ),
           ),
-        if (moreVisible && !showFileName)
-          // Top-right is free here: the selection check and the placeholder
-          // spinner, the other occupants of this corner, both exclude it.
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Dense grids have tiny tiles; a full-size button would hide
-              // too much of the thumbnail.
-              final compact = constraints.maxWidth < 100;
-              final size = compact ? 22.0 : 28.0;
-              return Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.all(compact ? 3 : 4),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh.withValues(alpha: 0.82),
-                      shape: BoxShape.circle,
-                    ),
-                    child: SizedBox(
-                      width: size,
-                      height: size,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        iconSize: compact ? 16 : 18,
-                        color: cs.onSurface,
-                        icon: const Icon(Icons.more_vert_rounded),
-                        onPressed: onMoreTap,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
       ],
     );
 
@@ -293,7 +258,7 @@ class GridCardShell extends StatelessWidget {
       ),
     );
 
-    Widget footer = moreSlotInFooter
+    Widget footer = hasMoreSlot
         ? LayoutBuilder(
             builder: (context, constraints) {
               // Dense grids have narrow cards; keep the button from eating

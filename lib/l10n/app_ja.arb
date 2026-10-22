@@ -3386,5 +3386,16 @@
   "browserTabCloseAll": "すべて閉じる",
   "dualPaneEnabledTitle": "2ペイン表示を使用",
   "dualPaneEnabledSubtitle": "画面に十分な幅があるとき、開いている2つのタブを並べて表示します。ファイルマネージャーのタブが必要です。",
-  "pressBackAgainToExit": "もう一度戻るを押すと終了します"
+  "pressBackAgainToExit": "もう一度戻るを押すと終了します",
+  "tabEdgeSwipeLabel": "最初または最後のタブを越えてスワイプしたとき",
+  "tabEdgeSwipeDrawerAndNewTabLabel": "サイドメニュー / 新しいタブ",
+  "tabEdgeSwipeDrawerAndNewTabDesc": "最初のタブで右にスワイプするとサイドメニューが開き、最後のタブで左にスワイプすると新しいタブが開きます。",
+  "tabEdgeSwipeLoopLabel": "タブをループ",
+  "tabEdgeSwipeLoopDesc": "最後のタブを越えてスワイプすると最初のタブへ、最初のタブを越えると最後のタブへ移動します。サイドメニューは画面の左端またはメニューボタンから開きます。",
+  "appBarAtBottomLabel": "アプリバーを下に表示",
+  "appBarAtBottomDesc": "アプリバーを画面の上部から下部に移動し、親指で届きやすくします。",
+  "selectByIconLabel": "アイコンのタップで選択",
+  "selectByIconDesc": "リスト表示で、ファイルまたはフォルダのアイコンをタップすると選択されます。オフにすると、アイコンをタップしても何も起こりません。",
+  "showFileExtensionsLabel": "ファイルの拡張子を表示",
+  "showFileExtensionsDesc": "ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。"
 }

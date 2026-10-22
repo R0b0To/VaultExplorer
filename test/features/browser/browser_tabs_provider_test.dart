@@ -303,6 +303,101 @@ void main() {
     });
   });
 
+  group('returning Home', () {
+    test('activates the open Home tab and closes the tab it left', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final folder = w.active;
+
+      expect(w.tabs.returnToDashboardAtRoot(folder), isTrue);
+
+      expect(w.ids, [home]);
+      expect(w.active, home);
+      expect(w.tabs.tabForKey(folder), isNull);
+    });
+
+    test('leaves every other tab where it was', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final first = w.active;
+      final second = w.tabs.openTab(_container(2))!;
+      expect(w.ids, [home, first, second]);
+
+      expect(w.tabs.returnToDashboardAtRoot(second), isTrue);
+
+      expect(w.ids, [home, first]);
+      expect(w.active, home);
+    });
+
+    test('works when Home sits to the right of the tab', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final folder = w.active;
+      w.tabs.moveTab(0, 1);
+      expect(w.ids, [folder, home]);
+
+      expect(w.tabs.returnToDashboardAtRoot(folder), isTrue);
+
+      expect(w.ids, [home]);
+      expect(w.active, home);
+    });
+
+    test('does not keep the closed tab as the previous one', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final folder = w.active;
+      expect(w.tabs.previousTab(), isNotNull);
+
+      w.tabs.returnToDashboardAtRoot(folder);
+
+      expect(w.tabs.previousTab(), isNull);
+    });
+
+    test('is one change for the UI, not a close followed by a switch', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final seen = w.notifications;
+
+      w.tabs.returnToDashboardAtRoot(w.active);
+
+      expect(w.notifications - seen, 1);
+    });
+
+    test('ignores a tab that is not the active one', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final folder = w.active;
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(home), isFalse);
+
+      expect(w.ids, [home, folder]);
+      expect(w.active, folder);
+      expect(w.notifications, seen);
+    });
+
+    test('leaves Home alone when it is already the active tab', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      w.tabs.activate(home);
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(home), isTrue);
+
+      expect(w.state.tabs, hasLength(2));
+      expect(w.active, home);
+      expect(w.notifications, seen);
+    });
+
+    test('reports false, changing nothing, when there is no Home tab', () {
+      final w = workspace(1);
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(w.active), isFalse);
+
+      expect(w.state.tabs, hasLength(1));
+      expect(w.notifications, seen);
+    });
+  });
+
   group('BrowserTabsConfig', () {
     test('is equal to itself and to nothing else', () {
       final a = BrowserTabsConfig.create(initialContainer: _container(1));

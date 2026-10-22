@@ -189,6 +189,12 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setShowItemActionsMenu(bool val) =>
       _updateConfig(state.config.copyWith(showItemActionsMenu: val));
 
+  Future<void> setSelectByIcon(bool val) =>
+      _updateConfig(state.config.copyWith(selectByIcon: val));
+
+  Future<void> setShowFileExtensions(bool val) =>
+      _updateConfig(state.config.copyWith(showFileExtensions: val));
+
   Future<void> setShowGridFileNames(bool val) =>
       _updateConfig(state.config.copyWith(showGridFileNames: val));
 

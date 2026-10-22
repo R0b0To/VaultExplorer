@@ -11597,4 +11597,42 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => '한 번 더 뒤로 가기를 누르면 종료됩니다';
+
+  @override
+  String get tabEdgeSwipeLabel => '첫 번째 또는 마지막 탭을 넘어 스와이프할 때';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel => '사이드 메뉴 열기 / 새 탭';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      '첫 번째 탭에서 오른쪽으로 스와이프하면 사이드 메뉴가 열리고, 마지막 탭에서 왼쪽으로 스와이프하면 새 탭이 열립니다.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => '탭 순환';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      '마지막 탭을 넘어 스와이프하면 첫 번째 탭으로, 첫 번째 탭을 넘어 스와이프하면 마지막 탭으로 이동합니다. 사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로 엽니다.';
+
+  @override
+  String get appBarAtBottomLabel => '앱 바를 아래에 표시';
+
+  @override
+  String get appBarAtBottomDesc =>
+      '앱 바를 화면 위쪽에서 아래쪽으로 옮겨 엄지손가락으로 더 쉽게 닿도록 합니다.';
+
+  @override
+  String get selectByIconLabel => '아이콘을 탭하여 선택';
+
+  @override
+  String get selectByIconDesc =>
+      '목록 보기에서 파일이나 폴더의 아이콘을 탭하면 선택됩니다. 끄면 아이콘을 탭해도 아무 일도 일어나지 않습니다.';
+
+  @override
+  String get showFileExtensionsLabel => '파일 확장자 표시';
+
+  @override
+  String get showFileExtensionsDesc =>
+      '파일 이름 끝에 확장자를 표시합니다. 검색 중에는 항상 확장자가 표시됩니다.';
 }

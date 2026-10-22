@@ -54,6 +54,10 @@ class FileListView extends StatefulWidget {
   final List<FileDetailColumn> detailColumns;
   final LongFileNameDisplayMode longFileNameMode;
   final bool showItemActionsMenu;
+
+  /// Whether file names are listed with their extension. See
+  /// `FileManagerToolbarConfig.showFileExtensions`.
+  final bool showFileExtensions;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
@@ -95,6 +99,7 @@ class FileListView extends StatefulWidget {
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.showItemActionsMenu = true,
+    this.showFileExtensions = true,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -372,6 +377,7 @@ class _FileListViewState extends State<FileListView> {
                                 isPinned: isPinned,
                                 isBookmark: isBookmark,
                                 showItemActionsMenu: widget.showItemActionsMenu,
+                                showFileExtensions: widget.showFileExtensions,
                                 onTap: () => widget.onFileTap(entry),
                                 onLongPress: () {},
                                 onLongMenu: widget.onFileLongMenu,
@@ -466,6 +472,7 @@ class _FileListViewState extends State<FileListView> {
                                   isPinned: isPinned,
                                   isBookmark: isBookmark,
                                   showItemActionsMenu: widget.showItemActionsMenu,
+                                  showFileExtensions: widget.showFileExtensions,
                                   onTap: () => widget.onFileTap(entry),
                                   onLongPress: () {},
                                   onLongMenu: widget.onFileLongMenu,

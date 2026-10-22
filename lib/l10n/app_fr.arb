@@ -3386,5 +3386,16 @@
   "browserTabCloseAll": "Fermer tout",
   "dualPaneEnabledTitle": "Utiliser le double volet",
   "dualPaneEnabledSubtitle": "Affiche deux onglets ouverts côte à côte lorsque l’écran est assez large. Nécessite les onglets du gestionnaire de fichiers.",
-  "pressBackAgainToExit": "Appuyez à nouveau sur retour pour quitter"
+  "pressBackAgainToExit": "Appuyez à nouveau sur retour pour quitter",
+  "tabEdgeSwipeLabel": "Balayage au-delà du premier ou du dernier onglet",
+  "tabEdgeSwipeDrawerAndNewTabLabel": "Ouvrir le menu latéral / nouvel onglet",
+  "tabEdgeSwipeDrawerAndNewTabDesc": "Balayez vers la droite sur le premier onglet pour ouvrir le menu latéral. Balayez vers la gauche sur le dernier onglet pour ouvrir un nouvel onglet.",
+  "tabEdgeSwipeLoopLabel": "Parcourir les onglets en boucle",
+  "tabEdgeSwipeLoopDesc": "Balayer au-delà du dernier onglet mène au premier, et au-delà du premier mène au dernier. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu.",
+  "appBarAtBottomLabel": "Afficher la barre supérieure en bas",
+  "appBarAtBottomDesc": "Déplace la barre supérieure du haut vers le bas de l’écran, où le pouce l’atteint plus facilement.",
+  "selectByIconLabel": "Sélectionner en touchant l’icône",
+  "selectByIconDesc": "Dans la vue en liste, toucher l’icône d’un fichier ou d’un dossier le sélectionne. Désactivé, toucher l’icône ne fait rien.",
+  "showFileExtensionsLabel": "Afficher les extensions de fichier",
+  "showFileExtensionsDesc": "Affiche l’extension à la fin des noms de fichiers. Les extensions sont toujours affichées pendant une recherche."
 }

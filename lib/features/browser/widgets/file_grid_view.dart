@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -44,6 +45,10 @@ class FileGridView extends StatefulWidget {
   final double cornerRadius;
   final double spacing;
   final bool showFileNames;
+
+  /// Whether file names are captioned with their extension. Off hides it,
+  /// except while a search is typed so a match inside it stays visible.
+  final bool showFileExtensions;
   final LongFileNameDisplayMode longFileNameMode;
   final GridAspectRatio gridAspectRatio;
   final int initialColumns;
@@ -80,6 +85,7 @@ class FileGridView extends StatefulWidget {
     this.cornerRadius = 12.0,
     this.spacing = 8.0,
     this.showFileNames = true,
+    this.showFileExtensions = true,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.gridAspectRatio = GridAspectRatio.square,
     this.initialColumns = 3,
@@ -462,6 +468,10 @@ class _FileGridViewState extends State<FileGridView>
         nameParts.removeLast();
         displayName = nameParts.join('.');
       }
+    }
+    final query = widget.searchQuery;
+    if (!widget.showFileExtensions && (query == null || query.isEmpty)) {
+      displayName = stripFileExtension(cleanName);
     }
     final isImg =
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;

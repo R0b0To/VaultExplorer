@@ -12091,4 +12091,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Press back again to exit';
+
+  @override
+  String get tabEdgeSwipeLabel => 'Swiping past the first or last tab';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel => 'Open side menu / new tab';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Swipe right on the first tab to open the side menu. Swipe left on the last tab to open a new tab.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Loop through tabs';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.';
+
+  @override
+  String get appBarAtBottomLabel => 'Show app bar at bottom';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.';
+
+  @override
+  String get selectByIconLabel => 'Select by tapping the icon';
+
+  @override
+  String get selectByIconDesc =>
+      'In list view, tapping the icon of a file or folder selects it. When off, tapping the icon does nothing.';
+
+  @override
+  String get showFileExtensionsLabel => 'Show file extensions';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Show the extension at the end of file names. Extensions are always shown while searching.';
 }

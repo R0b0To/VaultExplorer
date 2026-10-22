@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -48,6 +49,10 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final double cornerRadius;
   final double spacing;
   final bool showFileNames;
+
+  /// Whether file names are captioned with their extension. Off hides it,
+  /// except while a search is typed so a match inside it stays visible.
+  final bool showFileExtensions;
   final LongFileNameDisplayMode longFileNameMode;
   final int initialColumns;
   final ValueChanged<int>? onColumnCountChanged;
@@ -83,6 +88,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.cornerRadius = 12.0,
     this.spacing = 8.0,
     this.showFileNames = true,
+    this.showFileExtensions = true,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.initialColumns = 2,
     this.onColumnCountChanged,
@@ -593,6 +599,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         nameParts.removeLast();
         displayName = nameParts.join('.');
       }
+    }
+    final query = widget.searchQuery;
+    if (!widget.showFileExtensions && (query == null || query.isEmpty)) {
+      displayName = stripFileExtension(cleanName);
     }
     final isImg =
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;

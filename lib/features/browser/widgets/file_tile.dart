@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -41,6 +42,10 @@ class FileTile extends StatelessWidget {
   /// Two-row layout -- see `FileListView.isDetailed`.
   final bool isDetailed;
   final bool showItemActionsMenu;
+
+  /// Whether [entry]'s name is shown with its extension. Off hides it, except
+  /// while a search is typed so a match inside the extension stays visible.
+  final bool showFileExtensions;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
   final LongFileNameDisplayMode longFileNameMode;
@@ -78,6 +83,7 @@ class FileTile extends StatelessWidget {
     this.isCompact = false,
     this.isDetailed = false,
     this.showItemActionsMenu = true,
+    this.showFileExtensions = true,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -104,6 +110,12 @@ class FileTile extends StatelessWidget {
         parts.removeLast();
         displayName = parts.join('.');
       }
+    }
+    // Folders have no extension: "backup.2024" is a whole name.
+    if (!showFileExtensions &&
+        !entry.isDir &&
+        (searchQuery == null || searchQuery!.isEmpty)) {
+      displayName = stripFileExtension(entry.name);
     }
     // Icon and color come from the active skin. With the classic skin this
     // is exactly `vaultIcon ?? iconForFile(name)` / `vaultColor ??

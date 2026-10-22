@@ -45,6 +45,14 @@ void main() {
       await controller.setShowBreadcrumbBar(false);
       expect(container.read(provider).config.showBreadcrumbBar, isFalse);
 
+      expect(container.read(provider).config.selectByIcon, isTrue);
+      await controller.setSelectByIcon(false);
+      expect(container.read(provider).config.selectByIcon, isFalse);
+
+      expect(container.read(provider).config.showFileExtensions, isTrue);
+      await controller.setShowFileExtensions(false);
+      expect(container.read(provider).config.showFileExtensions, isFalse);
+
       await controller.setPlaylistTransitionEffect(PlaylistTransitionEffect.fade);
       expect(container.read(provider).config.playlistTransitionEffect, PlaylistTransitionEffect.fade);
 

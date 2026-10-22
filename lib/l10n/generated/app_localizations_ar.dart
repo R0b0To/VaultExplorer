@@ -12307,4 +12307,43 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
+
+  @override
+  String get tabEdgeSwipeLabel => 'السحب بعد أول علامة تبويب أو آخرها';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'فتح القائمة الجانبية / علامة تبويب جديدة';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'اسحب خارج أول علامة تبويب لفتح القائمة الجانبية، واسحب خارج آخر علامة تبويب لفتح علامة تبويب جديدة.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'التنقل بين علامات التبويب بشكل دائري';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'السحب بعد آخر علامة تبويب ينقلك إلى الأولى، والسحب بعد الأولى ينقلك إلى الأخيرة. افتح القائمة الجانبية من حافة الشاشة أو من زر القائمة.';
+
+  @override
+  String get appBarAtBottomLabel => 'عرض شريط التطبيق في الأسفل';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'ينقل شريط التطبيق من أعلى الشاشة إلى أسفلها ليسهل الوصول إليه بالإبهام.';
+
+  @override
+  String get selectByIconLabel => 'التحديد بالنقر على الأيقونة';
+
+  @override
+  String get selectByIconDesc =>
+      'في عرض القائمة، يؤدي النقر على أيقونة ملف أو مجلد إلى تحديده. عند الإيقاف، لا يحدث شيء عند النقر على الأيقونة.';
+
+  @override
+  String get showFileExtensionsLabel => 'إظهار امتدادات الملفات';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'يعرض الامتداد في نهاية أسماء الملفات. تظهر الامتدادات دائمًا أثناء البحث.';
 }

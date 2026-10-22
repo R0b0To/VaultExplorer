@@ -3386,5 +3386,16 @@
   "browserTabCloseAll": "Chiudi tutto",
   "dualPaneEnabledTitle": "Usa doppio riquadro",
   "dualPaneEnabledSubtitle": "Mostra due schede aperte affiancate quando lo schermo è abbastanza largo. Richiede le schede del gestore file.",
-  "pressBackAgainToExit": "Premi di nuovo indietro per uscire"
+  "pressBackAgainToExit": "Premi di nuovo indietro per uscire",
+  "tabEdgeSwipeLabel": "Scorrimento oltre la prima o l’ultima scheda",
+  "tabEdgeSwipeDrawerAndNewTabLabel": "Apri menu laterale / nuova scheda",
+  "tabEdgeSwipeDrawerAndNewTabDesc": "Scorri verso destra sulla prima scheda per aprire il menu laterale. Scorri verso sinistra sull’ultima scheda per aprire una nuova scheda.",
+  "tabEdgeSwipeLoopLabel": "Scorrimento ciclico delle schede",
+  "tabEdgeSwipeLoopDesc": "Scorrendo oltre l’ultima scheda si passa alla prima, e oltre la prima si passa all’ultima. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu.",
+  "appBarAtBottomLabel": "Mostra la barra superiore in basso",
+  "appBarAtBottomDesc": "Sposta la barra superiore dalla parte alta dello schermo a quella bassa, dove il pollice la raggiunge più facilmente.",
+  "selectByIconLabel": "Seleziona toccando l’icona",
+  "selectByIconDesc": "Nella vista elenco, toccare l’icona di un file o di una cartella la seleziona. Se disattivato, toccare l’icona non fa nulla.",
+  "showFileExtensionsLabel": "Mostra le estensioni dei file",
+  "showFileExtensionsDesc": "Mostra l’estensione alla fine dei nomi dei file. Durante la ricerca le estensioni vengono sempre mostrate."
 }

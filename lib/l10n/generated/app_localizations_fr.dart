@@ -12382,4 +12382,44 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get pressBackAgainToExit =>
       'Appuyez à nouveau sur retour pour quitter';
+
+  @override
+  String get tabEdgeSwipeLabel =>
+      'Balayage au-delà du premier ou du dernier onglet';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Ouvrir le menu latéral / nouvel onglet';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Balayez vers la droite sur le premier onglet pour ouvrir le menu latéral. Balayez vers la gauche sur le dernier onglet pour ouvrir un nouvel onglet.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Parcourir les onglets en boucle';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Balayer au-delà du dernier onglet mène au premier, et au-delà du premier mène au dernier. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu.';
+
+  @override
+  String get appBarAtBottomLabel => 'Afficher la barre supérieure en bas';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Déplace la barre supérieure du haut vers le bas de l’écran, où le pouce l’atteint plus facilement.';
+
+  @override
+  String get selectByIconLabel => 'Sélectionner en touchant l’icône';
+
+  @override
+  String get selectByIconDesc =>
+      'Dans la vue en liste, toucher l’icône d’un fichier ou d’un dossier le sélectionne. Désactivé, toucher l’icône ne fait rien.';
+
+  @override
+  String get showFileExtensionsLabel => 'Afficher les extensions de fichier';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Affiche l’extension à la fin des noms de fichiers. Les extensions sont toujours affichées pendant une recherche.';
 }

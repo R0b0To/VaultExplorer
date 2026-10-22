@@ -12276,4 +12276,44 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Premi di nuovo indietro per uscire';
+
+  @override
+  String get tabEdgeSwipeLabel =>
+      'Scorrimento oltre la prima o l’ultima scheda';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Apri menu laterale / nuova scheda';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Scorri verso destra sulla prima scheda per aprire il menu laterale. Scorri verso sinistra sull’ultima scheda per aprire una nuova scheda.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Scorrimento ciclico delle schede';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Scorrendo oltre l’ultima scheda si passa alla prima, e oltre la prima si passa all’ultima. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu.';
+
+  @override
+  String get appBarAtBottomLabel => 'Mostra la barra superiore in basso';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Sposta la barra superiore dalla parte alta dello schermo a quella bassa, dove il pollice la raggiunge più facilmente.';
+
+  @override
+  String get selectByIconLabel => 'Seleziona toccando l’icona';
+
+  @override
+  String get selectByIconDesc =>
+      'Nella vista elenco, toccare l’icona di un file o di una cartella la seleziona. Se disattivato, toccare l’icona non fa nulla.';
+
+  @override
+  String get showFileExtensionsLabel => 'Mostra le estensioni dei file';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Mostra l’estensione alla fine dei nomi dei file. Durante la ricerca le estensioni vengono sempre mostrate.';
 }

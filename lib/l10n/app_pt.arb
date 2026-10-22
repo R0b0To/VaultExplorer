@@ -3386,5 +3386,16 @@
   "browserTabCloseAll": "Fechar tudo",
   "dualPaneEnabledTitle": "Usar painel duplo",
   "dualPaneEnabledSubtitle": "Mostra duas abas abertas lado a lado quando a tela tiver espaço suficiente. Requer as abas do gerenciador de arquivos.",
-  "pressBackAgainToExit": "Pressione voltar novamente para sair"
+  "pressBackAgainToExit": "Pressione voltar novamente para sair",
+  "tabEdgeSwipeLabel": "Deslizar além da primeira ou da última aba",
+  "tabEdgeSwipeDrawerAndNewTabLabel": "Abrir menu lateral / nova aba",
+  "tabEdgeSwipeDrawerAndNewTabDesc": "Deslize para a direita na primeira aba para abrir o menu lateral. Deslize para a esquerda na última aba para abrir uma nova aba.",
+  "tabEdgeSwipeLoopLabel": "Percorrer as abas em loop",
+  "tabEdgeSwipeLoopDesc": "Deslizar além da última aba leva à primeira, e além da primeira leva à última. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu.",
+  "appBarAtBottomLabel": "Mostrar barra superior embaixo",
+  "appBarAtBottomDesc": "Move a barra superior do alto da tela para a parte de baixo, onde o polegar alcança com mais facilidade.",
+  "selectByIconLabel": "Selecionar tocando no ícone",
+  "selectByIconDesc": "Na visualização em lista, tocar no ícone de um arquivo ou pasta o seleciona. Desativado, tocar no ícone não faz nada.",
+  "showFileExtensionsLabel": "Mostrar extensões de arquivo",
+  "showFileExtensionsDesc": "Mostra a extensão no final dos nomes de arquivo. Durante a pesquisa, as extensões são sempre mostradas."
 }

@@ -12365,4 +12365,43 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Натисніть «назад» ще раз, щоб вийти';
+
+  @override
+  String get tabEdgeSwipeLabel => 'Свайп за межі першої або останньої вкладки';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Відкрити бічне меню / нова вкладка';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Проведіть праворуч на першій вкладці, щоб відкрити бічне меню. Проведіть ліворуч на останній вкладці, щоб відкрити нову вкладку.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Перемикати вкладки по колу';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Свайп за межі останньої вкладки веде до першої, а за межі першої — до останньої. Бічне меню відкривається від лівого краю екрана або кнопкою меню.';
+
+  @override
+  String get appBarAtBottomLabel => 'Показувати панель унизу';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Переміщує верхню панель з верху екрана вниз, щоб її було легше діставати великим пальцем.';
+
+  @override
+  String get selectByIconLabel => 'Вибір дотиком до значка';
+
+  @override
+  String get selectByIconDesc =>
+      'У поданні списком дотик до значка файлу або папки вибирає його. Якщо вимкнено, дотик до значка нічого не робить.';
+
+  @override
+  String get showFileExtensionsLabel => 'Показувати розширення файлів';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Показує розширення в кінці імен файлів. Під час пошуку розширення завжди показуються.';
 }

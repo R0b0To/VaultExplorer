@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -57,6 +58,12 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
       appSettingsControllerProvider.select(
         (s) => s.settings.useDualPaneBrowsing,
       ),
+    );
+    final tabEdgeSwipe = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.tabEdgeSwipe),
+    );
+    final appBarAtBottom = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
     );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -159,6 +166,27 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                   ? cs.primary
                                   : cs.onSurfaceVariant,
                             ),
+                          ),
+                          OptionPickerTile<BrowserTabEdgeSwipe>(
+                            label: context.l10n.tabEdgeSwipeLabel,
+                            value: tabEdgeSwipe,
+                            enabled: useBrowserTabs,
+                            prefixIcon: Icons.swipe_rounded,
+                            options: BrowserTabEdgeSwipe.values.map((mode) {
+                              return SelectOption(
+                                value: mode,
+                                label: mode.getLocalizedLabel(context.l10n),
+                                subtitle: mode.getLocalizedDescription(
+                                  context.l10n,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (v) => ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings(
+                                  (settings) =>
+                                      settings.copyWith(tabEdgeSwipe: v),
+                                ),
                           ),
                           OptionPickerTile<BrowserLayoutMode>(
                             label: context.l10n.defaultFolderLayoutLabel,
@@ -284,6 +312,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
+                            value: state.config.showFileExtensions,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setShowFileExtensions(v),
+                            title: Text(
+                              context.l10n.showFileExtensionsLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showFileExtensionsDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.description_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showBreadcrumbBar,
                             onChanged: (v) => ref
                                 .read(
@@ -364,6 +421,34 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             ),
                             secondary: Icon(
                               Icons.vertical_align_top_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: appBarAtBottom,
+                            onChanged: (v) => ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings(
+                                  (settings) =>
+                                      settings.copyWith(appBarAtBottom: v),
+                                ),
+                            title: Text(
+                              context.l10n.appBarAtBottomLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.appBarAtBottomDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_align_bottom_rounded,
                               color: cs.primary,
                             ),
                           ),
@@ -643,6 +728,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             ),
                             secondary: Icon(
                               Icons.more_vert_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.selectByIcon,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setSelectByIcon(v),
+                            title: Text(
+                              context.l10n.selectByIconLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.selectByIconDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.touch_app_outlined,
                               color: cs.primary,
                             ),
                           ),

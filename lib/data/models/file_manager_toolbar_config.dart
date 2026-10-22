@@ -82,6 +82,15 @@ class FileManagerToolbarConfig {
 
   final bool showListThumbnails;
   final bool showItemActionsMenu;
+
+  /// Whether tapping a list row's leading icon/thumbnail toggles that item's
+  /// selection. Off: the icon is part of the row and a tap opens the item;
+  /// selecting then starts with a long press.
+  final bool selectByIcon;
+
+  /// Whether file names are listed with their extension ("report.pdf") or
+  /// without ("report"). Folders have no extension and are unaffected.
+  final bool showFileExtensions;
   final LongFileNameDisplayMode longFileNameDisplayMode;
   final double listZoomLevel;
   final int gridColumnsPortrait;
@@ -134,6 +143,8 @@ class FileManagerToolbarConfig {
     this.gridSpacing = defaultGridSpacing,
     this.showListThumbnails = true,
     this.showItemActionsMenu = true,
+    this.selectByIcon = true,
+    this.showFileExtensions = true,
     this.longFileNameDisplayMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.listZoomLevel = 1.0,
     this.gridColumnsPortrait = 3,
@@ -185,6 +196,8 @@ class FileManagerToolbarConfig {
         gridSpacing: defaultGridSpacing,
         showListThumbnails: true,
         showItemActionsMenu: true,
+        selectByIcon: true,
+        showFileExtensions: true,
         longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
         listZoomLevel: 1.0,
         gridColumnsPortrait: 3,
@@ -290,6 +303,8 @@ class FileManagerToolbarConfig {
     int? gridSpacing,
     bool? showListThumbnails,
     bool? showItemActionsMenu,
+    bool? selectByIcon,
+    bool? showFileExtensions,
     LongFileNameDisplayMode? longFileNameDisplayMode,
     double? listZoomLevel,
     int? gridColumnsPortrait,
@@ -334,6 +349,8 @@ class FileManagerToolbarConfig {
             .clamp(minGridSpacing, maxGridSpacing),
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
         showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
+        selectByIcon: selectByIcon ?? this.selectByIcon,
+        showFileExtensions: showFileExtensions ?? this.showFileExtensions,
         longFileNameDisplayMode:
             longFileNameDisplayMode ?? this.longFileNameDisplayMode,
         listZoomLevel: listZoomLevel ?? this.listZoomLevel,
@@ -385,6 +402,7 @@ class FileManagerToolbarConfig {
     'gridSpacing',
     'showListThumbnails',
     'showItemActionsMenu',
+    'showFileExtensions',
     'longFileNameDisplayMode',
     'listZoomLevel',
     'gridColumnsPortrait',
@@ -399,6 +417,7 @@ class FileManagerToolbarConfig {
   /// Settings -> Export.
   static const Set<String> behaviorKeys = {
     'showHiddenFiles',
+    'selectByIcon',
     'autoStartPlaylistMode',
     'rememberPerFolderLayout',
     'resetSizeOnLayoutChange',
@@ -486,6 +505,8 @@ class FileManagerToolbarConfig {
         'gridSpacing': gridSpacing,
         'showListThumbnails': showListThumbnails,
         'showItemActionsMenu': showItemActionsMenu,
+        'selectByIcon': selectByIcon,
+        'showFileExtensions': showFileExtensions,
         'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
         'listZoomLevel': listZoomLevel,
         'gridColumnsPortrait': gridColumnsPortrait,
@@ -610,6 +631,10 @@ class FileManagerToolbarConfig {
           .clamp(minGridSpacing, maxGridSpacing),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
       showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
+      // Absent in configs saved before these options existed -> the original
+      // behavior (icon taps select; names shown in full).
+      selectByIcon: j['selectByIcon'] as bool? ?? true,
+      showFileExtensions: j['showFileExtensions'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,
       listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,
       gridColumnsPortrait: (j['gridColumnsPortrait'] as num?)?.toInt() ?? 3,

@@ -3386,5 +3386,16 @@
   "browserTabCloseAll": "Alle schließen",
   "dualPaneEnabledTitle": "Zwei Bereiche verwenden",
   "dualPaneEnabledSubtitle": "Zwei geöffnete Tabs nebeneinander anzeigen, wenn der Bildschirm breit genug ist. Erfordert Dateimanager-Tabs.",
-  "pressBackAgainToExit": "Zum Beenden erneut zurück drücken"
+  "pressBackAgainToExit": "Zum Beenden erneut zurück drücken",
+  "tabEdgeSwipeLabel": "Wischen über den ersten oder letzten Tab hinaus",
+  "tabEdgeSwipeDrawerAndNewTabLabel": "Seitenmenü öffnen / neuer Tab",
+  "tabEdgeSwipeDrawerAndNewTabDesc": "Auf dem ersten Tab nach rechts wischen, um das Seitenmenü zu öffnen. Auf dem letzten Tab nach links wischen, um einen neuen Tab zu öffnen.",
+  "tabEdgeSwipeLoopLabel": "Tabs im Kreis durchlaufen",
+  "tabEdgeSwipeLoopDesc": "Wischen über den letzten Tab hinaus führt zum ersten, über den ersten hinaus zum letzten. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche.",
+  "appBarAtBottomLabel": "App-Leiste unten anzeigen",
+  "appBarAtBottomDesc": "Verschiebt die App-Leiste vom oberen an den unteren Bildschirmrand, wo sie mit dem Daumen leichter erreichbar ist.",
+  "selectByIconLabel": "Per Tippen auf das Symbol auswählen",
+  "selectByIconDesc": "In der Listenansicht wählt ein Tippen auf das Symbol einer Datei oder eines Ordners das Element aus. Ist die Option aus, passiert beim Tippen auf das Symbol nichts.",
+  "showFileExtensionsLabel": "Dateiendungen anzeigen",
+  "showFileExtensionsDesc": "Zeigt die Endung am Ende von Dateinamen an. Bei der Suche werden Endungen immer angezeigt."
 }

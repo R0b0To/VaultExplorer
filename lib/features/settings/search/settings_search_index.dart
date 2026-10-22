@@ -451,6 +451,25 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['split view', 'two panes', 'side by side', 'landscape'],
   ),
   _e(
+    'file_manager.tab_edge_swipe',
+    SettingsDestination.fileManager,
+    (l) => l.tabEdgeSwipeLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [
+      (l) => l.tabEdgeSwipeDrawerAndNewTabDesc,
+      (l) => l.tabEdgeSwipeLoopDesc,
+    ],
+    keywords: [
+      'loop',
+      'wrap around',
+      'swipe',
+      'tabs',
+      'new tab',
+      'side menu',
+      'drawer',
+    ],
+  ),
+  _e(
     'file_manager.default_layout',
     SettingsDestination.fileManager,
     (l) => l.defaultFolderLayoutLabel,
@@ -489,6 +508,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['dotfiles', 'hidden', 'invisible'],
   ),
   _e(
+    'file_manager.file_extensions',
+    SettingsDestination.fileManager,
+    (l) => l.showFileExtensionsLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.showFileExtensionsDesc],
+    keywords: ['extension', 'suffix', 'file type', 'file names', '.pdf'],
+  ),
+  _e(
     'file_manager.breadcrumb_bar',
     SettingsDestination.fileManager,
     (l) => l.showBreadcrumbBarLabel,
@@ -511,6 +538,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.browserLayoutSectionHeader,
     details: [(l) => l.autoHideAppBarDesc],
     keywords: ['top bar', 'toolbar', 'scroll', 'hide'],
+  ),
+  _e(
+    'file_manager.app_bar_at_bottom',
+    SettingsDestination.fileManager,
+    (l) => l.appBarAtBottomLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.appBarAtBottomDesc],
+    keywords: ['bottom bar', 'top bar', 'toolbar', 'thumb', 'one hand', 'reach'],
   ),
   _e(
     'file_manager.toolbar_layout',
@@ -582,6 +617,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.listViewOptionsSectionHeader,
     details: [(l) => l.showItemActionsMenuDesc],
     keywords: ['three dots', 'overflow', 'menu', 'list view'],
+  ),
+  _e(
+    'file_manager.select_by_icon',
+    SettingsDestination.fileManager,
+    (l) => l.selectByIconLabel,
+    section: (l) => l.listViewOptionsSectionHeader,
+    details: [(l) => l.selectByIconDesc],
+    keywords: ['select', 'selection', 'icon', 'tap', 'checkbox', 'list view'],
   ),
   _e(
     'file_manager.detail_columns',

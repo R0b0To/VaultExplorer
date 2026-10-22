@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -81,6 +82,9 @@ AppSettings _customSettings() => AppSettings(
   autoLockOnShareImport: false,
   quickActionLockMode: QuickActionLockMode.alwaysLock,
   enableAuthenticator: false,
+  useBrowserTabs: false,
+  useDualPaneBrowsing: true,
+  tabEdgeSwipe: BrowserTabEdgeSwipe.loop,
   // interface
   themeMode: ThemeMode.dark,
   useDynamicColor: true,
@@ -96,6 +100,7 @@ AppSettings _customSettings() => AppSettings(
   fileManagerFollowsAppSkin: false,
   editorFollowsAppSkin: false,
   editorAppearancePrefs: {'fontSize': 18.0, 'showLineNumbers': false},
+  appBarAtBottom: true,
 );
 
 MediaViewerToolbarConfig _customViewer() {
@@ -134,6 +139,7 @@ FileManagerToolbarConfig _customToolbar() {
     showBookmarkBar: !d.showBookmarkBar,
     showMediaCarousel: !d.showMediaCarousel,
     autoHideAppBar: !d.autoHideAppBar,
+    showFileExtensions: !d.showFileExtensions,
     useFabForToolbar: !d.useFabForToolbar,
     bottomSelectionBar: !d.bottomSelectionBar,
     detailColumnsOrder: d.detailColumnsOrder.reversed.toList(),
@@ -160,6 +166,7 @@ FileManagerToolbarConfig _customToolbar() {
     skin: const FileManagerSkin(monospaceNames: true),
     // behavior
     showHiddenFiles: !d.showHiddenFiles,
+    selectByIcon: !d.selectByIcon,
     autoStartPlaylistMode: !d.autoStartPlaylistMode,
     rememberPerFolderLayout: !d.rememberPerFolderLayout,
     resetSizeOnLayoutChange: !d.resetSizeOnLayoutChange,

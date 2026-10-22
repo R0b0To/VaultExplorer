@@ -12305,4 +12305,44 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Pulsa atrás de nuevo para salir';
+
+  @override
+  String get tabEdgeSwipeLabel =>
+      'Deslizar más allá de la primera o la última pestaña';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Abrir menú lateral / nueva pestaña';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Desliza a la derecha en la primera pestaña para abrir el menú lateral. Desliza a la izquierda en la última pestaña para abrir una pestaña nueva.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Recorrer las pestañas en bucle';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Al deslizar más allá de la última pestaña pasas a la primera, y más allá de la primera pasas a la última. Abre el menú lateral desde el borde izquierdo de la pantalla o con el botón de menú.';
+
+  @override
+  String get appBarAtBottomLabel => 'Mostrar la barra superior abajo';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Mueve la barra superior de la parte alta de la pantalla a la parte baja, donde el pulgar llega con más facilidad.';
+
+  @override
+  String get selectByIconLabel => 'Seleccionar tocando el icono';
+
+  @override
+  String get selectByIconDesc =>
+      'En la vista de lista, tocar el icono de un archivo o carpeta lo selecciona. Si está desactivado, tocar el icono no hace nada.';
+
+  @override
+  String get showFileExtensionsLabel => 'Mostrar extensiones de archivo';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Muestra la extensión al final de los nombres de archivo. Durante la búsqueda las extensiones siempre se muestran.';
 }

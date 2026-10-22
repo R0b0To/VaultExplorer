@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
@@ -155,6 +156,8 @@ class AppSettings {
   BrowserLayoutMode defaultLayoutMode;
   bool useBrowserTabs;
   bool useDualPaneBrowsing;
+  BrowserTabEdgeSwipe tabEdgeSwipe;
+  bool appBarAtBottom;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
@@ -203,6 +206,8 @@ class AppSettings {
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.useBrowserTabs = true,
     this.useDualPaneBrowsing = false,
+    this.tabEdgeSwipe = BrowserTabEdgeSwipe.drawerAndNewTab,
+    this.appBarAtBottom = false,
     this.containerSortMode = ContainerSortMode.manual,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
@@ -293,6 +298,8 @@ class AppSettings {
     BrowserLayoutMode? defaultLayoutMode,
     bool? useBrowserTabs,
     bool? useDualPaneBrowsing,
+    BrowserTabEdgeSwipe? tabEdgeSwipe,
+    bool? appBarAtBottom,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
@@ -349,6 +356,8 @@ class AppSettings {
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       useBrowserTabs: useBrowserTabs ?? this.useBrowserTabs,
       useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
+      tabEdgeSwipe: tabEdgeSwipe ?? this.tabEdgeSwipe,
+      appBarAtBottom: appBarAtBottom ?? this.appBarAtBottom,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
@@ -440,6 +449,7 @@ class AppSettings {
     'extensionPreferences': extensionPreferences,
     'useBrowserTabs': useBrowserTabs,
     'useDualPaneBrowsing': useDualPaneBrowsing,
+    'tabEdgeSwipe': tabEdgeSwipe.toJson(),
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'languageCode': languageCode,
@@ -463,6 +473,7 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'containerSortMode': containerSortMode.toJson(),
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
+    'appBarAtBottom': appBarAtBottom,
     'playlistScrollMode': playlistScrollMode.toJson(),
     'playlistScrollDirection':
         playlistScrollMode == PlaylistScrollMode.verticalPage
@@ -508,6 +519,7 @@ class AppSettings {
     extensionPreferences: other.extensionPreferences,
     useBrowserTabs: other.useBrowserTabs,
     useDualPaneBrowsing: other.useDualPaneBrowsing,
+    tabEdgeSwipe: other.tabEdgeSwipe,
     autoOpenOnUnlock: other.autoOpenOnUnlock,
     htmlEnableJavaScript: other.htmlEnableJavaScript,
     // copyWith can't set a null language through `languageCode` alone.
@@ -533,6 +545,7 @@ class AppSettings {
     defaultFileSortAscending: other.defaultFileSortAscending,
     containerSortMode: other.containerSortMode,
     showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
+    appBarAtBottom: other.appBarAtBottom,
     playlistScrollMode: other.playlistScrollMode,
     authenticatorShowNumbers: other.authenticatorShowNumbers,
     authenticatorSearchPlacement: other.authenticatorSearchPlacement,
@@ -595,6 +608,8 @@ class AppSettings {
         BrowserLayoutMode.list,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
     useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
+    tabEdgeSwipe: BrowserTabEdgeSwipe.fromJson(j['tabEdgeSwipe'] as String?),
+    appBarAtBottom: j['appBarAtBottom'] as bool? ?? false,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

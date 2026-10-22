@@ -11415,4 +11415,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => '再按一次返回键退出';
+
+  @override
+  String get tabEdgeSwipeLabel => '滑过第一个或最后一个标签页时';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel => '打开侧边菜单 / 新建标签页';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      '在第一个标签页向右滑动可打开侧边菜单，在最后一个标签页向左滑动可新建标签页。';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => '循环切换标签页';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      '滑过最后一个标签页会回到第一个，滑过第一个则跳到最后一个。可从屏幕左边缘或菜单按钮打开侧边菜单。';
+
+  @override
+  String get appBarAtBottomLabel => '将应用栏显示在底部';
+
+  @override
+  String get appBarAtBottomDesc => '将应用栏从屏幕顶部移到底部，方便用拇指操作。';
+
+  @override
+  String get selectByIconLabel => '点按图标选择';
+
+  @override
+  String get selectByIconDesc => '在列表视图中，点按文件或文件夹的图标即可将其选中。关闭后，点按图标不会有任何反应。';
+
+  @override
+  String get showFileExtensionsLabel => '显示文件扩展名';
+
+  @override
+  String get showFileExtensionsDesc => '在文件名末尾显示扩展名。搜索时始终显示扩展名。';
 }

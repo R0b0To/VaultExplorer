@@ -13826,5 +13826,49 @@
   "pressBackAgainToExit": "Press back again to exit",
   "@pressBackAgainToExit": {
     "description": "Hint shown on the first back press on Home. A second press within a couple of seconds exits the app"
+  },
+  "tabEdgeSwipeLabel": "Swiping past the first or last tab",
+  "@tabEdgeSwipeLabel": {
+    "description": "Setting title for what swiping sideways past the first or last file manager tab does."
+  },
+  "tabEdgeSwipeDrawerAndNewTabLabel": "Open side menu / new tab",
+  "@tabEdgeSwipeDrawerAndNewTabLabel": {
+    "description": "Option: swiping past the first tab opens the side menu and swiping past the last tab opens a new tab."
+  },
+  "tabEdgeSwipeDrawerAndNewTabDesc": "Swipe right on the first tab to open the side menu. Swipe left on the last tab to open a new tab.",
+  "@tabEdgeSwipeDrawerAndNewTabDesc": {
+    "description": "Explains the option that opens the side menu from the first tab and a new tab from the last tab."
+  },
+  "tabEdgeSwipeLoopLabel": "Loop through tabs",
+  "@tabEdgeSwipeLoopLabel": {
+    "description": "Option: swiping past the first or last tab wraps around to the other end."
+  },
+  "tabEdgeSwipeLoopDesc": "Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.",
+  "@tabEdgeSwipeLoopDesc": {
+    "description": "Explains the option that loops through the file manager tabs."
+  },
+  "appBarAtBottomLabel": "Show app bar at bottom",
+  "@appBarAtBottomLabel": {
+    "description": "Setting title for showing the app bar at the bottom of the screen instead of the top."
+  },
+  "appBarAtBottomDesc": "Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.",
+  "@appBarAtBottomDesc": {
+    "description": "Explains the setting that moves the app bar to the bottom of the screen."
+  },
+  "selectByIconLabel": "Select by tapping the icon",
+  "@selectByIconLabel": {
+    "description": "Setting title for selecting files and folders by tapping their icon in list view."
+  },
+  "selectByIconDesc": "In list view, tapping the icon of a file or folder selects it. When off, tapping the icon does nothing.",
+  "@selectByIconDesc": {
+    "description": "Explains the select-by-icon setting."
+  },
+  "showFileExtensionsLabel": "Show file extensions",
+  "@showFileExtensionsLabel": {
+    "description": "Setting title for showing file extensions at the end of file names."
+  },
+  "showFileExtensionsDesc": "Show the extension at the end of file names. Extensions are always shown while searching.",
+  "@showFileExtensionsDesc": {
+    "description": "Explains the show file extensions setting. Extensions are always shown while searching."
   }
 }

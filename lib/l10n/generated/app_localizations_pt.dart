@@ -12273,4 +12273,43 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Pressione voltar novamente para sair';
+
+  @override
+  String get tabEdgeSwipeLabel => 'Deslizar além da primeira ou da última aba';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Abrir menu lateral / nova aba';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Deslize para a direita na primeira aba para abrir o menu lateral. Deslize para a esquerda na última aba para abrir uma nova aba.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Percorrer as abas em loop';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Deslizar além da última aba leva à primeira, e além da primeira leva à última. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu.';
+
+  @override
+  String get appBarAtBottomLabel => 'Mostrar barra superior embaixo';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Move a barra superior do alto da tela para a parte de baixo, onde o polegar alcança com mais facilidade.';
+
+  @override
+  String get selectByIconLabel => 'Selecionar tocando no ícone';
+
+  @override
+  String get selectByIconDesc =>
+      'Na visualização em lista, tocar no ícone de um arquivo ou pasta o seleciona. Desativado, tocar no ícone não faz nada.';
+
+  @override
+  String get showFileExtensionsLabel => 'Mostrar extensões de arquivo';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Mostra a extensão no final dos nomes de arquivo. Durante a pesquisa, as extensões são sempre mostradas.';
 }

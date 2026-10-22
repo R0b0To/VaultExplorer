@@ -20478,6 +20478,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Press back again to exit'**
   String get pressBackAgainToExit;
+
+  /// Setting title for what swiping sideways past the first or last file manager tab does.
+  ///
+  /// In en, this message translates to:
+  /// **'Swiping past the first or last tab'**
+  String get tabEdgeSwipeLabel;
+
+  /// Option: swiping past the first tab opens the side menu and swiping past the last tab opens a new tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Open side menu / new tab'**
+  String get tabEdgeSwipeDrawerAndNewTabLabel;
+
+  /// Explains the option that opens the side menu from the first tab and a new tab from the last tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe right on the first tab to open the side menu. Swipe left on the last tab to open a new tab.'**
+  String get tabEdgeSwipeDrawerAndNewTabDesc;
+
+  /// Option: swiping past the first or last tab wraps around to the other end.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop through tabs'**
+  String get tabEdgeSwipeLoopLabel;
+
+  /// Explains the option that loops through the file manager tabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.'**
+  String get tabEdgeSwipeLoopDesc;
+
+  /// Setting title for showing the app bar at the bottom of the screen instead of the top.
+  ///
+  /// In en, this message translates to:
+  /// **'Show app bar at bottom'**
+  String get appBarAtBottomLabel;
+
+  /// Explains the setting that moves the app bar to the bottom of the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.'**
+  String get appBarAtBottomDesc;
+
+  /// Setting title for selecting files and folders by tapping their icon in list view.
+  ///
+  /// In en, this message translates to:
+  /// **'Select by tapping the icon'**
+  String get selectByIconLabel;
+
+  /// Explains the select-by-icon setting.
+  ///
+  /// In en, this message translates to:
+  /// **'In list view, tapping the icon of a file or folder selects it. When off, tapping the icon does nothing.'**
+  String get selectByIconDesc;
+
+  /// Setting title for showing file extensions at the end of file names.
+  ///
+  /// In en, this message translates to:
+  /// **'Show file extensions'**
+  String get showFileExtensionsLabel;
+
+  /// Explains the show file extensions setting. Extensions are always shown while searching.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the extension at the end of file names. Extensions are always shown while searching.'**
+  String get showFileExtensionsDesc;
 }
 
 class _AppLocalizationsDelegate

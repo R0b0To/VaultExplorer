@@ -12277,4 +12277,44 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'Zum Beenden erneut zurück drücken';
+
+  @override
+  String get tabEdgeSwipeLabel =>
+      'Wischen über den ersten oder letzten Tab hinaus';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel =>
+      'Seitenmenü öffnen / neuer Tab';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      'Auf dem ersten Tab nach rechts wischen, um das Seitenmenü zu öffnen. Auf dem letzten Tab nach links wischen, um einen neuen Tab zu öffnen.';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'Tabs im Kreis durchlaufen';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      'Wischen über den letzten Tab hinaus führt zum ersten, über den ersten hinaus zum letzten. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche.';
+
+  @override
+  String get appBarAtBottomLabel => 'App-Leiste unten anzeigen';
+
+  @override
+  String get appBarAtBottomDesc =>
+      'Verschiebt die App-Leiste vom oberen an den unteren Bildschirmrand, wo sie mit dem Daumen leichter erreichbar ist.';
+
+  @override
+  String get selectByIconLabel => 'Per Tippen auf das Symbol auswählen';
+
+  @override
+  String get selectByIconDesc =>
+      'In der Listenansicht wählt ein Tippen auf das Symbol einer Datei oder eines Ordners das Element aus. Ist die Option aus, passiert beim Tippen auf das Symbol nichts.';
+
+  @override
+  String get showFileExtensionsLabel => 'Dateiendungen anzeigen';
+
+  @override
+  String get showFileExtensionsDesc =>
+      'Zeigt die Endung am Ende von Dateinamen an. Bei der Suche werden Endungen immer angezeigt.';
 }

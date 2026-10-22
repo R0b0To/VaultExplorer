@@ -11598,4 +11598,40 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get pressBackAgainToExit => 'もう一度戻るを押すと終了します';
+
+  @override
+  String get tabEdgeSwipeLabel => '最初または最後のタブを越えてスワイプしたとき';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabLabel => 'サイドメニュー / 新しいタブ';
+
+  @override
+  String get tabEdgeSwipeDrawerAndNewTabDesc =>
+      '最初のタブで右にスワイプするとサイドメニューが開き、最後のタブで左にスワイプすると新しいタブが開きます。';
+
+  @override
+  String get tabEdgeSwipeLoopLabel => 'タブをループ';
+
+  @override
+  String get tabEdgeSwipeLoopDesc =>
+      '最後のタブを越えてスワイプすると最初のタブへ、最初のタブを越えると最後のタブへ移動します。サイドメニューは画面の左端またはメニューボタンから開きます。';
+
+  @override
+  String get appBarAtBottomLabel => 'アプリバーを下に表示';
+
+  @override
+  String get appBarAtBottomDesc => 'アプリバーを画面の上部から下部に移動し、親指で届きやすくします。';
+
+  @override
+  String get selectByIconLabel => 'アイコンのタップで選択';
+
+  @override
+  String get selectByIconDesc =>
+      'リスト表示で、ファイルまたはフォルダのアイコンをタップすると選択されます。オフにすると、アイコンをタップしても何も起こりません。';
+
+  @override
+  String get showFileExtensionsLabel => 'ファイルの拡張子を表示';
+
+  @override
+  String get showFileExtensionsDesc => 'ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。';
 }

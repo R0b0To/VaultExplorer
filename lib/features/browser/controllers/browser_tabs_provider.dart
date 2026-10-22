@@ -342,11 +342,26 @@ class BrowserTabs extends _$BrowserTabs {
     state = state.copyWith(tabs: List.unmodifiable(tabs));
   }
 
+  /// Back from the root of [tabId] to the Home tab that is already open.
+  ///
+  /// The tab being left is closed, so going Home never leaves the location the
+  /// person just backed out of open behind it. Returns false, changing
+  /// nothing, when [tabId] is not the active tab or there is no Home tab to
+  /// return to; callers then use [replaceActiveWithDashboard], which turns the
+  /// active tab into Home in place and so closes it the same way.
   bool returnToDashboardAtRoot(TabId tabId) {
     if (tabId != state.activeTabId) return false;
     final home = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
     if (home == null) return false;
-    activate(home.tabId);
+    // Already on Home: nothing to leave behind.
+    if (home.tabId == tabId) return true;
+    final tabs = state.tabs.where((tab) => tab.tabId != tabId).toList();
+    state = state.copyWith(
+      tabs: List.unmodifiable(tabs),
+      activeTabId: home.tabId,
+      // The tab that was focused before is the one just closed.
+      clearPreviousTabId: true,
+    );
     return true;
   }
 

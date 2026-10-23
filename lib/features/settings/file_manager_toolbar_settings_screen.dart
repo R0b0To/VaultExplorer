@@ -100,9 +100,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                     ),
                     children: [
                       // ==========================================
-                      // 1. GENERAL BROWSER LAYOUT & BARS
+                      // 1. TABS & DUAL PANE BROWSING
                       // ==========================================
-                      SectionHeader(context.l10n.browserLayoutSectionHeader),
+                      SectionHeader(context.l10n.browserTabsEnabledTitle),
                       SectionCard(
                         children: [
                           SwitchListTile(
@@ -189,6 +189,174 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                       settings.copyWith(tabEdgeSwipe: v),
                                 ),
                           ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.autoHideTabBar,
+                            onChanged: useBrowserTabs
+                                ? (v) => ref
+                                      .read(
+                                        fileManagerToolbarSettingsProvider(
+                                          containerUri,
+                                        ).notifier,
+                                      )
+                                      .setAutoHideTabBar(v)
+                                : null,
+                            title: Text(
+                              context.l10n.textEditorAutoHideTabBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n
+                                  .textEditorAutoHideTabBarDescription,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.tab_unselected_rounded,
+                              color: useBrowserTabs
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 2. BARS & INTERFACE CHROME
+                      // ==========================================
+                      SectionHeader(context.l10n.browserLayoutSectionHeader),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: appBarAtBottom,
+                            onChanged: (v) => ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings(
+                                  (settings) =>
+                                      settings.copyWith(appBarAtBottom: v),
+                                ),
+                            title: Text(
+                              context.l10n.appBarAtBottomLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.appBarAtBottomDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_align_bottom_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.autoHideAppBar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setAutoHideAppBar(v),
+                            title: Text(
+                              context.l10n.autoHideAppBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideAppBarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_align_top_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.showBreadcrumbBar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setShowBreadcrumbBar(v),
+                            title: Text(
+                              context.l10n.showBreadcrumbBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showBreadcrumbBarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.linear_scale_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.showStatsBar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setShowStatsBar(v),
+                            title: Text(
+                              context.l10n.showStatsBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showStatsBarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.analytics_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // ==========================================
+                      // 3. FOLDER LAYOUT & FILE PRESENTATION
+                      // ==========================================
+                      SectionCard(
+                        children: [
                           OptionPickerTile<BrowserLayoutMode>(
                             label: context.l10n.defaultFolderLayoutLabel,
                             value: defaultLayoutMode,
@@ -338,158 +506,12 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            value: state.config.showBreadcrumbBar,
-                            onChanged: (v) => ref
-                                .read(
-                                  fileManagerToolbarSettingsProvider(
-                                    containerUri,
-                                  ).notifier,
-                                )
-                                .setShowBreadcrumbBar(v),
-                            title: Text(
-                              context.l10n.showBreadcrumbBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              context.l10n.showBreadcrumbBarDesc,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            secondary: Icon(
-                              Icons.linear_scale_rounded,
-                              color: cs.primary,
-                            ),
-                          ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            value: state.config.showStatsBar,
-                            onChanged: (v) => ref
-                                .read(
-                                  fileManagerToolbarSettingsProvider(
-                                    containerUri,
-                                  ).notifier,
-                                )
-                                .setShowStatsBar(v),
-                            title: Text(
-                              context.l10n.showStatsBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              context.l10n.showStatsBarDesc,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            secondary: Icon(
-                              Icons.analytics_outlined,
-                              color: cs.primary,
-                            ),
-                          ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            value: state.config.autoHideAppBar,
-                            onChanged: (v) => ref
-                                .read(
-                                  fileManagerToolbarSettingsProvider(
-                                    containerUri,
-                                  ).notifier,
-                                )
-                                .setAutoHideAppBar(v),
-                            title: Text(
-                              context.l10n.autoHideAppBarLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              context.l10n.autoHideAppBarDesc,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            secondary: Icon(
-                              Icons.vertical_align_top_rounded,
-                              color: cs.primary,
-                            ),
-                          ),
-                          if (useBrowserTabs)
-                            SwitchListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              value: state.config.autoHideTabBar,
-                              onChanged: (v) => ref
-                                  .read(
-                                    fileManagerToolbarSettingsProvider(
-                                      containerUri,
-                                    ).notifier,
-                                  )
-                                  .setAutoHideTabBar(v),
-                              title: Text(
-                                context.l10n.textEditorAutoHideTabBarLabel,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                context.l10n
-                                    .textEditorAutoHideTabBarDescription,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                              secondary: Icon(
-                                Icons.tab_rounded,
-                                color: cs.primary,
-                              ),
-                            ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            value: appBarAtBottom,
-                            onChanged: (v) => ref
-                                .read(appSettingsControllerProvider.notifier)
-                                .updateSettings(
-                                  (settings) =>
-                                      settings.copyWith(appBarAtBottom: v),
-                                ),
-                            title: Text(
-                              context.l10n.appBarAtBottomLabel,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              context.l10n.appBarAtBottomDesc,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            secondary: Icon(
-                              Icons.vertical_align_bottom_rounded,
-                              color: cs.primary,
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
 
                       // ==========================================
-                      // 2. TOOLBAR & SHORTCUTS
+                      // 4. TOOLBAR & SHORTCUTS
                       // ==========================================
                       SectionHeader(context.l10n.toolbarLayoutSectionHeader),
                       SectionCard(
@@ -625,7 +647,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
 
                       // ==========================================
-                      // 3. BOOKMARKS
+                      // 5. BOOKMARKS
                       // ==========================================
                       SectionHeader(context.l10n.bookmarkBarSectionHeader),
                       SectionCard(
@@ -699,43 +721,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
 
                       // ==========================================
-                      // 4. THUMBNAILS & CACHE (LOCAL STORAGE)
+                      // 6. VIEW MODES & PRESENTATION
                       // ==========================================
-                      // The one slot shared by Local Storage and the decoy file
-                      // manager. The vault default is edited in App settings.
-                      SectionHeader(context.l10n.localStorageCardTitle),
-                      SectionCard(
-                        children: [
-                          ThumbnailSettingsTiles(
-                            cacheMode:
-                                state.config.localStorageThumbnailCacheMode,
-                            quality: state.config.localStorageThumbnailQuality,
-                            cacheModeLabel: context.l10n.cacheModeLabel,
-                            qualityLabel: context.l10n.thumbnailQualityLabel,
-                            isLocalStorage: true,
-                            onCacheModeChanged: (v) => ref
-                                .read(
-                                  fileManagerToolbarSettingsProvider(
-                                    containerUri,
-                                  ).notifier,
-                                )
-                                .setLocalStorageThumbnailCacheMode(v),
-                            onQualityChanged: (v) => ref
-                                .read(
-                                  fileManagerToolbarSettingsProvider(
-                                    containerUri,
-                                  ).notifier,
-                                )
-                                .setLocalStorageThumbnailQuality(v),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ==========================================
-                      // 5. VIEW MODES & PRESENTATION
-                      // ==========================================
-                      // 5a. List View
+                      // 6a. List View
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(
                         children: [
@@ -864,7 +852,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // 4b. Gallery / Grid View
+                      // 6b. Gallery / Grid View
                       SectionHeader(context.l10n.galleryGridViewSectionHeader),
                       SectionCard(
                         children: [
@@ -957,7 +945,39 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
 
                       // ==========================================
-                      // 5. APPEARANCE & MEDIA
+                      // 7. THUMBNAILS & CACHE (LOCAL STORAGE)
+                      // ==========================================
+                      SectionHeader(context.l10n.localStorageCardTitle),
+                      SectionCard(
+                        children: [
+                          ThumbnailSettingsTiles(
+                            cacheMode:
+                                state.config.localStorageThumbnailCacheMode,
+                            quality: state.config.localStorageThumbnailQuality,
+                            cacheModeLabel: context.l10n.cacheModeLabel,
+                            qualityLabel: context.l10n.thumbnailQualityLabel,
+                            isLocalStorage: true,
+                            onCacheModeChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setLocalStorageThumbnailCacheMode(v),
+                            onQualityChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setLocalStorageThumbnailQuality(v),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 8. THEME & MEDIA VIEWER
                       // ==========================================
                       SectionHeader(context.l10n.fileSkinSectionHeader),
                       SectionCard(
@@ -1022,7 +1042,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             subtitle: Text(
-                              '${context.l10n.playbackSettingsTitle}, ${context.l10n.toolbarLayoutSectionHeader}, ${context.l10n.advancedOptionsTitle}',
+                              '${context.l10n.playbackSettingsTitle}, ${context.l10n.advancedOptionsTitle}',
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),

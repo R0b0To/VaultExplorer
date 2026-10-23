@@ -61,7 +61,6 @@ class MediaViewerToolbarConfig {
     this.bottomBarActions = const [
       MediaViewerAction.mute,
       MediaViewerAction.playbackMode,
-      MediaViewerAction.abLoop,
       MediaViewerAction.previous,
       MediaViewerAction.playPause,
       MediaViewerAction.next,
@@ -74,6 +73,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.editImage,
       MediaViewerAction.editVideo,
       MediaViewerAction.editAudio,
+      MediaViewerAction.abLoop,
       MediaViewerAction.rename,
       MediaViewerAction.delete,
     ],

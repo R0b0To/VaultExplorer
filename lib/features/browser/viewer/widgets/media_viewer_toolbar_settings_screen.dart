@@ -273,27 +273,16 @@ Widget _buildMoveMenu({
 // ROOT SCREEN: MEDIA VIEWER TOOLBAR SETTINGS SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Redesigned Media Player Controls Screen.
+/// Consolidated Media Player Controls settings screen.
 ///
-/// Implements the responsive hub-and-spoke / master-detail pattern modeled after
-/// [AppSettingsScreen]:
-/// - On narrow/portrait layouts: Displays an overview hub list of categorized cards.
-///   Tapping a category navigates to its dedicated sub-page.
-/// - On wide/landscape layouts (`context.screen.useWideLayout`): Displays a
-///   persistent sidebar on the left and an embedded detail pane on the right.
-/// - Includes instant search and reset-to-defaults actions in the AppBar.
+/// Playback and advanced options appear together in one scrollable page.
+/// Control placement is edited from the media viewer's Arrange Controls UI.
 class MediaViewerToolbarSettingsScreen extends ConsumerStatefulWidget {
   final String? containerUri;
-  final MediaViewerSection? initialSection;
-
-  /// For backward compatibility with callers passing an integer index (0, 1, 2).
-  final int? initialTab;
 
   const MediaViewerToolbarSettingsScreen({
     super.key,
     this.containerUri,
-    this.initialSection,
-    this.initialTab,
   });
 
   @override
@@ -311,23 +300,7 @@ class _MediaViewerToolbarSettingsScreenState
   @override
   void initState() {
     super.initState();
-    _selectedSection = widget.initialSection ??
-        (widget.initialTab != null
-            ? switch (widget.initialTab!) {
-                1 => MediaViewerSection.toolbarLayout,
-                2 => MediaViewerSection.advanced,
-                _ => MediaViewerSection.playback,
-              }
-            : MediaViewerSection.playback);
-
-    if (widget.initialSection != null || widget.initialTab != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (!context.screen.useWideLayout) {
-          _navigateToSection(context, _selectedSection);
-        }
-      });
-    }
+    _selectedSection = MediaViewerSection.playback;
   }
 
   @override
@@ -635,19 +608,22 @@ class _MediaViewerToolbarSettingsScreenState
                       cs,
                       textTheme,
                     )
-                  : (context.screen.useWideLayout
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                              width: context.screen.secondaryPaneWidth(),
-                              child: _buildSidebar(cs, textTheme),
-                            ),
-                            const VerticalDivider(width: 0.2),
-                            Expanded(child: _buildDetailPane()),
-                          ],
-                        )
-                      : _buildNarrowHubList(cs, textTheme)),
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          MediaViewerPlaybackSettingsScreen(
+                            containerUri: widget.containerUri,
+                            embedded: true,
+                            shrinkWrap: true,
+                          ),
+                          MediaViewerAdvancedSettingsScreen(
+                            containerUri: widget.containerUri,
+                            embedded: true,
+                            shrinkWrap: true,
+                          ),
+                        ],
+                      ),
+                    ),
             ),
     );
   }
@@ -1011,11 +987,13 @@ class _MediaViewerToolbarSettingsScreenState
 class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
   final String? containerUri;
   final bool embedded;
+  final bool shrinkWrap;
 
   const MediaViewerPlaybackSettingsScreen({
     super.key,
     this.containerUri,
     this.embedded = false,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -1036,6 +1014,8 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: ListView(
+            shrinkWrap: shrinkWrap,
+            physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.sm,
@@ -2265,11 +2245,13 @@ class _MediaViewerToolbarLayoutScreenState
 class MediaViewerAdvancedSettingsScreen extends ConsumerWidget {
   final String? containerUri;
   final bool embedded;
+  final bool shrinkWrap;
 
   const MediaViewerAdvancedSettingsScreen({
     super.key,
     this.containerUri,
     this.embedded = false,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -2289,6 +2271,8 @@ class MediaViewerAdvancedSettingsScreen extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: ListView(
+            shrinkWrap: shrinkWrap,
+            physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.sm,

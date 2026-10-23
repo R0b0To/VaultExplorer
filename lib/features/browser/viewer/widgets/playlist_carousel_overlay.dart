@@ -49,11 +49,14 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
 
   bool _isDraggingSlider = false;
   bool _showScrubber = false;
+  bool _scrubberChangedDuringGesture = false;
+  bool _dismissRequested = false;
   double _verticalDragDistance = 0.0;
 
   void _toggleScrubber(bool show) {
     if (_showScrubber == show || widget.playlist.length <= 1) return;
     HapticFeedback.selectionClick();
+    _scrubberChangedDuringGesture = true;
     setState(() {
       _showScrubber = show;
     });
@@ -61,9 +64,12 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
 
   void _handleVerticalDragStart(DragStartDetails details) {
     _verticalDragDistance = 0.0;
+    _scrubberChangedDuringGesture = false;
+    _dismissRequested = false;
   }
 
   void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    if (_dismissRequested) return;
     _verticalDragDistance += details.primaryDelta ?? 0;
     if (_verticalDragDistance < -12 && !_showScrubber) {
       _toggleScrubber(true);
@@ -71,6 +77,10 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
     } else if (_verticalDragDistance > 12 && _showScrubber) {
       _toggleScrubber(false);
       _verticalDragDistance = 0.0;
+    } else if (_verticalDragDistance > 32 &&
+        !_showScrubber &&
+        !_scrubberChangedDuringGesture) {
+      _dismissCarousel();
     }
   }
 
@@ -80,8 +90,19 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
       _toggleScrubber(true);
     } else if (vy > 100 && _showScrubber) {
       _toggleScrubber(false);
+    } else if (vy > 180 &&
+        !_showScrubber &&
+        !_scrubberChangedDuringGesture) {
+      _dismissCarousel();
     }
     _verticalDragDistance = 0.0;
+  }
+
+  void _dismissCarousel() {
+    final onClose = widget.onClose;
+    if (_dismissRequested || onClose == null) return;
+    _dismissRequested = true;
+    onClose();
   }
 
   double? _viewportWidth;

@@ -3529,13 +3529,37 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   // Docked filmstrip carousel expands/collapses smoothly above controls
-                                  AnimatedSize(
+                                  AnimatedSwitcher(
                                     duration:
                                         MediaViewerConstants.animationDuration,
-                                    curve: Curves.easeOutCubic,
-                                    alignment: Alignment.bottomCenter,
+                                    reverseDuration:
+                                        MediaViewerConstants.animationDuration,
+                                    switchInCurve: Curves.easeOutCubic,
+                                    switchOutCurve: Curves.easeInCubic,
+                                    transitionBuilder: (child, animation) {
+                                      final slide = animation.drive(
+                                        Tween<Offset>(
+                                          begin: const Offset(0, 0.12),
+                                          end: Offset.zero,
+                                        ),
+                                      );
+                                      return SizeTransition(
+                                        sizeFactor: animation,
+                                        axisAlignment: 1.0,
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: SlideTransition(
+                                            position: slide,
+                                            child: child,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                     child: showCarousel
                                         ? PlaylistCarouselOverlay(
+                                            key: const ValueKey(
+                                              'playlist-carousel-visible',
+                                            ),
                                             container: widget.container,
                                             playlist:
                                                 _playlistController.playlist,
@@ -3548,7 +3572,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                             onSelect: _selectFromCarousel,
                                             onClose: _toggleCarousel,
                                           )
-                                        : const SizedBox.shrink(),
+                                        : const SizedBox.shrink(
+                                            key: ValueKey(
+                                              'playlist-carousel-hidden',
+                                            ),
+                                          ),
                                   ),
                                   MediaViewerBottomControls(
                                     playlistController: _playlistController,

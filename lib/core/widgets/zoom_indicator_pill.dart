@@ -12,17 +12,19 @@ import 'package:material_ui/material_ui.dart';
 class ZoomIndicatorPill extends StatelessWidget {
   final double scale;
   final VoidCallback onReset;
+  final Color? backgroundColor;
 
   const ZoomIndicatorPill({
     super.key,
     required this.scale,
     required this.onReset,
+    this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withValues(alpha: 0.65),
+      color: backgroundColor ?? Colors.black.withValues(alpha: 0.65),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onReset,
@@ -74,11 +76,13 @@ class AutoHideZoomIndicator extends StatefulWidget {
     required this.transform,
     required this.onReset,
     this.hideAfter = const Duration(seconds: 2),
+    this.backgroundColor,
   });
 
   final ValueListenable<Matrix4> transform;
   final VoidCallback onReset;
   final Duration hideAfter;
+  final Color? backgroundColor;
 
   @override
   State<AutoHideZoomIndicator> createState() => _AutoHideZoomIndicatorState();
@@ -146,7 +150,11 @@ class _AutoHideZoomIndicatorState extends State<AutoHideZoomIndicator> {
       duration: const Duration(milliseconds: 180),
       child: IgnorePointer(
         ignoring: !_visible,
-        child: ZoomIndicatorPill(scale: _scale, onReset: widget.onReset),
+        child: ZoomIndicatorPill(
+          scale: _scale,
+          onReset: widget.onReset,
+          backgroundColor: widget.backgroundColor,
+        ),
       ),
     );
   }

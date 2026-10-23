@@ -835,6 +835,7 @@ bool _isClampingMatrix = false;
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _transformationController,
+                      backgroundColor: Colors.white.withValues(alpha: 0.12),
                       onReset: () => _animateImageZoomTo(
                         _getBaselineMatrix(constraints),
                         toBaseline: true,

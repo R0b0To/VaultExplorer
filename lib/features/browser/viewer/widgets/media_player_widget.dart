@@ -1671,6 +1671,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _videoTransformationController,
+                      backgroundColor: Colors.white.withValues(alpha: 0.12),
                       onReset: _resetVideoZoom,
                     ),
                   ),

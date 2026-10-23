@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -17,6 +18,7 @@ import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
@@ -716,19 +718,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
   }
 
+  /// Runs [action] after the current frame. A post-frame callback does not ask
+  /// for a frame by itself, and nothing else is animating when a swipe ends on
+  /// a finger lift, so one is requested; otherwise [action] would sit waiting
+  /// until the next touch or notification happened to redraw the screen.
+  void _afterThisFrame(VoidCallback action) {
+    final binding = WidgetsBinding.instance;
+    binding.addPostFrameCallback((_) => action());
+    binding.ensureVisualUpdate();
+  }
+
   void _scheduleNewTabPrompt() {
     if (_newTabPromptScheduled) return;
     _newTabPromptScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _afterThisFrame(() {
       if (!mounted) {
         _newTabPromptScheduled = false;
         return;
       }
       unawaited(
         _openNewTabSheet().whenComplete(() {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _newTabPromptScheduled = false;
-          });
+          _afterThisFrame(() => _newTabPromptScheduled = false);
         }),
       );
     });
@@ -739,7 +749,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   void _scheduleLoopTo(int index) {
     if (_loopScheduled) return;
     _loopScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _afterThisFrame(() {
       _loopScheduled = false;
       if (!mounted) return;
       _loopToIndex(index);
@@ -843,6 +853,17 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final activeTab = ref.watch(activeBrowserTabProvider(_workspace));
     final activeTabId = activeTab?.tabId;
     final activeContainer = activeTab?.container;
+    // The app bar holds the search field, so while a search is open it stays
+    // fully visible however far the list has scrolled. The collapsed state is
+    // kept, and comes back when the search ends.
+    final searchActive =
+        activeTabId != null &&
+        activeTab?.isDashboard != true &&
+        ref.watch(
+          fileBrowserSearchProvider(
+            activeTabId,
+          ).select((search) => search.active),
+        );
     final toolbarSettingsUri =
         activeContainer == null || activeContainer.isLocalStorage
         ? null
@@ -970,7 +991,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         builder: (context, child) => Align(
           key: const Key('browser_app_bar_align'),
           alignment: Alignment.bottomCenter,
-          heightFactor: autoHideAppBar
+          heightFactor: autoHideAppBar && !searchActive
               ? _appBarVisibilityController.value
               : 1.0,
           child: SizedBox(height: kToolbarHeight, child: child),
@@ -984,12 +1005,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
 
     final shell = Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
               children: [
                 if (!appBarAtBottom) appBarSlot,
                 if (tabsEnabled && tabs.isNotEmpty) strip,
@@ -1108,23 +1129,23 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 ),
               ],
             ),
-            // The selection app bar floats above the top of the browser
-            // rather than taking the (auto-hiding) app bar's slot, so it is
-            // visible when that slot is collapsed and nothing shifts. With the
-            // app bar at the bottom the selection bar takes that bar's place
-            // instead (see _BottomAppBarSlot).
-            if (!appBarAtBottom)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _SelectionBarOverlay(
-                  workspaceConfig: _workspace,
-                  selectionAppBarListenable: _chrome.selectionAppBar,
-                ),
+          ),
+          // The selection app bar floats above the whole browser, status bar
+          // included, rather than taking the (auto-hiding) app bar's slot, so
+          // it is visible when that slot is collapsed and nothing shifts. With
+          // the app bar at the bottom the selection bar takes that bar's place
+          // instead (see _BottomAppBarSlot).
+          if (!appBarAtBottom)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _SelectionBarOverlay(
+                workspaceConfig: _workspace,
+                selectionAppBarListenable: _chrome.selectionAppBar,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
       floatingActionButton: ValueListenableBuilder<Widget?>(
         valueListenable: _chrome.floatingAction,
@@ -1142,15 +1163,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 children: [
                   // The app bar goes under this slot, at the screen's edge, and
                   // so takes over the system navigation inset it would pad for.
-                  MediaQuery.removePadding(
+                  MediaQuery.removeViewInsets(
                     context: context,
                     removeBottom: true,
-                    child: bottomBarSlot,
+                    child: MediaQuery.removePadding(
+                      context: context,
+                      removeBottom: true,
+                      child: bottomBarSlot,
+                    ),
                   ),
                   _BottomAppBarSlot(
                     workspaceConfig: _workspace,
                     visibility: _appBarVisibilityController,
                     autoHide: autoHideAppBar,
+                    searchActive: searchActive,
                     appBar: appBar,
                     selectionAppBarListenable: _chrome.selectionAppBar,
                   ),
@@ -1201,7 +1227,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 /// Selecting while the app bar has auto-hidden must still show the selection
 /// actions, and must not push the list down. So the bar is an overlay: it
 /// covers the app bar slot when that is visible and the top of the content
-/// when it is collapsed, and the layout underneath never changes.
+/// when it is collapsed, and the layout underneath never changes. It slides in
+/// and out, and paints behind the status bar like the app bar it replaces.
 class _SelectionBarOverlay extends ConsumerWidget {
   const _SelectionBarOverlay({
     required this.workspaceConfig,
@@ -1221,18 +1248,52 @@ class _SelectionBarOverlay extends ConsumerWidget {
     return ValueListenableBuilder<BrowserAppBarFactory?>(
       valueListenable: selectionAppBarListenable,
       builder: (context, selectionAppBar, _) {
-        if (!hasSelection || selectionAppBar == null) {
-          return const SizedBox.shrink();
-        }
-        return SizedBox(
-          key: const Key('browser_selection_app_bar_overlay'),
-          height: kToolbarHeight,
-          child: SkinAreaScope(
-            area: SkinArea.files,
-            child: Builder(
-              builder: (appBarContext) => selectionAppBar(appBarContext),
-            ),
+        return AnimatedSwitcher(
+          duration: AppMotion.short2,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.topCenter,
+            children: [...previousChildren, if (currentChild != null) currentChild],
           ),
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, -1),
+                end: Offset.zero,
+              ).animate(curved),
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+          child: hasSelection && selectionAppBar != null
+              ? Material(
+                  key: const ValueKey<String>('browser_selection_app_bar_overlay'),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  elevation: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: SizedBox(
+                      height: kToolbarHeight,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: SkinAreaScope(
+                          area: SkinArea.files,
+                          child: Builder(
+                            builder: (appBarContext) =>
+                                selectionAppBar(appBarContext),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(
+                  key: ValueKey<String>('no_browser_selection_app_bar'),
+                ),
         );
       },
     );
@@ -1279,6 +1340,7 @@ class _BottomAppBarSlot extends ConsumerWidget {
     required this.workspaceConfig,
     required this.visibility,
     required this.autoHide,
+    required this.searchActive,
     required this.appBar,
     required this.selectionAppBarListenable,
   });
@@ -1286,6 +1348,9 @@ class _BottomAppBarSlot extends ConsumerWidget {
   final BrowserTabsConfig workspaceConfig;
   final Animation<double> visibility;
   final bool autoHide;
+
+  /// A search is open: the bar holds its field, so it is kept fully visible.
+  final bool searchActive;
   final Widget appBar;
   final ValueListenable<BrowserAppBarFactory?> selectionAppBarListenable;
 
@@ -1307,7 +1372,9 @@ class _BottomAppBarSlot extends ConsumerWidget {
             builder: (context, child) => Align(
               key: const Key('browser_app_bar_align'),
               alignment: Alignment.topCenter,
-              heightFactor: autoHide && !selecting ? visibility.value : 1.0,
+              heightFactor: autoHide && !selecting && !searchActive
+                  ? visibility.value
+                  : 1.0,
               child: SizedBox(height: kToolbarHeight, child: child),
             ),
             // Down here there is no status bar for the bar to pad for.

@@ -4932,18 +4932,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           )
         : null;
     final embeddedBottomBar = selectionInBottomBar
-        ? Material(
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            elevation: 4,
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: kToolbarHeight,
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeTop: true,
-                  removeBottom: true,
-                  child: buildAppBar(context, selectionMode: true),
+        // The shell's bottom slot sits at the screen's edge, under the
+        // keyboard. Lifting the bar by the keyboard's height keeps the
+        // selection actions visible and tappable while a search is still open
+        // (selecting a result with the keyboard up). Read from the slot's own
+        // context: that is where the keyboard inset is still intact.
+        ? Builder(
+            builder: (slotContext) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(slotContext).bottom,
+              ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                elevation: 4,
+                child: SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    height: kToolbarHeight,
+                    child: MediaQuery.removePadding(
+                      context: context,
+                      removeTop: true,
+                      removeBottom: true,
+                      child: buildAppBar(context, selectionMode: true),
+                    ),
+                  ),
                 ),
               ),
             ),

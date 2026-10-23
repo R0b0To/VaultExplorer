@@ -11,8 +11,8 @@ import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart'
 /// shell; the active directory viewport supplies its context-aware actions.
 ///
 /// The selection app bar is not shown here: it lives in an overlay above the
-/// browser (see the shell) so that selecting never depends on, or resizes, the
-/// auto-hiding slot this widget fills.
+/// whole browser (see the shell) so that selecting never depends on, or
+/// resizes, the auto-hiding slot this widget fills.
 class AdaptiveBrowserAppBar extends ConsumerWidget
     implements PreferredSizeWidget {
   const AdaptiveBrowserAppBar({

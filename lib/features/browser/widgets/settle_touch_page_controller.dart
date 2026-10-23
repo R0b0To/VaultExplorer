@@ -53,6 +53,18 @@ class _AlwaysTouchableScrollContext implements ScrollContext {
 
   final ScrollContext _inner;
 
+  // Scrollable may recreate its PagePosition while keeping the same
+  // ScrollableState. PagePosition.absorb requires the old and new positions'
+  // contexts to compare equal, so wrappers around that same state must also
+  // compare equal across createScrollPosition calls.
+  @override
+  bool operator ==(Object other) =>
+      other is _AlwaysTouchableScrollContext &&
+      identical(other._inner, _inner);
+
+  @override
+  int get hashCode => identityHashCode(_inner);
+
   @override
   BuildContext? get notificationContext => _inner.notificationContext;
 

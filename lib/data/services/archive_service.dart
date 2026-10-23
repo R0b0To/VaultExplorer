@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:vaultexplorer/core/api/vault_archive_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
@@ -257,32 +258,38 @@ class ArchiveService {
     ValueChanged<String>? onProgress,
     int? opId,
   }) async {
-    if (archiveContext.vaultFilePath != null &&
-        archiveContext.vaultPath != null) {
-      final bulkRes = await _archive.extractVaultArchiveAll(
-        filePath: archiveContext.vaultFilePath!,
-        vaultPath: archiveContext.vaultPath!,
-        destUri: container.uri,
-        destDirPath: targetDirInContainer,
-        subPath: subPath.isNotEmpty ? subPath : null,
-        passphrase: archiveContext.passphrase,
-        opId: opId,
-      );
-      if (bulkRes.status == ArchiveOpenStatus.ok) {
-        return bulkRes.extractedCount;
-      }
-    } else if (archiveContext.localPathOrUri != null) {
-      final bulkRes = await _archive.extractVaultArchiveAll(
-        filePath: archiveContext.localPathOrUri!,
-        vaultPath: null,
-        destUri: container.uri,
-        destDirPath: targetDirInContainer,
-        subPath: subPath.isNotEmpty ? subPath : null,
-        passphrase: archiveContext.passphrase,
-        opId: opId,
-      );
-      if (bulkRes.status == ArchiveOpenStatus.ok) {
-        return bulkRes.extractedCount;
+    // The native bulk extractor writes to a regular filesystem path or a
+    // mounted vault, but it cannot address a SAF tree URI as a destination.
+    // Sidebar storage locations can be SAF-backed even though they represent
+    // ordinary local folders, so use the per-entry file-IO path for them.
+    if (!container.isSafStorage) {
+      if (archiveContext.vaultFilePath != null &&
+          archiveContext.vaultPath != null) {
+        final bulkRes = await _archive.extractVaultArchiveAll(
+          filePath: archiveContext.vaultFilePath!,
+          vaultPath: archiveContext.vaultPath!,
+          destUri: container.uri,
+          destDirPath: targetDirInContainer,
+          subPath: subPath.isNotEmpty ? subPath : null,
+          passphrase: archiveContext.passphrase,
+          opId: opId,
+        );
+        if (bulkRes.status == ArchiveOpenStatus.ok) {
+          return bulkRes.extractedCount;
+        }
+      } else if (archiveContext.localPathOrUri != null) {
+        final bulkRes = await _archive.extractVaultArchiveAll(
+          filePath: archiveContext.localPathOrUri!,
+          vaultPath: null,
+          destUri: container.uri,
+          destDirPath: targetDirInContainer,
+          subPath: subPath.isNotEmpty ? subPath : null,
+          passphrase: archiveContext.passphrase,
+          opId: opId,
+        );
+        if (bulkRes.status == ArchiveOpenStatus.ok) {
+          return bulkRes.extractedCount;
+        }
       }
     }
 

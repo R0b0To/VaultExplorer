@@ -9,7 +9,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -946,9 +945,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
-    final automationApi = ref.read(vaultAutomationApiProvider);
-    final mountedVaults = await automationApi.getActiveContainerSessions();
-    if (!mounted) return;
+    // Respect this shell's workspace boundary. In decoy mode this callback
+    // intentionally returns no vaults, even if the engine still has sessions
+    // left over from an earlier normal-mode run.
+    final mountedVaults = List<MountedContainer>.unmodifiable(
+      widget.mountedContainers(),
+    );
     final choice = await BrowserNewTabSheet.show(
       context,
       mountedVaults: mountedVaults,
@@ -968,7 +970,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       (vault) => vault.uri == container.uri,
     );
     if (wasMountedVault) {
-      final currentVaults = await automationApi.getActiveContainerSessions();
+      final currentVaults = await ref
+          .read(vaultAutomationApiProvider)
+          .getActiveContainerSessions();
       if (!mounted) return;
       final current = currentVaults
           .where((vault) => vault.uri == container.uri)

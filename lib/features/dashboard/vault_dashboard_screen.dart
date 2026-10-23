@@ -191,7 +191,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       lockScreenLockOnlyContainers: _lockScreenLockOnlyContainers,
       enforceAppLock: _enforceAppLock,
     );
-    _lockController.notifyAppUnlocked();
+    _lockController.notifyAppUnlocked(preserveBackgroundState: true);
+    unawaited(_resumePersistedVaultAutoLock());
     WidgetsBinding.instance.addObserver(this);
     _checkStorageAccess();
   }
@@ -199,6 +200,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   @override
   void didUpdateWidget(covariant VaultDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
+  }
+
+  Future<void> _resumePersistedVaultAutoLock() async {
+    await _container.read(appSettingsControllerProvider.notifier).load();
+    if (!mounted) return;
+    await _lockController.resumeFromPersistedBackgroundState(
+      evaluateAppLock: false,
+    );
   }
 
   bool _handleDashboardScrollNotification(
@@ -336,42 +345,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   }
 
   Future<void> _lockAllMountedContainers() async {
-    final state = _container.read(vaultDashboardControllerProvider);
-    final mountedList = state.mounted;
-    final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(
-      vaultDashboardControllerProvider.notifier,
-    );
-
-    VeLog.i(
-      _kLogTag,
-      '_lockAllMountedContainers: locking ${mountedList.length} container(s): '
-      '${mountedList.map((c) => c.volId).toList()}',
-    );
-
-    for (final c in List<MountedContainer>.from(mountedList)) {
-      if (state.records[c.uri]?.isExemptFromGlobalLock == true) {
-        VeLog.d(
-          _kLogTag,
-          '_lockAllMountedContainers: volId=${c.volId} exempt (per-container '
-          'Auto-Lock Duration configured), skipping',
-        );
-        continue;
-      }
-      if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(
-          _kLogTag,
-          '_lockAllMountedContainers: volId=${c.volId} guard busy, skipping',
-        );
-        continue;
-      }
-      try {
-        final locked = await lifecycle.lockContainer(c.uri);
-        if (locked) controller.onContainerLocked(c.volId);
-      } finally {
-        controller.releaseLockGuard(c.volId);
-      }
-    }
+    await _container
+        .read(vaultDashboardControllerProvider.notifier)
+        .lockAllMountedContainersForAutoLock();
   }
 
   // Companion to _lockAllMountedContainers, for containers explicitly
@@ -383,39 +359,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   // "isExemptFromGlobalLock"), so there's no overlap/double-locking between
   // the two methods.
   Future<void> _lockImmediateOverrideContainers() async {
-    final state = _container.read(vaultDashboardControllerProvider);
-    final mountedList = state.mounted;
-    final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(
-      vaultDashboardControllerProvider.notifier,
-    );
-
-    final targets = mountedList
-        .where((c) => state.records[c.uri]?.autoCloseImmediately == true)
-        .toList(growable: false);
-    if (targets.isEmpty) return;
-
-    VeLog.i(
-      _kLogTag,
-      '_lockImmediateOverrideContainers: locking ${targets.length} '
-      'Immediately-configured container(s): ${targets.map((c) => c.volId).toList()}',
-    );
-
-    for (final c in targets) {
-      if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(
-          _kLogTag,
-          '_lockImmediateOverrideContainers: volId=${c.volId} guard busy, skipping',
-        );
-        continue;
-      }
-      try {
-        final locked = await lifecycle.lockContainer(c.uri);
-        if (locked) controller.onContainerLocked(c.volId);
-      } finally {
-        controller.releaseLockGuard(c.volId);
-      }
-    }
+    await _container
+        .read(vaultDashboardControllerProvider.notifier)
+        .lockImmediatelyConfiguredContainers();
   }
 
   // Companion to _lockImmediateOverrideContainers, for containers
@@ -429,39 +375,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   // _lockAllMountedContainers (they're "isExemptFromGlobalLock"), so
   // there's no overlap/double-locking between the two methods.
   Future<void> _lockScreenLockOnlyContainers() async {
-    final state = _container.read(vaultDashboardControllerProvider);
-    final mountedList = state.mounted;
-    final lifecycle = _container.read(vaultLifecycleApiProvider);
-    final controller = _container.read(
-      vaultDashboardControllerProvider.notifier,
-    );
-
-    final targets = mountedList
-        .where((c) => state.records[c.uri]?.autoCloseScreenLockOnly == true)
-        .toList(growable: false);
-    if (targets.isEmpty) return;
-
-    VeLog.i(
-      _kLogTag,
-      '_lockScreenLockOnlyContainers: locking ${targets.length} '
-      'Screen-Lock-Only container(s): ${targets.map((c) => c.volId).toList()}',
-    );
-
-    for (final c in targets) {
-      if (!controller.acquireLockGuard(c.volId)) {
-        VeLog.d(
-          _kLogTag,
-          '_lockScreenLockOnlyContainers: volId=${c.volId} guard busy, skipping',
-        );
-        continue;
-      }
-      try {
-        final locked = await lifecycle.lockContainer(c.uri);
-        if (locked) controller.onContainerLocked(c.volId);
-      } finally {
-        controller.releaseLockGuard(c.volId);
-      }
-    }
+    await _container
+        .read(vaultDashboardControllerProvider.notifier)
+        .lockScreenLockOnlyConfiguredContainers();
   }
 
   /// Opens [container] in an additional file-manager tab (long-press menu of

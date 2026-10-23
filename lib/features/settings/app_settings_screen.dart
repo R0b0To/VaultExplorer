@@ -1007,14 +1007,16 @@ class _SecuritySettingsScreenState
           : context.l10n.disableDiscreteModeMessage,
       confirmLabel: enable ? context.l10n.enable : context.l10n.disable,
     );
-    if (!confirmed || !context.mounted) return;
+    if (!confirmed || !mounted) return;
 
     final targetMode = enable ? DisguiseMode.decoy : DisguiseMode.vault;
     final ok = await ref
         .read(appSettingsControllerProvider.notifier)
         .setDiscreteMode(enable);
 
-    if (ok && context.mounted) {
+    if (ok) {
+      await ref.read(sessionLockControllerProvider).prepareForModeSwitchExit();
+      if (!mounted) return;
       applyDisguiseModeTaskSwitcherLabel(targetMode, context.l10n);
       showAppSnackBar(
         context,
@@ -1023,8 +1025,9 @@ class _SecuritySettingsScreenState
             : context.l10n.discreteModeDisabledSnack,
       );
       await Future<void>.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
       SystemNavigator.pop();
-    } else if (context.mounted) {
+    } else if (mounted) {
       showAppSnackBar(
         context,
         message: context.l10n.failedToChangeDiscreteMode,

@@ -15,6 +15,7 @@ import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
@@ -35,14 +36,20 @@ import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final bool hideDashboardUntilShareHandled;
+  final bool returnToDecoyOnBackground;
 
-  const MainShell({super.key, this.hideDashboardUntilShareHandled = false});
+  const MainShell({
+    super.key,
+    this.hideDashboardUntilShareHandled = false,
+    this.returnToDecoyOnBackground = false,
+  });
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
   int _index = 0;
   late bool _hideDashboard = widget.hideDashboardUntilShareHandled;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
@@ -126,6 +133,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _quickCaptureColdStart = ref.read(pendingQuickCaptureLaunchProvider).take();
     if (!_quickCaptureColdStart) {
       // The Settings tab used to be the thing that created -- and so started
@@ -244,6 +252,22 @@ class _MainShellState extends ConsumerState<MainShell> {
     _onQuickCaptureRequested();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.returnToDecoyOnBackground &&
+        (state == AppLifecycleState.hidden ||
+            state == AppLifecycleState.paused)) {
+      // System pickers and similar operations deliberately suppress auto-lock;
+      // they may briefly background this activity but should not close the
+      // revealed vault shell while the external operation is in progress.
+      if (ref.read(sessionLockControllerProvider).isLockSuppressed) return;
+      final navigator = Navigator.of(context, rootNavigator: true);
+      if (navigator.canPop()) {
+        navigator.popUntil((route) => route.isFirst);
+      }
+    }
+  }
+
   void _onQuickCaptureRequested() {
     if (!mounted || _handlingQuickCapture) return;
     setState(() => _handlingQuickCapture = true);
@@ -260,6 +284,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(

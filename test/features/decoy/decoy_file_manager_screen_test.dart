@@ -14,10 +14,12 @@ void main() {
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   bool hasAccess = false;
   bool requestAccessCalled = false;
+  int activeSessionQueries = 0;
 
   setUp(() {
     hasAccess = false;
     requestAccessCalled = false;
+    activeSessionQueries = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
@@ -28,6 +30,18 @@ void main() {
           return true;
         case 'listDirectory':
           return <String>[];
+        case 'getActiveContainerSessions':
+          activeSessionQueries++;
+          return {
+            'sessions': [
+              {
+                'uri': 'content://vault/hidden',
+                'displayName': 'Hidden Vault',
+                'volId': 42,
+                'files': <String>[],
+              },
+            ],
+          };
         default:
           return null;
       }
@@ -92,6 +106,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(BrowserTabsShell), findsOneWidget);
+    });
+
+    testWidgets('new tabs never offer vault sessions in decoy mode', (tester) async {
+      hasAccess = true;
+      await tester.pumpWidget(buildTestWidget());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final queriesBeforeOpeningNewTab = activeSessionQueries;
+
+      await tester.tap(find.byIcon(Icons.add_rounded).last);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(activeSessionQueries, queriesBeforeOpeningNewTab);
+      expect(find.text('Hidden Vault'), findsNothing);
     });
   });
 

@@ -99,6 +99,7 @@ class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => MainShell(
           hideDashboardUntilShareHandled: isShareHandoff,
+          returnToDecoyOnBackground: true,
         ),
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,

@@ -2,15 +2,29 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 
 part 'session_lock_controller.g.dart';
 
 const _kLogTag = 'SessionLockController';
+const _kPausedAtStorageKey = 'session_lock_paused_at_v1';
 
 @Riverpod(keepAlive: true)
 SessionLockController sessionLockController(Ref ref) {
-  final controller = SessionLockController();
+  final secureStorage = ref.read(appSecureStorageProvider);
+  final controller = SessionLockController(
+    readPausedAt: () async {
+      final raw = await secureStorage.read(key: _kPausedAtStorageKey);
+      final milliseconds = int.tryParse(raw ?? '');
+      if (milliseconds == null) return null;
+      return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    },
+    writePausedAt: (pausedAt) => secureStorage.write(
+      key: _kPausedAtStorageKey,
+      value: pausedAt?.millisecondsSinceEpoch.toString(),
+    ),
+  );
   ref.onDispose(controller.dispose);
   return controller;
 }
@@ -57,6 +71,8 @@ class SessionLockController {
   Future<void> Function()? _lockScreenLockOnlyContainers;
   void Function()? _enforceAppLock;
   DateTime Function() _now;
+  final Future<DateTime?> Function()? _readPausedAt;
+  final Future<void> Function(DateTime? pausedAt)? _writePausedAt;
 
   Timer? _vaultLockTimer;
   Timer? _appLockTimer;
@@ -65,6 +81,7 @@ class SessionLockController {
   bool _appLockedOnScreenOff = false;
   bool _vaultLockedOnScreenOff = false;
    bool _isMediaPlaying = false;
+  bool _ignoreBackgroundUntilResume = false;
   int _suppressLockDepth = 0;
 
   bool get isAppLocked => _isAppLocked;
@@ -84,6 +101,7 @@ class SessionLockController {
     }
     if (_suppressLockDepth == 0) {
       _pausedAt = null;
+      _persistPausedAt(null);
     }
   }
 
@@ -113,8 +131,11 @@ class SessionLockController {
     }
   }
 
-  SessionLockController({DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+  SessionLockController({
+    DateTime Function()? now,
+    this._readPausedAt,
+    this._writePausedAt,
+  }) : _now = now ?? DateTime.now;
 
   bool get isConfigured => _settings != null;
 
@@ -261,12 +282,68 @@ class SessionLockController {
   /// Independent of [performVaultLock] -- does not touch mounted containers.
  /// Called when the user successfully authenticates and dismisses the lock gate.
   /// Called when the user successfully authenticates and enters the dashboard.
-  void notifyAppUnlocked() {
+  void notifyAppUnlocked({bool preserveBackgroundState = false}) {
     VeLog.i(_kLogTag, 'notifyAppUnlocked: app gate unlocked, resetting lock state');
     _isAppLocked = false;
-    _pausedAt = null;
+    if (!preserveBackgroundState) {
+      _pausedAt = null;
+      _persistPausedAt(null);
+    }
     _appLockedOnScreenOff = false;
     scheduleAutoLock();
+  }
+
+  /// Clears elapsed background state when the Activity is intentionally
+  /// closed to switch between normal and decoy identities. That transition
+  /// is not user absence and must not trigger auto-lock in the next identity.
+  Future<void> prepareForModeSwitchExit() async {
+    _pausedAt = null;
+    _ignoreBackgroundUntilResume = true;
+    try {
+      await _writePausedAt?.call(null);
+    } catch (e) {
+      VeLog.w(_kLogTag, 'Failed to clear background timestamp for mode switch', e);
+    }
+  }
+
+  /// Retains a background event received while a mode-specific screen is
+  /// still loading its settings and lock callbacks.
+  void recordBackgroundedAt(DateTime pausedAt) {
+    _pausedAt ??= pausedAt;
+    _persistPausedAt(_pausedAt);
+  }
+
+  /// Applies a background interval saved by a previous Flutter engine. This
+  /// covers app/task recreation, where an in-memory lifecycle timestamp is
+  /// lost but native vault sessions can still be mounted.
+  Future<void> resumeFromPersistedBackgroundState({
+    bool evaluateAppLock = true,
+  }) async {
+    if (_settings == null) return;
+    if (_pausedAt == null && _readPausedAt != null) {
+      try {
+        final restored = await _readPausedAt.call();
+        // A new pause may have arrived while storage was being read. Keep it.
+        _pausedAt ??= restored;
+      } catch (e) {
+        VeLog.w(_kLogTag, 'Failed to restore background timestamp', e);
+      }
+    }
+    if (_pausedAt == null) return;
+    handleAppLifecycleState(
+      AppLifecycleState.resumed,
+      evaluateAppLock: evaluateAppLock,
+    );
+  }
+
+  void _persistPausedAt(DateTime? pausedAt) {
+    final write = _writePausedAt;
+    if (write == null) return;
+    unawaited(
+      write(pausedAt).catchError((Object error) {
+        VeLog.w(_kLogTag, 'Failed to persist background timestamp', error);
+      }),
+    );
   }
 
   void performAppLock() {
@@ -298,7 +375,7 @@ class SessionLockController {
     await performVaultLock();
   }
 
-  void handleAppLifecycleState(AppLifecycleState state) {
+  void handleAppLifecycleState(AppLifecycleState state, {bool evaluateAppLock = true}) {
     if (_settings == null) return;
     VeLog.d(
       _kLogTag,
@@ -309,20 +386,35 @@ class SessionLockController {
     // 'inactive' occurs during transient foreground overlays like the system biometric
     // prompt, permission dialogs, or notification shade, where the app has NOT left the screen.
     if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused) {
+      if (_ignoreBackgroundUntilResume) {
+        VeLog.d(_kLogTag, 'handleAppLifecycleState: ignoring background during identity switch');
+        return;
+      }
       if (isLockSuppressed) {
         VeLog.d(_kLogTag, 'handleAppLifecycleState: hidden/paused while lock suppressed, ignoring');
         return;
       }
-      _pausedAt ??= _now();
+      if (_pausedAt == null) {
+        _pausedAt = _now();
+        _persistPausedAt(_pausedAt);
+      }
       _cancelTimers();
     } else if (state == AppLifecycleState.resumed) {
+      _ignoreBackgroundUntilResume = false;
       if (isLockSuppressed) {
         VeLog.d(_kLogTag, 'handleAppLifecycleState: resumed while lock suppressed, ignoring');
         _pausedAt = null;
+        _persistPausedAt(null);
         return;
       }
       final pausedAt = _pausedAt;
+      if (pausedAt == null && _readPausedAt != null) {
+        unawaited(resumeFromPersistedBackgroundState(evaluateAppLock: evaluateAppLock));
+        return;
+      }
+      if (pausedAt != null) _cancelTimers();
       _pausedAt = null;
+      _persistPausedAt(null);
       final lockedAppOnScreenOff = _appLockedOnScreenOff;
       final lockedVaultOnScreenOff = _vaultLockedOnScreenOff;
       _appLockedOnScreenOff = false;
@@ -348,7 +440,9 @@ class SessionLockController {
         'appLockAfterMins=${settings.appLockAfterMins}, autoLockMins=${settings.autoLockMins})',
       );
 
-      if (hasMasterPassword && !_isAppLocked && !lockedAppOnScreenOff) {
+      if (!evaluateAppLock) {
+        _scheduleAppLockTimer();
+      } else if (hasMasterPassword && !_isAppLocked && !lockedAppOnScreenOff) {
         if (settings.appLockScreenLockOnly) {
           // This mode ignores mere backgrounding entirely -- only a genuine
           // screen-off signal (handleScreenOff) should re-show the lock

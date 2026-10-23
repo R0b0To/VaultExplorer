@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/volume_filesystem_registry.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -113,22 +114,18 @@ class VaultDashboardController extends _$VaultDashboardController {
   late final void Function(int) _onHiddenVolProtectionListener;
   late final void Function(int) _onVaultForceLockedListener;
   late final void Function(MountedContainer) _onVaultAutomationUnlockedListener;
-  late final void Function() _onScreenOffListener;
 
   @override
   VaultDashboardViewState build() {
     final state = VaultDashboardViewState(appSettings: AppSettings());
 
     final events = ref.read(vaultEngineEventsProvider);
-    final lockController = ref.read(sessionLockControllerProvider);
-
     _onUsbDetachedListener = (volId) => onUsbContainerDetached(volId);
     _onHiddenVolProtectionListener = (volId) =>
         onHiddenVolumeProtectionTriggered(volId);
     _onVaultForceLockedListener = (volId) => onVaultForceLocked(volId);
     _onVaultAutomationUnlockedListener = (container) =>
         onVaultAutomationUnlocked(container);
-    _onScreenOffListener = lockController.handleScreenOff;
 
     events.addUsbContainerDetachedListener(_onUsbDetachedListener);
     events.addHiddenVolumeProtectionTriggeredListener(
@@ -138,7 +135,6 @@ class VaultDashboardController extends _$VaultDashboardController {
     events.addVaultAutomationUnlockedListener(
       _onVaultAutomationUnlockedListener,
     );
-    events.addScreenOffListener(_onScreenOffListener);
 
     // If vaultCryptoApiProvider updates (e.g. native decoy-to-vault mode switch
     // completes), containerRepositoryProvider is recreated. Listen and reload.
@@ -165,7 +161,6 @@ class VaultDashboardController extends _$VaultDashboardController {
       events.removeVaultAutomationUnlockedListener(
         _onVaultAutomationUnlockedListener,
       );
-      events.removeScreenOffListener(_onScreenOffListener);
     });
 
     Future.microtask(loadAll);
@@ -271,7 +266,14 @@ class VaultDashboardController extends _$VaultDashboardController {
   void _syncSecureScreen() {
     final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
     unawaited(
-      secureScreenPolicy.apply(preference: state.appSettings.blockScreenshots),
+      disguiseModeApi.getMode().then((mode) {
+        if (mode == DisguiseMode.decoy) {
+          return secureScreenPolicy.disableForDecoy();
+        }
+        return secureScreenPolicy.apply(
+          preference: state.appSettings.blockScreenshots,
+        );
+      }),
     );
     unawaited(
       ref
@@ -386,6 +388,81 @@ class VaultDashboardController extends _$VaultDashboardController {
       scheduleAutoClose(container);
     }
     ref.read(sessionLockControllerProvider).scheduleAutoLock();
+  }
+
+  /// Applies the global app-wide vault-lock policy to active sessions. This
+  /// lives on the shared controller so both normal and decoy surfaces enforce
+  /// the same configured behavior.
+  Future<void> lockAllMountedContainersForAutoLock() async {
+    await loadAll();
+    if (!ref.mounted) return;
+    final snapshot = state;
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final mounted = List<MountedContainer>.from(snapshot.mounted);
+    VeLog.i(
+      _kLogTag,
+      'lockAllMountedContainersForAutoLock: locking ${mounted.length} container(s): '
+      '${mounted.map((c) => c.volId).toList()}',
+    );
+
+    for (final container in mounted) {
+      if (snapshot.records[container.uri]?.isExemptFromGlobalLock == true) {
+        VeLog.d(
+          _kLogTag,
+          'lockAllMountedContainersForAutoLock: volId=${container.volId} exempt, skipping',
+        );
+        continue;
+      }
+      if (!acquireLockGuard(container.volId)) continue;
+      try {
+        final locked = await lifecycle.lockContainer(container.uri);
+        if (locked && ref.mounted) onContainerLocked(container.volId);
+      } finally {
+        releaseLockGuard(container.volId);
+      }
+    }
+  }
+
+  /// Applies per-container "Immediately" overrides after a real background
+  /// event or screen-off signal.
+  Future<void> lockImmediatelyConfiguredContainers() async {
+    await loadAll();
+    if (!ref.mounted) return;
+    final snapshot = state;
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final targets = List<MountedContainer>.from(snapshot.mounted).where(
+      (container) => snapshot.records[container.uri]?.autoCloseImmediately == true,
+    );
+    for (final container in targets) {
+      if (!acquireLockGuard(container.volId)) continue;
+      try {
+        final locked = await lifecycle.lockContainer(container.uri);
+        if (locked && ref.mounted) onContainerLocked(container.volId);
+      } finally {
+        releaseLockGuard(container.volId);
+      }
+    }
+  }
+
+  /// Applies per-container "Screen Lock Only" overrides on a genuine
+  /// screen-off event, never on ordinary backgrounding.
+  Future<void> lockScreenLockOnlyConfiguredContainers() async {
+    await loadAll();
+    if (!ref.mounted) return;
+    final snapshot = state;
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final targets = List<MountedContainer>.from(snapshot.mounted).where(
+      (container) => snapshot.records[container.uri]?.autoCloseScreenLockOnly == true,
+    );
+    for (final container in targets) {
+      if (!acquireLockGuard(container.volId)) continue;
+      try {
+        final locked = await lifecycle.lockContainer(container.uri);
+        if (locked && ref.mounted) onContainerLocked(container.volId);
+      } finally {
+        releaseLockGuard(container.volId);
+      }
+    }
   }
 
   void onContainerMounted(

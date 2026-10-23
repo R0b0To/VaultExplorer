@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/sync/services/scheduled_sync_background.dart';
 
 final _scheduledSyncControl = MethodChannel(
@@ -56,7 +57,11 @@ void main() async {
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
 
   final appContainer = ProviderContainer();
-  appContainer.read(vaultEngineEventsProvider);
+  final vaultEngineEvents = appContainer.read(vaultEngineEventsProvider);
+  final sessionLockController = appContainer.read(
+    sessionLockControllerProvider,
+  );
+  vaultEngineEvents.addScreenOffListener(sessionLockController.handleScreenOff);
 
   configurePlatformIntegrations(appContainer);
 

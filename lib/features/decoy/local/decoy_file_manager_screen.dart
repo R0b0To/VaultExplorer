@@ -7,6 +7,7 @@
 //
 // Replaces the old, separately-built DecoyLocalExplorerScreen (still
 // present under this folder, now unused) as the "Files" content inside
+import 'dart:async';
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,9 @@ import 'package:vaultexplorer/features/decoy/local/decoy_share_import_flow.dart'
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
 class DecoyFileManagerScreen extends ConsumerStatefulWidget {
   const DecoyFileManagerScreen({super.key});
@@ -38,6 +42,7 @@ class DecoyFileManagerScreen extends ConsumerStatefulWidget {
 class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
     with WidgetsBindingObserver {
   static const _repo = DecoyLocalRepository();
+  late final ProviderContainer _container;
   bool _checkingAccess = true;
   bool _hasAccess = false;
   MountedContainer? _primaryContainer;
@@ -58,6 +63,9 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   // its own listing of the same root the picker is about to list a
   // second time) for a view the person is about to never actually see.
   bool _deferBrowserForShare = false;
+  bool _sessionLockConfigured = false;
+  bool _isForeground = true;
+  DateTime? _backgroundedBeforeLockSetupAt;
   int _shareSeq = 0;
   Route<dynamic>? _activeShareRoute;
 
@@ -81,9 +89,13 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   @override
   void initState() {
     super.initState();
+    _container = ProviderScope.containerOf(context, listen: false);
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isForeground = lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
     disguiseModeApi.setLocalIncomingShareRequestListener(_onLocalIncomingShareRequest);
     _earlyPendingShareCheck = disguiseModeApi.checkPendingLocalShareRequest();
+    unawaited(_configureSessionLock());
   }
 
   @override
@@ -94,8 +106,63 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final lockController = ref.read(sessionLockControllerProvider);
+    if (state == AppLifecycleState.hidden || state == AppLifecycleState.paused) {
+      _isForeground = false;
+      if (_sessionLockConfigured) {
+        lockController.handleAppLifecycleState(state);
+      } else {
+        _backgroundedBeforeLockSetupAt ??= DateTime.now();
+      }
+    }
     if (state == AppLifecycleState.resumed) {
+      _isForeground = true;
       _checkAccessAndResolveRoot();
+      unawaited(_container.read(vaultDashboardControllerProvider.notifier).handleRefresh());
+      if (_sessionLockConfigured) {
+        lockController.handleAppLifecycleState(state);
+      }
+    }
+  }
+
+  Future<void> _configureSessionLock() async {
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+    if (!mounted) return;
+
+    // The app-password gate belongs to the normal identity. Decoy mode still
+    // enforces vault timeout and per-vault choices, without opening or
+    // arming the normal identity's password gate.
+    final decoySettings = settings.copyWith(
+      useMasterPassword: false,
+      appLockAfterMins: 0,
+      appLockScreenLockOnly: false,
+    );
+    final lockController = ref.read(sessionLockControllerProvider);
+    lockController.configure(
+      settings: () => decoySettings,
+      lockAllMountedContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockAllMountedContainersForAutoLock(),
+      lockImmediateOverrideContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockImmediatelyConfiguredContainers(),
+      lockScreenLockOnlyContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockScreenLockOnlyConfiguredContainers(),
+      enforceAppLock: () {},
+    );
+
+    // Restore active sessions so per-container timed auto-close continues
+    // while the decoy file manager is the visible identity as well.
+    await _container.read(vaultDashboardControllerProvider.notifier).loadAll();
+    if (!mounted) return;
+    _sessionLockConfigured = true;
+    final pendingBackgroundAt = _backgroundedBeforeLockSetupAt;
+    if (pendingBackgroundAt != null) {
+      lockController.recordBackgroundedAt(pendingBackgroundAt);
+    }
+    if (_isForeground) {
+      await lockController.resumeFromPersistedBackgroundState();
     }
   }
 

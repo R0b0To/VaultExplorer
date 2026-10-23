@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,11 +17,12 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
-import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
+import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
+    show AppBannerTone, InlineBanner;
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_swipe_to_seek_area.dart';
 import 'package:vaultexplorer/features/video_editor/models/edit_segment.dart';
@@ -90,7 +90,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
   bool _exporting = false;
   bool _previewResult = false;
   bool _skippingGap = false;
+  bool _isMuted = false;
+  int _volumeBeforeMute = 100;
   double _playbackSpeed = 1.0;
+  OverlayEntry? _toastEntry;
+  Timer? _toastTimer;
 
   // Seek pump: only the latest requested position is ever sent, one at a time.
   int? _pendingSeekUs;
@@ -122,6 +126,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _clearToast();
     final waveOp = _waveOpId;
     if (waveOp != null) unawaited(_api.cancel(waveOp)); // stop decoding for nobody
     unawaited(_shutdownPlayer());
@@ -412,7 +417,35 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     await player.play();
   }
 
-  void _step(int deltaUs) => unawaited(_seekToUs(_playhead.value + deltaUs));
+  Future<void> _toggleMute() async {
+    final player = _player;
+    if (player == null) return;
+
+    final nextMuted = !_isMuted;
+    if (nextMuted) {
+      final currentVolume = player.media3Controller.currentVolume;
+      if (currentVolume > 0) _volumeBeforeMute = currentVolume;
+    }
+    setState(() => _isMuted = nextMuted);
+    try {
+      await player.setVolume(nextMuted ? 0 : _volumeBeforeMute);
+    } catch (e) {
+      VeLog.w(_tag, 'Could not change audio volume', e);
+      if (mounted) setState(() => _isMuted = !nextMuted);
+    }
+  }
+
+  void _setPlaybackSpeed(double speed) {
+    final player = _player;
+    if (player == null) return;
+    unawaited(player.setPlaybackSpeed(speed));
+    setState(() => _playbackSpeed = speed);
+  }
+
+  String _speedValue(double speed) {
+    final value = speed.toString();
+    return value.endsWith('.0') ? value.substring(0, value.length - 2) : value;
+  }
 
   /// Jumps to the previous / next segment edge (or the start / end of the file).
   void _jumpCutPoint({required bool forward}) {
@@ -445,7 +478,31 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
   void _toast(String message, {AppBannerTone tone = AppBannerTone.info}) {
     if (!mounted) return;
-    showAppSnackBar(context, message: message, tone: tone);
+    _clearToast();
+    final overlay = Overlay.of(context);
+    final top = MediaQuery.paddingOf(context).top + kToolbarHeight + 8;
+    _toastEntry = OverlayEntry(
+      builder: (_) => Positioned(
+        top: top,
+        left: 16,
+        right: 16,
+        child: IgnorePointer(
+          child: Material(
+            color: Colors.transparent,
+            child: InlineBanner(message, tone: tone),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_toastEntry!);
+    _toastTimer = Timer(const Duration(seconds: 2), _clearToast);
+  }
+
+  void _clearToast() {
+    _toastTimer?.cancel();
+    _toastTimer = null;
+    _toastEntry?.remove();
+    _toastEntry = null;
   }
 
   void _setStart() {
@@ -969,7 +1026,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
             const SizedBox(height: 8),
           ],
 
-          // Row 1: time readout + zoom controls
+          // Row 1: time readout. Pinch the timeline to zoom in or out.
           Row(
             children: [
               ValueListenableBuilder<int>(
@@ -978,25 +1035,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                   '${formatTimecode(us)} / ${formatTimecode(editor.durationUs)}',
                   style: text.labelLarge,
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: l10n.videoEditorZoomOut,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.zoom_out_rounded),
-                onPressed: () => _timelineKey.currentState?.zoomBy(0.5),
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorZoomIn,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.zoom_in_rounded),
-                onPressed: () => _timelineKey.currentState?.zoomBy(2),
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorZoomFit,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.fit_screen_rounded),
-                onPressed: () => _timelineKey.currentState?.resetZoom(),
               ),
             ],
           ),
@@ -1054,6 +1092,67 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
               ),
+              IconButton.filledTonal(
+                style: IconButton.styleFrom(
+                  backgroundColor: _isMuted ? cs.primaryContainer : null,
+                  foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
+                ),
+                tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
+                icon: Icon(
+                  _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  size: 24,
+                ),
+                onPressed: () => unawaited(_toggleMute()),
+              ),
+              PopupMenuButton<double>(
+                tooltip: l10n.playbackSpeedLabel,
+                initialValue: _playbackSpeed,
+                onSelected: _setPlaybackSpeed,
+                itemBuilder: (context) => [
+                  for (final speed in MediaViewerConstants.playbackSpeeds)
+                    PopupMenuItem<double>(
+                      value: speed,
+                      child: Text(
+                        speed == 1.0
+                            ? l10n.playbackSpeedNormal(_speedValue(speed))
+                            : l10n.playbackSpeedValue(_speedValue(speed)),
+                      ),
+                    ),
+                ],
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: _playbackSpeed == 1.0
+                        ? cs.surfaceContainerHighest
+                        : cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.speed_rounded,
+                        size: 18,
+                        color: _playbackSpeed == 1.0
+                            ? cs.onSurfaceVariant
+                            : cs.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_speedValue(_playbackSpeed)}×',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _playbackSpeed == 1.0
+                              ? cs.onSurfaceVariant
+                              : cs.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
               ActionChip(
                 avatar: const Icon(Icons.layers_rounded, size: 18),
                 label: Text('${segments.length}'),
@@ -1069,25 +1168,32 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           ),
           const SizedBox(height: 4),
 
-          // Row 4: transport + preview cut + 2x speed
+          // Row 4: cut-point navigation, playback and cut preview.
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
                   tooltip: l10n.audioEditorPrevCutPoint,
                   icon: const Icon(Icons.skip_previous_rounded),
                   onPressed: () => _jumpCutPoint(forward: false),
                 ),
-                _StepButton(label: '−1s', onTap: () => _step(-1000000)),
                 ValueListenableBuilder<NativeVideoValue>(
                   valueListenable: player,
                   builder: (context, v, _) => IconButton.filled(
                     style: IconButton.styleFrom(
+                      minimumSize: const Size(58, 58),
+                      padding: EdgeInsets.zero,
                       backgroundColor: cs.primary,
                       foregroundColor: cs.onPrimary,
                     ),
+                    iconSize: 32,
                     tooltip: l10n.mediaViewerActionPlayPause,
                     icon: Icon(
                       v.isPlaying
@@ -1097,8 +1203,12 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                     onPressed: () => unawaited(_togglePlay()),
                   ),
                 ),
-                _StepButton(label: '+1s', onTap: () => _step(1000000)),
                 IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
                   tooltip: l10n.audioEditorNextCutPoint,
                   icon: const Icon(Icons.skip_next_rounded),
                   onPressed: () => _jumpCutPoint(forward: true),
@@ -1106,12 +1216,17 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
                   style: IconButton.styleFrom(
-                    backgroundColor: _previewResult ? cs.primaryContainer : null,
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                    backgroundColor: _previewResult
+                        ? cs.primaryContainer
+                        : null,
                     foregroundColor: _previewResult
                         ? cs.onPrimaryContainer
                         : null,
                   ),
                   tooltip: l10n.videoEditorPreviewCut,
+                  iconSize: 28,
                   icon: Icon(
                     _previewResult
                         ? Icons.content_cut_rounded
@@ -1120,89 +1235,72 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                   onPressed: () =>
                       setState(() => _previewResult = !_previewResult),
                 ),
-                const SizedBox(width: 4),
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: _playbackSpeed > 1.0
-                        ? cs.primaryContainer
-                        : null,
-                    foregroundColor: _playbackSpeed > 1.0
-                        ? cs.onPrimaryContainer
-                        : null,
-                  ),
-                  tooltip: _playbackSpeed > 1.0 ? '1×' : '2×',
-                  icon: Text(
-                    _playbackSpeed > 1.0 ? '2×' : '1×',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _playbackSpeed > 1.0
-                          ? cs.onPrimaryContainer
-                          : cs.onSurfaceVariant,
-                    ),
-                  ),
-                  onPressed: () {
-                    final next = _playbackSpeed > 1.0 ? 1.0 : 2.0;
-                    _player?.setPlaybackSpeed(next);
-                    setState(() => _playbackSpeed = next);
-                  },
-                ),
               ],
             ),
           ),
           const SizedBox(height: 4),
 
-          // Row 5: tools
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                tooltip: l10n.videoEditorSetStart,
-                icon: const Icon(Icons.first_page_rounded),
-                onPressed: selected == null ? null : _setStart,
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorSetEnd,
-                icon: const Icon(Icons.last_page_rounded),
-                onPressed: selected == null ? null : _setEnd,
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorSplit,
-                icon: const Icon(Icons.call_split_rounded),
-                onPressed: _splitSegment,
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorRemoveSection,
-                icon: const Icon(Icons.delete_outline_rounded),
-                onPressed: selected == null ? null : editor.deleteSelected,
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorAddSegment,
-                icon: const Icon(Icons.add_rounded),
-                onPressed: _addSegment,
-              ),
-            ],
+          // Row 5: editing tools.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
+                  tooltip: l10n.videoEditorSetStart,
+                  icon: const Icon(Icons.first_page_rounded),
+                  onPressed: selected == null ? null : _setStart,
+                ),
+                IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
+                  tooltip: l10n.videoEditorSetEnd,
+                  icon: const Icon(Icons.last_page_rounded),
+                  onPressed: selected == null ? null : _setEnd,
+                ),
+                IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
+                  tooltip: l10n.videoEditorSplit,
+                  icon: const Icon(Icons.call_split_rounded),
+                  onPressed: _splitSegment,
+                ),
+                IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
+                  tooltip: l10n.videoEditorRemoveSection,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: selected == null ? null : editor.deleteSelected,
+                ),
+                IconButton(
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(52, 52),
+                    padding: EdgeInsets.zero,
+                  ),
+                  tooltip: l10n.videoEditorAddSegment,
+                  icon: const Icon(Icons.add_rounded),
+                  onPressed: _addSegment,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StepButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _StepButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        minimumSize: const Size(44, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-      ),
-      child: Text(label),
     );
   }
 }

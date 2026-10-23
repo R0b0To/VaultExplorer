@@ -94,10 +94,10 @@ class AudioTimelineState extends State<AudioTimeline> {
   }
 
   @override
-  void didUpdateWidget(AudioTimeline old) {
-    super.didUpdateWidget(old);
-    if (old.playheadUs != widget.playheadUs) {
-      old.playheadUs.removeListener(_followPlayhead);
+  void didUpdateWidget(AudioTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playheadUs != widget.playheadUs) {
+      oldWidget.playheadUs.removeListener(_followPlayhead);
       widget.playheadUs.addListener(_followPlayhead);
     }
   }
@@ -204,7 +204,7 @@ class AudioTimelineState extends State<AudioTimeline> {
         widget.onScrubEnd();
       }
       _dragMode = _DragMode.zoom;
-      final scale = d.horizontalScale <= 0 ? 1.0 : d.horizontalScale;
+      final scale = d.scale <= 0 ? 1.0 : d.scale;
       final span =
           (_gestureSpanUs / scale).round().clamp(_minSpanUs, _fullSpan).toInt();
       final start = (_focalUs - (d.localFocalPoint.dx / _width) * span).round();

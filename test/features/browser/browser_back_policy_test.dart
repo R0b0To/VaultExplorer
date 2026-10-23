@@ -1,12 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
-import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 
 BrowserBackAction _back({
   bool selection = false,
   bool search = false,
   bool atRoot = true,
-  BrowserTabOrigin origin = BrowserTabOrigin.other,
   bool appRoot = false,
   bool hostsHome = true,
   bool tabsEnabled = true,
@@ -14,7 +12,6 @@ BrowserBackAction _back({
   selectionMode: selection,
   searchActive: search,
   atRoot: atRoot,
-  origin: origin,
   appRoot: appRoot,
   hostsHome: hostsHome,
   tabsEnabled: tabsEnabled,
@@ -31,41 +28,17 @@ void main() {
       expect(_back(atRoot: false), BrowserBackAction.navigateUp);
     });
 
-    test('selection and search come before the starting point, too', () {
-      expect(
-        _back(selection: true, origin: BrowserTabOrigin.home),
-        BrowserBackAction.exitSelection,
-      );
-      expect(
-        _back(search: true, origin: BrowserTabOrigin.home),
-        BrowserBackAction.clearSearch,
-      );
-    });
-
-    test('depth wins over origin: Home is only reached from the root', () {
-      expect(
-        _back(atRoot: false, origin: BrowserTabOrigin.home),
-        BrowserBackAction.navigateUp,
-      );
+    test('folder depth wins: Home is only reached from the root', () {
+      expect(_back(atRoot: false), BrowserBackAction.navigateUp);
     });
   });
 
   group('at the root of a tab in the main shell', () {
-    test('opened from Home: back returns to Home', () {
+    test('storage root: back returns to Home', () {
       for (final tabs in [true, false]) {
         expect(
-          _back(origin: BrowserTabOrigin.home, tabsEnabled: tabs),
+          _back(tabsEnabled: tabs),
           BrowserBackAction.returnHome,
-          reason: 'tabsEnabled=$tabs',
-        );
-      }
-    });
-
-    test('opened from the drawer, a folder action or a menu: back stops', () {
-      for (final tabs in [true, false]) {
-        expect(
-          _back(origin: BrowserTabOrigin.other, tabsEnabled: tabs),
-          BrowserBackAction.stay,
           reason: 'tabsEnabled=$tabs',
         );
       }
@@ -97,25 +70,22 @@ void main() {
           for (final appRoot in bools) {
             for (final hostsHome in bools) {
               for (final tabs in bools) {
-                for (final origin in BrowserTabOrigin.values) {
-                  final action = _back(
-                    selection: selection,
-                    search: search,
-                    atRoot: atRoot,
-                    appRoot: appRoot,
-                    hostsHome: hostsHome,
-                    tabsEnabled: tabs,
-                    origin: origin,
-                  );
-                  expect(
-                    action == BrowserBackAction.leave,
-                    appRoot && atRoot && !selection && !search,
-                    reason:
-                        'sel=$selection search=$search root=$atRoot '
-                        'appRoot=$appRoot home=$hostsHome tabs=$tabs '
-                        'origin=$origin -> $action',
-                  );
-                }
+                final action = _back(
+                  selection: selection,
+                  search: search,
+                  atRoot: atRoot,
+                  appRoot: appRoot,
+                  hostsHome: hostsHome,
+                  tabsEnabled: tabs,
+                );
+                expect(
+                  action == BrowserBackAction.leave,
+                  appRoot && atRoot && !selection && !search,
+                  reason:
+                      'sel=$selection search=$search root=$atRoot '
+                      'appRoot=$appRoot home=$hostsHome tabs=$tabs '
+                      '-> $action',
+                );
               }
             }
           }

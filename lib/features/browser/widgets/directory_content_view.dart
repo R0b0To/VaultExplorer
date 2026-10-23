@@ -48,7 +48,6 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
-import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
@@ -1806,19 +1805,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     return true;
   }
 
-  BrowserTabOrigin get _tabOrigin =>
-      _workspaceState.tabs
-          .where((tab) => tab.tabId == _tabId)
-          .firstOrNull
-          ?.origin ??
-      BrowserTabOrigin.other;
-
   /// What system back does right now, read from live state.
   BrowserBackAction _resolveBack() => resolveBrowserBack(
     selectionMode: isSelectionMode,
     searchActive: _searchActive,
     atRoot: _atRoot,
-    origin: _tabOrigin,
     appRoot: widget.workspaceConfig.appRoot,
     hostsHome: widget.workspaceConfig.includeDashboardTab,
     tabsEnabled: ref

@@ -51,7 +51,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
   /// Opens [container] in the browser. Home tiles and unlock flows pass
-  /// [BrowserTabOrigin.home] so that back at the root returns here.
+  /// [BrowserTabOrigin.home] to record that the storage was opened here.
   final void Function(MountedContainer container, {BrowserTabOrigin origin})?
   onOpenBrowser;
   final bool backPreviewOnly;

@@ -364,8 +364,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         if (existingBrowserTab.volId != container.volId) {
           actions.replaceActive(container, origin: origin);
         } else {
-          // The same storage reopened: the latest way it was opened decides
-          // where back at its root goes.
+          // Preserve the latest entry point when reopening the same storage.
           actions.setOrigin(existingBrowserTab.tabId, origin);
         }
       }

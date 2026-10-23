@@ -67,6 +67,12 @@ class FileManagerToolbarConfig {
   final Map<String, String> folderLayoutModes;
   final Map<String, String> folderGridAspectRatios;
   final Map<String, String> folderSortModes;
+
+  /// URIs of vaults or storage locations whose bookmark groups are collapsed
+  /// in the navigation drawer. This is device-local UI state; bookmark data
+  /// stays with its existing store.
+  final Set<String> collapsedBookmarkGroupUris;
+
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
 
@@ -145,6 +151,7 @@ class FileManagerToolbarConfig {
     this.folderLayoutModes = const {},
     this.folderGridAspectRatios = const {},
     this.folderSortModes = const {},
+    this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
       FileDetailColumn.size,
@@ -322,6 +329,7 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderLayoutModes,
     Map<String, String>? folderGridAspectRatios,
     Map<String, String>? folderSortModes,
+    Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
     List<FileItemAction>? itemActionsOrder,
@@ -371,6 +379,8 @@ class FileManagerToolbarConfig {
         folderGridAspectRatios:
             folderGridAspectRatios ?? this.folderGridAspectRatios,
         folderSortModes: folderSortModes ?? this.folderSortModes,
+        collapsedBookmarkGroupUris:
+            collapsedBookmarkGroupUris ?? this.collapsedBookmarkGroupUris,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         itemActionsOrder: itemActionsOrder ?? this.itemActionsOrder,
@@ -465,13 +475,15 @@ class FileManagerToolbarConfig {
     'localStorageThumbnailQuality',
   };
 
-  /// Keyed by `containerUri:dirPath`, i.e. per-container path data. Never
-  /// exported (see [SettingsBackupService]); the import side keeps whatever
-  /// this device already has.
+  /// Per-container UI state kept on this device and never exported (see
+  /// [SettingsBackupService]); the import side keeps whatever this device
+  /// already has. The folder maps use `containerUri:dirPath` keys, while
+  /// collapsed bookmark groups use the container URI.
   static const Set<String> perFolderKeys = {
     'folderLayoutModes',
     'folderGridAspectRatios',
     'folderSortModes',
+    'collapsedBookmarkGroupUris',
   };
 
   /// The nested media viewer config is split between the two exports, so it is
@@ -534,6 +546,8 @@ class FileManagerToolbarConfig {
         'folderLayoutModes': folderLayoutModes,
         'folderGridAspectRatios': folderGridAspectRatios,
         'folderSortModes': folderSortModes,
+        'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
+          ..sort(),
         'detailColumnsOrder':
             detailColumnsOrder.map((c) => c.toJson()).toList(),
         'hiddenDetailColumns':
@@ -633,6 +647,11 @@ class FileManagerToolbarConfig {
               (k, v) => MapEntry(k, v as String),
             ) ??
             const <String, String>{};
+    final collapsedBookmarkGroupUris =
+        (j['collapsedBookmarkGroupUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
     final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
@@ -683,6 +702,7 @@ class FileManagerToolbarConfig {
       folderLayoutModes: rawFolderLayoutModes,
       folderGridAspectRatios: rawFolderGridAspectRatios,
       folderSortModes: rawFolderSortModes,
+      collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [
               FileDetailColumn.date,

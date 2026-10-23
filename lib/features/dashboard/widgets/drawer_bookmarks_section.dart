@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +12,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
 import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 
 /// The navigation drawer's bookmarks, grouped by their vault or storage
@@ -58,9 +61,6 @@ class DrawerBookmarksSection extends ConsumerStatefulWidget {
 
 class _DrawerBookmarksSectionState
     extends ConsumerState<DrawerBookmarksSection> {
-  /// Groups the person folded away. Per drawer visit: not worth remembering.
-  final Set<int> _collapsed = {};
-
   /// Every source whose marks are available in the drawer. Storage locations
   /// keep their marks in the device-local store, keyed by their own URI.
   List<MountedContainer> get _containers => [
@@ -203,6 +203,11 @@ class _DrawerBookmarksSectionState
 
     if (groups.isEmpty) return const SizedBox.shrink();
 
+    final collapsedBookmarkGroupUris = ref.watch(
+      fileManagerToolbarSettingsProvider(null).select(
+        (settings) => settings.config.collapsedBookmarkGroupUris,
+      ),
+    );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -225,7 +230,12 @@ class _DrawerBookmarksSectionState
           ),
         ),
         for (final group in groups)
-          _group(context, group.vault, group.marks.bookmarks),
+          _group(
+            context,
+            group.vault,
+            group.marks.bookmarks,
+            collapsed: collapsedBookmarkGroupUris.contains(group.vault.uri),
+          ),
       ],
     );
   }
@@ -233,22 +243,23 @@ class _DrawerBookmarksSectionState
   Widget _group(
     BuildContext context,
     MountedContainer vault,
-    List<VaultBookmark> bookmarks,
-  ) {
+    List<VaultBookmark> bookmarks, {
+    required bool collapsed,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
-    final collapsed = _collapsed.contains(vault.volId);
-
     return Column(
       key: ValueKey('drawer_bookmarks_${vault.volId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         InkWell(
           borderRadius: BorderRadius.circular(28),
-          onTap: () => setState(() {
-            if (!_collapsed.add(vault.volId)) _collapsed.remove(vault.volId);
-          }),
+          onTap: () => unawaited(
+            ref
+                .read(fileManagerToolbarSettingsProvider(null).notifier)
+                .toggleBookmarkGroupCollapsed(vault.uri),
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 2, 4),
             child: Row(

@@ -187,6 +187,20 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setShowBookmarkBar(bool val) =>
       _updateConfig(state.config.copyWith(showBookmarkBar: val));
 
+  /// Persists whether a bookmark group is collapsed. Keying by URI keeps the
+  /// preference stable when a vault is mounted again with a different volId.
+  Future<void> toggleBookmarkGroupCollapsed(String containerUri) async {
+    if (containerUri.isEmpty) return;
+    if (state.loading) await load(null);
+    if (!ref.mounted) return;
+
+    final next = {...state.config.collapsedBookmarkGroupUris};
+    if (!next.add(containerUri)) next.remove(containerUri);
+    await _updateConfig(
+      state.config.copyWith(collapsedBookmarkGroupUris: next),
+    );
+  }
+
   Future<void> setShowListThumbnails(bool val) =>
       _updateConfig(state.config.copyWith(showListThumbnails: val));
 

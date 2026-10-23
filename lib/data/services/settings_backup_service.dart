@@ -87,8 +87,10 @@ class AppliedSettings {
 /// The master password hash/salt never enter [AppSettings.toJson] in the first
 /// place, and container records (bookmarks/pinned paths and keystore material,
 /// see [ContainerRepository]) are out of scope entirely. The per-folder
-/// layout memory ([FileManagerToolbarConfig.perFolderKeys]) is keyed by
-/// `containerUri:dirPath` and is not part of either export.
+/// per-container UI memory ([FileManagerToolbarConfig.perFolderKeys]) is never
+/// part of either export. It includes path layouts keyed by
+/// `containerUri:dirPath` and collapsed bookmark groups keyed by container
+/// URI.
 ///
 /// Files written before the split (schema 3 and older) carried everything.
 /// They are still restored in full, so an old backup keeps working.
@@ -231,6 +233,8 @@ class SettingsBackupService {
         folderLayoutModes: currentToolbar.folderLayoutModes,
         folderGridAspectRatios: currentToolbar.folderGridAspectRatios,
         folderSortModes: currentToolbar.folderSortModes,
+        collapsedBookmarkGroupUris:
+            currentToolbar.collapsedBookmarkGroupUris,
       );
     } else {
       toolbar = currentToolbar.withBehaviorFrom(importedToolbar);

@@ -29,6 +29,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dar
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
+import 'package:vaultexplorer/features/browser/widgets/gated_page_scroll_physics.dart';
 import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -203,6 +204,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// flickers. The bar stays put until the handle is released.
   bool _scrollbarDragging = false;
   bool _scrollbarDragEndedAtTop = false;
+
+  /// How long after its last movement a list still counts as scrolling. A
+  /// scroll that is really running reports every frame; this only guards
+  /// against an end that was never reported (the page was closed mid-fling),
+  /// which would otherwise leave tab swiping locked.
+  static const Duration _pageScrollFreshFor = Duration(milliseconds: 250);
+
+  /// Tab swiping is only for a view that is standing still: a touch that lands
+  /// while a list is scrolling (or that is what stops it) only stops the
+  /// scroll, and cannot also swipe to another tab. Decided once per touch, in
+  /// [_onBrowserPointerDown], and read by the pager's physics.
+  final PagerSwipeGate _swipeGate = PagerSwipeGate();
+  final Stopwatch _pageScrollClock = Stopwatch()..start();
+  bool _pageScrollActive = false;
+  Duration _lastPageScrollAt = Duration.zero;
+
+  /// A touch can itself end a fling, and the list reports that end before the
+  /// browser hears about the touch. The end stays visible until the frame is
+  /// over so that touch is still seen as the one that stopped the scroll.
+  bool _pageScrollEndPending = false;
+  bool _pageScrollEndResetScheduled = false;
 
   /// A drag that started on the first and/or last tab, and so may end up
   /// asking for something past it. [_edgeOverscrollForward] is how far it was
@@ -540,6 +562,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       _handleTabEdgeSwipe(notification);
       return false;
     }
+    _trackPageScroll(notification);
     if (!active) return false;
 
     if (_scrollbarDragging) {
@@ -603,6 +626,38 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     return false;
   }
 
+  /// Whether a list inside a page is scrolling right now, or was a moment ago
+  /// and was stopped by the touch being handled.
+  bool get _pageIsScrolling {
+    if (_pageScrollEndPending) return true;
+    return _pageScrollActive &&
+        _pageScrollClock.elapsed - _lastPageScrollAt < _pageScrollFreshFor;
+  }
+
+  /// Follows the vertical scrolling of the lists in the pages, the same way the
+  /// hold-to-select container does, for [_pageIsScrolling].
+  void _trackPageScroll(ScrollNotification notification) {
+    if (notification is ScrollStartNotification ||
+        notification is ScrollUpdateNotification ||
+        notification is OverscrollNotification) {
+      _pageScrollActive = true;
+      _pageScrollEndPending = false;
+      _lastPageScrollAt = _pageScrollClock.elapsed;
+    } else if (notification is ScrollEndNotification) {
+      _pageScrollActive = false;
+      _pageScrollEndPending = true;
+      if (!_pageScrollEndResetScheduled) {
+        _pageScrollEndResetScheduled = true;
+        // A touch that stops a fling may not cause a frame by itself, and the
+        // flag must not outlive that touch.
+        _afterThisFrame(() {
+          _pageScrollEndPending = false;
+          _pageScrollEndResetScheduled = false;
+        });
+      }
+    }
+  }
+
   void _onBrowserPointerDown(PointerDownEvent event) {
     // The count only goes wrong if a finger's end was never seen (the layout
     // changed under it); nothing has been heard for a while then, so start over.
@@ -612,6 +667,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     _lastPointerEventTime = event.timeStamp;
     _pointersDown++;
+    // The first finger decides whether this touch may swipe between tabs. It
+    // stays decided until the next touch: the pager reads it when the finger
+    // lets go too, which is after this handler has seen the lift.
+    if (_pointersDown == 1) _swipeGate.locked = _pageIsScrolling;
     // A second finger (pinching to zoom the grid, say) is not a swipe.
     final startsSwipe =
         _pointersDown == 1 &&
@@ -1175,15 +1234,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                               // from the touch-down so it still tracks.
                               dragStartBehavior: DragStartBehavior.down,
                               clipBehavior: Clip.hardEdge,
-                              physics:
-                                  tabsEnabled &&
-                                      tabEdgeSwipe.swipesBetweenTabs &&
-                                      !_drawerOpenOrDragging &&
-                                      !_edgeDrawerGestureActive
-                                  ? const PageScrollPhysics(
-                                      parent: AlwaysScrollableScrollPhysics(),
-                                    )
-                                  : const NeverScrollableScrollPhysics(),
+                              // The gated physics snap to pages themselves
+                              // (PageView would put its own ahead of them, out
+                              // of reach of the gate).
+                              pageSnapping: false,
+                              physics: GatedPageScrollPhysics(
+                                gate: _swipeGate,
+                                parent:
+                                    tabsEnabled &&
+                                        tabEdgeSwipe.swipesBetweenTabs &&
+                                        !_drawerOpenOrDragging &&
+                                        !_edgeDrawerGestureActive
+                                    ? const AlwaysScrollableScrollPhysics()
+                                    : const NeverScrollableScrollPhysics(),
+                              ),
                               itemCount: tabs.length,
                               onPageChanged: _onPageChanged,
                               findChildIndexCallback: (key) {

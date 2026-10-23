@@ -40,6 +40,7 @@ class ImagePageItem extends StatefulWidget {
   final bool edgeSwipeHudEnabled;
   final double edgeSwipeWidthFraction;
   final bool isActive;
+  final double zoomIndicatorBottomOffset;
 
   const ImagePageItem({
     super.key,
@@ -65,6 +66,7 @@ class ImagePageItem extends StatefulWidget {
     this.edgeSwipeHudEnabled = true,
     this.edgeSwipeWidthFraction = 0.25,
     this.isActive = true,
+    this.zoomIndicatorBottomOffset = 16,
   });
 
   @override
@@ -826,8 +828,10 @@ bool _isClampingMatrix = false;
                   ),
                 // Last, so the edge-swipe strip can't cover it.
                 if (widget.enableZoom)
-                  Positioned(
-                    bottom: 16,
+                  AnimatedPositioned(
+                    duration: MediaViewerConstants.animationDuration,
+                    curve: Curves.easeOutCubic,
+                    bottom: widget.zoomIndicatorBottomOffset,
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _transformationController,

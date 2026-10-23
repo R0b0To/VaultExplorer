@@ -298,9 +298,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       height: kBrowserTabStripHeight,
       decoration: BoxDecoration(
         color: stripBackground,
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-        ),
       ),
       child: Row(
         children: [

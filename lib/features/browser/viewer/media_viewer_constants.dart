@@ -28,6 +28,11 @@ class MediaViewerConstants {
   static const int maxImageDecodePixels = 8 * 1024 * 1024;
   static const double maxVideoZoom = 12.0;
 
+  /// Bottom clearance for the zoom pill while media controls are visible,
+  /// excluding the device safe-area inset and optional carousel.
+  static const double zoomIndicatorImageControlsClearance = 96.0;
+  static const double zoomIndicatorVideoControlsClearance = 128.0;
+
   /// Lower bound offered by the "minimum zoom" setting -- how far below
   /// 1.0x pinch zoom-out is allowed to go at most. The configured value is
   /// clamped into `[minVideoZoomFloor, 1.0]`.

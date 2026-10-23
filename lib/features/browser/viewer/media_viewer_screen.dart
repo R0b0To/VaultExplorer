@@ -2857,6 +2857,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
+    // Keep the zoom pill above the bottom controls while they are visible.
+    // The controls reserve the device safe-area inset at the bottom.
+    final zoomIndicatorBottomOffset = !_showUI
+        ? 16.0
+        : MediaQuery.paddingOf(context).bottom +
+              (isImg
+                  ? MediaViewerConstants.zoomIndicatorImageControlsClearance
+                  : MediaViewerConstants.zoomIndicatorVideoControlsClearance) +
+              (_enableCarousel && _isCarouselVisible
+                  ? PlaylistCarouselOverlay.height
+                  : 0.0);
     final gestureConfig = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
@@ -2875,6 +2886,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               adjustments: _adjustmentsFor(fileName),
               showUI: _showUI,
+              zoomIndicatorBottomOffset: zoomIndicatorBottomOffset,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               enableZoom: !_scrollMode.isContinuous,
               pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
@@ -2909,6 +2921,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               showUI: _showUI,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               doubleTapPlayPause: gestureConfig.doubleTapPlayPause,
+              zoomIndicatorBottomOffset: zoomIndicatorBottomOffset,
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
               skipSeconds: _doubleTapSkipSeconds,

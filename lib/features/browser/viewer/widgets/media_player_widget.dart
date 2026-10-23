@@ -116,6 +116,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   /// Double-tapping the middle plays or pauses instead of zooming; the zoom
   /// is reset from the zoom-level pill.
   final bool doubleTapPlayPause;
+  final double zoomIndicatorBottomOffset;
   final double seekSensitivity;
   final double volumeGestureSensitivity;
   final double brightnessGestureSensitivity;
@@ -166,6 +167,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.swipeToSeekEnabled = false,
     this.tapEdgesToNavigate = true,
     this.doubleTapPlayPause = true,
+    this.zoomIndicatorBottomOffset = 16,
     this.seekSensitivity = 1.0,
     this.volumeGestureSensitivity = 1.0,
     this.brightnessGestureSensitivity = 1.0,
@@ -1662,8 +1664,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   ),
                 if (_showSwipeSeekHud) _buildSwipeSeekHud(),
                 if (!widget.isAudio && widget.enableZoom)
-                  Positioned(
-                    bottom: 16,
+                  AnimatedPositioned(
+                    duration: MediaViewerConstants.animationDuration,
+                    curve: Curves.easeOutCubic,
+                    bottom: widget.zoomIndicatorBottomOffset,
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _videoTransformationController,

@@ -258,7 +258,10 @@ class _CameraMediaReviewViewState extends State<CameraMediaReviewView> {
         } else if (selectedStillExists && selectedBeforeSave.isVideo) {
           try {
             await _videoController?.play();
-          } catch (_) {}
+          } catch (_) {
+            // Resuming the preview is best-effort after a successful save;
+            // the saved media is intact and the user can still tap Play.
+          }
         }
       }
     }

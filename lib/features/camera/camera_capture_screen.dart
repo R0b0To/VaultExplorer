@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -515,11 +516,17 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       }
       final name = await _vaultService.nextAvailableScanPdfName();
       virtualPath = _vaultService.buildVirtualPath(name);
-      final ok = await cameraController.savePhotoToVault(
-        bytes: pdf,
-        volId: widget.container.volId,
-        virtualPath: virtualPath,
-      );
+      final ok = widget.container.isLocalStorage
+          ? await captureFileIoApi.writeWholeFile(
+              widget.container,
+              virtualPath,
+              pdf,
+            )
+          : await cameraController.savePhotoToVault(
+              bytes: pdf,
+              volId: widget.container.volId,
+              virtualPath: virtualPath,
+            );
       if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
         await _vaultService.deleteFile(virtualPath);
         return (name: null, insufficientSpace: false);
@@ -558,7 +565,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     captureSessionController.setEncrypting(
       true,
-      label: context.l10n.savingToVault,
+      label: widget.container.isLocalStorage
+          ? context.l10n.savingLabel
+          : context.l10n.savingToVault,
     );
     await Future.delayed(const Duration(milliseconds: 50));
 
@@ -613,11 +622,17 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               ? await _vaultService.nextAvailableScanImageName()
               : await _vaultService.nextAvailableName(isPhoto: true);
           final virtualPath = _vaultService.buildVirtualPath(name);
-          final ok = await cameraController.savePhotoToVault(
-            bytes: bytes,
-            volId: widget.container.volId,
-            virtualPath: virtualPath,
-          );
+          final ok = widget.container.isLocalStorage
+              ? await captureFileIoApi.writeWholeFile(
+                  widget.container,
+                  virtualPath,
+                  bytes,
+                )
+              : await cameraController.savePhotoToVault(
+                  bytes: bytes,
+                  volId: widget.container.volId,
+                  virtualPath: virtualPath,
+                );
           if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
             await _vaultService.deleteFile(virtualPath);
             if (mounted) {
@@ -661,11 +676,17 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           }
           final name = await _vaultService.nextAvailableName(isPhoto: false);
           final virtualPath = _vaultService.buildVirtualPath(name);
-          final ok = await cameraController.saveVideoToVault(
-            videoPath: finalVideoPath,
-            volId: widget.container.volId,
-            virtualPath: virtualPath,
-          );
+          final ok = widget.container.isLocalStorage
+              ? await captureFileIoApi.writeFileFromLocalPath(
+                  widget.container,
+                  virtualPath,
+                  finalVideoPath,
+                )
+              : await cameraController.saveVideoToVault(
+                  videoPath: finalVideoPath,
+                  volId: widget.container.volId,
+                  virtualPath: virtualPath,
+                );
           if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
             await _vaultService.deleteFile(virtualPath);
             if (mounted) {

@@ -37,14 +37,10 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
   /// main FAB -- the menu contents and behavior are unchanged either way.
   final bool asFab;
 
-  /// Hides Camera, Import Files/Folder, and the Secure Item submenu.
-  /// Those all need a registered native vault session (camera capture
-  /// encrypts while recording; import copies through the native engine;
-  /// Secure Item creates an encrypted vault-item record) -- none of which
-  /// exists for a plain local-storage container. New Folder/New Text File
-  /// stay available since they go through the same createDirectory/
-  /// writeWholeFile calls that already work for local storage.
-  final bool hideVaultOnlyActions;
+  /// Hides Import Files/Folder and the Secure Item submenu, which require a
+  /// registered vault session. Camera and audio capture also work with plain
+  /// storage containers and remain available there.
+  final bool hideImportAndSecureItemActions;
 
   const AddItemMenuButton({
     super.key,
@@ -62,7 +58,7 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
     required this.onImportFilesFromDevice,
     required this.onImportFolderFromDevice,
     required this.onAddVaultItem,
-    this.hideVaultOnlyActions = false,
+    this.hideImportAndSecureItemActions = false,
     this.asFab = false,
   });
 
@@ -194,21 +190,21 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             );
           },
         ),
-        if (!widget.hideVaultOnlyActions) ...[
-          MenuItemButton(
-            leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-            onPressed: () => ref
-                .read(sessionLockControllerProvider)
-                .withLockSuppression(widget.onCaptureFromCamera),
-            child: Text(context.l10n.camera),
-          ),
-          MenuItemButton(
-            leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
-            onPressed: () => ref
-                .read(sessionLockControllerProvider)
-                .withLockSuppression(widget.onRecordAudio),
-            child: Text(context.l10n.audioRecorder),
-          ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
+          onPressed: () => ref
+              .read(sessionLockControllerProvider)
+              .withLockSuppression(widget.onCaptureFromCamera),
+          child: Text(context.l10n.camera),
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
+          onPressed: () => ref
+              .read(sessionLockControllerProvider)
+              .withLockSuppression(widget.onRecordAudio),
+          child: Text(context.l10n.audioRecorder),
+        ),
+        if (!widget.hideImportAndSecureItemActions) ...[
           const PopupMenuDivider(),
           MenuItemButton(
             leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/api/vault_audio_edit_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -548,14 +549,20 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         }
         return;
       }
-      final ok = await _recorder.saveToVault(
-        path: savePath,
-        volId: widget.container.volId,
-        virtualPath: virtualPath,
-      );
+      final ok = widget.container.isLocalStorage
+          ? await _fileIo.writeFileFromLocalPath(
+              widget.container,
+              virtualPath,
+              savePath,
+            )
+          : await _recorder.saveToVault(
+              path: savePath,
+              volId: widget.container.volId,
+              virtualPath: virtualPath,
+            );
       if (!ok) {
-        // The native side keeps the temp file when the vault write fails,
-        // so the person can retry. Don't leave a half-written file behind.
+        // Keep the temp recording available for retry and remove any partial
+        // destination file.
         await _deletePartialVaultFile(virtualPath);
         await _failSave();
         return;
@@ -566,7 +573,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         return;
       }
       await _recorder.discard(savePath);
-      _recordedPath = null; // securely wiped after the vault commit succeeded
+      _recordedPath = null; // securely wiped after the destination write succeeds
       _saved = true;
       if (popOnSuccess && mounted) Navigator.pop(context, name);
     } catch (e) {
@@ -1114,7 +1121,12 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
             if (saving) ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 12),
-              Text(l10n.savingToVault, style: textTheme.bodyMedium),
+              Text(
+                widget.container.isLocalStorage
+                    ? l10n.savingLabel
+                    : l10n.savingToVault,
+                style: textTheme.bodyMedium,
+              ),
             ] else
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

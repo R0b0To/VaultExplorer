@@ -4272,7 +4272,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onImportFilesFromDevice: _importFilesFromDevice,
         onImportFolderFromDevice: _importFolderFromDevice,
         onAddVaultItem: _addVaultItem,
-        hideVaultOnlyActions: widget.container.isLocalStorage,
+        hideImportAndSecureItemActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: layoutMode,
@@ -4403,7 +4403,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onImportFilesFromDevice: _importFilesFromDevice,
             onImportFolderFromDevice: _importFolderFromDevice,
             onAddVaultItem: _addVaultItem,
-            hideVaultOnlyActions: widget.container.isLocalStorage,
+            hideImportAndSecureItemActions: widget.container.isLocalStorage,
             asFab: true,
           ),
         ),

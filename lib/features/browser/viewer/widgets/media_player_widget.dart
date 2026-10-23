@@ -1663,7 +1663,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                 if (_showSwipeSeekHud) _buildSwipeSeekHud(),
                 if (!widget.isAudio && widget.enableZoom)
                   Positioned(
-                    top: MediaQuery.paddingOf(context).top + 72,
+                    bottom: 16,
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _videoTransformationController,

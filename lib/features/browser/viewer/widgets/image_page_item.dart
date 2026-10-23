@@ -827,7 +827,7 @@ bool _isClampingMatrix = false;
                 // Last, so the edge-swipe strip can't cover it.
                 if (widget.enableZoom)
                   Positioned(
-                    top: MediaQuery.paddingOf(context).top + 72,
+                    bottom: 16,
                     right: 16,
                     child: AutoHideZoomIndicator(
                       transform: _transformationController,

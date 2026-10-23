@@ -98,6 +98,44 @@ class _FakeFileIoApi extends VaultFileIoApi {
   }
 }
 
+/// Models the part of a vault that matters for extraction: `createDirectory`
+/// and file writes fail when the parent folder doesn't exist yet. Plain device
+/// storage behaves differently (its writes create missing parents), which is
+/// why a nested-folder extract worked there but not inside a vault.
+class _VaultLikeFileIoApi extends VaultFileIoApi {
+  _VaultLikeFileIoApi() : super(const MethodChannel('test/vault-file-io'));
+
+  final dirs = <String>{''};
+  final files = <String>[];
+  final createCalls = <String>[];
+
+  static String _parent(String path) {
+    final i = path.lastIndexOf('/');
+    return i < 0 ? '' : path.substring(0, i);
+  }
+
+  @override
+  Future<bool> createDirectory(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    createCalls.add(dirPath);
+    if (!dirs.contains(_parent(dirPath))) return false;
+    return dirs.add(dirPath);
+  }
+
+  @override
+  Future<bool> writeWholeFile(
+    MountedContainer container,
+    String fileName,
+    Uint8List bytes,
+  ) async {
+    if (!dirs.contains(_parent(fileName))) return false;
+    files.add(fileName);
+    return true;
+  }
+}
+
 final _container = MountedContainer(
   uri: 'content://test-container',
   displayName: 'Test Vault',
@@ -164,6 +202,95 @@ void main() {
       expect(archiveApi.stagedIndexes, [0]);
     },
   );
+
+  group('extracting nested folders into a vault-like destination', () {
+    test('extracts a folder whose files all sit in nested subfolders', () async {
+      final archiveApi = _FakeArchiveApi({
+        'sub1/sub2/deep.txt': Uint8List.fromList([1]),
+        'sub1/sub2/more.txt': Uint8List.fromList([2]),
+      });
+      final io = _VaultLikeFileIoApi();
+      ArchiveService.configureWithArchiveApi(
+        archiveApi: archiveApi,
+        fileIoApi: io,
+      );
+      final context = await ArchiveService.open(
+        container: _container,
+        archivePathInContainer: 'test.zip',
+        pathStackEntryIndex: 0,
+      );
+
+      final count = await ArchiveService.extractSelectedToContainer(
+        container: _container,
+        archiveContext: context,
+        entryPaths: const ['sub1'],
+        targetDirInContainer: '',
+      );
+
+      expect(count, 2);
+      expect(io.files, ['sub1/sub2/deep.txt', 'sub1/sub2/more.txt']);
+      // Parents first, and each folder only once.
+      expect(io.createCalls, ['sub1', 'sub1/sub2']);
+    });
+
+    test('creates a destination folder that does not exist yet', () async {
+      final archiveApi = _FakeArchiveApi({
+        'sub1/sub2/deep.txt': Uint8List.fromList([1]),
+        'sub1/top.txt': Uint8List.fromList([2]),
+      });
+      final io = _VaultLikeFileIoApi();
+      ArchiveService.configureWithArchiveApi(
+        archiveApi: archiveApi,
+        fileIoApi: io,
+      );
+      final context = await ArchiveService.open(
+        container: _container,
+        archivePathInContainer: 'test.zip',
+        pathStackEntryIndex: 0,
+      );
+
+      final count = await ArchiveService.extractSelectedToContainer(
+        container: _container,
+        archiveContext: context,
+        entryPaths: const ['sub1'],
+        targetDirInContainer: 'out/test',
+      );
+
+      expect(count, 2);
+      expect(io.files, [
+        'out/test/sub1/sub2/deep.txt',
+        'out/test/sub1/top.txt',
+      ]);
+    });
+
+    test('the case-collision route also creates every missing ancestor', () async {
+      final archiveApi = _FakeArchiveApi({
+        'sub1/sub2/deep.txt': Uint8List.fromList([1]),
+      });
+      final io = _VaultLikeFileIoApi();
+      ArchiveService.configureWithArchiveApi(
+        archiveApi: archiveApi,
+        fileIoApi: io,
+      );
+      final context = await ArchiveService.open(
+        container: _container,
+        archivePathInContainer: 'test.zip',
+        pathStackEntryIndex: 0,
+      );
+
+      final count = await ArchiveService.extractMappedToContainer(
+        container: _container,
+        archiveContext: context,
+        destRelByEntryPath: const {
+          'sub1/sub2/deep.txt': 'sub1/sub2/deep.txt',
+        },
+        targetDirInContainer: '',
+      );
+
+      expect(count, 1);
+      expect(io.files, ['sub1/sub2/deep.txt']);
+    });
+  });
 
   group('ArchiveService extension helpers', () {
     test('.apk is openable as an archive but is not an archive extension', () {

@@ -287,6 +287,7 @@ class ArchiveService {
     }
 
     int count = 0;
+    final ensuredDirs = <String>{};
 
     final subDirs = archiveContext.getSubDirectories(subPath);
     for (final dirPath in subDirs) {
@@ -299,7 +300,7 @@ class ArchiveService {
           ? relativePath
           : '$targetDirInContainer/$relativePath';
 
-      await _fileIo.createDirectory(container, destDir);
+      await _ensureDirectory(container, destDir, ensuredDirs);
     }
 
     final allFiles = archiveContext.allEntries.where((e) => !e.isDirectory);
@@ -320,6 +321,8 @@ class ArchiveService {
           : '$targetDirInContainer/$relativePath';
 
       onProgress?.call(p.basename(name));
+
+      await _ensureDirectory(container, p.posix.dirname(destPath), ensuredDirs);
 
       final ok = await _extractEntryToContainer(
         container: container,
@@ -345,41 +348,25 @@ class ArchiveService {
     int? opId,
   }) async {
     int count = 0;
-    final Set<String> targetFiles = {};
+    final selectedDestinations = _selectedExtractDestinations(
+      archiveContext.allEntries
+          .where((entry) => !entry.isDirectory)
+          .map((entry) => _cleanArchiveEntryPath(entry.path)),
+      entryPaths,
+    );
 
-    for (final selectedPath in entryPaths) {
-      final cleanSelected = selectedPath.replaceAll('\\', '/');
-      for (final entry in archiveContext.allEntries) {
-        if (entry.isDirectory) continue;
-        final entryPath = entry.path.replaceAll('\\', '/');
-        final cleanEntry = entryPath.startsWith('/')
-            ? entryPath.substring(1)
-            : entryPath;
-        if (cleanEntry == cleanSelected ||
-            cleanEntry.startsWith('$cleanSelected/')) {
-          targetFiles.add(cleanEntry);
-        }
-      }
-    }
-
-    if (targetFiles.isEmpty) {
-      targetFiles.addAll(entryPaths);
-    }
-
-    for (final relPath in targetFiles) {
+    final ensuredDirs = <String>{};
+    for (final mapping in selectedDestinations.entries) {
       final destPath = targetDirInContainer.isEmpty
-          ? relPath
-          : '$targetDirInContainer/$relPath';
+          ? mapping.value
+          : '$targetDirInContainer/${mapping.value}';
 
-      final parentDir = p.dirname(destPath);
-      if (parentDir.isNotEmpty && parentDir != '.') {
-        await _fileIo.createDirectory(container, parentDir);
-      }
+      await _ensureDirectory(container, p.posix.dirname(destPath), ensuredDirs);
 
       final ok = await _extractEntryToContainer(
         container: container,
         archiveContext: archiveContext,
-        entryPath: relPath,
+        entryPath: mapping.key,
         destPath: destPath,
         opId: opId,
       );
@@ -389,6 +376,67 @@ class ArchiveService {
       }
     }
     return count;
+  }
+
+  /// Maps each selected archive entry path to its copy destination path.
+  /// Archive paths are rooted at the archive root, while a copied selection
+  /// should retain only the selected item's name and its descendants. For
+  /// example, selecting `sub/sub1/sub2` maps
+  /// `sub/sub1/sub2/file.txt` to `sub2/file.txt`.
+  static Map<String, String> _selectedExtractDestinations(
+    Iterable<String> entryPaths,
+    List<String> selectedEntryPaths,
+  ) {
+    final files = entryPaths.toList();
+    final destinations = <String, String>{};
+
+    for (final rawSelectedPath in selectedEntryPaths) {
+      final selectedPath = _cleanArchiveEntryPath(rawSelectedPath);
+      if (selectedPath.isEmpty) continue;
+
+      final matches = files.where(
+        (filePath) =>
+            filePath == selectedPath || filePath.startsWith('$selectedPath/'),
+      );
+      final selectedName = p.posix.basename(selectedPath);
+
+      for (final filePath in matches) {
+        final relativePath = filePath == selectedPath
+            ? ''
+            : filePath.substring(selectedPath.length + 1);
+        final destinationPath = relativePath.isEmpty
+            ? selectedName
+            : p.posix.join(selectedName, relativePath);
+        destinations.putIfAbsent(filePath, () => destinationPath);
+      }
+    }
+
+    // Keep the previous best-effort behavior when a selected path doesn't
+    // match the scan result; ArchiveContext will report the missing entry.
+    if (destinations.isEmpty) {
+      for (final rawSelectedPath in selectedEntryPaths) {
+        final selectedPath = _cleanArchiveEntryPath(rawSelectedPath);
+        if (selectedPath.isNotEmpty) {
+          destinations.putIfAbsent(
+            selectedPath,
+            () => p.posix.basename(selectedPath),
+          );
+        }
+      }
+    }
+
+    return destinations;
+  }
+
+  static String _cleanArchiveEntryPath(String path) {
+    var clean = path.replaceAll('\\', '/');
+    while (clean.startsWith('/')) {
+      clean = clean.substring(1);
+    }
+    while (clean.endsWith('/')) {
+      clean = clean.substring(0, clean.length - 1);
+    }
+    return clean;
   }
 
   /// Where extracting [archiveContext] would write each file: archive entry
@@ -401,26 +449,13 @@ class ArchiveService {
     List<String>? selectedEntryPaths,
     String subPath = '',
   }) {
-    String clean(String path) {
-      final slashed = path.replaceAll('\\', '/');
-      return slashed.startsWith('/') ? slashed.substring(1) : slashed;
-    }
-
     final files = archiveContext.allEntries
         .where((e) => !e.isDirectory)
-        .map((e) => clean(e.path))
+        .map((e) => _cleanArchiveEntryPath(e.path))
         .toList();
 
     if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
-      final selected = selectedEntryPaths.map(clean).toList();
-      final picked = <String>{
-        for (final f in files)
-          if (selected.any((s) => f == s || f.startsWith('$s/'))) f,
-      };
-      // Same fallback as extractSelectedToContainer: nothing matched, so the
-      // selection itself is what gets extracted.
-      final chosen = picked.isEmpty ? selected : picked.toList();
-      return {for (final f in chosen) f: f};
+      return _selectedExtractDestinations(files, selectedEntryPaths);
     }
 
     if (subPath.isEmpty) return {for (final f in files) f: f};
@@ -477,15 +512,13 @@ class ArchiveService {
     int? opId,
   }) async {
     int count = 0;
+    final ensuredDirs = <String>{};
     for (final mapping in destRelByEntryPath.entries) {
       final destPath = targetDirInContainer.isEmpty
           ? mapping.value
           : '$targetDirInContainer/${mapping.value}';
 
-      final parentDir = p.dirname(destPath);
-      if (parentDir.isNotEmpty && parentDir != '.') {
-        await _fileIo.createDirectory(container, parentDir);
-      }
+      await _ensureDirectory(container, p.posix.dirname(destPath), ensuredDirs);
 
       final ok = await _extractEntryToContainer(
         container: container,
@@ -500,6 +533,37 @@ class ArchiveService {
       }
     }
     return count;
+  }
+
+  /// Creates [dirPath] and every missing ancestor inside [container],
+  /// parents first.
+  ///
+  /// `createDirectory` is **not** recursive on vaults (Cryptomator, gocryptfs,
+  /// CryFS), disk-image volumes or SAF folders: it fails when the parent
+  /// folder doesn't exist yet. Plain device storage only appears to be
+  /// recursive because its file writes create missing parents themselves.
+  /// So extracting `sub1/sub2/a.txt` has to create `sub1` before `sub1/sub2`
+  /// (and the destination folder itself, e.g. when "extract into subfolder"
+  /// targets a folder that doesn't exist yet), rather than only the file's
+  /// immediate parent.
+  ///
+  /// [ensured] remembers the folders already handled during one extraction,
+  /// so each folder costs a single call instead of one per file inside it.
+  /// The result of `createDirectory` is deliberately ignored: "already
+  /// exists" reports failure on some backends, and a folder that really
+  /// couldn't be created surfaces as the file write failing right after.
+  static Future<void> _ensureDirectory(
+    MountedContainer container,
+    String dirPath,
+    Set<String> ensured,
+  ) async {
+    var current = '';
+    for (final segment in dirPath.split('/')) {
+      if (segment.isEmpty || segment == '.') continue;
+      current = current.isEmpty ? segment : '$current/$segment';
+      if (!ensured.add(current)) continue;
+      await _fileIo.createDirectory(container, current);
+    }
   }
 
   static Future<bool> _extractEntryToContainer({

@@ -21,8 +21,6 @@ class _FakeFileManagerToolbarService extends FileManagerToolbarService {
 
 Widget _buildTestApp({
   required ProviderContainer container,
-  int? initialTab,
-  MediaViewerSection? initialSection,
 }) {
   return UncontrolledProviderScope(
     container: container,
@@ -32,10 +30,7 @@ Widget _buildTestApp({
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: MediaViewerToolbarSettingsScreen(
-        initialTab: initialTab,
-        initialSection: initialSection,
-      ),
+      home: const MediaViewerToolbarSettingsScreen(),
     ),
   );
 }
@@ -87,7 +82,7 @@ void main() {
   });
 
   testWidgets(
-      'switches between sections on wide sidebar layout and displays Toolbar Layout & Mockup',
+      'shows playback and advanced settings together on a wide layout',
       (tester) async {
     tester.view.physicalSize = const Size(1024, 768);
     tester.view.devicePixelRatio = 1.0;
@@ -105,30 +100,29 @@ void main() {
     await tester.pumpWidget(_buildTestApp(container: container));
     await tester.pumpAndSettle();
 
-    // Tap Toolbar Layout in the sidebar
-    final toolbarTile = find.text('Toolbar Layout');
-    expect(toolbarTile, findsOneWidget);
-    await tester.tap(toolbarTile);
-    await tester.pumpAndSettle();
+    final playbackSetting = find.widgetWithText(SwitchListTile, 'Swipe to Seek');
+    await tester.scrollUntilVisible(
+      playbackSetting,
+      100.0,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(playbackSetting, findsOneWidget);
 
-    // Mockup and section headers should be visible in detail pane
-    expect(find.text('video_01.mp4'), findsOneWidget);
-    expect(find.textContaining('All Sections'), findsOneWidget);
-    expect(find.text('Top Bar Actions'), findsWidgets);
-
-    // Tap Advanced Options in the sidebar
-    final advancedTile = find.text('Advanced Options');
-    expect(advancedTile, findsOneWidget);
-    await tester.tap(advancedTile);
-    await tester.pumpAndSettle();
-
-    expect(
-        find.widgetWithText(SwitchListTile, 'Enable volume boost'), findsOneWidget);
+    final advancedSetting = find.widgetWithText(
+      SwitchListTile,
+      'Enable volume boost',
+    );
+    await tester.scrollUntilVisible(
+      advancedSetting,
+      100.0,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(advancedSetting, findsOneWidget);
     expect(find.text('Thumbnail Generation'), findsOneWidget);
   });
 
   testWidgets(
-      'renders narrow hub list and navigates to Playback Settings on portrait layout',
+      'renders the consolidated settings screen directly on a narrow layout',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -146,64 +140,14 @@ void main() {
     await tester.pumpWidget(_buildTestApp(container: container));
     await tester.pumpAndSettle();
 
-    // On narrow portrait screen without initialTab, the hub list is shown
-    expect(find.text('Playback Settings'), findsOneWidget);
-    expect(find.text('Toolbar Layout'), findsOneWidget);
-    expect(find.text('Advanced Options'), findsOneWidget);
-
-    // Tap Playback Settings hub card
-    await tester.tap(find.text('Playback Settings'));
-    await tester.pumpAndSettle();
-
-    // Sub-screen is pushed with its own settings
+    expect(find.text('Media Player Controls'), findsOneWidget);
     final finder = find.widgetWithText(SwitchListTile, 'Swipe to Seek');
     await tester.scrollUntilVisible(
       finder,
       100.0,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     expect(finder, findsOneWidget);
-  });
-
-  testWidgets(
-      'opens directly to Toolbar Layout when initialTab is 1 on narrow phone layout',
-      (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final fakeService = _FakeFileManagerToolbarService();
-    final container = ProviderContainer(
-      overrides: [
-        fileManagerToolbarServiceProvider.overrideWithValue(fakeService),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(_buildTestApp(container: container, initialTab: 1));
-    await tester.pumpAndSettle();
-
-    // Auto-navigates into Toolbar Layout
-    expect(find.text('video_01.mp4'), findsOneWidget);
-
-    // Tap on Top Bar filter chip
-    final topBarChip = find.widgetWithText(FilterChip, 'Top Bar Actions (2)');
-    expect(topBarChip, findsOneWidget);
-    await tester.ensureVisible(topBarChip);
-    await tester.tap(topBarChip);
-    await tester.pumpAndSettle();
-
-    // Scroll down to reveal availableToAdd
-    final addButton = find.byTooltip('Add').first;
-    await tester.scrollUntilVisible(
-      addButton,
-      100.0,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(addButton, findsOneWidget);
-    await tester.tap(addButton);
-    await tester.pumpAndSettle();
   });
 
   testWidgets('filters settings with instant search', (tester) async {

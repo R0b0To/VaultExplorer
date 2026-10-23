@@ -26,7 +26,8 @@ class _FakeContainerRepository implements ContainerRepository {
 
 class _FakeFileManagerToolbarService extends FileManagerToolbarService {
   @override
-  Future<FileManagerToolbarConfig> load() async => FileManagerToolbarConfig.defaults();
+  Future<FileManagerToolbarConfig> load() async =>
+      FileManagerToolbarConfig.defaults().copyWith(autoHideAppBar: true);
 }
 
 MountedContainer _testContainer(int volId) => MountedContainer(

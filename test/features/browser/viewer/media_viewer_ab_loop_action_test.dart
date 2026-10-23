@@ -40,14 +40,10 @@ void main() {
       );
     });
 
-    test('sits next to the playback mode button in the default bottom bar', () {
+    test('is available in the default More menu, not the bottom bar', () {
       const config = MediaViewerToolbarConfig();
-      final bottom = config.bottomBarActions;
-      expect(
-        bottom.indexOf(MediaViewerAction.abLoop),
-        bottom.indexOf(MediaViewerAction.playbackMode) + 1,
-      );
-      expect(config.moreMenuActions, isNot(contains(MediaViewerAction.abLoop)));
+      expect(config.bottomBarActions, isNot(contains(MediaViewerAction.abLoop)));
+      expect(config.moreMenuActions, contains(MediaViewerAction.abLoop));
     });
 
     test('an old saved layout gets it in the More menu, not the bottom bar', () {
@@ -66,9 +62,13 @@ void main() {
     });
 
     test('a user placement is respected, not duplicated', () {
-      final saved = MediaViewerToolbarConfig.defaults().copyWith(
+      final defaults = MediaViewerToolbarConfig.defaults();
+      final saved = defaults.copyWith(
         topBarActions: [MediaViewerAction.bookmark, MediaViewerAction.abLoop],
         bottomBarActions: [MediaViewerAction.playPause],
+        moreMenuActions: defaults.moreMenuActions
+            .where((action) => action != MediaViewerAction.abLoop)
+            .toList(),
       );
       final restored = MediaViewerToolbarConfig.fromJson(saved.toJson());
       expect(restored.topBarActions, contains(MediaViewerAction.abLoop));
@@ -76,9 +76,13 @@ void main() {
     });
 
     test('a hidden placement is respected too', () {
-      final saved = MediaViewerToolbarConfig.defaults().copyWith(
+      final defaults = MediaViewerToolbarConfig.defaults();
+      final saved = defaults.copyWith(
         bottomBarActions: [MediaViewerAction.playPause],
         hiddenActions: {MediaViewerAction.abLoop},
+        moreMenuActions: defaults.moreMenuActions
+            .where((action) => action != MediaViewerAction.abLoop)
+            .toList(),
       );
       final restored = MediaViewerToolbarConfig.fromJson(saved.toJson());
       expect(restored.hiddenActions, contains(MediaViewerAction.abLoop));

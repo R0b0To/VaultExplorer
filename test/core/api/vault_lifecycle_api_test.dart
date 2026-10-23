@@ -528,19 +528,19 @@ void main() {
     });
   });
 
-  group('fail-open helper methods (deliberately favor availability over strictness)', () {
+  group('helper methods with channel-failure fallbacks', () {
     test('documentExists defaults to true (assume-exists) on channel failure', () async {
       nextError = PlatformException(code: 'ERR');
       expect(await api.documentExists('content://c'), isTrue);
     });
 
-    test('finishWrite defaults to true on both null result and channel failure', () async {
+    test('finishWrite defaults null to success but reports channel failure', () async {
       final container = _container();
       nextResult = null;
       expect(await api.finishWrite(container, 'file.txt'), isTrue);
 
       nextError = PlatformException(code: 'ERR');
-      expect(await api.finishWrite(container, 'file.txt'), isTrue);
+      expect(await api.finishWrite(container, 'file.txt'), isFalse);
     });
 
     test('detectsAsPlainDiskImage defaults to false on channel failure', () async {

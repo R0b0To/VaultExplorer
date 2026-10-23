@@ -140,6 +140,7 @@ FileManagerToolbarConfig _customToolbar() {
     showBookmarkBar: !d.showBookmarkBar,
     showMediaCarousel: !d.showMediaCarousel,
     autoHideAppBar: !d.autoHideAppBar,
+    autoHideTabBar: !d.autoHideTabBar,
     showFileExtensions: !d.showFileExtensions,
     useFabForToolbar: !d.useFabForToolbar,
     bottomSelectionBar: !d.bottomSelectionBar,

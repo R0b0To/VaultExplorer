@@ -3255,7 +3255,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             l10n: context.l10n,
           );
           _ownedOpIds.add(op.id);
-          _bindGroupedDeleteListener(op, container);
+          _bindGroupedDeleteListener(
+            op,
+            container,
+            currentDirPath: group.first.currentDirPath,
+          );
         }
       },
     );
@@ -3263,8 +3267,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _bindGroupedDeleteListener(
     FileOperation op,
-    MountedContainer container,
-  ) {
+    MountedContainer container, {
+    required String currentDirPath,
+  }) {
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -3276,13 +3281,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (!done) return;
       op.removeListener(listener);
       unawaited(() async {
-        final deletedPaths = op.itemStatuses
+        final successfulPaths = op.itemStatuses
             .where((status) => status.result == FileItemResult.success)
             .map((status) => status.item.path)
             .toSet();
+        if (container.volId == widget.container.volId &&
+            currentDirPath == _currentDirPath) {
+          final deletedNames = successfulPaths
+              .map((path) => p.basename(path))
+              .toSet();
+          if (deletedNames.isNotEmpty) {
+            _navNotifier.removeItemsByName(deletedNames);
+          }
+        }
+        if (_searchActive && successfulPaths.isNotEmpty) {
+          _searchNotifier.removeDeletedPaths(
+            successfulPaths,
+            _currentDirPath,
+          );
+        }
         await ref
             .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
-            .removeDeletedPaths(container, deletedPaths);
+            .removeDeletedPaths(container, successfulPaths);
         if (!mounted) return;
         if (container.volId == widget.container.volId) {
           if (_isVisibleTab) {

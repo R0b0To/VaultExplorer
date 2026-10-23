@@ -259,6 +259,12 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   }
 
   void removeItemsByName(Set<String> deletedNames) {
+    if (deletedNames.isEmpty) return;
+    // An already-running directory read may have captured these entries
+    // before the delete completed. Keep that older response from restoring
+    // them after this optimistic removal; the caller starts a fresh read once
+    // the related metadata cleanup is done.
+    _loadGeneration++;
     // Exact names: `deletedNames` come from the entries that were actually
     // deleted, and on a case-sensitive destination "Notes" and "notes" are
     // different entries -- deleting one must not hide the other.

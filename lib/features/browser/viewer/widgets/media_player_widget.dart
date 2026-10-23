@@ -165,7 +165,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
     this.tapEdgesToNavigate = true,
-    this.doubleTapPlayPause = false,
+    this.doubleTapPlayPause = true,
     this.seekSensitivity = 1.0,
     this.volumeGestureSensitivity = 1.0,
     this.brightnessGestureSensitivity = 1.0,
@@ -1661,30 +1661,13 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                     level: _volumeLevel,
                   ),
                 if (_showSwipeSeekHud) _buildSwipeSeekHud(),
-                if (widget.doubleTapPlayPause &&
-                    !widget.isAudio &&
-                    widget.enableZoom)
+                if (!widget.isAudio && widget.enableZoom)
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 72,
                     right: 16,
-                    child: ValueListenableBuilder<Matrix4>(
-                      valueListenable: _videoTransformationController,
-                      builder: (context, matrix, _) {
-                        final scale = _getMatrixScale(matrix);
-                        final zoomed =
-                            (scale - _baselineZoomScale).abs() > 0.01;
-                        return AnimatedOpacity(
-                          opacity: zoomed ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 150),
-                          child: IgnorePointer(
-                            ignoring: !zoomed,
-                            child: ZoomIndicatorPill(
-                              scale: scale,
-                              onReset: _resetVideoZoom,
-                            ),
-                          ),
-                        );
-                      },
+                    child: AutoHideZoomIndicator(
+                      transform: _videoTransformationController,
+                      onReset: _resetVideoZoom,
                     ),
                   ),
               ],

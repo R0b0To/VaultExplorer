@@ -111,7 +111,7 @@ class MediaViewerToolbarConfig {
     this.swipeToSeekEnabled = false,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.tapEdgesToNavigate = true,
-    this.doubleTapPlayPause = false,
+    this.doubleTapPlayPause = true,
     this.loopPlaylist = true,
     this.thumbnailGenerationStrategy = ThumbnailGenerationStrategy.hybrid,
     this.thumbnailFramePosition = 0.12,
@@ -439,7 +439,7 @@ class MediaViewerToolbarConfig {
         orElse: () => ResumePlaybackMode.askEveryTime,
       ),
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
-      doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? false,
+      doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? true,
       loopPlaylist: j['loopPlaylist'] as bool? ?? true,
       thumbnailGenerationStrategy: ThumbnailGenerationStrategy.fromJson(
         j['thumbnailGenerationStrategy'] as String?,

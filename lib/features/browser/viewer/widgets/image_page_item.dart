@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' show PointerDeviceKind;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/image_dimensions.dart';
+import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -822,6 +823,19 @@ bool _isClampingMatrix = false;
                     isLeft: true,
                     icon: Icons.wb_sunny_rounded,
                     level: _brightnessLevel,
+                  ),
+                // Last, so the edge-swipe strip can't cover it.
+                if (widget.enableZoom)
+                  Positioned(
+                    top: MediaQuery.paddingOf(context).top + 72,
+                    right: 16,
+                    child: AutoHideZoomIndicator(
+                      transform: _transformationController,
+                      onReset: () => _animateImageZoomTo(
+                        _getBaselineMatrix(constraints),
+                        toBaseline: true,
+                      ),
+                    ),
                   ),
               ],
             ),

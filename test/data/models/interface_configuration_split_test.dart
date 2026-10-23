@@ -144,6 +144,8 @@ FileManagerToolbarConfig _customToolbar() {
     bottomSelectionBar: !d.bottomSelectionBar,
     detailColumnsOrder: d.detailColumnsOrder.reversed.toList(),
     hiddenDetailColumns: {d.detailColumnsOrder.first},
+    itemActionsOrder: d.itemActionsOrder.reversed.toList(),
+    hiddenItemActions: {d.itemActionsOrder.first},
     showGridFileNames: !d.showGridFileNames,
     gridAspectRatio: _other(GridAspectRatio.values, d.gridAspectRatio),
     gridCornerStyle: _other(GridCornerStyle.values, d.gridCornerStyle),

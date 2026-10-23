@@ -11471,4 +11471,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showFileExtensionsDesc => '在文件名末尾显示扩展名。搜索时始终显示扩展名。';
+
+  @override
+  String get itemActionsMenuTitle => '项目操作';
+
+  @override
+  String get itemActionsMenuDesc => '选择在项目菜单和选择菜单中显示哪些操作，以及它们的显示顺序。';
+
+  @override
+  String get itemActionsQuickRowHeader => '快捷操作行';
+
+  @override
+  String get itemActionsMenuListHeader => '菜单列表';
 }

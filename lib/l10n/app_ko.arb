@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "아이콘을 탭하여 선택",
   "selectByIconDesc": "목록 보기에서 파일이나 폴더의 아이콘을 탭하면 선택됩니다. 끄면 아이콘을 탭해도 아무 일도 일어나지 않습니다.",
   "showFileExtensionsLabel": "파일 확장자 표시",
-  "showFileExtensionsDesc": "파일 이름 끝에 확장자를 표시합니다. 검색 중에는 항상 확장자가 표시됩니다."
+  "showFileExtensionsDesc": "파일 이름 끝에 확장자를 표시합니다. 검색 중에는 항상 확장자가 표시됩니다.",
+  "itemActionsMenuTitle": "항목 작업",
+  "itemActionsMenuDesc": "항목 메뉴와 선택 메뉴에 표시할 작업과 표시 순서를 선택합니다.",
+  "itemActionsQuickRowHeader": "빠른 작업 줄",
+  "itemActionsMenuListHeader": "메뉴 목록"
 }

@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
@@ -67,6 +68,12 @@ class FileManagerToolbarConfig {
   final Map<String, String> folderSortModes;
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
+
+  /// Order and visibility of the actions in the item actions sheet and the
+  /// selection bar's overflow menu. Always holds every [FileItemAction]
+  /// exactly once (see [fromJson]).
+  final List<FileItemAction> itemActionsOrder;
+  final Set<FileItemAction> hiddenItemActions;
   final bool showGridFileNames;
   final GridAspectRatio gridAspectRatio;
 
@@ -137,6 +144,8 @@ class FileManagerToolbarConfig {
       FileDetailColumn.type,
     ],
     this.hiddenDetailColumns = const {FileDetailColumn.type},
+    this.itemActionsOrder = FileItemAction.values,
+    this.hiddenItemActions = const {},
     this.showGridFileNames = true,
     this.gridAspectRatio = GridAspectRatio.square,
     this.gridCornerStyle = GridCornerStyle.rounded,
@@ -190,6 +199,8 @@ class FileManagerToolbarConfig {
           FileDetailColumn.type,
         ],
         hiddenDetailColumns: {FileDetailColumn.type},
+        itemActionsOrder: FileItemAction.values,
+        hiddenItemActions: {},
         showGridFileNames: true,
         gridAspectRatio: GridAspectRatio.square,
         gridCornerStyle: GridCornerStyle.rounded,
@@ -227,6 +238,11 @@ class FileManagerToolbarConfig {
 
   List<FileManagerAction> get visible =>
       order.where((a) => !hidden.contains(a)).toList(growable: false);
+
+  /// [itemActionsOrder] without the hidden actions.
+  List<FileItemAction> get visibleItemActions => itemActionsOrder
+      .where((a) => !hiddenItemActions.contains(a))
+      .toList(growable: false);
 
   List<FileDetailColumn> get visibleDetailColumns => detailColumnsOrder
       .where((c) => !hiddenDetailColumns.contains(c))
@@ -297,6 +313,8 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderSortModes,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
+    List<FileItemAction>? itemActionsOrder,
+    Set<FileItemAction>? hiddenItemActions,
     bool? showGridFileNames,
     GridAspectRatio? gridAspectRatio,
     GridCornerStyle? gridCornerStyle,
@@ -342,6 +360,8 @@ class FileManagerToolbarConfig {
         folderSortModes: folderSortModes ?? this.folderSortModes,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
+        itemActionsOrder: itemActionsOrder ?? this.itemActionsOrder,
+        hiddenItemActions: hiddenItemActions ?? this.hiddenItemActions,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
         gridCornerStyle: gridCornerStyle ?? this.gridCornerStyle,
@@ -396,6 +416,8 @@ class FileManagerToolbarConfig {
     'bottomSelectionBar',
     'detailColumnsOrder',
     'hiddenDetailColumns',
+    'itemActionsOrder',
+    'hiddenItemActions',
     'showGridFileNames',
     'gridAspectRatio',
     'gridCornerStyle',
@@ -499,6 +521,9 @@ class FileManagerToolbarConfig {
             detailColumnsOrder.map((c) => c.toJson()).toList(),
         'hiddenDetailColumns':
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
+        'itemActionsOrder': itemActionsOrder.map((a) => a.toJson()).toList(),
+        'hiddenItemActions':
+            hiddenItemActions.map((a) => a.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
         'gridAspectRatio': gridAspectRatio.toJson(),
         'gridCornerStyle': gridCornerStyle.toJson(),
@@ -548,6 +573,22 @@ class FileManagerToolbarConfig {
             .whereType<FileDetailColumn>()
             .toSet()
         : const {FileDetailColumn.type};
+    // Unknown names are dropped, duplicates collapsed, and any action the
+    // stored list lacks (a config from before the action existed) is
+    // appended in its default position order, so the list is always complete.
+    final seenItemActions = <FileItemAction>{};
+    final rawItemActions = (j['itemActionsOrder'] as List<dynamic>? ?? [])
+        .map((v) => FileItemAction.fromJson(v as String?))
+        .whereType<FileItemAction>()
+        .where(seenItemActions.add)
+        .toList();
+    for (final a in FileItemAction.values) {
+      if (!rawItemActions.contains(a)) rawItemActions.add(a);
+    }
+    final hiddenItemActions = (j['hiddenItemActions'] as List<dynamic>? ?? [])
+        .map((v) => FileItemAction.fromJson(v as String?))
+        .whereType<FileItemAction>()
+        .toSet();
     final rawFolderLayoutModes =
         (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
               (k, v) => MapEntry(k, v as String),
@@ -620,6 +661,8 @@ class FileManagerToolbarConfig {
             ]
           : rawDetailColumns,
       hiddenDetailColumns: hiddenDetailColumns,
+      itemActionsOrder: rawItemActions,
+      hiddenItemActions: hiddenItemActions,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       gridAspectRatio:
           GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),

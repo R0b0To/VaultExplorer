@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
@@ -311,6 +312,48 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     final newConfig = state.config.copyWith(hiddenDetailColumns: hidden);
     await _updateConfig(newConfig);
   }
+
+  /// Moves an item action within its own section of the settings list: the
+  /// quick-action row ([quickRow] true) or the menu list. [oldIndex] and
+  /// [newIndex] are positions among that section's actions only; the other
+  /// section's actions keep their places in [FileManagerToolbarConfig.itemActionsOrder].
+  Future<void> reorderItemActions(
+    bool quickRow,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    final order = List<FileItemAction>.from(state.config.itemActionsOrder);
+    final section = order.where((a) => a.isQuickAction == quickRow).toList();
+    final moved = section.removeAt(oldIndex);
+    section.insert(newIndex, moved);
+    var next = 0;
+    final reordered = [
+      for (final a in order) a.isQuickAction == quickRow ? section[next++] : a,
+    ];
+    await _updateConfig(state.config.copyWith(itemActionsOrder: reordered));
+  }
+
+  Future<void> toggleItemActionVisible(
+    FileItemAction action,
+    bool visible,
+  ) async {
+    final hidden = Set<FileItemAction>.from(state.config.hiddenItemActions);
+    if (visible) {
+      hidden.remove(action);
+    } else {
+      hidden.add(action);
+    }
+    await _updateConfig(state.config.copyWith(hiddenItemActions: hidden));
+  }
+
+  /// Puts the item actions back in their default order with none hidden,
+  /// leaving every other setting alone.
+  Future<void> resetItemActions() => _updateConfig(
+    state.config.copyWith(
+      itemActionsOrder: FileItemAction.values,
+      hiddenItemActions: const {},
+    ),
+  );
 
   Future<void> reorderBookmarks(int oldIndex, int newIndex) async {
     final record = state.record;

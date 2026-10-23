@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "Sélectionner en touchant l’icône",
   "selectByIconDesc": "Dans la vue en liste, toucher l’icône d’un fichier ou d’un dossier le sélectionne. Désactivé, toucher l’icône ne fait rien.",
   "showFileExtensionsLabel": "Afficher les extensions de fichier",
-  "showFileExtensionsDesc": "Affiche l’extension à la fin des noms de fichiers. Les extensions sont toujours affichées pendant une recherche."
+  "showFileExtensionsDesc": "Affiche l’extension à la fin des noms de fichiers. Les extensions sont toujours affichées pendant une recherche.",
+  "itemActionsMenuTitle": "Actions de l’élément",
+  "itemActionsMenuDesc": "Choisissez les actions qui apparaissent dans le menu de l’élément et dans le menu de sélection, ainsi que leur ordre.",
+  "itemActionsQuickRowHeader": "Rangée d’actions rapides",
+  "itemActionsMenuListHeader": "Liste du menu"
 }

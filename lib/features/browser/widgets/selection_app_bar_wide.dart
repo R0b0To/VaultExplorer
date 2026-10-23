@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
+import 'package:vaultexplorer/features/browser/widgets/item_action_menu_config.dart';
 
 class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
@@ -58,6 +60,11 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
+  /// The user's item-action configuration: hidden actions are removed from
+  /// the buttons and the overflow menu, and the menu follows this order.
+  final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> hiddenItemActions;
+
   const SelectionAppBarWide({
     super.key,
     required this.selectedCount,
@@ -110,6 +117,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onUnbookmark,
     required this.onEncrypt,
     required this.onDecrypt,
+    this.itemActionOrder = FileItemAction.values,
+    this.hiddenItemActions = const {},
   });
 
   @override
@@ -119,8 +128,11 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    bool shown(FileItemAction action) => !hiddenItemActions.contains(action);
     final bool showExtractButton =
-        allowExtractAction && (singleArchiveSelected || isInsideArchive);
+        allowExtractAction &&
+        (singleArchiveSelected || isInsideArchive) &&
+        shown(FileItemAction.extract);
 
     return AppBar(
       leading: IconButton(
@@ -163,19 +175,19 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             tooltip: context.l10n.extract,
             onPressed: onExtractSelectedArchive,
           ),
-        if (showShareOption)
+        if (showShareOption && shown(FileItemAction.share))
           IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: context.l10n.shareAction,
             onPressed: onShare,
           ),
-        if (!isInsideArchive)
+        if (!isInsideArchive && shown(FileItemAction.copy))
           IconButton(
             icon: const Icon(Icons.copy_rounded),
             tooltip: context.l10n.copyTooltip,
             onPressed: onCopy,
           ),
-        if (!isInsideArchive)
+        if (!isInsideArchive && shown(FileItemAction.move))
           IconButton(
             icon: Icon(
               Icons.cut_rounded,
@@ -184,7 +196,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
             onPressed: onCut,
           ),
-        if (!isInsideArchive && allowRenameAction)
+        if (!isInsideArchive && allowRenameAction && shown(FileItemAction.rename))
           IconButton(
             icon: Icon(
               Icons.drive_file_rename_outline_rounded,
@@ -193,7 +205,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
             onPressed: onRename,
           ),
-        if (!isInsideArchive)
+        if (!isInsideArchive && shown(FileItemAction.delete))
           IconButton(
             icon: Icon(
               Icons.delete_outline_rounded,
@@ -225,7 +237,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'unbookmark') onUnbookmark();
             if (value == 'file_info') onFileInfo?.call();
           },
-          itemBuilder: (context) => [
+          itemBuilder: (context) => applyItemActionMenuConfig(
+            [
             if (onOpenInNewTab != null)
               PopupMenuItem<String>(
                 value: 'open_in_new_tab',
@@ -451,7 +464,10 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
-          ],
+            ],
+            order: itemActionOrder,
+            hidden: hiddenItemActions,
+          ),
         ),
         const SizedBox(width: 8),
         VerticalDivider(width: 1, indent: 12, endIndent: 12, color: cs.outlineVariant),

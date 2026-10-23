@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "アイコンのタップで選択",
   "selectByIconDesc": "リスト表示で、ファイルまたはフォルダのアイコンをタップすると選択されます。オフにすると、アイコンをタップしても何も起こりません。",
   "showFileExtensionsLabel": "ファイルの拡張子を表示",
-  "showFileExtensionsDesc": "ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。"
+  "showFileExtensionsDesc": "ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。",
+  "itemActionsMenuTitle": "アイテムの操作",
+  "itemActionsMenuDesc": "アイテムのメニューと選択メニューに表示する操作と、その並び順を選択します。",
+  "itemActionsQuickRowHeader": "クイック操作の行",
+  "itemActionsMenuListHeader": "メニューリスト"
 }

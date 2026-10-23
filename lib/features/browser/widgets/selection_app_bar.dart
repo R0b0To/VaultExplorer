@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
+import 'package:vaultexplorer/features/browser/widgets/item_action_menu_config.dart';
 
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
@@ -55,6 +57,11 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
+  /// The user's item-action configuration: hidden actions are removed from
+  /// the buttons and the overflow menu, and the menu follows this order.
+  final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> hiddenItemActions;
+
   const SelectionAppBar({
     super.key,
     required this.selectedCount,
@@ -105,6 +112,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.showDecryptOption,
     required this.onEncrypt,
     required this.onDecrypt,
+    this.itemActionOrder = FileItemAction.values,
+    this.hiddenItemActions = const {},
   });
 
   @override
@@ -114,22 +123,29 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    bool shown(FileItemAction action) => !hiddenItemActions.contains(action);
     final bool showExtractButton =
-        allowExtractAction && (singleArchiveSelected || isInsideArchive);
+        allowExtractAction &&
+        (singleArchiveSelected || isInsideArchive) &&
+        shown(FileItemAction.extract);
+    final bool showShareButton =
+        showShareOption && shown(FileItemAction.share);
+    final bool showDeleteButton =
+        !isInsideArchive && shown(FileItemAction.delete);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final double barWidth = constraints.maxWidth;
 
         const double leadingWidth = 40.0;
-        final double deleteBtnWidth = isInsideArchive ? 0.0 : 48.0;
+        final double deleteBtnWidth = showDeleteButton ? 48.0 : 0.0;
         final double extractBtnWidth = showExtractButton ? 48.0 : 0.0;
         const double overflowBtnWidth = 48.0;
         const double endPadding = 4.0;
         const double minTitleWidth = 100.0;
         const double actionButtonWidth = 48.0;
 
-        final double shareBtnWidth = showShareOption ? 48.0 : 0.0;
+        final double shareBtnWidth = showShareButton ? 48.0 : 0.0;
 
         final double fixedOverhead = leadingWidth +
             deleteBtnWidth +
@@ -142,10 +158,24 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         final double availableWidth = barWidth - fixedOverhead;
         final int availableSlots = (availableWidth / actionButtonWidth).floor().clamp(0, 3);
 
-        final bool showCopy = !isInsideArchive && availableSlots >= 1;
-        final bool showCut = !isInsideArchive && availableSlots >= 2;
-        final bool showRename =
-            !isInsideArchive && allowRenameAction && availableSlots >= 3;
+        // Copy, move and rename take the free slots in that order; an action
+        // the user hid does not use one up, so the next one moves into it.
+        var freeSlots = availableSlots;
+        bool takeSlot(bool wanted) {
+          if (!wanted || freeSlots <= 0) return false;
+          freeSlots--;
+          return true;
+        }
+
+        final bool showCopy =
+            takeSlot(!isInsideArchive && shown(FileItemAction.copy));
+        final bool showCut =
+            takeSlot(!isInsideArchive && shown(FileItemAction.move));
+        final bool showRename = takeSlot(
+          !isInsideArchive &&
+              allowRenameAction &&
+              shown(FileItemAction.rename),
+        );
 
           return AppBar(
           backgroundColor: cs.surfaceContainer,
@@ -231,7 +261,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 tooltip: context.l10n.extract,
                 onPressed: onExtractSelectedArchive,
               ),
-            if (showShareOption)
+            if (showShareButton)
               IconButton(
                 icon: const Icon(Icons.share_rounded),
                 tooltip: context.l10n.shareAction,
@@ -255,7 +285,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.renameTooltip,
                 onPressed: readOnly ? null : onRename,
               ),
-            if (!isInsideArchive)
+            if (showDeleteButton)
               IconButton(
                 icon: Icon(
                   Icons.delete_outline_rounded,
@@ -288,7 +318,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'unbookmark') onUnbookmark();
                 if (value == 'file_info') onFileInfo?.call();
               },
-              itemBuilder: (context) => [
+              itemBuilder: (context) => applyItemActionMenuConfig(
+                [
                 // 1. Consumption
                 if (onOpenInNewTab != null)
                   PopupMenuItem<String>(
@@ -545,7 +576,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-              ],
+                ],
+                order: itemActionOrder,
+                hidden: hiddenItemActions,
+              ),
             ),
             const SizedBox(width: 4),
           ],

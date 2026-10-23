@@ -12337,4 +12337,17 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       'Zeigt die Endung am Ende von Dateinamen an. Bei der Suche werden Endungen immer angezeigt.';
+
+  @override
+  String get itemActionsMenuTitle => 'Elementaktionen';
+
+  @override
+  String get itemActionsMenuDesc =>
+      'Lege fest, welche Aktionen im Elementmenü und im Auswahlmenü erscheinen und in welcher Reihenfolge.';
+
+  @override
+  String get itemActionsQuickRowHeader => 'Schnellaktionen-Leiste';
+
+  @override
+  String get itemActionsMenuListHeader => 'Menüliste';
 }

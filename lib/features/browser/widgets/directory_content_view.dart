@@ -1176,6 +1176,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               await _decryptSelected();
             }
           : null,
+      // The user's choice of which actions to show, and in what order.
+      actionOrder: _toolbarConfig.itemActionsOrder,
+      hiddenActions: _toolbarConfig.hiddenItemActions,
     );
   }
 

@@ -335,6 +335,8 @@ PreferredSizeWidget buildBrowserAppBar(
         onEditVideo: doEditVideo,
         showEditAudioOption: showEditAudioOption,
         onEditAudio: doEditAudio,
+        itemActionOrder: toolbarConfig.itemActionsOrder,
+        hiddenItemActions: toolbarConfig.hiddenItemActions,
       );
     }
     return SelectionAppBarWide(
@@ -388,6 +390,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onEditVideo: doEditVideo,
       showEditAudioOption: showEditAudioOption,
       onEditAudio: doEditAudio,
+      itemActionOrder: toolbarConfig.itemActionsOrder,
+      hiddenItemActions: toolbarConfig.hiddenItemActions,
     );
   }
 

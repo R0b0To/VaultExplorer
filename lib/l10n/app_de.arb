@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "Per Tippen auf das Symbol auswählen",
   "selectByIconDesc": "In der Listenansicht wählt ein Tippen auf das Symbol einer Datei oder eines Ordners das Element aus. Ist die Option aus, passiert beim Tippen auf das Symbol nichts.",
   "showFileExtensionsLabel": "Dateiendungen anzeigen",
-  "showFileExtensionsDesc": "Zeigt die Endung am Ende von Dateinamen an. Bei der Suche werden Endungen immer angezeigt."
+  "showFileExtensionsDesc": "Zeigt die Endung am Ende von Dateinamen an. Bei der Suche werden Endungen immer angezeigt.",
+  "itemActionsMenuTitle": "Elementaktionen",
+  "itemActionsMenuDesc": "Lege fest, welche Aktionen im Elementmenü und im Auswahlmenü erscheinen und in welcher Reihenfolge.",
+  "itemActionsQuickRowHeader": "Schnellaktionen-Leiste",
+  "itemActionsMenuListHeader": "Menüliste"
 }

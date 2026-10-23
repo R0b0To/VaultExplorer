@@ -12336,4 +12336,17 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       'Mostra l’estensione alla fine dei nomi dei file. Durante la ricerca le estensioni vengono sempre mostrate.';
+
+  @override
+  String get itemActionsMenuTitle => 'Azioni dell’elemento';
+
+  @override
+  String get itemActionsMenuDesc =>
+      'Scegli quali azioni compaiono nel menu dell’elemento e nel menu di selezione, e in quale ordine.';
+
+  @override
+  String get itemActionsQuickRowHeader => 'Riga delle azioni rapide';
+
+  @override
+  String get itemActionsMenuListHeader => 'Elenco del menu';
 }

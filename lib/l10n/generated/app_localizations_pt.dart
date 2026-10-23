@@ -12333,4 +12333,17 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       'Mostra a extensão no final dos nomes de arquivo. Durante a pesquisa, as extensões são sempre mostradas.';
+
+  @override
+  String get itemActionsMenuTitle => 'Ações do item';
+
+  @override
+  String get itemActionsMenuDesc =>
+      'Escolha quais ações aparecem no menu do item e no menu de seleção, e em que ordem.';
+
+  @override
+  String get itemActionsQuickRowHeader => 'Linha de ações rápidas';
+
+  @override
+  String get itemActionsMenuListHeader => 'Lista do menu';
 }

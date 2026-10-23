@@ -11655,4 +11655,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get showFileExtensionsDesc => 'ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。';
+
+  @override
+  String get itemActionsMenuTitle => 'アイテムの操作';
+
+  @override
+  String get itemActionsMenuDesc => 'アイテムのメニューと選択メニューに表示する操作と、その並び順を選択します。';
+
+  @override
+  String get itemActionsQuickRowHeader => 'クイック操作の行';
+
+  @override
+  String get itemActionsMenuListHeader => 'メニューリスト';
 }

@@ -11656,4 +11656,16 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       '파일 이름 끝에 확장자를 표시합니다. 검색 중에는 항상 확장자가 표시됩니다.';
+
+  @override
+  String get itemActionsMenuTitle => '항목 작업';
+
+  @override
+  String get itemActionsMenuDesc => '항목 메뉴와 선택 메뉴에 표시할 작업과 표시 순서를 선택합니다.';
+
+  @override
+  String get itemActionsQuickRowHeader => '빠른 작업 줄';
+
+  @override
+  String get itemActionsMenuListHeader => '메뉴 목록';
 }

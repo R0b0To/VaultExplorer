@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
@@ -50,6 +51,77 @@ void main() {
       };
       final config = FileManagerToolbarConfig.fromJson(json);
       expect(config.autoStartPlaylistMode, isTrue);
+    });
+  });
+
+  group('FileManagerToolbarConfig item actions', () {
+    test('defaults list every action in order, none hidden', () {
+      final config = FileManagerToolbarConfig.defaults();
+
+      expect(config.itemActionsOrder, FileItemAction.values);
+      expect(config.hiddenItemActions, isEmpty);
+      expect(config.visibleItemActions, FileItemAction.values);
+
+      const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
+      expect(unassigned.itemActionsOrder, FileItemAction.values);
+      expect(unassigned.hiddenItemActions, isEmpty);
+    });
+
+    test('visibleItemActions drops hidden actions and keeps the order', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        itemActionsOrder: FileItemAction.values.reversed.toList(),
+        hiddenItemActions: {FileItemAction.delete, FileItemAction.pin},
+      );
+
+      expect(
+        config.visibleItemActions,
+        FileItemAction.values.reversed
+            .where(
+              (a) => a != FileItemAction.delete && a != FileItemAction.pin,
+            )
+            .toList(),
+      );
+    });
+
+    test('round-trips order and hidden actions through JSON', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        itemActionsOrder: FileItemAction.values.reversed.toList(),
+        hiddenItemActions: {FileItemAction.share, FileItemAction.encrypt},
+      );
+
+      final restored = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+
+      expect(restored.itemActionsOrder, config.itemActionsOrder);
+      expect(restored.hiddenItemActions, config.hiddenItemActions);
+    });
+
+    test('a config saved before the setting existed gets the defaults', () {
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'showBreadcrumbBar': true,
+      });
+
+      expect(config.itemActionsOrder, FileItemAction.values);
+      expect(config.hiddenItemActions, isEmpty);
+    });
+
+    test('fromJson drops unknown names and duplicates, appends missing', () {
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'itemActionsOrder': ['delete', 'noSuchAction', 'share', 'delete'],
+        'hiddenItemActions': ['noSuchAction', 'copy'],
+      });
+
+      expect(config.itemActionsOrder.take(2), [
+        FileItemAction.delete,
+        FileItemAction.share,
+      ]);
+      expect(config.itemActionsOrder.toSet(), FileItemAction.values.toSet());
+      expect(
+        config.itemActionsOrder.length,
+        FileItemAction.values.length,
+      );
+      expect(config.hiddenItemActions, {FileItemAction.copy});
     });
   });
 

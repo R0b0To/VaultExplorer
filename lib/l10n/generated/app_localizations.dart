@@ -20580,6 +20580,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show the extension at the end of file names. Extensions are always shown while searching.'**
   String get showFileExtensionsDesc;
+
+  /// Title of the settings screen, and of the entry that opens it, for choosing which item actions are shown and their order
+  ///
+  /// In en, this message translates to:
+  /// **'Item actions'**
+  String get itemActionsMenuTitle;
+
+  /// Explains the item actions settings screen, which controls the actions shown in the item actions sheet and the selection bar menu
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which actions appear in the item menu and the selection menu, and the order they appear in.'**
+  String get itemActionsMenuDesc;
+
+  /// Header of the list of quick actions, which the item actions sheet shows as a horizontal row of icon buttons
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions row'**
+  String get itemActionsQuickRowHeader;
+
+  /// Header of the list of the remaining item actions, which the item actions sheet shows as a vertical list
+  ///
+  /// In en, this message translates to:
+  /// **'Menu list'**
+  String get itemActionsMenuListHeader;
 }
 
 class _AppLocalizationsDelegate

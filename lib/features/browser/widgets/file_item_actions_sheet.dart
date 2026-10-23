@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -58,6 +59,11 @@ class FileItemActionsSheet extends ConsumerWidget {
   /// Tab actions (only wired while the file manager is hosted in tabs).
   final VoidCallback? onOpenInNewTab;
 
+  /// The user's item-action configuration: hidden actions are not offered,
+  /// and the quick row and the list follow this order.
+  final List<FileItemAction> actionOrder;
+  final Set<FileItemAction> hiddenActions;
+
   const FileItemActionsSheet({
     super.key,
     required this.entry,
@@ -92,6 +98,8 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEncrypt,
     this.onDecrypt,
     this.onOpenInNewTab,
+    this.actionOrder = FileItemAction.values,
+    this.hiddenActions = const {},
   });
 
   static Future<void> show(
@@ -128,6 +136,8 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEncrypt,
     VoidCallback? onDecrypt,
     VoidCallback? onOpenInNewTab,
+    List<FileItemAction> actionOrder = FileItemAction.values,
+    Set<FileItemAction> hiddenActions = const {},
   }) {
     return showModalBottomSheet(
       context: context,
@@ -169,6 +179,8 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEncrypt: onEncrypt,
         onDecrypt: onDecrypt,
         onOpenInNewTab: onOpenInNewTab,
+        actionOrder: actionOrder,
+        hiddenActions: hiddenActions,
       ),
     );
   }
@@ -245,80 +257,238 @@ class FileItemActionsSheet extends ConsumerWidget {
     );
   }
 
-  /// Horizontal row of the four primary actions (Share, Copy, Move, Delete).
+  /// Wraps [onTap] the way every sheet action runs: close the sheet first,
+  /// then invoke the callback. A confirmation (e.g. for delete) lives in the
+  /// caller's callback and is untouched.
+  VoidCallback _closeThen(BuildContext context, VoidCallback onTap) {
+    return () {
+      Navigator.pop(context);
+      onTap();
+    };
+  }
+
+  /// The button for a quick action, or null when it does not apply here
+  /// (archive entries are virtual, and a missing callback means the caller
+  /// does not offer the action).
+  Widget? _buildQuickButton(
+    BuildContext context,
+    ColorScheme cs,
+    FileItemAction action,
+  ) {
+    if (archiveContext != null) return null;
+    final l10n = context.l10n;
+    switch (action) {
+      case FileItemAction.share:
+        if (onShare == null) return null;
+        return _QuickActionButton(
+          icon: Icons.share_rounded,
+          label: l10n.shareAction,
+          onTap: _closeThen(context, onShare!),
+        );
+      case FileItemAction.copy:
+        return _QuickActionButton(
+          icon: Icons.copy_rounded,
+          label: l10n.copyAction,
+          onTap: _closeThen(context, onCopy),
+        );
+      case FileItemAction.move:
+        return _QuickActionButton(
+          icon: Icons.cut_rounded,
+          label: l10n.moveAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onCut),
+        );
+      case FileItemAction.delete:
+        // Destructive: red accent. The confirmation dialog lives in the
+        // `onDelete` callback supplied by the caller and is untouched.
+        return _QuickActionButton(
+          icon: Icons.delete_outline_rounded,
+          label: l10n.delete,
+          color: cs.error,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onDelete),
+        );
+      default:
+        return null;
+    }
+  }
+
+  /// The list row for a non-quick action, or null when it does not apply.
+  Widget? _buildListTile(BuildContext context, FileItemAction action) {
+    final l10n = context.l10n;
+    final inArchive = archiveContext != null;
+    switch (action) {
+      case FileItemAction.openInNewTab:
+        if (onOpenInNewTab == null) return null;
+        return _ActionTile(
+          icon: Icons.tab_rounded,
+          label: l10n.browserTabOpenInNewTab,
+          onTap: _closeThen(context, onOpenInNewTab!),
+        );
+      case FileItemAction.extract:
+        // Archive entries are virtual, read-only entries. The sole file
+        // operation available there is staging one for extraction into a
+        // real destination.
+        if (onExtract == null) return null;
+        return _ActionTile(
+          icon: Icons.unarchive_outlined,
+          label: l10n.extract,
+          onTap: _closeThen(context, onExtract!),
+        );
+      case FileItemAction.openWith:
+        if (inArchive || onOpenWith == null) return null;
+        return _ActionTile(
+          icon: Icons.open_in_new_rounded,
+          label: l10n.openWithAppAction,
+          onTap: _closeThen(context, onOpenWith!),
+        );
+      case FileItemAction.editImage:
+        if (inArchive || onEditImage == null) return null;
+        return _ActionTile(
+          icon: Icons.edit_outlined,
+          label: l10n.editImageAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onEditImage!),
+        );
+      case FileItemAction.editVideo:
+        if (inArchive || onEditVideo == null) return null;
+        return _ActionTile(
+          icon: Icons.content_cut_rounded,
+          label: l10n.videoEditorEditAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onEditVideo!),
+        );
+      case FileItemAction.editAudio:
+        if (inArchive || onEditAudio == null) return null;
+        return _ActionTile(
+          icon: Icons.graphic_eq_rounded,
+          label: l10n.audioEditorEditAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onEditAudio!),
+        );
+      case FileItemAction.rename:
+        if (inArchive) return null;
+        return _ActionTile(
+          icon: Icons.drive_file_rename_outline_rounded,
+          label: l10n.renameAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onRename),
+        );
+      case FileItemAction.archive:
+        if (inArchive || onArchive == null) return null;
+        return _ActionTile(
+          icon: Icons.archive_outlined,
+          label: l10n.archiveSelectionAction,
+          enabled: !isReadOnly,
+          onTap: _closeThen(context, onArchive!),
+        );
+      case FileItemAction.exportToDevice:
+        if (inArchive || onExport == null) return null;
+        return _ActionTile(
+          icon: Icons.drive_folder_upload_rounded,
+          label: l10n.exportToDeviceAction,
+          onTap: _closeThen(context, onExport!),
+        );
+      case FileItemAction.encrypt:
+        if (inArchive || onEncrypt == null) return null;
+        return _ActionTile(
+          icon: Icons.lock_outline_rounded,
+          label: l10n.cryptoDirectionEncrypt,
+          onTap: _closeThen(context, onEncrypt!),
+        );
+      case FileItemAction.decrypt:
+        if (inArchive || onDecrypt == null) return null;
+        return _ActionTile(
+          icon: Icons.lock_open_rounded,
+          label: l10n.cryptoDirectionDecrypt,
+          onTap: _closeThen(context, onDecrypt!),
+        );
+      case FileItemAction.docProvider:
+        if (inArchive || onToggleDocProvider == null) return null;
+        return _ActionTile(
+          icon: isDocumentProviderMounted
+              ? Icons.folder_shared_rounded
+              : Icons.folder_shared_outlined,
+          label: isDocumentProviderMounted
+              ? l10n.documentProviderSettingsMenu
+              : l10n.exposeAsDocumentProviderMenu,
+          onTap: _closeThen(context, onToggleDocProvider!),
+        );
+      case FileItemAction.syncSettings:
+        if (inArchive || onSyncSettings == null) return null;
+        return _ActionTile(
+          icon: Icons.sync_rounded,
+          label: l10n.autoSyncMenuAction,
+          onTap: _closeThen(context, onSyncSettings!),
+        );
+      case FileItemAction.pin:
+        if (inArchive) return null;
+        return _ActionTile(
+          icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+          label: isPinned ? l10n.unpinAction : l10n.pinAction,
+          onTap: _closeThen(context, onTogglePin),
+        );
+      case FileItemAction.bookmark:
+        if (inArchive) return null;
+        return _ActionTile(
+          icon: isBookmark ? Icons.star_outline_rounded : Icons.star_rounded,
+          label: isBookmark ? l10n.unbookmarkAction : l10n.bookmarkAction,
+          onTap: _closeThen(context, onToggleBookmark),
+        );
+      case FileItemAction.share:
+      case FileItemAction.copy:
+      case FileItemAction.move:
+      case FileItemAction.delete:
+        return null; // Quick actions: see _buildQuickButton.
+    }
+  }
+
+  /// Horizontal row of quick-action buttons.
   ///
   /// Each button is a Flexible child under `spaceAround`: it takes its natural
   /// width (>= 64dp, so the touch target is always >= 48x48dp) and shrinks, with
   /// an ellipsized label, rather than overflowing on narrow screens or with
   /// long localized labels.
-  Widget _buildQuickActions(BuildContext context, ColorScheme cs) {
-    final l10n = context.l10n;
-    final actions = <Widget>[
-      if (onShare != null)
-        _QuickActionButton(
-          icon: Icons.share_rounded,
-          label: l10n.shareAction,
-          onTap: () {
-            Navigator.pop(context);
-            onShare!();
-          },
-        ),
-      _QuickActionButton(
-        icon: Icons.copy_rounded,
-        label: l10n.copyAction,
-        onTap: () {
-          Navigator.pop(context);
-          onCopy();
-        },
-      ),
-      _QuickActionButton(
-        icon: Icons.cut_rounded,
-        label: l10n.moveAction,
-        enabled: !isReadOnly,
-        onTap: () {
-          Navigator.pop(context);
-          onCut();
-        },
-      ),
-      // Destructive: red accent. The confirmation dialog lives in the
-      // `onDelete` callback supplied by the caller and is untouched.
-      _QuickActionButton(
-        icon: Icons.delete_outline_rounded,
-        label: l10n.delete,
-        color: cs.error,
-        enabled: !isReadOnly,
-        onTap: () {
-          Navigator.pop(context);
-          onDelete();
-        },
-      ),
-    ];
-
+  Widget _buildQuickRow(List<Widget> buttons) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [for (final action in actions) Flexible(child: action)],
+        children: [for (final button in buttons) Flexible(child: button)],
       ),
     );
-  }
-
-  /// Joins the non-empty action groups with a small gap, so a group whose
-  /// callbacks are all null/not applicable never leaves a stray spacer behind.
-  static List<Widget> _withGroupSpacing(List<List<Widget>> groups) {
-    final result = <Widget>[];
-    for (final group in groups) {
-      if (group.isEmpty) continue;
-      if (result.isNotEmpty) result.add(const SizedBox(height: 8));
-      result.addAll(group);
-    }
-    return result;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    // Apply the user's configuration: hidden actions are dropped and the rest
+    // follow the configured order. Actions that do not apply to this item
+    // (no callback, archive entry) yield null and are skipped.
+    final configured = [
+      for (final action in actionOrder)
+        if (!hiddenActions.contains(action)) action,
+    ];
+    final quickButtons = configured
+        .where((action) => action.isQuickAction)
+        .map((action) => _buildQuickButton(context, cs, action))
+        .whereType<Widget>()
+        .toList();
+    final listItems = <Widget>[];
+    int? previousGroup;
+    for (final action in configured) {
+      if (action.isQuickAction) continue;
+      final tile = _buildListTile(context, action);
+      if (tile == null) continue;
+      // A small gap between rows of different groups, as before.
+      if (previousGroup != null && previousGroup != action.group) {
+        listItems.add(const SizedBox(height: 8));
+      }
+      listItems.add(tile);
+      previousGroup = action.group;
+    }
 
     final isDir = entry.isDir;
     final isInsideArchive = archiveContext != null;
@@ -402,203 +572,25 @@ class FileItemActionsSheet extends ConsumerWidget {
             ),
             const Divider(height: 16),
 
-            // Primary actions: horizontal quick row. Archive entries are
-            // virtual, read-only entries, so none of these apply there.
-            if (!isInsideArchive) ...[
-              _buildQuickActions(context, cs),
-              Divider(
-                height: 16,
-                color: cs.outlineVariant.withValues(alpha: 0.5),
-              ),
+            if (quickButtons.isNotEmpty) ...[
+              _buildQuickRow(quickButtons),
+              if (listItems.isNotEmpty)
+                Divider(
+                  height: 16,
+                  color: cs.outlineVariant.withValues(alpha: 0.5),
+                ),
             ],
 
             // Secondary actions list
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _withGroupSpacing([
-                    // Tabs
-                    [
-                      if (onOpenInNewTab != null)
-                        _ActionTile(
-                          icon: Icons.tab_rounded,
-                          label: context.l10n.browserTabOpenInNewTab,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onOpenInNewTab!();
-                          },
-                        ),
-                    ],
-
-                    // Archive entries are virtual, read-only entries. The
-                    // sole file operation available here is staging one for
-                    // extraction into a real destination.
-                    [
-                      if (onExtract != null)
-                        _ActionTile(
-                          icon: Icons.unarchive_outlined,
-                          label: context.l10n.extract,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onExtract!();
-                          },
-                        ),
-                    ],
-
-                    // Consumption & editing
-                    [
-                      if (!isInsideArchive && onOpenWith != null)
-                        _ActionTile(
-                          icon: Icons.open_in_new_rounded,
-                          label: context.l10n.openWithAppAction,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onOpenWith!();
-                          },
-                        ),
-                      if (!isInsideArchive && onEditImage != null)
-                        _ActionTile(
-                          icon: Icons.edit_outlined,
-                          label: context.l10n.editImageAction,
-                          enabled: !isReadOnly,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onEditImage!();
-                          },
-                        ),
-                      if (!isInsideArchive && onEditVideo != null)
-                        _ActionTile(
-                          icon: Icons.content_cut_rounded,
-                          label: context.l10n.videoEditorEditAction,
-                          enabled: !isReadOnly,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onEditVideo!();
-                          },
-                        ),
-                      if (!isInsideArchive && onEditAudio != null)
-                        _ActionTile(
-                          icon: Icons.graphic_eq_rounded,
-                          label: context.l10n.audioEditorEditAction,
-                          enabled: !isReadOnly,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onEditAudio!();
-                          },
-                        ),
-                    ],
-
-                    // Rename & archive
-                    [
-                      if (!isInsideArchive)
-                        _ActionTile(
-                          icon: Icons.drive_file_rename_outline_rounded,
-                          label: context.l10n.renameAction,
-                          enabled: !isReadOnly,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onRename();
-                          },
-                        ),
-                      if (!isInsideArchive && onArchive != null)
-                        _ActionTile(
-                          icon: Icons.archive_outlined,
-                          label: context.l10n.archiveSelectionAction,
-                          enabled: !isReadOnly,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onArchive!();
-                          },
-                        ),
-                    ],
-
-                    // Vault, crypto & integrations (same order as the selection bar)
-                    [
-                      if (!isInsideArchive && onExport != null)
-                        _ActionTile(
-                          icon: Icons.drive_folder_upload_rounded,
-                          label: context.l10n.exportToDeviceAction,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onExport!();
-                          },
-                        ),
-                      if (!isInsideArchive && onEncrypt != null)
-                        _ActionTile(
-                          icon: Icons.lock_outline_rounded,
-                          label: context.l10n.cryptoDirectionEncrypt,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onEncrypt!();
-                          },
-                        ),
-                      if (!isInsideArchive && onDecrypt != null)
-                        _ActionTile(
-                          icon: Icons.lock_open_rounded,
-                          label: context.l10n.cryptoDirectionDecrypt,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onDecrypt!();
-                          },
-                        ),
-                      if (!isInsideArchive && onToggleDocProvider != null)
-                        _ActionTile(
-                          icon: isDocumentProviderMounted
-                              ? Icons.folder_shared_rounded
-                              : Icons.folder_shared_outlined,
-                          label: isDocumentProviderMounted
-                              ? context.l10n.documentProviderSettingsMenu
-                              : context.l10n.exposeAsDocumentProviderMenu,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onToggleDocProvider!();
-                          },
-                        ),
-                      if (!isInsideArchive && onSyncSettings != null)
-                        _ActionTile(
-                          icon: Icons.sync_rounded,
-                          label: context.l10n.autoSyncMenuAction,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onSyncSettings!();
-                          },
-                        ),
-                    ],
-
-                    // Pins & bookmarks
-                    [
-                      if (!isInsideArchive) ...[
-                        _ActionTile(
-                          icon: isPinned
-                              ? Icons.push_pin_outlined
-                              : Icons.push_pin_rounded,
-                          label: isPinned
-                              ? context.l10n.unpinAction
-                              : context.l10n.pinAction,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onTogglePin();
-                          },
-                        ),
-                        _ActionTile(
-                          icon: isBookmark
-                              ? Icons.star_outline_rounded
-                              : Icons.star_rounded,
-                          label: isBookmark
-                              ? context.l10n.unbookmarkAction
-                              : context.l10n.bookmarkAction,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onToggleBookmark();
-                          },
-                        ),
-                      ],
-                    ],
-                  ]),
+            if (listItems.isNotEmpty)
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: listItems,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

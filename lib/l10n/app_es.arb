@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "Seleccionar tocando el icono",
   "selectByIconDesc": "En la vista de lista, tocar el icono de un archivo o carpeta lo selecciona. Si está desactivado, tocar el icono no hace nada.",
   "showFileExtensionsLabel": "Mostrar extensiones de archivo",
-  "showFileExtensionsDesc": "Muestra la extensión al final de los nombres de archivo. Durante la búsqueda las extensiones siempre se muestran."
+  "showFileExtensionsDesc": "Muestra la extensión al final de los nombres de archivo. Durante la búsqueda las extensiones siempre se muestran.",
+  "itemActionsMenuTitle": "Acciones del elemento",
+  "itemActionsMenuDesc": "Elige qué acciones aparecen en el menú del elemento y en el menú de selección, y en qué orden.",
+  "itemActionsQuickRowHeader": "Fila de acciones rápidas",
+  "itemActionsMenuListHeader": "Lista del menú"
 }

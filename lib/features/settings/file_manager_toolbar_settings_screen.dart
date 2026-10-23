@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart'
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/features/settings/file_manager_item_actions_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -490,6 +491,40 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 builder: (_) => SkinAreaScope(
                                   area: SkinArea.settings,
                                   child: FileManagerToolbarActionsScreen(
+                                    containerUri: containerUri,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            leading: Icon(
+                              Icons.more_horiz_rounded,
+                              color: cs.primary,
+                            ),
+                            title: Text(
+                              context.l10n.itemActionsMenuTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${state.config.itemActionsOrder.length - state.config.hiddenItemActions.length} / ${state.config.itemActionsOrder.length}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SkinAreaScope(
+                                  area: SkinArea.settings,
+                                  child: FileManagerItemActionsScreen(
                                     containerUri: containerUri,
                                   ),
                                 ),

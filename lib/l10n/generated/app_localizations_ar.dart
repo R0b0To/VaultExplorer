@@ -12367,4 +12367,17 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       'يعرض الامتداد في نهاية أسماء الملفات. تظهر الامتدادات دائمًا أثناء البحث.';
+
+  @override
+  String get itemActionsMenuTitle => 'إجراءات العنصر';
+
+  @override
+  String get itemActionsMenuDesc =>
+      'اختر الإجراءات التي تظهر في قائمة العنصر وقائمة التحديد، وترتيب ظهورها.';
+
+  @override
+  String get itemActionsQuickRowHeader => 'صف الإجراءات السريعة';
+
+  @override
+  String get itemActionsMenuListHeader => 'قائمة الخيارات';
 }

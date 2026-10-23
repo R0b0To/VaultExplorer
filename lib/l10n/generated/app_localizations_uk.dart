@@ -12425,4 +12425,17 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showFileExtensionsDesc =>
       'Показує розширення в кінці імен файлів. Під час пошуку розширення завжди показуються.';
+
+  @override
+  String get itemActionsMenuTitle => 'Дії з елементом';
+
+  @override
+  String get itemActionsMenuDesc =>
+      'Виберіть, які дії відображаються в меню елемента та в меню вибору, і в якому порядку.';
+
+  @override
+  String get itemActionsQuickRowHeader => 'Рядок швидких дій';
+
+  @override
+  String get itemActionsMenuListHeader => 'Список меню';
 }

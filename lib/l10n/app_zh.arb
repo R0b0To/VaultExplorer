@@ -3403,5 +3403,9 @@
   "selectByIconLabel": "点按图标选择",
   "selectByIconDesc": "在列表视图中，点按文件或文件夹的图标即可将其选中。关闭后，点按图标不会有任何反应。",
   "showFileExtensionsLabel": "显示文件扩展名",
-  "showFileExtensionsDesc": "在文件名末尾显示扩展名。搜索时始终显示扩展名。"
+  "showFileExtensionsDesc": "在文件名末尾显示扩展名。搜索时始终显示扩展名。",
+  "itemActionsMenuTitle": "项目操作",
+  "itemActionsMenuDesc": "选择在项目菜单和选择菜单中显示哪些操作，以及它们的显示顺序。",
+  "itemActionsQuickRowHeader": "快捷操作行",
+  "itemActionsMenuListHeader": "菜单列表"
 }

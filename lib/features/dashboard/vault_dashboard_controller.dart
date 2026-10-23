@@ -265,13 +265,14 @@ class VaultDashboardController extends _$VaultDashboardController {
 
   void _syncSecureScreen() {
     final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
+    final blockScreenshots = state.appSettings.blockScreenshots;
     unawaited(
       disguiseModeApi.getMode().then((mode) {
         if (mode == DisguiseMode.decoy) {
           return secureScreenPolicy.disableForDecoy();
         }
         return secureScreenPolicy.apply(
-          preference: state.appSettings.blockScreenshots,
+          preference: blockScreenshots,
         );
       }),
     );
@@ -394,8 +395,6 @@ class VaultDashboardController extends _$VaultDashboardController {
   /// lives on the shared controller so both normal and decoy surfaces enforce
   /// the same configured behavior.
   Future<void> lockAllMountedContainersForAutoLock() async {
-    await loadAll();
-    if (!ref.mounted) return;
     final snapshot = state;
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final mounted = List<MountedContainer>.from(snapshot.mounted);
@@ -426,8 +425,6 @@ class VaultDashboardController extends _$VaultDashboardController {
   /// Applies per-container "Immediately" overrides after a real background
   /// event or screen-off signal.
   Future<void> lockImmediatelyConfiguredContainers() async {
-    await loadAll();
-    if (!ref.mounted) return;
     final snapshot = state;
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final targets = List<MountedContainer>.from(snapshot.mounted).where(
@@ -447,8 +444,6 @@ class VaultDashboardController extends _$VaultDashboardController {
   /// Applies per-container "Screen Lock Only" overrides on a genuine
   /// screen-off event, never on ordinary backgrounding.
   Future<void> lockScreenLockOnlyConfiguredContainers() async {
-    await loadAll();
-    if (!ref.mounted) return;
     final snapshot = state;
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final targets = List<MountedContainer>.from(snapshot.mounted).where(

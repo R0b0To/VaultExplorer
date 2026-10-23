@@ -11483,4 +11483,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => '菜单列表';
+
+  @override
+  String get itemActionsMoveToQuickRow => '移到快捷操作行';
+
+  @override
+  String get itemActionsMoveToMenuList => '移到菜单列表';
 }

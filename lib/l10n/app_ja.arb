@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "アイテムの操作",
   "itemActionsMenuDesc": "アイテムのメニューと選択メニューに表示する操作と、その並び順を選択します。",
   "itemActionsQuickRowHeader": "クイック操作の行",
-  "itemActionsMenuListHeader": "メニューリスト"
+  "itemActionsMenuListHeader": "メニューリスト",
+  "itemActionsMoveToQuickRow": "クイック操作の行に移動",
+  "itemActionsMoveToMenuList": "メニューリストに移動"
 }

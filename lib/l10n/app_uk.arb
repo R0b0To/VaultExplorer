@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "Дії з елементом",
   "itemActionsMenuDesc": "Виберіть, які дії відображаються в меню елемента та в меню вибору, і в якому порядку.",
   "itemActionsQuickRowHeader": "Рядок швидких дій",
-  "itemActionsMenuListHeader": "Список меню"
+  "itemActionsMenuListHeader": "Список меню",
+  "itemActionsMoveToQuickRow": "Перемістити до рядка швидких дій",
+  "itemActionsMoveToMenuList": "Перемістити до списку меню"
 }

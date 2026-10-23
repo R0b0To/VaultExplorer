@@ -61,6 +61,7 @@ void main() {
       expect(config.itemActionsOrder, FileItemAction.values);
       expect(config.hiddenItemActions, isEmpty);
       expect(config.visibleItemActions, FileItemAction.values);
+      expect(config.quickItemActions, FileItemAction.defaultQuickActions);
 
       const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
       expect(unassigned.itemActionsOrder, FileItemAction.values);
@@ -95,6 +96,46 @@ void main() {
 
       expect(restored.itemActionsOrder, config.itemActionsOrder);
       expect(restored.hiddenItemActions, config.hiddenItemActions);
+    });
+
+    test('round-trips a custom quick row through JSON', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        quickItemActions: {
+          FileItemAction.rename,
+          FileItemAction.pin,
+          FileItemAction.encrypt,
+        },
+      );
+
+      final restored = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+
+      expect(restored.quickItemActions, config.quickItemActions);
+    });
+
+    test('an absent quick row gets the original four; empty stays empty', () {
+      final absent = FileManagerToolbarConfig.fromJson(<String, dynamic>{});
+      final empty = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'quickItemActions': <String>[],
+      });
+
+      expect(absent.quickItemActions, FileItemAction.defaultQuickActions);
+      expect(empty.quickItemActions, isEmpty);
+    });
+
+    test('a stored quick row drops unknown names and is cut to the max', () {
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'quickItemActions': [
+          'noSuchAction',
+          ...FileItemAction.values.map((a) => a.toJson()),
+        ],
+      });
+
+      expect(
+        config.quickItemActions,
+        FileItemAction.values.take(FileItemAction.maxQuickActions).toSet(),
+      );
     });
 
     test('a config saved before the setting existed gets the defaults', () {

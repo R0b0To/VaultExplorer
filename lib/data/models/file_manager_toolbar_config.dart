@@ -74,6 +74,11 @@ class FileManagerToolbarConfig {
   /// exactly once (see [fromJson]).
   final List<FileItemAction> itemActionsOrder;
   final Set<FileItemAction> hiddenItemActions;
+
+  /// The actions the item sheet shows in its horizontal quick row; every other
+  /// action is a list row. At most [FileItemAction.maxQuickActions]. Their
+  /// order within the row (and the list) is [itemActionsOrder].
+  final Set<FileItemAction> quickItemActions;
   final bool showGridFileNames;
   final GridAspectRatio gridAspectRatio;
 
@@ -146,6 +151,7 @@ class FileManagerToolbarConfig {
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.itemActionsOrder = FileItemAction.values,
     this.hiddenItemActions = const {},
+    this.quickItemActions = FileItemAction.defaultQuickActions,
     this.showGridFileNames = true,
     this.gridAspectRatio = GridAspectRatio.square,
     this.gridCornerStyle = GridCornerStyle.rounded,
@@ -201,6 +207,7 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: {FileDetailColumn.type},
         itemActionsOrder: FileItemAction.values,
         hiddenItemActions: {},
+        quickItemActions: FileItemAction.defaultQuickActions,
         showGridFileNames: true,
         gridAspectRatio: GridAspectRatio.square,
         gridCornerStyle: GridCornerStyle.rounded,
@@ -315,6 +322,7 @@ class FileManagerToolbarConfig {
     Set<FileDetailColumn>? hiddenDetailColumns,
     List<FileItemAction>? itemActionsOrder,
     Set<FileItemAction>? hiddenItemActions,
+    Set<FileItemAction>? quickItemActions,
     bool? showGridFileNames,
     GridAspectRatio? gridAspectRatio,
     GridCornerStyle? gridCornerStyle,
@@ -362,6 +370,7 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         itemActionsOrder: itemActionsOrder ?? this.itemActionsOrder,
         hiddenItemActions: hiddenItemActions ?? this.hiddenItemActions,
+        quickItemActions: quickItemActions ?? this.quickItemActions,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
         gridCornerStyle: gridCornerStyle ?? this.gridCornerStyle,
@@ -418,6 +427,7 @@ class FileManagerToolbarConfig {
     'hiddenDetailColumns',
     'itemActionsOrder',
     'hiddenItemActions',
+    'quickItemActions',
     'showGridFileNames',
     'gridAspectRatio',
     'gridCornerStyle',
@@ -524,6 +534,7 @@ class FileManagerToolbarConfig {
         'itemActionsOrder': itemActionsOrder.map((a) => a.toJson()).toList(),
         'hiddenItemActions':
             hiddenItemActions.map((a) => a.toJson()).toList(),
+        'quickItemActions': quickItemActions.map((a) => a.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
         'gridAspectRatio': gridAspectRatio.toJson(),
         'gridCornerStyle': gridCornerStyle.toJson(),
@@ -589,6 +600,17 @@ class FileManagerToolbarConfig {
         .map((v) => FileItemAction.fromJson(v as String?))
         .whereType<FileItemAction>()
         .toSet();
+    // Absent in configs from before the quick row was configurable: keep the
+    // original four. A stored list longer than the row can hold is cut.
+    final rawQuickItemActions = j['quickItemActions'] as List<dynamic>?;
+    final quickItemActions = rawQuickItemActions == null
+        ? FileItemAction.defaultQuickActions
+        : rawQuickItemActions
+              .map((v) => FileItemAction.fromJson(v as String?))
+              .whereType<FileItemAction>()
+              .toSet()
+              .take(FileItemAction.maxQuickActions)
+              .toSet();
     final rawFolderLayoutModes =
         (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
               (k, v) => MapEntry(k, v as String),
@@ -663,6 +685,7 @@ class FileManagerToolbarConfig {
       hiddenDetailColumns: hiddenDetailColumns,
       itemActionsOrder: rawItemActions,
       hiddenItemActions: hiddenItemActions,
+      quickItemActions: quickItemActions,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       gridAspectRatio:
           GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),

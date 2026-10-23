@@ -13910,5 +13910,13 @@
   "itemActionsMenuListHeader": "Menu list",
   "@itemActionsMenuListHeader": {
     "description": "Header of the list of the remaining item actions, which the item actions sheet shows as a vertical list"
+  },
+  "itemActionsMoveToQuickRow": "Move to quick actions row",
+  "@itemActionsMoveToQuickRow": {
+    "description": "Tooltip of the button that moves an item action from the menu list into the item sheet quick actions row"
+  },
+  "itemActionsMoveToMenuList": "Move to menu list",
+  "@itemActionsMoveToMenuList": {
+    "description": "Tooltip of the button that moves an item action from the quick actions row into the item sheet menu list"
   }
 }

@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "Elementaktionen",
   "itemActionsMenuDesc": "Lege fest, welche Aktionen im Elementmenü und im Auswahlmenü erscheinen und in welcher Reihenfolge.",
   "itemActionsQuickRowHeader": "Schnellaktionen-Leiste",
-  "itemActionsMenuListHeader": "Menüliste"
+  "itemActionsMenuListHeader": "Menüliste",
+  "itemActionsMoveToQuickRow": "In die Schnellaktionen-Leiste verschieben",
+  "itemActionsMoveToMenuList": "In die Menüliste verschieben"
 }

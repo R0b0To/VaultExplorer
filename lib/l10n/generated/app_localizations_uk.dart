@@ -12438,4 +12438,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'Список меню';
+
+  @override
+  String get itemActionsMoveToQuickRow => 'Перемістити до рядка швидких дій';
+
+  @override
+  String get itemActionsMoveToMenuList => 'Перемістити до списку меню';
 }

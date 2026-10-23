@@ -12380,4 +12380,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'قائمة الخيارات';
+
+  @override
+  String get itemActionsMoveToQuickRow => 'نقل إلى صف الإجراءات السريعة';
+
+  @override
+  String get itemActionsMoveToMenuList => 'نقل إلى قائمة الخيارات';
 }

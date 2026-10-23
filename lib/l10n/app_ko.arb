@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "항목 작업",
   "itemActionsMenuDesc": "항목 메뉴와 선택 메뉴에 표시할 작업과 표시 순서를 선택합니다.",
   "itemActionsQuickRowHeader": "빠른 작업 줄",
-  "itemActionsMenuListHeader": "메뉴 목록"
+  "itemActionsMenuListHeader": "메뉴 목록",
+  "itemActionsMoveToQuickRow": "빠른 작업 줄로 이동",
+  "itemActionsMoveToMenuList": "메뉴 목록으로 이동"
 }

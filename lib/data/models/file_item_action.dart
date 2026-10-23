@@ -8,9 +8,10 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 /// nothing customised, both surfaces list their actions exactly as they did
 /// before this was configurable.
 ///
-/// [share], [copy], [move] and [delete] are the *quick* actions: the item
-/// sheet lays them out as a horizontal row of icon buttons instead of list
-/// rows. Everything else is a list row.
+/// In the item sheet an action is either one of the *quick* actions, laid out
+/// as a horizontal row of icon-over-label buttons, or a list row. Which
+/// actions are quick is the user's choice (see [defaultQuickActions] and
+/// [maxQuickActions]); every action works in either place.
 enum FileItemAction {
   openInNewTab,
   extract,
@@ -32,37 +33,40 @@ enum FileItemAction {
   bookmark,
   delete;
 
-  /// Whether the item sheet shows this action in its horizontal quick row.
-  bool get isQuickAction => switch (this) {
-    FileItemAction.share ||
-    FileItemAction.copy ||
-    FileItemAction.move ||
-    FileItemAction.delete => true,
-    _ => false,
+  /// The actions in the item sheet's quick row until the user changes it.
+  static const Set<FileItemAction> defaultQuickActions = {
+    FileItemAction.share,
+    FileItemAction.copy,
+    FileItemAction.move,
+    FileItemAction.delete,
   };
+
+  /// How many actions the quick row can hold. Each button needs at least
+  /// 48dp, so this many still fit on a 360dp-wide phone.
+  static const int maxQuickActions = 5;
 
   /// Visual group of a list row in the item sheet. A small gap separates two
   /// neighbouring rows of different groups, which reproduces the original
   /// grouping while the order is the default one and degrades gracefully
-  /// when the user mixes groups.
+  /// when the user mixes groups. The numbers follow the default order.
   int get group => switch (this) {
     FileItemAction.openInNewTab => 0,
     FileItemAction.extract => 1,
     FileItemAction.openWith ||
+    FileItemAction.share ||
     FileItemAction.editImage ||
     FileItemAction.editVideo ||
     FileItemAction.editAudio => 2,
-    FileItemAction.rename || FileItemAction.archive => 3,
+    FileItemAction.rename ||
+    FileItemAction.copy ||
+    FileItemAction.move ||
+    FileItemAction.archive => 3,
     FileItemAction.exportToDevice ||
     FileItemAction.encrypt ||
     FileItemAction.decrypt ||
     FileItemAction.docProvider ||
     FileItemAction.syncSettings => 4,
     FileItemAction.pin || FileItemAction.bookmark => 5,
-    // Quick actions are not list rows; any value works.
-    FileItemAction.share ||
-    FileItemAction.copy ||
-    FileItemAction.move ||
     FileItemAction.delete => 6,
   };
 

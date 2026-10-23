@@ -20604,6 +20604,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Menu list'**
   String get itemActionsMenuListHeader;
+
+  /// Tooltip of the button that moves an item action from the menu list into the item sheet quick actions row
+  ///
+  /// In en, this message translates to:
+  /// **'Move to quick actions row'**
+  String get itemActionsMoveToQuickRow;
+
+  /// Tooltip of the button that moves an item action from the quick actions row into the item sheet menu list
+  ///
+  /// In en, this message translates to:
+  /// **'Move to menu list'**
+  String get itemActionsMoveToMenuList;
 }
 
 class _AppLocalizationsDelegate

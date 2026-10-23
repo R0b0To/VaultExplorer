@@ -11667,4 +11667,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'メニューリスト';
+
+  @override
+  String get itemActionsMoveToQuickRow => 'クイック操作の行に移動';
+
+  @override
+  String get itemActionsMoveToMenuList => 'メニューリストに移動';
 }

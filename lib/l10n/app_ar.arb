@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "إجراءات العنصر",
   "itemActionsMenuDesc": "اختر الإجراءات التي تظهر في قائمة العنصر وقائمة التحديد، وترتيب ظهورها.",
   "itemActionsQuickRowHeader": "صف الإجراءات السريعة",
-  "itemActionsMenuListHeader": "قائمة الخيارات"
+  "itemActionsMenuListHeader": "قائمة الخيارات",
+  "itemActionsMoveToQuickRow": "نقل إلى صف الإجراءات السريعة",
+  "itemActionsMoveToMenuList": "نقل إلى قائمة الخيارات"
 }

@@ -20,7 +20,7 @@ MountedContainer _container(int volId, [String? name]) => MountedContainer(
 class _Workspace {
   _Workspace(
     this._container,
-    MountedContainer initial, {
+    MountedContainer? initial, {
     bool appRoot = false,
     bool includeDashboardTab = false,
   }) : config = BrowserTabsConfig.create(
@@ -247,6 +247,198 @@ void main() {
       w.tabs.swapToPrevious();
       w.tabs.closeTab(b);
       expect(w.notifications - seen, 4);
+    });
+  });
+
+  // Characterization of how Home behaves today, written before the Home logic
+  // is touched. Every expectation was traced by hand through the commands.
+  group('Home tab', () {
+    List<bool> homes(_Workspace w) =>
+        w.state.tabs.map((tab) => tab.isDashboard).toList();
+
+    test('comes first, with the first folder tab focused and Home remembered', () {
+      final w = workspace(1, includeDashboardTab: true);
+      expect(homes(w), [true, false]);
+      expect(w.state.activeTab!.volId, 1);
+      expect(w.tabs.previousTab()!.isDashboard, isTrue);
+    });
+
+    test('a Home-only workspace needs no container', () {
+      final w = _Workspace(container, null, includeDashboardTab: true);
+      expect(homes(w), [true]);
+      expect(w.state.activeTab!.isDashboard, isTrue);
+    });
+
+    test('openDashboardTab focuses the existing Home and never adds a second', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final folder = w.active;
+
+      final home = w.tabs.openDashboardTab();
+
+      expect(w.active, home);
+      expect(homes(w), [true, false]);
+      expect(w.tabs.previousTab()!.tabId, folder);
+    });
+
+    test('openDashboardTab with room puts Home first and remembers where it was', () {
+      final w = workspace(1);
+      final folder = w.active;
+
+      final home = w.tabs.openDashboardTab();
+
+      expect(homes(w), [true, false]);
+      expect(w.active, home);
+      expect(w.tabs.previousTab()!.tabId, folder);
+    });
+
+    test('openDashboardTab at the cap replaces the active tab instead of adding', () {
+      final w = workspace(1);
+      for (var vol = 2; vol <= kMaxBrowserTabs; vol++) {
+        w.tabs.openTab(_container(vol));
+      }
+      expect(w.state.atLimit, isTrue);
+
+      final home = w.tabs.openDashboardTab();
+
+      expect(w.state.tabs, hasLength(kMaxBrowserTabs));
+      expect(w.state.tabs.where((tab) => tab.isDashboard), hasLength(1));
+      expect(w.state.tabs.last.isDashboard, isTrue);
+      expect(w.active, home);
+    });
+
+    test('openNewDashboardTab inserts Home after the active tab', () {
+      final w = workspace(1);
+      final first = w.active;
+      w.tabs.openTab(_container(2));
+      w.tabs.activate(first);
+
+      final home = w.tabs.openNewDashboardTab();
+
+      expect(home, isNotNull);
+      expect(homes(w), [false, true, false]);
+      expect(w.active, home);
+    });
+
+    test('openNewDashboardTab focuses an existing Home', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final existing = w.state.tabs.first.tabId;
+
+      expect(w.tabs.openNewDashboardTab(), existing);
+      expect(w.active, existing);
+      expect(homes(w), [true, false]);
+    });
+
+    test('openNewDashboardTab at the cap does nothing', () {
+      final w = workspace(1);
+      for (var vol = 2; vol <= kMaxBrowserTabs; vol++) {
+        w.tabs.openTab(_container(vol));
+      }
+      final seen = w.notifications;
+
+      expect(w.tabs.openNewDashboardTab(), isNull);
+      expect(w.notifications, seen);
+      expect(w.state.tabs.where((tab) => tab.isDashboard), isEmpty);
+    });
+
+    test('replaceActiveWithDashboard swaps the active tab for a fresh Home', () {
+      final w = workspace(1);
+      final first = w.active;
+      w.tabs.openTab(_container(2));
+
+      w.tabs.replaceActiveWithDashboard();
+
+      expect(homes(w), [false, true]);
+      expect(w.state.activeTab!.isDashboard, isTrue);
+      expect(w.tabs.previousTab()!.tabId, first);
+    });
+
+    test('replaceActiveWithDashboard leaves only the new Home when one existed', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final oldHome = w.state.tabs.first.tabId;
+
+      w.tabs.replaceActiveWithDashboard();
+
+      expect(homes(w), [true]);
+      expect(w.active, isNot(oldHome));
+      expect(w.tabs.previousTab(), isNull);
+    });
+
+    test('replaceActiveWithDashboard is a no-op while Home is already active', () {
+      final w = workspace(1, includeDashboardTab: true);
+      w.tabs.openDashboardTab();
+      final seen = w.notifications;
+
+      w.tabs.replaceActiveWithDashboard();
+
+      expect(w.notifications, seen);
+      expect(homes(w), [true, false]);
+    });
+
+    test('replaceActiveWithDashboard in an empty workspace opens Home', () {
+      final w = workspace(1);
+      w.tabs.closeAll();
+
+      w.tabs.replaceActiveWithDashboard();
+
+      expect(homes(w), [true]);
+      expect(w.state.activeTab!.isDashboard, isTrue);
+    });
+
+    test('returnToDashboardAtRoot closes the tab and shows the existing Home', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final folder = w.active;
+
+      expect(w.tabs.returnToDashboardAtRoot(folder), isTrue);
+
+      expect(homes(w), [true]);
+      expect(w.active, home);
+      expect(w.tabs.previousTab(), isNull);
+    });
+
+    test('returnToDashboardAtRoot only acts for the active tab', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final home = w.state.tabs.first.tabId;
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(home), isFalse);
+      expect(w.notifications, seen);
+    });
+
+    test('returnToDashboardAtRoot has nothing to return to without a Home', () {
+      final w = workspace(1);
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(w.active), isFalse);
+      expect(w.notifications, seen);
+    });
+
+    test('returnToDashboardAtRoot on Home itself changes nothing', () {
+      final w = workspace(1, includeDashboardTab: true);
+      w.tabs.openDashboardTab();
+      final seen = w.notifications;
+
+      expect(w.tabs.returnToDashboardAtRoot(w.active), isTrue);
+      expect(w.notifications, seen);
+    });
+
+    test('opening from Home and going back puts Home back in the same slot', () {
+      // Home -> open a vault from a Home tile -> back at its root.
+      final w = workspace(1, includeDashboardTab: true);
+      final other = w.state.tabs.last.tabId;
+      w.tabs.openDashboardTab();
+
+      w.tabs.replaceActive(_container(2), origin: BrowserTabOrigin.home);
+      expect(homes(w), [false, false], reason: 'Home gives way to the vault');
+      expect(w.state.activeTab!.origin, BrowserTabOrigin.home);
+
+      // Nothing to return to as a separate tab, so Home takes the slot back.
+      expect(w.tabs.returnToDashboardAtRoot(w.active), isFalse);
+      w.tabs.replaceActiveWithDashboard();
+
+      expect(homes(w), [true, false]);
+      expect(w.state.activeTab!.isDashboard, isTrue);
+      expect(w.state.tabs.last.tabId, other, reason: 'other tab is untouched');
     });
   });
 

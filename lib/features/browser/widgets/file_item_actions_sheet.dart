@@ -64,6 +64,9 @@ class FileItemActionsSheet extends ConsumerWidget {
   final List<FileItemAction> actionOrder;
   final Set<FileItemAction> hiddenActions;
 
+  /// Which actions go in the horizontal quick row; all others are list rows.
+  final Set<FileItemAction> quickActions;
+
   const FileItemActionsSheet({
     super.key,
     required this.entry,
@@ -100,6 +103,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onOpenInNewTab,
     this.actionOrder = FileItemAction.values,
     this.hiddenActions = const {},
+    this.quickActions = FileItemAction.defaultQuickActions,
   });
 
   static Future<void> show(
@@ -138,6 +142,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onOpenInNewTab,
     List<FileItemAction> actionOrder = FileItemAction.values,
     Set<FileItemAction> hiddenActions = const {},
+    Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -181,6 +186,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onOpenInNewTab: onOpenInNewTab,
         actionOrder: actionOrder,
         hiddenActions: hiddenActions,
+        quickActions: quickActions,
       ),
     );
   }
@@ -267,179 +273,168 @@ class FileItemActionsSheet extends ConsumerWidget {
     };
   }
 
-  /// The button for a quick action, or null when it does not apply here
+  /// What to show for [action] on this item, or null when it does not apply
   /// (archive entries are virtual, and a missing callback means the caller
-  /// does not offer the action).
-  Widget? _buildQuickButton(
+  /// does not offer the action). The same spec renders as a quick-row button
+  /// or as a list row, so every action works in either place.
+  _ActionSpec? _specFor(
     BuildContext context,
     ColorScheme cs,
     FileItemAction action,
   ) {
-    if (archiveContext != null) return null;
-    final l10n = context.l10n;
-    switch (action) {
-      case FileItemAction.share:
-        if (onShare == null) return null;
-        return _QuickActionButton(
-          icon: Icons.share_rounded,
-          label: l10n.shareAction,
-          onTap: _closeThen(context, onShare!),
-        );
-      case FileItemAction.copy:
-        return _QuickActionButton(
-          icon: Icons.copy_rounded,
-          label: l10n.copyAction,
-          onTap: _closeThen(context, onCopy),
-        );
-      case FileItemAction.move:
-        return _QuickActionButton(
-          icon: Icons.cut_rounded,
-          label: l10n.moveAction,
-          enabled: !isReadOnly,
-          onTap: _closeThen(context, onCut),
-        );
-      case FileItemAction.delete:
-        // Destructive: red accent. The confirmation dialog lives in the
-        // `onDelete` callback supplied by the caller and is untouched.
-        return _QuickActionButton(
-          icon: Icons.delete_outline_rounded,
-          label: l10n.delete,
-          color: cs.error,
-          enabled: !isReadOnly,
-          onTap: _closeThen(context, onDelete),
-        );
-      default:
-        return null;
-    }
-  }
-
-  /// The list row for a non-quick action, or null when it does not apply.
-  Widget? _buildListTile(BuildContext context, FileItemAction action) {
     final l10n = context.l10n;
     final inArchive = archiveContext != null;
     switch (action) {
       case FileItemAction.openInNewTab:
         if (onOpenInNewTab == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.tab_rounded,
           label: l10n.browserTabOpenInNewTab,
-          onTap: _closeThen(context, onOpenInNewTab!),
+          onTap: onOpenInNewTab!,
         );
       case FileItemAction.extract:
         // Archive entries are virtual, read-only entries. The sole file
         // operation available there is staging one for extraction into a
         // real destination.
         if (onExtract == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.unarchive_outlined,
           label: l10n.extract,
-          onTap: _closeThen(context, onExtract!),
+          onTap: onExtract!,
         );
       case FileItemAction.openWith:
         if (inArchive || onOpenWith == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.open_in_new_rounded,
           label: l10n.openWithAppAction,
-          onTap: _closeThen(context, onOpenWith!),
+          onTap: onOpenWith!,
+        );
+      case FileItemAction.share:
+        if (inArchive || onShare == null) return null;
+        return _ActionSpec(
+          icon: Icons.share_rounded,
+          label: l10n.shareAction,
+          onTap: onShare!,
         );
       case FileItemAction.editImage:
         if (inArchive || onEditImage == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.edit_outlined,
           label: l10n.editImageAction,
           enabled: !isReadOnly,
-          onTap: _closeThen(context, onEditImage!),
+          onTap: onEditImage!,
         );
       case FileItemAction.editVideo:
         if (inArchive || onEditVideo == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.content_cut_rounded,
           label: l10n.videoEditorEditAction,
           enabled: !isReadOnly,
-          onTap: _closeThen(context, onEditVideo!),
+          onTap: onEditVideo!,
         );
       case FileItemAction.editAudio:
         if (inArchive || onEditAudio == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.graphic_eq_rounded,
           label: l10n.audioEditorEditAction,
           enabled: !isReadOnly,
-          onTap: _closeThen(context, onEditAudio!),
+          onTap: onEditAudio!,
         );
       case FileItemAction.rename:
         if (inArchive) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.drive_file_rename_outline_rounded,
           label: l10n.renameAction,
           enabled: !isReadOnly,
-          onTap: _closeThen(context, onRename),
+          onTap: onRename,
+        );
+      case FileItemAction.copy:
+        if (inArchive) return null;
+        return _ActionSpec(
+          icon: Icons.copy_rounded,
+          label: l10n.copyAction,
+          onTap: onCopy,
+        );
+      case FileItemAction.move:
+        if (inArchive) return null;
+        return _ActionSpec(
+          icon: Icons.cut_rounded,
+          label: l10n.moveAction,
+          enabled: !isReadOnly,
+          onTap: onCut,
         );
       case FileItemAction.archive:
         if (inArchive || onArchive == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.archive_outlined,
           label: l10n.archiveSelectionAction,
           enabled: !isReadOnly,
-          onTap: _closeThen(context, onArchive!),
+          onTap: onArchive!,
         );
       case FileItemAction.exportToDevice:
         if (inArchive || onExport == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.drive_folder_upload_rounded,
           label: l10n.exportToDeviceAction,
-          onTap: _closeThen(context, onExport!),
+          onTap: onExport!,
         );
       case FileItemAction.encrypt:
         if (inArchive || onEncrypt == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.lock_outline_rounded,
           label: l10n.cryptoDirectionEncrypt,
-          onTap: _closeThen(context, onEncrypt!),
+          onTap: onEncrypt!,
         );
       case FileItemAction.decrypt:
         if (inArchive || onDecrypt == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.lock_open_rounded,
           label: l10n.cryptoDirectionDecrypt,
-          onTap: _closeThen(context, onDecrypt!),
+          onTap: onDecrypt!,
         );
       case FileItemAction.docProvider:
         if (inArchive || onToggleDocProvider == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: isDocumentProviderMounted
               ? Icons.folder_shared_rounded
               : Icons.folder_shared_outlined,
           label: isDocumentProviderMounted
               ? l10n.documentProviderSettingsMenu
               : l10n.exposeAsDocumentProviderMenu,
-          onTap: _closeThen(context, onToggleDocProvider!),
+          onTap: onToggleDocProvider!,
         );
       case FileItemAction.syncSettings:
         if (inArchive || onSyncSettings == null) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: Icons.sync_rounded,
           label: l10n.autoSyncMenuAction,
-          onTap: _closeThen(context, onSyncSettings!),
+          onTap: onSyncSettings!,
         );
       case FileItemAction.pin:
         if (inArchive) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
           label: isPinned ? l10n.unpinAction : l10n.pinAction,
-          onTap: _closeThen(context, onTogglePin),
+          onTap: onTogglePin,
         );
       case FileItemAction.bookmark:
         if (inArchive) return null;
-        return _ActionTile(
+        return _ActionSpec(
           icon: isBookmark ? Icons.star_outline_rounded : Icons.star_rounded,
           label: isBookmark ? l10n.unbookmarkAction : l10n.bookmarkAction,
-          onTap: _closeThen(context, onToggleBookmark),
+          onTap: onToggleBookmark,
         );
-      case FileItemAction.share:
-      case FileItemAction.copy:
-      case FileItemAction.move:
       case FileItemAction.delete:
-        return null; // Quick actions: see _buildQuickButton.
+        if (inArchive) return null;
+        // Destructive: red accent. The confirmation dialog lives in the
+        // `onDelete` callback supplied by the caller and is untouched.
+        return _ActionSpec(
+          icon: Icons.delete_outline_rounded,
+          label: l10n.delete,
+          color: cs.error,
+          enabled: !isReadOnly,
+          onTap: onDelete,
+        );
     }
   }
 
@@ -471,22 +466,38 @@ class FileItemActionsSheet extends ConsumerWidget {
       for (final action in actionOrder)
         if (!hiddenActions.contains(action)) action,
     ];
-    final quickButtons = configured
-        .where((action) => action.isQuickAction)
-        .map((action) => _buildQuickButton(context, cs, action))
-        .whereType<Widget>()
-        .toList();
+    final quickButtons = <Widget>[];
     final listItems = <Widget>[];
     int? previousGroup;
     for (final action in configured) {
-      if (action.isQuickAction) continue;
-      final tile = _buildListTile(context, action);
-      if (tile == null) continue;
+      final spec = _specFor(context, cs, action);
+      if (spec == null) continue;
+      final onTap = _closeThen(context, spec.onTap);
+      if (quickActions.contains(action)) {
+        quickButtons.add(
+          _QuickActionButton(
+            icon: spec.icon,
+            label: spec.label,
+            color: spec.color,
+            enabled: spec.enabled,
+            onTap: onTap,
+          ),
+        );
+        continue;
+      }
       // A small gap between rows of different groups, as before.
       if (previousGroup != null && previousGroup != action.group) {
         listItems.add(const SizedBox(height: 8));
       }
-      listItems.add(tile);
+      listItems.add(
+        _ActionTile(
+          icon: spec.icon,
+          label: spec.label,
+          color: spec.color,
+          enabled: spec.enabled,
+          onTap: onTap,
+        ),
+      );
       previousGroup = action.group;
     }
 
@@ -825,6 +836,24 @@ class _ItemVideoThumbnail extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// What an action looks like and does for the current item; rendered either
+/// as a quick-row button or as a list row.
+class _ActionSpec {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+  final Color? color;
+
+  const _ActionSpec({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.color,
+  });
 }
 
 class _ActionTile extends StatelessWidget {

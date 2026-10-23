@@ -4,21 +4,22 @@ import 'package:vaultexplorer/l10n/generated/app_localizations_en.dart';
 
 void main() {
   group('FileItemAction', () {
-    test('the quick actions are exactly share, copy, move and delete', () {
+    test('the default quick actions are share, copy, move and delete', () {
+      expect(FileItemAction.defaultQuickActions, {
+        FileItemAction.share,
+        FileItemAction.copy,
+        FileItemAction.move,
+        FileItemAction.delete,
+      });
       expect(
-        FileItemAction.values.where((a) => a.isQuickAction).toSet(),
-        {
-          FileItemAction.share,
-          FileItemAction.copy,
-          FileItemAction.move,
-          FileItemAction.delete,
-        },
+        FileItemAction.defaultQuickActions.length,
+        lessThanOrEqualTo(FileItemAction.maxQuickActions),
       );
     });
 
-    test('quick actions keep their share, copy, move, delete order', () {
+    test('default quick actions keep their share, copy, move, delete order', () {
       final quick = FileItemAction.values
-          .where((a) => a.isQuickAction)
+          .where(FileItemAction.defaultQuickActions.contains)
           .toList();
 
       expect(quick, [
@@ -31,7 +32,7 @@ void main() {
 
     test('the default order lists the list actions as the sheet did', () {
       final list = FileItemAction.values
-          .where((a) => !a.isQuickAction)
+          .where((a) => !FileItemAction.defaultQuickActions.contains(a))
           .toList();
 
       expect(list, [
@@ -53,9 +54,15 @@ void main() {
       ]);
     });
 
-    test('list actions only change group at the original group boundaries', () {
+    test('groups never decrease along the default order', () {
+      final groups = FileItemAction.values.map((a) => a.group).toList();
+
+      expect(groups, [0, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6]);
+    });
+
+    test('with the default quick row, the list keeps its original groups', () {
       final groups = FileItemAction.values
-          .where((a) => !a.isQuickAction)
+          .where((a) => !FileItemAction.defaultQuickActions.contains(a))
           .map((a) => a.group)
           .toList();
 

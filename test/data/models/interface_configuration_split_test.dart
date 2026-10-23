@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
@@ -146,6 +147,7 @@ FileManagerToolbarConfig _customToolbar() {
     hiddenDetailColumns: {d.detailColumnsOrder.first},
     itemActionsOrder: d.itemActionsOrder.reversed.toList(),
     hiddenItemActions: {d.itemActionsOrder.first},
+    quickItemActions: {FileItemAction.rename, FileItemAction.pin},
     showGridFileNames: !d.showGridFileNames,
     gridAspectRatio: _other(GridAspectRatio.values, d.gridAspectRatio),
     gridCornerStyle: _other(GridCornerStyle.values, d.gridCornerStyle),

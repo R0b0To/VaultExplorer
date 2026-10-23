@@ -1179,6 +1179,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       // The user's choice of which actions to show, and in what order.
       actionOrder: _toolbarConfig.itemActionsOrder,
       hiddenActions: _toolbarConfig.hiddenItemActions,
+      quickActions: _toolbarConfig.quickItemActions,
     );
   }
 

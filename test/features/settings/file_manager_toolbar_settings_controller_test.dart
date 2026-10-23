@@ -97,25 +97,26 @@ void main() {
       final controller = container.read(provider.notifier);
       await controller.load(null);
       await controller.resetItemActions();
+      final quickSet = container.read(provider).config.quickItemActions;
       final before = container.read(provider).config.itemActionsOrder;
-      final quickBefore = before.where((a) => a.isQuickAction).toList();
-      final listBefore = before.where((a) => !a.isQuickAction).toList();
+      final quickBefore = before.where(quickSet.contains).toList();
+      final listBefore = before.where((a) => !quickSet.contains(a)).toList();
 
       // Quick row: move delete (index 3) to the front.
       await controller.reorderItemActions(true, 3, 0);
       var after = container.read(provider).config.itemActionsOrder;
-      expect(after.where((a) => a.isQuickAction).toList(), [
+      expect(after.where(quickSet.contains).toList(), [
         FileItemAction.delete,
         quickBefore[0],
         quickBefore[1],
         quickBefore[2],
       ]);
-      expect(after.where((a) => !a.isQuickAction).toList(), listBefore);
+      expect(after.where((a) => !quickSet.contains(a)).toList(), listBefore);
 
       // Menu list: move the second action to the end.
       await controller.reorderItemActions(false, 1, listBefore.length - 1);
       after = container.read(provider).config.itemActionsOrder;
-      expect(after.where((a) => !a.isQuickAction).toList(), [
+      expect(after.where((a) => !quickSet.contains(a)).toList(), [
         listBefore[0],
         ...listBefore.skip(2),
         listBefore[1],
@@ -124,18 +125,63 @@ void main() {
       expect(after.toSet(), FileItemAction.values.toSet());
     });
 
-    test('resetItemActions restores order and visibility only', () async {
+    test('setItemActionInQuickRow moves an action between sections', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+      await controller.resetItemActions();
+
+      await controller.setItemActionInQuickRow(FileItemAction.rename, true);
+      var config = container.read(provider).config;
+      expect(config.quickItemActions, contains(FileItemAction.rename));
+      // Master order is untouched: only the section changed.
+      expect(config.itemActionsOrder, FileItemAction.values);
+
+      await controller.setItemActionInQuickRow(FileItemAction.delete, false);
+      config = container.read(provider).config;
+      expect(config.quickItemActions, isNot(contains(FileItemAction.delete)));
+      expect(config.quickItemActions, contains(FileItemAction.rename));
+    });
+
+    test('the quick row refuses an action once it is full', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+      await controller.resetItemActions();
+
+      // 4 by default; the 5th fits, the 6th does not.
+      await controller.setItemActionInQuickRow(FileItemAction.rename, true);
+      await controller.setItemActionInQuickRow(FileItemAction.pin, true);
+
+      final quick = container.read(provider).config.quickItemActions;
+      expect(quick.length, FileItemAction.maxQuickActions);
+      expect(quick, isNot(contains(FileItemAction.pin)));
+    });
+
+    test('an emptied quick row stays empty', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+      await controller.resetItemActions();
+
+      for (final action in FileItemAction.defaultQuickActions) {
+        await controller.setItemActionInQuickRow(action, false);
+      }
+
+      expect(container.read(provider).config.quickItemActions, isEmpty);
+    });
+
+    test('resetItemActions restores order, visibility and quick row only', () async {
       final controller = container.read(provider.notifier);
       await controller.load(null);
 
       await controller.setShowHiddenFiles(true);
       await controller.toggleItemActionVisible(FileItemAction.share, false);
       await controller.reorderItemActions(true, 0, 3);
+      await controller.setItemActionInQuickRow(FileItemAction.rename, true);
       await controller.resetItemActions();
 
       final config = container.read(provider).config;
       expect(config.itemActionsOrder, FileItemAction.values);
       expect(config.hiddenItemActions, isEmpty);
+      expect(config.quickItemActions, FileItemAction.defaultQuickActions);
       expect(config.showHiddenFiles, isTrue);
     });
 

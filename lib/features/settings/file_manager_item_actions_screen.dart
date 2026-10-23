@@ -8,9 +8,11 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_co
 /// Lets the user choose which item actions are shown, and in what order, in
 /// the item actions sheet and the selection bar's overflow menu.
 ///
-/// The four quick actions (the sheet's horizontal row) and the menu list are
-/// ordered separately, mirroring how the sheet lays them out; both are stored
-/// in the single `itemActionsOrder` list.
+/// The quick actions (the sheet's horizontal row) and the menu list are
+/// ordered separately, mirroring how the sheet lays them out, and an action can
+/// be moved from one to the other. Both orders come from the single
+/// `itemActionsOrder` list; which section an action is in is
+/// `quickItemActions`.
 class FileManagerItemActionsScreen extends ConsumerWidget {
   final String? containerUri;
   const FileManagerItemActionsScreen({super.key, this.containerUri});
@@ -24,8 +26,10 @@ class FileManagerItemActionsScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final order = state.config.itemActionsOrder;
-    final quickActions = order.where((a) => a.isQuickAction).toList();
-    final menuActions = order.where((a) => !a.isQuickAction).toList();
+    final quickSet = state.config.quickItemActions;
+    final quickActions = order.where(quickSet.contains).toList();
+    final menuActions = order.where((a) => !quickSet.contains(a)).toList();
+    final quickRowFull = quickActions.length >= FileItemAction.maxQuickActions;
 
     return Scaffold(
       appBar: AppBar(
@@ -59,13 +63,21 @@ class FileManagerItemActionsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                SectionHeader(context.l10n.itemActionsQuickRowHeader),
+                SectionHeader(
+                  '${context.l10n.itemActionsQuickRowHeader} '
+                  '(${quickActions.length}/${FileItemAction.maxQuickActions})',
+                ),
                 _ItemActionSection(
                   actions: quickActions,
                   hidden: state.config.hiddenItemActions,
                   onReorder: (oldIndex, newIndex) =>
                       notifier.reorderItemActions(true, oldIndex, newIndex),
                   onToggle: notifier.toggleItemActionVisible,
+                  moveIcon: Icons.arrow_downward_rounded,
+                  moveTooltip: context.l10n.itemActionsMoveToMenuList,
+                  canMove: true,
+                  onMove: (action) =>
+                      notifier.setItemActionInQuickRow(action, false),
                 ),
                 SectionHeader(context.l10n.itemActionsMenuListHeader),
                 _ItemActionSection(
@@ -74,6 +86,11 @@ class FileManagerItemActionsScreen extends ConsumerWidget {
                   onReorder: (oldIndex, newIndex) =>
                       notifier.reorderItemActions(false, oldIndex, newIndex),
                   onToggle: notifier.toggleItemActionVisible,
+                  moveIcon: Icons.arrow_upward_rounded,
+                  moveTooltip: context.l10n.itemActionsMoveToQuickRow,
+                  canMove: !quickRowFull,
+                  onMove: (action) =>
+                      notifier.setItemActionInQuickRow(action, true),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -93,11 +110,22 @@ class _ItemActionSection extends StatelessWidget {
   final void Function(int oldIndex, int newIndex) onReorder;
   final Future<void> Function(FileItemAction action, bool visible) onToggle;
 
+  /// Moves an action to the other section. [canMove] is false when that
+  /// section cannot take another one (the quick row is full).
+  final IconData moveIcon;
+  final String moveTooltip;
+  final bool canMove;
+  final Future<void> Function(FileItemAction action) onMove;
+
   const _ItemActionSection({
     required this.actions,
     required this.hidden,
     required this.onReorder,
     required this.onToggle,
+    required this.moveIcon,
+    required this.moveTooltip,
+    required this.canMove,
+    required this.onMove,
   });
 
   @override
@@ -159,6 +187,12 @@ class _ItemActionSection extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  IconButton(
+                    icon: Icon(moveIcon, size: 20),
+                    tooltip: moveTooltip,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: canMove ? () => onMove(action) : null,
+                  ),
                   Switch(
                     value: visible,
                     onChanged: (v) => onToggle(action, v),

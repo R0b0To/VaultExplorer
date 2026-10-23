@@ -12346,4 +12346,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'Lista do menu';
+
+  @override
+  String get itemActionsMoveToQuickRow => 'Mover para a linha de ações rápidas';
+
+  @override
+  String get itemActionsMoveToMenuList => 'Mover para a lista do menu';
 }

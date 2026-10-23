@@ -12350,4 +12350,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'Menüliste';
+
+  @override
+  String get itemActionsMoveToQuickRow =>
+      'In die Schnellaktionen-Leiste verschieben';
+
+  @override
+  String get itemActionsMoveToMenuList => 'In die Menüliste verschieben';
 }

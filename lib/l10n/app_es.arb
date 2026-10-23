@@ -3407,5 +3407,7 @@
   "itemActionsMenuTitle": "Acciones del elemento",
   "itemActionsMenuDesc": "Elige qué acciones aparecen en el menú del elemento y en el menú de selección, y en qué orden.",
   "itemActionsQuickRowHeader": "Fila de acciones rápidas",
-  "itemActionsMenuListHeader": "Lista del menú"
+  "itemActionsMenuListHeader": "Lista del menú",
+  "itemActionsMoveToQuickRow": "Mover a la fila de acciones rápidas",
+  "itemActionsMoveToMenuList": "Mover a la lista del menú"
 }

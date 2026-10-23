@@ -323,12 +323,14 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     int newIndex,
   ) async {
     final order = List<FileItemAction>.from(state.config.itemActionsOrder);
-    final section = order.where((a) => a.isQuickAction == quickRow).toList();
+    final quick = state.config.quickItemActions;
+    bool inSection(FileItemAction a) => quick.contains(a) == quickRow;
+    final section = order.where(inSection).toList();
     final moved = section.removeAt(oldIndex);
     section.insert(newIndex, moved);
     var next = 0;
     final reordered = [
-      for (final a in order) a.isQuickAction == quickRow ? section[next++] : a,
+      for (final a in order) inSection(a) ? section[next++] : a,
     ];
     await _updateConfig(state.config.copyWith(itemActionsOrder: reordered));
   }
@@ -346,12 +348,32 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await _updateConfig(state.config.copyWith(hiddenItemActions: hidden));
   }
 
-  /// Puts the item actions back in their default order with none hidden,
-  /// leaving every other setting alone.
+  /// Puts [action] in the item sheet's quick row ([quickRow] true) or in its
+  /// menu list. The action keeps its place in the master order, so it lands
+  /// among the other actions of its new section where that order puts it.
+  /// Does nothing when the quick row is already full.
+  Future<void> setItemActionInQuickRow(
+    FileItemAction action,
+    bool quickRow,
+  ) async {
+    final quick = Set<FileItemAction>.from(state.config.quickItemActions);
+    if (quickRow) {
+      if (quick.contains(action)) return;
+      if (quick.length >= FileItemAction.maxQuickActions) return;
+      quick.add(action);
+    } else {
+      if (!quick.remove(action)) return;
+    }
+    await _updateConfig(state.config.copyWith(quickItemActions: quick));
+  }
+
+  /// Puts the item actions back in their default order and quick row with
+  /// none hidden, leaving every other setting alone.
   Future<void> resetItemActions() => _updateConfig(
     state.config.copyWith(
       itemActionsOrder: FileItemAction.values,
       hiddenItemActions: const {},
+      quickItemActions: FileItemAction.defaultQuickActions,
     ),
   );
 

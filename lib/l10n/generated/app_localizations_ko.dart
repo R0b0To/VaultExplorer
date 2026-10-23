@@ -11668,4 +11668,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => '메뉴 목록';
+
+  @override
+  String get itemActionsMoveToQuickRow => '빠른 작업 줄로 이동';
+
+  @override
+  String get itemActionsMoveToMenuList => '메뉴 목록으로 이동';
 }

@@ -12456,4 +12456,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get itemActionsMenuListHeader => 'Liste du menu';
+
+  @override
+  String get itemActionsMoveToQuickRow =>
+      'Déplacer vers la rangée d’actions rapides';
+
+  @override
+  String get itemActionsMoveToMenuList => 'Déplacer vers la liste du menu';
 }

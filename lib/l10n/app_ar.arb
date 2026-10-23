@@ -2616,6 +2616,8 @@
   "videoEditorCutOutModeDescription": "أزل المقاطع المحددة وصدّر بقية الفيديو.",
   "tapEdgesToNavigateTitle": "انقر على الحواف للتنقل",
   "tapEdgesToNavigateSubtitle": "انقر على الحافة اليسرى أو اليمنى لعرض العنصر السابق أو التالي.",
+  "doubleTapPlayPauseTitle": "النقر المزدوج للتشغيل/الإيقاف المؤقت",
+  "doubleTapPlayPauseSubtitle": "انقر نقرًا مزدوجًا في منتصف شاشة الفيديو أو الصوت للتشغيل أو الإيقاف المؤقت بدلًا من التكبير. اضغط على مستوى التكبير المعروض أثناء التكبير لإعادة ضبط العرض.",
   "loopPlaylistTitle": "تكرار قائمة التشغيل",
   "loopPlaylistSubtitle": "انتقل إلى العنصر الأول بعد الأخير أثناء التنقل أو تشغيل القائمة.",
   "showFileNamesInMediaNotificationTitle": "إظهار أسماء الملفات في إشعارات الوسائط",

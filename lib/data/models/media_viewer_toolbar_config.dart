@@ -35,6 +35,10 @@ class MediaViewerToolbarConfig {
   final bool swipeToSeekEnabled;
   final ResumePlaybackMode resumePlaybackMode;
   final bool tapEdgesToNavigate;
+
+  /// Double-tapping the middle of the video or audio screen plays or pauses
+  /// instead of zooming. The zoom is then reset from the zoom-level pill.
+  final bool doubleTapPlayPause;
   final bool loopPlaylist;
   final ThumbnailGenerationStrategy thumbnailGenerationStrategy;
   final double thumbnailFramePosition;
@@ -107,6 +111,7 @@ class MediaViewerToolbarConfig {
     this.swipeToSeekEnabled = false,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.tapEdgesToNavigate = true,
+    this.doubleTapPlayPause = false,
     this.loopPlaylist = true,
     this.thumbnailGenerationStrategy = ThumbnailGenerationStrategy.hybrid,
     this.thumbnailFramePosition = 0.12,
@@ -148,6 +153,7 @@ class MediaViewerToolbarConfig {
     bool? swipeToSeekEnabled,
     ResumePlaybackMode? resumePlaybackMode,
     bool? tapEdgesToNavigate,
+    bool? doubleTapPlayPause,
     bool? loopPlaylist,
     ThumbnailGenerationStrategy? thumbnailGenerationStrategy,
     double? thumbnailFramePosition,
@@ -193,6 +199,7 @@ class MediaViewerToolbarConfig {
     swipeToSeekEnabled: swipeToSeekEnabled ?? this.swipeToSeekEnabled,
     resumePlaybackMode: resumePlaybackMode ?? this.resumePlaybackMode,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
+    doubleTapPlayPause: doubleTapPlayPause ?? this.doubleTapPlayPause,
     loopPlaylist: loopPlaylist ?? this.loopPlaylist,
     thumbnailGenerationStrategy:
         thumbnailGenerationStrategy ?? this.thumbnailGenerationStrategy,
@@ -284,6 +291,7 @@ class MediaViewerToolbarConfig {
     'swipeToSeekEnabled': swipeToSeekEnabled,
     'resumePlaybackMode': resumePlaybackMode.name,
     'tapEdgesToNavigate': tapEdgesToNavigate,
+    'doubleTapPlayPause': doubleTapPlayPause,
     'loopPlaylist': loopPlaylist,
     'thumbnailGenerationStrategy': thumbnailGenerationStrategy.name,
     'thumbnailFramePosition': thumbnailFramePosition,
@@ -431,6 +439,7 @@ class MediaViewerToolbarConfig {
         orElse: () => ResumePlaybackMode.askEveryTime,
       ),
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
+      doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? false,
       loopPlaylist: j['loopPlaylist'] as bool? ?? true,
       thumbnailGenerationStrategy: ThumbnailGenerationStrategy.fromJson(
         j['thumbnailGenerationStrategy'] as String?,

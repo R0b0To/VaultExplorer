@@ -332,31 +332,38 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
       );
     }
 
-    return Column(
+    // Photo and video stay stacked; scan sits beside them, centred on the pair.
+    return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        modeButton(
-          selected: !captureControls.isVideoMode && !captureIsScanMode,
-          icon: Icons.photo_camera_rounded,
-          onTap: () async {
-            if (captureIsScanMode) {
-              await setDocumentScanMode(false);
-            } else {
-              await setVideoMode(false);
-            }
-          },
-        ),
-        const SizedBox(height: 10),
-        modeButton(
-          selected: captureControls.isVideoMode,
-          icon: Icons.videocam_rounded,
-          onTap: () async {
-            if (captureIsScanMode) await setDocumentScanMode(false);
-            await setVideoMode(true);
-          },
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            modeButton(
+              selected: !captureControls.isVideoMode && !captureIsScanMode,
+              icon: Icons.photo_camera_rounded,
+              onTap: () async {
+                if (captureIsScanMode) {
+                  await setDocumentScanMode(false);
+                } else {
+                  await setVideoMode(false);
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            modeButton(
+              selected: captureControls.isVideoMode,
+              icon: Icons.videocam_rounded,
+              onTap: () async {
+                if (captureIsScanMode) await setDocumentScanMode(false);
+                await setVideoMode(true);
+              },
+            ),
+          ],
         ),
         if (supportsDocumentScan) ...[
-          const SizedBox(height: 10),
+          const SizedBox(width: 10),
           modeButton(
             selected: captureIsScanMode,
             icon: Icons.document_scanner_rounded,
@@ -728,7 +735,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
                 if (!captureIsRecording && !captureIsCountingDown)
                   buildModeToggle()
                 else
-                  const SizedBox(width: 48),
+                  SizedBox(width: supportsDocumentScan ? 94 : 48),
               ],
             ),
           ],

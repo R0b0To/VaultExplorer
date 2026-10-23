@@ -57,6 +57,7 @@ class _DocumentScanEditorScreenState extends ConsumerState<DocumentScanEditorScr
   bool _saving = false;
   int _previewSeq = 0;
   int? _dragging;
+  int? _draggingEdge;
 
   @override
   void initState() {
@@ -88,6 +89,27 @@ class _DocumentScanEditorScreenState extends ConsumerState<DocumentScanEditorScr
   void _dragCorner(int index, Offset delta, Size box) {
     final target = _quad.corners[index] + Offset(delta.dx / box.width, delta.dy / box.height);
     final moved = _quad.withCorner(index, target);
+    // Never let the outline fold over itself or collapse.
+    if (!moved.isValid) return;
+    setState(() => _quad = moved);
+  }
+
+  /// Pushes edge [index] (corner [index] to the next one) along its own normal,
+  /// so the top and bottom edges move only up and down and the sides only left
+  /// and right, however the outline is skewed. [delta] is in pixels and [box]
+  /// is the image's on-screen size.
+  void _dragEdge(int index, Offset delta, Size box) {
+    final a = _quad.corners[index % 4];
+    final b = _quad.corners[(index + 1) % 4];
+    final edge = Offset((b.dx - a.dx) * box.width, (b.dy - a.dy) * box.height);
+    final length = edge.distance;
+    if (length <= 0) return;
+    final normal = Offset(-edge.dy / length, edge.dx / length);
+    final along = delta.dx * normal.dx + delta.dy * normal.dy;
+    final moved = _quad.withEdgeMoved(
+      index,
+      Offset(normal.dx * along / box.width, normal.dy * along / box.height),
+    );
     // Never let the outline fold over itself or collapse.
     if (!moved.isValid) return;
     setState(() => _quad = moved);
@@ -230,6 +252,10 @@ class _DocumentScanEditorScreenState extends ConsumerState<DocumentScanEditorScr
             Positioned.fill(
               child: IgnorePointer(child: CustomPaint(painter: _OutlinePainter(points))),
             ),
+            // Edge handles sit under the corner ones, so where a short edge
+            // brings them together the corner is the one that is grabbed.
+            for (var i = 0; i < 4; i++)
+              _buildEdgeHandle(i, points[i], points[(i + 1) % 4], rect.size),
             for (var i = 0; i < 4; i++)
               Positioned(
                 left: points[i].dx - _handleHit / 2,
@@ -249,6 +275,32 @@ class _DocumentScanEditorScreenState extends ConsumerState<DocumentScanEditorScr
           ],
         );
       },
+    );
+  }
+
+  /// A bar at the middle of an edge for resizing the crop from that side.
+  Widget _buildEdgeHandle(int index, Offset from, Offset to, Size box) {
+    final mid = Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2);
+    final angle = math.atan2(to.dy - from.dy, to.dx - from.dx);
+    return Positioned(
+      key: ValueKey('scan_edge_handle_$index'),
+      left: mid.dx - _handleHit / 2,
+      top: mid.dy - _handleHit / 2,
+      width: _handleHit,
+      height: _handleHit,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanStart: (_) => setState(() => _draggingEdge = index),
+        onPanUpdate: (d) => _dragEdge(index, d.delta, box),
+        onPanEnd: (_) => setState(() => _draggingEdge = null),
+        onPanCancel: () => setState(() => _draggingEdge = null),
+        child: Center(
+          child: Transform.rotate(
+            angle: angle,
+            child: _EdgeBar(active: _draggingEdge == index),
+          ),
+        ),
+      ),
     );
   }
 
@@ -436,6 +488,26 @@ class _HandleDot extends StatelessWidget {
       height: 26,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: active ? Colors.amber : Colors.white,
+        border: Border.all(color: Colors.amber, width: 3),
+        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
+      ),
+    );
+  }
+}
+
+class _EdgeBar extends StatelessWidget {
+  const _EdgeBar({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 14,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(7),
         color: active ? Colors.amber : Colors.white,
         border: Border.all(color: Colors.amber, width: 3),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],

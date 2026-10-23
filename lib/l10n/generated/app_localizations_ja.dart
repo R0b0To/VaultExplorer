@@ -9097,6 +9097,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tapEdgesToNavigateSubtitle => '画面の左端または右端をタップして、前または次のメディアを表示します。';
 
   @override
+  String get doubleTapPlayPauseTitle => 'ダブルタップで再生/一時停止';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      '動画または音声画面の中央をダブルタップすると、ズームではなく再生または一時停止します。ズーム中に表示されるズームレベルをタップすると、表示がリセットされます。';
+
+  @override
   String get loopPlaylistTitle => 'プレイリストをループ';
 
   @override

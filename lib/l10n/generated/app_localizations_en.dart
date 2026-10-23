@@ -9460,6 +9460,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap the left or right edge to show the previous or next media item.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'Double-tap to play/pause';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'Double-tap the middle of the video or audio screen to play or pause instead of zooming. Tap the zoom level shown while zoomed to reset the view.';
+
+  @override
   String get loopPlaylistTitle => 'Loop playlist';
 
   @override

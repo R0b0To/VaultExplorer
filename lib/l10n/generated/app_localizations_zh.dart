@@ -8970,6 +8970,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tapEdgesToNavigateSubtitle => '点按左侧或右侧边缘以显示上一个或下一个媒体项目。';
 
   @override
+  String get doubleTapPlayPauseTitle => '双击播放/暂停';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      '双击视频或音频画面中央可播放或暂停，而不是缩放。缩放时点按显示的缩放比例可重置视图。';
+
+  @override
   String get loopPlaylistTitle => '循环播放列表';
 
   @override

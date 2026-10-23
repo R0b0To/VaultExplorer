@@ -44,6 +44,28 @@ class ScanQuad {
     return ScanQuad(next);
   }
 
+  /// Moves edge [index], the one from corner [index] to the next corner, by
+  /// [delta] (normalised), carrying both of its corners along.
+  ///
+  /// The delta is trimmed so neither corner leaves the image; trimming the
+  /// move rather than clamping each corner keeps the edge's length and angle.
+  ScanQuad withEdgeMoved(int index, Offset delta) {
+    final a = corners[index % 4];
+    final b = corners[(index + 1) % 4];
+    final dx = math.max(
+      -math.min(a.dx, b.dx),
+      math.min(1 - math.max(a.dx, b.dx), delta.dx),
+    ).toDouble();
+    final dy = math.max(
+      -math.min(a.dy, b.dy),
+      math.min(1 - math.max(a.dy, b.dy), delta.dy),
+    ).toDouble();
+    final next = [...corners];
+    next[index % 4] = a + Offset(dx, dy);
+    next[(index + 1) % 4] = b + Offset(dx, dy);
+    return ScanQuad(next);
+  }
+
   /// Area as a fraction of the whole image.
   double get area {
     var sum = 0.0;

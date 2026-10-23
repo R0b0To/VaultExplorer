@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
@@ -111,6 +112,10 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final double holdToSpeedMultiplier;
   final bool swipeToSeekEnabled;
   final bool tapEdgesToNavigate;
+
+  /// Double-tapping the middle plays or pauses instead of zooming; the zoom
+  /// is reset from the zoom-level pill.
+  final bool doubleTapPlayPause;
   final double seekSensitivity;
   final double volumeGestureSensitivity;
   final double brightnessGestureSensitivity;
@@ -160,6 +165,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
     this.tapEdgesToNavigate = true,
+    this.doubleTapPlayPause = false,
     this.seekSensitivity = 1.0,
     this.volumeGestureSensitivity = 1.0,
     this.brightnessGestureSensitivity = 1.0,
@@ -775,6 +781,22 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     _animateVideoZoomTo(clampedMatrix, toBaseline: false);
   }
 
+  void _togglePlayPause() {
+    final controller = _boundController;
+    if (controller == null || !controller.value.isInitialized) return;
+    HapticFeedback.lightImpact();
+    if (controller.value.isPlaying) {
+      unawaited(controller.pause());
+    } else {
+      unawaited(controller.play());
+    }
+  }
+
+  void _resetVideoZoom() {
+    HapticFeedback.selectionClick();
+    _animateVideoZoomTo(Matrix4.identity(), toBaseline: true);
+  }
+
   void _handleDoubleTapSkip({required bool backwards}) {
     if (_isSkipActive) {
       if (_skipBackwards == backwards) return;
@@ -1368,9 +1390,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   },
                   onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
                   onDoubleTap: () {
-                    if (widget.isAudio) return;
-                    // Strict check: if not default zoom, double-tap anywhere on screen resets zoom
-                    if (_isZoomed) {
+                    if (widget.isAudio) {
+                      if (widget.doubleTapPlayPause) _togglePlayPause();
+                      return;
+                    }
+                    // Strict check: if not default zoom, double-tap anywhere on
+                    // screen resets zoom. With double-tap play/pause the zoom
+                    // is reset from the zoom-level pill instead.
+                    if (_isZoomed && !widget.doubleTapPlayPause) {
                       _handleVideoDoubleTap();
                       return;
                     }
@@ -1387,6 +1414,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                       _handleDoubleTapSkip(backwards: true);
                     } else if (dx > width * 0.7) {
                       _handleDoubleTapSkip(backwards: false);
+                    } else if (widget.doubleTapPlayPause) {
+                      _togglePlayPause();
                     } else {
                       _handleVideoDoubleTap();
                     }
@@ -1488,7 +1517,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         widget.onToggleUI(!widget.showUI);
       },
       onDoubleTap: () {
-        if (_isZoomed) {
+        if (_isZoomed && !widget.doubleTapPlayPause) {
           _handleVideoDoubleTap();
         }
       },
@@ -1632,6 +1661,32 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                     level: _volumeLevel,
                   ),
                 if (_showSwipeSeekHud) _buildSwipeSeekHud(),
+                if (widget.doubleTapPlayPause &&
+                    !widget.isAudio &&
+                    widget.enableZoom)
+                  Positioned(
+                    top: MediaQuery.paddingOf(context).top + 72,
+                    right: 16,
+                    child: ValueListenableBuilder<Matrix4>(
+                      valueListenable: _videoTransformationController,
+                      builder: (context, matrix, _) {
+                        final scale = _getMatrixScale(matrix);
+                        final zoomed =
+                            (scale - _baselineZoomScale).abs() > 0.01;
+                        return AnimatedOpacity(
+                          opacity: zoomed ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 150),
+                          child: IgnorePointer(
+                            ignoring: !zoomed,
+                            child: ZoomIndicatorPill(
+                              scale: scale,
+                              onReset: _resetVideoZoom,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
               ],
             ),
           );

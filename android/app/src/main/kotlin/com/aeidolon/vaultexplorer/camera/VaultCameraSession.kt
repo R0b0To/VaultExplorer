@@ -505,22 +505,22 @@ class VaultCameraSession(
 
         val jpegSizes = map.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
         val maxJpegSize = jpegSizes.maxByOrNull { it.width.toLong() * it.height.toLong() } ?: jpegSizes.first()
-        photoSize = if (photoResolution == VaultPhotoResolution.MAX) {
-            maxJpegSize
-        } else {
-            chooseSize(jpegSizes, photoResolution.targetLongEdge, capAt1080p = false)
-        }
+        val photoTiers = photoTierSizes(jpegSizes, maxJpegSize)
+        // A tier the camera has no distinct size for is not offered; if one of
+        // those was saved as the choice, use the closest tier that is.
+        photoSize = photoTiers[photoResolution]
+            ?: photoTiers.entries
+                .minByOrNull { abs(it.key.targetLongEdge - photoResolution.targetLongEdge) }
+                ?.value
+            ?: maxJpegSize
 
         val videoSizes = map.getOutputSizes(MediaCodec::class.java)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
         videoSize = chooseVideoSizeByHeight(videoSizes, videoQuality.targetVideoHeight)
 
         availablePhotoResolutions.clear()
-        for (res in VaultPhotoResolution.values()) {
-            val s = if (res == VaultPhotoResolution.MAX) {
-                maxJpegSize
-            } else {
-                chooseSize(jpegSizes, res.targetLongEdge, capAt1080p = false)
-            }
+        // Largest first, so the map (and the menu built from it) reads top-down.
+        for (res in VaultPhotoResolution.values().sortedByDescending { it.targetLongEdge }) {
+            val s = photoTiers[res] ?: continue
             val key = when (res) {
                 VaultPhotoResolution.LOW -> "low"
                 VaultPhotoResolution.MEDIUM -> "med"
@@ -1566,6 +1566,36 @@ class VaultCameraSession(
             .minByOrNull { abs(minOf(it.width, it.height) - targetHeight) }
             ?: candidates.firstOrNull()
             ?: Size(1920, 1080)
+    }
+
+    /**
+     * One distinct JPEG size per photo tier, largest first.
+     *
+     * Picking each tier's nearest size on its own lets two tiers land on the
+     * same size (shown twice in the menu) while sizes in between are never
+     * offered. Here each tier only considers sizes strictly smaller than the
+     * tier above it, so the sizes always descend; a tier with nothing left to
+     * pick is left out.
+     */
+    private fun photoTierSizes(
+        jpegSizes: List<Size>,
+        maxJpegSize: Size,
+    ): Map<VaultPhotoResolution, Size> {
+        fun area(s: Size) = s.width.toLong() * s.height.toLong()
+        val valid = jpegSizes.filter { it.width > 0 && it.height > 0 }.distinct()
+        val tiers = LinkedHashMap<VaultPhotoResolution, Size>()
+        var ceiling = Long.MAX_VALUE
+        for (res in VaultPhotoResolution.values().sortedByDescending { it.targetLongEdge }) {
+            val pick = if (res == VaultPhotoResolution.MAX) {
+                maxJpegSize
+            } else {
+                valid.filter { area(it) < ceiling }
+                    .minByOrNull { abs(maxOf(it.width, it.height) - res.targetLongEdge) }
+            } ?: continue
+            tiers[res] = pick
+            ceiling = area(pick)
+        }
+        return tiers
     }
 
     private fun chooseSize(candidates: List<Size>, targetLongEdge: Int, capAt1080p: Boolean = false): Size {

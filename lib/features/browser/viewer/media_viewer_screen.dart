@@ -2908,6 +2908,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   gestureConfig.thumbnailGenerationStrategy,
               showUI: _showUI,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
+              doubleTapPlayPause: gestureConfig.doubleTapPlayPause,
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
               skipSeconds: _doubleTapSkipSeconds,

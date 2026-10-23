@@ -63,6 +63,40 @@ void main() {
     });
   });
 
+  group('ScanQuad.withEdgeMoved', () {
+    test('moves both corners of the edge together', () {
+      final quad = ScanQuad.inset(0.1);
+      final moved = quad.withEdgeMoved(0, const Offset(0, -0.05));
+      expect(moved.corners[0].dy, closeTo(0.05, 1e-9));
+      expect(moved.corners[1].dy, closeTo(0.05, 1e-9));
+      expect(moved.corners[0].dx, closeTo(0.1, 1e-9));
+      expect(moved.corners[2], quad.corners[2]);
+      expect(moved.corners[3], quad.corners[3]);
+    });
+
+    test('the last edge wraps back to the first corner', () {
+      final quad = ScanQuad.inset(0.1);
+      final moved = quad.withEdgeMoved(3, const Offset(0.04, 0));
+      expect(moved.corners[3].dx, closeTo(0.14, 1e-9));
+      expect(moved.corners[0].dx, closeTo(0.14, 1e-9));
+      expect(moved.corners[1], quad.corners[1]);
+    });
+
+    test('is stopped at the image border without bending the edge', () {
+      final quad = ScanQuad.fromPoints(
+        const [0.1, 0.2, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9],
+      );
+      final moved = quad.withEdgeMoved(0, const Offset(0, -0.5));
+      // The higher corner reaches the border first and holds the whole edge.
+      expect(moved.corners[1].dy, closeTo(0.0, 1e-9));
+      expect(moved.corners[0].dy, closeTo(0.1, 1e-9));
+      expect(
+        moved.corners[0].dy - moved.corners[1].dy,
+        closeTo(quad.corners[0].dy - quad.corners[1].dy, 1e-9),
+      );
+    });
+  });
+
   group('cameraNaturalToDisplay', () {
     test('exactly inverts the camera screen\'s display->natural mapping', () {
       const samples = [

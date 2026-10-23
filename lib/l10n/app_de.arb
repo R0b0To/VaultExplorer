@@ -2616,6 +2616,8 @@
   "videoEditorCutOutModeDescription": "Entferne die ausgewählten Segmente und exportiere das übrige Video.",
   "tapEdgesToNavigateTitle": "Zum Navigieren auf die Ränder tippen",
   "tapEdgesToNavigateSubtitle": "Tippe auf den linken oder rechten Rand, um das vorherige oder nächste Medium anzuzeigen.",
+  "doubleTapPlayPauseTitle": "Doppeltippen für Wiedergabe/Pause",
+  "doubleTapPlayPauseSubtitle": "Doppeltippe in die Mitte des Video- oder Audiobildschirms, um abzuspielen oder zu pausieren, statt zu zoomen. Tippe auf die Zoomstufe, die beim Zoomen angezeigt wird, um die Ansicht zurückzusetzen.",
   "loopPlaylistTitle": "Wiedergabeliste wiederholen",
   "loopPlaylistSubtitle": "Nach dem letzten Eintrag beim Navigieren oder Abspielen wieder beim ersten beginnen.",
   "showFileNamesInMediaNotificationTitle": "Dateinamen in Medienbenachrichtigungen anzeigen",

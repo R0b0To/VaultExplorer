@@ -1249,6 +1249,27 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                 children: [
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.doubleTapPlayPause,
+                    onChanged: controller.setMediaViewerDoubleTapPlayPause,
+                    title: Text(
+                      l10n.doubleTapPlayPauseTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.doubleTapPlayPauseSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.touch_app_rounded,
+                      color: cs.primary,
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     value: mediaConfig.swipeToSeekEnabled,
                     onChanged: controller.setMediaViewerSwipeToSeekEnabled,
                     title: Text(

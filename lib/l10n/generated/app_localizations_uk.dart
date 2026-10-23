@@ -9679,6 +9679,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Торкніться лівого або правого краю, щоб показати попередній або наступний медіафайл.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'Подвійний дотик для відтворення/паузи';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'Двічі торкніться центру екрана відео або аудіо, щоб відтворити чи призупинити замість масштабування. Торкніться рівня масштабу, який показано під час збільшення, щоб скинути вигляд.';
+
+  @override
   String get loopPlaylistTitle => 'Повторювати список відтворення';
 
   @override

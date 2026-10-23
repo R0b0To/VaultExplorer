@@ -571,6 +571,13 @@ void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     return updateMediaViewerConfig(updated);
   }
 
+  Future<void> setMediaViewerDoubleTapPlayPause(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      doubleTapPlayPause: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
   Future<void> setMediaViewerLoopPlaylist(bool enabled) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       loopPlaylist: enabled,

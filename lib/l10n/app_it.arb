@@ -2616,6 +2616,8 @@
   "videoEditorCutOutModeDescription": "Rimuovi i segmenti selezionati ed esporta il resto del video.",
   "tapEdgesToNavigateTitle": "Tocca i bordi per navigare",
   "tapEdgesToNavigateSubtitle": "Tocca il bordo sinistro o destro per mostrare l’elemento precedente o successivo.",
+  "doubleTapPlayPauseTitle": "Doppio tocco per riprodurre/pausa",
+  "doubleTapPlayPauseSubtitle": "Tocca due volte il centro dello schermo video o audio per riprodurre o mettere in pausa invece di fare zoom. Tocca il livello di zoom mostrato durante lo zoom per reimpostare la vista.",
   "loopPlaylistTitle": "Ripeti playlist",
   "loopPlaylistSubtitle": "Dopo l’ultimo elemento, torna al primo durante la navigazione o la riproduzione.",
   "showFileNamesInMediaNotificationTitle": "Mostra i nomi dei file nelle notifiche multimediali",

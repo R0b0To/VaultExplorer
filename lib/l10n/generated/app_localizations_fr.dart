@@ -9681,6 +9681,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Touchez le bord gauche ou droit pour afficher l’élément précédent ou suivant.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'Double appui pour lecture/pause';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'Appuyez deux fois au centre de l’écran vidéo ou audio pour lancer ou mettre en pause au lieu de zoomer. Touchez le niveau de zoom affiché pendant le zoom pour réinitialiser la vue.';
+
+  @override
   String get loopPlaylistTitle => 'Répéter la liste de lecture';
 
   @override

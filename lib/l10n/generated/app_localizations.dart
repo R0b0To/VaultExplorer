@@ -15919,6 +15919,18 @@ abstract class AppLocalizations {
   /// **'Tap the left or right edge to show the previous or next media item.'**
   String get tapEdgesToNavigateSubtitle;
 
+  /// Setting label for double-tapping the video or audio screen to play or pause instead of zooming.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap to play/pause'**
+  String get doubleTapPlayPauseTitle;
+
+  /// Explains that double-tap plays or pauses and the zoom level chip resets the zoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap the middle of the video or audio screen to play or pause instead of zooming. Tap the zoom level shown while zoomed to reset the view.'**
+  String get doubleTapPlayPauseSubtitle;
+
   /// Setting label for wrapping playlist navigation from the last item to the first.
   ///
   /// In en, this message translates to:

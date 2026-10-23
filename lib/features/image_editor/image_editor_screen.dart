@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
+import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
@@ -1340,7 +1341,7 @@ String get _fileName {
                     duration: const Duration(milliseconds: 150),
                     child: IgnorePointer(
                       ignoring: isCropping || _currentScale <= 1.05,
-                      child: _ZoomIndicatorPill(
+                      child: ZoomIndicatorPill(
                         scale: _currentScale,
                         onReset: () => _resetZoom(animate: true),
                       ),
@@ -1938,58 +1939,6 @@ class _TextAnnotationDialogState extends State<_TextAnnotationDialog> {
           child: Text(widget.addLabel),
         ),
       ],
-    );
-  }
-}
-
-class _ZoomIndicatorPill extends StatelessWidget {
-  final double scale;
-  final VoidCallback onReset;
-
-  const _ZoomIndicatorPill({
-    required this.scale,
-    required this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.65),
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onReset,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.fit_screen_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${(scale * 100).round()}%',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFeatures: [ui.FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

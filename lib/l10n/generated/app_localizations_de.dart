@@ -9602,6 +9602,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Tippe auf den linken oder rechten Rand, um das vorherige oder nächste Medium anzuzeigen.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'Doppeltippen für Wiedergabe/Pause';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'Doppeltippe in die Mitte des Video- oder Audiobildschirms, um abzuspielen oder zu pausieren, statt zu zoomen. Tippe auf die Zoomstufe, die beim Zoomen angezeigt wird, um die Ansicht zurückzusetzen.';
+
+  @override
   String get loopPlaylistTitle => 'Wiedergabeliste wiederholen';
 
   @override

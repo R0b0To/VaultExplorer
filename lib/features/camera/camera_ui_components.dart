@@ -448,7 +448,20 @@ class CameraTopControlsBar extends StatelessWidget {
   }
 
 
-   String _formatPhotoResolution(String res) {
+  /// The tiers the camera reports, largest first. The native side leaves out a
+  /// tier that would repeat another one's size; before it has reported
+  /// anything, all four are listed.
+  List<String> get _photoResolutionKeys {
+    const order = ['max', 'high', 'med', 'low'];
+    if (photoResolutions.isEmpty) return order;
+    final available = [
+      for (final key in order)
+        if (photoResolutions.containsKey(key)) key,
+    ];
+    return available.isEmpty ? order : available;
+  }
+
+  String _formatPhotoResolution(String res) {
     final exact = photoResolutions[res];
     if (exact != null && exact.isNotEmpty) return exact;
     if (res == photoResolution &&
@@ -611,7 +624,7 @@ class CameraTopControlsBar extends StatelessWidget {
                       iconTurns: iconTurns,
                       onSelected: onPhotoResolutionChanged,
                       items: [
-                        for (final r in const ['max', 'high', 'med', 'low'])
+                        for (final r in _photoResolutionKeys)
                           CameraPopupMenuItem(
                             value: r,
                             isSelected: photoResolution == r,

@@ -9652,6 +9652,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'انقر على الحافة اليسرى أو اليمنى لعرض العنصر السابق أو التالي.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'النقر المزدوج للتشغيل/الإيقاف المؤقت';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'انقر نقرًا مزدوجًا في منتصف شاشة الفيديو أو الصوت للتشغيل أو الإيقاف المؤقت بدلًا من التكبير. اضغط على مستوى التكبير المعروض أثناء التكبير لإعادة ضبط العرض.';
+
+  @override
   String get loopPlaylistTitle => 'تكرار قائمة التشغيل';
 
   @override

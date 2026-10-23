@@ -28,6 +28,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.d
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
+import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -159,6 +160,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   static const double _loopFlingMinOverscroll = 12;
   static const double _loopFlingVelocity = 800;
 
+  /// How many times the platform touch slop a sideways drag must travel before
+  /// the tab pager claims it. A list inside a tab starts scrolling after one
+  /// slop of vertical travel, so a vertical scroll that drifts sideways keeps
+  /// the gesture; only a clearly horizontal swipe reaches the pager's larger
+  /// slop first. Raise it to make accidental tab swipes rarer still.
+  static const double _tabPagerSlopFactor = 2.0;
+
   /// With tab swiping off, a left swipe anywhere offers a new tab. It has to be
   /// quick (a slow drag is a long-press drag selecting items, say) and mostly
   /// horizontal, and it is given up on if the finger goes back the other way.
@@ -187,6 +195,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _restoreAppBarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _loopScheduled = false;
+
+  /// True while a fast-scroll handle is held. The handle scrolls with a stream
+  /// of `jumpTo` calls that read as scroll direction; with the app bar at the
+  /// bottom, reacting to them resizes the list under the handle and the bar
+  /// flickers. The bar stays put until the handle is released.
+  bool _scrollbarDragging = false;
+  bool _scrollbarDragEndedAtTop = false;
 
   /// A drag that started on the first and/or last tab, and so may end up
   /// asking for something past it. [_edgeOverscrollForward] is how far it was
@@ -278,7 +293,22 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         next.activeIndex == _pageViewDrivenActiveIndex;
     if (pageViewChangedActiveTab) _pageViewDrivenActiveIndex = null;
 
-    if (_isPureTabReorder(previous, next)) {
+    if (previous?.activeTabId != next.activeTabId) {
+      // A handle drag cannot outlive the page it was on.
+      _scrollbarDragging = false;
+      _scrollbarDragEndedAtTop = false;
+    }
+
+    // Closing tabs leaves the pager's offset pointing past the new last page
+    // (or at the wrong tab). The scroll physics would then spring back to the
+    // edge, which reads as a slide. The target is inside the old extents too,
+    // so jumping now, before the list shrinks, switches directly.
+    final tabsShrank =
+        previous != null &&
+        next.tabs.length < previous.tabs.length &&
+        next.tabs.isNotEmpty &&
+        next.activeIndex >= 0;
+    if (_isPureTabReorder(previous, next) || tabsShrank) {
       if (_pageController.hasClients) {
         final target = next.activeIndex;
         final current = _pageController.page;
@@ -506,6 +536,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     if (!active) return false;
 
+    if (_scrollbarDragging) {
+      // Remember whether the handle ended up at the top, so releasing it can
+      // bring the bar back there (see _onScrollbarDrag).
+      _scrollbarDragEndedAtTop =
+          notification.metrics.maxScrollExtent > 0.0 &&
+          notification.metrics.pixels <= 0.0;
+      return false;
+    }
+
     if (!enabled) {
       if (_appBarVisibilityController.value != 1.0) {
         _appBarVisibilityController.animateTo(
@@ -614,6 +653,33 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _lastPointerEventTime = event.timeStamp;
     if (_pointersDown > 0) _pointersDown--;
     if (event.pointer == _newTabSwipePointer) _newTabSwipePointer = null;
+  }
+
+  bool _onScrollbarDrag(FastScrollbarDragNotification notification) {
+    if (_scrollbarDragging == notification.dragging) return true;
+    _scrollbarDragging = notification.dragging;
+    if (notification.dragging) {
+      _scrollbarDragEndedAtTop = false;
+      return true;
+    }
+    // Released: show the bar if the list ended up at the top, otherwise never
+    // leave it stranded half-way.
+    final atTop = _scrollbarDragEndedAtTop;
+    _scrollbarDragEndedAtTop = false;
+    final value = _appBarVisibilityController.value;
+    final double? target = atTop
+        ? 1.0
+        : (value > 0.0 && value < 1.0)
+        ? (value >= 0.5 ? 1.0 : 0.0)
+        : null;
+    if (target != null && target != value) {
+      _appBarVisibilityController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    return true;
   }
 
   void _resetEdgeSwipe() {
@@ -1015,7 +1081,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 if (!appBarAtBottom) appBarSlot,
                 if (tabsEnabled && tabs.isNotEmpty) strip,
                 Expanded(
-                  child: LayoutBuilder(
+                  child: NotificationListener<FastScrollbarDragNotification>(
+                    onNotification: _onScrollbarDrag,
+                    child: LayoutBuilder(
                     builder: (context, viewportConstraints) {
                       final orientation = MediaQuery.of(context).orientation;
                       final minDualPaneWidth = orientation == Orientation.landscape
@@ -1066,6 +1134,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                       }
 
                       _publishVisibleTabs(const <TabId>{});
+                      // Only the pager gets the larger touch slop; every page
+                      // keeps the platform's own, so lists inside a tab scroll
+                      // as usual.
+                      final pageMedia = MediaQuery.of(context);
+                      final pagerMedia = pageMedia.copyWith(
+                        gestureSettings: DeviceGestureSettings(
+                          touchSlop:
+                              (pageMedia.gestureSettings.touchSlop ??
+                                  kTouchSlop) *
+                              _tabPagerSlopFactor,
+                        ),
+                      );
                       return Listener(
                         behavior: HitTestBehavior.translucent,
                         onPointerDown: _onBrowserPointerDown,
@@ -1080,8 +1160,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                           ),
                           child: FadeTransition(
                             opacity: _loopFade,
-                            child: PageView.builder(
+                            child: MediaQuery(
+                              data: pagerMedia,
+                              child: PageView.builder(
                               controller: _pageController,
+                              // The larger slop would otherwise swallow the
+                              // first stretch of the swipe; count the drag
+                              // from the touch-down so it still tracks.
+                              dragStartBehavior: DragStartBehavior.down,
                               clipBehavior: Clip.hardEdge,
                               physics:
                                   tabsEnabled &&
@@ -1114,17 +1200,22 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                   key: ValueKey<TabId>(tab.tabId),
                                   controller: _pageController,
                                   index: index,
-                                  child: _buildTabContent(
-                                    tab,
-                                    isActive: pageIsActive,
+                                  child: MediaQuery(
+                                    data: pageMedia,
+                                    child: _buildTabContent(
+                                      tab,
+                                      isActive: pageIsActive,
+                                    ),
                                   ),
                                 );
                               },
+                            ),
                             ),
                           ),
                         ),
                       );
                     },
+                  ),
                   ),
                 ),
               ],

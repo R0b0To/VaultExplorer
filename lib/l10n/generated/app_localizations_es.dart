@@ -9619,6 +9619,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Toca el borde izquierdo o derecho para mostrar el elemento multimedia anterior o siguiente.';
 
   @override
+  String get doubleTapPlayPauseTitle => 'Doble toque para reproducir/pausar';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      'Toca dos veces el centro de la pantalla de vídeo o audio para reproducir o pausar en lugar de hacer zoom. Toca el nivel de zoom que aparece al ampliar para restablecer la vista.';
+
+  @override
   String get loopPlaylistTitle => 'Repetir lista de reproducción';
 
   @override

@@ -8,6 +8,17 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 
+/// Sent up the tree when a [FastScrollbar] handle is grabbed or released.
+///
+/// Lets an ancestor that reacts to scroll direction (the file manager's
+/// auto-hiding app bar) ignore the stream of `jumpTo` calls the handle makes
+/// without every list, grid and masonry view having to forward a callback.
+class FastScrollbarDragNotification extends Notification {
+  const FastScrollbarDragNotification({required this.dragging});
+
+  final bool dragging;
+}
+
 /// A Material-style fast scroller inspired by MaterialFiles (AndroidFastScroll).
 class FastScrollbar extends StatefulWidget {
   final ScrollController controller;
@@ -294,7 +305,7 @@ void _onControllerChange() {
 
     _autoHideTimer?.cancel();
     _isDragging = true;
-    widget.onDragStateChanged?.call(true);
+    _notifyDragState(true);
     _fadeController.value = 1.0;
 
     final currentThumbTop = _scrollFraction * travelDistance;
@@ -328,6 +339,13 @@ void _onControllerChange() {
     }
 
     setState(() {});
+  }
+
+  void _notifyDragState(bool dragging) {
+    widget.onDragStateChanged?.call(dragging);
+    if (mounted) {
+      FastScrollbarDragNotification(dragging: dragging).dispatch(context);
+    }
   }
 
   void _handleDragUpdate(
@@ -368,7 +386,7 @@ void _onControllerChange() {
   void _handleDragEnd(DragEndDetails details) {
     if (!_isDragging) return;
     _isDragging = false;
-    widget.onDragStateChanged?.call(false);
+    _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();
     setState(() {});
@@ -377,7 +395,7 @@ void _onControllerChange() {
   void _handleDragCancel() {
     if (!_isDragging) return;
     _isDragging = false;
-    widget.onDragStateChanged?.call(false);
+    _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();
     setState(() {});

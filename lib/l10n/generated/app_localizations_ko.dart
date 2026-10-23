@@ -9097,6 +9097,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '왼쪽 또는 오른쪽 가장자리를 눌러 이전 또는 다음 미디어를 표시합니다.';
 
   @override
+  String get doubleTapPlayPauseTitle => '두 번 탭하여 재생/일시정지';
+
+  @override
+  String get doubleTapPlayPauseSubtitle =>
+      '동영상 또는 오디오 화면 중앙을 두 번 탭하면 확대 대신 재생 또는 일시정지합니다. 확대 중에 표시되는 확대 수준을 탭하면 보기가 초기화됩니다.';
+
+  @override
   String get loopPlaylistTitle => '재생목록 반복';
 
   @override

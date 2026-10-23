@@ -12024,6 +12024,14 @@
   "@tapEdgesToNavigateSubtitle": {
     "description": "Explains the previous/next media navigation edge tap gesture."
   },
+  "doubleTapPlayPauseTitle": "Double-tap to play/pause",
+  "@doubleTapPlayPauseTitle": {
+    "description": "Setting label for double-tapping the video or audio screen to play or pause instead of zooming."
+  },
+  "doubleTapPlayPauseSubtitle": "Double-tap the middle of the video or audio screen to play or pause instead of zooming. Tap the zoom level shown while zoomed to reset the view.",
+  "@doubleTapPlayPauseSubtitle": {
+    "description": "Explains that double-tap plays or pauses and the zoom level chip resets the zoom."
+  },
   "loopPlaylistTitle": "Loop playlist",
   "@loopPlaylistTitle": {
     "description": "Setting label for wrapping playlist navigation from the last item to the first."

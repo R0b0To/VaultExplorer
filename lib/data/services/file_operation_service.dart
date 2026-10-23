@@ -836,7 +836,7 @@ class FileOperationService extends ChangeNotifier {
             await collect(childContainerPath, childArchivePath);
           } else {
             srcPaths.add(
-              source.isLocalStorage
+              source.isRawLocal
                   ? p.join(source.uri, childContainerPath)
                   : childContainerPath,
             );
@@ -853,7 +853,7 @@ class FileOperationService extends ChangeNotifier {
           await collect(item.path, item.name);
         } else {
           srcPaths.add(
-            source.isLocalStorage ? p.join(source.uri, item.path) : item.path,
+            source.isRawLocal ? p.join(source.uri, item.path) : item.path,
           );
           entryNames.add(item.name);
           modifiedSecs.add(item.modifiedSecs);
@@ -898,7 +898,7 @@ class FileOperationService extends ChangeNotifier {
         srcUri: source.isLocalStorage ? source.uri : source.uri,
         destUri: dest.isLocalStorage ? dest.uri : dest.uri,
         destVaultPath: destVaultPath,
-        destFilePath: dest.isLocalStorage
+        destFilePath: dest.isRawLocal
             ? p.join(dest.uri, destVaultPath)
             : null,
         passphrase: passphrase,

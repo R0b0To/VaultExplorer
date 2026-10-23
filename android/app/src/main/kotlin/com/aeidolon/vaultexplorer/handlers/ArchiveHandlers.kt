@@ -15,6 +15,7 @@ import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.ExecutorService
 
 class ArchiveHandlers(
@@ -770,9 +771,15 @@ class ArchiveHandlers(
 
         val srcVolId = if (!srcUri.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(srcUri) else null
         val destVolId = if (!destUri.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(destUri) else null
+        val srcIsSaf = srcVolId == null && srcUri?.startsWith("content://") == true
+        val destIsSaf = destVolId == null && destUri?.startsWith("content://") == true
+        if (destIsSaf && destVaultPath.isNullOrBlank()) {
+            result.error("INVALID_ARGS", "Destination storage path required", null)
+            return
+        }
 
         // Resolve source paths to absolute paths if source is on local disk
-        val srcPaths = if (srcVolId == null && !srcUri.isNullOrEmpty()) {
+        val srcPaths = if (srcVolId == null && !srcUri.isNullOrEmpty() && !srcIsSaf) {
             rawSrcPaths.map { sp ->
                 val f = File(sp)
                 if (f.isAbsolute) sp else File(srcUri, sp).absolutePath
@@ -788,8 +795,8 @@ class ArchiveHandlers(
         val splitSizeBytes = call.argument<Number>("splitSizeBytes")?.toLong() ?: 0L
         if (splitSizeBytes > 0L) {
             createSplitArchive(
-                result, srcVolId, srcIsFolderVault, srcPaths, entryNames, sourceModifiedSecs,
-                destVolId, destIsFolderVault, destVaultPath, destFilePath, destUri,
+                result, srcVolId, srcIsFolderVault, srcIsSaf, srcUri, srcPaths, entryNames, sourceModifiedSecs,
+                destVolId, destIsFolderVault, destIsSaf, destVaultPath, destFilePath, destUri,
                 splitSizeBytes, format, passphrase, encryptFilenames,
                 compressionLevel, compressionMethod, opId
             )
@@ -799,8 +806,18 @@ class ArchiveHandlers(
         // 1. If neither side is a folder vault, use direct native-to-native C++ streaming paths
         if (!srcIsFolderVault && !destIsFolderVault) {
             ioExecutor.execute {
+                var tempSrcDir: File? = null
+                var tempArchiveFile: File? = null
                 var destPfd: ParcelFileDescriptor? = null
                 try {
+                    val localSrcPaths = if (srcIsSaf) {
+                        val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
+                        tempSrcDir = dir
+                        stageSafArchiveSources(srcUri!!, srcPaths, dir)
+                    } else {
+                        srcPaths
+                    }
+
                     if (srcVolId != null && destVolId != null && destVaultPath != null) {
                         val ok = NativeEngine.archiveCreateVaultToVaultNative(
                             srcVolId, srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
@@ -808,22 +825,41 @@ class ArchiveHandlers(
                         )
                         activity.runOnUiThread { result.success(ok) }
                     } else if (srcVolId != null) {
-                        val target = destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
-                            File(destUri, destVaultPath).absolutePath
+                        val target = if (destIsSaf) {
+                            if (destUri.isNullOrEmpty() || destVaultPath.isNullOrEmpty()) {
+                                activity.runOnUiThread {
+                                    result.error("INVALID_ARGS", "Destination storage path required", null)
+                                }
+                                return@execute
+                            }
+                            val temp = File(activity.cacheDir, "arch_out_${System.nanoTime()}.tmp")
+                            tempArchiveFile = temp
+                            temp.absolutePath
                         } else {
-                            destUri
+                            destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                                File(destUri, destVaultPath).absolutePath
+                            } else {
+                                destUri
+                            }
                         }
                         if (target == null) {
                             activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
                             return@execute
                         }
-                        val targetUri = Uri.parse(target)
-                        destPfd = if (targetUri.scheme == "content") {
-                            activity.contentResolver.openFileDescriptor(targetUri, "wt")
+                        destPfd = if (destIsSaf) {
+                            ParcelFileDescriptor.open(
+                                tempArchiveFile!!,
+                                ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE,
+                            )
                         } else {
-                            val file = File(targetUri.path ?: target)
-                            file.parentFile?.mkdirs()
-                            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE)
+                            val targetUri = Uri.parse(target)
+                            if (targetUri.scheme == "content") {
+                                activity.contentResolver.openFileDescriptor(targetUri, "wt")
+                            } else {
+                                val file = File(targetUri.path ?: target)
+                                file.parentFile?.mkdirs()
+                                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE)
+                            }
                         }
                         if (destPfd == null) {
                             activity.runOnUiThread { result.error("IO_ERROR", "Could not open destination file descriptor", null) }
@@ -834,24 +870,46 @@ class ArchiveHandlers(
                             srcVolId, srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
                             destPfd.fd, format, passphrase, encryptFilenames, compressionLevel, compressionMethod, opId
                         )
-                        activity.runOnUiThread { result.success(ok) }
+                        destPfd?.close()
+                        destPfd = null
+                        val finalSuccess = ok && (!destIsSaf || copyArchiveToSaf(tempArchiveFile!!, destUri!!, destVaultPath!!))
+                        activity.runOnUiThread { result.success(finalSuccess) }
                     } else {
-                        val target = destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
-                            File(destUri, destVaultPath).absolutePath
+                        val target = if (destIsSaf) {
+                            if (destUri.isNullOrEmpty() || destVaultPath.isNullOrEmpty()) {
+                                activity.runOnUiThread {
+                                    result.error("INVALID_ARGS", "Destination storage path required", null)
+                                }
+                                return@execute
+                            }
+                            val temp = File(activity.cacheDir, "arch_out_${System.nanoTime()}.tmp")
+                            tempArchiveFile = temp
+                            temp.absolutePath
                         } else {
-                            destUri
+                            destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                                File(destUri, destVaultPath).absolutePath
+                            } else {
+                                destUri
+                            }
                         }
                         if (target == null) {
                             activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
                             return@execute
                         }
-                        val targetUri = Uri.parse(target)
-                        destPfd = if (targetUri.scheme == "content") {
-                            activity.contentResolver.openFileDescriptor(targetUri, "wt")
+                        destPfd = if (destIsSaf) {
+                            ParcelFileDescriptor.open(
+                                tempArchiveFile!!,
+                                ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE,
+                            )
                         } else {
-                            val file = File(targetUri.path ?: target)
-                            file.parentFile?.mkdirs()
-                            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE)
+                            val targetUri = Uri.parse(target)
+                            if (targetUri.scheme == "content") {
+                                activity.contentResolver.openFileDescriptor(targetUri, "wt")
+                            } else {
+                                val file = File(targetUri.path ?: target)
+                                file.parentFile?.mkdirs()
+                                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_TRUNCATE)
+                            }
                         }
                         if (destPfd == null) {
                             activity.runOnUiThread { result.error("IO_ERROR", "Could not open destination file descriptor", null) }
@@ -859,15 +917,23 @@ class ArchiveHandlers(
                         }
 
                         val ok = NativeEngine.archiveCreateLocalToFdNative(
-                            srcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
+                            localSrcPaths.toTypedArray(), entryNames.toTypedArray(), sourceModifiedSecs,
                             destPfd.fd, format, passphrase, encryptFilenames, compressionLevel, compressionMethod, opId
                         )
-                        activity.runOnUiThread { result.success(ok) }
+                        destPfd?.close()
+                        destPfd = null
+                        val finalSuccess = ok && (!destIsSaf || copyArchiveToSaf(tempArchiveFile!!, destUri!!, destVaultPath!!))
+                        activity.runOnUiThread { result.success(finalSuccess) }
                     }
                 } catch (e: Exception) {
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
                 } finally {
                     runCatching { destPfd?.close() }
+                    tempArchiveFile?.let { SecureFileWipe.secureDeleteFile(it) }
+                    tempSrcDir?.let { dir ->
+                        dir.listFiles()?.forEach { SecureFileWipe.secureDeleteFile(it) }
+                        dir.delete()
+                    }
                 }
             }
             return
@@ -904,6 +970,12 @@ class ArchiveHandlers(
                     localSourcePaths = files
                     localEntryNames = names
                     localModifiedSecs = modified.toLongArray()
+                } else if (srcIsSaf) {
+                    val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
+                    tempSrcDir = dir
+                    localSourcePaths = stageSafArchiveSources(srcUri!!, srcPaths, dir)
+                    localEntryNames = entryNames
+                    localModifiedSecs = sourceModifiedSecs
                 } else {
                     localSourcePaths = srcPaths
                     localEntryNames = entryNames
@@ -913,8 +985,13 @@ class ArchiveHandlers(
                 // B. Prepare target file descriptor
                 val targetPfd: ParcelFileDescriptor
                 val isVaultDest = destVolId != null && destVaultPath != null
+                val isSafDest = destIsSaf && destVaultPath != null
 
-                if (isVaultDest) {
+                if (isVaultDest || isSafDest) {
+                    if (isSafDest && destUri.isNullOrEmpty()) {
+                        activity.runOnUiThread { result.error("INVALID_ARGS", "Destination storage URI required", null) }
+                        return@execute
+                    }
                     val arch = File(activity.cacheDir, "arch_out_${System.nanoTime()}.tmp")
                     tempArchiveFile = arch
                     targetPfd = ParcelFileDescriptor.open(
@@ -968,6 +1045,8 @@ class ArchiveHandlers(
                     val written = ContainerFileSystem.writeBackFile(destVolId!!, destVaultPath!!, tempArchiveFile.absolutePath, opId)
                     ContainerFileSystem.finishWrite(destVolId, destVaultPath)
                     finalSuccess = written
+                } else if (ok && isSafDest && tempArchiveFile != null && tempArchiveFile.exists()) {
+                    finalSuccess = copyArchiveToSaf(tempArchiveFile!!, destUri!!, destVaultPath!!)
                 }
 
                 activity.runOnUiThread { result.success(finalSuccess) }
@@ -996,9 +1075,9 @@ class ArchiveHandlers(
      */
     private fun createSplitArchive(
         result: MethodChannel.Result,
-        srcVolId: Int?, srcIsFolderVault: Boolean, srcPaths: List<String>,
+        srcVolId: Int?, srcIsFolderVault: Boolean, srcIsSaf: Boolean, srcUri: String?, srcPaths: List<String>,
         entryNames: List<String>, sourceModifiedSecs: LongArray,
-        destVolId: Int?, destIsFolderVault: Boolean,
+        destVolId: Int?, destIsFolderVault: Boolean, destIsSaf: Boolean,
         destVaultPath: String?, destFilePath: String?, destUri: String?,
         splitSizeBytes: Long, format: Int, passphrase: String?, encryptFilenames: Boolean,
         compressionLevel: Int, compressionMethod: Int, opId: Int
@@ -1007,6 +1086,7 @@ class ArchiveHandlers(
             var tempSrcDir: File? = null
             var tempOutDir: File? = null
             val writtenToVault = mutableListOf<String>()
+            val writtenToSaf = mutableListOf<String>()
             try {
                 // Sources
                 var nativeSrcVol = srcVolId ?: -1
@@ -1033,13 +1113,26 @@ class ArchiveHandlers(
                     nativeSrcPaths = files
                     nativeNames = names
                     nativeModified = modified.toLongArray()
+                } else if (srcIsSaf) {
+                    val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
+                    tempSrcDir = dir
+                    nativeSrcVol = -1
+                    nativeSrcPaths = stageSafArchiveSources(srcUri!!, srcPaths, dir)
                 }
 
                 // Where the archive (= its parts) goes
                 var nativeDestVol = -1
                 val archivePath: String
                 val intoVault = destVolId != null && destVaultPath != null
-                if (intoVault && destIsFolderVault) {
+                if (destIsSaf && destVaultPath != null) {
+                    if (destUri.isNullOrEmpty()) {
+                        activity.runOnUiThread { result.error("INVALID_ARGS", "Destination storage URI required", null) }
+                        return@execute
+                    }
+                    val dir = File(activity.cacheDir, "arch_out_${System.nanoTime()}").apply { mkdirs() }
+                    tempOutDir = dir
+                    archivePath = File(dir, File(destVaultPath).name).absolutePath
+                } else if (intoVault && destIsFolderVault) {
                     val dir = File(activity.cacheDir, "arch_out_${System.nanoTime()}").apply { mkdirs() }
                     tempOutDir = dir
                     archivePath = File(dir, File(destVaultPath!!).name).absolutePath
@@ -1075,24 +1168,40 @@ class ArchiveHandlers(
                     compressionLevel, compressionMethod, opId
                 )
 
-                // Folder-vault destination: copy the finished parts in.
+                // Copy the finished parts to the folder-vault or SAF destination.
                 if (success && tempOutDir != null) {
-                    val vaultPrefix = destVaultPath!!.let { it.substring(0, it.lastIndexOf('/') + 1) }
                     val parts = tempOutDir.listFiles()?.sortedBy { it.name } ?: emptyList()
                     for (part in parts) {
-                        val vaultTarget = vaultPrefix + part.name
-                        val written = ContainerFileSystem.writeBackFile(destVolId!!, vaultTarget, part.absolutePath, opId)
-                        ContainerFileSystem.finishWrite(destVolId, vaultTarget)
-                        if (!written) {
-                            success = false
-                            break
+                        if (destIsSaf) {
+                            val parent = destVaultPath!!.substringBeforeLast('/', "")
+                            val safTarget = if (parent.isEmpty()) part.name else "$parent/${part.name}"
+                            writtenToSaf.add(safTarget)
+                            if (!copyArchiveToSaf(part, destUri!!, safTarget)) {
+                                success = false
+                                break
+                            }
+                        } else {
+                            val vaultPrefix = destVaultPath!!.let { it.substring(0, it.lastIndexOf('/') + 1) }
+                            val vaultTarget = vaultPrefix + part.name
+                            val written = ContainerFileSystem.writeBackFile(destVolId!!, vaultTarget, part.absolutePath, opId)
+                            ContainerFileSystem.finishWrite(destVolId, vaultTarget)
+                            if (!written) {
+                                success = false
+                                break
+                            }
+                            writtenToVault.add(vaultTarget)
                         }
-                        writtenToVault.add(vaultTarget)
                         SecureFileWipe.secureDeleteFile(part)
                     }
                     if (!success) {
                         // Leave no half-written set behind.
-                        writtenToVault.forEach { runCatching { ContainerFileSystem.deleteFile(destVolId!!, it) } }
+                        if (destIsSaf) {
+                            writtenToSaf.forEach {
+                                runCatching { activity.safStorageManager.deleteRecursively(Uri.parse(destUri!!), it) }
+                            }
+                        } else {
+                            writtenToVault.forEach { runCatching { ContainerFileSystem.deleteFile(destVolId!!, it) } }
+                        }
                     }
                 }
 
@@ -1101,6 +1210,11 @@ class ArchiveHandlers(
             } catch (e: Exception) {
                 if (destVolId != null && destIsFolderVault) {
                     writtenToVault.forEach { runCatching { ContainerFileSystem.deleteFile(destVolId, it) } }
+                }
+                if (destIsSaf && !destUri.isNullOrEmpty()) {
+                    writtenToSaf.forEach {
+                        runCatching { activity.safStorageManager.deleteRecursively(Uri.parse(destUri), it) }
+                    }
                 }
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {
@@ -1114,5 +1228,24 @@ class ArchiveHandlers(
                 }
             }
         }
+    }
+
+    private fun stageSafArchiveSources(treeUri: String, relativePaths: List<String>, destinationDir: File): List<String> {
+        val tree = Uri.parse(treeUri)
+        return relativePaths.mapIndexed { index, relativePath ->
+            val stagedFile = File(destinationDir, "source_$index")
+            val copied = activity.safStorageManager.copyFile(tree, relativePath, null, stagedFile.absolutePath)
+            if (!copied || !stagedFile.isFile) {
+                throw IOException("Could not read storage item for archive: $relativePath")
+            }
+            stagedFile.absolutePath
+        }
+    }
+
+    private fun copyArchiveToSaf(sourceFile: File, treeUri: String, relativePath: String): Boolean {
+        val tree = Uri.parse(treeUri)
+        val copied = activity.safStorageManager.copyFile(null, sourceFile.absolutePath, tree, relativePath)
+        if (!copied) runCatching { activity.safStorageManager.deleteRecursively(tree, relativePath) }
+        return copied
     }
 }

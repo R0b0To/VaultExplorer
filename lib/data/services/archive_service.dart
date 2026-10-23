@@ -664,7 +664,11 @@ class ArchiveService {
         if (child.isDir) {
           await collect(childContainerPath, childArchivePath);
         } else {
-          srcPaths.add(childContainerPath);
+          srcPaths.add(
+            container.isRawLocal
+                ? p.join(container.uri, childContainerPath)
+                : childContainerPath,
+          );
           entryNames.add(childArchivePath);
           modifiedSecs.add(child.modifiedSecs);
         }
@@ -678,7 +682,11 @@ class ArchiveService {
       if (entry.isDir) {
         await collect(containerPath, entry.name);
       } else {
-        srcPaths.add(containerPath);
+        srcPaths.add(
+          container.isRawLocal
+              ? p.join(container.uri, containerPath)
+              : containerPath,
+        );
         entryNames.add(entry.name);
         modifiedSecs.add(entry.modifiedSecs);
       }
@@ -696,6 +704,9 @@ class ArchiveService {
       srcUri: container.uri,
       destUri: container.uri,
       destVaultPath: destPathInContainer,
+      destFilePath: container.isRawLocal
+          ? p.join(container.uri, destPathInContainer)
+          : null,
       passphrase: passphrase,
       opId: opId,
     );

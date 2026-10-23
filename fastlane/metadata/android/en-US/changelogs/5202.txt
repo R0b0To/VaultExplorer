@@ -1,0 +1,6 @@
+• Added optional multi-tab file management
+• Redesigned bookmarks: stored securely in vaults & shown in side drawer
+• Customizable action menus & bottom app bar option
+• Added crop handles to doc scanner & video double-tap play/pause
+• Vault storage safeguards for camera/audio capture
+• Fixed archive extraction issues & accidental hold-to-select while scrolling

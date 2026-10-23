@@ -1,0 +1,24 @@
+## What's Changed
+
+### New Features
+* **Multi-Tab System:** Added an optional tab navigation system to manage multiple locations simultaneously (can be enabled/disabled in File Manager settings).
+* **Redesigned Bookmarks:** Bookmarks now appear in the side drawer when vaults are unlocked. Configurations are stored directly inside the vault for portability and to prevent file path leaks.
+* **Customizable Action Menus:** Reorganized the file/folder action menu with options to show, hide, and reorder available actions.
+* **Local Storage Capture:** Camera, Quick Capture, and audio recording actions are now available directly in local storage locations.
+
+### UI & UX Improvements
+* **App Bar Positioning:** Added an option to move the app bar to the bottom of the screen.
+* **File View Customization:**
+  * Added an option to hide file extensions.
+  * Added an option to enable or disable selection by tapping file icons.
+  * Added a 3-dots context menu to grid and masonry layouts (automatically hidden if filenames are hidden).
+* **Media & Tools:**
+  * **Video Player:** Added double-tap gesture to play/pause video playback.
+  * **Document Scanner:** Added interactive handles to resize crop boundaries.
+* **Storage Safeguards:** Implemented safe write checks for camera, Quick Capture, and audio recordings (verifies available vault space before writing files, with a 1% safety margin).
+* **Archive Compression:** Removed media-based compression overrides; archive creation now defaults to Normal (Level 5).
+
+### Bug Fixes
+* **Selection Gestures:** Fixed an issue where stopping a scroll gesture triggered hold-to-select; selection now requires a distinct press-and-hold.
+* **Camera Detection:** Fixed a bug where camera auto-detection would register duplicate resolutions.
+* **Archive Extraction:** Resolved failures during archive extraction inside vaults and on external storage locations.

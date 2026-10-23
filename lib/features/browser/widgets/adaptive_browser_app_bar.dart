@@ -10,9 +10,9 @@ import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart'
 /// Stationary app-bar slot for the browser shell. Home chrome is built by the
 /// shell; the active directory viewport supplies its context-aware actions.
 ///
-/// The selection app bar is not shown here: it lives in an overlay above the
-/// whole browser (see the shell) so that selecting never depends on, or
-/// resizes, the auto-hiding slot this widget fills.
+/// When the app bar is at the top, the browser shell overlays selection actions
+/// above this toolbar. With the bottom-bar setting, the selection app bar is
+/// rendered in the bottom slot instead.
 class AdaptiveBrowserAppBar extends ConsumerWidget
     implements PreferredSizeWidget {
   const AdaptiveBrowserAppBar({

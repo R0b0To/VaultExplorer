@@ -544,6 +544,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['top bar', 'toolbar', 'scroll', 'hide'],
   ),
   _e(
+    'file_manager.auto_hide_tab_bar',
+    SettingsDestination.fileManager,
+    (l) => l.textEditorAutoHideTabBarLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.textEditorAutoHideTabBarDescription],
+    keywords: ['tabs', 'tab strip', 'scroll', 'hide'],
+  ),
+  _e(
     'file_manager.app_bar_at_bottom',
     SettingsDestination.fileManager,
     (l) => l.appBarAtBottomLabel,

@@ -1740,7 +1740,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     origin: _tabOrigin,
     appRoot: widget.workspaceConfig.appRoot,
     hostsHome: widget.workspaceConfig.includeDashboardTab,
-    tabsEnabled: ref.read(appSettingsControllerProvider).settings.useBrowserTabs,
+    tabsEnabled: ref
+        .read(appSettingsControllerProvider)
+        .settings
+        .useBrowserTabs,
   );
 
   void _onSystemBack() {
@@ -4706,11 +4709,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final double bannerBottomOffset = _searchActive
         ? 0.0
-        : (baseBottomOffset +
-              ((selectionBarVisible && _toolbarConfig.bottomSelectionBar)
-                  ? kToolbarHeight
-                  : 0.0) +
-              fabClearance);
+        : (baseBottomOffset + fabClearance);
 
     PreferredSizeWidget buildAppBar(
       BuildContext appBarContext, {
@@ -4882,7 +4881,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _latestAppBarBuilder = buildAppBar;
     final regularAppBarFactory = _appBarFactoryFor(
       signature: appBarSignature,
-      selectionMode: selectionInTopBar,
+      selectionMode: false,
     );
     final selectionAppBarFactory = _appBarFactoryFor(
       signature: Object.hash(appBarSignature, true),
@@ -4935,7 +4934,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ],
           )
         : null;
-    final embeddedBottomBar = selectionInBottomBar
+    final selectionBottomBar = selectionInBottomBar
         // The shell's bottom slot sits at the screen's edge, under the
         // keyboard. Lifting the bar by the keyboard's height keeps the
         // selection actions visible and tappable while a search is still open
@@ -4948,7 +4947,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
               child: Material(
                 color: Theme.of(context).colorScheme.surfaceContainer,
-                elevation: 4,
+                elevation: 0,
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
@@ -4964,7 +4963,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
             ),
           )
-        : browserBottomBar;
+        : null;
+    final Widget? embeddedBottomBar = selectionBottomBar == null
+        ? browserBottomBar
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (browserBottomBar != null) browserBottomBar,
+              selectionBottomBar,
+            ],
+          );
     if (_isActiveTab) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_isActiveTab) return;

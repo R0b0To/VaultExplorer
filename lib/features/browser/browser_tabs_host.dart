@@ -181,6 +181,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final PageController _pageController;
   late final ProviderSubscription<BrowserChromeHub> _chromeSubscription;
   late final AnimationController _appBarVisibilityController;
+  late final AnimationController _tabBarVisibilityController;
 
   /// Fades the pages back in after the tabs loop, so wrapping from one end to
   /// the other reads as a transition rather than a jump.
@@ -195,6 +196,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _drawerOpenOrDragging = false;
   bool _edgeDrawerGestureActive = false;
   bool _restoreAppBarScheduled = false;
+  bool _restoreTabBarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _loopScheduled = false;
 
@@ -282,6 +284,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       duration: const Duration(milliseconds: 220),
       value: 1.0,
     );
+    _tabBarVisibilityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
     _loopTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -306,6 +313,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _pageController.dispose();
     _chromeSubscription.close();
     _appBarVisibilityController.dispose();
+    _tabBarVisibilityController.dispose();
     _loopTransitionController.dispose();
     super.dispose();
   }
@@ -478,6 +486,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     BrowserTabState tab, {
     required bool isActive,
     required bool autoHideAppBar,
+    required bool autoHideTabBar,
   }) {
     return Expanded(
       child: NotificationListener<ScrollNotification>(
@@ -486,6 +495,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             _handleAppBarScroll(
               notification,
               enabled: autoHideAppBar,
+              autoHideTabBar: autoHideTabBar,
               active: isActive,
             );
           }
@@ -556,6 +566,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _handleAppBarScroll(
     ScrollNotification notification, {
     required bool enabled,
+    required bool autoHideTabBar,
     required bool active,
   }) {
     if (notification.metrics.axis == Axis.horizontal) {
@@ -574,19 +585,40 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       return false;
     }
 
+    _updateChromeVisibilityFromScroll(
+      _appBarVisibilityController,
+      notification,
+      enabled: enabled,
+      barHeight: kToolbarHeight,
+    );
+    _updateChromeVisibilityFromScroll(
+      _tabBarVisibilityController,
+      notification,
+      enabled: autoHideTabBar,
+      barHeight: kBrowserTabStripHeight,
+    );
+    return false;
+  }
+
+  void _updateChromeVisibilityFromScroll(
+    AnimationController controller,
+    ScrollNotification notification, {
+    required bool enabled,
+    required double barHeight,
+  }) {
     if (!enabled) {
-      if (_appBarVisibilityController.value != 1.0) {
-        _appBarVisibilityController.animateTo(
+      if (controller.value != 1.0) {
+        controller.animateTo(
           1.0,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
         );
       }
-      return false;
+      return;
     }
 
     void setProgress(double value) {
-      _appBarVisibilityController.value = value.clamp(0.0, 1.0).toDouble();
+      controller.value = value.clamp(0.0, 1.0).toDouble();
     }
 
     final metrics = notification.metrics;
@@ -596,34 +628,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       if (canScroll && metrics.pixels <= 0.0 && delta <= 0.0) {
         setProgress(1.0);
       } else if (delta != 0.0) {
-        setProgress(
-          _appBarVisibilityController.value - (delta / kToolbarHeight),
-        );
+        setProgress(controller.value - (delta / barHeight));
       }
     } else if (notification is OverscrollNotification) {
       if (notification.overscroll != 0.0) {
-        setProgress(
-          _appBarVisibilityController.value -
-              (notification.overscroll / kToolbarHeight),
-        );
+        setProgress(controller.value - (notification.overscroll / barHeight));
       }
     } else if (notification is ScrollEndNotification) {
       if (canScroll && metrics.pixels <= 0.0) {
-        _appBarVisibilityController.animateTo(
+        controller.animateTo(
           1.0,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
         );
-      } else if (_appBarVisibilityController.value > 0.0 &&
-          _appBarVisibilityController.value < 1.0) {
-        _appBarVisibilityController.animateTo(
-          _appBarVisibilityController.value >= 0.5 ? 1.0 : 0.0,
+      } else if (controller.value > 0.0 && controller.value < 1.0) {
+        controller.animateTo(
+          controller.value >= 0.5 ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
         );
       }
     }
-    return false;
   }
 
   /// Whether a list inside a page is scrolling right now, or was a moment ago
@@ -731,18 +756,23 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     // leave it stranded half-way.
     final atTop = _scrollbarDragEndedAtTop;
     _scrollbarDragEndedAtTop = false;
-    final value = _appBarVisibilityController.value;
-    final double? target = atTop
-        ? 1.0
-        : (value > 0.0 && value < 1.0)
-        ? (value >= 0.5 ? 1.0 : 0.0)
-        : null;
-    if (target != null && target != value) {
-      _appBarVisibilityController.animateTo(
-        target,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-      );
+    for (final controller in [
+      _appBarVisibilityController,
+      _tabBarVisibilityController,
+    ]) {
+      final value = controller.value;
+      final double? target = atTop
+          ? 1.0
+          : (value > 0.0 && value < 1.0)
+          ? (value >= 0.5 ? 1.0 : 0.0)
+          : null;
+      if (target != null && target != value) {
+        controller.animateTo(
+          target,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
     }
     return true;
   }
@@ -916,9 +946,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
+    final automationApi = ref.read(vaultAutomationApiProvider);
+    final mountedVaults = await automationApi.getActiveContainerSessions();
+    if (!mounted) return;
     final choice = await BrowserNewTabSheet.show(
       context,
-      mountedVaults: widget.mountedContainers(),
+      mountedVaults: mountedVaults,
       primaryLocalContainer: widget.primaryLocalContainer(),
       allowDashboard: widget.includeDashboardTab,
     );
@@ -930,8 +963,29 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       return;
     }
     final path = choice.path;
+    var container = choice.container!;
+    final wasMountedVault = mountedVaults.any(
+      (vault) => vault.uri == container.uri,
+    );
+    if (wasMountedVault) {
+      final currentVaults = await automationApi.getActiveContainerSessions();
+      if (!mounted) return;
+      final current = currentVaults
+          .where((vault) => vault.uri == container.uri)
+          .firstOrNull;
+      if (current == null) {
+        showAppSnackBar(
+          context,
+          message:
+              '${container.displayName}: ${context.l10n.vaultStatusLocked}',
+          tone: AppBannerTone.warning,
+        );
+        return;
+      }
+      container = current;
+    }
     final tabId = _workspaceActions.openTab(
-      choice.container!,
+      container,
       initialPath: (path == null || path.isEmpty) ? null : path,
     );
     if (tabId == null) _showLimitReached();
@@ -1004,6 +1058,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         toolbarSettingsUri,
       ).select((settings) => settings.config.autoHideAppBar),
     );
+    final autoHideTabBar = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        toolbarSettingsUri,
+      ).select((settings) => settings.config.autoHideTabBar),
+    );
     if (!autoHideAppBar &&
         _appBarVisibilityController.value != 1.0 &&
         !_restoreAppBarScheduled) {
@@ -1013,6 +1072,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         if (mounted) _appBarVisibilityController.value = 1.0;
       });
     }
+    if (!autoHideTabBar &&
+        _tabBarVisibilityController.value != 1.0 &&
+        !_restoreTabBarScheduled) {
+      _restoreTabBarScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreTabBarScheduled = false;
+        if (mounted) _tabBarVisibilityController.value = 1.0;
+      });
+    }
+    final selectionHasItems = ref.watch(
+      aggregatedTabsSelectionProvider(
+        _workspace,
+      ).select((selection) => selection.hasSelection),
+    );
     final isFirstTab = tabs.first.tabId == activeTabId;
     final hasMultipleTabs = ref.watch(hasActiveBrowserTabsProvider(_workspace));
     final tabsEnabled = ref.watch(
@@ -1076,18 +1149,33 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             activeTab.isDashboard ? null : activeTab.volId,
           );
     double visibleAppBarHeight() =>
-        (autoHideAppBar ? _appBarVisibilityController.value : 1.0) *
+        (autoHideAppBar && !searchActive
+            ? _appBarVisibilityController.value
+            : 1.0) *
         kToolbarHeight;
 
+    double tabStripVisibleHeight() =>
+        (autoHideTabBar ? _tabBarVisibilityController.value : 1.0) *
+        kBrowserTabStripHeight;
+
     /// Bottom edge of the chrome stacked at the top of the screen: the status
-    /// bar, the tab strip and, unless it was moved to the bottom, the app bar.
+    /// bar, app bar and tab strip.
     double browserChromeBottom() {
       final visibleTabStripHeight = tabsEnabled && tabs.isNotEmpty
-          ? kBrowserTabStripHeight
+          ? tabStripVisibleHeight()
           : 0.0;
+      final visibleTopBarHeight = appBarAtBottom ? 0.0 : visibleAppBarHeight();
+      final regularChromeHeight = visibleTopBarHeight + visibleTabStripHeight;
+      final hasTopSelectionOverlay =
+          !appBarAtBottom &&
+          selectionHasItems &&
+          _chrome.selectionAppBar.value != null;
+      final topChromeHeight =
+          hasTopSelectionOverlay && regularChromeHeight < kToolbarHeight
+          ? kToolbarHeight
+          : regularChromeHeight;
       return MediaQuery.paddingOf(context).top +
-          (appBarAtBottom ? 0.0 : visibleAppBarHeight()) +
-          visibleTabStripHeight;
+          (appBarAtBottom ? visibleTabStripHeight : topChromeHeight);
     }
 
     /// Whether a drag that begins at [position] may pull the drawer out. The
@@ -1115,19 +1203,25 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
       ),
     );
-    // The bar's usual place, at the top of the browser.
-    final Widget appBarSlot = ClipRect(
+    final Widget appBarSlot = _TopAppBarSlot(
+      workspaceConfig: _workspace,
+      visibility: _appBarVisibilityController,
+      autoHide: autoHideAppBar,
+      searchActive: searchActive,
+      appBar: appBar,
+      selectionAppBarListenable: _chrome.selectionAppBar,
+    );
+    final Widget tabStripSlot = ClipRect(
       child: AnimatedBuilder(
-        animation: _appBarVisibilityController,
+        animation: _tabBarVisibilityController,
         builder: (context, child) => Align(
-          key: const Key('browser_app_bar_align'),
-          alignment: Alignment.bottomCenter,
-          heightFactor: autoHideAppBar && !searchActive
-              ? _appBarVisibilityController.value
+          alignment: Alignment.topCenter,
+          heightFactor: autoHideTabBar
+              ? _tabBarVisibilityController.value
               : 1.0,
-          child: SizedBox(height: kToolbarHeight, child: child),
+          child: SizedBox(height: kBrowserTabStripHeight, child: child),
         ),
-        child: appBar,
+        child: strip,
       ),
     );
     final Widget bottomBarSlot = ValueListenableBuilder<Widget?>(
@@ -1144,164 +1238,168 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             child: Column(
               children: [
                 if (!appBarAtBottom) appBarSlot,
-                if (tabsEnabled && tabs.isNotEmpty) strip,
+                if (tabsEnabled && tabs.isNotEmpty) tabStripSlot,
                 Expanded(
                   child: NotificationListener<FastScrollbarDragNotification>(
                     onNotification: _onScrollbarDrag,
                     child: LayoutBuilder(
-                    builder: (context, viewportConstraints) {
-                      final orientation = MediaQuery.of(context).orientation;
-                      final minDualPaneWidth = orientation == Orientation.landscape
-                          ? 640.0
-                          : 720.0;
-                      final dualPane =
-                          tabsEnabled &&
-                          useDualPaneBrowsing &&
-                          tabs.length > 1 &&
-                          viewportConstraints.maxWidth >= minDualPaneWidth;
+                      builder: (context, viewportConstraints) {
+                        final orientation = MediaQuery.of(context).orientation;
+                        final minDualPaneWidth =
+                            orientation == Orientation.landscape
+                            ? 640.0
+                            : 720.0;
+                        final dualPane =
+                            tabsEnabled &&
+                            useDualPaneBrowsing &&
+                            tabs.length > 1 &&
+                            viewportConstraints.maxWidth >= minDualPaneWidth;
 
-                      if (_wasDualPane != dualPane) {
-                        final wasDualPane = _wasDualPane;
-                        _wasDualPane = dualPane;
-                        if (wasDualPane == true && !dualPane) {
-                          _schedulePageSync();
+                        if (_wasDualPane != dualPane) {
+                          final wasDualPane = _wasDualPane;
+                          _wasDualPane = dualPane;
+                          if (wasDualPane == true && !dualPane) {
+                            _schedulePageSync();
+                          }
                         }
-                      }
 
-                      if (dualPane) {
-                        final pair = _resolveDualPaneTabIds(tabs, activeTabId);
-                        final firstTab = tabs.firstWhere(
-                          (tab) => tab.tabId == pair[0],
-                        );
-                        final secondTab = tabs.firstWhere(
-                          (tab) => tab.tabId == pair[1],
-                        );
-                        _publishVisibleTabs({pair[0], pair[1]});
-                        return Row(
-                          children: [
-                            _buildDualPaneViewport(
-                              firstTab,
-                              isActive: firstTab.tabId == activeTabId,
-                              autoHideAppBar: autoHideAppBar,
-                            ),
-                            VerticalDivider(
-                              width: 1,
-                              thickness: 1,
-                              color: Theme.of(context).dividerColor,
-                            ),
-                            _buildDualPaneViewport(
-                              secondTab,
-                              isActive: secondTab.tabId == activeTabId,
-                              autoHideAppBar: autoHideAppBar,
-                            ),
-                          ],
-                        );
-                      }
-
-                      _publishVisibleTabs(const <TabId>{});
-                      // Only the pager gets the larger touch slop; every page
-                      // keeps the platform's own, so lists inside a tab scroll
-                      // as usual.
-                      final pageMedia = MediaQuery.of(context);
-                      final pagerMedia = pageMedia.copyWith(
-                        gestureSettings: DeviceGestureSettings(
-                          touchSlop:
-                              (pageMedia.gestureSettings.touchSlop ??
-                                  kTouchSlop) *
-                              _tabPagerSlopFactor,
-                        ),
-                      );
-                      return Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerDown: _onBrowserPointerDown,
-                        onPointerMove: _onBrowserPointerMove,
-                        onPointerUp: _onBrowserPointerUp,
-                        onPointerCancel: _onBrowserPointerCancel,
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: (notification) => _handleAppBarScroll(
-                            notification,
-                            enabled: autoHideAppBar,
-                            active: activeTabId != null,
-                          ),
-                          child: FadeTransition(
-                            opacity: _loopFade,
-                            child: MediaQuery(
-                              data: pagerMedia,
-                              child: PageView.builder(
-                              controller: _pageController,
-                              // The larger slop would otherwise swallow the
-                              // first stretch of the swipe; count the drag
-                              // from the touch-down so it still tracks.
-                              dragStartBehavior: DragStartBehavior.down,
-                              clipBehavior: Clip.hardEdge,
-                              // The gated physics snap to pages themselves
-                              // (PageView would put its own ahead of them, out
-                              // of reach of the gate).
-                              pageSnapping: false,
-                              physics: GatedPageScrollPhysics(
-                                gate: _swipeGate,
-                                parent:
-                                    tabsEnabled &&
-                                        tabEdgeSwipe.swipesBetweenTabs &&
-                                        !_drawerOpenOrDragging &&
-                                        !_edgeDrawerGestureActive
-                                    ? const AlwaysScrollableScrollPhysics()
-                                    : const NeverScrollableScrollPhysics(),
+                        if (dualPane) {
+                          final pair = _resolveDualPaneTabIds(
+                            tabs,
+                            activeTabId,
+                          );
+                          final firstTab = tabs.firstWhere(
+                            (tab) => tab.tabId == pair[0],
+                          );
+                          final secondTab = tabs.firstWhere(
+                            (tab) => tab.tabId == pair[1],
+                          );
+                          _publishVisibleTabs({pair[0], pair[1]});
+                          return Row(
+                            children: [
+                              _buildDualPaneViewport(
+                                firstTab,
+                                isActive: firstTab.tabId == activeTabId,
+                                autoHideAppBar: autoHideAppBar,
+                                autoHideTabBar: autoHideTabBar,
                               ),
-                              itemCount: tabs.length,
-                              onPageChanged: _onPageChanged,
-                              findChildIndexCallback: (key) {
-                                if (key is! ValueKey<TabId>) return null;
-                                final index = tabs.indexWhere(
-                                  (tab) => tab.tabId == key.value,
-                                );
-                                return index < 0 ? null : index;
-                              },
-                              itemBuilder: (context, index) {
-                                final tab = tabs[index];
-                                final pageIsActive = tab.tabId == activeTabId;
-                                // Whether the page's tickers run (thumbnail loading,
-                                // folder previews) follows what is on screen, not
-                                // which tab is active: the active tab only changes
-                                // once a swipe passes the half-way point, which used
-                                // to blank the leaving page and delay the entering
-                                // one for half the transition.
-                                return _BrowserTabPage(
-                                  key: ValueKey<TabId>(tab.tabId),
+                              VerticalDivider(
+                                width: 1,
+                                thickness: 1,
+                                color: Theme.of(context).dividerColor,
+                              ),
+                              _buildDualPaneViewport(
+                                secondTab,
+                                isActive: secondTab.tabId == activeTabId,
+                                autoHideAppBar: autoHideAppBar,
+                                autoHideTabBar: autoHideTabBar,
+                              ),
+                            ],
+                          );
+                        }
+
+                        _publishVisibleTabs(const <TabId>{});
+                        // Only the pager gets the larger touch slop; every page
+                        // keeps the platform's own, so lists inside a tab scroll
+                        // as usual.
+                        final pageMedia = MediaQuery.of(context);
+                        final pagerMedia = pageMedia.copyWith(
+                          gestureSettings: DeviceGestureSettings(
+                            touchSlop:
+                                (pageMedia.gestureSettings.touchSlop ??
+                                    kTouchSlop) *
+                                _tabPagerSlopFactor,
+                          ),
+                        );
+                        return Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: _onBrowserPointerDown,
+                          onPointerMove: _onBrowserPointerMove,
+                          onPointerUp: _onBrowserPointerUp,
+                          onPointerCancel: _onBrowserPointerCancel,
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (notification) =>
+                                _handleAppBarScroll(
+                                  notification,
+                                  enabled: autoHideAppBar,
+                                  autoHideTabBar: autoHideTabBar,
+                                  active: activeTabId != null,
+                                ),
+                            child: FadeTransition(
+                              opacity: _loopFade,
+                              child: MediaQuery(
+                                data: pagerMedia,
+                                child: PageView.builder(
                                   controller: _pageController,
-                                  index: index,
-                                  child: MediaQuery(
-                                    data: pageMedia,
-                                    child: _buildTabContent(
-                                      tab,
-                                      isActive: pageIsActive,
-                                    ),
+                                  // The larger slop would otherwise swallow the
+                                  // first stretch of the swipe; count the drag
+                                  // from the touch-down so it still tracks.
+                                  dragStartBehavior: DragStartBehavior.down,
+                                  clipBehavior: Clip.hardEdge,
+                                  // The gated physics snap to pages themselves
+                                  // (PageView would put its own ahead of them, out
+                                  // of reach of the gate).
+                                  pageSnapping: false,
+                                  physics: GatedPageScrollPhysics(
+                                    gate: _swipeGate,
+                                    parent:
+                                        tabsEnabled &&
+                                            tabEdgeSwipe.swipesBetweenTabs &&
+                                            !_drawerOpenOrDragging &&
+                                            !_edgeDrawerGestureActive
+                                        ? const AlwaysScrollableScrollPhysics()
+                                        : const NeverScrollableScrollPhysics(),
                                   ),
-                                );
-                              },
-                            ),
+                                  itemCount: tabs.length,
+                                  onPageChanged: _onPageChanged,
+                                  findChildIndexCallback: (key) {
+                                    if (key is! ValueKey<TabId>) return null;
+                                    final index = tabs.indexWhere(
+                                      (tab) => tab.tabId == key.value,
+                                    );
+                                    return index < 0 ? null : index;
+                                  },
+                                  itemBuilder: (context, index) {
+                                    final tab = tabs[index];
+                                    final pageIsActive =
+                                        tab.tabId == activeTabId;
+                                    // Whether the page's tickers run (thumbnail loading,
+                                    // folder previews) follows what is on screen, not
+                                    // which tab is active: the active tab only changes
+                                    // once a swipe passes the half-way point, which used
+                                    // to blank the leaving page and delay the entering
+                                    // one for half the transition.
+                                    return _BrowserTabPage(
+                                      key: ValueKey<TabId>(tab.tabId),
+                                      controller: _pageController,
+                                      index: index,
+                                      child: MediaQuery(
+                                        data: pageMedia,
+                                        child: _buildTabContent(
+                                          tab,
+                                          isActive: pageIsActive,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          // The selection app bar floats above the whole browser, status bar
-          // included, rather than taking the (auto-hiding) app bar's slot, so
-          // it is visible when that slot is collapsed and nothing shifts. With
-          // the app bar at the bottom the selection bar takes that bar's place
-          // instead (see _BottomAppBarSlot).
           if (!appBarAtBottom)
             Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: _SelectionBarOverlay(
+              child: _TopSelectionBarOverlay(
                 workspaceConfig: _workspace,
                 selectionAppBarListenable: _chrome.selectionAppBar,
               ),
@@ -1383,15 +1481,64 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   }
 }
 
-/// The selection app bar, laid over the top of the browser.
-///
-/// Selecting while the app bar has auto-hidden must still show the selection
-/// actions, and must not push the list down. So the bar is an overlay: it
-/// covers the app bar slot when that is visible and the top of the content
-/// when it is collapsed, and the layout underneath never changes. It slides in
-/// and out, and paints behind the status bar like the app bar it replaces.
-class _SelectionBarOverlay extends ConsumerWidget {
-  const _SelectionBarOverlay({
+/// The top app bar stays in the normal auto-hiding layout slot. A selection
+/// bar overlays it separately, so showing selection actions never changes the
+/// viewport's layout.
+class _TopAppBarSlot extends ConsumerWidget {
+  const _TopAppBarSlot({
+    required this.workspaceConfig,
+    required this.visibility,
+    required this.autoHide,
+    required this.searchActive,
+    required this.appBar,
+    required this.selectionAppBarListenable,
+  });
+
+  final BrowserTabsConfig workspaceConfig;
+  final Animation<double> visibility;
+  final bool autoHide;
+  final bool searchActive;
+  final Widget appBar;
+  final ValueListenable<BrowserAppBarFactory?> selectionAppBarListenable;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasSelection = ref.watch(
+      aggregatedTabsSelectionProvider(
+        workspaceConfig,
+      ).select((selection) => selection.hasSelection),
+    );
+    return ValueListenableBuilder<BrowserAppBarFactory?>(
+      valueListenable: selectionAppBarListenable,
+      builder: (context, selectionAppBar, _) {
+        final selecting = hasSelection && selectionAppBar != null;
+        return ClipRect(
+          child: AnimatedBuilder(
+            animation: visibility,
+            builder: (context, child) => Align(
+              key: const Key('browser_app_bar_align'),
+              alignment: Alignment.bottomCenter,
+              heightFactor: autoHide && !searchActive
+                  ? visibility.value
+                  : 1.0,
+              child: SizedBox(height: kToolbarHeight, child: child),
+            ),
+            child: SizedBox(
+              height: kToolbarHeight,
+              child: Offstage(offstage: selecting, child: appBar),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Selection actions cover the top toolbar and remain outside the layout
+/// flow. When scroll reveals the normal app bar, this overlay already occupies
+/// its position, so the listing does not jump when selection starts.
+class _TopSelectionBarOverlay extends ConsumerWidget {
+  const _TopSelectionBarOverlay({
     required this.workspaceConfig,
     required this.selectionAppBarListenable,
   });
@@ -1409,52 +1556,30 @@ class _SelectionBarOverlay extends ConsumerWidget {
     return ValueListenableBuilder<BrowserAppBarFactory?>(
       valueListenable: selectionAppBarListenable,
       builder: (context, selectionAppBar, _) {
-        return AnimatedSwitcher(
-          duration: AppMotion.short2,
-          layoutBuilder: (currentChild, previousChildren) => Stack(
-            alignment: Alignment.topCenter,
-            children: [...previousChildren, if (currentChild != null) currentChild],
-          ),
-          transitionBuilder: (child, animation) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, -1),
-                end: Offset.zero,
-              ).animate(curved),
-              child: FadeTransition(opacity: animation, child: child),
-            );
-          },
-          child: hasSelection && selectionAppBar != null
-              ? Material(
-                  key: const ValueKey<String>('browser_selection_app_bar_overlay'),
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  elevation: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: SizedBox(
-                      height: kToolbarHeight,
-                      child: MediaQuery.removePadding(
-                        context: context,
-                        removeTop: true,
-                        child: SkinAreaScope(
-                          area: SkinArea.files,
-                          child: Builder(
-                            builder: (appBarContext) =>
-                                selectionAppBar(appBarContext),
-                          ),
-                        ),
-                      ),
-                    ),
+        if (!hasSelection || selectionAppBar == null) {
+          return const SizedBox.shrink();
+        }
+        return Material(
+          key: const ValueKey<String>('browser_selection_app_bar_overlay'),
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          elevation: 0,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              width: double.infinity,
+              height: kToolbarHeight,
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                child: SkinAreaScope(
+                  area: SkinArea.files,
+                  child: Builder(
+                    builder: (appBarContext) => selectionAppBar(appBarContext),
                   ),
-                )
-              : const SizedBox.shrink(
-                  key: ValueKey<String>('no_browser_selection_app_bar'),
                 ),
+              ),
+            ),
+          ),
         );
       },
     );
@@ -1551,8 +1676,7 @@ class _BottomAppBarSlot extends ConsumerWidget {
                       key: const Key('browser_selection_app_bar_overlay'),
                       area: SkinArea.files,
                       child: Builder(
-                        builder: (appBarContext) =>
-                            selectionBar(appBarContext),
+                        builder: (appBarContext) => selectionBar(appBarContext),
                       ),
                     ),
                 ],

@@ -425,6 +425,37 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          if (useBrowserTabs)
+                            SwitchListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              value: state.config.autoHideTabBar,
+                              onChanged: (v) => ref
+                                  .read(
+                                    fileManagerToolbarSettingsProvider(
+                                      containerUri,
+                                    ).notifier,
+                                  )
+                                  .setAutoHideTabBar(v),
+                              title: Text(
+                                context.l10n.textEditorAutoHideTabBarLabel,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                context.l10n
+                                    .textEditorAutoHideTabBarDescription,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              secondary: Icon(
+                                Icons.tab_rounded,
+                                color: cs.primary,
+                              ),
+                            ),
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,

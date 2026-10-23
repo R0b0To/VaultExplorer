@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -73,6 +74,69 @@ void main() {
 
       await controller.toggleActionVisible(FileManagerAction.search, true);
       expect(container.read(provider).config.hidden, isNot(contains(FileManagerAction.search)));
+    });
+
+    test('toggleItemActionVisible hides and reveals item actions', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+
+      await controller.toggleItemActionVisible(FileItemAction.delete, false);
+      expect(
+        container.read(provider).config.hiddenItemActions,
+        contains(FileItemAction.delete),
+      );
+
+      await controller.toggleItemActionVisible(FileItemAction.delete, true);
+      expect(
+        container.read(provider).config.hiddenItemActions,
+        isNot(contains(FileItemAction.delete)),
+      );
+    });
+
+    test('reorderItemActions moves within one section only', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+      await controller.resetItemActions();
+      final before = container.read(provider).config.itemActionsOrder;
+      final quickBefore = before.where((a) => a.isQuickAction).toList();
+      final listBefore = before.where((a) => !a.isQuickAction).toList();
+
+      // Quick row: move delete (index 3) to the front.
+      await controller.reorderItemActions(true, 3, 0);
+      var after = container.read(provider).config.itemActionsOrder;
+      expect(after.where((a) => a.isQuickAction).toList(), [
+        FileItemAction.delete,
+        quickBefore[0],
+        quickBefore[1],
+        quickBefore[2],
+      ]);
+      expect(after.where((a) => !a.isQuickAction).toList(), listBefore);
+
+      // Menu list: move the second action to the end.
+      await controller.reorderItemActions(false, 1, listBefore.length - 1);
+      after = container.read(provider).config.itemActionsOrder;
+      expect(after.where((a) => !a.isQuickAction).toList(), [
+        listBefore[0],
+        ...listBefore.skip(2),
+        listBefore[1],
+      ]);
+      expect(after.length, FileItemAction.values.length);
+      expect(after.toSet(), FileItemAction.values.toSet());
+    });
+
+    test('resetItemActions restores order and visibility only', () async {
+      final controller = container.read(provider.notifier);
+      await controller.load(null);
+
+      await controller.setShowHiddenFiles(true);
+      await controller.toggleItemActionVisible(FileItemAction.share, false);
+      await controller.reorderItemActions(true, 0, 3);
+      await controller.resetItemActions();
+
+      final config = container.read(provider).config;
+      expect(config.itemActionsOrder, FileItemAction.values);
+      expect(config.hiddenItemActions, isEmpty);
+      expect(config.showHiddenFiles, isTrue);
     });
 
     test('setSkin updates the skin and leaves other settings alone', () async {

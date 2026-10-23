@@ -108,13 +108,15 @@ void main() {
         containerFormat: 'cryptomator',
         unlockMethod: ContainerUnlockMethod.biometrics,
         pendingPassword: 'remembered-password',
-        bookmarkPaths: ['/bookmarked'],
-        pinnedPaths: ['/pinned'],
+        keyfiles: [
+          {'uri': 'file:///keys/a.key', 'name': 'a.key'},
+        ],
       ),
     );
-    // A PIN hash lives under `vc2_pin_hash_`, which `vc2_pin_` (pinned paths)
-    // is a string prefix of -- the one place a prefix filter can go wrong.
     storage.data[ContainerRepository.pinHashKey(uri)] = 'pin-hash';
+    // A read-only vault's device-only bookmarks (VaultMarksStore). They are
+    // read on demand, never at startup.
+    storage.data[ContainerRepository.marksKey(uri)] = '{"bookmarks":[]}';
 
     storage.prefixRequests.clear();
     storage.prefixResults.clear();
@@ -127,12 +129,13 @@ void main() {
     } catch (_) {}
   });
 
-  test('hydrate still restores bookmarks and pinned paths', () async {
+  test('hydrate still restores keyfiles from secure storage', () async {
     final record = (await coldRepo().loadAll())[uri];
 
     expect(record, isNotNull);
-    expect(record!.bookmarkPaths, ['/bookmarked']);
-    expect(record.pinnedPaths, ['/pinned']);
+    expect(record!.keyfiles, [
+      {'uri': 'file:///keys/a.key', 'name': 'a.key'},
+    ]);
   });
 
   test('hydrate never reads the remembered password or the PIN hash', () async {
@@ -143,9 +146,10 @@ void main() {
     final fetched = storage.prefixResults.single.keys;
     expect(fetched.any((k) => k.startsWith('vc2_pw_')), isFalse);
     expect(fetched.any((k) => k.startsWith('vc2_pin_hash_')), isFalse);
+    // Nor a vault's bookmarks: those are only read once it is unlocked.
+    expect(fetched.any((k) => k.startsWith('vc2_marks_')), isFalse);
     // ...while the metadata it does need was part of the same read.
-    expect(fetched, contains(ContainerRepository.bookmarkKey(uri)));
-    expect(fetched, contains(ContainerRepository.pinnedKey(uri)));
+    expect(fetched, contains(ContainerRepository.keyfilesKey(uri)));
   });
 
   test('overlapping loadAll() calls share one hydrate and agree', () async {
@@ -155,7 +159,7 @@ void main() {
 
     expect(storage.prefixRequests, hasLength(1));
     for (final records in results) {
-      expect(records[uri]?.bookmarkPaths, ['/bookmarked']);
+      expect(records[uri]?.keyfiles, hasLength(1));
     }
   });
 

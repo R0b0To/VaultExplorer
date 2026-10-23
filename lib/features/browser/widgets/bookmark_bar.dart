@@ -2,34 +2,25 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
 
 class BookmarkBar extends StatelessWidget {
-  final List<String> bookmarkPaths;
+  final List<VaultBookmark> bookmarks;
   final Axis axis;
-  final ValueChanged<String> onTapItem;
-  final ValueChanged<String> onRemoveBookmark;
-  final bool Function(String path)? isDirectory;
+  final ValueChanged<VaultBookmark> onTapItem;
+  final ValueChanged<VaultBookmark> onRemoveBookmark;
 
   const BookmarkBar({
     super.key,
-    required this.bookmarkPaths,
+    required this.bookmarks,
     this.axis = Axis.horizontal,
     required this.onTapItem,
     required this.onRemoveBookmark,
-    this.isDirectory,
   });
-
-  bool _isFolder(String path) {
-    if (isDirectory != null) {
-      return isDirectory!(path);
-    }
-    final leaf = path.split('/').last;
-    return !leaf.contains('.') || path.endsWith('/');
-  }
 
   @override
   Widget build(BuildContext context) {
-    if (bookmarkPaths.isEmpty) return const SizedBox.shrink();
+    if (bookmarks.isEmpty) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -44,11 +35,11 @@ class BookmarkBar extends StatelessWidget {
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          itemCount: bookmarkPaths.length,
+          itemCount: bookmarks.length,
           itemBuilder: (context, index) {
-            final path = bookmarkPaths[index];
-            final name = path.split('/').last;
-            final isDir = _isFolder(path);
+            final bookmark = bookmarks[index];
+            final name = bookmark.name;
+            final isDir = bookmark.isDir;
             final icon = isDir ? skin.folderIcon : skin.fileIcon(name);
             final iconColor = isDir
                 ? skin.folderIconColor(cs)
@@ -61,8 +52,8 @@ class BookmarkBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: () => onTapItem(path),
-                  onLongPress: () => _showItemMenu(context, path, name),
+                  onTap: () => onTapItem(bookmark),
+                  onLongPress: () => _showItemMenu(context, bookmark),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     child: Row(
@@ -104,11 +95,11 @@ class BookmarkBar extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              itemCount: bookmarkPaths.length,
+              itemCount: bookmarks.length,
               itemBuilder: (context, index) {
-                final path = bookmarkPaths[index];
-                final name = path.split('/').last;
-                final isDir = _isFolder(path);
+                final bookmark = bookmarks[index];
+                final name = bookmark.name;
+                final isDir = bookmark.isDir;
                 final icon = isDir ? skin.folderIcon : skin.fileIcon(name);
                 final iconColor = isDir
                     ? skin.folderIconColor(cs)
@@ -117,14 +108,14 @@ class BookmarkBar extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Tooltip(
-                    message: path,
+                    message: bookmark.path,
                     child: Material(
                       color: cs.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(AppRadius.md),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
-                        onTap: () => onTapItem(path),
-                        onLongPress: () => _showItemMenu(context, path, name),
+                        onTap: () => onTapItem(bookmark),
+                        onLongPress: () => _showItemMenu(context, bookmark),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 8),
@@ -157,26 +148,33 @@ class BookmarkBar extends StatelessWidget {
     );
   }
 
-  void _showItemMenu(BuildContext context, String path, String name) {
+  void _showItemMenu(BuildContext context, VaultBookmark bookmark) {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        content: Text(path, style: Theme.of(context).textTheme.bodySmall),
+        title: Text(
+          bookmark.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        content: Text(
+          bookmark.path,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(dialogCtx);
-              onRemoveBookmark(path);
+              onRemoveBookmark(bookmark);
             },
             child: Text(context.l10n.removeFromBookmarks),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogCtx);
-              onTapItem(path);
+              onTapItem(bookmark);
             },
-            child: Text(context.l10n.openWithAppAction.split(' ').first),
+            child: Text(context.l10n.openAction),
           ),
         ],
       ),

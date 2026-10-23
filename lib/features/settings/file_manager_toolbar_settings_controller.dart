@@ -380,28 +380,6 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     ),
   );
 
-  Future<void> reorderBookmarks(int oldIndex, int newIndex) async {
-    final record = state.record;
-    if (record == null) return;
-
-    final paths = List<String>.from(record.bookmarkPaths);
-    final moved = paths.removeAt(oldIndex);
-    paths.insert(newIndex, moved);
-
-    final newRecord = record.copyWith(bookmarkPaths: paths);
-    state = state._copy(record: newRecord, setRecord: true);
-    await ref.read(containerRepositoryProvider).save(newRecord);
-  }
-
-  Future<void> removeBookmark(String path) async {
-    final record = state.record;
-    if (record == null) return;
-    final paths = List<String>.from(record.bookmarkPaths)..remove(path);
-    final newRecord = record.copyWith(bookmarkPaths: paths);
-    state = state._copy(record: newRecord, setRecord: true);
-    await ref.read(containerRepositoryProvider).save(newRecord);
-  }
-
   Future<void> resetToDefaults() async {
     final def = FileManagerToolbarConfig.defaults();
     await _updateConfig(def);

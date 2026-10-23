@@ -823,8 +823,6 @@ class ContainerConfigController extends _$ContainerConfigController {
                 .toList()
           : const [],
       compositeCarriers: existingRecord?.compositeCarriers ?? const [],
-      pinnedPaths: existingRecord?.pinnedPaths ?? const [],
-      bookmarkPaths: existingRecord?.bookmarkPaths ?? const [],
     );
 
     await ref.read(containerRepositoryProvider).save(record);

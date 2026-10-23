@@ -4450,6 +4450,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get reorderBookmarksDesc => 'アイテムをドラッグしてブックマークバー内の順序を変更します';
 
   @override
+  String get drawerBookmarksSectionTitle => 'ブックマーク';
+
+  @override
+  String get openAction => '開く';
+
+  @override
+  String get bookmarkTargetMissing => 'ブックマークした項目は存在しなくなりました';
+
+  @override
   String get navBarVaultsLabel => 'ボールト';
 
   @override

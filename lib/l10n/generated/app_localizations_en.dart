@@ -4613,6 +4613,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Drag items to reorder them in the bookmark bar';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Bookmarks';
+
+  @override
+  String get openAction => 'Open';
+
+  @override
+  String get bookmarkTargetMissing => 'The bookmarked item no longer exists';
+
+  @override
   String get navBarVaultsLabel => 'Vaults';
 
   @override

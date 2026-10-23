@@ -4742,6 +4742,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'اسحب العناصر لإعادة ترتيبها في شريط المفضلة';
 
   @override
+  String get drawerBookmarksSectionTitle => 'المفضلة';
+
+  @override
+  String get openAction => 'فتح';
+
+  @override
+  String get bookmarkTargetMissing =>
+      'العنصر المضاف إلى المفضلة لم يعد موجودًا';
+
+  @override
   String get navBarVaultsLabel => 'الخزنات';
 
   @override

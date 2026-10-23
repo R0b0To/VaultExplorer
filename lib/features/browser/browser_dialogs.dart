@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -15,6 +17,7 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/create_archive_bottom_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -708,6 +711,11 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
     final newNameBase = _ctrl.text;
     if (newNameBase.isEmpty) return;
     final l10n = context.l10n;
+    // Taken now: the dialog is popped before the renames finish, and a
+    // disposed State can no longer read providers.
+    final marks = ref.read(
+      fileBrowserPinsBookmarksProvider(widget.container.volId).notifier,
+    );
     if (_isSingle) {
       if (!isValid) return;
       final oldEntry = widget.oldEntries.first;
@@ -736,6 +744,8 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
         built.path,
       );
       if (ok) {
+        // Bookmarks and pins on the entry (or inside a renamed folder) follow.
+        unawaited(marks.remapPaths(widget.container, {oldFull: built.path}));
         widget.onSuccess();
         widget.onEntryRenamed?.call(oldFull, built.path);
       } else if (parentContext.mounted) {
@@ -752,6 +762,7 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
     int successCount = 0;
     int failCount = 0;
     String? firstFailureReason;
+    final renamed = <String, String>{};
     final existingLower =
         Set<String>.from(widget.existingEntries.map((e) => e.name.toLowerCase()));
     for (final oldEntry in widget.oldEntries) {
@@ -798,10 +809,14 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
       final ok = await _fileIoApi.renameFile(widget.container, oldFull, newFull);
       if (ok) {
         successCount++;
+        renamed[oldFull] = newFull;
         widget.onEntryRenamed?.call(oldFull, newFull);
       } else {
         failCount++;
       }
+    }
+    if (renamed.isNotEmpty) {
+      unawaited(marks.remapPaths(widget.container, renamed));
     }
     if (successCount > 0) widget.onSuccess();
     if (failCount > 0 && parentContext.mounted) {

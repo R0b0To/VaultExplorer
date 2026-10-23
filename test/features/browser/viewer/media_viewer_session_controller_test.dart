@@ -15,7 +15,6 @@ void main() {
       expect(state.showUI, isFalse);
       expect(state.isCarouselVisible, isFalse);
       expect(state.enableCarousel, isTrue);
-      expect(state.bookmarkPaths, isEmpty);
       expect(state.autoAdvance, isFalse);
       expect(state.isAutoAdvancing, isFalse);
       expect(state.slideshowDelaySeconds, 4);
@@ -58,7 +57,7 @@ void main() {
       );
     });
 
-    test('carousel and bookmark state management', () {
+    test('carousel state management', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -67,21 +66,9 @@ void main() {
 
       notifier.setCarouselVisible(true);
       notifier.setEnableCarousel(false);
-      var state = container.read(mediaViewerSessionProvider('session-1'));
+      final state = container.read(mediaViewerSessionProvider('session-1'));
       expect(state.isCarouselVisible, isTrue);
       expect(state.enableCarousel, isFalse);
-
-      notifier.setBookmarkPaths(['photo1.jpg']);
-      state = container.read(mediaViewerSessionProvider('session-1'));
-      expect(state.bookmarkPaths, ['photo1.jpg']);
-
-      notifier.toggleBookmark('photo2.jpg');
-      state = container.read(mediaViewerSessionProvider('session-1'));
-      expect(state.bookmarkPaths, ['photo1.jpg', 'photo2.jpg']);
-
-      notifier.toggleBookmark('photo1.jpg');
-      state = container.read(mediaViewerSessionProvider('session-1'));
-      expect(state.bookmarkPaths, ['photo2.jpg']);
     });
 
     test('playback, subtitles, and layout options', () {

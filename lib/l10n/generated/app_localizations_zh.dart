@@ -4391,6 +4391,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reorderBookmarksDesc => '拖动项目以在收藏栏中重新排序';
 
   @override
+  String get drawerBookmarksSectionTitle => '收藏';
+
+  @override
+  String get openAction => '打开';
+
+  @override
+  String get bookmarkTargetMissing => '收藏的项目已不存在';
+
+  @override
   String get navBarVaultsLabel => '保险库';
 
   @override

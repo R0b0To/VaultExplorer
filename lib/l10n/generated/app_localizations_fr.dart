@@ -4723,6 +4723,15 @@ class AppLocalizationsFr extends AppLocalizations {
       'Faites glisser les éléments pour les réorganiser dans la barre des favoris';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Favoris';
+
+  @override
+  String get openAction => 'Ouvrir';
+
+  @override
+  String get bookmarkTargetMissing => 'L’élément en favori n’existe plus';
+
+  @override
   String get navBarVaultsLabel => 'Coffres';
 
   @override

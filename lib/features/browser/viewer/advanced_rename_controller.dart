@@ -22,10 +22,13 @@
 // actual batch-rename execution (was a direct `vaultExplorerApi.renameFile`
 // loop with per-item setState progress, upgraded to `vaultFileIoApiProvider`
 // here, same Phase-2 upgrade applied throughout this migration).
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
  
 part 'advanced_rename_controller.g.dart';
  
@@ -133,6 +136,10 @@ class AdvancedRenameForm extends _$AdvancedRenameForm {
     state = state._copy(isExecuting: true, executionProgress: 0.0);
     var succeeded = 0;
     var failed = 0;
+    final marks = ref.read(
+      fileBrowserPinsBookmarksProvider(container.volId).notifier,
+    );
+    final renamed = <String, String>{};
  
     for (var i = 0; i < renames.length; i++) {
       final r = renames[i];
@@ -142,6 +149,7 @@ class AdvancedRenameForm extends _$AdvancedRenameForm {
             .renameFile(container, r.oldFull, r.newFull);
         if (ok) {
           succeeded++;
+          renamed[r.oldFull] = r.newFull;
           onEachRenamed(r.oldFull, r.newFull);
         } else {
           failed++;
@@ -154,6 +162,11 @@ class AdvancedRenameForm extends _$AdvancedRenameForm {
       }
     }
  
+    // Bookmarks and pins on renamed entries follow them.
+    if (renamed.isNotEmpty) {
+      unawaited(marks.remapPaths(container, renamed));
+    }
+
     if (ref.mounted) state = state._copy(isExecuting: false);
     return (succeeded: succeeded, failed: failed);
   }

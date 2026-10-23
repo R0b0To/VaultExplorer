@@ -4691,6 +4691,15 @@ class AppLocalizationsEs extends AppLocalizations {
       'Arrastra los elementos para reordenarlos en la barra de marcadores';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Marcadores';
+
+  @override
+  String get openAction => 'Abrir';
+
+  @override
+  String get bookmarkTargetMissing => 'El elemento marcado ya no existe';
+
+  @override
   String get navBarVaultsLabel => 'Bóvedas';
 
   @override

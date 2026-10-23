@@ -11,6 +11,8 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/core/widgets/inputs/slider_setting_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_item_actions_screen.dart';
@@ -26,7 +28,17 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   /// Holds no vault-related options (the app-wide vault thumbnail default and
   /// its "reset all vaults" action live in App settings), so the decoy file
   /// manager can open this same screen without exposing anything about vaults.
-  const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
+
+
+  /// The vault whose bookmarks this screen offers to rearrange. Null for the
+  /// app-wide settings page, where there is no single vault.
+  final MountedContainer? container;
+
+  const FileManagerToolbarSettingsScreen({
+    super.key,
+    this.containerUri,
+    this.container,
+  });
 
   static String _layoutModeLabel(
     BrowserLayoutMode mode,
@@ -49,6 +61,14 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
+    final bookmarkVault = container;
+    final bookmarkCount = bookmarkVault == null
+        ? 0
+        : ref.watch(
+            fileBrowserPinsBookmarksProvider(
+              bookmarkVault.volId,
+            ).select((marks) => marks.bookmarks.length),
+          );
     final defaultLayoutMode = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.defaultLayoutMode),
     );
@@ -681,7 +701,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.secondary,
                             ),
                           ),
-                          if (state.record != null)
+                          if (bookmarkVault != null)
                             ListTile(
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -698,7 +718,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 ),
                               ),
                               subtitle: Text(
-                                '${state.record!.bookmarkPaths.length}',
+                                '$bookmarkCount',
                                 style: textTheme.bodySmall?.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
@@ -710,7 +730,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                   builder: (_) => SkinAreaScope(
                                     area: SkinArea.settings,
                                     child: FileManagerBookmarksScreen(
-                                      containerUri: containerUri,
+                                      container: bookmarkVault,
                                     ),
                                   ),
                                 ),
@@ -1378,27 +1398,60 @@ class FileManagerDetailColumnsScreen extends ConsumerWidget {
 // SUB-SCREEN 3: BOOKMARKS REORDER & REMOVAL
 // ─────────────────────────────────────────────────────────────────────────────
 
-class FileManagerBookmarksScreen extends ConsumerWidget {
-  final String? containerUri;
-  const FileManagerBookmarksScreen({super.key, this.containerUri});
+/// Rearranges and removes one vault's bookmarks. Reads and writes through the
+/// same provider as the file browser, the media viewer and the drawer, so an
+/// open browser reflects every change at once.
+class FileManagerBookmarksScreen extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  const FileManagerBookmarksScreen({super.key, required this.container});
 
-  static bool _isFolder(String path) {
-    final leaf = path.split('/').last;
-    return !leaf.contains('.') || path.endsWith('/');
+  @override
+  ConsumerState<FileManagerBookmarksScreen> createState() =>
+      _FileManagerBookmarksScreenState();
+}
+
+class _FileManagerBookmarksScreenState
+    extends ConsumerState<FileManagerBookmarksScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Normally already loaded (the drawer or browser got there first); this
+    // only matters if the screen is opened on its own.
+    Future.microtask(() {
+      if (!mounted) return;
+      ref
+          .read(fileBrowserPinsBookmarksProvider(widget.container.volId).notifier)
+          .ensureLoaded(widget.container);
+    });
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
+  Widget build(BuildContext context) {
+    final container = widget.container;
+    final marks = ref.watch(fileBrowserPinsBookmarksProvider(container.volId));
+    final notifier = ref.read(
+      fileBrowserPinsBookmarksProvider(container.volId).notifier,
+    );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final bookmarks = state.record?.bookmarkPaths ?? const <String>[];
+    final bookmarks = marks.bookmarks;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          context.l10n.reorderBookmarksTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.l10n.reorderBookmarksTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              container.displayName,
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
       body: SafeArea(
@@ -1426,17 +1479,12 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                     ),
                     buildDefaultDragHandles: false,
                     itemCount: bookmarks.length,
-                    onReorderItem: (oldIndex, newIndex) => ref
-                        .read(
-                          fileManagerToolbarSettingsProvider(
-                            containerUri,
-                          ).notifier,
-                        )
-                        .reorderBookmarks(oldIndex, newIndex),
+                    onReorderItem: (oldIndex, newIndex) =>
+                        notifier.reorderBookmarks(container, oldIndex, newIndex),
                     itemBuilder: (context, i) {
-                      final path = bookmarks[i];
-                      final name = path.split('/').last;
-                      final isDir = _isFolder(path);
+                      final bookmark = bookmarks[i];
+                      final name = bookmark.name;
+                      final isDir = bookmark.isDir;
                       final ext = name.contains('.')
                           ? name.split('.').last
                           : '';
@@ -1448,7 +1496,7 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                           : (vaultColorForExt(ext) ?? colorForFile(name));
 
                       return Padding(
-                        key: ValueKey(path),
+                        key: ValueKey(bookmark.path),
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Material(
                           color: cs.surfaceContainerHigh,
@@ -1480,6 +1528,16 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            subtitle: bookmark.parentPath.isEmpty
+                                ? null
+                                : Text(
+                                    bookmark.parentPath,
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1489,13 +1547,10 @@ class FileManagerBookmarksScreen extends ConsumerWidget {
                                     size: 20,
                                     color: cs.error,
                                   ),
-                                  onPressed: () => ref
-                                      .read(
-                                        fileManagerToolbarSettingsProvider(
-                                          containerUri,
-                                        ).notifier,
-                                      )
-                                      .removeBookmark(path),
+                                  onPressed: () => notifier.removeBookmark(
+                                    container,
+                                    bookmark.path,
+                                  ),
                                   tooltip: context.l10n.unbookmarkAction,
                                 ),
                                 const SizedBox(width: 4),

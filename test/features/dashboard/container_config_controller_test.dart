@@ -115,8 +115,6 @@ void main() {
           {'uri': 'file:///carrier1.jpg', 'name': 'carrier1.jpg'},
           {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
         ],
-        pinnedPaths: ['/Documents/doc.pdf'],
-        bookmarkPaths: ['/Photos'],
       );
 
       final saved = await controller.saveContainer(
@@ -130,8 +128,6 @@ void main() {
         {'uri': 'file:///carrier1.jpg', 'name': 'carrier1.jpg'},
         {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
       ]);
-      expect(saved.pinnedPaths, ['/Documents/doc.pdf']);
-      expect(saved.bookmarkPaths, ['/Photos']);
     });
   });
 

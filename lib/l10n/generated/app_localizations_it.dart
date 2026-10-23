@@ -4680,6 +4680,15 @@ class AppLocalizationsIt extends AppLocalizations {
       'Trascina gli elementi per riordinarli nella barra dei preferiti';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Preferiti';
+
+  @override
+  String get openAction => 'Apri';
+
+  @override
+  String get bookmarkTargetMissing => 'L’elemento nei preferiti non esiste più';
+
+  @override
   String get navBarVaultsLabel => 'Vault';
 
   @override

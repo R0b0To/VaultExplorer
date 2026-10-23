@@ -238,48 +238,12 @@ class ContainerRepository {
       );
     }
 
-    // Encrypt and store Bookmark & Pinned paths securely in the Keystore
-    final bookmarkKey = _bookmarkKey(record.uri);
-    final legacyBookmarkKey = _legacyBookmarkKey(record.uri);
-    if (record.bookmarkPaths.isNotEmpty) {
-      await _writeKeyWithLegacyCleanup(
-        record.uri,
-        bookmarkKey,
-        legacyBookmarkKey,
-        _legacyBookmarkKey,
-        jsonEncode(record.bookmarkPaths),
-      );
-    } else {
-      await _deleteKeyWithLegacyCleanup(
-        record.uri,
-        bookmarkKey,
-        legacyBookmarkKey,
-        _legacyBookmarkKey,
-      );
-    }
-
-    final pinnedKey = _pinnedKey(record.uri);
-    final legacyPinnedKey = _legacyPinnedKey(record.uri);
-    if (record.pinnedPaths.isNotEmpty) {
-      await _writeKeyWithLegacyCleanup(
-        record.uri,
-        pinnedKey,
-        legacyPinnedKey,
-        _legacyPinnedKey,
-        jsonEncode(record.pinnedPaths),
-      );
-    } else {
-      await _deleteKeyWithLegacyCleanup(
-        record.uri,
-        pinnedKey,
-        legacyPinnedKey,
-        _legacyPinnedKey,
-      );
-    }
+    // Bookmarks and pins are not part of the record any more: they live with
+    // the vault (see VaultMarksStore).
 
     // documentProviderFolders names paths *inside* the vault; keyfiles names
-    // external files used to unlock it. Both go to Keystore-backed storage,
-    // same as bookmarks/pinned, instead of the clear-text containers file.
+    // external files used to unlock it. Both go to Keystore-backed storage
+    // instead of the clear-text containers file.
     final docFoldersKey = _docFoldersKey(record.uri);
     final legacyDocFoldersKey = _legacyDocFoldersKey(record.uri);
     if (record.documentProviderFolders.isNotEmpty) {
@@ -381,18 +345,8 @@ class ContainerRepository {
       _legacyPinHashKey(uri),
       _legacyPinHashKey,
     );
-    await _deleteKeyWithLegacyCleanup(
-      uri,
-      _bookmarkKey(uri),
-      _legacyBookmarkKey(uri),
-      _legacyBookmarkKey,
-    );
-    await _deleteKeyWithLegacyCleanup(
-      uri,
-      _pinnedKey(uri),
-      _legacyPinnedKey(uri),
-      _legacyPinnedKey,
-    );
+    // Device-only bookmarks/pins of a read-only vault (VaultMarksStore).
+    await _secure.delete(key: marksKey(uri));
     await _deleteKeyWithLegacyCleanup(
       uri,
       _docFoldersKey(uri),
@@ -767,13 +721,11 @@ class ContainerRepository {
   static String _legacyPinHashKey(String uri) =>
       _legacyScopedKey('vc2_pin_hash_', uri, 170);
 
-  static String _bookmarkKey(String uri) => _scopedKey('vc2_fav_', uri, 170);
-  static String _legacyBookmarkKey(String uri) =>
-      _legacyScopedKey('vc2_fav_', uri, 170);
-
-  static String _pinnedKey(String uri) => _scopedKey('vc2_pin_', uri, 170);
-  static String _legacyPinnedKey(String uri) =>
-      _legacyScopedKey('vc2_pin_', uri, 170);
+  /// Where a *read-only* vault's bookmarks and pins are kept on this device.
+  /// Writable vaults keep theirs inside the vault. Not read at startup (it is
+  /// not one of the prefixes `_hydrate` asks for), so a locked vault's marks
+  /// are never decrypted or held in memory.
+  static String marksKey(String uri) => _scopedKey('vc2_marks_', uri, 170);
 
   static String _docFoldersKey(String uri) =>
       _scopedKey('vc2_docfolders_', uri, 170);
@@ -804,16 +756,6 @@ class ContainerRepository {
   static String pinHashKey(String uri) => _pinHashKey(uri);
   @visibleForTesting
   static String legacyPinHashKey(String uri) => _legacyPinHashKey(uri);
-
-  @visibleForTesting
-  static String bookmarkKey(String uri) => _bookmarkKey(uri);
-  @visibleForTesting
-  static String legacyBookmarkKey(String uri) => _legacyBookmarkKey(uri);
-
-  @visibleForTesting
-  static String pinnedKey(String uri) => _pinnedKey(uri);
-  @visibleForTesting
-  static String legacyPinnedKey(String uri) => _legacyPinnedKey(uri);
 
   @visibleForTesting
   static String docFoldersKey(String uri) => _docFoldersKey(uri);
@@ -863,17 +805,13 @@ class ContainerRepository {
         // Only the per-container metadata keys below are needed here. Asking
         // for just those means the remembered-password (`vc2_pw_`) and
         // pattern/PIN-hash entries are never decrypted or handed to Dart on
-        // cold start. `vc2_pin_` (pinned paths) is also a string prefix of
-        // `vc2_pin_hash_`, so that one is excluded explicitly.
+        // cold start.
         secureData = await _secure.readAllWithPrefixes(
           const [
-            'vc2_fav_',
-            'vc2_pin_',
             'vc2_docfolders_',
             'vc2_keyfiles_',
             'vc2_composite_carriers_',
           ],
-          excludePrefixes: const ['vc2_pin_hash_'],
         );
       } catch (e) {
         VeLog.w(
@@ -923,16 +861,6 @@ class ContainerRepository {
         }
 
         // Read the encrypted paths back from Keystore
-        final bookmarkJson = readSecureWithFallback(
-          _bookmarkKey(rawRecord.uri),
-          _legacyBookmarkKey(rawRecord.uri),
-          _legacyBookmarkKey,
-        );
-        final pinJson = readSecureWithFallback(
-          _pinnedKey(rawRecord.uri),
-          _legacyPinnedKey(rawRecord.uri),
-          _legacyPinnedKey,
-        );
         final docFoldersJson = readSecureWithFallback(
           _docFoldersKey(rawRecord.uri),
           _legacyDocFoldersKey(rawRecord.uri),
@@ -949,12 +877,6 @@ class ContainerRepository {
           _legacyCompositeCarriersKey,
         );
 
-        final bookmarkPaths = bookmarkJson != null
-            ? List<String>.from(jsonDecode(bookmarkJson))
-            : <String>[];
-        final pinPaths = pinJson != null
-            ? List<String>.from(jsonDecode(pinJson))
-            : <String>[];
         final docFolders = docFoldersJson != null
             ? (jsonDecode(docFoldersJson) as List<dynamic>)
                   .map(
@@ -976,8 +898,6 @@ class ContainerRepository {
             : <Map<String, String>>[];
 
         final secureRecord = rawRecord.copyWith(
-          bookmarkPaths: bookmarkPaths,
-          pinnedPaths: pinPaths,
           documentProviderFolders: docFolders,
           keyfiles: keyfiles,
           compositeCarriers: compositeCarriers,
@@ -1083,8 +1003,6 @@ class ContainerRecord {
   final int hashId;
   final String containerFormat;
   final List<Map<String, String>> keyfiles;
-  final List<String> pinnedPaths;
-  final List<String> bookmarkPaths;
   // The carrier files making up a composite/distributed container -- see
   // isCompositeSource. Deliberately excluded from the cleartext JSON file
   // and Keystore-encrypted instead, same as `keyfiles`: this list is the
@@ -1116,8 +1034,6 @@ class ContainerRecord {
     this.hashId = 255,
     this.containerFormat = 'veracrypt',
     this.keyfiles = const [],
-    this.pinnedPaths = const [],
-    this.bookmarkPaths = const [],
     this.compositeCarriers = const [],
   });
 
@@ -1182,8 +1098,6 @@ class ContainerRecord {
     int? hashId,
     String? containerFormat,
     List<Map<String, String>>? keyfiles,
-    List<String>? pinnedPaths,
-    List<String>? bookmarkPaths,
     List<Map<String, String>>? compositeCarriers,
   }) {
     return ContainerRecord(
@@ -1216,8 +1130,6 @@ class ContainerRecord {
       hashId: hashId ?? this.hashId,
       containerFormat: containerFormat ?? this.containerFormat,
       keyfiles: keyfiles ?? this.keyfiles,
-      pinnedPaths: pinnedPaths ?? this.pinnedPaths,
-      bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
       compositeCarriers: compositeCarriers ?? this.compositeCarriers,
     );
   }
@@ -1243,9 +1155,9 @@ class ContainerRecord {
     'hashId': hashId,
     'containerFormat': containerFormat,
 
-    // EXCLUDED FOR SECURITY: `bookmarkPaths`, `pinnedPaths`,
-    // `documentProviderFolders`, `keyfiles`, and `compositeCarriers` all
-    // name paths on disk (inside the vault, external keyfiles, or -- for
+    // EXCLUDED FOR SECURITY: `documentProviderFolders`, `keyfiles`, and
+    // `compositeCarriers` all name paths on disk (inside the vault,
+    // external keyfiles, or -- for
     // compositeCarriers -- the carrier files a distributed container is
     // secretly split across) and are Keystore-encrypted instead of being
     // serialized into this clear-text file.
@@ -1283,8 +1195,6 @@ class ContainerRecord {
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',
       // Populated from secure storage in _hydrate(), not from this file.
       keyfiles: const [],
-      pinnedPaths: [],
-      bookmarkPaths: [],
       compositeCarriers: const [],
     );
   }

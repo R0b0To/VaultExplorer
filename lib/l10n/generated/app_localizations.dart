@@ -7806,6 +7806,24 @@ abstract class AppLocalizations {
   /// **'Drag items to reorder them in the bookmark bar'**
   String get reorderBookmarksDesc;
 
+  /// Heading of the navigation drawer section that lists bookmarks of unlocked vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get drawerBookmarksSectionTitle;
+
+  /// Button label that opens an item
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get openAction;
+
+  /// Shown when a bookmark is tapped but the file or folder it pointed to was renamed or deleted
+  ///
+  /// In en, this message translates to:
+  /// **'The bookmarked item no longer exists'**
+  String get bookmarkTargetMissing;
+
   /// Bottom navigation bar label for the Vaults dashboard tab
   ///
   /// In en, this message translates to:

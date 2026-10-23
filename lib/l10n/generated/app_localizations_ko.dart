@@ -4450,6 +4450,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get reorderBookmarksDesc => '항목을 드래그하여 북마크 표시줄의 순서를 변경하세요';
 
   @override
+  String get drawerBookmarksSectionTitle => '북마크';
+
+  @override
+  String get openAction => '열기';
+
+  @override
+  String get bookmarkTargetMissing => '북마크한 항목이 더 이상 존재하지 않습니다';
+
+  @override
   String get navBarVaultsLabel => '볼트';
 
   @override

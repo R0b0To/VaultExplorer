@@ -4692,6 +4692,15 @@ class AppLocalizationsPt extends AppLocalizations {
       'Arraste os itens para reordená-los na barra de favoritos';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Favoritos';
+
+  @override
+  String get openAction => 'Abrir';
+
+  @override
+  String get bookmarkTargetMissing => 'O item favoritado não existe mais';
+
+  @override
   String get navBarVaultsLabel => 'Cofres';
 
   @override

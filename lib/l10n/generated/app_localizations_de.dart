@@ -4692,6 +4692,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ziehen Sie Elemente, um sie in der Lesezeichenleiste neu anzuordnen';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Lesezeichen';
+
+  @override
+  String get openAction => 'Öffnen';
+
+  @override
+  String get bookmarkTargetMissing =>
+      'Das Element dieses Lesezeichens existiert nicht mehr';
+
+  @override
   String get navBarVaultsLabel => 'Tresore';
 
   @override

@@ -28,7 +28,8 @@ import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
-import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
@@ -352,7 +353,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   bool get _showUI => _session.showUI;
   bool get _isCarouselVisible => _session.isCarouselVisible;
   bool get _enableCarousel => _session.enableCarousel;
-  List<String> get _bookmarkPaths => _session.bookmarkPaths;
+  // Bookmarks and pins are the file browser's, shared through one provider,
+  // so a bookmark added here shows up there and vice versa. build() watches
+  // the provider; these read it, like the session getters above.
+  FileBrowserPinsBookmarksState get _marks =>
+      ref.read(fileBrowserPinsBookmarksProvider(widget.container.volId));
+  FileBrowserPinsBookmarks get _marksNotifier => ref.read(
+    fileBrowserPinsBookmarksProvider(widget.container.volId).notifier,
+  );
   bool get _autoAdvance => _session.autoAdvance;
   bool get _isAutoAdvancing => _session.isAutoAdvancing;
   int get _slideshowDelaySeconds => _session.slideshowDelaySeconds;
@@ -629,12 +637,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final appSettings = await ref
         .read(appSettingsServiceProvider)
         .loadSettings();
-    final containerRecord = (await ref
-        .read(containerRepositoryProvider)
-        .loadAll())[widget.container.uri];
-    final bookmarkPaths = containerRecord?.bookmarkPaths;
-    final pinnedPaths = containerRecord?.pinnedPaths;
+    await _marksNotifier.ensureLoaded(widget.container);
     if (mounted) {
+      final pinnedPaths = _marks.pinnedPaths;
       unawaited(
         MediaSessionBridge.setShowFileNamesInNotification(
           config.mediaViewerToolbarConfig.showFileNamesInMediaNotification,
@@ -649,9 +654,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _sessionController.setVideoAspectRatioMode(
         config.mediaViewerToolbarConfig.defaultAspectRatioMode,
       );
-      _sessionController.setBookmarkPaths(
-        List<String>.from(bookmarkPaths ?? const []),
-      );
       _sessionController.setIsMuted(appSettings.videoMuted);
       if (playbackModeRevision == _playbackModeInteractionRevision) {
         _updatePlaybackMode(appSettings.videoPlaybackMode, persist: false);
@@ -660,7 +662,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       if (appSettings.videoMuted) {
         _playbackManager.activeController?.setVolume(0);
       }
-      if (pinnedPaths != null) {
+      if (pinnedPaths.isNotEmpty) {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
 
@@ -1650,22 +1652,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   bool get _isCurrentFileBookmark =>
-      _bookmarkPaths.contains(_playlistController.currentFile);
+      _marks.isBookmarked(_playlistController.currentFile);
 
   Future<void> _toggleBookmarkCurrentFile() async {
     final file = _playlistController.currentFile;
-    final wasBookmark = _bookmarkPaths.contains(file);
-    _sessionController.toggleBookmark(file);
-    final containerRepository = ref.read(containerRepositoryProvider);
-    final records = await containerRepository.loadAll();
-    var record = records[widget.container.uri];
-    record ??= ContainerRecord(
-      uri: widget.container.uri,
-      label: widget.container.displayName,
-      containerFormat: widget.container.containerFormat,
-    );
-    record = record.copyWith(bookmarkPaths: _bookmarkPaths);
-    await containerRepository.save(record);
+    final wasBookmark = _marks.isBookmarked(file);
+    await _marksNotifier.toggleBookmarks(widget.container, [
+      VaultBookmark(file, isDir: false),
+    ], bookmark: !wasBookmark);
     if (mounted) {
       showAppSnackBar(
         context,
@@ -3013,6 +3007,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   @override
   Widget build(BuildContext context) {
     ref.watch(mediaViewerSessionProvider(_sessionKey));
+    ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
     final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
     final mediaViewerConfig = _effectiveToolbarConfig(
       toolbarSettings.config.mediaViewerToolbarConfig,

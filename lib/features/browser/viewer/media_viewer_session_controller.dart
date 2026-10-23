@@ -22,7 +22,6 @@ class MediaViewerSessionState {
     this.showUI = false,
     this.isCarouselVisible = false,
     this.enableCarousel = true,
-    this.bookmarkPaths = const [],
     this.autoAdvance = false,
     this.isAutoAdvancing = false,
     this.slideshowDelaySeconds = 4,
@@ -47,7 +46,6 @@ class MediaViewerSessionState {
   final bool showUI;
   final bool isCarouselVisible;
   final bool enableCarousel;
-  final List<String> bookmarkPaths;
   final bool autoAdvance;
   final bool isAutoAdvancing;
   final int slideshowDelaySeconds;
@@ -98,7 +96,6 @@ class MediaViewerSessionState {
     bool? showUI,
     bool? isCarouselVisible,
     bool? enableCarousel,
-    List<String>? bookmarkPaths,
     bool? autoAdvance,
     bool? isAutoAdvancing,
     int? slideshowDelaySeconds,
@@ -123,7 +120,6 @@ class MediaViewerSessionState {
         showUI: showUI ?? this.showUI,
         isCarouselVisible: isCarouselVisible ?? this.isCarouselVisible,
         enableCarousel: enableCarousel ?? this.enableCarousel,
-        bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
         autoAdvance: autoAdvance ?? this.autoAdvance,
         isAutoAdvancing: isAutoAdvancing ?? this.isAutoAdvancing,
         slideshowDelaySeconds:
@@ -173,20 +169,6 @@ class MediaViewerSession extends _$MediaViewerSession {
   void setEnableCarousel(bool enable) {
     if (state.enableCarousel == enable) return;
     state = state.copyWith(enableCarousel: enable);
-  }
-
-  void setBookmarkPaths(List<String> paths) {
-    state = state.copyWith(bookmarkPaths: List.unmodifiable(paths));
-  }
-
-  void toggleBookmark(String path) {
-    final list = List<String>.from(state.bookmarkPaths);
-    if (list.contains(path)) {
-      list.remove(path);
-    } else {
-      list.add(path);
-    }
-    state = state.copyWith(bookmarkPaths: List.unmodifiable(list));
   }
 
   void setAutoAdvance(bool autoAdvance) {

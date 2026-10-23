@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
@@ -662,6 +663,28 @@ class AppNavigationDrawer extends ConsumerWidget {
                         },
                       ),
                   ],
+
+                  // Bookmarks of unlocked vaults and available storage
+                  // locations; empty (and invisible) when there are none.
+                  DrawerBookmarksSection(
+                    vaults: [
+                      for (final item in displayItems)
+                        if (item is MountedVaultItem) item.container,
+                    ],
+                    storageLocations: [
+                      ?primary,
+                      for (final loc in externalStorages)
+                        buildExternalStorageContainer(
+                          rootPath: loc.resolvedUri,
+                          displayName: loc.displayName,
+                          volId: loc.volId,
+                        ),
+                    ],
+                    currentVolId: currentVolId,
+                    onSelectContainer: onSelectContainer,
+                    onOpenInNewTab: onOpenInNewTab,
+                    onOpenLocalStorage: onOpenLocalStorage,
+                  ),
 
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 1),

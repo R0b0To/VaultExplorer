@@ -4714,6 +4714,15 @@ class AppLocalizationsUk extends AppLocalizations {
       'Перетягуйте елементи для зміни їхнього порядку';
 
   @override
+  String get drawerBookmarksSectionTitle => 'Закладки';
+
+  @override
+  String get openAction => 'Відкрити';
+
+  @override
+  String get bookmarkTargetMissing => 'Елемент із закладки більше не існує';
+
+  @override
   String get navBarVaultsLabel => 'Сховища';
 
   @override

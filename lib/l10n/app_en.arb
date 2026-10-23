@@ -6021,6 +6021,18 @@
   "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
   "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
+  "drawerBookmarksSectionTitle": "Bookmarks",
+  "@drawerBookmarksSectionTitle": {
+    "description": "Heading of the navigation drawer section that lists bookmarks of unlocked vaults"
+  },
+  "openAction": "Open",
+  "@openAction": {
+    "description": "Button label that opens an item"
+  },
+  "bookmarkTargetMissing": "The bookmarked item no longer exists",
+  "@bookmarkTargetMissing": {
+    "description": "Shown when a bookmark is tapped but the file or folder it pointed to was renamed or deleted"
+  },
   "navBarVaultsLabel": "Vaults",
   "@navBarVaultsLabel": {
     "description": "Bottom navigation bar label for the Vaults dashboard tab"

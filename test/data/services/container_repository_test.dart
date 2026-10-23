@@ -125,14 +125,6 @@ void main() {
         ContainerRepository.legacyPinHashKey(shortUri),
       );
       expect(
-        ContainerRepository.bookmarkKey(shortUri),
-        ContainerRepository.legacyBookmarkKey(shortUri),
-      );
-      expect(
-        ContainerRepository.pinnedKey(shortUri),
-        ContainerRepository.legacyPinnedKey(shortUri),
-      );
-      expect(
         ContainerRepository.docFoldersKey(shortUri),
         ContainerRepository.legacyDocFoldersKey(shortUri),
       );
@@ -170,8 +162,7 @@ void main() {
       expect(keyA.startsWith('vc2_pw_'), isTrue);
       expect(ContainerRepository.patternHashKey(uriA).startsWith('vc2_pattern_'), isTrue);
       expect(ContainerRepository.pinHashKey(uriA).startsWith('vc2_pin_hash_'), isTrue);
-      expect(ContainerRepository.bookmarkKey(uriA).startsWith('vc2_fav_'), isTrue);
-      expect(ContainerRepository.pinnedKey(uriA).startsWith('vc2_pin_'), isTrue);
+      expect(ContainerRepository.marksKey(uriA).startsWith('vc2_marks_'), isTrue);
       expect(ContainerRepository.docFoldersKey(uriA).startsWith('vc2_docfolders_'), isTrue);
       expect(ContainerRepository.keyfilesKey(uriA).startsWith('vc2_keyfiles_'), isTrue);
       expect(ContainerRepository.compositeCarriersKey(uriA).startsWith('vc2_composite_carriers_'), isTrue);
@@ -292,7 +283,9 @@ void main() {
         containerFormat: 'cryptomator',
         unlockMethod: ContainerUnlockMethod.biometrics,
         pendingPassword: 'PasswordA',
-        bookmarkPaths: ['/docA'],
+        keyfiles: [
+          {'uri': 'file:///keyA', 'name': 'keyA'},
+        ],
       );
       await repo.save(recordA);
 
@@ -302,18 +295,35 @@ void main() {
         containerFormat: 'cryptomator',
         unlockMethod: ContainerUnlockMethod.biometrics,
         pendingPassword: 'PasswordB',
-        bookmarkPaths: ['/docB'],
+        keyfiles: [
+          {'uri': 'file:///keyB', 'name': 'keyB'},
+        ],
       );
       await repo.save(recordB);
 
+      // Device-only bookmarks of two read-only vaults (VaultMarksStore).
+      secureStorage.data[ContainerRepository.marksKey(uriA)] = '{"A":1}';
+      secureStorage.data[ContainerRepository.marksKey(uriB)] = '{"B":1}';
+
       await repo.remove(uriA);
+
+      expect(
+        secureStorage.data.containsKey(ContainerRepository.marksKey(uriA)),
+        isFalse,
+      );
+      expect(
+        secureStorage.data.containsKey(ContainerRepository.marksKey(uriB)),
+        isTrue,
+      );
 
       expect(await repo.getPassword(uriA), isNull);
       expect(await repo.getPassword(uriB), 'PasswordB');
 
       final loadedB = (await repo.loadAll())[uriB];
       expect(loadedB, isNotNull);
-      expect(loadedB!.bookmarkPaths, ['/docB']);
+      expect(loadedB!.keyfiles, [
+        {'uri': 'file:///keyB', 'name': 'keyB'},
+      ]);
     });
   });
 
@@ -414,16 +424,15 @@ void main() {
   });
 
   group('Hydration & Legacy Migration of Secure Metadata', () {
-    test('_hydrate migrates legacy bookmarks, pinned paths, and doc folders', () async {
-      final legacyBookmarkKey = ContainerRepository.legacyBookmarkKey(uriA);
-      final primaryBookmarkKey = ContainerRepository.bookmarkKey(uriA);
-      final legacyPinnedKey = ContainerRepository.legacyPinnedKey(uriA);
-      final primaryPinnedKey = ContainerRepository.pinnedKey(uriA);
+    test('_hydrate migrates legacy keyfiles and doc folders', () async {
+      final legacyKeyfilesKey = ContainerRepository.legacyKeyfilesKey(uriA);
+      final primaryKeyfilesKey = ContainerRepository.keyfilesKey(uriA);
       final legacyDocFoldersKey = ContainerRepository.legacyDocFoldersKey(uriA);
       final primaryDocFoldersKey = ContainerRepository.docFoldersKey(uriA);
 
-      secureStorage.data[legacyBookmarkKey] = jsonEncode(['/legacy/bookmark']);
-      secureStorage.data[legacyPinnedKey] = jsonEncode(['/legacy/pinned']);
+      secureStorage.data[legacyKeyfilesKey] = jsonEncode([
+        {'uri': 'file:///legacy.key', 'name': 'legacy.key'},
+      ]);
       secureStorage.data[legacyDocFoldersKey] = jsonEncode([
         {'path': '/legacy/docs', 'autoMount': true},
       ]);
@@ -441,15 +450,20 @@ void main() {
       final all = await repo.loadAll();
       final loaded = all[uriA]!;
 
-      expect(loaded.bookmarkPaths, ['/legacy/bookmark']);
-      expect(loaded.pinnedPaths, ['/legacy/pinned']);
+      expect(loaded.keyfiles, [
+        {'uri': 'file:///legacy.key', 'name': 'legacy.key'},
+      ]);
       expect(loaded.documentProviderFolders.length, 1);
       expect(loaded.documentProviderFolders.first.path, '/legacy/docs');
       expect(loaded.documentProviderFolders.first.autoMount, isTrue);
 
       // Should be migrated into primary keys
-      expect(secureStorage.data[primaryBookmarkKey], jsonEncode(['/legacy/bookmark']));
-      expect(secureStorage.data[primaryPinnedKey], jsonEncode(['/legacy/pinned']));
+      expect(
+        secureStorage.data[primaryKeyfilesKey],
+        jsonEncode([
+          {'uri': 'file:///legacy.key', 'name': 'legacy.key'},
+        ]),
+      );
       expect(
         secureStorage.data[primaryDocFoldersKey],
         jsonEncode([{'path': '/legacy/docs', 'autoMount': true}]),

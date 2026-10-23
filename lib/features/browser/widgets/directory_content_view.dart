@@ -51,6 +51,8 @@ import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_paste_options_sheet.dart';
@@ -522,6 +524,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   );
   Set<String> get _pinnedPaths => _pinsBookmarks.pinnedPaths;
   List<String> get _bookmarkPaths => _pinsBookmarks.bookmarkPaths;
+  List<VaultBookmark> get _bookmarks => _pinsBookmarks.bookmarks;
   // Set as the very first line of dispose(). `mounted` alone isn't a
   // sufficient guard for the two native-event listeners below: Flutter
   // marks the element's lifecycle state defunct *before* running this
@@ -532,6 +535,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   // markNeedsBuild's assertion. `_disposed` closes that gap regardless of
   // how the listener ends up firing late.
   bool _disposed = false;
+
+  // Set once the first listing (or the initial path) has loaded; a bookmark
+  // requested from the drawer waits for it. See _consumeBookmarkRequest.
+  bool _initialLoadDone = false;
+  ProviderSubscription<BookmarkNavigationRequest?>? _bookmarkRequestSub;
 
   bool get _atRoot => _nav.atRoot;
   String get _currentDirPath => _nav.currentDirPath;
@@ -720,6 +728,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       browserTabsProvider(widget.workspaceConfig),
       _onWorkspaceChanged,
     );
+    _bookmarkRequestSub = ref.listenManual<BookmarkNavigationRequest?>(
+      bookmarkNavigationRequestsProvider,
+      (_, next) {
+        if (next != null) _consumeBookmarkRequest();
+      },
+    );
     _wasActiveTab = _isActiveTab;
     _wasMultiTab = _hasMultipleTabs;
     _wasVisibleTab = _isVisibleTab;
@@ -732,6 +746,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void dispose() {
     _disposed = true;
     _workspaceSubscription?.close();
+    _bookmarkRequestSub?.close();
     _chrome.visibleTabs.removeListener(_onVisibleTabsChanged);
     _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1067,7 +1082,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       },
       onToggleBookmark: () async {
         await _pinsBookmarksNotifier.toggleBookmarks(widget.container, [
-          fullPath,
+          VaultBookmark(fullPath, isDir: entry.isDir),
         ], bookmark: !_isBookmark(entry));
       },
       onInfo: () {
@@ -1277,13 +1292,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     for (final group in groups.values) {
       final container = group.first.container;
-      final paths = group
-          .map((item) => fullPathOf(item.entry, item.currentDirPath))
-          .toSet()
-          .toList();
+      // One bookmark per path, with the kind the listing reports for it.
+      final byPath = <String, VaultBookmark>{
+        for (final item in group)
+          fullPathOf(item.entry, item.currentDirPath): VaultBookmark(
+            fullPathOf(item.entry, item.currentDirPath),
+            isDir: item.entry.isDir,
+          ),
+      };
       await ref
           .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
-          .toggleBookmarks(container, paths, bookmark: bookmark);
+          .toggleBookmarks(
+            container,
+            byPath.values.toList(),
+            bookmark: bookmark,
+          );
     }
     final count = selected.length;
     _setStatus(
@@ -1324,7 +1347,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void _signalActivity() => widget.onUserActivity?.call();
   Future<void> _initSettingsAndContents() async {
     _navNotifier.setLoading(true);
-    _pinsBookmarksNotifier.load(widget.container);
+    // Loads once however many places ask (the drawer may have already).
+    unawaited(_pinsBookmarksNotifier.ensureLoaded(widget.container));
     try {
       // Independent of one another, so they run together instead of each
       // waiting for the previous one's secure-storage round trip.
@@ -1371,9 +1395,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       // New tab opened on a folder: go straight there (builds the path
       // stack from the root) instead of listing the root first.
       await _navigateToPath(initialPath, isDir: true);
-      return;
+    } else {
+      await _loadDirectoryContents(_currentDirPath);
     }
-    await _loadDirectoryContents(_currentDirPath);
+    // A bookmark tapped in the drawer opened this vault: now that it has
+    // loaded, go where the bookmark points.
+    _initialLoadDone = true;
+    _consumeBookmarkRequest();
   }
 
   Future<void> _loadToolbarConfig() async {
@@ -1390,7 +1418,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _navNotifier.setLayoutMode(_getLayoutModeForFolder(_currentDirPath));
     final currentSort = _getSortStateForFolder(_currentDirPath);
     _sortNotifier.restore(currentSort.sortBy, currentSort.sortAscending);
-    _pinsBookmarksNotifier.load(widget.container);
   }
 
   /// True for a [FileOperation] that ended in an error state the person
@@ -1678,6 +1705,60 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       await _handleFileTap(fileEntry);
     }
+  }
+
+  /// Opens a bookmark: a folder is entered, a file is opened in its folder.
+  /// If it was renamed or deleted since (outside what this app can follow, for
+  /// instance by another device), say so rather than opening an empty folder
+  /// or a file that isn't there, and offer to drop the dead bookmark.
+  Future<void> _openBookmark(VaultBookmark bookmark) async {
+    if (_disposed || !mounted) return;
+    if (!await _bookmarkTargetExists(bookmark)) {
+      if (_disposed || !mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.bookmarkTargetMissing,
+        tone: AppBannerTone.warning,
+        action: SnackBarAction(
+          label: context.l10n.remove,
+          onPressed: () => unawaited(
+            _pinsBookmarksNotifier.removeBookmark(
+              widget.container,
+              bookmark.path,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_disposed || !mounted) return;
+    await _navigateToPath(bookmark.path, isDir: bookmark.isDir);
+  }
+
+  Future<bool> _bookmarkTargetExists(VaultBookmark bookmark) async {
+    try {
+      final raw = await ref
+          .read(vaultFileIoApiProvider)
+          .listDirectory(widget.container, bookmark.parentPath, refresh: true);
+      if (raw == null) return false;
+      return RawEntry.parseAll(
+        raw,
+      ).any((e) => e.isDir == bookmark.isDir && e.name == bookmark.name);
+    } catch (_) {
+      // Can't tell: let navigation run and report its own failure.
+      return true;
+    }
+  }
+
+  /// Takes a bookmark the drawer asked for, if it is for this vault and this
+  /// is the tab in front. See [bookmarkNavigationRequestsProvider].
+  void _consumeBookmarkRequest() {
+    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) return;
+    final request = ref
+        .read(bookmarkNavigationRequestsProvider.notifier)
+        .take(widget.container.volId);
+    if (request == null) return;
+    unawaited(_openBookmark(request.bookmark));
   }
 
   void _navigateUp() {
@@ -2952,6 +3033,34 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     exitSelectionMode();
   }
 
+  /// A finished move keeps bookmarks and pins on what was moved: within one
+  /// vault they follow it to the new path; moved out to another vault there is
+  /// nothing left to point at, so they are dropped.
+  void _syncMarksAfterMove(FileOperation op) {
+    final moves = <String, String>{};
+    for (var i = 0; i < op.items.length; i++) {
+      final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
+      if (status?.result != FileItemResult.success) continue;
+      final item = op.items[i];
+      final name = op.resolvedDestName(i) ?? item.name;
+      moves[item.path] = op.destDirPath.isEmpty
+          ? name
+          : '${op.destDirPath}/$name';
+    }
+    if (moves.isEmpty) return;
+    if (op.sourceVolId == widget.container.volId) {
+      unawaited(_pinsBookmarksNotifier.remapPaths(widget.container, moves));
+      return;
+    }
+    final source = widget.resolveContainer?.call(op.sourceVolId);
+    if (source == null) return;
+    unawaited(
+      ref
+          .read(fileBrowserPinsBookmarksProvider(source.volId).notifier)
+          .removeDeletedPaths(source, moves.keys.toSet()),
+    );
+  }
+
   void _bindOpListener(FileOperation op) {
     void listener() {
       if (!mounted) {
@@ -2963,6 +3072,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
+        if (op.isCut && !op.isDelete) _syncMarksAfterMove(op);
         final isDirectDest = op.destDirPath == _currentDirPath;
         final isSubdirOfCurrent = op.destDirPath.startsWith(
           _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
@@ -4670,14 +4780,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         hasBookmarkBarViewportSlot && showBookmarkBar;
 
     Widget buildHorizontalBookmarkBar() => BookmarkBar(
-      bookmarkPaths: _bookmarkPaths,
+      bookmarks: _bookmarks,
       axis: Axis.horizontal,
-      onTapItem: (path) {
-        final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
-        _navigateToPath(path, isDir: isDir);
-      },
-      onRemoveBookmark: (path) =>
-          _pinsBookmarksNotifier.removeBookmark(widget.container, path),
+      onTapItem: (bookmark) => unawaited(_openBookmark(bookmark)),
+      onRemoveBookmark: (bookmark) => _pinsBookmarksNotifier.removeBookmark(
+        widget.container,
+        bookmark.path,
+      ),
     );
 
     final selectedForBarSet = {for (final item in selectedForBar) item.entry};
@@ -5099,18 +5208,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                             children: [
                               if (isLandscape && showBookmarkBar)
                                 BookmarkBar(
-                                  bookmarkPaths: _bookmarkPaths,
+                                  bookmarks: _bookmarks,
                                   axis: Axis.vertical,
-                                  onTapItem: (path) {
-                                    final isDir =
-                                        !path.split('/').last.contains('.') ||
-                                        path.endsWith('/');
-                                    _navigateToPath(path, isDir: isDir);
-                                  },
-                                  onRemoveBookmark: (path) =>
+                                  onTapItem: (bookmark) =>
+                                      unawaited(_openBookmark(bookmark)),
+                                  onRemoveBookmark: (bookmark) =>
                                       _pinsBookmarksNotifier.removeBookmark(
                                         widget.container,
-                                        path,
+                                        bookmark.path,
                                       ),
                                 ),
                               Expanded(

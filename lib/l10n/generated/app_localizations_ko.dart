@@ -8843,6 +8843,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => '이전 프레임';
+
+  @override
+  String get videoEditorNextFrame => '다음 프레임';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

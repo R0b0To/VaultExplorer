@@ -8845,6 +8845,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => '前のフレーム';
+
+  @override
+  String get videoEditorNextFrame => '次のフレーム';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

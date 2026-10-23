@@ -2546,6 +2546,8 @@
   "videoEditorZoomIn": "Zoom in",
   "videoEditorZoomOut": "Zoom out",
   "videoEditorZoomFit": "Fit to screen",
+  "videoEditorPrevFrame": "الإطار السابق",
+  "videoEditorNextFrame": "الإطار التالي",
   "videoEditorPrevKeyframe": "Previous keyframe",
   "videoEditorNextKeyframe": "Next keyframe",
   "videoEditorExporting": "Exporting video",

@@ -2546,6 +2546,8 @@
   "videoEditorZoomIn": "Збільшити",
   "videoEditorZoomOut": "Зменшити",
   "videoEditorZoomFit": "Вписати в екран",
+  "videoEditorPrevFrame": "Попередній кадр",
+  "videoEditorNextFrame": "Наступний кадр",
   "videoEditorPrevKeyframe": "Попередній ключовий кадр",
   "videoEditorNextKeyframe": "Наступний ключовий кадр",
   "videoEditorExporting": "Експорт відео",

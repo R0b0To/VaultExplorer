@@ -15493,6 +15493,18 @@ abstract class AppLocalizations {
   /// **'Fit to screen'**
   String get videoEditorZoomFit;
 
+  /// Tooltip for stepping back one video frame in the video editor
+  ///
+  /// In en, this message translates to:
+  /// **'Previous frame'**
+  String get videoEditorPrevFrame;
+
+  /// Tooltip for stepping forward one video frame in the video editor
+  ///
+  /// In en, this message translates to:
+  /// **'Next frame'**
+  String get videoEditorNextFrame;
+
   /// Tooltip for the video editor button that jumps to the previous keyframe
   ///
   /// In en, this message translates to:

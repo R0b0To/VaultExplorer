@@ -9415,6 +9415,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get videoEditorZoomFit => 'Вписати в екран';
 
   @override
+  String get videoEditorPrevFrame => 'Попередній кадр';
+
+  @override
+  String get videoEditorNextFrame => 'Наступний кадр';
+
+  @override
   String get videoEditorPrevKeyframe => 'Попередній ключовий кадр';
 
   @override

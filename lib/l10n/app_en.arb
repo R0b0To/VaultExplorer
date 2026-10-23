@@ -11666,6 +11666,14 @@
   "@videoEditorZoomFit": {
     "description": "Tooltip for the video editor button that shows the whole timeline"
   },
+  "videoEditorPrevFrame": "Previous frame",
+  "@videoEditorPrevFrame": {
+    "description": "Tooltip for stepping back one video frame in the video editor"
+  },
+  "videoEditorNextFrame": "Next frame",
+  "@videoEditorNextFrame": {
+    "description": "Tooltip for stepping forward one video frame in the video editor"
+  },
   "videoEditorPrevKeyframe": "Previous keyframe",
   "@videoEditorPrevKeyframe": {
     "description": "Tooltip for the video editor button that jumps to the previous keyframe"

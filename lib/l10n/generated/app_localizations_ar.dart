@@ -9395,6 +9395,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => 'الإطار السابق';
+
+  @override
+  String get videoEditorNextFrame => 'الإطار التالي';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

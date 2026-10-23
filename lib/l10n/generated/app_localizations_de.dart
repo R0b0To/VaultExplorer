@@ -9345,6 +9345,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => 'Vorheriges Einzelbild';
+
+  @override
+  String get videoEditorNextFrame => 'Nächstes Einzelbild';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

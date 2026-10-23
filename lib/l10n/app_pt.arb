@@ -2546,6 +2546,8 @@
   "videoEditorZoomIn": "Zoom in",
   "videoEditorZoomOut": "Zoom out",
   "videoEditorZoomFit": "Fit to screen",
+  "videoEditorPrevFrame": "Quadro anterior",
+  "videoEditorNextFrame": "Próximo quadro",
   "videoEditorPrevKeyframe": "Previous keyframe",
   "videoEditorNextKeyframe": "Next keyframe",
   "videoEditorExporting": "Exporting video",

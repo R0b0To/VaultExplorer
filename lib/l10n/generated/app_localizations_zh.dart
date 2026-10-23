@@ -8720,6 +8720,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => '上一帧';
+
+  @override
+  String get videoEditorNextFrame => '下一帧';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

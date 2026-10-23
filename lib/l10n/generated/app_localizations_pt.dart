@@ -9347,6 +9347,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get videoEditorZoomFit => 'Fit to screen';
 
   @override
+  String get videoEditorPrevFrame => 'Quadro anterior';
+
+  @override
+  String get videoEditorNextFrame => 'Próximo quadro';
+
+  @override
   String get videoEditorPrevKeyframe => 'Previous keyframe';
 
   @override

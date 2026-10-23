@@ -213,7 +213,7 @@ class VideoTimelineState extends State<VideoTimeline> {
       }
       _dragMode = _DragMode.zoom;
       _multiTouch = true;
-      final scale = d.horizontalScale <= 0 ? 1.0 : d.horizontalScale;
+      final scale = d.scale <= 0 ? 1.0 : d.scale;
       final span = (_gestureSpanUs / scale).round().clamp(_minSpanUs, _fullSpan).toInt();
       final start = (_focalUs - (d.localFocalPoint.dx / _width) * span).round();
       setState(() {

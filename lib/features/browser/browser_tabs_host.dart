@@ -29,6 +29,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dar
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
+import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -244,7 +245,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       appRoot: widget.appRoot,
     );
     final initialState = ref.read(browserTabsProvider(_workspace));
-    _pageController = PageController(initialPage: initialState.activeIndex);
+    // Pages keep taking touches while a swipe is still settling, so a vertical
+    // scroll can start right after changing tabs instead of waiting for the
+    // pager's spring to come fully to rest.
+    _pageController = SettleTouchPageController(
+      initialPage: initialState.activeIndex,
+    );
     _chromeSubscription = ref.listenManual<BrowserChromeHub>(
       browserChromeProvider(_workspace),
       (_, _) {},

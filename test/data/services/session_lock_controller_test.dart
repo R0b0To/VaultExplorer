@@ -333,6 +333,146 @@ void main() {
     });
   });
 
+  // pauseVaultAutoLock/resumeVaultAutoLock are held by the camera and audio
+  // capture screens for the length of a recording: the *timed* vault lock must
+  // not unmount the vault (and so force-stop the recording) while one runs.
+  // App lock and screen-off handling are deliberately unaffected.
+  group('recording hold (pauseVaultAutoLock)', () {
+    test('pausing cancels the armed vault timer and activity does not re-arm it', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.scheduleAutoLock();
+        async.elapse(const Duration(minutes: 4));
+        controller.pauseVaultAutoLock();
+        expect(controller.isVaultAutoLockPaused, isTrue);
+
+        async.elapse(const Duration(minutes: 30));
+        expect(lockAllMountedContainersCalls, 0);
+
+        // A tap anywhere in the app re-arms the timers -- not this one.
+        controller.scheduleAutoLock();
+        async.elapse(const Duration(minutes: 30));
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('timer re-arms with a fresh full timeout once the hold is released', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.scheduleAutoLock();
+        controller.pauseVaultAutoLock();
+        async.elapse(const Duration(minutes: 30));
+        controller.resumeVaultAutoLock();
+        expect(controller.isVaultAutoLockPaused, isFalse);
+
+        async.elapse(const Duration(minutes: 4, seconds: 59));
+        expect(lockAllMountedContainersCalls, 0);
+        async.elapse(const Duration(seconds: 1));
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('holds nest: the timer only re-arms after every hold is released', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.pauseVaultAutoLock();
+        controller.resumeVaultAutoLock();
+        expect(controller.isVaultAutoLockPaused, isTrue);
+
+        controller.scheduleAutoLock();
+        async.elapse(const Duration(minutes: 30));
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.resumeVaultAutoLock();
+        expect(controller.isVaultAutoLockPaused, isFalse);
+        async.elapse(const Duration(minutes: 5));
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('an unbalanced resumeVaultAutoLock is a no-op', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.resumeVaultAutoLock();
+        controller.pauseVaultAutoLock();
+        expect(controller.isVaultAutoLockPaused, isTrue);
+
+        controller.dispose();
+      });
+    });
+
+    test('the app-lock gate still applies while the hold is active', () {
+      fakeAsync((async) {
+        settings = AppSettings(
+          autoLockMins: 5,
+          lockContainersOnScreenLock: true,
+          appLockAfterMins: 5,
+          useMasterPassword: true,
+          masterPasswordHash: 'h',
+        );
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.scheduleAutoLock();
+        async.elapse(const Duration(minutes: 5));
+
+        // Like the lock screen: the gate comes up, the vault (and the
+        // recording running in it) is left alone.
+        expect(enforceAppLockCalls, 1);
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('screen-off locking is not suppressed by the hold', () {
+      fakeAsync((async) {
+        settings = AppSettings(
+          autoLockMins: 0,
+          lockContainersOnScreenLock: true,
+        );
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleScreenOff();
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('a screen-off countdown (timed autoLockMins) does not fire while held', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleScreenOff();
+        async.elapse(const Duration(minutes: 30));
+
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+  });
+
   group('performAppLock, performVaultLock, performAutoLock', () {
     test('performAppLock locks app gate when master password is set', () {
       settings = AppSettings(

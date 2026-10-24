@@ -90,8 +90,11 @@ class SessionLockController {
   bool get isLockSuppressed => _suppressLockDepth > 0;
   bool get isVaultAutoLockPaused => _vaultAutoLockPauseDepth > 0;
 
-  /// Pauses only the vault inactivity timer while a video recording is active.
-  /// App locking and explicit screen-off/manual lock actions remain in force.
+  /// Pauses only the vault inactivity timer while a recording (video or
+  /// audio) is active, so the timed auto-lock can't unmount the vault under
+  /// it and force the recording to stop. App locking and explicit
+  /// screen-off/manual lock actions remain in force. Calls nest: the timer
+  /// only re-arms once every hold has been released.
   void pauseVaultAutoLock() {
     _vaultAutoLockPauseDepth++;
     if (_vaultAutoLockPauseDepth == 1) {

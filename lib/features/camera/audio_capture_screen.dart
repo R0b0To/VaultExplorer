@@ -14,9 +14,11 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
 import 'package:vaultexplorer/features/audio_editor/models/audio_waveform.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 import 'active_recording_registry.dart';
@@ -78,6 +80,8 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   late final VaultFileIoApi _fileIo;
   late final VaultEngineEvents _events;
   late final ActiveRecordingRegistry _registry;
+  late final SessionLockController _sessionLockController;
+  late final VaultDashboardController _dashboardController;
   late final CameraVaultService _vaultService;
   late final VaultAudioEditApi _audioEditApi;
 
@@ -92,9 +96,14 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   /// second tap can't start another one on top of it.
   bool _busy = false;
 
-  /// True while the registry callback, keep-screen-on and the background
-  /// service are held for an active recording.
+  /// True while the registry callback, keep-screen-on, the background
+  /// service and the timed auto-lock hold are held for an active recording.
   bool _resourcesHeld = false;
+
+  /// True while this screen holds [SessionLockController.pauseVaultAutoLock]
+  /// and the container's auto-close pause. Kept separate from
+  /// [_resourcesHeld] so the hold is taken and released exactly once.
+  bool _autoLockPausedForRecording = false;
 
   /// Set once the take is safely in the vault.
   bool _saved = false;
@@ -130,6 +139,10 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     _fileIo = ref.read(vaultFileIoApiProvider);
     _events = ref.read(vaultEngineEventsProvider);
     _registry = ref.read(activeRecordingRegistryProvider);
+    // Captured here (not read in dispose) so the auto-lock hold can still be
+    // released while the element is being torn down, same as the camera screen.
+    _sessionLockController = ref.read(sessionLockControllerProvider);
+    _dashboardController = ref.read(vaultDashboardControllerProvider.notifier);
     _audioEditApi = ref.read(vaultAudioEditApiProvider);
     _vaultService = CameraVaultService(
       container: widget.container,
@@ -191,7 +204,10 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   void _acquireRecordingResources() {
     _resourcesHeld = true;
     unawaited(_fileIo.setKeepScreenOn(true));
-    // If the vault locks mid-recording, stop and save what exists so far.
+    // The timed auto-lock must not cut a running recording short.
+    _pauseAutoLockForRecording();
+    // If the vault is locked mid-recording by anything else (e.g. the user
+    // tapping Lock), stop and save what exists so far.
     _registry.register(widget.container.uri, _stopAndSaveForLock);
     unawaited(
       _fileIo.startBackgroundRecording(
@@ -208,6 +224,31 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     _registry.unregister(widget.container.uri);
     unawaited(_fileIo.setKeepScreenOn(false));
     unawaited(_fileIo.stopBackgroundRecording());
+    _resumeAutoLockAfterRecording();
+  }
+
+  /// Holds off the two inactivity timers for as long as a take is being
+  /// recorded (including while it is paused): the global vault auto-lock
+  /// ([SessionLockController.pauseVaultAutoLock]) and this container's own
+  /// auto-close timer. Both would otherwise lock the vault out from under the
+  /// recording and force it to be stopped. Like an app lock, they simply do
+  /// not apply while a recording is in progress; the idle timeout starts
+  /// fresh once the recording ends. Screen-off is already ignored while this
+  /// screen is open (the add-item menu opens it under
+  /// `withLockSuppression`), and a manual lock still goes through
+  /// [_registry], which saves what was recorded so far.
+  void _pauseAutoLockForRecording() {
+    if (_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = true;
+    _sessionLockController.pauseVaultAutoLock();
+    _dashboardController.pauseAutoCloseForActivity(widget.container.volId);
+  }
+
+  void _resumeAutoLockAfterRecording() {
+    if (!_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = false;
+    _dashboardController.resumeAutoCloseAfterActivity(widget.container.volId);
+    _sessionLockController.resumeVaultAutoLock();
   }
 
   // ── Recording ───────────────────────────────────────────────────────────

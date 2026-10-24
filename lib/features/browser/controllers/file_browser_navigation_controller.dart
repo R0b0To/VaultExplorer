@@ -71,7 +71,7 @@ class FileBrowserNavigationState {
     this.statusMessage,
     this.statusIsError = false,
     this.freeSpace,
-    this.layoutMode = BrowserLayoutMode.list,
+    this.layoutMode = BrowserLayoutMode.detailed,
     this.currentFilter,
     this.archiveContext,
     this.isContainerLocked = false,
@@ -170,7 +170,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
   void initRoot({
     required String rootLabel,
-    BrowserLayoutMode layoutMode = BrowserLayoutMode.list,
+    BrowserLayoutMode layoutMode = BrowserLayoutMode.detailed,
   }) {
     if (state.pathStack.isEmpty) {
       state = state.copyWith(

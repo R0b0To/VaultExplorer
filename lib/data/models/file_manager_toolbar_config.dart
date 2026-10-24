@@ -177,9 +177,9 @@ class FileManagerToolbarConfig {
     this.masonryColumnsLandscape = 4,
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
-    this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.defaultThumbnailQuality = ThumbnailQuality.defaultAutoQuality,
     this.localStorageThumbnailCacheMode = ThumbnailCacheMode.disabled,
-    this.localStorageThumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.localStorageThumbnailQuality = ThumbnailQuality.defaultAutoQuality,
     this.mediaViewerToolbarConfig = const MediaViewerToolbarConfig(),
     this.skin = FileManagerSkin.classic,
   });
@@ -234,9 +234,9 @@ class FileManagerToolbarConfig {
         masonryColumnsLandscape: 4,
         playlistTransitionEffect: PlaylistTransitionEffect.slide,
         defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
-        defaultThumbnailQuality: ThumbnailQuality.defaultQuality,
+        defaultThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
         localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
-        localStorageThumbnailQuality: ThumbnailQuality.defaultQuality,
+        localStorageThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
         mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
         skin: FileManagerSkin.classic,
       );
@@ -656,8 +656,9 @@ class FileManagerToolbarConfig {
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
         ThumbnailCacheMode.disabled;
-    final defaultThumbnailQuality =
-        ThumbnailQuality.fromJson(j['defaultThumbnailQuality']);
+    final defaultThumbnailQuality = j.containsKey('defaultThumbnailQuality')
+        ? ThumbnailQuality.fromJson(j['defaultThumbnailQuality'])
+        : ThumbnailQuality.defaultAutoQuality;
     // Configs saved before Local Storage had a thumbnail slot of its own
     // used the app-wide default for it, so an absent slot is seeded from the
     // default's value: upgrading changes nothing about how Local Storage

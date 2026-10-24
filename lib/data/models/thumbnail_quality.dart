@@ -44,6 +44,11 @@ class ThumbnailQuality {
   static const double coverOversample = 4 / 3;
 
   static const defaultQuality = ThumbnailQuality(quality: 80, size: 180);
+  static const defaultAutoQuality = ThumbnailQuality(
+    quality: 80,
+    size: 180,
+    auto: true,
+  );
 
   int get jpegQuality => quality.clamp(10, 100);
 

@@ -203,7 +203,7 @@ class AppSettings {
     this.lockAppOnScreenLock = true,
     this.appLockAfterMins = 0,
     this.appLockScreenLockOnly = false,
-    this.defaultLayoutMode = BrowserLayoutMode.list,
+    this.defaultLayoutMode = BrowserLayoutMode.detailed,
     this.useBrowserTabs = true,
     this.useDualPaneBrowsing = false,
     this.tabEdgeSwipe = BrowserTabEdgeSwipe.drawerAndNewTab,
@@ -605,7 +605,7 @@ class AppSettings {
     appLockScreenLockOnly: j['appLockScreenLockOnly'] as bool? ?? false,
     defaultLayoutMode:
         BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
-        BrowserLayoutMode.list,
+        BrowserLayoutMode.detailed,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
     useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
     tabEdgeSwipe: BrowserTabEdgeSwipe.fromJson(j['tabEdgeSwipe'] as String?),

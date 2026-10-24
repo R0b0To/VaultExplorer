@@ -244,6 +244,10 @@ object ContainerSessionRegistry {
         sessionRemovedListeners.add(listener)
     }
 
+    fun removeSessionRemovedListener(listener: (Int) -> Unit) {
+        sessionRemovedListeners.remove(listener)
+    }
+
     fun removeSession(volId: Int) {
         if (activeSessions.remove(volId) == null) return
         for (listener in sessionRemovedListeners) {

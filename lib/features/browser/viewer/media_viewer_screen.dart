@@ -197,6 +197,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
+  bool _lockedRouteDismissalScheduled = false;
   int _transitionToken = 0;
   int _resumeFlowToken = 0;
   bool _resumeFlowStarted = false;
@@ -1684,7 +1685,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         ),
       ),
     );
-    if (!mounted) return;
+    if (!mounted ||
+        ref.read(mediaViewerLockProvider(widget.container.volId))) {
+      return;
+    }
     _menuClosed();
     // Whether or not anything was actually saved, force this item's
     // ImagePageItem to remount so it re-reads through FullResImageCache /
@@ -1714,7 +1718,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         ),
       ),
     );
-    if (!mounted) return;
+    if (!mounted ||
+        ref.read(mediaViewerLockProvider(widget.container.volId))) {
+      return;
+    }
     _menuClosed();
     // The editor has released the player by now (it does so before popping);
     // bring this video back up.
@@ -1740,7 +1747,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         ),
       ),
     );
-    if (!mounted) return;
+    if (!mounted ||
+        ref.read(mediaViewerLockProvider(widget.container.volId))) {
+      return;
+    }
     _menuClosed();
     // The editor has released the player by now (it does so before popping);
     // bring this track back up.
@@ -2791,6 +2801,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
   }
 
+  void _dismissRouteAfterContainerLock() {
+    if (_lockedRouteDismissalScheduled) return;
+    _lockedRouteDismissalScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      // A media editor may be above this route. The editor handles the same
+      // lock event and removes itself; removing this route too prevents its
+      // locked black placeholder from being left over the dashboard.
+      Navigator.of(context).removeRoute(route);
+    });
+  }
+
   @override
   void dispose() {
     unawaited(_saveActivePlaybackPosition());
@@ -3040,6 +3064,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       mediaViewerLockProvider(widget.container.volId),
     );
     if (isContainerLocked) {
+      _dismissRouteAfterContainerLock();
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),

@@ -1372,13 +1372,37 @@ class VaultLifecycleApi {
   /// itself, so it's safe (and cheap) to call this every time [enabled]
   /// or the set of mounted containers changes -- see
   /// BackgroundServiceHandlers.kt.
-  Future<void> syncBackgroundService({required bool enabled}) async {
+  Future<void> syncBackgroundService({
+    required bool enabled,
+    List<String>? lockOnAppBackgroundUris,
+  }) async {
     try {
-      await _channel.invokeMethod(ChannelMethods.syncBackgroundService, {
+      final arguments = <String, Object?>{
         'enabled': enabled,
-      });
+      };
+      if (lockOnAppBackgroundUris != null) {
+        arguments['lockOnAppBackgroundUris'] = lockOnAppBackgroundUris;
+      }
+      await _channel.invokeMethod(ChannelMethods.syncBackgroundService, arguments);
     } catch (e) {
       logSwallowed('syncBackgroundService', e);
+    }
+  }
+
+  /// Keeps the native background service's timeout in sync with the Dart
+  /// auto-close timer. The service can enforce the deadline after the app
+  /// task (and its Dart isolate) has been removed from Recents.
+  Future<void> scheduleContainerAutoClose({
+    required String vaultUri,
+    required int? deadlineMillis,
+  }) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.scheduleContainerAutoClose, {
+        'vaultUri': vaultUri,
+        'deadlineMillis': deadlineMillis,
+      });
+    } catch (e) {
+      logSwallowed('scheduleContainerAutoClose', e);
     }
   }
 

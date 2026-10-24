@@ -10,6 +10,7 @@ abstract final class ChannelMethods {
   static const probeContainerFormat = 'probeContainerFormat';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
+  static const scheduleContainerAutoClose = 'scheduleContainerAutoClose';
   static const scheduleVaultSync = 'scheduleVaultSync';
   static const canScheduleExactAlarms = 'canScheduleExactAlarms';
   static const requestExactAlarmAccess = 'requestExactAlarmAccess';

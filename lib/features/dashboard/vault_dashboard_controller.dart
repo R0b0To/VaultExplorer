@@ -24,6 +24,7 @@ import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
 part 'vault_dashboard_controller.g.dart';
 
 const _kLogTag = 'VaultDashboardController';
+const _kAutoCloseStartedAtPrefix = 'container_auto_close_started_at_v1_';
 
 class VaultDashboardViewState {
   final List<MountedContainer> mounted;
@@ -96,6 +97,7 @@ class VaultDashboardViewState {
 class VaultDashboardController extends _$VaultDashboardController {
   final Map<int, Timer> _autoCloseTimers = {};
   final Map<int, DateTime> _autoCloseScheduledAt = {};
+  final Map<int, String> _autoCloseContainerUris = {};
   Timer? _undoTimer;
   Future<void>? _loadAllFuture;
 
@@ -151,6 +153,7 @@ class VaultDashboardController extends _$VaultDashboardController {
       }
       _autoCloseTimers.clear();
       _autoCloseScheduledAt.clear();
+      _autoCloseContainerUris.clear();
       _undoTimer?.cancel();
 
       events.removeUsbContainerDetachedListener(_onUsbDetachedListener);
@@ -249,8 +252,90 @@ class VaultDashboardController extends _$VaultDashboardController {
       }
     }
     for (final session in sessions) {
-      onContainerMounted(session, record: state.records[session.uri]);
+      final record = state.records[session.uri];
+      final timeoutMins = record?.autoCloseMins ?? 0;
+      DateTime? scheduledAt;
+      if (timeoutMins > 0) {
+        scheduledAt = _autoCloseScheduledAt[session.volId] ??
+            await _readAutoCloseStartedAt(session.uri);
+        if (!ref.mounted) return;
+      }
+
+      final timeout = Duration(minutes: timeoutMins);
+      final expired = scheduledAt != null &&
+          DateTime.now().difference(scheduledAt) >= timeout;
+      if (expired) {
+        _autoCloseContainerUris[session.volId] = session.uri;
+        _autoCloseScheduledAt[session.volId] = scheduledAt;
+        final locked = await _lockExpiredRestoredSession(session);
+        if (!ref.mounted) return;
+        if (locked) continue;
+      }
+
+      onContainerMounted(
+        session,
+        record: record,
+        autoCloseStartedAt: scheduledAt,
+        retryExpiredAutoClose: expired,
+      );
     }
+  }
+
+  String _autoCloseStartedAtKey(String uri) =>
+      '$_kAutoCloseStartedAtPrefix$uri';
+
+  Future<DateTime?> _readAutoCloseStartedAt(String uri) async {
+    try {
+      final raw = await ref
+          .read(appSecureStorageProvider)
+          .read(key: _autoCloseStartedAtKey(uri));
+      final milliseconds = int.tryParse(raw ?? '');
+      return milliseconds == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    } catch (e) {
+      VeLog.w(_kLogTag, 'Could not restore per-container auto-close time', e);
+      return null;
+    }
+  }
+
+  void _persistAutoCloseStartedAt(String uri, DateTime? startedAt) {
+    final storage = ref.read(appSecureStorageProvider);
+    final key = _autoCloseStartedAtKey(uri);
+    final write = startedAt == null
+        ? storage.delete(key: key)
+        : storage.write(
+            key: key,
+            value: startedAt.millisecondsSinceEpoch.toString(),
+          );
+    unawaited(
+      write.catchError((Object error) {
+        VeLog.w(_kLogTag, 'Could not persist per-container auto-close time', error);
+      }),
+    );
+  }
+
+  Future<bool> _lockExpiredRestoredSession(MountedContainer container) async {
+    if (ref.read(sessionLockControllerProvider).isMediaPlaying) return false;
+    if (!acquireLockGuard(container.volId)) return false;
+    try {
+      final locked = await ref
+          .read(vaultLifecycleApiProvider)
+          .lockContainer(container.uri);
+      if (locked && ref.mounted) {
+        onContainerLocked(container.volId);
+        return true;
+      }
+    } catch (e) {
+      VeLog.e(
+        _kLogTag,
+        'Restored auto-close lock failed for volId=${container.volId}',
+        e,
+      );
+    } finally {
+      releaseLockGuard(container.volId);
+    }
+    return false;
   }
 
   Future<void> handleRefresh() async {
@@ -281,19 +366,66 @@ class VaultDashboardController extends _$VaultDashboardController {
           .read(vaultLifecycleApiProvider)
           .syncBackgroundService(
             enabled: state.appSettings.keepVaultsRunningInBackground,
+            lockOnAppBackgroundUris: state.mounted
+                .where((container) {
+                  final record = state.records[container.uri];
+                  final explicitlyImmediate =
+                      record?.autoCloseImmediately == true;
+                  final appDefaultImmediate =
+                      state.appSettings.lockContainersOnScreenLock &&
+                      !state.appSettings.autoLockScreenLockOnly &&
+                      state.appSettings.autoLockMins == 0 &&
+                      !(record?.isExemptFromGlobalLock ?? false);
+                  return explicitlyImmediate || appDefaultImmediate;
+                })
+                .map((container) => container.uri)
+                .toList(growable: false),
           ),
     );
   }
 
   void scheduleAutoClose(MountedContainer container) {
+    _scheduleAutoCloseAt(container, DateTime.now());
+  }
+
+  void _scheduleAutoCloseAt(
+    MountedContainer container,
+    DateTime startedAt, {
+    bool retryExpired = false,
+  }) {
+    _autoCloseContainerUris[container.volId] = container.uri;
     final record = state.records[container.uri];
     final mins = record?.autoCloseMins ?? 0;
     if (mins <= 0) {
       cancelAutoClose(container.volId);
       return;
     }
-    _autoCloseScheduledAt[container.volId] = DateTime.now();
-    _armAutoCloseTimer(container, Duration(minutes: mins));
+    _autoCloseScheduledAt[container.volId] = startedAt;
+    _persistAutoCloseStartedAt(container.uri, startedAt);
+    final deadline = startedAt.add(Duration(minutes: mins));
+    unawaited(
+      ref.read(vaultLifecycleApiProvider).scheduleContainerAutoClose(
+            vaultUri: container.uri,
+            deadlineMillis: deadline.millisecondsSinceEpoch,
+          ),
+    );
+    final remaining = Duration(minutes: mins) - DateTime.now().difference(startedAt);
+    if (remaining <= Duration.zero && retryExpired) {
+      _armAutoCloseRetry(container);
+    } else {
+      _armAutoCloseTimer(
+        container,
+        remaining.isNegative ? Duration.zero : remaining,
+      );
+    }
+  }
+
+  void _armAutoCloseRetry(MountedContainer container) {
+    _autoCloseTimers[container.volId]?.cancel();
+    _autoCloseTimers[container.volId] = Timer(
+      const Duration(seconds: 30),
+      () => _performAutoCloseLock(container),
+    );
   }
 
   void _armAutoCloseTimer(MountedContainer container, Duration duration) {
@@ -308,14 +440,12 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (!ref.mounted) return;
     if (ref.read(sessionLockControllerProvider).isMediaPlaying) {
       VeLog.d(_kLogTag, '_performAutoCloseLock: media is playing, postponing auto-close');
+      _armAutoCloseRetry(container);
       return;
     }
     if (!acquireLockGuard(container.volId)) {
       if (ref.mounted) {
-        _autoCloseTimers[container.volId] = Timer(
-          const Duration(seconds: 30),
-          () => _performAutoCloseLock(container),
-        );
+        _armAutoCloseRetry(container);
       }
       return;
     }
@@ -324,8 +454,10 @@ class VaultDashboardController extends _$VaultDashboardController {
           .read(vaultLifecycleApiProvider)
           .lockContainer(container.uri);
       if (locked && ref.mounted) onContainerLocked(container.volId);
+      if (!locked && ref.mounted) _armAutoCloseRetry(container);
     } catch (e) {
       VeLog.e(_kLogTag, 'Auto-close lock failed for volId=${container.volId}', e);
+      if (ref.mounted) _armAutoCloseRetry(container);
     } finally {
       releaseLockGuard(container.volId);
     }
@@ -335,6 +467,16 @@ class VaultDashboardController extends _$VaultDashboardController {
     _autoCloseTimers[volId]?.cancel();
     _autoCloseTimers.remove(volId);
     _autoCloseScheduledAt.remove(volId);
+    final uri = _autoCloseContainerUris.remove(volId);
+    if (uri != null) {
+      _persistAutoCloseStartedAt(uri, null);
+      unawaited(
+        ref.read(vaultLifecycleApiProvider).scheduleContainerAutoClose(
+              vaultUri: uri,
+              deadlineMillis: null,
+            ),
+      );
+    }
   }
 
   void resetAllAutoCloseTimers() {
@@ -347,19 +489,24 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   Future<void> checkAutoCloseTimeouts() async {
-    final now = DateTime.now();
     for (final container in List<MountedContainer>.from(state.mounted)) {
       final record = state.records[container.uri];
       final mins = record?.autoCloseMins ?? 0;
       if (mins <= 0) continue;
 
-      final scheduledAt = _autoCloseScheduledAt[container.volId];
+      var scheduledAt = _autoCloseScheduledAt[container.volId];
       if (scheduledAt == null) {
-        scheduleAutoClose(container);
-        continue;
+        scheduledAt = await _readAutoCloseStartedAt(container.uri);
+        if (!ref.mounted) return;
+        if (scheduledAt == null) {
+          scheduleAutoClose(container);
+          continue;
+        }
+        _autoCloseContainerUris[container.volId] = container.uri;
+        _autoCloseScheduledAt[container.volId] = scheduledAt;
       }
 
-      final elapsed = now.difference(scheduledAt);
+      final elapsed = DateTime.now().difference(scheduledAt);
       final timeout = Duration(minutes: mins);
       if (elapsed >= timeout) {
         VeLog.i(
@@ -367,7 +514,6 @@ class VaultDashboardController extends _$VaultDashboardController {
           'checkAutoCloseTimeouts: volId=${container.volId} timeout reached '
           '(elapsed=${elapsed.inSeconds}s >= timeout=${timeout.inSeconds}s), locking',
         );
-        cancelAutoClose(container.volId);
         await _performAutoCloseLock(container);
       } else {
         final remaining = timeout - elapsed;
@@ -463,8 +609,19 @@ class VaultDashboardController extends _$VaultDashboardController {
   void onContainerMounted(
     MountedContainer container, {
     ContainerRecord? record,
+    DateTime? autoCloseStartedAt,
+    bool retryExpiredAutoClose = false,
   }) {
-    if (state.mounted.any((c) => c.uri == container.uri)) return;
+    if (state.mounted.any((c) => c.uri == container.uri)) {
+      if (autoCloseStartedAt != null) {
+        _scheduleAutoCloseAt(
+          container,
+          autoCloseStartedAt,
+          retryExpired: retryExpiredAutoClose,
+        );
+      }
+      return;
+    }
 
     final newMounted = List<MountedContainer>.from(state.mounted)
       ..add(container);
@@ -483,7 +640,15 @@ class VaultDashboardController extends _$VaultDashboardController {
     );
 
     _syncSecureScreen();
-    scheduleAutoClose(container);
+    if (autoCloseStartedAt == null) {
+      scheduleAutoClose(container);
+    } else {
+      _scheduleAutoCloseAt(
+        container,
+        autoCloseStartedAt,
+        retryExpired: retryExpiredAutoClose,
+      );
+    }
     refreshContainerSpace(container.volId);
     unawaited(_recordVolumeFilesystem(container));
     if (record != null) {
@@ -787,6 +952,7 @@ class VaultDashboardController extends _$VaultDashboardController {
     final newRecords = Map<String, ContainerRecord>.from(state.records)
       ..[uri] = record;
     state = state._copy(records: Map.unmodifiable(newRecords));
+    _syncSecureScreen();
 
     final idx = state.mounted.indexWhere((m) => m.uri == uri);
     if (idx != -1) {

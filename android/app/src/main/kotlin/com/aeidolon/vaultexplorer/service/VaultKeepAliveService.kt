@@ -7,20 +7,27 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.container.ContainerEngine
+import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry
 import com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry
 import com.aeidolon.vaultexplorer.saf.MirrorPushEvents
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.withLock
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.util.NotificationLocale
@@ -38,6 +45,10 @@ private const val CONTAINER_DOCUMENTS_AUTHORITY = "com.aeidolon.vaultexplorer.do
  * kill the process, with no chance to unmount cleanly.
  */
 class VaultKeepAliveService : Service() {
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val sessionRemovedListener: (Int) -> Unit = { refreshNotification() }
+    private val autoCloseCallbacks = mutableMapOf<String, Runnable>()
+    private val autoCloseInFlight = ConcurrentHashMap.newKeySet<String>()
     private val mirrorPushListener = MirrorPushEvents.Listener {
         if (isRunning && ContainerSessionRegistry.hasAnyActiveSessions()) {
             getSystemService(NotificationManager::class.java)
@@ -49,6 +60,8 @@ class VaultKeepAliveService : Service() {
         private const val TAG = "VaultKeepAliveService"
         private const val CHANNEL_ID = "vault_keep_alive"
         private const val NOTIFICATION_ID = 4201
+        private const val AUTO_CLOSE_FALLBACK_GRACE_MS = 5_000L
+        private const val AUTO_CLOSE_RETRY_MS = 30_000L
 
         /** Fired by the notification's action button; also handled if it
          *  arrives as the Intent that starts the service fresh. */
@@ -56,6 +69,11 @@ class VaultKeepAliveService : Service() {
 
         @Volatile
         private var instance: VaultKeepAliveService? = null
+
+        private val pendingAutoCloseDeadlines = ConcurrentHashMap<String, Long>()
+
+        @Volatile
+        private var lockOnAppBackgroundUris: Set<String> = emptySet()
 
         @Volatile
         var isRunning: Boolean = false
@@ -101,20 +119,58 @@ class VaultKeepAliveService : Service() {
             maxProgress = max
             isIndeterminate = indeterminate
             val s = instance
-            if (s != null && isRunning &&
-                (ContainerSessionRegistry.hasAnyActiveSessions() || hasActiveOperations)
-            ) {
-                val nm = context.getSystemService(NotificationManager::class.java)
-                nm.notify(NOTIFICATION_ID, s.buildNotification())
+            if (s != null && isRunning) {
+                if (ContainerSessionRegistry.hasAnyActiveSessions() || hasActiveOperations) {
+                    val nm = context.getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, s.buildNotification())
+                } else {
+                    refreshNotification()
+                }
             }
         }
 
         fun refreshNotification() {
             val service = instance ?: return
-            if (!isRunning || (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations)) return
-            service.getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, service.buildNotification())
+            service.mainHandler.post {
+                service.refreshNotificationNow()
+            }
         }
+
+        fun scheduleContainerAutoClose(context: Context, uri: String, deadlineMillis: Long?) {
+            if (uri.isBlank()) return
+            ContainerAutoCloseAlarm.schedule(context, uri, deadlineMillis)
+            if (deadlineMillis == null || deadlineMillis <= 0L) {
+                pendingAutoCloseDeadlines.remove(uri)
+                instance?.cancelAutoClose(uri)
+                return
+            }
+
+            pendingAutoCloseDeadlines[uri] = deadlineMillis
+            instance?.scheduleAutoClose(uri, deadlineMillis)
+        }
+
+        fun updateLockOnAppBackgroundUris(uris: List<String>?) {
+            if (uris != null) lockOnAppBackgroundUris = uris.filter(String::isNotBlank).toSet()
+        }
+
+        fun onAutoCloseAlarm(context: Context, uri: String, deadlineMillis: Long) {
+            val intent = Intent(context, VaultKeepAliveService::class.java)
+                .setAction(ContainerAutoCloseAlarm.ACTION)
+                .putExtra(ContainerAutoCloseAlarm.EXTRA_URI, uri)
+                .putExtra(ContainerAutoCloseAlarm.EXTRA_DEADLINE, deadlineMillis)
+            val service = instance
+            if (service != null && isRunning) {
+                service.handleAutoCloseAlarm(uri, deadlineMillis)
+                return
+            }
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "Could not restart keep-alive service for auto-close alarm: ${e.message}" }
+            }
+        }
+
+        fun hasRunningInstance(): Boolean = instance != null && isRunning
     }
 
     private lateinit var executor: ExecutorService
@@ -127,6 +183,10 @@ class VaultKeepAliveService : Service() {
         instance = this
         isRunning = true
         executor = Executors.newSingleThreadExecutor()
+        ContainerSessionRegistry.addSessionRemovedListener(sessionRemovedListener)
+        pendingAutoCloseDeadlines.forEach { (uri, deadlineMillis) ->
+            scheduleAutoClose(uri, deadlineMillis)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -142,25 +202,39 @@ class VaultKeepAliveService : Service() {
         if (intent?.action == ACTION_LOCK_ALL) {
             VeLog.i(TAG) { "onStartCommand: ACTION_LOCK_ALL -> locking every active session" }
             lockAllAndMaybeStop()
-        } else if (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations) {
-            VeLog.d(TAG) { "onStartCommand: no active sessions -> stopping service" }
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+        } else {
+            if (intent?.action == ContainerAutoCloseAlarm.ACTION) {
+                val uri = intent.getStringExtra(ContainerAutoCloseAlarm.EXTRA_URI)
+                val deadlineMillis = intent.getLongExtra(ContainerAutoCloseAlarm.EXTRA_DEADLINE, 0L)
+                if (uri != null && deadlineMillis > 0L) {
+                    handleAutoCloseAlarm(uri, deadlineMillis)
+                }
+            }
+            if (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations) {
+                VeLog.d(TAG) { "onStartCommand: no active sessions -> stopping service" }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
         return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        if (ContainerSessionRegistry.hasAnyActiveSessions()) {
-            val nm = getSystemService(NotificationManager::class.java)
-            nm?.notify(NOTIFICATION_ID, buildNotification())
+        val targets = lockOnAppBackgroundUris
+        if (targets.isNotEmpty()) {
+            lockContainersAfterTaskRemoval(targets)
+        } else {
+            refreshNotificationNow()
         }
     }
 
     override fun onBind(intent: Intent?) = null
 
     override fun onDestroy() {
+        autoCloseCallbacks.values.forEach(mainHandler::removeCallbacks)
+        autoCloseCallbacks.clear()
+        ContainerSessionRegistry.removeSessionRemovedListener(sessionRemovedListener)
         if (observingMirrorPush) MirrorPushEvents.removeListener(mirrorPushListener)
         instance = null
         isRunning = false
@@ -174,6 +248,180 @@ class VaultKeepAliveService : Service() {
         executor.shutdown()
         super.onDestroy()
     }
+
+    private fun scheduleAutoClose(uri: String, deadlineMillis: Long) {
+        mainHandler.post {
+            if (pendingAutoCloseDeadlines[uri] != deadlineMillis) return@post
+            cancelAutoCloseOnMain(uri)
+            val fireAt = deadlineMillis + AUTO_CLOSE_FALLBACK_GRACE_MS
+            val callback = Runnable {
+                autoCloseCallbacks.remove(uri)
+                if (pendingAutoCloseDeadlines[uri] != deadlineMillis) return@Runnable
+                attemptAutoClose(uri, deadlineMillis)
+            }
+            autoCloseCallbacks[uri] = callback
+            mainHandler.postDelayed(callback, (fireAt - System.currentTimeMillis()).coerceAtLeast(0L))
+        }
+    }
+
+    private fun rescheduleAutoClose(uri: String, previousDeadlineMillis: Long) {
+        mainHandler.post {
+            if (pendingAutoCloseDeadlines[uri] != previousDeadlineMillis) return@post
+            val retryDeadline = System.currentTimeMillis() + AUTO_CLOSE_RETRY_MS
+            if (pendingAutoCloseDeadlines.replace(uri, previousDeadlineMillis, retryDeadline)) {
+                ContainerAutoCloseAlarm.schedule(applicationContext, uri, retryDeadline)
+                scheduleAutoClose(uri, retryDeadline)
+            }
+        }
+    }
+
+    private fun cancelAutoClose(uri: String) {
+        mainHandler.post {
+            cancelAutoCloseOnMain(uri)
+        }
+    }
+
+    private fun cancelAutoCloseOnMain(uri: String) {
+        autoCloseCallbacks.remove(uri)?.let(mainHandler::removeCallbacks)
+    }
+
+    private fun handleAutoCloseAlarm(uri: String, deadlineMillis: Long) {
+        if (ContainerSessionRegistry.getVolumeIdByUri(uri) == null) {
+            pendingAutoCloseDeadlines.remove(uri, deadlineMillis)
+            ContainerAutoCloseAlarm.cancel(applicationContext, uri)
+            refreshNotification()
+            return
+        }
+        val currentDeadline = pendingAutoCloseDeadlines[uri]
+        if (currentDeadline != null && currentDeadline != deadlineMillis) return
+        if (currentDeadline == null) pendingAutoCloseDeadlines[uri] = deadlineMillis
+        cancelAutoCloseOnMain(uri)
+        attemptAutoClose(uri, deadlineMillis)
+    }
+
+    private fun lockContainersAfterTaskRemoval(uris: Set<String>) {
+        for (uri in uris) {
+            pendingAutoCloseDeadlines.remove(uri)
+            ContainerAutoCloseAlarm.cancel(applicationContext, uri)
+            cancelAutoCloseOnMain(uri)
+        }
+
+        val wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:ImmediateAutoClose")
+            .apply {
+                setReferenceCounted(false)
+                acquire(2 * 60 * 1000L)
+            }
+        try {
+            executor.execute {
+                try {
+                    for (uri in uris) {
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uri) ?: continue
+                        if (ContainerLifecycleCore.lockContainer(applicationContext, uri)) {
+                            VaultForceLockedBridge.reportLocked(volId)
+                        } else {
+                            scheduleImmediateAutoCloseRetry(uri)
+                        }
+                    }
+                } finally {
+                    mainHandler.post {
+                        refreshNotificationNow()
+                        if (wakeLock.isHeld) wakeLock.release()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            if (wakeLock.isHeld) wakeLock.release()
+            VeLog.w(TAG) { "Could not queue immediate auto-lock: ${e.message}" }
+            refreshNotification()
+        }
+    }
+
+    private fun scheduleImmediateAutoCloseRetry(uri: String) {
+        val deadlineMillis = System.currentTimeMillis() + AUTO_CLOSE_RETRY_MS
+        pendingAutoCloseDeadlines[uri] = deadlineMillis
+        ContainerAutoCloseAlarm.schedule(applicationContext, uri, deadlineMillis)
+        scheduleAutoClose(uri, deadlineMillis)
+    }
+
+    private fun attemptAutoClose(uri: String, deadlineMillis: Long) {
+        if (pendingAutoCloseDeadlines[uri] != deadlineMillis) return
+        if (!autoCloseInFlight.add(uri)) return
+        if (shouldPostponeAutoClose(uri)) {
+            autoCloseInFlight.remove(uri)
+            rescheduleAutoClose(uri, deadlineMillis)
+            return
+        }
+
+        val wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:AutoClose")
+            .apply {
+                setReferenceCounted(false)
+                acquire(2 * 60 * 1000L)
+            }
+        var releaseAfterNotification = false
+        try {
+            executor.execute {
+                try {
+                    if (pendingAutoCloseDeadlines[uri] != deadlineMillis) return@execute
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(uri)
+                    if (volId == null) {
+                        pendingAutoCloseDeadlines.remove(uri, deadlineMillis)
+                        ContainerAutoCloseAlarm.cancel(applicationContext, uri)
+                        refreshNotificationBeforeReleasingWakeLock(wakeLock)
+                        releaseAfterNotification = true
+                        return@execute
+                    }
+
+                    val locked = ContainerLifecycleCore.lockContainer(applicationContext, uri)
+                    if (locked) {
+                        pendingAutoCloseDeadlines.remove(uri, deadlineMillis)
+                        ContainerAutoCloseAlarm.cancel(applicationContext, uri)
+                        VaultForceLockedBridge.reportLocked(volId)
+                        refreshNotificationBeforeReleasingWakeLock(wakeLock)
+                        releaseAfterNotification = true
+                    } else {
+                        rescheduleAutoClose(uri, deadlineMillis)
+                    }
+                } finally {
+                    autoCloseInFlight.remove(uri)
+                    if (!releaseAfterNotification && wakeLock.isHeld) wakeLock.release()
+                }
+            }
+        } catch (e: Exception) {
+            autoCloseInFlight.remove(uri)
+            if (wakeLock.isHeld) wakeLock.release()
+            VeLog.w(TAG) { "Could not queue auto-close lock: ${e.message}" }
+            rescheduleAutoClose(uri, deadlineMillis)
+        }
+    }
+
+    private fun refreshNotificationNow() {
+        if (instance !== this || !isRunning) return
+        if (!ContainerSessionRegistry.hasAnyActiveSessions() && !hasActiveOperations) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        } else {
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, buildNotification())
+        }
+    }
+
+    private fun refreshNotificationBeforeReleasingWakeLock(wakeLock: PowerManager.WakeLock) {
+        mainHandler.post {
+            refreshNotificationNow()
+            if (wakeLock.isHeld) wakeLock.release()
+        }
+    }
+
+    private fun shouldPostponeAutoClose(uri: String): Boolean =
+        uri !in lockOnAppBackgroundUris &&
+            (VaultPlaybackSession.snapshot()?.playing == true ||
+                hasActiveOperations ||
+                MirrorPushEvents.snapshot().activeCount > 0 ||
+                VaultCameraRecordingService.isRunning ||
+                (VaultAutomationRecordingService.isRecording &&
+                    VaultAutomationRecordingService.currentVaultUri == uri))
 
     private fun lockAllAndMaybeStop() {
         executor.execute {

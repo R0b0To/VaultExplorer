@@ -14,13 +14,7 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_controller.dart';
 
-enum _UsbUnlockCredentialState {
-  loading,
-  biometric,
-  pattern,
-  pin,
-  password,
-}
+enum _UsbUnlockCredentialState { loading, biometric, pattern, pin, password }
 
 class UsbUnlockSheet extends ConsumerStatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -67,15 +61,14 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
   bool _prefillCleared = false;
 
   UsbUnlockParams get _params => UsbUnlockParams(
-        existingRecord: widget.existingRecord,
-        prefillPassword: widget.prefillPassword,
-        documentProvider: widget.documentProvider,
-        autoMountFolders: widget.autoMountFolders,
-        mountedUris: widget.mountedUris,
-      );
+    existingRecord: widget.existingRecord,
+    prefillPassword: widget.prefillPassword,
+    documentProvider: widget.documentProvider,
+    autoMountFolders: widget.autoMountFolders,
+    mountedUris: widget.mountedUris,
+  );
 
-  bool get _passwordPrefilled =>
-      widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
+  bool get _passwordPrefilled => widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
 
   /// While true, the password field's real characters can't be revealed
   /// via the show/hide toggle or copied via text selection — see
@@ -98,7 +91,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
   }
 
   void _onUnlock() {
-    ref.read(usbUnlockControllerProvider(_params).notifier).unlock(
+    ref
+        .read(usbUnlockControllerProvider(_params).notifier)
+        .unlock(
           passwordText: _passwordCtrl.text,
           pimText: _pimCtrl.text,
           hiddenPasswordText: _hiddenPasswordCtrl.text,
@@ -124,47 +119,36 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(
-      usbUnlockControllerProvider(_params).select((s) => s.mountedSuccess),
-      (prev, next) {
-        if (next != null && mounted) {
-          HapticFeedback.lightImpact();
-          if (next.oldUri != null && next.record != null && widget.onReconnected != null) {
-            widget.onReconnected!(next.container, next.record!, next.oldUri!);
-          } else {
-            widget.onMounted(next.container, record: next.record);
-          }
-          if (widget.openBrowserRoute != null) {
-            Navigator.of(context).pushReplacement(
-              widget.openBrowserRoute!(next.container),
-            );
-          } else {
-            Navigator.pop(context);
-          }
+    ref.listen(usbUnlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) {
+      if (next != null && mounted) {
+        HapticFeedback.lightImpact();
+        if (next.oldUri != null && next.record != null && widget.onReconnected != null) {
+          widget.onReconnected!(next.container, next.record!, next.oldUri!);
+        } else {
+          widget.onMounted(next.container, record: next.record);
         }
-      },
-    );
-   ref.listen(
-      usbUnlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick),
-      (prev, next) {
-        if (mounted) {
-          ref.read(usbUnlockControllerProvider(_params).notifier).tryBiometric(context.l10n);
+        if (widget.openBrowserRoute != null) {
+          Navigator.of(context).pushReplacement(widget.openBrowserRoute!(next.container));
+        } else {
+          Navigator.pop(context);
         }
-      },
-    );
-    ref.listen(
-      usbUnlockControllerProvider(_params).select((s) => s.selected?.deviceName),
-      (prev, next) {
-        if (prev != null && prev != next && widget.existingRecord == null) {
-          _passwordCtrl.clear();
-          _pimCtrl.clear();
-          _hiddenPasswordCtrl.clear();
-          _hiddenPimCtrl.clear();
-          _prefillCleared = false;
-          setState(() {});
-        }
-      },
-    );
+      }
+    });
+    ref.listen(usbUnlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick), (prev, next) {
+      if (mounted) {
+        ref.read(usbUnlockControllerProvider(_params).notifier).tryBiometric(context.l10n);
+      }
+    });
+    ref.listen(usbUnlockControllerProvider(_params).select((s) => s.selected?.deviceName), (prev, next) {
+      if (prev != null && prev != next && widget.existingRecord == null) {
+        _passwordCtrl.clear();
+        _pimCtrl.clear();
+        _hiddenPasswordCtrl.clear();
+        _hiddenPimCtrl.clear();
+        _prefillCleared = false;
+        setState(() {});
+      }
+    });
 
     final state = ref.watch(usbUnlockControllerProvider(_params));
     final cs = context.colors;
@@ -180,7 +164,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         }
       },
       child: Scaffold(
-       appBar: AppBar(
+        appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
@@ -204,10 +188,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(4),
             child: state.loading
-                ? LinearProgressIndicator(
-                    color: cs.primary,
-                    backgroundColor: cs.primaryContainer,
-                  )
+                ? LinearProgressIndicator(color: cs.primary, backgroundColor: cs.primaryContainer)
                 : const SizedBox(height: 4),
           ),
         ),
@@ -230,9 +211,6 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final isPatternOrPin =
-        credState == _UsbUnlockCredentialState.pattern || credState == _UsbUnlockCredentialState.pin;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -241,23 +219,21 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           Expanded(
             flex: 5,
             child: SingleChildScrollView(
-              physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildDevicePickerCard(state, cs, textTheme),
                   const SizedBox(height: 10),
                   ..._buildCredentialSection(context, state, credState, cs, textTheme),
+                  ..._buildQuickUnlockOptionsSection(context, state, credState, cs, textTheme),
                   ..._buildPrimaryActionSection(context, state, credState, cs, textTheme),
                 ],
               ),
             ),
           ),
           const SizedBox(width: 28),
-          Expanded(
-            flex: 6,
-            child: _buildRightPane(context, state, credState, cs, textTheme),
-          ),
+          Expanded(flex: 6, child: _buildRightPane(context, state, credState, cs, textTheme)),
         ],
       ),
     );
@@ -270,11 +246,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final isPatternOrPin =
-        credState == _UsbUnlockCredentialState.pattern || credState == _UsbUnlockCredentialState.pin;
-
     return SingleChildScrollView(
-      physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -282,6 +255,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           _buildDevicePickerCard(state, cs, textTheme),
           const SizedBox(height: 10),
           ..._buildCredentialSection(context, state, credState, cs, textTheme),
+          ..._buildQuickUnlockOptionsSection(context, state, credState, cs, textTheme),
           ..._buildPrimaryActionSection(context, state, credState, cs, textTheme),
           const SizedBox(height: 16),
         ],
@@ -306,9 +280,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             fit: BoxFit.scaleDown,
             child: PatternLockView(
               key: ValueKey(state.patternResetKey),
-              onPatternComplete: (p) => ref
-                  .read(usbUnlockControllerProvider(_params).notifier)
-                  .onPatternComplete(p, context.l10n),
+              onPatternComplete: (p) =>
+                  ref.read(usbUnlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
               showError: state.patternError,
             ),
           ),
@@ -320,9 +293,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             fit: BoxFit.scaleDown,
             child: PinLockView(
               key: ValueKey(state.pinResetKey),
-              onPinComplete: (p) => ref
-                  .read(usbUnlockControllerProvider(_params).notifier)
-                  .onPinComplete(p, context.l10n),
+              onPinComplete: (p) =>
+                  ref.read(usbUnlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
               showError: state.pinError,
             ),
           ),
@@ -332,19 +304,16 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         return Center(
           child: Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer.withValues(alpha: 0.4),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: cs.primaryContainer.withValues(alpha: 0.4), shape: BoxShape.circle),
             child: Icon(Icons.fingerprint_rounded, size: 56, color: cs.primary),
           ),
         );
 
-    case _UsbUnlockCredentialState.password:
+      case _UsbUnlockCredentialState.password:
       default:
-        final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
-        final isKnownLuksOrBitlocker = widget.existingRecord != null && (format.isLuks || format == ContainerFormat.bitlocker);
-        if (!state.hasAdvancedSettings || isKnownLuksOrBitlocker) return const SizedBox.shrink();
+        if (state.selected == null || state.loadingDevices || state.requestingPermission) {
+          return const SizedBox.shrink();
+        }
         final hasSelection = state.selected != null;
         final canConfigure = hasSelection && !state.loading;
         return SingleChildScrollView(
@@ -354,9 +323,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 200),
                 opacity: canConfigure ? 1.0 : 0.45,
-                child: SectionCard(
-                  children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
-                ),
+                child: SectionCard(children: _buildAdvancedOptionsSection(context, state, cs, textTheme)),
               ),
             ],
           ),
@@ -366,7 +333,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
 
   Widget _buildDevicePickerCard(UsbUnlockState state, ColorScheme cs, TextTheme textTheme) {
     if (state.loadingDevices) {
-      return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+      return const Center(
+        child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()),
+      );
     }
     if (state.devices.isEmpty) {
       return SectionCard(
@@ -396,17 +365,10 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ...state.devices.map((d) {
             final isSelected = state.selected?.deviceName == d.deviceName;
             return ListTile(
-              leading: Icon(
-                Icons.usb_rounded,
-                color: isSelected ? cs.primary : cs.onSurfaceVariant,
-              ),
+              leading: Icon(Icons.usb_rounded, color: isSelected ? cs.primary : cs.onSurfaceVariant),
               title: Text(d.productName),
-              trailing: Radio<UsbDeviceInfo>(
-                value: d,
-              ),
-              onTap: () => ref
-                  .read(usbUnlockControllerProvider(_params).notifier)
-                  .selectDevice(d),
+              trailing: Radio<UsbDeviceInfo>(value: d),
+              onTap: () => ref.read(usbUnlockControllerProvider(_params).notifier).selectDevice(d),
             );
           }),
         ],
@@ -462,9 +424,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => ref
-                                .read(usbUnlockControllerProvider(_params).notifier)
-                                .setShowPasswordFallback(true),
+                            onPressed: () =>
+                                ref.read(usbUnlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                             child: Text(context.l10n.usePasswordButtonLabel),
                           ),
                         ),
@@ -508,9 +469,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                     ],
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () => ref
-                          .read(usbUnlockControllerProvider(_params).notifier)
-                          .setShowPasswordFallback(true),
+                      onPressed: () =>
+                          ref.read(usbUnlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                       child: Text(context.l10n.usePasswordInsteadButtonLabel),
                     ),
                   ],
@@ -543,9 +503,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                     ],
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () => ref
-                          .read(usbUnlockControllerProvider(_params).notifier)
-                          .setShowPasswordFallback(true),
+                      onPressed: () =>
+                          ref.read(usbUnlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                       child: Text(context.l10n.usePasswordInsteadButtonLabel),
                     ),
                   ],
@@ -555,14 +514,13 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ),
         ];
 
-     case _UsbUnlockCredentialState.password:
+      case _UsbUnlockCredentialState.password:
         final isUnlock = widget.existingRecord != null;
         final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
         final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
         final isKnownLuks = isUnlock && format.isLuks;
         final isKnownBitlocker = isUnlock && format == ContainerFormat.bitlocker;
         final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
-        final hasAdvanced = (!isKnownLuks && !isKnownBitlocker) && state.hasAdvancedSettings;
         final isWide = context.screen.useWideLayout;
         final hasSelection = state.selected != null;
         final canConfigure = hasSelection && !state.loading;
@@ -572,139 +530,219 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             duration: const Duration(milliseconds: 200),
             opacity: canConfigure ? 1.0 : 0.45,
             child: SectionCard(
-            children: [
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TextField(
+                    controller: _passwordCtrl,
+                    enabled: canConfigure,
+                    obscureText: _revealLocked ? true : _obscure,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    enableIMEPersonalizedLearning: false,
+                    enableInteractiveSelection: !_revealLocked && canConfigure,
+                    autofocus: widget.existingRecord != null && widget.prefillPassword?.isEmpty != false,
+                    onChanged: (val) {
+                      if (val.isEmpty) _prefillCleared = true;
+                      setState(() {});
+                    },
+                    onSubmitted: (_) => _onUnlock(),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: cs.surfaceContainerHighest,
+                      labelText: context.l10n.passwordFieldLabel,
+                      hintText: isKnownBitlocker
+                          ? context.l10n.passwordHintBitlocker
+                          : context.l10n.passwordHintContainer,
+                      prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_passwordPrefilled)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Tooltip(
+                                message: context.l10n.usingSavedPasswordTooltip,
+                                child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
+                              ),
+                            ),
+                          PasswordVisibilityToggle(
+                            obscured: _revealLocked ? true : _obscure,
+                            enabled: !_revealLocked && canConfigure,
+                            onToggle: () => setState(() => _obscure = !_obscure),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (isKnownVeraCrypt) ...[
+                  PimInputField(controller: _pimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
+                ],
+                if (hasDirectOptions) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: KeyfilesPicker(
+                      keyfiles: state.keyfiles,
+                      picking: state.pickingKeyfiles,
+                      enabled: canConfigure,
+                      onPick: () => ref.read(usbUnlockControllerProvider(_params).notifier).pickKeyfiles(),
+                      onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
+                    ),
+                  ),
+                  if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                      child: Text(
+                        context.l10n.luksKeyfileReplacesPasswordNote,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
+                ],
+                if (hasSelection && !isWide) ...[
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      enabled: canConfigure,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                      leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+                      title: Text(
+                        context.l10n.advancedOptionsTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
+                    ),
+                  ),
+                ],
+                if (widget.existingRecord == null) ...[
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    value: state.remember,
+                    onChanged: canConfigure
+                        ? (val) {
+                            ref.read(usbUnlockControllerProvider(_params).notifier).setRemember(val);
+                          }
+                        : null,
+                    title: Text(context.l10n.rememberContainerLabel),
+                    subtitle: Text(
+                      context.l10n.rememberContainerSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ];
+    }
+  }
+
+  List<Widget> _buildQuickUnlockOptionsSection(
+    BuildContext context,
+    UsbUnlockState state,
+    _UsbUnlockCredentialState credState,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    if (credState == _UsbUnlockCredentialState.password ||
+        credState == _UsbUnlockCredentialState.loading ||
+        state.selected == null ||
+        state.loadingDevices ||
+        state.requestingPermission) {
+      return const [];
+    }
+
+    final canConfigure = !state.loading && !state.loadingAuth && !state.isAuthenticating;
+    final notifier = ref.read(usbUnlockControllerProvider(_params).notifier);
+    final supportsHiddenVolumeProtection = !state.isLuks && !state.isBitlocker;
+
+    return [
+      const SizedBox(height: 10),
+      SectionCard(
+        children: [
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            value: state.readOnly,
+            onChanged: canConfigure ? notifier.setReadOnly : null,
+            title: Text(context.l10n.readOnlyModeLabel),
+            subtitle: Text(
+              context.l10n.readOnlyModeContainerSubtitle,
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
+          ),
+          if (supportsHiddenVolumeProtection) ...[
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              value: state.protectHiddenVolume && !state.readOnly,
+              onChanged: canConfigure && !state.readOnly ? notifier.setProtectHiddenVolume : null,
+              title: Text(context.l10n.protectHiddenVolumeToggleTitle),
+              subtitle: Text(
+                state.readOnly
+                    ? context.l10n.readOnlyModeContainerSubtitle
+                    : context.l10n.protectHiddenVolumeToggleSubtitle,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
+            ),
+            if (state.protectHiddenVolume && !state.readOnly) ...[
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
-                  controller: _passwordCtrl,
-                  enabled: canConfigure,
-                  obscureText: _revealLocked ? true : _obscure,
+                  controller: _hiddenPasswordCtrl,
+                  obscureText: _hiddenObscure,
                   autocorrect: false,
                   enableSuggestions: false,
                   enableIMEPersonalizedLearning: false,
-                  enableInteractiveSelection: !_revealLocked && canConfigure,
-                  autofocus: widget.existingRecord != null && widget.prefillPassword?.isEmpty != false,
-                  onChanged: (val) {
-                    if (val.isEmpty) _prefillCleared = true;
-                    setState(() {});
-                  },
-                  onSubmitted: (_) => _onUnlock(),
+                  enabled: canConfigure,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: cs.surfaceContainerHighest,
-                    labelText: context.l10n.passwordFieldLabel,
-                    hintText: isKnownBitlocker
-                        ? context.l10n.passwordHintBitlocker
-                        : context.l10n.passwordHintContainer,
-                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_passwordPrefilled)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Tooltip(
-                              message: context.l10n.usingSavedPasswordTooltip,
-                              child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
-                            ),
-                          ),
-                        PasswordVisibilityToggle(
-                          obscured: _revealLocked ? true : _obscure,
-                          enabled: !_revealLocked && canConfigure,
-                          onToggle: () => setState(() => _obscure = !_obscure),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
+                    labelText: context.l10n.hiddenPasswordLabel,
+                    prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.standard, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _hiddenObscure,
+                      enabled: canConfigure,
+                      onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
                     ),
                   ),
                 ),
               ),
-              if (isKnownVeraCrypt) ...[
-                PimInputField(
-                  controller: _pimCtrl,
+              PimInputField(controller: _hiddenPimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1),
+                child: KeyfilesPicker(
+                  keyfiles: state.hiddenKeyfiles,
+                  picking: state.pickingHiddenKeyfiles,
                   enabled: canConfigure,
-                  onSubmitted: (_) => _onUnlock(),
+                  onPick: () => notifier.pickHiddenKeyfiles(),
+                  onRemove: notifier.removeHiddenKeyfile,
                 ),
-              ],
-            if (hasDirectOptions) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 1),
-                  child: KeyfilesPicker(
-                    keyfiles: state.keyfiles,
-                    picking: state.pickingKeyfiles,
-                    enabled: canConfigure,
-                    onPick: () => ref.read(usbUnlockControllerProvider(_params).notifier).pickKeyfiles(),
-                    onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
-                  ),
-                ),
-                if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                    child: Text(
-                      context.l10n.luksKeyfileReplacesPasswordNote,
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ],
-              if (!hasAdvanced) ...[
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  value: state.readOnly,
-                  onChanged: canConfigure
-                      ? (val) {
-                          ref.read(usbUnlockControllerProvider(_params).notifier).setReadOnly(val);
-                        }
-                      : null,
-                  title: Text(context.l10n.readOnlyModeLabel),
-                  secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
-                ),
-              ],
-              if (hasAdvanced && !isWide) ...[
-                Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    enabled: canConfigure,
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-                    leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-                    title: Text(
-                      context.l10n.advancedOptionsTitle,
-                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
-                  ),
-                ),
-              ],
-             if (widget.existingRecord == null) ...[
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  value: state.remember,
-                  onChanged: canConfigure
-                      ? (val) {
-                          ref.read(usbUnlockControllerProvider(_params).notifier).setRemember(val);
-                        }
-                      : null,
-                  title: Text(context.l10n.rememberContainerLabel),
-                  subtitle: Text(
-                    context.l10n.rememberContainerSubtitle,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
-                ),
-              ],
+              ),
+              AdvancedParamsPanel(
+                collapsible: false,
+                cipherId: state.hiddenCipherId,
+                hashId: state.hiddenHashId,
+                enabled: canConfigure,
+                onCipherChanged: notifier.setHiddenCipherId,
+                onHashChanged: notifier.setHiddenHashId,
+              ),
             ],
-          ),
-        ),
-      ];
-    }
+          ],
+        ],
+      ),
+    ];
   }
 
- List<Widget> _buildAdvancedOptionsSection(
+  List<Widget> _buildAdvancedOptionsSection(
     BuildContext context,
     UsbUnlockState state,
     ColorScheme cs,
     TextTheme textTheme,
- ) {
+  ) {
     final isUnlock = widget.existingRecord != null;
     final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
     final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
@@ -715,12 +753,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     final canConfigure = hasSelection && !state.loading;
 
     return [
-     if (!hasDirectOptions && !isKnownBitlocker) ...[
-        PimInputField(
-          controller: _pimCtrl,
-          enabled: canConfigure,
-          onSubmitted: (_) => _onUnlock(),
-        ),
+      if (!hasDirectOptions && !isKnownBitlocker) ...[
+        PimInputField(controller: _pimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
           child: KeyfilesPicker(
@@ -799,11 +833,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             ),
           ),
         ),
-       PimInputField(
-          controller: _hiddenPimCtrl,
-          enabled: canConfigure,
-          onSubmitted: (_) => _onUnlock(),
-        ),
+        PimInputField(controller: _hiddenPimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
           child: KeyfilesPicker(
@@ -857,10 +887,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     final isButtonEnabled = state.selected != null;
 
     return [
-      if (state.error != null) ...[
-        const SizedBox(height: 10),
-        InlineErrorBanner(state.error!),
-      ],
+      if (state.error != null) ...[const SizedBox(height: 10), InlineErrorBanner(state.error!)],
       const SizedBox(height: 10),
       if (state.loading) ...[
         Padding(
@@ -884,20 +911,14 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
       ],
       FilledButton(
         onPressed: state.loading ? null : (isButtonEnabled ? _onUnlock : null),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(50),
-          shape: const StadiumBorder(),
-        ),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: const StadiumBorder()),
         child: state.loading
             ? const SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
               )
-            : Text(
-                context.l10n.unlockDriveButton,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
+            : Text(context.l10n.unlockDriveButton, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       ),
       if (state.loading) ...[
         const SizedBox(height: 4),

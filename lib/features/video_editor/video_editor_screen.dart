@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_video_edit_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -56,9 +58,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   static const String _tag = 'VideoEditorScreen';
 
   NativeVideoController? _player;
+  late final VaultEngineEvents _events;
+  late final VaultFileIoApi _fileIoApi;
   VideoEditorController? _editor;
   VideoProbe? _probe;
   String? _loadError;
+  bool _containerLocked = false;
 
   /// Filmstrip thumbnails loaded across the timeline.
   List<FilmstripEntry>? _filmstripFrames;
@@ -99,12 +104,18 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   @override
   void initState() {
     super.initState();
+    _events = ref.read(vaultEngineEventsProvider);
+    _events.addContainerLockedListener(_onContainerLocked);
+    _fileIoApi = ref.read(vaultFileIoApiProvider);
+    unawaited(_fileIoApi.setKeepScreenOn(true));
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    _events.removeContainerLockedListener(_onContainerLocked);
+    unawaited(_fileIoApi.setKeepScreenOn(false));
     WidgetsBinding.instance.removeObserver(this);
     _clearToast();
     unawaited(_shutdownPlayer());
@@ -112,6 +123,21 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     _editor?.dispose();
     _playhead.dispose();
     super.dispose();
+  }
+
+  void _onContainerLocked(int volId) {
+    if (!mounted || volId != widget.container.volId || _containerLocked) {
+      return;
+    }
+    setState(() => _containerLocked = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((candidate) => candidate == route);
+      if (route.isActive) navigator.removeRoute(route);
+    });
   }
 
   void _disposeFilmstrip() {
@@ -285,16 +311,23 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
           if (us >= r.endUs - 80000) {
             _skippingGap = true;
             if (i < ranges.length - 1) {
-              unawaited(_seekToUs(ranges[i + 1].startUs).then((_) {
-                _skippingGap = false;
-              }));
+              unawaited(
+                _seekToUs(ranges[i + 1].startUs).then((_) {
+                  _skippingGap = false;
+                }),
+              );
             } else {
               // Reached end of last segment: pause and park at start of first segment
-              unawaited(player.pause().then((_) {
-                return _seekToUs(ranges.first.startUs);
-              }).then((_) {
-                _skippingGap = false;
-              }));
+              unawaited(
+                player
+                    .pause()
+                    .then((_) {
+                      return _seekToUs(ranges.first.startUs);
+                    })
+                    .then((_) {
+                      _skippingGap = false;
+                    }),
+              );
             }
           }
           break;
@@ -305,15 +338,22 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         _skippingGap = true;
         final next = ranges.where((r) => r.startUs > us).firstOrNull;
         if (next != null) {
-          unawaited(_seekToUs(next.startUs).then((_) {
-            _skippingGap = false;
-          }));
+          unawaited(
+            _seekToUs(next.startUs).then((_) {
+              _skippingGap = false;
+            }),
+          );
         } else {
-          unawaited(player.pause().then((_) {
-            return _seekToUs(ranges.first.startUs);
-          }).then((_) {
-            _skippingGap = false;
-          }));
+          unawaited(
+            player
+                .pause()
+                .then((_) {
+                  return _seekToUs(ranges.first.startUs);
+                })
+                .then((_) {
+                  _skippingGap = false;
+                }),
+          );
         }
       }
     }
@@ -386,9 +426,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       final ranges = editor.snappedRanges;
       if (ranges.isNotEmpty) {
         final cur = _playhead.value;
-        final inside = ranges.any((r) => cur >= r.startUs && cur < r.endUs - 80000);
+        final inside = ranges.any(
+          (r) => cur >= r.startUs && cur < r.endUs - 80000,
+        );
         if (!inside) {
-          final next = ranges.where((r) => r.startUs >= cur).firstOrNull ?? ranges.first;
+          final next =
+              ranges.where((r) => r.startUs >= cur).firstOrNull ?? ranges.first;
           await _seekToUs(next.startUs);
         }
       }
@@ -622,8 +665,6 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     required int outputCount,
   }) async {
     final api = ref.read(vaultVideoEditApiProvider);
-    final events = ref.read(vaultEngineEventsProvider);
-    final fileIo = ref.read(vaultFileIoApiProvider);
     final lockController = ref.read(sessionLockControllerProvider);
     final l10n = context.l10n;
     final navigator = Navigator.of(context, rootNavigator: true);
@@ -634,7 +675,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       if (e.opId == opId) progress.value = e;
     }
 
-    events.addVideoEditProgressListener(onProgress);
+    _events.addVideoEditProgressListener(onProgress);
     setState(() => _exporting = true);
 
     unawaited(
@@ -654,7 +695,6 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
 
     VideoExportResult? result;
     VideoEditException? failure;
-    await fileIo.setKeepScreenOn(true);
     try {
       await lockController.withLockSuppression(() async {
         result = await api.export(
@@ -673,8 +713,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       VeLog.w(_tag, 'Export failed unexpectedly', e);
       failure = VideoEditException('EXPORT_FAILED', e.toString());
     } finally {
-      await fileIo.setKeepScreenOn(false);
-      events.removeVideoEditProgressListener(onProgress);
+      _events.removeVideoEditProgressListener(onProgress);
     }
 
     if (navigator.mounted) navigator.pop(); // close progress dialog
@@ -708,6 +747,9 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_containerLocked) {
+      return const ColoredBox(color: Colors.black, child: SizedBox.expand());
+    }
     final l10n = context.l10n;
     final editor = _editor;
 
@@ -834,7 +876,8 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   Widget _buildPreview(NativeVideoController player) {
     final editor = _editor;
     final totalDuration = Duration(microseconds: editor?.durationUs ?? 0);
-    final canSeek = editor != null &&
+    final canSeek =
+        editor != null &&
         player.value.isInitialized &&
         !_exporting &&
         totalDuration > Duration.zero;
@@ -1018,7 +1061,8 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                     ],
                   ),
                 ),
-              ),const SizedBox(width: 4),
+              ),
+              const SizedBox(width: 4),
               ActionChip(
                 avatar: const Icon(Icons.layers_rounded, size: 18),
                 label: Text('${segments.length}'),
@@ -1103,8 +1147,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                   style: IconButton.styleFrom(
                     minimumSize: const Size(52, 52),
                     padding: EdgeInsets.zero,
-                    backgroundColor: _previewResult ? cs.primaryContainer : null,
-                    foregroundColor: _previewResult ? cs.onPrimaryContainer : null,
+                    backgroundColor: _previewResult
+                        ? cs.primaryContainer
+                        : null,
+                    foregroundColor: _previewResult
+                        ? cs.onPrimaryContainer
+                        : null,
                   ),
                   iconSize: 28,
                   tooltip: l10n.videoEditorPreviewCut,

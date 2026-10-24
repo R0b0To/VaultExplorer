@@ -16,12 +16,7 @@ const List<Color> editorColorPalette = [
   Color(0xFF000000), // Black
 ];
 
-const List<double> editorStrokeWidthFractions = [
-  0.005,
-  0.010,
-  0.020,
-  0.035,
-];
+const List<double> editorStrokeWidthFractions = [0.005, 0.010, 0.020, 0.035];
 
 class AnnotationLayer extends StatefulWidget {
   final Size imageSize;
@@ -30,7 +25,8 @@ class AnnotationLayer extends StatefulWidget {
   final Color color;
   final double strokeWidthFraction;
   final ValueChanged<EditAnnotation> onAnnotationAdded;
-  final void Function(int index, EditAnnotation annotation)? onAnnotationUpdated;
+  final void Function(int index, EditAnnotation annotation)?
+  onAnnotationUpdated;
   final void Function(int index)? onAnnotationRemoved;
   final ValueChanged<Offset> onTextTapped;
 
@@ -59,14 +55,10 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
   // Freehand drawing state
   final List<Offset> _currentDrawingPoints = [];
 
-  // Redaction box state
-  Offset? _redactStartNormalized;
-  Offset? _redactCurrentNormalized;
-
   Offset _toNormalized(Offset local) => Offset(
-        (local.dx / widget.imageSize.width).clamp(0.0, 1.0),
-        (local.dy / widget.imageSize.height).clamp(0.0, 1.0),
-      );
+    (local.dx / widget.imageSize.width).clamp(0.0, 1.0),
+    (local.dy / widget.imageSize.height).clamp(0.0, 1.0),
+  );
 
   int? _hitTest(Offset normalized) {
     for (int i = widget.annotations.length - 1; i >= 0; i--) {
@@ -81,8 +73,11 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     final norm = _toNormalized(details.localPosition);
     final hit = _hitTest(norm);
 
-    // 1. IN REDACT TOOL: Touching an existing redact box grabs and moves it
-    if (widget.activeTool == EditorTool.redact && hit != null && widget.annotations[hit] is RedactAnnotation) {
+    // 1. IN REDACT TOOL: Touching an existing redaction grabs and moves it.
+    if (widget.activeTool == EditorTool.redact &&
+        hit != null &&
+        (widget.annotations[hit] is RedactAnnotation ||
+            widget.annotations[hit] is RedactStrokeAnnotation)) {
       setState(() {
         _selectedAnnotationIndex = hit;
         _isDraggingAnnotation = true;
@@ -92,7 +87,9 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     }
 
     // 2. IN TEXT TOOL: Touching existing text grabs and moves it
-    if (widget.activeTool == EditorTool.text && hit != null && widget.annotations[hit] is TextMarkAnnotation) {
+    if (widget.activeTool == EditorTool.text &&
+        hit != null &&
+        widget.annotations[hit] is TextMarkAnnotation) {
       setState(() {
         _selectedAnnotationIndex = hit;
         _isDraggingAnnotation = true;
@@ -116,8 +113,10 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
       setState(() => _selectedAnnotationIndex = null);
     }
 
-    // 4. DRAW TOOL: Always draws freely, even over redact boxes
-    if (widget.activeTool == EditorTool.draw) {
+    // 4. DRAW AND REDACT TOOLS both use a freehand stroke. Redaction is
+    // rendered as an opaque overlay, using the same brush width controls.
+    if (widget.activeTool == EditorTool.draw ||
+        widget.activeTool == EditorTool.redact) {
       setState(() {
         _currentDrawingPoints
           ..clear()
@@ -125,28 +124,14 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
       });
       return;
     }
-
-    // 5. REDACT TOOL: Dragging on empty space creates a new redact box
-    if (widget.activeTool == EditorTool.redact) {
-      setState(() {
-        _redactStartNormalized = norm;
-        _redactCurrentNormalized = norm;
-      });
-      return;
-    }
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (widget.activeTool == EditorTool.draw) {
+    if ((widget.activeTool == EditorTool.draw ||
+            widget.activeTool == EditorTool.redact) &&
+        !_isDraggingAnnotation) {
       setState(() {
         _currentDrawingPoints.add(_toNormalized(details.localPosition));
-      });
-      return;
-    }
-
-    if (widget.activeTool == EditorTool.redact && _redactStartNormalized != null) {
-      setState(() {
-        _redactCurrentNormalized = _toNormalized(details.localPosition);
       });
       return;
     }
@@ -155,8 +140,10 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
         _selectedAnnotationIndex != null &&
         _lastLocalPoint != null) {
       final delta = Offset(
-        (details.localPosition.dx - _lastLocalPoint!.dx) / widget.imageSize.width,
-        (details.localPosition.dy - _lastLocalPoint!.dy) / widget.imageSize.height,
+        (details.localPosition.dx - _lastLocalPoint!.dx) /
+            widget.imageSize.width,
+        (details.localPosition.dy - _lastLocalPoint!.dy) /
+            widget.imageSize.height,
       );
       _lastLocalPoint = details.localPosition;
 
@@ -166,32 +153,30 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     }
   }
 
-void _onPanEnd(DragEndDetails details) {
-    if (widget.activeTool == EditorTool.draw && _currentDrawingPoints.isNotEmpty) {
-      widget.onAnnotationAdded(
-        DrawingAnnotation(
-          points: List<Offset>.from(_currentDrawingPoints),
-          color: widget.color,
-          strokeWidthFraction: widget.strokeWidthFraction,
-        ),
-      );
-      setState(() => _currentDrawingPoints.clear());
-      return;
-    }
-
-    if (widget.activeTool == EditorTool.redact &&
-        _redactStartNormalized != null &&
-        _redactCurrentNormalized != null) {
-      final rect = Rect.fromPoints(_redactStartNormalized!, _redactCurrentNormalized!);
-      if (rect.width > 0.01 && rect.height > 0.01) {
+  void _onPanEnd(DragEndDetails details) {
+    if (!_isDraggingAnnotation &&
+        (widget.activeTool == EditorTool.draw ||
+            widget.activeTool == EditorTool.redact) &&
+        _currentDrawingPoints.isNotEmpty) {
+      final points = List<Offset>.from(_currentDrawingPoints);
+      if (widget.activeTool == EditorTool.redact) {
         widget.onAnnotationAdded(
-          RedactAnnotation(rect: rect, color: widget.color),
+          RedactStrokeAnnotation(
+            points: points,
+            color: widget.color.withValues(alpha: 1),
+            strokeWidthFraction: widget.strokeWidthFraction,
+          ),
+        );
+      } else {
+        widget.onAnnotationAdded(
+          DrawingAnnotation(
+            points: points,
+            color: widget.color,
+            strokeWidthFraction: widget.strokeWidthFraction,
+          ),
         );
       }
-      setState(() {
-        _redactStartNormalized = null;
-        _redactCurrentNormalized = null;
-      });
+      setState(() => _currentDrawingPoints.clear());
       return;
     }
 
@@ -206,8 +191,6 @@ void _onPanEnd(DragEndDetails details) {
   void _onPanCancel() {
     setState(() {
       _currentDrawingPoints.clear();
-      _redactStartNormalized = null;
-      _redactCurrentNormalized = null;
       _isDraggingAnnotation = false;
       _lastLocalPoint = null;
     });
@@ -224,8 +207,6 @@ void _onPanEnd(DragEndDetails details) {
         _isDraggingAnnotation = true;
         _lastLocalPoint = details.localPosition;
         _currentDrawingPoints.clear();
-        _redactStartNormalized = null;
-        _redactCurrentNormalized = null;
       });
     }
   }
@@ -235,8 +216,10 @@ void _onPanEnd(DragEndDetails details) {
         _selectedAnnotationIndex != null &&
         _lastLocalPoint != null) {
       final delta = Offset(
-        (details.localPosition.dx - _lastLocalPoint!.dx) / widget.imageSize.width,
-        (details.localPosition.dy - _lastLocalPoint!.dy) / widget.imageSize.height,
+        (details.localPosition.dx - _lastLocalPoint!.dx) /
+            widget.imageSize.width,
+        (details.localPosition.dy - _lastLocalPoint!.dy) /
+            widget.imageSize.height,
       );
       _lastLocalPoint = details.localPosition;
 
@@ -264,6 +247,17 @@ void _onPanEnd(DragEndDetails details) {
         DrawingAnnotation(
           points: [norm],
           color: widget.color,
+          strokeWidthFraction: widget.strokeWidthFraction,
+        ),
+      );
+      return;
+    }
+
+    if (widget.activeTool == EditorTool.redact) {
+      widget.onAnnotationAdded(
+        RedactStrokeAnnotation(
+          points: [norm],
+          color: widget.color.withValues(alpha: 1),
           strokeWidthFraction: widget.strokeWidthFraction,
         ),
       );
@@ -303,9 +297,6 @@ void _onPanEnd(DragEndDetails details) {
           annotations: widget.annotations,
           selectedIndex: _selectedAnnotationIndex,
           liveDrawing: _currentDrawingPoints,
-          liveRedact: (_redactStartNormalized != null && _redactCurrentNormalized != null)
-              ? Rect.fromPoints(_redactStartNormalized!, _redactCurrentNormalized!)
-              : null,
           liveColor: widget.color,
           strokeWidthFraction: widget.strokeWidthFraction,
         ),
@@ -318,7 +309,6 @@ class _AnnotationPainter extends CustomPainter {
   final List<EditAnnotation> annotations;
   final int? selectedIndex;
   final List<Offset> liveDrawing;
-  final Rect? liveRedact;
   final Color liveColor;
   final double strokeWidthFraction;
 
@@ -326,7 +316,6 @@ class _AnnotationPainter extends CustomPainter {
     required this.annotations,
     this.selectedIndex,
     required this.liveDrawing,
-    this.liveRedact,
     required this.liveColor,
     required this.strokeWidthFraction,
   });
@@ -369,29 +358,32 @@ class _AnnotationPainter extends CustomPainter {
         ..style = PaintingStyle.stroke;
 
       if (liveDrawing.length == 1) {
-        final p = Offset(liveDrawing.first.dx * size.width, liveDrawing.first.dy * size.height);
-        canvas.drawCircle(p, strokeWidth / 2, paint..style = PaintingStyle.fill);
+        final p = Offset(
+          liveDrawing.first.dx * size.width,
+          liveDrawing.first.dy * size.height,
+        );
+        canvas.drawCircle(
+          p,
+          strokeWidth / 2,
+          paint..style = PaintingStyle.fill,
+        );
       } else {
         final path = Path();
-        final first = Offset(liveDrawing.first.dx * size.width, liveDrawing.first.dy * size.height);
+        final first = Offset(
+          liveDrawing.first.dx * size.width,
+          liveDrawing.first.dy * size.height,
+        );
         path.moveTo(first.dx, first.dy);
 
         for (int i = 1; i < liveDrawing.length; i++) {
-          final pt = Offset(liveDrawing[i].dx * size.width, liveDrawing[i].dy * size.height);
+          final pt = Offset(
+            liveDrawing[i].dx * size.width,
+            liveDrawing[i].dy * size.height,
+          );
           path.lineTo(pt.dx, pt.dy);
         }
         canvas.drawPath(path, paint);
       }
-    }
-
-    if (liveRedact != null) {
-      final pixelRect = Rect.fromLTRB(
-        liveRedact!.left * size.width,
-        liveRedact!.top * size.height,
-        liveRedact!.right * size.width,
-        liveRedact!.bottom * size.height,
-      );
-      canvas.drawRect(pixelRect, Paint()..color = liveColor);
     }
   }
 

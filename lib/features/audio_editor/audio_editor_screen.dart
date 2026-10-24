@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_audio_edit_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
@@ -66,11 +67,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
   late final VaultAudioEditApi _api;
   late final VaultEngineEvents _events;
+  late final VaultFileIoApi _fileIoApi;
 
   NativeVideoController? _player;
   AudioEditorController? _editor;
   AudioProbe? _probe;
   String? _loadError;
+  bool _containerLocked = false;
 
   AudioWaveform? _waveform;
 
@@ -105,8 +108,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
   /// Path the native side reads from: real and absolute for local storage,
   /// container-relative for a vault (same rule the media viewer follows).
-  String get _nativePath =>
-      _isLocal ? p.join(widget.container.uri, widget.filePath) : widget.filePath;
+  String get _nativePath => _isLocal
+      ? p.join(widget.container.uri, widget.filePath)
+      : widget.filePath;
 
   String get _fileName => widget.filePath.split('/').last;
 
@@ -119,21 +123,43 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     super.initState();
     _api = ref.read(vaultAudioEditApiProvider);
     _events = ref.read(vaultEngineEventsProvider);
+    _events.addContainerLockedListener(_onContainerLocked);
+    _fileIoApi = ref.read(vaultFileIoApiProvider);
+    unawaited(_fileIoApi.setKeepScreenOn(true));
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    _events.removeContainerLockedListener(_onContainerLocked);
+    unawaited(_fileIoApi.setKeepScreenOn(false));
     WidgetsBinding.instance.removeObserver(this);
     _clearToast();
     final waveOp = _waveOpId;
-    if (waveOp != null) unawaited(_api.cancel(waveOp)); // stop decoding for nobody
+    if (waveOp != null) {
+      unawaited(_api.cancel(waveOp)); // stop decoding for nobody
+    }
     unawaited(_shutdownPlayer());
     _editor?.dispose();
     _playhead.dispose();
     _waveProgress.dispose();
     super.dispose();
+  }
+
+  void _onContainerLocked(int volId) {
+    if (!mounted || volId != widget.container.volId || _containerLocked) {
+      return;
+    }
+    setState(() => _containerLocked = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((candidate) => candidate == route);
+      if (route.isActive) navigator.removeRoute(route);
+    });
   }
 
   /// Releases the native player and clears the playback-active flag.
@@ -324,12 +350,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           );
         } else {
           unawaited(
-            player
-                .pause()
-                .then((_) => _seekToUs(ranges.first.startUs))
-                .then((_) {
-                  _skippingGap = false;
-                }),
+            player.pause().then((_) => _seekToUs(ranges.first.startUs)).then((
+              _,
+            ) {
+              _skippingGap = false;
+            }),
           );
         }
       }
@@ -408,7 +433,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
         );
         if (!inside) {
           final later = ranges.where((r) => r.startUs >= cur);
-          await _seekToUs(later.isNotEmpty ? later.first.startUs : ranges.first.startUs);
+          await _seekToUs(
+            later.isNotEmpty ? later.first.startUs : ranges.first.startUs,
+          );
         }
       }
     } else if (_playhead.value >= editor.durationUs - 200000) {
@@ -669,7 +696,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     } else {
       // The original is about to go, so only the other files can clash.
       final others = {...existingLowercase}..remove(_fileName.toLowerCase());
-      targetName = FileOperationService.makeUniqueName('$stem.$extension', others);
+      targetName = FileOperationService.makeUniqueName(
+        '$stem.$extension',
+        others,
+      );
     }
 
     try {
@@ -691,7 +721,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     required int outputCount,
     int? compressBitratePerChannel,
   }) async {
-    final fileIo = ref.read(vaultFileIoApiProvider);
     final lockController = ref.read(sessionLockControllerProvider);
     final l10n = context.l10n;
     final navigator = Navigator.of(context, rootNavigator: true);
@@ -722,7 +751,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
     AudioExportResult? result;
     AudioEditException? failure;
-    await fileIo.setKeepScreenOn(true);
     try {
       await lockController.withLockSuppression(() async {
         result = await _api.export(
@@ -742,7 +770,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       VeLog.w(_tag, 'Export failed unexpectedly', e);
       failure = AudioEditException('EXPORT_FAILED', e.toString());
     } finally {
-      await fileIo.setKeepScreenOn(false);
       _events.removeAudioEditProgressListener(onProgress);
     }
 
@@ -782,6 +809,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_containerLocked) {
+      return const ColoredBox(color: Colors.black, child: SizedBox.expand());
+    }
     final l10n = context.l10n;
     final editor = _editor;
 
@@ -886,11 +916,19 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           return Row(
             children: [
               Expanded(child: panel),
-              SizedBox(width: 380, child: SingleChildScrollView(child: controls)),
+              SizedBox(
+                width: 380,
+                child: SingleChildScrollView(child: controls),
+              ),
             ],
           );
         }
-        return Column(children: [Expanded(child: panel), controls]);
+        return Column(
+          children: [
+            Expanded(child: panel),
+            controls,
+          ],
+        );
       },
     );
   }
@@ -904,7 +942,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     final details = probe == null ? '' : _describe(probe);
     final editor = _editor;
     final totalDuration = Duration(microseconds: editor?.durationUs ?? 0);
-    final canSeek = editor != null &&
+    final canSeek =
+        editor != null &&
         player.value.isInitialized &&
         !_exporting &&
         totalDuration > Duration.zero;
@@ -1339,7 +1378,10 @@ class _ExportProgressDialog extends StatelessWidget {
           if (e != null && e.phase == 'saving') {
             label = l10n.videoEditorSaving;
           } else if (outputCount > 1) {
-            label = l10n.videoEditorCutting((e?.outputIndex ?? 0) + 1, outputCount);
+            label = l10n.videoEditorCutting(
+              (e?.outputIndex ?? 0) + 1,
+              outputCount,
+            );
           } else {
             label = l10n.videoEditorCuttingOne;
           }

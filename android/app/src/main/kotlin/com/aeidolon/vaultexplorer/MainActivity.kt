@@ -95,6 +95,7 @@ private object ChannelMethods {
     const val PROBE_CONTAINER_FORMAT    = "probeContainerFormat"
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
+    const val SCHEDULE_CONTAINER_AUTO_CLOSE = "scheduleContainerAutoClose"
     const val SCHEDULE_VAULT_SYNC       = "scheduleVaultSync"
     const val CAN_SCHEDULE_EXACT_ALARMS = "canScheduleExactAlarms"
     const val REQUEST_EXACT_ALARM_ACCESS = "requestExactAlarmAccess"
@@ -1124,6 +1125,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
+                ChannelMethods.SCHEDULE_CONTAINER_AUTO_CLOSE ->
+                    backgroundServiceHandlers.handleScheduleContainerAutoClose(call, result)
                 ChannelMethods.SCHEDULE_VAULT_SYNC -> scheduledSyncHandlers.handleSchedule(call, result)
                 ChannelMethods.CAN_SCHEDULE_EXACT_ALARMS ->
                     scheduledSyncHandlers.handleCanScheduleExactAlarms(result)

@@ -16,15 +16,7 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/unlock/unlock_controller.dart';
 
-enum _UnlockCredentialState {
-  loading,
-  missing,
-  biometric,
-  pattern,
-  pin,
-  password,
-  none,
-}
+enum _UnlockCredentialState { loading, missing, biometric, pattern, pin, password, none }
 
 class UnlockSheet extends ConsumerStatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -75,25 +67,24 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   bool _prefillCleared = false;
 
   UnlockParams get _params => UnlockParams(
-        initialUri: widget.initialUri,
-        initialName: widget.initialName,
-        prefillPassword: widget.prefillPassword,
-        documentProvider: widget.documentProvider,
-        autoMountFolders: widget.autoMountFolders,
-        mountedUris: widget.mountedUris,
-        initialCompositeCarriers: widget.initialCompositeCarriers,
-      );
+    initialUri: widget.initialUri,
+    initialName: widget.initialName,
+    prefillPassword: widget.prefillPassword,
+    documentProvider: widget.documentProvider,
+    autoMountFolders: widget.autoMountFolders,
+    mountedUris: widget.mountedUris,
+    initialCompositeCarriers: widget.initialCompositeCarriers,
+  );
 
   Future<T> _suppressLock<T>(Future<T> Function() action) =>
       ref.read(sessionLockControllerProvider).withLockSuppression(action);
 
-  bool get _passwordPrefilled =>
-      widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
+  bool get _passwordPrefilled => widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
 
   /// While true, the password field's real characters can't be revealed
   /// via the show/hide toggle or copied via text selection — see
   /// [_prefillCleared].
-   bool get _revealLocked => (widget.prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
+  bool get _revealLocked => (widget.prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
 
   /// Opened from the composite-create wizard's "already have one?" shortcut:
   /// this screen is a dedicated composite unlock (carriers can be added or
@@ -105,14 +96,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       widget.initialCompositeCarriers != null ||
       (state.selectedUri != null && state.containerFormat != 'container');
 
-  bool _isKnownVeraCrypt(UnlockState state) =>
-      _isKnownFormat(state) && (state.isVeraCrypt || state.isComposite);
+  bool _isKnownVeraCrypt(UnlockState state) => _isKnownFormat(state) && (state.isVeraCrypt || state.isComposite);
 
-  bool _isKnownLuks(UnlockState state) =>
-      _isKnownFormat(state) && state.isLuks;
+  bool _isKnownLuks(UnlockState state) => _isKnownFormat(state) && state.isLuks;
 
-  bool _hasDirectOptions(UnlockState state) =>
-      _isKnownVeraCrypt(state) || _isKnownLuks(state);
+  bool _hasDirectOptions(UnlockState state) => _isKnownVeraCrypt(state) || _isKnownLuks(state);
 
   @override
   void initState() {
@@ -121,7 +109,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
   }
 
- @override
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _passwordCtrl.dispose();
@@ -149,7 +137,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   }
 
   void _onUnlock() {
-    ref.read(unlockControllerProvider(_params).notifier).unlock(
+    ref
+        .read(unlockControllerProvider(_params).notifier)
+        .unlock(
           passwordText: _passwordCtrl.text,
           pimText: _pimCtrl.text,
           hiddenPasswordText: _hiddenPasswordCtrl.text,
@@ -185,8 +175,8 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       return state.compositeCarrierCount > 1
           ? context.l10n.compositeBadgeMultipleCarriers(state.compositeCarrierCount)
           : (state.compositeCarrierCount == 1
-              ? context.l10n.compositeBadgeSingleCarrier
-              : context.l10n.compositeBadgeDefault);
+                ? context.l10n.compositeBadgeSingleCarrier
+                : context.l10n.compositeBadgeDefault);
     }
     if (state.isLuks) return context.l10n.formatContainerLabel('LUKS');
     if (state.isCryptomator) return context.l10n.formatVaultLabel('Cryptomator');
@@ -222,39 +212,29 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(
-      unlockControllerProvider(_params).select((s) => s.mountedSuccess),
-      (prev, next) {
-        if (next != null && mounted) {
-          HapticFeedback.lightImpact();
-          widget.onMounted(next.container, record: next.record);
-          if (widget.openBrowserRoute != null) {
-            Navigator.of(context).pushReplacement(
-              widget.openBrowserRoute!(next.container),
-            );
-          } else {
-            Navigator.pop(context);
-          }
+    ref.listen(unlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) {
+      if (next != null && mounted) {
+        HapticFeedback.lightImpact();
+        widget.onMounted(next.container, record: next.record);
+        if (widget.openBrowserRoute != null) {
+          Navigator.of(context).pushReplacement(widget.openBrowserRoute!(next.container));
+        } else {
+          Navigator.pop(context);
         }
-      },
-    );
-     ref.listen(
-      unlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick),
-      (prev, next) {
-        if (mounted) {
-          _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n));
-        }
-      },
-    );
+      }
+    });
+    ref.listen(unlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick), (prev, next) {
+      if (mounted) {
+        _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n));
+      }
+    });
 
     final state = ref.watch(unlockControllerProvider(_params));
     final cs = context.colors;
     final textTheme = context.typography;
     final wideLayout = context.screen.useWideLayout;
     final credState = _getCredentialState(state);
-    final isBusy = state.loading ||
-        state.checkingContainer ||
-        (state.selectedUri != null && state.loadingAuth);
+    final isBusy = state.loading || state.checkingContainer || (state.selectedUri != null && state.loadingAuth);
 
     return PopScope(
       canPop: !state.loading,
@@ -264,7 +244,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         }
       },
       child: Scaffold(
-       appBar: AppBar(
+        appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
@@ -279,18 +259,12 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
             overflow: TextOverflow.ellipsis,
           ),
           actions: widget.initialUri == null && widget.initialCompositeCarriers == null && wideLayout
-              ? [
-                  _buildVaultKindSegmentedButton(context, state),
-                  const SizedBox(width: 12),
-                ]
+              ? [_buildVaultKindSegmentedButton(context, state), const SizedBox(width: 12)]
               : null,
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(4),
             child: isBusy
-                ? LinearProgressIndicator(
-                    color: cs.primary,
-                    backgroundColor: cs.primaryContainer,
-                  )
+                ? LinearProgressIndicator(color: cs.primary, backgroundColor: cs.primaryContainer)
                 : const SizedBox(height: 4),
           ),
         ),
@@ -313,9 +287,6 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final isPatternOrPin =
-        credState == _UnlockCredentialState.pattern || credState == _UnlockCredentialState.pin;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -324,23 +295,21 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           Expanded(
             flex: 5,
             child: SingleChildScrollView(
-              physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPickerCard(context, state, cs, textTheme),
                   const SizedBox(height: 10),
                   ..._buildCredentialSection(context, state, credState, cs, textTheme),
+                  ..._buildQuickUnlockOptionsSection(context, state, credState, cs, textTheme),
                   ..._buildPrimaryActionSection(context, state, credState, cs, textTheme),
                 ],
               ),
             ),
           ),
           const SizedBox(width: 28),
-          Expanded(
-            flex: 6,
-            child: _buildRightPane(context, state, credState, cs, textTheme),
-          ),
+          Expanded(flex: 6, child: _buildRightPane(context, state, credState, cs, textTheme)),
         ],
       ),
     );
@@ -353,11 +322,8 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final isPatternOrPin =
-        credState == _UnlockCredentialState.pattern || credState == _UnlockCredentialState.pin;
-
     return SingleChildScrollView(
-      physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -365,6 +331,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           _buildPickerCard(context, state, cs, textTheme),
           const SizedBox(height: 10),
           ..._buildCredentialSection(context, state, credState, cs, textTheme),
+          ..._buildQuickUnlockOptionsSection(context, state, credState, cs, textTheme),
           ..._buildPrimaryActionSection(context, state, credState, cs, textTheme),
           const SizedBox(height: 16),
         ],
@@ -373,179 +340,153 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   }
 
   Widget _buildVaultKindSplitRow(BuildContext context, UnlockState state) {
-  final cs = context.colors;
-  final textTheme = context.typography;
-  final isFolder = state.isFolderVault;
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final isFolder = state.isFolderVault;
 
-  return IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-       // ( Container File )
-        Expanded(
-          child: InkWell(
-            onTap: state.loading || state.checkingContainer
-                ? null
-                : () {
-                    _resetInputFields();
-                    ref
-                        .read(unlockControllerProvider(_params).notifier)
-                        .setSelectedVaultKind('container');
-                  },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              color: !isFolder
-                  ? cs.primaryContainer.withValues(alpha: 0.7)
-                  : Colors.transparent,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.folder_zip_rounded,
-                    size: 18,
-                    color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      context.l10n.vaultKindContainerFile,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: !isFolder ? FontWeight.bold : FontWeight.w500,
-                        color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ( Container File )
+          Expanded(
+            child: InkWell(
+              onTap: state.loading || state.checkingContainer
+                  ? null
+                  : () {
+                      _resetInputFields();
+                      ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind('container');
+                    },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                color: !isFolder ? cs.primaryContainer.withValues(alpha: 0.7) : Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.folder_zip_rounded,
+                      size: 18,
+                      color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        context.l10n.vaultKindContainerFile,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelLarge?.copyWith(
+                          fontWeight: !isFolder ? FontWeight.bold : FontWeight.w500,
+                          color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
 
-        // Middle separator "|"
-        VerticalDivider(
-          width: 1,
-          thickness: 1,
-          color: cs.outlineVariant.withValues(alpha: 0.5),
-        ),
+          // Middle separator "|"
+          VerticalDivider(width: 1, thickness: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
 
-        // ( Folder Vault )
-        Expanded(
-          child: InkWell(
-            onTap: state.loading || state.checkingContainer
-                ? null
-                : () {
-                    _resetInputFields();
-                    ref
-                        .read(unlockControllerProvider(_params).notifier)
-                        .setSelectedVaultKind('directory_vault');
-                  },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              color: isFolder
-                  ? cs.primaryContainer.withValues(alpha: 0.7)
-                  : Colors.transparent,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.folder,
-                    size: 18,
-                    color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      context.l10n.vaultKindFolderVault,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: isFolder ? FontWeight.bold : FontWeight.w500,
-                        color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+          // ( Folder Vault )
+          Expanded(
+            child: InkWell(
+              onTap: state.loading || state.checkingContainer
+                  ? null
+                  : () {
+                      _resetInputFields();
+                      ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind('directory_vault');
+                    },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                color: isFolder ? cs.primaryContainer.withValues(alpha: 0.7) : Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.folder, size: 18, color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        context.l10n.vaultKindFolderVault,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelLarge?.copyWith(
+                          fontWeight: isFolder ? FontWeight.bold : FontWeight.w500,
+                          color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildVaultKindSegmentedButton(
-  BuildContext context,
-  UnlockState state, {
-  OutlinedBorder? shape,
-}) {
-  return SizedBox(
-    width: shape != null ? double.infinity : null,
-    child: SegmentedButton<String>(
-      showSelectedIcon: false,
-      style: SegmentedButton.styleFrom(
-        side: BorderSide.none,
-        shape: shape,
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ],
       ),
-      segments: [
-        ButtonSegment(
-          value: 'container',
-          label: Text(
-            context.l10n.vaultKindContainerFile,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            softWrap: true,
-          ),
-          icon: const Icon(Icons.folder_zip_rounded, size: 16),
-        ),
-        ButtonSegment(
-          value: 'directory_vault',
-          label: Text(
-            context.l10n.vaultKindFolderVault,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            softWrap: true,
-          ),
-          icon: const Icon(Icons.folder_shared_rounded, size: 16),
-        ),
-      ],
-      selected: {state.isFolderVault ? 'directory_vault' : 'container'},
-      onSelectionChanged: state.loading || state.checkingContainer
-          ? null
-          : (sel) {
-              _resetInputFields();
-              ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind(sel.first);
-            },
-    ),
-  );
-}
+    );
+  }
 
-  Widget _buildPickerCard(
-    BuildContext context,
-    UnlockState state,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
+  Widget _buildVaultKindSegmentedButton(BuildContext context, UnlockState state, {OutlinedBorder? shape}) {
+    return SizedBox(
+      width: shape != null ? double.infinity : null,
+      child: SegmentedButton<String>(
+        showSelectedIcon: false,
+        style: SegmentedButton.styleFrom(
+          side: BorderSide.none,
+          shape: shape,
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        segments: [
+          ButtonSegment(
+            value: 'container',
+            label: Text(
+              context.l10n.vaultKindContainerFile,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
+            icon: const Icon(Icons.folder_zip_rounded, size: 16),
+          ),
+          ButtonSegment(
+            value: 'directory_vault',
+            label: Text(
+              context.l10n.vaultKindFolderVault,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
+            icon: const Icon(Icons.folder_shared_rounded, size: 16),
+          ),
+        ],
+        selected: {state.isFolderVault ? 'directory_vault' : 'container'},
+        onSelectionChanged: state.loading || state.checkingContainer
+            ? null
+            : (sel) {
+                _resetInputFields();
+                ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind(sel.first);
+              },
+      ),
+    );
+  }
+
+  Widget _buildPickerCard(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
     final hasSelection = state.selectedUri != null;
     final isWide = context.screen.useWideLayout;
-    final showLoadingFeedback = hasSelection &&
-        (state.checkingContainer || state.loadingAuth);
+    final showLoadingFeedback = hasSelection && (state.checkingContainer || state.loadingAuth);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-         if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
+        if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _buildVaultKindSegmentedButton(
@@ -559,7 +500,7 @@ Widget _buildVaultKindSegmentedButton(
           children: [
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-             leading: Container(
+              leading: Container(
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
@@ -574,31 +515,27 @@ Widget _buildVaultKindSegmentedButton(
                         size: 22,
                       )
                     : (state.isPlainDiskImage || state.containerFormat == 'plain'
-                        ? Icon(
-                            Icons.album_outlined,
-                            color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                            size: 22,
-                          )
-                        : ContainerFormatIcon(
-                            format: hasSelection
-                                ? ContainerFormat.fromWire(state.containerFormat)
-                                : ContainerFormat.directoryVault,
-                            color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                            size: 22,
-                          )),
+                          ? Icon(
+                              Icons.album_outlined,
+                              color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                              size: 22,
+                            )
+                          : ContainerFormatIcon(
+                              format: hasSelection
+                                  ? ContainerFormat.fromWire(state.containerFormat)
+                                  : ContainerFormat.directoryVault,
+                              color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                              size: 22,
+                            )),
               ),
               title: Text(
                 state.selectedName ??
-                    (state.isFolderVault
-                        ? context.l10n.tapToSelectVaultFolder
-                        : context.l10n.tapToSelectContainerFile),
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
-                ),
+                    (state.isFolderVault ? context.l10n.tapToSelectVaultFolder : context.l10n.tapToSelectContainerFile),
+                style: textTheme.bodyMedium?.copyWith(fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-            trailing: (hasSelection && widget.initialUri == null && widget.initialCompositeCarriers == null)
+              trailing: (hasSelection && widget.initialUri == null && widget.initialCompositeCarriers == null)
                   ? IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
                       tooltip: context.l10n.clearAllButton,
@@ -610,11 +547,17 @@ Widget _buildVaultKindSegmentedButton(
                             },
                     )
                   : (widget.initialUri == null && widget.initialCompositeCarriers == null
-                      ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant)
-                      : null),
-           onTap: state.loading || state.checkingContainer || widget.initialUri != null || widget.initialCompositeCarriers != null
+                        ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant)
+                        : null),
+              onTap:
+                  state.loading ||
+                      state.checkingContainer ||
+                      widget.initialUri != null ||
+                      widget.initialCompositeCarriers != null
                   ? null
-                  : () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickFile(context.l10n)),
+                  : () => _suppressLock(
+                      () async => ref.read(unlockControllerProvider(_params).notifier).pickFile(context.l10n),
+                    ),
             ),
           ],
         ),
@@ -628,31 +571,19 @@ Widget _buildVaultKindSegmentedButton(
             ),
             child: Row(
               children: [
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: cs.primary,
-                  ),
-                ),
+                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.primary)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     context.l10n.loadingContainerFromStorage,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
           ),
         ],
-        if (state.isComposite &&
-            state.compositeCarrierCount > 0 &&
-            widget.initialUri == null) ...[
+        if (state.isComposite && state.compositeCarrierCount > 0 && widget.initialUri == null) ...[
           if (state.compositeCarrierCount == 1) ...[
             const SizedBox(height: 8),
             InlineBanner(
@@ -667,13 +598,13 @@ Widget _buildVaultKindSegmentedButton(
         if (state.isFolderVault && !state.hasAllStorageAccess) ...[
           const SizedBox(height: 8),
           InlineBanner(
-            state.isCryfs
-                ? context.l10n.cryfsStorageAccessWarning
-                : context.l10n.folderVaultStorageAccessWarning,
+            state.isCryfs ? context.l10n.cryfsStorageAccessWarning : context.l10n.folderVaultStorageAccessWarning,
             tone: AppBannerTone.warning,
             icon: Icons.speed_rounded,
             trailing: TextButton(
-              onPressed: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).requestStoragePermission()),
+              onPressed: () => _suppressLock(
+                () async => ref.read(unlockControllerProvider(_params).notifier).requestStoragePermission(),
+              ),
               child: Text(context.l10n.enableButtonLabel),
             ),
           ),
@@ -686,12 +617,7 @@ Widget _buildVaultKindSegmentedButton(
   /// the carriers step of the composite-create wizard: "Add" can be tapped
   /// repeatedly (each pick may come from a different folder or storage
   /// volume, and is merged into the selection), and each row can be removed.
-  Widget _buildCompositeCarriersEditor(
-    BuildContext context,
-    UnlockState state,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
+  Widget _buildCompositeCarriersEditor(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
     final notifier = ref.read(unlockControllerProvider(_params).notifier);
     final carriers = state.compositeCarriers;
     final l10n = context.l10n;
@@ -703,9 +629,7 @@ Widget _buildVaultKindSegmentedButton(
         SectionCard(
           children: [
             InkWell(
-              onTap: state.loading
-                  ? null
-                  : () => _suppressLock(() async => notifier.addCompositeCarriers()),
+              onTap: state.loading ? null : () => _suppressLock(() async => notifier.addCompositeCarriers()),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -739,9 +663,7 @@ Widget _buildVaultKindSegmentedButton(
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                       ),
                       icon: const Icon(Icons.folder_open_rounded, size: 18),
                       label: Text(l10n.compositeBrowseButtonLabel),
@@ -750,8 +672,8 @@ Widget _buildVaultKindSegmentedButton(
                 ),
               ),
             ),
-          
-          ConstrainedBox(
+
+            ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 280),
               child: Scrollbar(
                 controller: _carrierScrollCtrl,
@@ -769,8 +691,7 @@ Widget _buildVaultKindSegmentedButton(
                   itemBuilder: (context, index) {
                     final carrier = carriers[index];
                     final budget = state.compositeCarrierProfiles[carrier.uri];
-                    final unrecognized =
-                        budget != null && budget.detectedFormat != 'composite_carrier';
+                    final unrecognized = budget != null && budget.detectedFormat != 'composite_carrier';
 
                     Widget leadingWidget;
                     if (budget == null) {
@@ -789,20 +710,14 @@ Widget _buildVaultKindSegmentedButton(
                       leadingWidget = Container(
                         width: 26,
                         height: 26,
-                        decoration: BoxDecoration(
-                          color: cs.errorContainer,
-                          shape: BoxShape.circle,
-                        ),
+                        decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
                         child: Icon(Icons.warning_amber_rounded, size: 16, color: cs.onErrorContainer),
                       );
                     } else {
                       leadingWidget = Container(
                         width: 26,
                         height: 26,
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest,
-                          shape: BoxShape.circle,
-                        ),
+                        decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
                         alignment: Alignment.center,
                         child: Text(
                           '${index + 1}',
@@ -831,11 +746,9 @@ Widget _buildVaultKindSegmentedButton(
                         budget == null
                             ? l10n.compositeCarrierAnalyzingStatus
                             : (unrecognized
-                                ? '${budget.detectedFormat.toUpperCase()} • ${formatBytes(budget.fileSize)}'
-                                : formatBytes(budget.fileSize)),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: unrecognized ? cs.error : cs.onSurfaceVariant,
-                        ),
+                                  ? '${budget.detectedFormat.toUpperCase()} • ${formatBytes(budget.fileSize)}'
+                                  : formatBytes(budget.fileSize)),
+                        style: textTheme.bodySmall?.copyWith(color: unrecognized ? cs.error : cs.onSurfaceVariant),
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18),
@@ -918,12 +831,13 @@ Widget _buildVaultKindSegmentedButton(
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 12),
-                      Row(
+                    Row(
                       children: [
                         Expanded(
                           child: FilledButton(
                             onPressed: () => _suppressLock(
-                              () async => ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
+                              () async =>
+                                  ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
                             ),
                             child: Text(
                               state.isComposite
@@ -969,15 +883,17 @@ Widget _buildVaultKindSegmentedButton(
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
+                            onPressed: () =>
+                                ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                             child: Text(context.l10n.usePasswordButtonLabel),
                           ),
                         ),
-                           const SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: () => _suppressLock(
-                              () async => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
+                              () async =>
+                                  ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
                             ),
                             child: Text(context.l10n.authenticateButtonLabel),
                           ),
@@ -1007,13 +923,15 @@ Widget _buildVaultKindSegmentedButton(
                       const SizedBox(height: 14),
                       PatternLockView(
                         key: ValueKey(state.patternResetKey),
-                        onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
+                        onPatternComplete: (p) =>
+                            ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
                         showError: state.patternError,
                       ),
                     ],
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () => ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
+                      onPressed: () =>
+                          ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                       child: Text(context.l10n.usePasswordInsteadButtonLabel),
                     ),
                   ],
@@ -1039,13 +957,15 @@ Widget _buildVaultKindSegmentedButton(
                       const SizedBox(height: 14),
                       PinLockView(
                         key: ValueKey(state.pinResetKey),
-                        onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
+                        onPinComplete: (p) =>
+                            ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
                         showError: state.pinError,
                       ),
                     ],
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () => ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
+                      onPressed: () =>
+                          ref.read(unlockControllerProvider(_params).notifier).setShowPasswordFallback(true),
                       child: Text(context.l10n.usePasswordInsteadButtonLabel),
                     ),
                   ],
@@ -1055,217 +975,183 @@ Widget _buildVaultKindSegmentedButton(
           ),
         ];
 
-case _UnlockCredentialState.password:
+      case _UnlockCredentialState.password:
         final isKnownVeraCrypt = _isKnownVeraCrypt(state);
         final isKnownLuks = _isKnownLuks(state);
         final hasDirectOptions = _hasDirectOptions(state);
         final hasSelection = state.selectedUri != null;
         final canConfigure = hasSelection && !state.loading && !state.checkingContainer;
 
-         final isPlain = state.isPlainDiskImage || state.containerFormat == 'plain';
+        final isPlain = state.isPlainDiskImage || state.containerFormat == 'plain';
 
         return [
           AnimatedOpacity(
             duration: const Duration(milliseconds: 200),
             opacity: canConfigure ? 1.0 : 0.45,
             child: SectionCard(
-            children: [
-              if (isPlain) ...[
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: InlineBanner(
-                    context.l10n.plainDiskImageNotice,
-                    tone: AppBannerTone.info,
-                    icon: Icons.album_outlined,
+              children: [
+                if (isPlain) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: InlineBanner(
+                      context.l10n.plainDiskImageNotice,
+                      tone: AppBannerTone.info,
+                      icon: Icons.album_outlined,
+                    ),
                   ),
-                ),
-              ] else ...[
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: TextField(
-                    controller: _passwordCtrl,
-                    enabled: canConfigure,
-                    // Stay obscured — and block text selection, so the real
-                    // characters can't be copied out either — while
-                    // _revealLocked: a saved credential shouldn't be
-                    // revealable in plain text just by editing around it.
-                    obscureText: _revealLocked ? true : _obscure,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    enableIMEPersonalizedLearning: false,
-                    enableInteractiveSelection: !_revealLocked && canConfigure,
-                    autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                    onChanged: (val) {
-                      if (val.isEmpty) _prefillCleared = true;
-                      setState(() {});
-                    },
-                    onSubmitted: (_) => _onUnlock(),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: cs.surfaceContainerHighest,
-                      labelText: context.l10n.passwordFieldLabel,
-                      hintText: state.isFolderVault
-                          ? context.l10n.passwordHintFolderVault
-                          : state.isBitlocker
-                              ? context.l10n.passwordHintBitlocker
-                              : state.isComposite
-                                  ? context.l10n.compositePasswordHint
-                                  : context.l10n.passwordHintContainer,
-                      prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_passwordPrefilled)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Tooltip(
-                                message: context.l10n.usingSavedPasswordTooltip,
-                                child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TextField(
+                      controller: _passwordCtrl,
+                      enabled: canConfigure,
+                      // Stay obscured — and block text selection, so the real
+                      // characters can't be copied out either — while
+                      // _revealLocked: a saved credential shouldn't be
+                      // revealable in plain text just by editing around it.
+                      obscureText: _revealLocked ? true : _obscure,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
+                      enableInteractiveSelection: !_revealLocked && canConfigure,
+                      autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                      onChanged: (val) {
+                        if (val.isEmpty) _prefillCleared = true;
+                        setState(() {});
+                      },
+                      onSubmitted: (_) => _onUnlock(),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: cs.surfaceContainerHighest,
+                        labelText: context.l10n.passwordFieldLabel,
+                        hintText: state.isFolderVault
+                            ? context.l10n.passwordHintFolderVault
+                            : state.isBitlocker
+                            ? context.l10n.passwordHintBitlocker
+                            : state.isComposite
+                            ? context.l10n.compositePasswordHint
+                            : context.l10n.passwordHintContainer,
+                        prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_passwordPrefilled)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Tooltip(
+                                  message: context.l10n.usingSavedPasswordTooltip,
+                                  child: Icon(Icons.bookmark_rounded, size: AppIconSize.standard, color: cs.primary),
+                                ),
                               ),
+                            PasswordVisibilityToggle(
+                              obscured: _revealLocked ? true : _obscure,
+                              enabled: !_revealLocked && canConfigure,
+                              onToggle: () => setState(() => _obscure = !_obscure),
                             ),
-                          PasswordVisibilityToggle(
-                            obscured: _revealLocked ? true : _obscure,
-                            enabled: !_revealLocked && canConfigure,
-                            onToggle: () => setState(() => _obscure = !_obscure),
-                          ),
-                          const SizedBox(width: 4),
-                        ],
+                            const SizedBox(width: 4),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-              if (isKnownVeraCrypt) ...[
-                PimInputField(
-                  controller: _pimCtrl,
-                  enabled: canConfigure,
-                  onSubmitted: (_) => _onUnlock(),
-                ),
-              ],
-            if (hasDirectOptions) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 1),
-                  child: KeyfilesPicker(
-                    keyfiles: state.keyfiles,
-                    picking: state.pickingKeyfiles,
-                    enabled: canConfigure,
-                    onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles()),
-                    onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
-                  ),
-                ),
-                if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                ],
+                if (isKnownVeraCrypt) ...[
+                  PimInputField(controller: _pimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
+                ],
+                if (hasDirectOptions) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                    child: Text(
-                      context.l10n.luksKeyfileReplacesPasswordNote,
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: KeyfilesPicker(
+                      keyfiles: state.keyfiles,
+                      picking: state.pickingKeyfiles,
+                      enabled: canConfigure,
+                      onPick: () => _suppressLock(
+                        () async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
+                      ),
+                      onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
+                    ),
+                  ),
+                  if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                      child: Text(
+                        context.l10n.luksKeyfileReplacesPasswordNote,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
+                ],
+                if (state.selectedUri != null && !state.containerMissing && !context.screen.useWideLayout) ...[
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      enabled: canConfigure,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                      leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+                      title: Text(
+                        context.l10n.advancedOptionsTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      children: _buildAdvancedOptionsSection(context, state),
                     ),
                   ),
                 ],
-              ],
-              if (!state.hasAdvancedSettings) ...[
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  value: state.readOnly,
-                  onChanged: canConfigure
-                      ? (val) {
-                          ref.read(unlockControllerProvider(_params).notifier).setReadOnly(val);
-                        }
-                      : null,
-                  title: Text(context.l10n.readOnlyModeLabel),
-                  secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
-                ),
-              ],
-              if (state.hasAdvancedSettings && !context.screen.useWideLayout) ...[
-                Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    enabled: canConfigure,
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-                    leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-                    title: Text(
-                      context.l10n.advancedOptionsTitle,
-                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                if (widget.initialUri == null) ...[
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    value: state.remember,
+                    onChanged: canConfigure
+                        ? (val) {
+                            ref.read(unlockControllerProvider(_params).notifier).setRemember(val);
+                          }
+                        : null,
+                    title: Text(context.l10n.rememberContainerLabel),
+                    subtitle: Text(
+                      context.l10n.rememberContainerSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
-                    children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
+                    secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                   ),
-                ),
+                ],
               ],
-             if (widget.initialUri == null) ...[
-                SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  value: state.remember,
-                  onChanged: canConfigure
-                      ? (val) {
-                          ref.read(unlockControllerProvider(_params).notifier).setRemember(val);
-                        }
-                      : null,
-                  title: Text(context.l10n.rememberContainerLabel),
-                  subtitle: Text(
-                    context.l10n.rememberContainerSubtitle,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
-      ];
+        ];
 
       default:
         return const [];
     }
   }
 
-List<Widget> _buildAdvancedOptionsSection(
+  List<Widget> _buildQuickUnlockOptionsSection(
     BuildContext context,
     UnlockState state,
+    _UnlockCredentialState credState,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final hasDirectOptions = _hasDirectOptions(state);
-    final hasSelection = state.selectedUri != null;
-    final canConfigure = hasSelection && !state.loading;
+    if (credState == _UnlockCredentialState.password ||
+        credState == _UnlockCredentialState.loading ||
+        credState == _UnlockCredentialState.missing ||
+        credState == _UnlockCredentialState.none ||
+        state.selectedUri == null ||
+        state.checkingContainer) {
+      return const [];
+    }
+
+    return [const SizedBox(height: 10), SectionCard(children: _buildUnlockModeOptions(context, state, cs, textTheme))];
+  }
+
+  List<Widget> _buildUnlockModeOptions(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
+    final canConfigure = !state.loading && !state.loadingAuth && !state.isAuthenticating && !state.checkingContainer;
+    final notifier = ref.read(unlockControllerProvider(_params).notifier);
+    final supportsHiddenVolumeProtection = state.isVeraCrypt && !state.isComposite;
 
     return [
-      if (!hasDirectOptions) ...[
-        if (state.isVeraCrypt || state.isComposite) ...[
-          PimInputField(
-            controller: _pimCtrl,
-            enabled: canConfigure,
-            onSubmitted: (_) => _onUnlock(),
-          ),
-        ],
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 1),
-          child: KeyfilesPicker(
-            keyfiles: state.keyfiles,
-            picking: state.pickingKeyfiles,
-            enabled: canConfigure,
-            onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles()),
-            onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
-          ),
-        ),
-      ],
-      if (state.isVeraCrypt || state.isComposite) ...[
-        AdvancedParamsPanel(
-          collapsible: false,
-          cipherId: state.cipherId,
-          hashId: state.hashId,
-          enabled: canConfigure,
-          onCipherChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setCipherId(val),
-          onHashChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHashId(val),
-        ),
-      ],
       SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         value: state.readOnly,
-        onChanged: canConfigure
-            ? (val) {
-                ref.read(unlockControllerProvider(_params).notifier).setReadOnly(val);
-              }
-            : null,
+        onChanged: canConfigure ? notifier.setReadOnly : null,
         title: Text(context.l10n.readOnlyModeLabel),
         subtitle: Text(
           context.l10n.readOnlyModeContainerSubtitle,
@@ -1273,15 +1159,11 @@ List<Widget> _buildAdvancedOptionsSection(
         ),
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
-      if (state.isVeraCrypt && !state.isComposite) ...[
+      if (supportsHiddenVolumeProtection) ...[
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,
-          onChanged: (canConfigure && !state.readOnly)
-              ? (val) {
-                  ref.read(unlockControllerProvider(_params).notifier).setProtectHiddenVolume(val);
-                }
-              : null,
+          onChanged: canConfigure && !state.readOnly ? notifier.setProtectHiddenVolume : null,
           title: Text(context.l10n.protectHiddenVolumeToggleTitle),
           subtitle: Text(
             state.readOnly
@@ -1292,7 +1174,7 @@ List<Widget> _buildAdvancedOptionsSection(
           secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
         ),
         if (state.protectHiddenVolume && !state.readOnly) ...[
-        Padding(
+          Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _hiddenPasswordCtrl,
@@ -1314,19 +1196,15 @@ List<Widget> _buildAdvancedOptionsSection(
               ),
             ),
           ),
-          PimInputField(
-            controller: _hiddenPimCtrl,
-            enabled: canConfigure,
-            onSubmitted: (_) => _onUnlock(),
-          ),
+          PimInputField(controller: _hiddenPimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: KeyfilesPicker(
               keyfiles: state.hiddenKeyfiles,
               picking: state.pickingHiddenKeyfiles,
               enabled: canConfigure,
-              onPick: () => _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickHiddenKeyfiles()),
-              onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeHiddenKeyfile(k),
+              onPick: () => _suppressLock(() async => notifier.pickHiddenKeyfiles()),
+              onRemove: notifier.removeHiddenKeyfile,
             ),
           ),
           AdvancedParamsPanel(
@@ -1334,11 +1212,47 @@ List<Widget> _buildAdvancedOptionsSection(
             cipherId: state.hiddenCipherId,
             hashId: state.hiddenHashId,
             enabled: canConfigure,
-            onCipherChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHiddenCipherId(val),
-            onHashChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHiddenHashId(val),
+            onCipherChanged: notifier.setHiddenCipherId,
+            onHashChanged: notifier.setHiddenHashId,
           ),
         ],
       ],
+    ];
+  }
+
+  List<Widget> _buildAdvancedOptionsSection(BuildContext context, UnlockState state) {
+    final hasDirectOptions = _hasDirectOptions(state);
+    final hasSelection = state.selectedUri != null;
+    final canConfigure = hasSelection && !state.loading;
+
+    return [
+      if (!hasDirectOptions) ...[
+        if (state.isVeraCrypt || state.isComposite) ...[
+          PimInputField(controller: _pimCtrl, enabled: canConfigure, onSubmitted: (_) => _onUnlock()),
+        ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: KeyfilesPicker(
+            keyfiles: state.keyfiles,
+            picking: state.pickingKeyfiles,
+            enabled: canConfigure,
+            onPick: () =>
+                _suppressLock(() async => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles()),
+            onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
+          ),
+        ),
+      ],
+      if (state.isVeraCrypt || state.isComposite) ...[
+        AdvancedParamsPanel(
+          collapsible: false,
+          cipherId: state.cipherId,
+          hashId: state.hashId,
+          enabled: canConfigure,
+          onCipherChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setCipherId(val),
+          onHashChanged: (val) => ref.read(unlockControllerProvider(_params).notifier).setHashId(val),
+        ),
+      ],
+      ..._buildUnlockModeOptions(context, state, context.colors, context.typography),
     ];
   }
 
@@ -1359,7 +1273,8 @@ List<Widget> _buildAdvancedOptionsSection(
             fit: BoxFit.scaleDown,
             child: PatternLockView(
               key: ValueKey(state.patternResetKey),
-              onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
+              onPatternComplete: (p) =>
+                  ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
               showError: state.patternError,
             ),
           ),
@@ -1381,17 +1296,16 @@ List<Widget> _buildAdvancedOptionsSection(
         return Center(
           child: Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer.withValues(alpha: 0.4),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: cs.primaryContainer.withValues(alpha: 0.4), shape: BoxShape.circle),
             child: Icon(Icons.fingerprint_rounded, size: 56, color: cs.primary),
           ),
         );
 
-     case _UnlockCredentialState.password:
+      case _UnlockCredentialState.password:
       default:
-        if (!state.hasAdvancedSettings) return const SizedBox.shrink();
+        if (state.selectedUri == null || state.containerMissing) {
+          return const SizedBox.shrink();
+        }
         final hasSelection = state.selectedUri != null;
         final canConfigure = hasSelection && !state.loading;
         return SingleChildScrollView(
@@ -1401,9 +1315,7 @@ List<Widget> _buildAdvancedOptionsSection(
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 200),
                 opacity: canConfigure ? 1.0 : 0.45,
-                child: SectionCard(
-                  children: _buildAdvancedOptionsSection(context, state, cs, textTheme),
-                ),
+                child: SectionCard(children: _buildAdvancedOptionsSection(context, state)),
               ),
             ],
           ),
@@ -1422,10 +1334,7 @@ List<Widget> _buildAdvancedOptionsSection(
     final isButtonEnabled = state.selectedUri != null && !state.checkingContainer;
 
     return [
-      if (state.error != null) ...[
-        const SizedBox(height: 10),
-        InlineErrorBanner(state.error!),
-      ],
+      if (state.error != null) ...[const SizedBox(height: 10), InlineErrorBanner(state.error!)],
       const SizedBox(height: 10),
       if (state.loading) ...[
         Padding(
@@ -1448,13 +1357,8 @@ List<Widget> _buildAdvancedOptionsSection(
         ),
       ],
       FilledButton(
-        onPressed: state.loading || state.checkingContainer
-            ? null
-            : (isButtonEnabled ? _onUnlock : null),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(50),
-          shape: const StadiumBorder(),
-        ),
+        onPressed: state.loading || state.checkingContainer ? null : (isButtonEnabled ? _onUnlock : null),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: const StadiumBorder()),
         child: state.loading
             ? const SizedBox(
                 width: 20,
@@ -1464,9 +1368,7 @@ List<Widget> _buildAdvancedOptionsSection(
             : Text(
                 state.isPlainDiskImage || state.containerFormat == 'plain'
                     ? context.l10n.mountContainerTitle
-                    : (state.isFolderVault
-                        ? context.l10n.unlockVaultButtonLabel
-                        : context.l10n.unlockContainerLabel),
+                    : (state.isFolderVault ? context.l10n.unlockVaultButtonLabel : context.l10n.unlockContainerLabel),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
       ),

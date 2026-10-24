@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/biometric_auth_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -202,6 +203,7 @@ class LockGate extends _$LockGate {
       if (ok && ref.mounted) _requestNavigateToDashboard();
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
+      if (isBiometricCancellation(e.code.name, e.description)) return;
       if (e.code.name.toLowerCase().contains('progress') ||
           desc.contains('progress')) {
         return;
@@ -213,6 +215,7 @@ class LockGate extends _$LockGate {
         );
       }
     } on PlatformException catch (e) {
+      if (isBiometricCancellation(e.code, e.message)) return;
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||
           (e.message?.contains('Authentication in progress') ?? false)) {

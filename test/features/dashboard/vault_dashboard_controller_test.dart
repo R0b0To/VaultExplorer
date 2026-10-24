@@ -29,16 +29,26 @@ void main() {
 
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   late ProviderContainer container;
+  late Map<String, String> secureValues;
+  late List<Map<String, dynamic>> activeSessions;
+  var lockContainerCalls = 0;
 
   setUp(() {
+    secureValues = {};
+    activeSessions = [];
+    lockContainerCalls = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
         case 'deleteSecure':
+          secureValues.remove((call.arguments as Map)['key'] as String);
           return true;
         case 'readSecure':
-          return null;
+          return secureValues[(call.arguments as Map)['key'] as String];
         case 'writeSecure':
+          final arguments = call.arguments as Map;
+          secureValues[arguments['key'] as String] =
+              arguments['value'] as String;
           return true;
         case 'syncBackgroundService':
           return null;
@@ -47,8 +57,9 @@ void main() {
         case 'hasAllFilesAccess':
           return true;
         case 'getActiveContainerSessions':
-          return {'sessions': <Map<String, dynamic>>[]};
+          return {'sessions': activeSessions};
         case 'lockContainer':
+          lockContainerCalls++;
           return true;
         default:
           return null;
@@ -197,6 +208,54 @@ void main() {
 
       // Cancel auto-close timer before tearing down
       controller.cancelAutoClose(vault.volId);
+    });
+
+    test('reconcile locks a restored vault with an expired auto-close deadline', () async {
+      const uri = 'file:///vault1.hc';
+      const autoCloseKey = 'container_auto_close_started_at_v1_$uri';
+      const record = ContainerRecord(
+        uri: uri,
+        label: 'Vault 1',
+        autoCloseMins: 1,
+      );
+      final vault = _testContainer(volId: 1, uri: uri, name: 'Vault 1');
+
+      // First controller represents the app before it is removed from recents.
+      final initialController =
+          container.read(vaultDashboardControllerProvider.notifier);
+      await initialController.loadAll();
+      initialController.onContainerMounted(vault, record: record);
+      await Future<void>.delayed(Duration.zero);
+      expect(secureValues.containsKey(autoCloseKey), isTrue);
+
+      // Disposing the controller simulates the process-local timer being lost.
+      container.dispose();
+      container = ProviderContainer();
+      final restoredController =
+          container.read(vaultDashboardControllerProvider.notifier);
+      await restoredController.loadAll();
+      await restoredController.updateContainerRecord(uri, record);
+
+      secureValues[autoCloseKey] = DateTime.now()
+          .subtract(const Duration(minutes: 2))
+          .millisecondsSinceEpoch
+          .toString();
+      activeSessions = [
+        {
+          'uri': uri,
+          'displayName': 'Vault 1',
+          'volId': 1,
+          'files': <String>[],
+          'containerFormat': 'veracrypt',
+        },
+      ];
+
+      await restoredController.reconcileActiveSessions();
+
+      expect(lockContainerCalls, 1);
+      expect(container.read(vaultDashboardControllerProvider).mounted, isEmpty);
+      await Future<void>.delayed(Duration.zero);
+      expect(secureValues.containsKey(autoCloseKey), isFalse);
     });
 
     test('resetAllAutoCloseTimers reschedules auto-close timers for mounted containers', () async {

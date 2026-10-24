@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
@@ -23,10 +24,13 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/image_editor/image_output_format.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/crop_overlay.dart';
+import 'package:vaultexplorer/features/image_editor/widgets/image_editor_adjustments_sheet.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/save_image_sheet.dart';
 import 'image_editor_annotations_controller.dart';
 import 'image_editor_controls_controller.dart';
@@ -45,8 +49,8 @@ class _EditorSnapshot {
   _EditorSnapshot({
     required ui.Image image,
     required List<EditAnnotation> annotations,
-  })  : image = image.clone(),
-        annotations = List.unmodifiable(annotations);
+  }) : image = image.clone(),
+       annotations = List.unmodifiable(annotations);
 
   void dispose() {
     image.dispose();
@@ -93,6 +97,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     with SingleTickerProviderStateMixin {
   VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
   VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
+  VaultEngineEvents? _vaultEvents;
+  bool _containerLocked = false;
 
   Uint8List? _originalBytes;
 
@@ -108,6 +114,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   bool _overwroteOriginal = false;
 
   ui.Image? _workingImage;
+  ViewerAdjustments _previewAdjustments = ViewerAdjustments.identity;
 
   final List<_EditorSnapshot> _undoStack = [];
 
@@ -154,7 +161,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
   bool get _canUndo => _undoStack.isNotEmpty || _annotations.isNotEmpty;
 
-String get _fileName {
+  String get _fileName {
     final path = widget.filePath;
     if (path == null) {
       if (widget.allowSequentialCapture) {
@@ -171,31 +178,40 @@ String get _fileName {
     return dot == -1 ? '' : _fileName.substring(dot + 1).toLowerCase();
   }
 
- late final TransformationController _transformationController;
+  late final TransformationController _transformationController;
   late final AnimationController _zoomAnimationController;
   late final CurvedAnimation _zoomCurvedAnimation;
   Matrix4Tween? _zoomMatrixTween;
-   double _currentScale = 1.0;
+  double _currentScale = 1.0;
   Orientation? _lastOrientation;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_fileIoApi.setKeepScreenOn(true));
+    final container = widget.container;
+    if (container != null) {
+      final events = ref.read(vaultEngineEventsProvider);
+      _vaultEvents = events;
+      events.addContainerLockedListener(_onContainerLocked);
+    }
     _transformationController = TransformationController();
     _transformationController.addListener(_onTransformationChanged);
     _zoomAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    _zoomCurvedAnimation = CurvedAnimation(
-      parent: _zoomAnimationController,
-      curve: Curves.easeOutCubic,
-    )..addListener(() {
-        if (_zoomMatrixTween != null) {
-          _transformationController.value =
-              _zoomMatrixTween!.evaluate(_zoomCurvedAnimation);
-        }
-      });
+    _zoomCurvedAnimation =
+        CurvedAnimation(
+          parent: _zoomAnimationController,
+          curve: Curves.easeOutCubic,
+        )..addListener(() {
+          if (_zoomMatrixTween != null) {
+            _transformationController.value = _zoomMatrixTween!.evaluate(
+              _zoomCurvedAnimation,
+            );
+          }
+        });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _load();
@@ -205,6 +221,8 @@ String get _fileName {
 
   @override
   void dispose() {
+    _vaultEvents?.removeContainerLockedListener(_onContainerLocked);
+    unawaited(_fileIoApi.setKeepScreenOn(false));
     _zoomCurvedAnimation.dispose();
     _zoomAnimationController.dispose();
     _transformationController.removeListener(_onTransformationChanged);
@@ -215,6 +233,23 @@ String get _fileName {
     _workingImage?.dispose();
     _cropRectNotifier?.dispose();
     super.dispose();
+  }
+
+  void _onContainerLocked(int volId) {
+    if (!mounted || widget.container?.volId != volId || _containerLocked) {
+      return;
+    }
+    setState(() => _containerLocked = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      final navigator = Navigator.of(context);
+      // Clear transient sheets above the editor, then remove the editor route
+      // without invoking its unsaved-changes prompt after the vault is locked.
+      navigator.popUntil((candidate) => candidate == route);
+      if (route.isActive) navigator.removeRoute(route);
+    });
   }
 
   void _onTransformationChanged() {
@@ -275,10 +310,7 @@ String get _fileName {
   void _pushUndoSnapshot() {
     if (_workingImage == null) return;
     _undoStack.add(
-      _EditorSnapshot(
-        image: _workingImage!,
-        annotations: _annotations,
-      ),
+      _EditorSnapshot(image: _workingImage!, annotations: _annotations),
     );
     if (_undoStack.length > 12) {
       final discarded = _undoStack.removeAt(0);
@@ -296,7 +328,8 @@ String get _fileName {
 
     final snapshot = _undoStack.removeLast();
     final oldImage = _workingImage;
-    final sizeChanged = oldImage == null ||
+    final sizeChanged =
+        oldImage == null ||
         oldImage.width != snapshot.image.width ||
         oldImage.height != snapshot.image.height;
     if (sizeChanged) {
@@ -325,7 +358,9 @@ String get _fileName {
     _documentController.startLoading();
     try {
       Uint8List? bytes = widget.imageBytes;
-      if (bytes == null && widget.container != null && widget.filePath != null) {
+      if (bytes == null &&
+          widget.container != null &&
+          widget.filePath != null) {
         bytes = FullResImageCache.get(widget.container!, widget.filePath!);
         bytes ??= await _fileIoApi.readWholeFile(
           widget.container!,
@@ -447,7 +482,10 @@ String get _fileName {
   void _onRotateAngleChanged(double rawAngle) {
     final snapped = _snapRotationAngle(rawAngle);
     if (snapped != _controls.cropRotationAngle) {
-      if (snapped == 0.0 || snapped == 90.0 || snapped == 180.0 || snapped == 270.0) {
+      if (snapped == 0.0 ||
+          snapped == 90.0 ||
+          snapped == 180.0 ||
+          snapped == 270.0) {
         HapticFeedback.selectionClick();
       }
       _controlsController.setCropRotationAngle(snapped);
@@ -491,7 +529,54 @@ String get _fileName {
     oldImage?.dispose();
   }
 
- Future<void> _selectTool(EditorTool tool) async {
+  Future<void> _showColorAdjustments() async {
+    if (_document.isSaving || _workingImage == null) return;
+    setState(() => _previewAdjustments = ViewerAdjustments.identity);
+    final result = await showModalBottomSheet<ViewerAdjustments>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ImageEditorAdjustmentsSheet(
+        initialValue: ViewerAdjustments.identity,
+        onChanged: (value) {
+          if (mounted) setState(() => _previewAdjustments = value);
+        },
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _previewAdjustments = ViewerAdjustments.identity);
+    if (result == null || result.isIdentity) return;
+    await _applyColorAdjustments(result);
+  }
+
+  Future<void> _applyColorAdjustments(ViewerAdjustments adjustments) async {
+    if (adjustments.isIdentity || _workingImage == null) return;
+    _pushUndoSnapshot();
+    await _flattenPendingAnnotations();
+    if (!mounted || _workingImage == null) return;
+
+    final source = _workingImage!;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawImage(
+      source,
+      Offset.zero,
+      Paint()..colorFilter = ColorFilter.matrix(adjustments.toColorMatrix()),
+    );
+    final picture = recorder.endRecording();
+    final adjusted = await picture.toImage(source.width, source.height);
+    picture.dispose();
+    if (!mounted) {
+      adjusted.dispose();
+      return;
+    }
+
+    setState(() => _workingImage = adjusted);
+    _documentController.markEdited();
+    source.dispose();
+  }
+
+  Future<void> _selectTool(EditorTool tool) async {
     if (_document.isSaving) return;
     if (tool == EditorTool.crop || _controls.activeTool == EditorTool.crop) {
       _resetZoom(animate: false);
@@ -598,7 +683,12 @@ String get _fileName {
     final nx1 = (localRect.right / boxSize.width).clamp(0.0, 1.0).toDouble();
     final ny1 = (localRect.bottom / boxSize.height).clamp(0.0, 1.0).toDouble();
 
-    final srcRect = Rect.fromLTRB(nx0 * rotW, ny0 * rotH, nx1 * rotW, ny1 * rotH);
+    final srcRect = Rect.fromLTRB(
+      nx0 * rotW,
+      ny0 * rotH,
+      nx1 * rotW,
+      ny1 * rotH,
+    );
     final newWidth = srcRect.width.round().clamp(1, baseImage.width).toInt();
     final newHeight = srcRect.height.round().clamp(1, baseImage.height).toInt();
 
@@ -673,7 +763,7 @@ String get _fileName {
         image.dispose();
         return;
       }
-     final oldImage = _workingImage;
+      final oldImage = _workingImage;
       _resetZoom(animate: false);
       setState(() {
         _workingImage = image;
@@ -812,9 +902,7 @@ String get _fileName {
       }
 
       final lastSlash = targetPath.lastIndexOf('/');
-      final dirPath = lastSlash == -1
-          ? ''
-          : targetPath.substring(0, lastSlash);
+      final dirPath = lastSlash == -1 ? '' : targetPath.substring(0, lastSlash);
       final baseName = lastSlash == -1
           ? targetPath
           : targetPath.substring(lastSlash + 1);
@@ -824,7 +912,11 @@ String get _fileName {
         final raw = await _fileIoApi.listDirectory(container, dirPath);
         if (raw != null) existingEntries = RawEntry.parseAll(raw);
       } catch (e) {
-        VeLog.w('ImageEditorScreen', 'Directory listing failed at ${VeLog.censorUri(dirPath)} during rename conflict check', e);
+        VeLog.w(
+          'ImageEditorScreen',
+          'Directory listing failed at ${VeLog.censorUri(dirPath)} during rename conflict check',
+          e,
+        );
       }
       if (!mounted) return;
 
@@ -850,7 +942,13 @@ String get _fileName {
 
       switch (choice) {
         case SaveAsNewFile(:final fileName):
-          await _saveAsNewFile(container, dirPath, fileName, fsType, encodedBytes);
+          await _saveAsNewFile(
+            container,
+            dirPath,
+            fileName,
+            fsType,
+            encodedBytes,
+          );
         case OverwriteOriginal():
           await _saveOverwrite(container, targetPath, encodedBytes);
       }
@@ -888,11 +986,7 @@ String get _fileName {
           tone: AppBannerTone.error,
         );
       case PathBuildSuccess(:final path):
-        final ok = await _fileIoApi.writeWholeFile(
-          container,
-          path,
-          bytes,
-        );
+        final ok = await _fileIoApi.writeWholeFile(container, path, bytes);
         if (!mounted) return;
         _documentController.setSaving(false);
         if (ok) {
@@ -919,11 +1013,7 @@ String get _fileName {
     String filePath,
     Uint8List bytes,
   ) async {
-    final ok = await _fileIoApi.writeWholeFile(
-      container,
-      filePath,
-      bytes,
-    );
+    final ok = await _fileIoApi.writeWholeFile(container, filePath, bytes);
     if (!mounted) return;
     if (!ok) {
       _documentController.setSaving(false);
@@ -980,7 +1070,7 @@ String get _fileName {
                 Navigator.of(dialogContext).pop(_ExitChoice.discard),
             child: Text(l10n.discardButton),
           ),
-         if (!(widget.container?.readOnly ?? false))
+          if (!(widget.container?.readOnly ?? false))
             FilledButton(
               onPressed: () =>
                   Navigator.of(dialogContext).pop(_ExitChoice.save),
@@ -1007,11 +1097,15 @@ String get _fileName {
 
   @override
   Widget build(BuildContext context) {
+    if (_containerLocked) {
+      return const ColoredBox(color: Colors.black, child: SizedBox.expand());
+    }
     ref.watch(imageEditorControlsProvider(_controlsKey));
     ref.watch(imageEditorAnnotationsProvider(_controlsKey));
     ref.watch(imageEditorDocumentProvider(_controlsKey));
     final l10n = context.l10n;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final hasError = _document.isLoading || _document.errorMessage != null;
 
     return PopScope(
@@ -1044,7 +1138,8 @@ String get _fileName {
                     cropAspectRatio: _controls.cropAspectRatio,
                     cropBoxSize: _cropBoxSize,
                     onRotateAngleChanged: _onRotateAngleChanged,
-                    onResetRotation: () => _controlsController.setCropRotationAngle(0.0),
+                    onResetRotation: () =>
+                        _controlsController.setCropRotationAngle(0.0),
                     onRotate90: _stepRotate90,
                     onSetCropAspect: _setCropAspect,
                     currentColor: _controls.currentColor,
@@ -1071,7 +1166,8 @@ String get _fileName {
                     cropAspectRatio: _controls.cropAspectRatio,
                     cropBoxSize: _cropBoxSize,
                     onRotateAngleChanged: _onRotateAngleChanged,
-                    onResetRotation: () => _controlsController.setCropRotationAngle(0.0),
+                    onResetRotation: () =>
+                        _controlsController.setCropRotationAngle(0.0),
                     onRotate90: _stepRotate90,
                     onSetCropAspect: _setCropAspect,
                     currentColor: _controls.currentColor,
@@ -1092,7 +1188,7 @@ String get _fileName {
     );
   }
 
-   Future<void> _onContinueCapturePressed() async {
+  Future<void> _onContinueCapturePressed() async {
     if (_document.isSaving || _workingImage == null) return;
     _documentController.setSaving(true);
     try {
@@ -1120,6 +1216,11 @@ String get _fileName {
       ];
     }
     final actions = <Widget>[
+      IconButton(
+        icon: const Icon(Icons.tune_rounded),
+        tooltip: l10n.adjustmentsSheetTitle,
+        onPressed: _showColorAdjustments,
+      ),
       IconButton(
         icon: const Icon(Icons.undo_rounded),
         tooltip: l10n.undoTooltip,
@@ -1222,7 +1323,7 @@ String get _fileName {
       );
     }
 
-   final isCropping = _controls.activeTool == EditorTool.crop;
+    final isCropping = _controls.activeTool == EditorTool.crop;
 
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != null && _lastOrientation != orientation) {
@@ -1237,10 +1338,7 @@ String get _fileName {
         return TweenAnimationBuilder<double>(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
-          tween: Tween<double>(
-            begin: 0.0,
-            end: isCropping ? 24.0 : 0.0,
-          ),
+          tween: Tween<double>(begin: 0.0, end: isCropping ? 24.0 : 0.0),
           builder: (context, animatedPadding, child) {
             final image = _workingImage!;
             final fitted = _computeFittedRect(
@@ -1320,17 +1418,22 @@ String get _fileName {
             return Stack(
               children: [
                 GestureDetector(
-                  onDoubleTapDown: (details) =>
-                      _handleDoubleTap(details.localPosition, constraints.biggest),
+                  onDoubleTapDown: (details) => _handleDoubleTap(
+                    details.localPosition,
+                    constraints.biggest,
+                  ),
                   child: InteractiveViewer(
                     transformationController: _transformationController,
                     minScale: 1.0,
                     maxScale: 5.0,
                     panEnabled:
                         !isCropping && _controls.activeTool == EditorTool.none,
-                    scaleEnabled: !isCropping,
+                    scaleEnabled: _controls.activeTool == EditorTool.none,
                     clipBehavior: Clip.hardEdge,
-                    child: canvasContent,
+                    child: ColorAdjustFilter(
+                      adjustments: _previewAdjustments,
+                      child: canvasContent,
+                    ),
                   ),
                 ),
                 Positioned(
@@ -1379,7 +1482,9 @@ String get _fileName {
                         shape: BoxShape.circle,
                         border: _controls.currentStrokeWidthFraction == fraction
                             ? Border.all(
-                                color: Theme.of(sheetContext).colorScheme.primary,
+                                color: Theme.of(
+                                  sheetContext,
+                                ).colorScheme.primary,
                                 width: 2,
                               )
                             : null,
@@ -1413,7 +1518,10 @@ String get _fileName {
           children: [
             for (final size in sizes)
               ListTile(
-                title: Text(size.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(
+                  size.label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 subtitle: Text(
                   'Sample preview ABC 123',
                   style: TextStyle(
@@ -1601,7 +1709,11 @@ class _AngleRulerDialState extends State<_AngleRulerDial> {
           const SizedBox(width: 6),
 
           IconButton(
-            icon: const Icon(Icons.rotate_90_degrees_cw_rounded, size: 20, color: Colors.white),
+            icon: const Icon(
+              Icons.rotate_90_degrees_cw_rounded,
+              size: 20,
+              color: Colors.white,
+            ),
             tooltip: '+90°',
             onPressed: widget.onRotate90,
           ),
@@ -1646,7 +1758,8 @@ class _RulerPainter extends CustomPainter {
       var normDeg = deg % 360;
       if (normDeg < 0) normDeg += 360;
 
-      final isCardinal = normDeg == 0 || normDeg == 90 || normDeg == 180 || normDeg == 270;
+      final isCardinal =
+          normDeg == 0 || normDeg == 90 || normDeg == 180 || normDeg == 270;
       final isMajor = deg % 10 == 0;
       final isMedium = deg % 5 == 0;
 
@@ -1698,10 +1811,7 @@ class _RotatedImagePreviewPainter extends CustomPainter {
   final ui.Image image;
   final double angleRad;
 
-  _RotatedImagePreviewPainter({
-    required this.image,
-    required this.angleRad,
-  });
+  _RotatedImagePreviewPainter({required this.image, required this.angleRad});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1712,7 +1822,10 @@ class _RotatedImagePreviewPainter extends CustomPainter {
 
     final cosVal = math.cos(angleRad).abs();
     final sinVal = math.sin(angleRad).abs();
-    final unscaledRotW = math.max(1.0, image.width * cosVal + image.height * sinVal);
+    final unscaledRotW = math.max(
+      1.0,
+      image.width * cosVal + image.height * sinVal,
+    );
     final scale = size.width / unscaledRotW;
 
     final drawW = image.width * scale;
@@ -1786,7 +1899,9 @@ class _SquareToolCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bgColor = selected ? cs.primaryContainer : Colors.white.withValues(alpha: 0.08);
+    final bgColor = selected
+        ? cs.primaryContainer
+        : Colors.white.withValues(alpha: 0.08);
     final iconColor = selected ? cs.onPrimaryContainer : Colors.white;
 
     return Material(
@@ -1934,10 +2049,7 @@ class _TextAnnotationDialogState extends State<_TextAnnotationDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(widget.cancelLabel),
         ),
-       FilledButton(
-          onPressed: _submit,
-          child: Text(widget.addLabel),
-        ),
+        FilledButton(onPressed: _submit, child: Text(widget.addLabel)),
       ],
     );
   }

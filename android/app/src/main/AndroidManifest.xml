@@ -218,10 +218,9 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps unlocked encrypted vaults mounted and available to other apps while the app is in the background" />
         </service>
-        <!-- Background playback + media notification / lock screen controls for
-             media opened from an unlocked vault. Not exported: it is only ever
-             driven in-process by VaultPlaybackSession, and its notification
-             actions use explicit, immutable PendingIntents. -->
+        <receiver
+            android:name="com.aeidolon.vaultexplorer.service.ContainerAutoCloseAlarmReceiver"
+            android:exported="false" />
         <service
             android:name="com.aeidolon.vaultexplorer.service.VaultMediaPlaybackService"
             android:exported="false"

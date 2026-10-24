@@ -23,6 +23,9 @@ class BackgroundServiceHandlers(private val activity: MainActivity) {
 
     fun handleSyncBackgroundService(call: MethodCall, result: MethodChannel.Result) {
         val enabled = call.argument<Boolean>("enabled") ?: false
+        VaultKeepAliveService.updateLockOnAppBackgroundUris(
+            call.argument<List<String>>("lockOnAppBackgroundUris"),
+        )
         val hasSessions = ContainerSessionRegistry.hasAnyActiveSessions()
         val intent = Intent(activity, VaultKeepAliveService::class.java)
         if (enabled && hasSessions) {
@@ -35,6 +38,17 @@ class BackgroundServiceHandlers(private val activity: MainActivity) {
             }
             activity.stopService(intent)
         }
+        result.success(null)
+    }
+
+    fun handleScheduleContainerAutoClose(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri.isNullOrBlank()) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        val deadlineMillis = call.argument<Number>("deadlineMillis")?.toLong()
+        VaultKeepAliveService.scheduleContainerAutoClose(activity, vaultUri, deadlineMillis)
         result.success(null)
     }
 

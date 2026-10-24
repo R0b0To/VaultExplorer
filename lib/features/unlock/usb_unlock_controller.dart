@@ -5,6 +5,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/biometric_auth_utils.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -529,6 +530,7 @@ void selectDevice(UsbDeviceInfo device) {
       }
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
+      if (isBiometricCancellation(e.code.name, e.description)) return;
       if (e.code.name.toLowerCase().contains('progress') ||
           desc.contains('progress')) {
         return;
@@ -540,6 +542,7 @@ void selectDevice(UsbDeviceInfo device) {
         );
       }
     } on PlatformException catch (e) {
+      if (isBiometricCancellation(e.code, e.message)) return;
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||
           (e.message?.contains('Authentication in progress') ?? false)) {

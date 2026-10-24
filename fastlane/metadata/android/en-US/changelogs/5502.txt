@@ -1,3 +1,4 @@
 - Fixed an issue where the document scanner library failed to load when first used on local storage
 - Fixed a duplicate floating drag handle in the image editor adjustments sheet
 - Minor UI polish and bug fixes
+- Fixed moved files still showing in their original folder when it's open in another tab

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -9,6 +10,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -1458,33 +1460,40 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           : bottomBarSlot,
     );
 
-    return FullScreenDragDrawer(
-      drawer: drawer,
-      onDrawerChanged: _onDrawerChanged,
-      onEdgeGestureChanged: _onEdgeDrawerGestureChanged,
-      edgeGestureTop: browserChromeBottom(),
-      edgeGestureTopBuilder: browserChromeBottom,
-      canStartGestureAt: canStartDrawerGestureAt,
-      // Reserve the left edge of the viewport for drawer opening while the
-      // PageView keeps native swipes everywhere else. On the first tab a right
-      // swipe may open it from anywhere, unless that swipe is what loops the
-      // tabs round to the last one or the person turned that action off. With
-      // tab swiping off there is no pager to keep out of the way.
-      canOpenFromAnywhere:
-          !(tabsEnabled && hasMultipleTabs) ||
-          tabSwipingOff ||
-          (isFirstTab &&
-              switch (tabEdgeSwipe) {
-                BrowserTabEdgeSwipe.drawerAndNewTab => true,
-                // Side by side there is no pager to loop, so the swipe is free.
-                BrowserTabEdgeSwipe.loop => !loopTabs,
-                BrowserTabEdgeSwipe.noEdgeActions ||
-                BrowserTabEdgeSwipe.noTabSwiping => false,
-              }),
-      backGestureInsetLeft: systemBackGestureInsetLeft < 24
-          ? 24
-          : systemBackGestureInsetLeft,
-      child: shell,
+    // Must wrap the whole screen: the system-bar probe points sit *behind* the
+    // status/nav bars, outside the SafeArea that the app bar and
+    // DirectoryContentView live in. Without this, nothing re-applies the
+    // theme's style after a full-screen viewer (which sets light icons) closes.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppSystemUI.forTheme(Theme.of(context)),
+      child: FullScreenDragDrawer(
+        drawer: drawer,
+        onDrawerChanged: _onDrawerChanged,
+        onEdgeGestureChanged: _onEdgeDrawerGestureChanged,
+        edgeGestureTop: browserChromeBottom(),
+        edgeGestureTopBuilder: browserChromeBottom,
+        canStartGestureAt: canStartDrawerGestureAt,
+        // Reserve the left edge of the viewport for drawer opening while the
+        // PageView keeps native swipes everywhere else. On the first tab a right
+        // swipe may open it from anywhere, unless that swipe is what loops the
+        // tabs round to the last one or the person turned that action off. With
+        // tab swiping off there is no pager to keep out of the way.
+        canOpenFromAnywhere:
+            !(tabsEnabled && hasMultipleTabs) ||
+            tabSwipingOff ||
+            (isFirstTab &&
+                switch (tabEdgeSwipe) {
+                  BrowserTabEdgeSwipe.drawerAndNewTab => true,
+                  // Side by side there is no pager to loop, so the swipe is free.
+                  BrowserTabEdgeSwipe.loop => !loopTabs,
+                  BrowserTabEdgeSwipe.noEdgeActions ||
+                  BrowserTabEdgeSwipe.noTabSwiping => false,
+                }),
+        backGestureInsetLeft: systemBackGestureInsetLeft < 24
+            ? 24
+            : systemBackGestureInsetLeft,
+        child: shell,
+      ),
     );
   }
 }

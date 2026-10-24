@@ -5043,11 +5043,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final bool isActiveTab = _isActiveTab;
     final bool canPop =
         !isActiveTab || _resolveBack() == BrowserBackAction.leave;
-    final systemOverlayStyle =
-        Theme.of(context).appBarTheme.systemOverlayStyle ??
-        (Theme.of(context).brightness == Brightness.dark
-            ? AppSystemUI.transparentDark
-            : SystemUiOverlayStyle.dark);
+    final systemOverlayStyle = AppSystemUI.forTheme(Theme.of(context));
     final Widget? browserBottomBar = (!isLandscape && showActionBar)
         ? Column(
             mainAxisSize: MainAxisSize.min,

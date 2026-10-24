@@ -27,6 +27,13 @@ abstract final class AppSystemUI {
     systemNavigationBarContrastEnforced: false,
     systemStatusBarContrastEnforced: false,
   );
+
+  /// The overlay style a full-screen page should publish for [theme].
+  static SystemUiOverlayStyle forTheme(ThemeData theme) =>
+      theme.appBarTheme.systemOverlayStyle ??
+      (theme.brightness == Brightness.dark
+          ? transparentDark
+          : SystemUiOverlayStyle.dark);
 }
 
 abstract final class AppIconSize {

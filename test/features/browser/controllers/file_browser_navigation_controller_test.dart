@@ -240,7 +240,7 @@ void main() {
 
         final enteredSegment = container.read(fileBrowserNavigationProvider(const TabId(1))).pathStack.last;
         expect(enteredSegment.previewItems?.map((e) => e.name), ['root-file.txt']);
-        expect(enteredSegment.previewLayoutMode, BrowserLayoutMode.list);
+        expect(enteredSegment.previewLayoutMode, BrowserLayoutMode.detailed);
 
         subscription.close();
       });

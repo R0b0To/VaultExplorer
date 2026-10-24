@@ -170,11 +170,11 @@ void main() {
     test('defaults in defaults() factory and constructor', () {
       final def = FileManagerToolbarConfig.defaults();
       expect(def.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(def.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
+      expect(def.defaultThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
 
       const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
       expect(unassigned.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(unassigned.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
+      expect(unassigned.defaultThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
     });
 
     test('copyWith updates thumbnail settings', () {
@@ -206,7 +206,7 @@ void main() {
     test('fromJson falls back to defaults when keys are missing', () {
       final config = FileManagerToolbarConfig.fromJson({});
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(config.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
+      expect(config.defaultThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
     });
   });
 
@@ -214,10 +214,16 @@ void main() {
     test('defaults match the vault default', () {
       final def = FileManagerToolbarConfig.defaults();
       expect(def.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(def.localStorageThumbnailQuality, ThumbnailQuality.defaultQuality);
+      expect(def.localStorageThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
 
       const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
-      expect(unassigned.localStorageThumbnails, ThumbnailSettings.defaults);
+      expect(
+        unassigned.localStorageThumbnails,
+        const ThumbnailSettings(
+          cacheMode: ThumbnailCacheMode.disabled,
+          quality: ThumbnailQuality.defaultAutoQuality,
+        ),
+      );
     });
 
     test('is independent of the vault default', () {

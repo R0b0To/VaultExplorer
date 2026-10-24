@@ -25,7 +25,7 @@ void main() {
       expect(s.autoLockMins, 0);
       expect(s.autoLockScreenLockOnly, isFalse);
       expect(s.appLockScreenLockOnly, isFalse);
-      expect(s.defaultLayoutMode, BrowserLayoutMode.list);
+      expect(s.defaultLayoutMode, BrowserLayoutMode.detailed);
       expect(s.containerSortMode, ContainerSortMode.manual);
       expect(s.themeMode, ThemeMode.system);
       expect(s.defaultFileSortBy, SortBy.name);
@@ -219,7 +219,7 @@ void main() {
       expect(s.autoLockMins, 0);
       expect(s.autoLockScreenLockOnly, isFalse);
       expect(s.appLockScreenLockOnly, isFalse);
-      expect(s.defaultLayoutMode, BrowserLayoutMode.list);
+      expect(s.defaultLayoutMode, BrowserLayoutMode.detailed);
       expect(s.containerSortMode, ContainerSortMode.manual);
       expect(s.themeMode, ThemeMode.system);
       expect(s.defaultFileSortBy, SortBy.name);

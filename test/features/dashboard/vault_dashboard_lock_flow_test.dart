@@ -257,6 +257,15 @@ void main() {
       controller.onContainerMounted(vaultDefault, record: recordDefault);
       controller.onContainerMounted(vaultNever, record: recordNever);
 
+      // MainShell owns the session-lock wiring in the app (the Dashboard is
+      // replaced by a vault's tab, so it cannot), which this bare Dashboard
+      // test has no shell for -- configure the lock controller the same way.
+      container.read(sessionLockControllerProvider).configure(
+            settings: () => container.read(vaultDashboardControllerProvider).appSettings,
+            lockAllMountedContainers: () => controller.lockAllMountedContainersForAutoLock(),
+            enforceAppLock: () {},
+          );
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,

@@ -8,7 +8,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
@@ -19,7 +18,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
@@ -34,7 +32,6 @@ import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart'
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
-import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_status_banner.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
@@ -78,7 +75,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isFabVisible = true;
-  bool _isEnforcingLock = false;
   late final ProviderContainer _container;
 
   // Cached stand-in [MountedContainer] for real device storage (see
@@ -184,15 +180,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     // and container unmounting) remain safe even after this widget is unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
     if (widget.backPreviewOnly) return;
-    _lockController.configure(
-      settings: () => _container.read(appSettingsControllerProvider).settings,
-      lockAllMountedContainers: _lockAllMountedContainers,
-      lockImmediateOverrideContainers: _lockImmediateOverrideContainers,
-      lockScreenLockOnlyContainers: _lockScreenLockOnlyContainers,
-      enforceAppLock: _enforceAppLock,
-    );
-    _lockController.notifyAppUnlocked(preserveBackgroundState: true);
-    unawaited(_resumePersistedVaultAutoLock());
+    // Session-lock wiring (configure, background/resume handling, app-lock
+    // gate) lives in MainShell: Home is replaced by the vault's tab when a
+    // vault is opened from it, so this widget is not always alive.
     WidgetsBinding.instance.addObserver(this);
     _checkStorageAccess();
   }
@@ -200,14 +190,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   @override
   void didUpdateWidget(covariant VaultDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
-  }
-
-  Future<void> _resumePersistedVaultAutoLock() async {
-    await _container.read(appSettingsControllerProvider.notifier).load();
-    if (!mounted) return;
-    await _lockController.resumeFromPersistedBackgroundState(
-      evaluateAppLock: false,
-    );
   }
 
   bool _handleDashboardScrollNotification(
@@ -292,92 +274,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       ref.read(vaultDashboardControllerProvider.notifier).handleRefresh();
       unawaited(_handleAppResume());
     }
-    _lockController.handleAppLifecycleState(state);
-  }
-
-  Future<void> _enforceAppLock() async {
-    VeLog.i(
-      _kLogTag,
-      '_enforceAppLock: called (isEnforcingLock=$_isEnforcingLock)',
-    );
-    if (!mounted || _isEnforcingLock) return;
-    _isEnforcingLock = true;
-    try {
-      final mode = await disguiseModeApi.getMode();
-      if (!mounted) return;
-
-      final navigator = Navigator.of(context);
-      navigator.popUntil((route) => route.isFirst);
-
-      if (mode == DisguiseMode.decoy) {
-        VeLog.i(
-          _kLogTag,
-          '_enforceAppLock: decoy mode active, disabling secure screen instead of locking',
-        );
-        await _container.read(secureScreenPolicyProvider).disableForDecoy();
-        return;
-      }
-
-      final settings = _container.read(appSettingsControllerProvider).settings;
-      if (settings.useMasterPassword && settings.masterPasswordHash != null) {
-        VeLog.i(
-          _kLogTag,
-          '_enforceAppLock: master password set -> pushing LockGateScreen',
-        );
-        navigator.pushAndRemoveUntil(
-          PageRouteBuilder(
-            pageBuilder: (_, _, _) => const LockGateScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-          (route) => false,
-        );
-      } else {
-        VeLog.d(
-          _kLogTag,
-          '_enforceAppLock: no master password set, nothing to push',
-        );
-        _container.read(sessionLockControllerProvider).notifyAppUnlocked();
-      }
-    } finally {
-      _isEnforcingLock = false;
-    }
-  }
-
-  Future<void> _lockAllMountedContainers() async {
-    await _container
-        .read(vaultDashboardControllerProvider.notifier)
-        .lockAllMountedContainersForAutoLock();
-  }
-
-  // Companion to _lockAllMountedContainers, for containers explicitly
-  // configured to "Immediately" (ContainerRecord.autoCloseImmediately).
-  // Called by SessionLockController on real screen-off/backgrounding events,
-  // independent of the app-wide sweep above and its timing -- see
-  // SessionLockController's class doc comment and _lockImmediateOverrides.
-  // These containers are exempt from _lockAllMountedContainers (they're
-  // "isExemptFromGlobalLock"), so there's no overlap/double-locking between
-  // the two methods.
-  Future<void> _lockImmediateOverrideContainers() async {
-    await _container
-        .read(vaultDashboardControllerProvider.notifier)
-        .lockImmediatelyConfiguredContainers();
-  }
-
-  // Companion to _lockImmediateOverrideContainers, for containers
-  // explicitly configured to "Screen Lock Only"
-  // (ContainerRecord.autoCloseScreenLockOnly). Called by
-  // SessionLockController ONLY from handleScreenOff -- never from
-  // handleAppLifecycleState's resumed-after-backgrounding branch, since
-  // ignoring mere app-backgrounding (screen still on) is exactly what this
-  // mode means -- see SessionLockController's class doc comment and
-  // _lockScreenLockOnlyOverrides. These containers are also exempt from
-  // _lockAllMountedContainers (they're "isExemptFromGlobalLock"), so
-  // there's no overlap/double-locking between the two methods.
-  Future<void> _lockScreenLockOnlyContainers() async {
-    await _container
-        .read(vaultDashboardControllerProvider.notifier)
-        .lockScreenLockOnlyConfiguredContainers();
   }
 
   /// Opens [container] in an additional file-manager tab (long-press menu of

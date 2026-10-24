@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -26,6 +27,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dar
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
+import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
@@ -33,6 +35,8 @@ import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+
+const _kLogTag = 'MainShell';
 
 class MainShell extends ConsumerStatefulWidget {
   final bool hideDashboardUntilShareHandled;
@@ -51,6 +55,8 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
   int _index = 0;
+  late final ProviderContainer _container;
+  bool _isEnforcingLock = false;
   late bool _hideDashboard = widget.hideDashboardUntilShareHandled;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
     const [],
@@ -134,6 +140,9 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Cached so asynchronous lock callbacks stay safe after this widget is
+    // unmounted.
+    _container = ProviderScope.containerOf(context, listen: false);
     _quickCaptureColdStart = ref.read(pendingQuickCaptureLaunchProvider).take();
     if (!_quickCaptureColdStart) {
       // The Settings tab used to be the thing that created -- and so started
@@ -142,6 +151,7 @@ class _MainShellState extends ConsumerState<MainShell>
       // `.settings` and expect it already loaded, so creating it here keeps
       // that timing now that the tab itself is built lazily.
       ref.read(appSettingsControllerProvider);
+      _configureSessionLock();
     }
     final policy = _secureScreenPolicy; // Eagerly evaluate while mounted
     ref.read(appSettingsServiceProvider).loadSettings().then((settings) {
@@ -254,17 +264,108 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final lockController = ref.read(sessionLockControllerProvider);
+    var leaveToDecoy = false;
     if (widget.returnToDecoyOnBackground &&
         (state == AppLifecycleState.hidden ||
             state == AppLifecycleState.paused)) {
       // System pickers and similar operations deliberately suppress auto-lock;
       // they may briefly background this activity but should not close the
       // revealed vault shell while the external operation is in progress.
-      if (ref.read(sessionLockControllerProvider).isLockSuppressed) return;
+      leaveToDecoy = !lockController.isLockSuppressed;
+    }
+    if (leaveToDecoy) {
       final navigator = Navigator.of(context, rootNavigator: true);
       if (navigator.canPop()) {
         navigator.popUntil((route) => route.isFirst);
       }
+    }
+    // Background/resume locking is driven from here rather than from the
+    // Dashboard: Home is replaced by the vault's tab when a vault is opened
+    // from it, so the Dashboard (and its observer) is gone for as long as the
+    // person is inside a vault.
+    if (!_quickCaptureColdStart) {
+      lockController.handleAppLifecycleState(state);
+    }
+  }
+
+  void _configureSessionLock() {
+    final lockController = ref.read(sessionLockControllerProvider);
+    lockController.configure(
+      settings: () => _container.read(appSettingsControllerProvider).settings,
+      lockAllMountedContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockAllMountedContainersForAutoLock(),
+      // Containers set to "Immediately", locked on real background/screen-off
+      // events independently of the app-wide sweep (see SessionLockController).
+      lockImmediateOverrideContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockImmediatelyConfiguredContainers(),
+      // Containers set to "Screen Lock Only"; SessionLockController only calls
+      // this from handleScreenOff, never for mere backgrounding.
+      lockScreenLockOnlyContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockScreenLockOnlyConfiguredContainers(),
+      enforceAppLock: _enforceAppLock,
+    );
+    lockController.notifyAppUnlocked(preserveBackgroundState: true);
+    unawaited(_resumePersistedVaultAutoLock());
+  }
+
+  Future<void> _resumePersistedVaultAutoLock() async {
+    await _container.read(appSettingsControllerProvider.notifier).load();
+    if (!mounted) return;
+    await ref
+        .read(sessionLockControllerProvider)
+        .resumeFromPersistedBackgroundState(evaluateAppLock: false);
+  }
+
+  Future<void> _enforceAppLock() async {
+    VeLog.i(
+      _kLogTag,
+      '_enforceAppLock: called (isEnforcingLock=$_isEnforcingLock)',
+    );
+    if (!mounted || _isEnforcingLock) return;
+    _isEnforcingLock = true;
+    try {
+      final mode = await disguiseModeApi.getMode();
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
+
+      if (mode == DisguiseMode.decoy) {
+        VeLog.i(
+          _kLogTag,
+          '_enforceAppLock: decoy mode active, disabling secure screen instead of locking',
+        );
+        await _container.read(secureScreenPolicyProvider).disableForDecoy();
+        return;
+      }
+
+      final settings = _container.read(appSettingsControllerProvider).settings;
+      if (settings.useMasterPassword && settings.masterPasswordHash != null) {
+        VeLog.i(
+          _kLogTag,
+          '_enforceAppLock: master password set -> pushing LockGateScreen',
+        );
+        navigator.pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (_, _, _) => const LockGateScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+          (route) => false,
+        );
+      } else {
+        VeLog.d(
+          _kLogTag,
+          '_enforceAppLock: no master password set, nothing to push',
+        );
+        _container.read(sessionLockControllerProvider).notifyAppUnlocked();
+      }
+    } finally {
+      _isEnforcingLock = false;
     }
   }
 
@@ -568,7 +669,9 @@ class _MainShellState extends ConsumerState<MainShell>
     _cacheDashboardLocalStorageContainer();
     final choice = await BrowserNewTabSheet.show(
       context,
-      mountedVaults: _mountedNotifier.value,
+      // Read the keepAlive controller directly: the notifier is only a mirror
+      // and used to go stale while Home was off-screen.
+      mountedVaults: ref.read(vaultDashboardControllerProvider).mounted,
       primaryLocalContainer: _primaryLocalStorageContainer,
     );
     if (!mounted || choice == null) return;
@@ -631,6 +734,14 @@ class _MainShellState extends ConsumerState<MainShell>
           _browserWorkspaceActions?.closeOthers(activeTabId);
         }
       },
+    );
+    // Keep the notifier (read by Tools and container resolution) in sync with
+    // the keepAlive dashboard controller. The Dashboard widget used to be its
+    // only writer, from its own build, so a lock/unlock done while Home was
+    // not built (drawer, another tab) left the list stale until Home was shown.
+    ref.listen<List<MountedContainer>>(
+      vaultDashboardControllerProvider.select((state) => state.mounted),
+      (_, mounted) => _mountedNotifier.value = List.unmodifiable(mounted),
     );
     final workspace = _browserWorkspace;
     if (workspace != null) {
@@ -760,7 +871,8 @@ class _MainShellState extends ConsumerState<MainShell>
             key: const ValueKey('main-shell-browser-tabs-host'),
             initialContainer: null,
             resolveContainer: resolveContainer,
-            mountedContainers: () => _mountedNotifier.value,
+            mountedContainers: () =>
+                ref.read(vaultDashboardControllerProvider).mounted,
             primaryLocalContainer: () => _primaryLocalStorageContainer,
             drawerBuilder: (workspace, volId) =>
                 buildDrawer(currentVolId: volId, workspace: workspace),

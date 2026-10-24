@@ -169,16 +169,17 @@ void _resizeAndSnapTests() {
     await tester.tapAt(origin(tester) + const Offset(100, 50));
     await tester.pump();
 
-    // Grab just inside the left edge and pull it right by 20px.
+    // Grab just inside the left edge and pull it right by 60px (it has to be
+    // well past the ~36px pan slop for the drag to start at all).
     await tester.dragFrom(
       origin(tester) + const Offset(45, 50),
-      const Offset(20, 0),
+      const Offset(60, 0),
     );
     await tester.pump();
 
     expect(result.added, isEmpty);
     final rect = result.updated.last.rect;
-    expect(rect.left, closeTo(0.15, 0.001));
+    expect(rect.left, closeTo(0.25, 0.001));
     expect(rect.right, closeTo(0.4, 0.001));
     expect(rect.top, closeTo(0.1, 0.001));
     expect(rect.bottom, closeTo(0.4, 0.001));

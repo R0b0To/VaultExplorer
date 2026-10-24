@@ -942,7 +942,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Row 1: Time readout
+          // Row 1: Time readout and timeline zoom controls.
           Row(
             children: [
               ValueListenableBuilder<int>(
@@ -951,6 +951,25 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                   '${formatTimecode(us)} / ${formatTimecode(editor.durationUs)}',
                   style: text.labelLarge,
                 ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: l10n.videoEditorZoomOut,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.zoom_out_rounded),
+                onPressed: () => _timelineKey.currentState?.zoomBy(0.5),
+              ),
+              IconButton(
+                tooltip: l10n.videoEditorZoomIn,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.zoom_in_rounded),
+                onPressed: () => _timelineKey.currentState?.zoomBy(2),
+              ),
+              IconButton(
+                tooltip: l10n.videoEditorZoomFit,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.fit_screen_rounded),
+                onPressed: () => _timelineKey.currentState?.resetZoom(),
               ),
             ],
           ),

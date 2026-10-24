@@ -2457,6 +2457,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Evita cualquier operación de escritura o modificación en la bóveda';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Siempre en modo de solo lectura';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'Las nuevas sesiones comienzan en modo de solo lectura.';
+
+  @override
   String get selectUsbDeviceLabel => 'Seleccionar dispositivo USB';
 
   @override

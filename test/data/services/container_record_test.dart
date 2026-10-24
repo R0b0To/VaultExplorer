@@ -151,4 +151,28 @@ void main() {
       expect(immediate.autoCloseImmediately, isTrue);
     });
   });
+
+  group('ContainerRecord.alwaysOpenReadOnly', () {
+    test('defaults to false and round-trips as a vault setting', () {
+      const record = ContainerRecord(uri: 'file:///vault.hc', label: 'Vault');
+      expect(record.alwaysOpenReadOnly, isFalse);
+
+      final configured = record.copyWith(alwaysOpenReadOnly: true);
+      final restored = ContainerRecord.fromJson(configured.toJson());
+
+      expect(restored.alwaysOpenReadOnly, isTrue);
+      expect(configured.toJson().containsKey('alwaysOpenReadOnly'), isTrue);
+      expect(configured.toJson().containsKey('readOnly'), isFalse);
+    });
+
+    test('migrates the previous persisted readOnly value as the default', () {
+      final legacy = ContainerRecord.fromJson({
+        'uri': 'file:///vault.hc',
+        'label': 'Legacy Vault',
+        'readOnly': true,
+      });
+
+      expect(legacy.alwaysOpenReadOnly, isTrue);
+    });
+  });
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/unlock/unlock_controller.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations_en.dart';
 
@@ -61,6 +63,38 @@ void main() {
       controller.setReadOnly(true);
       expect(container.read(unlockControllerProvider(params)).readOnly, isTrue);
       expect(container.read(unlockControllerProvider(params)).protectHiddenVolume, isFalse);
+    });
+
+    test('initializes the session toggle from the persistent vault default', () async {
+      const record = ContainerRecord(
+        uri: 'file:///read-only-vault.hc',
+        label: 'Read-only Vault',
+        alwaysOpenReadOnly: true,
+      );
+      final localContainer = ProviderContainer(
+        overrides: [
+          containerRepositoryProvider.overrideWith(
+            (ref) => _SingleRecordRepository(record),
+          ),
+        ],
+      );
+      addTearDown(localContainer.dispose);
+
+      final localParams = UnlockParams(initialUri: record.uri);
+      localContainer.listen(unlockControllerProvider(localParams), (_, _) {});
+      for (var i = 0; i < 100; i++) {
+        if (!localContainer.read(unlockControllerProvider(localParams)).loadingAuth) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      final controller = localContainer.read(unlockControllerProvider(localParams).notifier);
+      expect(localContainer.read(unlockControllerProvider(localParams)).readOnly, isTrue);
+
+      controller.setReadOnly(false);
+      expect(localContainer.read(unlockControllerProvider(localParams)).readOnly, isFalse);
+      // The per-unlock override is held only in UnlockState; the saved vault
+      // preference remains the default for a future unlock.
+      expect(record.alwaysOpenReadOnly, isTrue);
     });
 
     test('setSelectedVaultKind clears current selection and switches format', () {
@@ -311,4 +345,19 @@ void main() {
       expect(pickArgs, isNull);
     });
   });
+}
+
+class _SingleRecordRepository extends ContainerRepository {
+  _SingleRecordRepository(this.record)
+    : super.withCryptoApi(_NoopVaultCryptoApi());
+
+  final ContainerRecord record;
+
+  @override
+  Future<Map<String, ContainerRecord>> loadAll() async => {record.uri: record};
+}
+
+class _NoopVaultCryptoApi implements VaultCryptoApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

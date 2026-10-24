@@ -41,6 +41,7 @@ void main() {
       // -- it must stay subject to the app-wide lock-all sweep.
       expect(state.autoCloseMins, kInheritAutoLockDuration);
       expect(state.documentProvider, isFalse);
+      expect(state.alwaysOpenReadOnly, isFalse);
       expect(state.cacheDerivedKey, isFalse);
       expect(state.cipherId, 255);
       expect(state.hashId, 255);
@@ -64,6 +65,10 @@ void main() {
 
       controller.setDocumentProvider(true);
       expect(container.read(provider).documentProvider, isTrue);
+
+      controller.setAlwaysOpenReadOnly(true);
+      expect(container.read(provider).alwaysOpenReadOnly, isTrue);
+      expect(container.read(provider).isModified('', 'My Vault'), isTrue);
 
       controller.setThumbnailCacheMode(ThumbnailCacheMode.inContainer);
       expect(container.read(provider).thumbnailCacheMode, ThumbnailCacheMode.inContainer);
@@ -93,7 +98,7 @@ void main() {
       expect(container.read(provider).canSave('password123'), isTrue);
     });
 
-    test('saveContainer preserves compositeCarriers from existingRecord', () async {
+    test('saveContainer preserves compositeCarriers and read-only default', () async {
       final fakeRepo = _FakeContainerRepo();
       final fakeStorage = _FakeAppSecureStorage();
       final fakeLifecycle = _FakeVaultLifecycleApi();
@@ -107,6 +112,7 @@ void main() {
       addTearDown(localContainer.dispose);
 
       final controller = localContainer.read(provider.notifier);
+      controller.setAlwaysOpenReadOnly(true);
 
       const existingRecord = ContainerRecord(
         uri: 'composite:test123hash',
@@ -128,6 +134,7 @@ void main() {
         {'uri': 'file:///carrier1.jpg', 'name': 'carrier1.jpg'},
         {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
       ]);
+      expect(saved.alwaysOpenReadOnly, isTrue);
     });
   });
 
@@ -175,6 +182,25 @@ void main() {
       final state = localContainer.read(provider);
       expect(state.useGlobalThumbnails, isTrue);
       expect(state.isModified('', 'My Vault'), isFalse);
+    });
+
+    test('loads and saves the persistent read-only default', () async {
+      const existing = ContainerRecord(
+        uri: 'file:///vault.hc',
+        label: 'My Vault',
+        alwaysOpenReadOnly: true,
+      );
+      await initFromRecord(existing);
+
+      final state = localContainer.read(provider);
+      expect(state.alwaysOpenReadOnly, isTrue);
+      expect(state.isModified('', 'My Vault'), isFalse);
+
+      localContainer.read(provider.notifier).setAlwaysOpenReadOnly(false);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isTrue);
+
+      final saved = await save(existing);
+      expect(saved!.alwaysOpenReadOnly, isFalse);
     });
 
     test('saving a vault that follows the default stores no thumbnail settings '

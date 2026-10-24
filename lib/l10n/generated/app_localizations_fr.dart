@@ -2470,6 +2470,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Empêche toute opération d\'écriture ou de modification sur le coffre';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Toujours en lecture seule';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'Les nouvelles sessions démarrent en lecture seule.';
+
+  @override
   String get selectUsbDeviceLabel => 'Sélectionner un périphérique USB';
 
   @override

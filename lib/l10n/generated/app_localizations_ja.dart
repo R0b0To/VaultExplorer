@@ -2325,6 +2325,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get readOnlyModeSubtitle => '保管庫への書き込みや変更操作を防止します';
 
   @override
+  String get alwaysOpenReadOnlyLabel => '常に読み取り専用';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle => '新しいセッションは読み取り専用で開始します。';
+
+  @override
   String get selectUsbDeviceLabel => 'USBデバイスを選択';
 
   @override

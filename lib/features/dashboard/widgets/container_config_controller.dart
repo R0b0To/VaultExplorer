@@ -63,6 +63,7 @@ class ContainerConfigState {
   final ContainerUnlockMethod unlockMethod;
   final int autoCloseMins;
   final bool documentProvider;
+  final bool alwaysOpenReadOnly;
   /// This vault's own thumbnail settings -- what the vault uses when
   /// [useGlobalThumbnails] is off. Prefilled with the app-wide default while
   /// the vault follows it, so turning the switch off changes nothing until
@@ -111,6 +112,7 @@ class ContainerConfigState {
   final ContainerUnlockMethod initialUnlockMethod;
   final int initialAutoCloseMins;
   final bool initialDocumentProvider;
+  final bool initialAlwaysOpenReadOnly;
   final int initialCipherId;
   final int initialHashId;
   final ThumbnailCacheMode? initialThumbnailCacheMode;
@@ -127,6 +129,7 @@ class ContainerConfigState {
     required this.unlockMethod,
     required this.autoCloseMins,
     required this.documentProvider,
+    this.alwaysOpenReadOnly = false,
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     this.useGlobalThumbnails = true,
@@ -155,6 +158,7 @@ class ContainerConfigState {
     required this.initialUnlockMethod,
     required this.initialAutoCloseMins,
     required this.initialDocumentProvider,
+    this.initialAlwaysOpenReadOnly = false,
     required this.initialCipherId,
     required this.initialHashId,
     this.initialThumbnailCacheMode,
@@ -200,6 +204,7 @@ class ContainerConfigState {
     if (unlockMethod != initialUnlockMethod) return true;
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
+    if (alwaysOpenReadOnly != initialAlwaysOpenReadOnly) return true;
     if (useGlobalThumbnails != initialUseGlobalThumbnails) return true;
     // While following the global default the vault's own values are not
     // stored, so editing them (or not) is not a change.
@@ -253,6 +258,7 @@ class ContainerConfigState {
     ContainerUnlockMethod? unlockMethod,
     int? autoCloseMins,
     bool? documentProvider,
+    bool? alwaysOpenReadOnly,
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
     bool? useGlobalThumbnails,
@@ -283,6 +289,7 @@ class ContainerConfigState {
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
     bool? initialUseGlobalThumbnails,
+    bool? initialAlwaysOpenReadOnly,
     bool? initialCacheDerivedKey,
     VaultDeleteAfterImportMode? initialVaultDeleteAfterImportMode,
     String? initialPatternHash,
@@ -292,6 +299,7 @@ class ContainerConfigState {
     unlockMethod: unlockMethod ?? this.unlockMethod,
     autoCloseMins: autoCloseMins ?? this.autoCloseMins,
     documentProvider: documentProvider ?? this.documentProvider,
+    alwaysOpenReadOnly: alwaysOpenReadOnly ?? this.alwaysOpenReadOnly,
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
     useGlobalThumbnails: useGlobalThumbnails ?? this.useGlobalThumbnails,
@@ -324,6 +332,8 @@ class ContainerConfigState {
     initialUnlockMethod: initialUnlockMethod,
     initialAutoCloseMins: initialAutoCloseMins,
     initialDocumentProvider: initialDocumentProvider,
+    initialAlwaysOpenReadOnly:
+        initialAlwaysOpenReadOnly ?? this.initialAlwaysOpenReadOnly,
     initialCipherId: initialCipherId,
     initialHashId: initialHashId,
     initialThumbnailCacheMode:
@@ -353,6 +363,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       unlockMethod: ContainerUnlockMethod.password,
       autoCloseMins: kInheritAutoLockDuration,
       documentProvider: false,
+      alwaysOpenReadOnly: false,
       cacheDerivedKey: false,
       settingsLocked: false,
       isMounted: false,
@@ -360,6 +371,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialUnlockMethod: ContainerUnlockMethod.password,
       initialAutoCloseMins: kInheritAutoLockDuration,
       initialDocumentProvider: false,
+      initialAlwaysOpenReadOnly: false,
       initialCipherId: 255,
       initialHashId: 255,
     );
@@ -403,6 +415,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       unlockMethod: initialUnlockMethod,
       autoCloseMins: initialAutoCloseMins,
       documentProvider: initialDocumentProvider,
+      alwaysOpenReadOnly: rec?.alwaysOpenReadOnly ?? false,
       thumbnailCacheMode: rec?.thumbnailCacheMode,
       thumbnailQuality: rec?.thumbnailQuality,
       // A vault that is being added, or one that was never given settings of
@@ -426,6 +439,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialUnlockMethod: initialUnlockMethod,
       initialAutoCloseMins: initialAutoCloseMins,
       initialDocumentProvider: initialDocumentProvider,
+      initialAlwaysOpenReadOnly: rec?.alwaysOpenReadOnly ?? false,
       initialCipherId: initialCipherId,
       initialHashId: initialHashId,
       initialThumbnailCacheMode: rec?.thumbnailCacheMode,
@@ -604,6 +618,9 @@ class ContainerConfigController extends _$ContainerConfigController {
 
   void setDocumentProvider(bool val) =>
       state = state._copy(documentProvider: val);
+
+  void setAlwaysOpenReadOnly(bool val) =>
+      state = state._copy(alwaysOpenReadOnly: val);
 
   void setThumbnailCacheMode(ThumbnailCacheMode mode) =>
       state = state._copy(thumbnailCacheMode: mode);
@@ -795,6 +812,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       autoCloseScreenLockOnly:
           state.autoCloseMins == kScreenLockOnlyAutoLockDuration,
       documentProvider: state.documentProvider,
+      alwaysOpenReadOnly: state.alwaysOpenReadOnly,
       documentProviderFolders:
           existingRecord?.documentProviderFolders ?? const [],
       // Null on both means "follow the app-wide default": nothing is

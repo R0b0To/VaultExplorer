@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_controller.dart';
 
 void main() {
@@ -75,6 +76,28 @@ void main() {
 
       controller.setRemember(true);
       expect(container.read(usbUnlockControllerProvider(params)).remember, isTrue);
+    });
+
+    test('initializes the session toggle from the persistent vault default', () async {
+      const record = ContainerRecord(
+        uri: 'usb:sdb1',
+        label: 'USB Vault',
+        alwaysOpenReadOnly: true,
+      );
+      final existingParams = UsbUnlockParams(existingRecord: record);
+      container.listen(usbUnlockControllerProvider(existingParams), (_, _) {});
+      for (var i = 0; i < 100; i++) {
+        final state = container.read(usbUnlockControllerProvider(existingParams));
+        if (!state.loadingAuth && !state.loadingDevices) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      final controller = container.read(usbUnlockControllerProvider(existingParams).notifier);
+      expect(container.read(usbUnlockControllerProvider(existingParams)).readOnly, isTrue);
+
+      controller.setReadOnly(false);
+      expect(container.read(usbUnlockControllerProvider(existingParams)).readOnly, isFalse);
+      expect(record.alwaysOpenReadOnly, isTrue);
     });
   });
 }

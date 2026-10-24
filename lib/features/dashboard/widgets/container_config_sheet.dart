@@ -1146,6 +1146,26 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(
+                context.l10n.alwaysOpenReadOnlyLabel,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                context.l10n.alwaysOpenReadOnlySubtitle,
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              value: state.alwaysOpenReadOnly,
+              onChanged: (value) => ref
+                  .read(containerConfigControllerProvider(_params).notifier)
+                  .setAlwaysOpenReadOnly(value),
+              secondary: const Icon(Icons.visibility_outlined),
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              title: Text(
                 context.l10n.androidFileProviderTitle,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,

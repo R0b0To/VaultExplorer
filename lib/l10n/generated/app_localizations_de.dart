@@ -2463,6 +2463,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Verhindert Schreib- oder Änderungsvorgänge im Tresor';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Immer schreibgeschützt';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'Neue Sitzungen starten schreibgeschützt.';
+
+  @override
   String get selectUsbDeviceLabel => 'USB-Gerät auswählen';
 
   @override

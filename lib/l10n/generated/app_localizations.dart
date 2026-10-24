@@ -4032,6 +4032,18 @@ abstract class AppLocalizations {
   /// **'Prevents any write or modify operations on the vault'**
   String get readOnlyModeSubtitle;
 
+  /// No description provided for @alwaysOpenReadOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Always read-only'**
+  String get alwaysOpenReadOnlyLabel;
+
+  /// No description provided for @alwaysOpenReadOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New sessions start read-only.'**
+  String get alwaysOpenReadOnlySubtitle;
+
   /// Label for USB device selector
   ///
   /// In en, this message translates to:

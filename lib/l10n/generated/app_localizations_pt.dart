@@ -2456,6 +2456,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Impede qualquer operação de escrita ou modificação no cofre';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Sempre somente leitura';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'Novas sessões começam como somente leitura.';
+
+  @override
   String get selectUsbDeviceLabel => 'Selecionar Dispositivo USB';
 
   @override

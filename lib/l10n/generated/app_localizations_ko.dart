@@ -2326,6 +2326,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get readOnlyModeSubtitle => '볼트에 대한 쓰기 또는 수정 작업을 방지합니다';
 
   @override
+  String get alwaysOpenReadOnlyLabel => '항상 읽기 전용';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle => '새 세션은 읽기 전용으로 시작합니다.';
+
+  @override
   String get selectUsbDeviceLabel => 'USB 장치 선택';
 
   @override

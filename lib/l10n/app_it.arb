@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Seleziona file o cartella",
   "readOnlyModeLabel": "Modalità sola lettura",
   "readOnlyModeSubtitle": "Impedisce qualsiasi operazione di scrittura o modifica sul vault",
+  "alwaysOpenReadOnlyLabel": "Sempre in sola lettura",
+  "alwaysOpenReadOnlySubtitle": "Le nuove sessioni iniziano in sola lettura.",
   "selectUsbDeviceLabel": "Seleziona dispositivo USB",
   "noUsbDevicesFound": "Nessun dispositivo di archiviazione USB compatibile trovato",
   "containerConfigTitle": "Configurazione vault",

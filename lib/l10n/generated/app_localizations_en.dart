@@ -2419,6 +2419,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Prevents any write or modify operations on the vault';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Always read-only';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle => 'New sessions start read-only.';
+
+  @override
   String get selectUsbDeviceLabel => 'Select USB Device';
 
   @override

@@ -2482,6 +2482,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Забороняє будь-які операції запису або зміни у сховищі';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'Завжди лише для читання';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'Нові сеанси починаються в режимі лише для читання.';
+
+  @override
   String get selectUsbDeviceLabel => 'Виберіть USB-пристрій';
 
   @override

@@ -2288,6 +2288,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readOnlyModeSubtitle => '阻止对保险库进行任何写入或修改操作';
 
   @override
+  String get alwaysOpenReadOnlyLabel => '始终只读';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle => '新会话将以只读模式启动。';
+
+  @override
   String get selectUsbDeviceLabel => '选择USB设备';
 
   @override

@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "选择文件或文件夹",
   "readOnlyModeLabel": "只读模式",
   "readOnlyModeSubtitle": "阻止对保险库进行任何写入或修改操作",
+  "alwaysOpenReadOnlyLabel": "始终只读",
+  "alwaysOpenReadOnlySubtitle": "新会话将以只读模式启动。",
   "selectUsbDeviceLabel": "选择USB设备",
   "noUsbDevicesFound": "未找到兼容的USB存储设备",
   "containerConfigTitle": "保险库配置",

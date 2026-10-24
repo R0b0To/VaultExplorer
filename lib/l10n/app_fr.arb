@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Sélectionner un fichier ou un dossier",
   "readOnlyModeLabel": "Mode lecture seule",
   "readOnlyModeSubtitle": "Empêche toute opération d'écriture ou de modification sur le coffre",
+  "alwaysOpenReadOnlyLabel": "Toujours en lecture seule",
+  "alwaysOpenReadOnlySubtitle": "Les nouvelles sessions démarrent en lecture seule.",
   "selectUsbDeviceLabel": "Sélectionner un périphérique USB",
   "noUsbDevicesFound": "Aucun périphérique de stockage USB compatible trouvé",
   "containerConfigTitle": "Configuration du coffre",

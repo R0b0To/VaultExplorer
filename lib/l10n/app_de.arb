@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Datei oder Ordner auswählen",
   "readOnlyModeLabel": "Schreibgeschützter Modus",
   "readOnlyModeSubtitle": "Verhindert Schreib- oder Änderungsvorgänge im Tresor",
+  "alwaysOpenReadOnlyLabel": "Immer schreibgeschützt",
+  "alwaysOpenReadOnlySubtitle": "Neue Sitzungen starten schreibgeschützt.",
   "selectUsbDeviceLabel": "USB-Gerät auswählen",
   "noUsbDevicesFound": "Keine kompatiblen USB-Speichergeräte gefunden",
   "containerConfigTitle": "Tresor-Konfiguration",

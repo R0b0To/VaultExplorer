@@ -3193,6 +3193,8 @@
     "description": "Checkbox label for mounting in read-only mode"
   },
   "readOnlyModeSubtitle": "Prevents any write or modify operations on the vault",
+  "alwaysOpenReadOnlyLabel": "Always read-only",
+  "alwaysOpenReadOnlySubtitle": "New sessions start read-only.",
   "@readOnlyModeSubtitle": {
     "description": "Subtitle explaining read-only mode"
   },

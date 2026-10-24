@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "اختيار ملف أو مجلد",
   "readOnlyModeLabel": "وضع القراءة فقط",
   "readOnlyModeSubtitle": "يمنع أي عمليات كتابة أو تعديل على الخزنة",
+  "alwaysOpenReadOnlyLabel": "القراءة فقط دائمًا",
+  "alwaysOpenReadOnlySubtitle": "تبدأ الجلسات الجديدة بوضع القراءة فقط.",
   "selectUsbDeviceLabel": "اختيار جهاز USB",
   "noUsbDevicesFound": "لم يتم العثور على أجهزة تخزين USB متوافقة",
   "containerConfigTitle": "تكوين الخزنة",

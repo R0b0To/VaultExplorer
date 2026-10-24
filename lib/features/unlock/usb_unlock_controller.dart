@@ -361,7 +361,7 @@ class UsbUnlockController extends _$UsbUnlockController {
       if (!ref.mounted) return;
       state = state._copy(
         unlockMethod: record.unlockMethod,
-        readOnly: record.readOnly,
+        readOnly: record.alwaysOpenReadOnly,
         keyfiles: keyfiles,
         storedPatternHash: patternHash,
         storedPinHash: pinHash,
@@ -958,7 +958,6 @@ void selectDevice(UsbDeviceInfo device) {
           documentProvider: params.documentProvider,
           documentProviderFolders: const [],
           cacheDerivedKey: shouldCacheDerivedKey,
-          readOnly: state.readOnly,
           cipherId: state.cipherId,
           hashId: state.hashId,
           containerFormat: result.containerFormat,

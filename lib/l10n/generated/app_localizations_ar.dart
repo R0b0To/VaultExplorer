@@ -2492,6 +2492,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get readOnlyModeSubtitle => 'يمنع أي عمليات كتابة أو تعديل على الخزنة';
 
   @override
+  String get alwaysOpenReadOnlyLabel => 'القراءة فقط دائمًا';
+
+  @override
+  String get alwaysOpenReadOnlySubtitle =>
+      'تبدأ الجلسات الجديدة بوضع القراءة فقط.';
+
+  @override
   String get selectUsbDeviceLabel => 'اختيار جهاز USB';
 
   @override

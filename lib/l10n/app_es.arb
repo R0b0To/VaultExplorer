@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Selecciona archivo o carpeta",
   "readOnlyModeLabel": "Modo de solo lectura",
   "readOnlyModeSubtitle": "Evita cualquier operación de escritura o modificación en la bóveda",
+  "alwaysOpenReadOnlyLabel": "Siempre en modo de solo lectura",
+  "alwaysOpenReadOnlySubtitle": "Las nuevas sesiones comienzan en modo de solo lectura.",
   "selectUsbDeviceLabel": "Seleccionar dispositivo USB",
   "noUsbDevicesFound": "No se encontraron dispositivos de almacenamiento USB compatibles",
   "containerConfigTitle": "Configuración de la bóveda",

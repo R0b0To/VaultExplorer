@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Виберіть файл або папку",
   "readOnlyModeLabel": "Режим лише для читання",
   "readOnlyModeSubtitle": "Забороняє будь-які операції запису або зміни у сховищі",
+  "alwaysOpenReadOnlyLabel": "Завжди лише для читання",
+  "alwaysOpenReadOnlySubtitle": "Нові сеанси починаються в режимі лише для читання.",
   "selectUsbDeviceLabel": "Виберіть USB-пристрій",
   "noUsbDevicesFound": "Сумісних USB-накопичувачів не знайдено",
   "containerConfigTitle": "Конфігурація сховища",

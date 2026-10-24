@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "Selecionar Arquivo ou Pasta",
   "readOnlyModeLabel": "Modo somente leitura",
   "readOnlyModeSubtitle": "Impede qualquer operação de escrita ou modificação no cofre",
+  "alwaysOpenReadOnlyLabel": "Sempre somente leitura",
+  "alwaysOpenReadOnlySubtitle": "Novas sessões começam como somente leitura.",
   "selectUsbDeviceLabel": "Selecionar Dispositivo USB",
   "noUsbDevicesFound": "Nenhum dispositivo de armazenamento USB compatível encontrado",
   "containerConfigTitle": "Configuração do Cofre",

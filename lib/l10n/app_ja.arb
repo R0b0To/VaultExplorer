@@ -651,6 +651,8 @@
   "selectContainerFileOrFolder": "ファイルまたはフォルダを選択",
   "readOnlyModeLabel": "読み取り専用モード",
   "readOnlyModeSubtitle": "保管庫への書き込みや変更操作を防止します",
+  "alwaysOpenReadOnlyLabel": "常に読み取り専用",
+  "alwaysOpenReadOnlySubtitle": "新しいセッションは読み取り専用で開始します。",
   "selectUsbDeviceLabel": "USBデバイスを選択",
   "noUsbDevicesFound": "互換性のあるUSBストレージデバイスが見つかりません",
   "containerConfigTitle": "保管庫の設定",

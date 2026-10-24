@@ -995,7 +995,9 @@ class ContainerRecord {
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
   final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
-  final bool readOnly;
+  /// Persistent default used to initialize the read-only choice on each
+  /// unlock. The unlock screen's current read-only toggle is session-only.
+  final bool alwaysOpenReadOnly;
   final String? pendingPassword;
   final String? pendingPatternHash;
   final String? pendingPinHash;
@@ -1024,7 +1026,7 @@ class ContainerRecord {
     this.documentProviderFolders = const [],
     this.thumbnailCacheMode,
     this.thumbnailQuality,
-    this.readOnly = false,
+    this.alwaysOpenReadOnly = false,
     this.cacheDerivedKey = false,
     this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.pendingPassword,
@@ -1090,7 +1092,7 @@ class ContainerRecord {
     Object? thumbnailQuality = _keep,
     bool? cacheDerivedKey,
     VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
-    bool? readOnly,
+    bool? alwaysOpenReadOnly,
     String? pendingPassword,
     String? pendingPatternHash,
     String? pendingPinHash,
@@ -1122,7 +1124,7 @@ class ContainerRecord {
       cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
       vaultDeleteAfterImportMode:
           vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
-      readOnly: readOnly ?? this.readOnly,
+      alwaysOpenReadOnly: alwaysOpenReadOnly ?? this.alwaysOpenReadOnly,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
       pendingPinHash: pendingPinHash,
@@ -1150,7 +1152,7 @@ class ContainerRecord {
       'thumbnailQuality': thumbnailQuality!.toJson(),
     'cacheDerivedKey': cacheDerivedKey,
     'vaultDeleteAfterImportMode': vaultDeleteAfterImportMode.toJson(),
-    'readOnly': readOnly,
+    'alwaysOpenReadOnly': alwaysOpenReadOnly,
     'cipherId': cipherId,
     'hashId': hashId,
     'containerFormat': containerFormat,
@@ -1189,7 +1191,11 @@ class ContainerRecord {
       vaultDeleteAfterImportMode: VaultDeleteAfterImportMode.fromJson(
         j['vaultDeleteAfterImportMode'] as String?,
       ),
-      readOnly: j['readOnly'] as bool? ?? false,
+      // Before this setting existed, the unlock screen's read-only toggle
+      // was persisted under `readOnly`. Preserve that preference as the new
+      // default when upgrading an existing record.
+      alwaysOpenReadOnly:
+          j['alwaysOpenReadOnly'] as bool? ?? j['readOnly'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',

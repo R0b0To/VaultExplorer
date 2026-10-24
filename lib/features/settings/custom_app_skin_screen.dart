@@ -487,9 +487,27 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
   }
 
+  void _clearSchemeColor(String role) {
+    final values = Map<String, int>.from(_schemeColors())..remove(role);
+    _save(
+      _darkColors
+          ? _skin.copyWith(darkColors: values)
+          : _skin.copyWith(lightColors: values),
+    );
+  }
+
   void _setSemanticColor(String role, Color color) {
     final values = Map<String, int>.from(_semanticColors())
       ..[role] = color.toARGB32();
+    _save(
+      _darkColors
+          ? _skin.copyWith(darkSemanticColors: values)
+          : _skin.copyWith(lightSemanticColors: values),
+    );
+  }
+
+  void _clearSemanticColor(String role) {
+    final values = Map<String, int>.from(_semanticColors())..remove(role);
     _save(
       _darkColors
           ? _skin.copyWith(darkSemanticColors: values)
@@ -650,8 +668,16 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
   String _editorOption(String role) =>
       _skin.editorOption(role, dark: _darkColors);
 
-  Color _storedColor(Map<String, int> colors, String role) =>
-      Color(colors[role] ?? 0xFF808080);
+  Color _storedColor(Map<String, int> colors, String role) => Color(
+    colors[role] ?? colorSchemeToMap(_editorColorScheme())[role] ?? 0xFF808080,
+  );
+
+  Color _schemeColor(String role) => _storedColor(_schemeColors(), role);
+
+  Color _semanticColor(String role) => Color(
+    _semanticMap(_previewBase(_skin).extension<AppSemanticColors>()!)[role] ??
+        0xFF808080,
+  );
 
   // The preview is drawn with the very theme the app builds for this skin, so
   // what you see here is what each page will look like.
@@ -746,10 +772,10 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     if (areaId != null) return _areaTokenColor(areaId.$1, areaId.$2);
     if (id.startsWith('app:')) {
       final role = id.substring(4);
-      return _storedColor(appColors, role);
+      return _schemeColor(role);
     }
     if (id.startsWith('semantic:')) {
-      return _storedColor(_semanticColors(), id.substring(9));
+      return _semanticColor(id.substring(9));
     }
     if (id.startsWith('component:')) {
       return _componentColor(id.substring(10));
@@ -801,7 +827,9 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       return _pickColor(
         title: selection.title,
         current: _previewSelectionColor(id),
+        allowDefault: true,
         onColor: (value) => _setSchemeColor(role, value),
+        onDefault: () => _clearSchemeColor(role),
       );
     }
     if (id.startsWith('semantic:')) {
@@ -809,7 +837,9 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       return _pickColor(
         title: selection.title,
         current: _previewSelectionColor(id),
+        allowDefault: true,
         onColor: (value) => _setSemanticColor(role, value),
+        onDefault: () => _clearSemanticColor(role),
       );
     }
     if (id.startsWith('component:')) {
@@ -1283,11 +1313,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
           'primaryContainer',
           'onPrimaryContainer',
         ],
-        colors: _schemeColors(),
+        colorFor: _schemeColor,
         onPick: (role) => _pickColor(
           title: _colorRoleCopy(context)[role]?.$1 ?? _roleLabel(role),
-          current: _storedColor(_schemeColors(), role),
+          current: _schemeColor(role),
+          allowDefault: true,
           onColor: (value) => _setSchemeColor(role, value),
+          onDefault: () => _clearSchemeColor(role),
         ),
       ),
       _componentColorsSection(
@@ -1328,11 +1360,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
             context.l10n.skinAdvancedMaterialColorsForLessCommonElements,
         roles: advancedRoles,
         groups: advancedGroups,
-        colors: _schemeColors(),
+        colorFor: _schemeColor,
         onPick: (role) => _pickColor(
           title: _colorRoleCopy(context)[role]?.$1 ?? _roleLabel(role),
-          current: _storedColor(_schemeColors(), role),
+          current: _schemeColor(role),
+          allowDefault: true,
           onColor: (value) => _setSchemeColor(role, value),
+          onDefault: () => _clearSchemeColor(role),
         ),
       ),
       _colorRolesSection(
@@ -1340,11 +1374,13 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
         description:
             context.l10n.skinColorsForSuccessWarningsErrorsAndBookmarks,
         roles: appSemanticColorRoles,
-        colors: _semanticColors(),
+        colorFor: _semanticColor,
         onPick: (role) => _pickColor(
           title: _colorRoleCopy(context)[role]?.$1 ?? _roleLabel(role),
-          current: _storedColor(_semanticColors(), role),
+          current: _semanticColor(role),
+          allowDefault: true,
           onColor: (value) => _setSemanticColor(role, value),
+          onDefault: () => _clearSemanticColor(role),
         ),
       ),
       _groupHeader(
@@ -1466,21 +1502,22 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     required String description,
     required List<String> roles,
     List<(String, String, List<String>)>? groups,
-    required Map<String, int> colors,
+    required Color Function(String role) colorFor,
     required ValueChanged<String> onPick,
   }) => _sectionCard(
     title: title,
     subtitle: description,
     children: [
       if (groups == null)
-        for (final role in roles) _colorRoleTile(role, colors, onPick)
+        for (final role in roles) _colorRoleTile(role, colorFor, onPick)
       else
         for (final group in groups)
           ExpansionTile(
             title: Text(group.$1),
             subtitle: Text(group.$2),
             children: [
-              for (final role in group.$3) _colorRoleTile(role, colors, onPick),
+              for (final role in group.$3)
+                _colorRoleTile(role, colorFor, onPick),
             ],
           ),
     ],
@@ -1488,7 +1525,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
 
   Widget _colorRoleTile(
     String role,
-    Map<String, int> colors,
+    Color Function(String role) colorFor,
     ValueChanged<String> onPick,
   ) => ListTile(
     title: Text(_colorRoleCopy(context)[role]?.$1 ?? _roleLabel(role)),
@@ -1498,7 +1535,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     ),
-    trailing: _ColorDot(color: _storedColor(colors, role)),
+    trailing: _ColorDot(color: colorFor(role)),
     onTap: () => onPick(role),
   );
 

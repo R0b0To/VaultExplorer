@@ -912,7 +912,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoLockContainersSubtitle =>
-      'Автоматично блокувати відкриті сховища при бездіяльності';
+      'Автоматично блокувати відкриті сховища після періоду бездіяльності';
 
   @override
   String get autoLockTimeoutLabel => 'Час автоблокування';
@@ -1186,7 +1186,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Зберегти поведінку, безпеку та типові налаштування програми у файл. Вигляд зберігається зі «Скін програми».';
+      'Зберегти поведінку, безпеку та типові налаштування програми у файл. Вигляд зберігається в розділі «Тема оформлення програми».';
 
   @override
   String get importSettingsTitle => 'Імпорт налаштувань';
@@ -1200,7 +1200,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get importSettingsConfirmMessage =>
-      'Це замінить ваші поточні налаштування програми. Ваші скіни та розташування інтерфейсу не зміняться. Дію не можна скасувати.';
+      'Це замінить ваші поточні налаштування програми. Ваші теми оформлення та розташування інтерфейсу не зміняться. Дію не можна скасувати.';
 
   @override
   String get exportSettingsSuccessMessage => 'Налаштування експортовано';
@@ -3987,7 +3987,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoStartPlaylistModeDesc =>
-      'Автоматично відкривати список при перегляді медіа';
+      'Автоматично відкривати список під час перегляду медіа';
 
   @override
   String get showPlaylistCarouselLabel => 'Показувати карусель списку';
@@ -6164,7 +6164,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get rememberPerFolderLayoutLabel =>
-      'Пам’ятати вигляд і сортування для кожної папки';
+      'Пам\'ятати вигляд і сортування для кожної папки';
 
   @override
   String get rememberPerFolderLayoutDesc =>
@@ -7900,7 +7900,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get showItemActionsMenuDesc =>
-      'Відображати кнопку дії з трьома крапками для файлів і папок у списках';
+      'Відображати кнопку дії з трьома крапками для файлів і папок у списках, сітках та мозаїці';
 
   @override
   String get gridAspectRatioLabel => 'Співвідношення сторін сітки';
@@ -8200,7 +8200,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get lockVaultTooltip => 'Заблокувати сховище';
 
   @override
-  String get lockAllVaultsTitle => 'Заблокувати все';
+  String get lockAllVaultsTitle => 'Заблокувати всі сховища';
 
   @override
   String get safProviderLabel => 'Провайдер SAF';
@@ -8967,14 +8967,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get quickActionLockModeSubtitle =>
-      'Поведінка блокування сховища під час збереження зі швидкого знімка чи спільного доступу';
+      'Поведінка блокування сховища під час збереження зі швидкого захоплення або вікна «Поділитися»';
 
   @override
   String get quickActionLockModeLeaveAsFoundLabel => 'Залишати як було';
 
   @override
   String get quickActionLockModeLeaveAsFoundSubtitle =>
-      'Блокувати лише якщо сховище було заблоковане перед збереженням';
+      'Блокувати, лише якщо сховище було заблоковано перед збереженням';
 
   @override
   String get quickActionLockModeAlwaysLockLabel => 'Завжди блокувати';
@@ -9006,7 +9006,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get textEditorBackgroundMatchTheme => 'Як у темі';
 
   @override
-  String get textEditorBackgroundAmoledBlack => 'AMOLED чорний';
+  String get textEditorBackgroundAmoledBlack => 'Чорний AMOLED';
 
   @override
   String get textEditorBackgroundDarkSlate => 'Темний грифельний';
@@ -9525,14 +9525,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get videoEditorAnalyzing => 'Аналіз відео…';
 
   @override
-  String get videoEditorDiscardTitle => 'Відкинути зміни?';
+  String get videoEditorDiscardTitle => 'Скасувати зміни?';
 
   @override
   String get videoEditorDiscardMessage =>
-      'У вас є незбережені зміни. Справді відкинути їх?';
+      'У вас є незбережені зміни. Справді скасувати їх?';
 
   @override
-  String get videoEditorDiscardAction => 'Відкинути';
+  String get videoEditorDiscardAction => 'Скасувати';
 
   @override
   String get videoEditorPreviewCut => 'Попередній перегляд обрізки';
@@ -9585,7 +9585,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileSkinIconStyleLabel => 'Стиль піктограм';
 
   @override
-  String get fileSkinContainerLabel => 'Тло піктограми';
+  String get fileSkinContainerLabel => 'Фон піктограми';
 
   @override
   String get fileSkinIconColorLabel => 'Колір піктограми';
@@ -9649,22 +9649,22 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileSkinColorHexLabel => 'Колір у форматі HEX';
 
   @override
-  String get fileSkinPresetClassic => 'Класичний';
+  String get fileSkinPresetClassic => 'Класична';
 
   @override
-  String get fileSkinPresetMinimalOutline => 'Мінімальний контур';
+  String get fileSkinPresetMinimalOutline => 'Контур';
 
   @override
   String get fileSkinPresetFrames => 'Рамки';
 
   @override
-  String get fileSkinPresetVivid => 'Яскравий';
+  String get fileSkinPresetVivid => 'Яскрава';
 
   @override
   String get fileSkinPresetTerminal => 'Термінал';
 
   @override
-  String get fileSkinPresetCustom => 'Власний';
+  String get fileSkinPresetCustom => 'Власна';
 
   @override
   String get compositeArchiveCarrierBlockingWarning =>
@@ -9861,11 +9861,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get autoSyncSavedScheduled => 'Правило та щоденний розклад збережено.';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => 'Час щоденного запуску';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      'Місцевий час пристрою. Для швидкої перевірки виберіть час за хвилину чи дві від поточного; Android може запустити синхронізацію трохи пізніше.';
 
   @override
   String get autoSyncExactAlarmAccessTitle =>
@@ -9873,7 +9873,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoSyncExactAlarmAccessMessage =>
-      'Android вимагає доступу до «Будильників і нагадувань», щоб Vault Explorer запускав щоденну синхронізацію у вибраний час, коли застосунок закрито. Дозвольте доступ на наступному екрані, поверніться сюди й увімкніть заплановану синхронізацію знову.';
+      'Android вимагає доступу до «Будильників і нагадувань», щоб Vault Explorer запускав щоденну синхронізацію у вибраний час, коли програму закрито. Дозвольте доступ на наступному екрані, поверніться сюди й увімкніть заплановану синхронізацію знову.';
 
   @override
   String get autoSyncExactAlarmAccessOpen => 'Відкрити налаштування';
@@ -9975,15 +9975,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinForegroundForButtonsFilledWithTheActionAccentColor =>
-      'Колір переднього плану для кнопок, заповнених акцентним кольором дій.';
+      'Колір переднього плану для кнопок із заливкою акцентним кольором дій.';
 
   @override
   String get skinSelectionAndIconTileBackground =>
-      'Тло виділення та плиток піктограм';
+      'Фон виділення та плиток піктограм';
 
   @override
   String get skinSelectedFilesAndVaultFormat076e52 =>
-      'Вибрані файли та плитки формату сховища використовують цей колір. Заповнення плаваючої кнопки має окреме налаштування.';
+      'Вибрані файли та плитки формату сховища використовують цей колір. Заливка плаваючої кнопки має окреме налаштування.';
 
   @override
   String get skinTextAndIconsOnSelectionColors =>
@@ -10039,14 +10039,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Мітки та піктограми на вторинних кольорових областях.';
 
   @override
-  String get skinSecondaryBackground => 'Вторинне тло';
+  String get skinSecondaryBackground => 'Вторинний фон';
 
   @override
   String get skinSoftFillForSupportingContent =>
-      'М\'яке заповнення для допоміжного вмісту.';
+      'М\'яка заливка для допоміжного вмісту.';
 
   @override
-  String get skinTextOnSecondaryBackgrounds => 'Текст на вторинному тлі';
+  String get skinTextOnSecondaryBackgrounds => 'Текст на вторинному фоні';
 
   @override
   String get skinForegroundForSecondaryContainers =>
@@ -10098,15 +10098,15 @@ class AppLocalizationsUk extends AppLocalizations {
       'Мітки та піктограми на третинних кольорових областях.';
 
   @override
-  String get skinExtraAccentBackground => 'Тло додаткового акценту';
+  String get skinExtraAccentBackground => 'Фон додаткового акценту';
 
   @override
   String get skinSoftFillForTertiaryContent =>
-      'М\'яке заповнення для третинного вмісту.';
+      'М\'яка заливка для третинного вмісту.';
 
   @override
   String get skinTextOnExtraAccentBackgrounds =>
-      'Текст на тлі додаткового акценту';
+      'Текст на фоні додаткового акценту';
 
   @override
   String get skinForegroundForTertiaryContainers =>
@@ -10158,42 +10158,42 @@ class AppLocalizationsUk extends AppLocalizations {
       'Мітки та піктограми на областях кольору помилки.';
 
   @override
-  String get skinErrorBackground => 'Тло помилки';
+  String get skinErrorBackground => 'Фон помилки';
 
   @override
   String get skinSoftFillBehindErrorMessages =>
-      'М\'яке заповнення під повідомленнями про помилки.';
+      'М\'яка заливка під повідомленнями про помилки.';
 
   @override
-  String get skinTextOnErrorBackgrounds => 'Текст на тлі помилки';
+  String get skinTextOnErrorBackgrounds => 'Текст на фоні помилки';
 
   @override
   String get skinForegroundForErrorContainers =>
       'Передній план для контейнерів помилки.';
 
   @override
-  String get skinPageBackground => 'Тло сторінки';
+  String get skinPageBackground => 'Фон сторінки';
 
   @override
   String get skinTheMainBackgroundBehindAppContent =>
-      'Основне тло позаду вмісту програми.';
+      'Основний фон позаду вмісту програми.';
 
   @override
   String get skinMainTextAndIcons => 'Основний текст і піктограми';
 
   @override
   String get skinPrimaryContentDrawnOnPageAndCardBackgrounds =>
-      'Основний вміст на тлі сторінок і карток.';
+      'Основний вміст на фоні сторінок і карток.';
 
   @override
-  String get skinDimmedBackground => 'Затемнене тло';
+  String get skinDimmedBackground => 'Затемнений фон';
 
   @override
   String get skinTheDarkestNeutralSurfaceLayer =>
       'Найтемніший нейтральний шар поверхні.';
 
   @override
-  String get skinBrightBackground => 'Яскраве тло';
+  String get skinBrightBackground => 'Яскравий фон';
 
   @override
   String get skinTheLightestNeutralSurfaceLayer =>
@@ -10204,7 +10204,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheLowestAndQuietestSurfaceContainer =>
-      'Найнижчий і найспокійніший контейнер поверхні.';
+      'Найнижчий і найстриманіший контейнер поверхні.';
 
   @override
   String get skinLowCardLayer => 'Низький шар карток';
@@ -10262,7 +10262,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Відтінок для піднятих поверхонь.';
 
   @override
-  String get skinModalBackdrop => 'Модальне тло';
+  String get skinModalBackdrop => 'Модальний фон';
 
   @override
   String get skinTintBehindDialogsAndModalSheets =>
@@ -10311,14 +10311,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Передній план для вмісту з кольором успіху.';
 
   @override
-  String get skinSuccessBackground => 'Тло успіху';
+  String get skinSuccessBackground => 'Фон успіху';
 
   @override
   String get skinSoftFillBehindPositiveStatusMessages =>
-      'М\'яке заповнення під повідомленнями позитивного статусу.';
+      'М\'яка заливка під повідомленнями позитивного статусу.';
 
   @override
-  String get skinTextOnSuccessBackgrounds => 'Текст на тлі успіху';
+  String get skinTextOnSuccessBackgrounds => 'Текст на фоні успіху';
 
   @override
   String get skinForegroundForSuccessContainers =>
@@ -10339,14 +10339,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Передній план для вмісту з кольором попередження.';
 
   @override
-  String get skinWarningBackground => 'Тло попередження';
+  String get skinWarningBackground => 'Фон попередження';
 
   @override
   String get skinSoftFillBehindWarningMessages =>
-      'М\'яке заповнення під повідомленнями з попередженням.';
+      'М\'яка заливка під повідомленнями з попередженням.';
 
   @override
-  String get skinTextOnWarningBackgrounds => 'Текст на тлі попередження';
+  String get skinTextOnWarningBackgrounds => 'Текст на фоні попередження';
 
   @override
   String get skinForegroundForWarningContainers =>
@@ -10381,7 +10381,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinAppBackgroundsCardsMenusAndForegroundText =>
-      'Тло програми, картки, меню та текст переднього плану.';
+      'Фон програми, картки, меню та текст переднього плану.';
 
   @override
   String get skinBordersAndOverlays => 'Межі та накладання';
@@ -10399,7 +10399,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Виберіть колір програми, файлу чи редактора, щоб побачити, чим він керує.';
 
   @override
-  String get skinCustomizeSkin => 'Налаштувати скін';
+  String get skinCustomizeSkin => 'Налаштувати тему оформлення';
 
   @override
   String get skinLight => 'Світла';
@@ -10414,17 +10414,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinEditor => 'Редактор';
 
   @override
-  String get skinSkinDetails => 'Деталі скіна';
+  String get skinSkinDetails => 'Параметри теми';
 
   @override
   String get skinNameYourSkinAndChooseWhichPaletteToEdit =>
-      'Вкажіть назву скіна та виберіть палітру для редагування.';
+      'Вкажіть назву теми та виберіть палітру для редагування.';
 
   @override
-  String get skinSkinName => 'Назва скіна';
+  String get skinSkinName => 'Назва теми';
 
   @override
-  String get skinMyCustomSkin => 'Мій власний скін';
+  String get skinMyCustomSkin => 'Моя власна тема оформлення';
 
   @override
   String get skinLightColors => 'Світлі кольори';
@@ -10437,7 +10437,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheMainBackgroundTextAndActionColors =>
-      'Основні кольори тла, тексту та дій.';
+      'Основні кольори фону, тексту та дій.';
 
   @override
   String get skinAppBar => 'Панель програми';
@@ -10447,7 +10447,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Верхня панель навігації незалежна від карток і сторінок.';
 
   @override
-  String get skinTopBarFillColor => 'Колір заповнення верхньої панелі.';
+  String get skinTopBarFillColor => 'Колір заливки верхньої панелі.';
 
   @override
   String get skinTitleAndIcons => 'Заголовок і піктограми';
@@ -10461,13 +10461,13 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
-      'Його заповнення та колір піктограми відокремлені від кольорів виділення.';
+      'Її заливка та колір піктограми відокремлені від кольорів виділення.';
 
   @override
-  String get skinButtonFill => 'Заповнення кнопки';
+  String get skinButtonFill => 'Заливка кнопки';
 
   @override
-  String get skinBackgroundOfTheRoundButton => 'Тло круглої кнопки «+».';
+  String get skinBackgroundOfTheRoundButton => 'Фон круглої кнопки «+».';
 
   @override
   String get skinButtonIcon => 'Піктограма кнопки';
@@ -10481,21 +10481,20 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
-      'Встановіть тло для карток заблокованих і підключених сховищ.';
+      'Встановіть фон для карток заблокованих і підключених сховищ.';
 
   @override
   String get skinLockedVaultCard => 'Картка заблокованого сховища';
 
   @override
-  String get skinNeutralVaultCardFill =>
-      'Нейтральне заповнення картки сховища.';
+  String get skinNeutralVaultCardFill => 'Нейтральна заливка картки сховища.';
 
   @override
   String get skinMountedVaultCard => 'Картка підключеного сховища';
 
   @override
   String get skinSeparateFillForAnUnlockedMountedVault =>
-      'Окреме заповнення для розблокованого, підключеного сховища.';
+      'Окрема заливка для розблокованого, підключеного сховища.';
 
   @override
   String get skinFineTuneAppColors => 'Тонке налаштування кольорів програми';
@@ -10513,18 +10512,18 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheCustomSkinIsActive971ce3 =>
-      'Власний скін застосовується негайно, доки Менеджер файлів і Редактор налаштовані наслідувати скін програми.';
+      'Власна тема оформлення застосовується негайно, доки Файловий менеджер і Редактор налаштовані наслідувати тему програми.';
 
   @override
   String get skinCustomColorTapToChangeOrReset =>
-      'Власний колір — торкніться, щоб змінити або скинути за замовчуванням.';
+      'Власний колір — торкніться, щоб змінити або скинути до типового.';
 
   @override
   String get skinTapTheColorCircleToChooseAColor =>
       'Торкніться колірного кола, щоб вибрати колір.';
 
   @override
-  String get skinAppBarBackground => 'Тло панелі програми';
+  String get skinAppBarBackground => 'Фон панелі програми';
 
   @override
   String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
@@ -10556,22 +10555,22 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
-      'Заповнення кнопки та піктограма плюса мають окремі кольори скіна.';
+      'Заливка кнопки та піктограма плюса мають окремі кольори теми.';
 
   @override
   String get skinVaultCardAndIconBackground =>
-      'Тло картки та піктограми сховища';
+      'Фон картки та піктограми сховища';
 
   @override
   String get skinTheIconTileUsesPrimary5c2f93 =>
-      'Плитка піктограми використовує Primary container. Картка підключеного сховища змішує цей колір із піднятою поверхнею.';
+      'Плитка піктограми використовує основний контейнер. Картка підключеного сховища змішує цей колір із піднятою поверхнею.';
 
   @override
   String get skinVaultFormatIconColor => 'Колір піктограми формату сховища';
 
   @override
   String get skinVaultFormatInitialsUseOnPrimaryContainer =>
-      'Ініціали формату сховища використовують On primary container.';
+      'Ініціали формату сховища використовують колір на основному контейнері.';
 
   @override
   String get skinVaultStorageDetails => 'Деталі сховища даних';
@@ -10588,14 +10587,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheProgressBarUsesTheba7c98 =>
-      'Індикатор перебігу використовує акцент програми, а зі заповненням сховища перемикається на третинний колір і колір помилки.';
+      'Індикатор перебігу використовує акцент програми, а в міру заповнення сховища перемикається на третинний колір і колір помилки.';
 
   @override
-  String get skinLockActionBackground => 'Тло дії блокування';
+  String get skinLockActionBackground => 'Фон дії блокування';
 
   @override
   String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
-      'Кнопка блокування підключеного сховища використовує Primary container.';
+      'Кнопка блокування підключеного сховища використовує основний контейнер.';
 
   @override
   String get skinVaultActionsIconColor => 'Колір піктограми дій сховища';
@@ -10606,15 +10605,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinMountedVaultCardBackground =>
-      'Тло картки підключеного сховища';
+      'Фон картки підключеного сховища';
 
   @override
   String get skinThisIsTheBackgroundOfa8d0d3 =>
-      'Це тло картки підключеного сховища. Її плитка піктограми все одно використовує колір основної дії.';
+      'Це фон картки підключеного сховища. Її плитка піктограми все одно використовує колір основної дії.';
 
   @override
   String get skinLockedVaultCardBackground =>
-      'Тло картки заблокованого сховища';
+      'Фон картки заблокованого сховища';
 
   @override
   String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
@@ -10643,7 +10642,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Піктограма дій заблокованого сховища';
 
   @override
-  String get skinVaultActionsMenuBackground => 'Тло меню дій сховища';
+  String get skinVaultActionsMenuBackground => 'Фон меню дій сховища';
 
   @override
   String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
@@ -10668,7 +10667,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
-      'Панелі інструментів переглядача файлів використовують те саме тло панелі програми.';
+      'Панелі інструментів переглядача файлів використовують той самий фон панелі програми.';
 
   @override
   String get skinFileManagerBackButton => 'Кнопка «Назад» менеджера файлів';
@@ -10728,7 +10727,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheMainBackgroundBehindThisScreen =>
-      'Основне тло позаду цього екрана.';
+      'Основний фон позаду цього екрана.';
 
   @override
   String get skinFolderIconColor => 'Колір піктограми папки';
@@ -10764,10 +10763,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinSelectedRowsUseATranslucente0ff21 =>
-      'Вибрані рядки мають напівпрозоре підсвічування основного контейнера; сам список файлів залишається на тлі сторінки.';
+      'Вибрані рядки мають напівпрозоре підсвічування основного контейнера; сам список файлів залишається на фоні сторінки.';
 
   @override
-  String get skinFileActionsMenuBackground => 'Тло меню дій з файлом';
+  String get skinFileActionsMenuBackground => 'Фон меню дій з файлом';
 
   @override
   String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
@@ -10787,7 +10786,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinDeleteFileMenuItem => 'Пункт меню «Видалити файл»';
 
   @override
-  String get skinEditorBackground => 'Тло редактора';
+  String get skinEditorBackground => 'Фон редактора';
 
   @override
   String get skinTheCanvasColorBehindTheCode => 'Колір полотна позаду коду.';
@@ -10817,7 +10816,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTheBackgroundUsedToHighlightSelectedCode =>
-      'Тло для виділення вибраного коду.';
+      'Фон для виділення вибраного коду.';
 
   @override
   String get skinEditorKeywords => 'Ключові слова';
@@ -10905,7 +10904,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinMonospaceFileNames => 'Моноширинні назви файлів';
 
   @override
-  String get skinBackgroundBehindTheIcon => 'Тло позаду піктограми';
+  String get skinBackgroundBehindTheIcon => 'Фон позаду піктограми';
 
   @override
   String get skinIconColorSource => 'Джерело кольору піктограми';
@@ -10919,7 +10918,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
-      'Полотно, бічна смуга, курсор, виділення, тло та шаблон синтаксису.';
+      'Полотно, бічна смуга, курсор, виділення, фон та шаблон синтаксису.';
 
   @override
   String get skinGutterAndLineNumbers => 'Бічна смуга та номери рядків';
@@ -10931,7 +10930,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinSelection => 'Виділення';
 
   @override
-  String get skinEditorBackgroundTemplate => 'Шаблон тла редактора';
+  String get skinEditorBackgroundTemplate => 'Шаблон фону редактора';
 
   @override
   String get skinSyntaxTemplate => 'Шаблон синтаксису';
@@ -10983,7 +10982,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinUseTheSyntaxThemeBackground =>
-      'Використовувати тло теми синтаксису';
+      'Використовувати фон теми синтаксису';
 
   @override
   String get skinPureBlack => 'Чистий чорний';
@@ -11002,22 +11001,22 @@ class AppLocalizationsUk extends AppLocalizations {
       'Автоматично (відповідно до світлого чи темного режиму)';
 
   @override
-  String get skinSkinExported => 'Скін експортовано.';
+  String get skinSkinExported => 'Тему експортовано.';
 
   @override
-  String get skinSkinsExported => 'Скіни експортовано.';
+  String get skinSkinsExported => 'Теми експортовано.';
 
   @override
-  String get skinRemoveSkin => 'Видалити скін?';
+  String get skinRemoveSkin => 'Видалити тему?';
 
   @override
-  String get skinAppSkin => 'Скін програми';
+  String get skinAppSkin => 'Тема оформлення програми';
 
   @override
-  String get skinImportSkins => 'Імпортувати скіни';
+  String get skinImportSkins => 'Імпортувати теми';
 
   @override
-  String get skinExportSkins => 'Експортувати скіни';
+  String get skinExportSkins => 'Експортувати теми';
 
   @override
   String get skinChooseACoordinatedLookForTheAppFileManagerAndEditor =>
@@ -11028,14 +11027,14 @@ class AppLocalizationsUk extends AppLocalizations {
       'Світла й темна системні теми використовують відповідні варіанти палітри.';
 
   @override
-  String get skinEditCurrentSkin => 'Редагувати поточний скін';
+  String get skinEditCurrentSkin => 'Редагувати поточну тему';
 
   @override
   String get skinCreateASkinFromThisLook =>
-      'Створити скін на основі цього вигляду';
+      'Створити тему на основі цього вигляду';
 
   @override
-  String get skinYourSkins => 'Ваші скіни';
+  String get skinYourSkins => 'Ваші теми оформлення';
 
   @override
   String get skinCustomAppFileManagerAndEditorColors =>
@@ -11054,16 +11053,16 @@ class AppLocalizationsUk extends AppLocalizations {
       'Ваші кольори для редагування в програмі, менеджері файлів і редакторі';
 
   @override
-  String get skinSkinActions => 'Дії зі скіном';
+  String get skinSkinActions => 'Дії з темою';
 
   @override
-  String get skinEditSkin => 'Редагувати скін';
+  String get skinEditSkin => 'Редагувати тему';
 
   @override
-  String get skinExportSkin => 'Експортувати скін';
+  String get skinExportSkin => 'Експортувати тему';
 
   @override
-  String get skinRemoveSkinf09101 => 'Видалити скін';
+  String get skinRemoveSkinf09101 => 'Видалити тему';
 
   @override
   String get skinDragAroundTheRingTo868d62 =>
@@ -11092,34 +11091,34 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinOLEDPureBlack => 'OLED Чистий чорний';
 
   @override
-  String get skinCustomSkin => 'Власний скін';
+  String get skinCustomSkin => 'Власна тема оформлення';
 
   @override
   String skinImportSucceeded(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Імпортовано # скінів.',
-      many: 'Імпортовано # скінів.',
-      few: 'Імпортовано # скіни.',
-      one: 'Імпортовано 1 скін.',
+      other: 'Імпортовано $count тем.',
+      many: 'Імпортовано $count тем.',
+      few: 'Імпортовано $count теми.',
+      one: 'Імпортовано 1 тему.',
     );
     return '$_temp0';
   }
 
   @override
   String skinImportFailed(String error) {
-    return 'Не вдалося імпортувати скін: $error';
+    return 'Не вдалося імпортувати тему: $error';
   }
 
   @override
   String skinExportFailed(String error) {
-    return 'Не вдалося експортувати скін: $error';
+    return 'Не вдалося експортувати тему: $error';
   }
 
   @override
   String skinRemoveConfirmation(String skin) {
-    return '«$skin» буде видалено зі збережених скінів.';
+    return '«$skin» буде видалено зі збережених тем оформлення.';
   }
 
   @override
@@ -11146,27 +11145,27 @@ class AppLocalizationsUk extends AppLocalizations {
       'Цей колір контролюється налаштуванням кольору назви в розділі менеджера файлів.';
 
   @override
-  String get skinExportedSingle => 'Скін експортовано.';
+  String get skinExportedSingle => 'Тему експортовано.';
 
   @override
-  String get skinExportedMultiple => 'Скіни експортовано.';
+  String get skinExportedMultiple => 'Теми експортовано.';
 
   @override
-  String get skinExportSkinsOnly => 'Лише скіни';
+  String get skinExportSkinsOnly => 'Лише теми';
 
   @override
   String get skinExportSkinsOnlySubtitle =>
       'Кольори та стилі піктограм. Безпечно ділитися.';
 
   @override
-  String get skinExportSkinsAndInterface => 'Скіни та інтерфейс';
+  String get skinExportSkinsAndInterface => 'Теми та інтерфейс';
 
   @override
   String get skinExportSkinsAndInterfaceSubtitle =>
       'Також зберігає режим теми, розташування панелі інструментів і сітки, вигляд редактора та розташування медіаплеєра. Для ваших власних резервних копій.';
 
   @override
-  String get skinAppearanceExported => 'Скіни та інтерфейс експортовано.';
+  String get skinAppearanceExported => 'Теми та інтерфейс експортовано.';
 
   @override
   String get skinImportInterfaceTitle => 'Застосувати налаштування інтерфейсу?';
@@ -11179,7 +11178,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinImportInterfaceApply => 'Застосувати';
 
   @override
-  String get skinImportInterfaceSkip => 'Лише скіни';
+  String get skinImportInterfaceSkip => 'Лише теми';
 
   @override
   String get skinInterfaceApplied => 'Налаштування інтерфейсу застосовано.';
@@ -11298,7 +11297,7 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Збережено $count аудіофайлу',
+      other: 'Збережено $count аудіофайлів',
       many: 'Збережено $count аудіофайлів',
       few: 'Збережено $count аудіофайли',
       one: 'Збережено $count аудіофайл',
@@ -11368,11 +11367,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get abLoopClearedMessage => 'Повторення A-B вимкнено';
 
   @override
-  String get skinEditorPanelBackground => 'Тло панелей редактора';
+  String get skinEditorPanelBackground => 'Фон панелей редактора';
 
   @override
   String get skinEditorPanelBackgroundDescription =>
-      'Спільне тло бічної панелі та меню додаткових дій редактора.';
+      'Спільний фон бічної панелі та меню додаткових дій редактора.';
 
   @override
   String get skinFollowAppSkin => 'Використовувати тему програми';
@@ -11383,7 +11382,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get fileSkinUseIndependentStylesDescription =>
-      'Ці параметри задають власний стиль файлового менеджера. Якщо він використовує тему програми, зміна набору або стилю нижче вимкне цей режим.';
+      'Використовуйте наведені нижче параметри значків і кольорів файлового менеджера.';
 
   @override
   String get fileSkinManagedByAppSkinTitle =>
@@ -11391,7 +11390,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get fileSkinManagedByAppSkinDescription =>
-      'У попередньому перегляді показано активну тему програми. Зміна набору або стилю нижче збереже окрему тему файлового менеджера й вимкне використання теми програми.';
+      'У попередньому перегляді показано активну тему програми. Зміна набору або стилю нижче збереже окрему тему файлового менеджера й вимкне режим наслідування теми програми.';
 
   @override
   String get skinFileManagerIndependentTitle =>
@@ -11399,7 +11398,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinFileManagerIndependentDescription =>
-      'Зміни стилів файлів і папок у цій темі не відображатимуться у файловому менеджері, доки він використовує власну тему. Увімкніть використання теми програми, щоб застосувати тутешню тему.';
+      'Зміни стилів файлів і папок у цій темі не відображатимуться у файловому менеджері, доки він використовує власну тему. Увімкніть наслідування теми програми, щоб застосувати тему програми й тут.';
 
   @override
   String get skinChooseOrCreateSkin => 'Вибрати або створити тему';
@@ -11414,7 +11413,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get textEditorUseIndependentAppearanceDescription =>
-      'Нижче виберіть окреме тло редактора та тему підсвічування синтаксису.';
+      'Нижче виберіть окремий фон редактора та тему підсвічування синтаксису.';
 
   @override
   String get fileSkinComponentStyling => 'Стиль компонентів';
@@ -11846,7 +11845,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Приховувати верхню панель під час редагування для збільшення вертикального простору';
 
   @override
-  String get textEditorCopyToMenuItem => 'Копіювати до...';
+  String get textEditorCopyToMenuItem => 'Копіювати до…';
 
   @override
   String get textEditorCopyToDialogTitle => 'Копіювати в папку';
@@ -12064,7 +12063,8 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get resetSizeOnLayoutChangeLabel => 'Скидати розмір при зміні вигляду';
+  String get resetSizeOnLayoutChangeLabel =>
+      'Скидати розмір під час зміни вигляду';
 
   @override
   String get resetSizeOnLayoutChangeDesc =>
@@ -12072,7 +12072,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get thumbnailUseGlobalDefaultDesc =>
-      'Дотримується налаштувань мініатюр за замовчуванням із налаштувань застосунку, тож зміни там діють і для цього сховища.';
+      'Дотримується типових налаштувань мініатюр у налаштуваннях програми, тому зміни там застосовуються і до цього сховища.';
 
   @override
   String get resetVaultThumbnailsTitle =>
@@ -12187,7 +12187,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get settingsSearchUnavailable =>
-      'Цей параметр з’являється лише за ввімкненого пов’язаного налаштування.';
+      'Цей параметр відображається лише тоді, коли увімкнено пов\'язане налаштування.';
 
   @override
   String createArchiveCompressingSubtitle(String count, String size) {
@@ -12201,7 +12201,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get createArchiveMediaRecommendation =>
-      'Виявлено попередньо стиснені медіафайли. Стиснення «Зберегти» вибрано автоматично для економії процесора та заряду.';
+      'Виявлено попередньо стиснені медіафайли. Режим «Без стиснення» вибрано автоматично для економії процесора та заряду.';
 
   @override
   String get createArchiveNameLabel => 'Назва архіву';
@@ -12265,14 +12265,15 @@ class AppLocalizationsUk extends AppLocalizations {
   String get createArchiveCustomVolumeSizeHint => 'напр., 50';
 
   @override
-  String get archiveCompressionStoreTitle => 'Зберегти (0) — Без стиснення';
+  String get archiveCompressionStoreTitle =>
+      'Без стиснення (0) — Тільки пакування';
 
   @override
   String get archiveCompressionStoreDesc =>
       'Миттєве пакування, найкраще для відео, музики та архівів';
 
   @override
-  String get archiveCompressionFastTitle => 'Швидко (1–3) — Швидко';
+  String get archiveCompressionFastTitle => 'Швидке (1–3) — Прискорене';
 
   @override
   String get archiveCompressionFastDesc =>
@@ -12343,7 +12344,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get archiveMethodStoreNote =>
-      'Режим «Зберегти» не стискає, тому методу для вибору немає.';
+      'Режим «Без стиснення» не стискає, тому методу для вибору немає.';
 
   @override
   String get browserTabsEnabledTitle =>
@@ -12400,7 +12401,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Відкрити бічне меню / нова вкладка';
+      'Відкрити бічне меню / нову вкладку';
 
   @override
   String get tabEdgeSwipeDrawerAndNewTabDesc =>
@@ -12432,7 +12433,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get appBarAtBottomDesc =>
-      'Переміщує верхню панель з верху екрана вниз, щоб її було легше діставати великим пальцем.';
+      'Переміщує панель програми з верхньої частини екрана донизу, щоб її було легше діставати великим пальцем.';
 
   @override
   String get selectByIconLabel => 'Вибір дотиком до значка';
@@ -12446,7 +12447,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get showFileExtensionsDesc =>
-      'Показує розширення в кінці імен файлів. Під час пошуку розширення завжди показуються.';
+      'Показує розширення наприкінці назв файлів. Під час пошуку розширення завжди показуються.';
 
   @override
   String get itemActionsMenuTitle => 'Дії з елементом';

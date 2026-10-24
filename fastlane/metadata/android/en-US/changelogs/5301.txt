@@ -1,0 +1,3 @@
+• Fixed vault locked/unlocked status not updating properly
+• Updated fresh install defaults: detailed layout and adaptive thumbnail quality matching grid cell size
+• General UI cleanup and visual polish

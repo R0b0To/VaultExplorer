@@ -1,0 +1,10 @@
+## What's Changed
+
+### Improvements & Defaults
+* **Updated Out-of-the-Box Defaults:** Fresh installations now default to:
+  * **Detailed layout** for the file manager view.
+  * **Adaptive thumbnail quality** configured to match the grid cell size automatically.
+* **UI Polish:** Cleaned up and streamlined various UI elements across the interface.
+
+### Bug Fixes
+* **Vault Status:** Fixed an issue where the locked/unlocked state of vaults did not update reliably in the UI.

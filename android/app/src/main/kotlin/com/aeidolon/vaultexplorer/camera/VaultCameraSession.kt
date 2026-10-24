@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraAccessException
@@ -159,6 +160,7 @@ class VaultCameraSession(
         /** AE precapture trigger is sent (always for regular flash; only S24 UW with torch). */
         val triggerPrecapture: Boolean,
         val retried: Boolean,
+        val captureOrientationDegrees: Int,
     ) {
         var phase = if (useTorch) StillPhase.WAIT_TORCH else StillPhase.WAIT_PRECAPTURE
         var triggerFrame = -1L
@@ -208,6 +210,8 @@ class VaultCameraSession(
     private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
     private var pendingPhotoWriter: ChunkSink? = null
     private var pendingPhotoBytesCallback: ((Boolean, ByteArray?, ByteArray?, String?) -> Unit)? = null
+    private var pendingPhotoAspectRatio: Float? = null
+    private var pendingPhotoOrientationDegrees: Int? = null
     private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
 
     val currentCameraId: String get() = activeCameraId
@@ -984,14 +988,14 @@ class VaultCameraSession(
         }
     }
 
-    private fun computeCaptureOrientation(): Int {
+    private fun computeCaptureOrientation(rotationDegrees: Int = lastOrientationDegrees): Int {
         val chars = characteristics ?: return 0
         val sensorOrientation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
         val front = chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
         return if (front) {
-            (sensorOrientation + lastOrientationDegrees) % 360
+            (sensorOrientation + rotationDegrees) % 360
         } else {
-            (sensorOrientation - lastOrientationDegrees + 360) % 360
+            (sensorOrientation - rotationDegrees + 360) % 360
         }
     }
 
@@ -1012,10 +1016,16 @@ class VaultCameraSession(
         return true
     }
 
-    fun capturePhoto(callback: (Boolean, ByteArray?, ByteArray?, String?) -> Unit) {
+    fun capturePhoto(
+        aspectRatio: Float? = null,
+        orientationDegrees: Int? = null,
+        callback: (Boolean, ByteArray?, ByteArray?, String?) -> Unit,
+    ) {
         runOnCameraThread {
             if (!stillPreconditionsOk { callback(false, null, null, it) }) return@runOnCameraThread
             pendingPhotoBytesCallback = callback
+            pendingPhotoAspectRatio = aspectRatio
+            pendingPhotoOrientationDegrees = orientationDegrees
             startStill(retried = false)
         }
     }
@@ -1076,7 +1086,17 @@ class VaultCameraSession(
             forceTorchAsFlash -> false
             else -> CameraFlashQuirks.torchAsFlashAllowsAePrecapture()
         }
-        val flow = StillFlow(flashRequired, useTorch, triggerPrecapture, retried)
+        // Freeze orientation at capture start. Sensor updates can arrive while
+        // flash metering is running; the JPEG must keep the orientation chosen
+        // by the caller for the preview frame.
+        val captureRotation = pendingPhotoOrientationDegrees ?: lastOrientationDegrees
+        val flow = StillFlow(
+            flashRequired,
+            useTorch,
+            triggerPrecapture,
+            retried,
+            computeCaptureOrientation(captureRotation),
+        )
         stillFlow = flow
         VeLog.d(TAG) { "still: flashRequired=$flashRequired torch=$useTorch precapture=$triggerPrecapture retried=$retried" }
 
@@ -1239,7 +1259,7 @@ class VaultCameraSession(
             val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             builder.addTarget(reader.surface)
             applyControls(builder)
-            builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
+            builder.set(CaptureRequest.JPEG_ORIENTATION, flow.captureOrientationDegrees)
             session.capture(builder.build(), object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(
                     session: CameraCaptureSession,
@@ -1314,6 +1334,8 @@ class VaultCameraSession(
     private fun failPendingPhoto(reason: String) {
         pendingPhotoBytesCallback?.let {
             pendingPhotoBytesCallback = null
+            pendingPhotoAspectRatio = null
+            pendingPhotoOrientationDegrees = null
             it(false, null, null, reason)
         }
         pendingPhotoCallback?.let {
@@ -1381,14 +1403,22 @@ class VaultCameraSession(
             val bytesCb = pendingPhotoBytesCallback
             if (bytesCb != null) {
                 pendingPhotoBytesCallback = null
+                val aspectRatio = pendingPhotoAspectRatio
+                pendingPhotoAspectRatio = null
+                pendingPhotoOrientationDegrees = null
+                val photoBytes = if (aspectRatio != null) {
+                    cropJpegToAspectRatio(bytes, aspectRatio)
+                } else {
+                    bytes
+                }
                 val thumbBytes = try {
                     val opts = BitmapFactory.Options().apply {
                         inSampleSize = 8
                     }
-                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                    val bmp = BitmapFactory.decodeByteArray(photoBytes, 0, photoBytes.size, opts)
                     if (bmp != null) {
                         // Correctly extract EXIF orientation and apply it to the thumbnail bitmap
-                        val exif = ExifInterface(ByteArrayInputStream(bytes))
+                        val exif = ExifInterface(ByteArrayInputStream(photoBytes))
                         val orientation = exif.getAttributeInt(
                             ExifInterface.TAG_ORIENTATION,
                             ExifInterface.ORIENTATION_NORMAL
@@ -1428,7 +1458,7 @@ class VaultCameraSession(
                 } catch (_: Exception) {
                     null
                 }
-                bytesCb.invoke(true, bytes, thumbBytes, null)
+                bytesCb.invoke(true, photoBytes, thumbBytes, null)
                 return
             }
 
@@ -1443,6 +1473,103 @@ class VaultCameraSession(
             cb?.invoke(ok, if (ok) null else "write failed")
         } finally {
             image.close()
+        }
+    }
+
+    /**
+     * Crop the saved still to the same aspect ratio used by the on-screen preview.
+     * The preview uses a centered cover crop, so a centered still crop keeps the
+     * captured framing consistent with what the user saw. Scans bypass this path.
+     */
+    private fun cropJpegToAspectRatio(bytes: ByteArray, targetAspectRatio: Float): ByteArray {
+        if (!targetAspectRatio.isFinite() || targetAspectRatio <= 0f) return bytes
+
+        var cropped: Bitmap? = null
+        var temporaryFile: File? = null
+        try {
+            val sourceExif = ExifInterface(ByteArrayInputStream(bytes))
+            val orientation = sourceExif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL,
+            )
+            val orientationSwapsAxes = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                orientation == ExifInterface.ORIENTATION_TRANSVERSE
+            val rawTargetAspectRatio = if (orientationSwapsAxes) {
+                1f / targetAspectRatio
+            } else {
+                targetAspectRatio
+            }
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val sourceWidth = bounds.outWidth
+            val sourceHeight = bounds.outHeight
+            if (sourceWidth <= 0 || sourceHeight <= 0) return bytes
+
+            val sourceAspectRatio = sourceWidth.toFloat() / sourceHeight.toFloat()
+            if (abs(sourceAspectRatio - rawTargetAspectRatio) / rawTargetAspectRatio < 0.005f) {
+                return bytes
+            }
+
+            val cropWidth: Int
+            val cropHeight: Int
+            if (sourceAspectRatio > rawTargetAspectRatio) {
+                cropWidth = (sourceHeight * rawTargetAspectRatio).toInt().coerceIn(1, sourceWidth)
+                cropHeight = sourceHeight
+            } else {
+                cropWidth = sourceWidth
+                cropHeight = (sourceWidth / rawTargetAspectRatio).toInt().coerceIn(1, sourceHeight)
+            }
+            val left = (sourceWidth - cropWidth) / 2
+            val top = (sourceHeight - cropHeight) / 2
+            val decoder = BitmapRegionDecoder.newInstance(bytes, 0, bytes.size)
+            try {
+                cropped = decoder.decodeRegion(
+                    Rect(left, top, left + cropWidth, top + cropHeight),
+                    BitmapFactory.Options(),
+                ) ?: return bytes
+            } finally {
+                decoder.recycle()
+            }
+
+            val encoded = ByteArrayOutputStream().use { stream ->
+                if (!cropped.compress(Bitmap.CompressFormat.JPEG, 95, stream)) return bytes
+                stream.toByteArray()
+            }
+
+            // Bitmap compression drops EXIF. Restore the original orientation so
+            // Android's JPEG_ORIENTATION continues to display the crop upright.
+            val croppedFile = File.createTempFile("camera-crop-", ".jpg", context.cacheDir)
+            temporaryFile = croppedFile
+            croppedFile.writeBytes(encoded)
+            ExifInterface(croppedFile.absolutePath).apply {
+                setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
+                sourceExif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)?.let {
+                    setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, it)
+                }
+                sourceExif.getAttribute(ExifInterface.TAG_GPS_LATITUDE)?.let {
+                    setAttribute(ExifInterface.TAG_GPS_LATITUDE, it)
+                }
+                sourceExif.getAttribute(ExifInterface.TAG_GPS_LATITUDE_REF)?.let {
+                    setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, it)
+                }
+                sourceExif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE)?.let {
+                    setAttribute(ExifInterface.TAG_GPS_LONGITUDE, it)
+                }
+                sourceExif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF)?.let {
+                    setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, it)
+                }
+                saveAttributes()
+            }
+            return croppedFile.readBytes()
+        } catch (e: Throwable) {
+            VeLog.w(TAG, e) { "could not crop still to preview aspect ratio" }
+            return bytes
+        } finally {
+            if (cropped != null && !cropped.isRecycled) cropped.recycle()
+            temporaryFile?.delete()
         }
     }
 

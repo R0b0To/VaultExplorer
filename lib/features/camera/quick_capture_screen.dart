@@ -500,7 +500,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       _pendingScratchpad = session;
 
       await cameraController.setOrientationDegrees(
-        computeDeviceRotationDegrees(),
+        await computePreviewRotationDegrees(),
       );
 
       final result = await cameraController.startVideoRecordingToScratchpad(
@@ -699,9 +699,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                               previewHeight: cameraController.previewHeight,
                               sensorOrientation: cameraController.sensorOrientation,
                               displayRotation: captureDisplayRotation,
-                              frameAspectRatio: isLandscapeFrame
-                                  ? captureControls.aspectRatio
-                                  : 1 / captureControls.aspectRatio,
+                              frameAspectRatio: cameraPreviewFrameAspectRatio(
+                                isLandscape: isLandscapeFrame,
+                              ),
                               showShutterFlash: captureShowShutterFlash,
                             ),
                           ),

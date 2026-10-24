@@ -21,6 +21,7 @@ class CameraPopupMenuButton<T> extends StatefulWidget {
   final List<CameraPopupMenuItem<T>> items;
   final Widget child;
   final double iconTurns;
+  final bool enabled;
 
   const CameraPopupMenuButton({
     super.key,
@@ -28,6 +29,7 @@ class CameraPopupMenuButton<T> extends StatefulWidget {
     required this.items,
     required this.child,
     required this.iconTurns,
+    this.enabled = true,
   });
 
   @override
@@ -87,6 +89,7 @@ class _CameraPopupMenuButtonState<T> extends State<CameraPopupMenuButton<T>> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _showMenu,
@@ -449,6 +452,30 @@ class CameraTopControlsBar extends StatelessWidget {
     };
   }
 
+  String _formatVideoAspectRatio() {
+    final resolution = currentVideoResolution?.trim().isNotEmpty == true
+        ? currentVideoResolution!.trim()
+        : _formatVideoResolution(videoQuality);
+    final dimensions = RegExp(r'^(\d+)\s*x\s*(\d+)$').firstMatch(resolution);
+    if (dimensions == null) return '16:9';
+    final width = int.tryParse(dimensions.group(1)!);
+    final height = int.tryParse(dimensions.group(2)!);
+    if (width == null || height == null || width <= 0 || height <= 0) {
+      return '16:9';
+    }
+    final larger = math.max(width, height);
+    final smaller = math.min(width, height);
+    var a = larger;
+    var b = smaller;
+    while (b != 0) {
+      final remainder = a % b;
+      a = b;
+      b = remainder;
+    }
+    final divisor = a == 0 ? 1 : a;
+    return '${larger ~/ divisor}:${smaller ~/ divisor}';
+  }
+
 
   /// The tiers the camera reports, largest first. The native side leaves out a
   /// tier that would repeat another one's size; before it has reported
@@ -522,6 +549,7 @@ class CameraTopControlsBar extends StatelessWidget {
                   // Aspect Ratio Selector
                   CameraPopupMenuButton<double>(
                     iconTurns: iconTurns,
+                    enabled: !isVideoMode,
                     onSelected: onAspectRatioChanged,
                     items: [
                       CameraPopupMenuItem(
@@ -570,11 +598,13 @@ class CameraTopControlsBar extends StatelessWidget {
                             border: Border.all(color: Colors.white30),
                           ),
                           child: Text(
-                            (selectedAspectRatio - 4 / 3).abs() < 0.05
-                                ? '4:3'
-                                : (selectedAspectRatio - 16 / 9).abs() < 0.05
-                                    ? '16:9'
-                                    : '1:1',
+                            isVideoMode
+                                ? _formatVideoAspectRatio()
+                                : (selectedAspectRatio - 4 / 3).abs() < 0.05
+                                    ? '4:3'
+                                    : (selectedAspectRatio - 16 / 9).abs() < 0.05
+                                        ? '16:9'
+                                        : '1:1',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                           ),
                         ),

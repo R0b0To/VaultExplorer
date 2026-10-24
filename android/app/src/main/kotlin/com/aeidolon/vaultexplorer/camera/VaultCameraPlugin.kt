@@ -208,8 +208,14 @@ class VaultCameraPlugin(
                     session.setOrientationDegrees(degrees)
                     result.success(null)
                 }
-                  "capturePhoto" -> withSession(call, result) { session, _ ->
-                    session.capturePhoto { ok, bytes, thumbBytes, error ->
+                  "capturePhoto" -> withSession(call, result) { session, args ->
+                    val aspectRatio = (args["aspectRatio"] as? Number)
+                        ?.toFloat()
+                        ?.takeIf { it.isFinite() && it > 0f }
+                    val orientationDegrees = (args["orientationDegrees"] as? Number)
+                        ?.toInt()
+                        ?.let { ((it % 360) + 360) % 360 }
+                    session.capturePhoto(aspectRatio, orientationDegrees) { ok, bytes, thumbBytes, error ->
                         mainHandler.post {
                             if (ok && bytes != null) {
                                 result.success(

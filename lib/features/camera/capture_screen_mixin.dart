@@ -209,10 +209,49 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
     return ((captureDeviceTurns * 360).round() % 360 + 360) % 360;
   }
 
+  /// Rotation of the preview in the app's current display orientation.
+  /// Photos and videos use this so their orientation matches the visible frame,
+  /// including when Android's auto-rotate setting leaves the UI locked.
+  Future<int> computePreviewRotationDegrees() async {
+    final rotation = await VaultCameraController.getDisplayRotation();
+    if (mounted && rotation != captureDisplayRotation) {
+      setState(() => captureDisplayRotation = rotation);
+    }
+    return (rotation % 4) * 90;
+  }
+
   Future<void> refreshDisplayRotation() async {
     final rotation = await VaultCameraController.getDisplayRotation();
     if (!mounted || rotation == captureDisplayRotation) return;
     setState(() => captureDisplayRotation = rotation);
+  }
+
+  double get captureVideoAspectRatio {
+    final fallbackResolution = switch (captureControls.videoQuality) {
+      'uhd' => '3840x2160',
+      'hd' => '1280x720',
+      'sd' => '720x480',
+      _ => '1920x1080',
+    };
+    final resolution = captureSession.currentVideoResolution ??
+        captureSession.videoQualities[captureControls.videoQuality] ??
+        fallbackResolution;
+    final dimensions = resolution.toLowerCase().split('x');
+    if (dimensions.length != 2) return 16 / 9;
+    final width = int.tryParse(dimensions[0].trim());
+    final height = int.tryParse(dimensions[1].trim());
+    if (width == null || height == null || width <= 0 || height <= 0) {
+      return 16 / 9;
+    }
+    return math.max(width, height) / math.min(width, height);
+  }
+
+  /// Uses the recorder aspect in video mode and the chosen crop in photo mode.
+  double cameraPreviewFrameAspectRatio({required bool isLandscape}) {
+    final landscapeAspectRatio = captureControls.isVideoMode
+        ? captureVideoAspectRatio
+        : captureControls.aspectRatio;
+    return isLandscape ? landscapeAspectRatio : 1 / landscapeAspectRatio;
   }
 
   void scrollToEndOfTray() {
@@ -449,14 +488,19 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
       pendingPhotoCount++;
     });
     scrollToEndOfTray();
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final frameAspectRatio = isLandscape
+        ? captureControls.aspectRatio
+        : 1 / captureControls.aspectRatio;
 
     try {
-      await cameraController.setOrientationDegrees(
-        computeDeviceRotationDegrees(),
-      );
-
+      final orientationDegrees = await computePreviewRotationDegrees();
       final isFirstMedia = capturedMedia.isEmpty;
-      final result = await cameraController.capturePhoto();
+      final result = await cameraController.capturePhoto(
+        aspectRatio: frameAspectRatio,
+        orientationDegrees: orientationDegrees,
+      );
 
       if (result.success && result.bytes != null && mounted) {
         HapticFeedback.lightImpact();

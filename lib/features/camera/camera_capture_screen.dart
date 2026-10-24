@@ -419,8 +419,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     setState(() => _isProcessingScan = true);
 
     try {
-      await cameraController.setOrientationDegrees(computeDeviceRotationDegrees());
-      final shot = await cameraController.capturePhoto();
+      final orientationDegrees = await computePreviewRotationDegrees();
+      final shot = await cameraController.capturePhoto(
+        orientationDegrees: orientationDegrees,
+      );
       final jpeg = shot.bytes;
       if (!shot.success || jpeg == null) {
         if (mounted) {
@@ -465,38 +467,44 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
   }
 
-  /// Camera preview shown uncropped (so the live outline lines up with it) with
-  /// the detector's outline on top.
-  Widget _buildScanPreview() {
-    final aspect = cameraPreviewDisplayAspect(
+  /// Camera preview and document outline cropped to the selected frame ratio.
+  Widget _buildScanPreview({required bool isLandscapeFrame}) {
+    final sourceAspect = cameraPreviewDisplayAspect(
       previewWidth: cameraController.previewWidth,
       previewHeight: cameraController.previewHeight,
       sensorOrientation: cameraController.sensorOrientation,
       displayRotation: captureDisplayRotation,
     );
+    final frameAspect = cameraPreviewFrameAspectRatio(
+      isLandscape: isLandscapeFrame,
+    );
     return AspectRatio(
-      aspectRatio: aspect,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          CameraPreviewView(
-            textureId: cameraController.textureId!,
-            previewWidth: cameraController.previewWidth,
-            previewHeight: cameraController.previewHeight,
-            sensorOrientation: cameraController.sensorOrientation,
-            displayRotation: captureDisplayRotation,
-            frameAspectRatio: aspect,
-            showShutterFlash: captureShowShutterFlash,
-          ),
-          // The front camera's preview is mirrored, so the outline would be too.
-          if (captureControls.preferredFacing != 'front')
-            IgnorePointer(
-              child: DocumentQuadOverlay(
-                quad: _liveQuad,
-                displayRotation: captureDisplayRotation,
-              ),
+      aspectRatio: frameAspect,
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CameraPreviewView(
+              textureId: cameraController.textureId!,
+              previewWidth: cameraController.previewWidth,
+              previewHeight: cameraController.previewHeight,
+              sensorOrientation: cameraController.sensorOrientation,
+              displayRotation: captureDisplayRotation,
+              frameAspectRatio: frameAspect,
+              showShutterFlash: captureShowShutterFlash,
             ),
-        ],
+            // The front camera's preview is mirrored, so the outline would be too.
+            if (captureControls.preferredFacing != 'front')
+              IgnorePointer(
+                child: DocumentQuadOverlay(
+                  quad: _liveQuad,
+                  displayRotation: captureDisplayRotation,
+                  sourceAspectRatio: sourceAspect,
+                  frameAspectRatio: frameAspect,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -772,7 +780,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       _currentRecordingPath = virtualPath;
 
       await cameraController.setOrientationDegrees(
-        computeDeviceRotationDegrees(),
+        await computePreviewRotationDegrees(),
       );
 
       final result = await cameraController.startVideoRecording(
@@ -987,16 +995,18 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                     onTapDown: (details) => _onTapToFocus(details, constraints),
                     child: Center(
                       child: _isScanMode
-                          ? _buildScanPreview()
+                          ? _buildScanPreview(
+                              isLandscapeFrame: isLandscapeFrame,
+                            )
                           : CameraPreviewView(
                               textureId: cameraController.textureId!,
                               previewWidth: cameraController.previewWidth,
                               previewHeight: cameraController.previewHeight,
                               sensorOrientation: cameraController.sensorOrientation,
                               displayRotation: captureDisplayRotation,
-                              frameAspectRatio: isLandscapeFrame
-                                  ? captureControls.aspectRatio
-                                  : 1 / captureControls.aspectRatio,
+                              frameAspectRatio: cameraPreviewFrameAspectRatio(
+                                isLandscape: isLandscapeFrame,
+                              ),
                               showShutterFlash: captureShowShutterFlash,
                             ),
                     ),

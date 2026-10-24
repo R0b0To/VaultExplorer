@@ -6,6 +6,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -811,6 +813,12 @@ class _MainShellState extends ConsumerState<MainShell>
     MountedContainer? resolveContainer(int volId) {
       for (final c in _mountedNotifier.value) {
         if (c.volId == volId) return c;
+      }
+      if (volId <= kExternalStorageBaseVolId) {
+        final external = ref
+            .read(externalStorageLocationsProvider.notifier)
+            .resolveContainer(volId);
+        if (external != null) return external;
       }
       final fromDashboard = _dashboardKey.currentState?.resolveAnyContainer(
         volId,

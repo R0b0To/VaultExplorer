@@ -145,6 +145,33 @@ double cameraPreviewDisplayAspect({
   return turnedSideways ? naturalH / naturalW : naturalW / naturalH;
 }
 
+/// Maps a point in the full displayed camera frame into its centered cover crop.
+/// Coordinates can be outside 0..1 when the point lies beyond the visible crop;
+/// the preview clips those parts of the document outline.
+Offset cameraDisplayPointToAspectCrop(
+  Offset point, {
+  required double sourceAspectRatio,
+  required double frameAspectRatio,
+}) {
+  if (!sourceAspectRatio.isFinite ||
+      sourceAspectRatio <= 0 ||
+      !frameAspectRatio.isFinite ||
+      frameAspectRatio <= 0) {
+    return point;
+  }
+  if ((sourceAspectRatio - frameAspectRatio).abs() < 1e-6) return point;
+
+  if (sourceAspectRatio > frameAspectRatio) {
+    final visibleWidth = frameAspectRatio / sourceAspectRatio;
+    final left = (1 - visibleWidth) / 2;
+    return Offset((point.dx - left) / visibleWidth, point.dy);
+  }
+
+  final visibleHeight = sourceAspectRatio / frameAspectRatio;
+  final top = (1 - visibleHeight) / 2;
+  return Offset(point.dx, (point.dy - top) / visibleHeight);
+}
+
 /// The rectangle an image of [image] size occupies when fitted (contain) inside
 /// [container], centred.
 Rect fitContain(Size container, Size image) {

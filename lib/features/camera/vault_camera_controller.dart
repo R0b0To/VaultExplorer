@@ -339,12 +339,17 @@ class VaultCameraController {
     });
   }
 
-   Future<({bool success, Uint8List? bytes, Uint8List? thumbnail, String? error})> capturePhoto() async {
+  Future<({bool success, Uint8List? bytes, Uint8List? thumbnail, String? error})> capturePhoto({
+    double? aspectRatio,
+    int? orientationDegrees,
+  }) async {
     final sId = _sessionId;
     if (sId == null) return (success: false, bytes: null, thumbnail: null, error: 'Camera not open');
 
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('capturePhoto', {
       'sessionId': sId,
+      'aspectRatio': ?aspectRatio,
+      'orientationDegrees': ?orientationDegrees,
     });
 
     final ok = res?['success'] as bool? ?? false;

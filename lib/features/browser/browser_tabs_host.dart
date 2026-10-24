@@ -247,6 +247,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   Duration _newTabSwipeStartTime = Duration.zero;
   bool? _wasDualPane;
   List<TabId>? _dualPaneTabIds;
+  Set<TabId> _requestedVisibleTabs = const <TabId>{};
   int? _pageViewDrivenActiveIndex;
 
   BrowserTabsState get _workspaceState =>
@@ -546,6 +547,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// layout decides this (dual-pane depends on the width actually available),
   /// so it is published from the layout pass; the hub ignores repeats.
   void _publishVisibleTabs(Set<TabId> visible) {
+    // The layout asks on every build; only a change is worth a frame callback.
+    if (setEquals(_requestedVisibleTabs, visible)) return;
+    _requestedVisibleTabs = visible;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _chrome.setVisibleTabs(visible);
@@ -1106,7 +1110,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
     );
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     final minDualPaneWidth = orientation == Orientation.landscape
         ? 640.0
         : 720.0;
@@ -1137,9 +1141,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         : dualPaneTabIds.first == activeTabId
         ? dualPaneTabIds.last
         : dualPaneTabIds.first;
-    final systemBackGestureInsetLeft = MediaQuery.of(
+    final systemBackGestureInsetLeft = MediaQuery.systemGestureInsetsOf(
       context,
-    ).systemGestureInsets.left;
+    ).left;
     final strip = BrowserTabStrip(
       workspaceConfig: _workspace,
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
@@ -1188,7 +1192,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     bool canStartDrawerGestureAt(Offset position) {
       if (position.dy < browserChromeBottom()) return false;
       if (!appBarAtBottom) return true;
-      final media = MediaQuery.of(context);
+      // Read, don't subscribe: this runs from a pointer handler, and
+      // MediaQuery.of here would make the whole shell rebuild for every
+      // MediaQuery change (the keyboard animating, say) from then on.
+      final media = context.getInheritedWidgetOfExactType<MediaQuery>()?.data;
+      if (media == null) return true;
       final appBarTop =
           media.size.height -
           media.viewInsets.bottom -
@@ -1246,18 +1254,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 Expanded(
                   child: NotificationListener<FastScrollbarDragNotification>(
                     onNotification: _onScrollbarDrag,
-                    child: LayoutBuilder(
-                      builder: (context, viewportConstraints) {
-                        final orientation = MediaQuery.of(context).orientation;
-                        final minDualPaneWidth =
-                            orientation == Orientation.landscape
-                            ? 640.0
-                            : 720.0;
-                        final dualPane =
-                            tabsEnabled &&
-                            useDualPaneBrowsing &&
-                            tabs.length > 1 &&
-                            viewportConstraints.maxWidth >= minDualPaneWidth;
+                    // Not a LayoutBuilder: it reruns whenever the viewport's
+                    // height changes (every frame of an app bar or tab bar
+                    // auto-hide, the keyboard opening), and each run rebuilt
+                    // the pager and with it every mounted tab. The width test
+                    // below needs no constraints; the shell fills the window.
+                    child: Builder(
+                      builder: (context) {
+                        final dualPane = dualPaneForTabStrip;
 
                         if (_wasDualPane != dualPane) {
                           final wasDualPane = _wasDualPane;

@@ -60,6 +60,32 @@ void main() {
       expect(state.hasPendingFolderSizes, isFalse);
     });
 
+    test('totals agrees with selectedTotalBytes and hasPendingFolderSizes', () {
+      final cases = <FileBrowserSelectionState>[
+        (items: <RawEntry>{}, resolvedFolderSizes: <String, int>{}),
+        (items: {file1, file2}, resolvedFolderSizes: <String, int>{}),
+        (items: {file1, dir1}, resolvedFolderSizes: <String, int>{}),
+        (items: {file1, dir1}, resolvedFolderSizes: {'photos': 1024}),
+        (items: {dir1, dir2}, resolvedFolderSizes: {'photos': 1024}),
+        (
+          items: {file1, file2, dir1, dir2},
+          resolvedFolderSizes: {'photos': 1024, 'documents': 2048},
+        ),
+        // A resolved size of zero is a resolved size, not a pending folder.
+        (items: {dir1}, resolvedFolderSizes: {'photos': 0}),
+      ];
+
+      for (final state in cases) {
+        final totals = state.totals;
+        expect(totals.totalBytes, state.selectedTotalBytes, reason: '$state');
+        expect(
+          totals.hasPendingFolderSizes,
+          state.hasPendingFolderSizes,
+          reason: '$state',
+        );
+      }
+    });
+
     test('toggleSelectItem adds and removes items', () {
       final notifier = container.read(fileBrowserSelectionProvider(const TabId(1)).notifier);
 

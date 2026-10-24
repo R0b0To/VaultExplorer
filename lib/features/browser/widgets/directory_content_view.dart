@@ -1930,26 +1930,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ref.read(fileBrowserSelectionProvider(_stateKey)).hasPendingFolderSizes;
 
   List<_SelectedBrowserEntry> get _selectedBrowserEntries {
-    final tabs = _workspaceState.tabs;
-    return [
-      for (final tab in tabs)
-        if (!tab.isDashboard)
-          for (final entry
-              in ref.read(fileBrowserSelectionProvider(tab.tabId)).items)
-            (
-              stateKey: tab.tabId,
-              container: tab.container!,
-              currentDirPath: ref
-                  .read(fileBrowserNavigationProvider(tab.tabId))
-                  .currentDirPath,
-              entry: entry,
-              insideArchive:
-                  ref
-                      .read(fileBrowserNavigationProvider(tab.tabId))
-                      .archiveContext !=
-                  null,
-            ),
-    ];
+    final selected = <_SelectedBrowserEntry>[];
+    for (final tab in _workspaceTabs) {
+      if (tab.isDashboard) continue;
+      final items = ref.read(fileBrowserSelectionProvider(tab.tabId)).items;
+      if (items.isEmpty) continue;
+      // Per tab, not per entry: a large selection would otherwise look up the
+      // same navigation state twice for every selected item, on every build.
+      final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
+      final container = tab.container!;
+      final currentDirPath = nav.currentDirPath;
+      final insideArchive = nav.archiveContext != null;
+      for (final entry in items) {
+        selected.add((
+          stateKey: tab.tabId,
+          container: container,
+          currentDirPath: currentDirPath,
+          entry: entry,
+          insideArchive: insideArchive,
+        ));
+      }
+    }
+    return selected;
   }
 
   List<_SelectedBrowserEntry> get _uniqueSelectedBrowserEntries {
@@ -1962,7 +1964,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     return unique;
   }
 
-  int get _selectedBrowserEntryCount => _selectedBrowserEntries.length;
+  int get _selectedBrowserEntryCount {
+    var count = 0;
+    for (final tab in _workspaceTabs) {
+      if (tab.isDashboard) continue;
+      count += ref.read(fileBrowserSelectionProvider(tab.tabId)).items.length;
+    }
+    return count;
+  }
 
   int get _allSelectedTotalBytes {
     final keys = _workspaceState.tabs
@@ -4559,14 +4568,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         (settings) => settings.settings.useBrowserTabs,
       ),
     );
+    // This viewport's own selection. The active viewport also follows the other
+    // tabs' selections, through the aggregate it watches further down (which
+    // watches every tab's selection itself); no second subscription per tab is
+    // needed for that.
     ref.watch(fileBrowserSelectionProvider(_stateKey));
-    if (_isActiveTab) {
-      for (final tab in _workspaceTabs) {
-        if (!tab.isDashboard && tab.tabId != _stateKey) {
-          ref.watch(fileBrowserSelectionProvider(tab.tabId));
-        }
-      }
-    }
     ref.watch(fileBrowserSortProvider(_stateKey));
     ref.watch(fileBrowserNavigationProvider(_stateKey));
     ref.watch(vaultSyncedFolderPathsProvider(widget.container));

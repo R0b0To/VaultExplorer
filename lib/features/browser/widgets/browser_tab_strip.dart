@@ -85,7 +85,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     super.initState();
     _scrollController = ScrollController(
       initialScrollOffset: ref
-          .read(browserTabsProvider(widget.workspaceConfig))
+          .read(browserTabsProvider(widget.workspaceConfig).notifier)
           .tabStripScrollOffset,
       keepScrollOffset: false,
     )..addListener(_rememberScrollOffset);

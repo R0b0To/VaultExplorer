@@ -143,6 +143,27 @@ extension FileBrowserSelectionStateX on FileBrowserSelectionState {
     return false;
   }
 
+  /// [selectedTotalBytes] and [hasPendingFolderSizes] from a single pass over
+  /// [items], for callers that need both (the workspace-wide aggregate runs on
+  /// every selection change, and each of those getters walks the whole set).
+  ({int totalBytes, bool hasPendingFolderSizes}) get totals {
+    var bytes = 0;
+    var pending = false;
+    for (final e in items) {
+      if (!e.isDir) {
+        bytes += e.sizeBytes;
+        continue;
+      }
+      final resolved = resolvedFolderSizes[e.name];
+      if (resolved == null) {
+        pending = true;
+      } else {
+        bytes += resolved;
+      }
+    }
+    return (totalBytes: bytes, hasPendingFolderSizes: pending);
+  }
+
   /// Ready-to-display summary for the selection action-bar, e.g.
   /// "3 files · 42.3 MB" or "2 folders (calculating…)".
   String selectionSummary(AppLocalizations l10n) {

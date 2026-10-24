@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
@@ -97,6 +99,42 @@ void main() {
       expect(id, isNotNull);
       expect(w.ids.toSet(), hasLength(2));
       expect(w.state.activeTab!.initialPath, 'docs');
+    });
+
+    test('remembering the tab strip offset does not notify listeners', () {
+      final w = workspace(1);
+      w.tabs.openTab(_container(2));
+      final before = w.notifications;
+
+      w.tabs.setTabStripScrollOffset(120);
+      w.tabs.setTabStripScrollOffset(240.5);
+
+      expect(w.notifications, before);
+      expect(w.tabs.tabStripScrollOffset, 240.5);
+    });
+
+    test('tab strip offset clamps negatives and ignores non-finite values', () {
+      final w = workspace(1);
+
+      w.tabs.setTabStripScrollOffset(80);
+      w.tabs.setTabStripScrollOffset(double.nan);
+      w.tabs.setTabStripScrollOffset(double.infinity);
+      expect(w.tabs.tabStripScrollOffset, 80);
+
+      w.tabs.setTabStripScrollOffset(-30);
+      expect(w.tabs.tabStripScrollOffset, 0);
+    });
+
+    test('tab strip offset survives tab changes', () {
+      final w = workspace(1);
+      final second = w.tabs.openTab(_container(2))!;
+      w.tabs.setTabStripScrollOffset(96);
+
+      w.tabs.activate(w.ids.first);
+      w.tabs.reorderTabs(0, 1);
+      w.tabs.closeTab(second);
+
+      expect(w.tabs.tabStripScrollOffset, 96);
     });
 
     test('openTab activates the new tab and remembers the previous one', () {
@@ -587,6 +625,89 @@ void main() {
 
       expect(w.state.tabs, hasLength(1));
       expect(w.notifications, seen);
+    });
+  });
+
+  group('aggregatedTabsSelectionProvider', () {
+    const report = RawEntry(
+      name: 'report.txt',
+      isDir: false,
+      sizeBytes: 100,
+      modifiedSecs: 1,
+    );
+    const photo = RawEntry(
+      name: 'photo.jpg',
+      isDir: false,
+      sizeBytes: 50,
+      modifiedSecs: 1,
+    );
+    const folder = RawEntry(
+      name: 'photos',
+      isDir: true,
+      sizeBytes: 0,
+      modifiedSecs: 1,
+    );
+
+    AggregatedTabsSelection aggregate(BrowserTabsConfig config) =>
+        container.read(aggregatedTabsSelectionProvider(config));
+
+    test('sums every file tab and flags folders that are not sized yet', () {
+      final w = workspace(1);
+      final first = w.active;
+      final second = w.tabs.openTab(_container(2))!;
+      container
+          .read(fileBrowserSelectionProvider(first).notifier)
+          .setSelectedItems({report, folder});
+      container
+          .read(fileBrowserSelectionProvider(second).notifier)
+          .setSelectedItems({photo});
+
+      final selection = aggregate(w.config);
+
+      expect(selection.hasSelection, isTrue);
+      expect(selection.count, 3);
+      expect(selection.bytes, 150);
+      expect(selection.hasPendingFolderSizes, isTrue);
+      expect(selection.itemsByTab[first], {report, folder});
+      expect(selection.itemsByTab[second], {photo});
+    });
+
+    test('follows selection changes and clears with the selection', () {
+      final w = workspace(1);
+      final notifier = container.read(
+        fileBrowserSelectionProvider(w.active).notifier,
+      );
+
+      notifier.toggleSelectItem(report);
+      expect(aggregate(w.config).count, 1);
+      expect(aggregate(w.config).bytes, 100);
+
+      notifier.exitSelectionMode();
+      final cleared = aggregate(w.config);
+      expect(cleared.hasSelection, isFalse);
+      expect(cleared.bytes, 0);
+      expect(cleared.hasPendingFolderSizes, isFalse);
+    });
+
+    test('hands out read-only sets', () {
+      final w = workspace(1);
+      container
+          .read(fileBrowserSelectionProvider(w.active).notifier)
+          .setSelectedItems({report});
+
+      final items = aggregate(w.config).itemsByTab[w.active]!;
+
+      expect(() => items.add(photo), throwsUnsupportedError);
+      expect(() => items.remove(report), throwsUnsupportedError);
+    });
+
+    test('leaves the Dashboard tab out', () {
+      final w = workspace(1, includeDashboardTab: true);
+
+      final selection = aggregate(w.config);
+
+      expect(selection.itemsByTab.keys, [w.active]);
+      expect(selection.hasSelection, isFalse);
     });
   });
 

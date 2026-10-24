@@ -994,10 +994,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
     final workspaceConfig = widget.workspaceConfig;
-    final workspaceState = workspaceConfig == null
-        ? null
-        : ref.watch(browserTabsProvider(workspaceConfig));
-    final dashboardIsActive = workspaceState?.activeTab?.isDashboard ?? true;
+    // Only whether Home is the focused tab matters here. Watching the whole
+    // workspace state rebuilt the Dashboard on every unrelated tab change.
+    final dashboardIsActive = workspaceConfig == null
+        ? true
+        : ref.watch(
+            activeBrowserTabProvider(
+              workspaceConfig,
+            ).select((tab) => tab?.isDashboard ?? true),
+          );
     // In a hosted tab the shell owns a fixed app bar, so dashboard scrolling
     // never collapses or resizes it. Standalone mode retains its old behavior.
     final autoHideAppBar =

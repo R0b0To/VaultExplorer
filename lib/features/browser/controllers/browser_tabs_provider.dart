@@ -125,13 +125,11 @@ class BrowserTabsState {
   final List<BrowserTabState> tabs;
   final TabId? activeTabId;
   final TabId? previousTabId;
-  final double tabStripScrollOffset;
 
   const BrowserTabsState({
     required this.tabs,
     required this.activeTabId,
     this.previousTabId,
-    this.tabStripScrollOffset = 0,
   });
 
   int get activeIndex {
@@ -154,14 +152,12 @@ class BrowserTabsState {
     TabId? activeTabId,
     TabId? previousTabId,
     bool clearPreviousTabId = false,
-    double? tabStripScrollOffset,
   }) => BrowserTabsState(
     tabs: tabs ?? this.tabs,
     activeTabId: activeTabId ?? this.activeTabId,
     previousTabId: clearPreviousTabId
         ? null
         : (previousTabId ?? this.previousTabId),
-    tabStripScrollOffset: tabStripScrollOffset ?? this.tabStripScrollOffset,
   );
 }
 
@@ -200,11 +196,21 @@ class BrowserTabs extends _$BrowserTabs {
     );
   }
 
+  /// Where the tab strip was last scrolled to, so a rebuilt strip can come back
+  /// to the same place.
+  ///
+  /// Deliberately not part of [state]: it changes on every frame the strip
+  /// scrolls (including the animation that brings a newly active tab into
+  /// view), nothing renders from it, and publishing it through [state] woke
+  /// every listener of the workspace - the shell, the chrome hub, each mounted
+  /// viewport and the Dashboard - once per frame.
+  double _tabStripScrollOffset = 0;
+
+  double get tabStripScrollOffset => _tabStripScrollOffset;
+
   void setTabStripScrollOffset(double value) {
     if (!value.isFinite) return;
-    final offset = value < 0 ? 0.0 : value;
-    if (state.tabStripScrollOffset == offset) return;
-    state = state.copyWith(tabStripScrollOffset: offset);
+    _tabStripScrollOffset = value < 0 ? 0.0 : value;
   }
 
   TabId? openTab(
@@ -297,7 +303,6 @@ class BrowserTabs extends _$BrowserTabs {
       ),
       activeTabId: dashboard.tabId,
       previousTabId: previousTabId,
-      tabStripScrollOffset: state.tabStripScrollOffset,
     );
   }
 
@@ -586,21 +591,30 @@ final aggregatedTabsSelectionProvider =
     Provider.family<AggregatedTabsSelection, BrowserTabsConfig>((ref, config) {
       final tabs = ref.watch(browserTabsListProvider(config));
       final itemsByTab = <TabId, Set<RawEntry>>{};
+      var count = 0;
       var bytes = 0;
       var pending = false;
       for (final tab in tabs) {
         if (tab.isDashboard) continue;
         final selection = ref.watch(fileBrowserSelectionProvider(tab.tabId));
-        itemsByTab[tab.tabId] = Set.unmodifiable(selection.items);
-        bytes += selection.selectedTotalBytes;
-        pending = pending || selection.hasPendingFolderSizes;
+        final items = selection.items;
+        count += items.length;
+        if (items.isEmpty) {
+          // The common case for every tab but the one being worked in: nothing
+          // to copy or add up.
+          itemsByTab[tab.tabId] = const <RawEntry>{};
+          continue;
+        }
+        // Copied, not shared, so a consumer can never alter a tab's own
+        // selection through the aggregate.
+        itemsByTab[tab.tabId] = Set.unmodifiable(items);
+        final totals = selection.totals;
+        bytes += totals.totalBytes;
+        pending = pending || totals.hasPendingFolderSizes;
       }
       return AggregatedTabsSelection(
         itemsByTab: Map.unmodifiable(itemsByTab),
-        count: itemsByTab.values.fold<int>(
-          0,
-          (sum, items) => sum + items.length,
-        ),
+        count: count,
         bytes: bytes,
         hasPendingFolderSizes: pending,
       );

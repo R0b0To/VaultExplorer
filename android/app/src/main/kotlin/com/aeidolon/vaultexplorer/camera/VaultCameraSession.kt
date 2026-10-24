@@ -41,6 +41,7 @@ import java.io.File
 import java.util.concurrent.Executor
 import javax.crypto.SecretKey
 import kotlin.math.abs
+import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.VeLog
 
 private const val TAG = "VaultCameraSession"
@@ -94,6 +95,12 @@ class VaultCameraSession(
         rowStride: Int,
         rotationDegrees: Int
     ): String?
+
+    /**
+     * Set when a native analysis call could not be resolved at runtime. Live analysis then
+     * stays off for the rest of this session; the camera itself keeps working.
+     */
+    @Volatile private var nativeAnalysisUnavailable = false
 
     /** Live document quad from a Y plane, in the upright frame: [x0,y0,..,x3,y3,score] or null. */
     private external fun nativeDetectDocument(
@@ -246,6 +253,16 @@ class VaultCameraSession(
 
     fun setScanMode(enable: Boolean, document: Boolean = false) {
         runOnCameraThread {
+            // The JNI entry points below live in libvaultexplorer, which this class does not
+            // load by itself: NativeEngine's initialiser does, but only once a vault operation
+            // has touched it. Opening the camera from Local Storage before any vault was
+            // unlocked in this process would otherwise throw UnsatisfiedLinkError on the first
+            // analysis frame (an Error, so it was never caught and killed the app).
+            if (enable && (nativeAnalysisUnavailable || !NativeEngine.isLoaded)) {
+                nativeAnalysisUnavailable = true
+                VeLog.w(TAG) { "native library unavailable; live scan analysis disabled" }
+                return@runOnCameraThread
+            }
             val wantDocument = enable && document
             if (isScanMode == enable && isDocumentScan == wantDocument) return@runOnCameraThread
             isScanMode = enable
@@ -258,7 +275,7 @@ class VaultCameraSession(
     private fun onAnalysisFrameAvailable(reader: ImageReader) {
         val image = try { reader.acquireLatestImage() } catch (_: Exception) { null } ?: return
         try {
-            if (!isScanMode || isScanningFrame) return
+            if (!isScanMode || isScanningFrame || nativeAnalysisUnavailable) return
             val now = System.currentTimeMillis()
             val documentScan = isDocumentScan
             if (now - lastScanTime < (if (documentScan) 100 else 140)) return
@@ -299,6 +316,10 @@ class VaultCameraSession(
                             onEvent(mapOf("event" to "qr_code", "data" to text))
                         }
                     }
+                } catch (e: UnsatisfiedLinkError) {
+                    // An Error, not an Exception: without this it is fatal on this thread.
+                    nativeAnalysisUnavailable = true
+                    VeLog.e(TAG, e) { "native analysis unavailable; disabling live scan analysis" }
                 } catch (e: Exception) {
                     VeLog.w(TAG, e) { "analysis frame failed" }
                 } finally {

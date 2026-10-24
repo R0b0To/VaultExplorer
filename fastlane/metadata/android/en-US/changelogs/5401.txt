@@ -1,0 +1,6 @@
+• Added unlock modes (read-only, protect) & per-vault default settings
+• Image editor: saturation, contrast, hue controls & redact tool fix
+• Hold-to-activate torch mode for camera photos
+• Media editors auto-close on vault lock + wakelock fixes
+• Markdown editor auto-resolves relative image paths
+• Fixed autolock timers, photo aspect ratios, & storage moves

@@ -1,0 +1,21 @@
+## What's Changed
+
+### New Features & Enhancements
+* **Unlock Modes & Vault Defaults:** Added unlock modes (Read-Only and Hidden Volume Protect) across various credential unlock screens, along with a per-vault setting to remember default unlock preferences.
+* **Image Editor Adjustments:** Added minimal adjustment sliders for saturation, contrast, and hue in the image editor.
+* **Camera Torch Mode:** Added a hold-to-activate torch mode for taking photos in low light.
+* **Smart Markdown Image Paths:** Inserting images into the Markdown editor now automatically resolves relative paths, including parent and subfolder directories.
+* **Masked Mode Exit Guard:** `pressBackAgainToExit` prompt is now properly triggered at the decoy layer when masked mode is enabled.
+
+### Security & Media Editors
+* **Editor Lock Safeguard:** Video, image, and audio editors now automatically close immediately if the vault is locked by any trigger.
+* **Wakelock Management:** Resolved wakelock retention issues across all media editors.
+
+### Bug Fixes
+* **Autolock:** Fixed an issue where autolock timers became inactive after navigating away from the foreground app.
+* **Camera:** Fixed captured photos failing to respect the selected aspect ratio.
+* **Storage Operations:**
+  * Fixed file operations failing on added storage locations.
+  * Resolved an issue when moving files from an added storage location to the same location in local storage.
+* **Image Editor:** Fixed an issue preventing the redact tool from functioning properly.
+* **UI & Theming:** Fixed theme application glitches and restored the missing "Default" reset action on several theme elements.

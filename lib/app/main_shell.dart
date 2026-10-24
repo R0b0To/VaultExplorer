@@ -941,7 +941,13 @@ class _MainShellState extends ConsumerState<MainShell>
       // Leaving the app from Home takes two backs: the first arms the exit and
       // says so, the second (within the window) lets the system leave. This
       // holds with or without other tabs open, because hidden tabs never veto.
-      canPop: atHome && _exitArmed,
+      //
+      // When this shell was revealed from Mask Mode's decoy, Home is not the
+      // end of the line: back goes straight to the decoy underneath, with no
+      // exit hint. The decoy is the one that asks for the second back before
+      // the app is left (see the app-root back handling in
+      // DirectoryContentView).
+      canPop: atHome && (_exitArmed || widget.returnToDecoyOnBackground),
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
         // The focused folder tab handles back itself.

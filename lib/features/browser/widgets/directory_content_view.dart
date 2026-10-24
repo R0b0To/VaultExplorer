@@ -648,6 +648,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   DateTime? _lastOpReloadTime;
   Timer? _opReloadTimer;
 
+  /// Decoy mode (an app-root workspace) has nothing beneath it, so back at its
+  /// root would leave the app outright. The first back arms the exit and says
+  /// so; a second one within the window lets the system leave.
+  bool _exitArmed = false;
+  Timer? _exitArmTimer;
+
   void _onOperationsChanged() {
     if (!mounted) return;
     final hasActiveTargetingCurrent = _opSvc.activeOperations.any(
@@ -750,6 +756,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
+    _exitArmTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
     _opSvc.removeVolumeContentChangedListener(_onVolumeContentChanged);
     if (widget.scrollController == null) _browserScrollController.dispose();
@@ -1785,7 +1792,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool _handleBackAtRoot() {
     final workspace = widget.workspaceConfig;
     // An app-root workspace (decoy mode) has nothing beneath it: at the root
-    // the system leaves the app (see canPop in build).
+    // back asks for a second press, then the system leaves the app (see
+    // _armExit and canPop in build).
     if (workspace.appRoot) return false;
     if (ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       // With tabs enabled, the location remains in its tab at the root.
@@ -1834,10 +1842,24 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       case BrowserBackAction.popRoute:
         final navigator = Navigator.of(context);
         if (navigator.canPop()) navigator.pop();
-      case BrowserBackAction.stay:
       case BrowserBackAction.leave:
+        _armExit();
+      case BrowserBackAction.stay:
         break;
     }
+  }
+
+  void _armExit() {
+    _exitArmTimer?.cancel();
+    setState(() => _exitArmed = true);
+    showAppSnackBar(
+      context,
+      message: context.l10n.pressBackAgainToExit,
+      tone: AppBannerTone.info,
+    );
+    _exitArmTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _exitArmed = false);
+    });
   }
 
   bool get _canPreviewFolderBackGesture =>
@@ -5038,11 +5060,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     // Only the focused tab has a say in back. It vetoes the system unless the
     // policy says there is nothing left for the browser to do (decoy at its
-    // root). Hidden tabs never veto, so Home can hand back to the app shell,
-    // which asks for a second back before exiting.
+    // root) and the exit has been armed by a first back press. Hidden tabs
+    // never veto, so Home can hand back to the app shell, which asks for a
+    // second back before exiting.
     final bool isActiveTab = _isActiveTab;
     final bool canPop =
-        !isActiveTab || _resolveBack() == BrowserBackAction.leave;
+        !isActiveTab ||
+        (_resolveBack() == BrowserBackAction.leave && _exitArmed);
     final systemOverlayStyle = AppSystemUI.forTheme(Theme.of(context));
     final Widget? browserBottomBar = (!isLandscape && showActionBar)
         ? Column(

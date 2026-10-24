@@ -18,7 +18,8 @@ enum BrowserBackAction {
   /// At the root of a tab that was not opened from Home: stay put.
   stay,
 
-  /// Nothing left for the browser to do; let the system leave the app.
+  /// Nothing left for the browser to do (decoy at its root): ask for a second
+  /// back, then let the system leave the app.
   leave,
 }
 

@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_chrome.dart';
 import 'package:vaultexplorer/features/browser/viewer/editor_text_encoding.dart';
@@ -1631,64 +1632,21 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   }
 
   Future<void> _insertImageTemplate() async {
-    final imageExts = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'};
     final currentTab = _activeTab;
-    final lastSlash = currentTab.filePath.lastIndexOf('/');
-    final parentDir = lastSlash >= 0
-        ? currentTab.filePath.substring(0, lastSlash)
-        : '';
-
-    final rawList = await ref
-        .read(vaultFileIoApiProvider)
-        .listDirectory(widget.container, parentDir);
-
-    final images = rawList == null
-        ? <RawEntry>[]
-        : RawEntry.parseAll(rawList).where((e) {
-            if (e.isDir) return false;
-            final dot = e.name.lastIndexOf('.');
-            if (dot < 0) return false;
-            return imageExts.contains(e.name.substring(dot + 1).toLowerCase());
-          }).toList();
-
-    if (!mounted) return;
-
-    final selectedImage = await showDialog<String>(
+    final selectedImagePath = await showMarkdownImagePicker(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.selectImageTitle),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: images.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(ctx.l10n.noImagesFoundMessage),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: images.length,
-                  itemBuilder: (context, index) {
-                    final img = images[index];
-                    return ListTile(
-                      leading: const Icon(Icons.image_outlined),
-                      title: Text(img.name),
-                      onTap: () => Navigator.of(ctx).pop(img.name),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.cancel),
-          ),
-        ],
-      ),
+      container: widget.container,
+      markdownFilePath: currentTab.filePath,
     );
 
-    if (selectedImage == null) return;
+    if (!mounted || selectedImagePath == null) return;
 
-    final template = '![$selectedImage]($selectedImage)';
+    final selectedImage = selectedImagePath.split('/').last;
+    final relativePath = relativeMarkdownImagePath(
+      currentTab.filePath,
+      selectedImagePath,
+    );
+    final template = '![$selectedImage]($relativePath)';
     currentTab.codeController.replaceSelection(template);
     _focusNode.requestFocus();
   }
@@ -1856,9 +1814,14 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               icon: const Icon(Icons.add_link_rounded),
               label: Text(ctx.l10n.addFile),
               onPressed: () {
+                final currentTab = _activeTab;
+                final relativePath = relativeMarkdownImagePath(
+                  currentTab.filePath,
+                  fullPath,
+                );
                 Navigator.of(ctx).pop();
-                final template = '![$fileName]($fileName)';
-                _activeTab.codeController.replaceSelection(template);
+                final template = '![$fileName]($relativePath)';
+                currentTab.codeController.replaceSelection(template);
                 _focusNode.requestFocus();
               },
             ),

@@ -260,6 +260,7 @@ class _DrawerBookmarksSectionState
                 .read(fileManagerToolbarSettingsProvider(null).notifier)
                 .toggleBookmarkGroupCollapsed(vault.uri),
           ),
+          onLongPress: () => _manage(context, vault),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 2, 4),
             child: Row(
@@ -281,19 +282,6 @@ class _DrawerBookmarksSectionState
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                Text(
-                  '${bookmarks.length}',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 18,
-                  tooltip: context.l10n.reorderBookmarksTitle,
-                  icon: Icon(Icons.reorder_rounded, color: cs.onSurfaceVariant),
-                  onPressed: () => _manage(context, vault),
                 ),
               ],
             ),

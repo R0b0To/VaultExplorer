@@ -1,0 +1,2 @@
+- Improved post-recording video review with an editor-style thumbnail timeline, trim handles, zoom controls, and swipe-to-seek.
+- Prevented vault auto-lock and per-vault auto-close timers from interrupting active audio recordings; timers resume when recording ends.

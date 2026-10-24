@@ -3116,6 +3116,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         final keepVisible = _opNeedsAttention(op);
 
         if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
+          // This viewport brings itself up to date below, so the service's
+          // volume-changed notification for the same copy/move must not make
+          // it list the folder a second time. Only plain transfers publish
+          // one; if this viewport has moved to an unrelated folder in the
+          // meantime it takes the notification like any other view.
+          if (op.isTransfer) _ownedOpIds.add(op.id);
           if (_isVisibleTab) {
             _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
               if (!keepVisible) _opSvc.dismiss(op.id);

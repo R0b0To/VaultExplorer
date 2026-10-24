@@ -263,13 +263,16 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isCrossContainer =>
+  /// A plain copy or move between folders, as opposed to an import, export,
+  /// delete or archive operation.
+  bool get isTransfer =>
       !isImport &&
       !isExport &&
       !isDelete &&
       !isArchiveCreate &&
-      !isArchiveExtract &&
-      sourceVolId != destVolId;
+      !isArchiveExtract;
+
+  bool get isCrossContainer => isTransfer && sourceVolId != destVolId;
 
   String get verb => isImport
       ? l10n.verbImport

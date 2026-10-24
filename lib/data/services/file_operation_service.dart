@@ -103,6 +103,29 @@ class FileOperationService extends ChangeNotifier {
     _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: op.id));
   }
 
+  /// A copy or move has stopped (finished, failed or cancelled). It changed the
+  /// destination volume and, for a move, the volume the entries were taken
+  /// from, so a view of either (typically another tab, whose folder is neither
+  /// the destination nor on screen) learns its listing is out of date.
+  ///
+  /// Published whatever the outcome: a move that stopped part-way has still
+  /// taken some entries out of the source folder.
+  ///
+  /// The destination goes first. A view that started the operation skips the
+  /// first notification of its own operation (see `_ownedOpIds` in
+  /// DirectoryContentView), and the view that starts a paste shows the
+  /// destination volume.
+  void _publishTransferContentChanged(
+    FileOperation op, {
+    required int sourceVolId,
+    required int destVolId,
+  }) {
+    _publishVolumeContentChanged(op, destVolId);
+    if (op.isCut && sourceVolId != destVolId) {
+      _publishVolumeContentChanged(op, sourceVolId);
+    }
+  }
+
   void _beginBatches(Iterable<int> volIds) {
     for (final volId in volIds.toSet()) {
       _engineEvents.beginBatch(volId);
@@ -1586,6 +1609,12 @@ class FileOperationService extends ChangeNotifier {
           _unbindOperationListener(op);
           notifyListeners();
           _syncNotificationProgress();
+          // After the native batch is closed, so other views list the final state.
+          _publishTransferContentChanged(
+            op,
+            sourceVolId: src.volId,
+            destVolId: dest.volId,
+          );
         }
       }
     }
@@ -1752,6 +1781,11 @@ class FileOperationService extends ChangeNotifier {
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
+      _publishTransferContentChanged(
+        op,
+        sourceVolId: source.volId,
+        destVolId: dest.volId,
+      );
     }
   }
 

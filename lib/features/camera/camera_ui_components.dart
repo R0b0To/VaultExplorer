@@ -404,6 +404,7 @@ class CameraTopControlsBar extends StatelessWidget {
   final ValueChanged<String> onPhotoResolutionChanged;
   final VoidCallback onCycleTimerDelay;
   final VoidCallback onCycleFlashMode;
+  final VoidCallback onPhotoTorchActivated;
 
   const CameraTopControlsBar({
     super.key,
@@ -428,6 +429,7 @@ class CameraTopControlsBar extends StatelessWidget {
     required this.onPhotoResolutionChanged,
     required this.onCycleTimerDelay,
     required this.onCycleFlashMode,
+    required this.onPhotoTorchActivated,
   });
 
   String _formatVideoResolution(String quality) {
@@ -673,20 +675,28 @@ class CameraTopControlsBar extends StatelessWidget {
                       ),
                     ),
                   ],
-                  // Photo: auto / on / off. Video: torch on / off.
+                  // Photo taps cycle flash; a long press holds the torch.
                   if (hasFlash)
                     buildRotatedWidget(
                       iconTurns: iconTurns,
-                      child: IconButton(
-                        icon: Icon(
-                          flashMode == 'auto'
-                              ? Icons.flash_auto_rounded
-                              : (flashMode == 'on' || flashMode == 'torch')
-                              ? Icons.flash_on_rounded
-                              : Icons.flash_off_rounded,
-                          color: flashMode == 'off' ? Colors.white : Colors.amber,
+                      child: GestureDetector(
+                        onLongPress: isVideoMode ? null : onPhotoTorchActivated,
+                        child: IconButton(
+                          icon: Icon(
+                            isVideoMode
+                                ? (flashMode == 'torch'
+                                      ? Icons.flashlight_on_rounded
+                                      : Icons.flashlight_off_rounded)
+                                : switch (flashMode) {
+                                    'auto' => Icons.flash_auto_rounded,
+                                    'on' => Icons.flash_on_rounded,
+                                    'torch' => Icons.flashlight_on_rounded,
+                                    _ => Icons.flash_off_rounded,
+                                  },
+                            color: flashMode == 'off' ? Colors.white : Colors.amber,
+                          ),
+                          onPressed: onCycleFlashMode,
                         ),
-                        onPressed: onCycleFlashMode,
                       ),
                     ),
                 ],

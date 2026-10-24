@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
@@ -52,6 +54,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   late CameraVaultService _vaultService;
 
   late final ActiveRecordingRegistry _activeRecordingRegistry;
+  late final SessionLockController _sessionLockController;
+  late final VaultDashboardController _dashboardController;
+  bool _autoLockPausedForRecording = false;
 
   bool _backgroundRecordingActive = false;
 
@@ -64,6 +69,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   bool _hasSavedVideoCapture = false;
 
   bool _isReviewingMedia = false;
+
+  bool _lockedRouteDismissalScheduled = false;
 
   // --- Document scanning --------------------------------------------------
   final _scanApi = const DocumentScanApi();
@@ -103,6 +110,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     captureLifecycleApi = ref.read(vaultLifecycleApiProvider);
     engineEvents = ref.read(vaultEngineEventsProvider);
     _activeRecordingRegistry = ref.read(activeRecordingRegistryProvider);
+    _sessionLockController = ref.read(sessionLockControllerProvider);
+    _dashboardController = ref.read(vaultDashboardControllerProvider.notifier);
     cameraController = VaultCameraController(engineEvents);
 
     engineEvents.addBackgroundRecordingStopRequestedListener(
@@ -171,6 +180,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   @override
   void dispose() {
+    _resumeAutoLockAfterRecording();
     engineEvents.removeBackgroundRecordingStopRequestedListener(
       _onBackgroundRecordingStopRequestedEvent,
     );
@@ -214,6 +224,20 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     } else if (state == AppLifecycleState.resumed && backgroundingFuture != null) {
       unawaited(_handleResumed());
     }
+  }
+
+  void _pauseAutoLockForRecording() {
+    if (_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = true;
+    _sessionLockController.pauseVaultAutoLock();
+    _dashboardController.pauseAutoCloseForActivity(widget.container.volId);
+  }
+
+  void _resumeAutoLockAfterRecording() {
+    if (!_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = false;
+    _dashboardController.resumeAutoCloseAfterActivity(widget.container.volId);
+    _sessionLockController.resumeVaultAutoLock();
   }
 
   Future<void> _handleGoingBackground() async {
@@ -765,6 +789,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
       recordingStart = DateTime.now();
       setState(() => captureIsRecording = true);
+      _pauseAutoLockForRecording();
 
       if (!mounted) return;
       captureSessionController.startRecording();
@@ -810,6 +835,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     final startedAt = recordingStart;
     recordingStart = null;
     setState(() => captureIsRecording = false);
+    _resumeAutoLockAfterRecording();
 
     try {
       final isFirstMedia = capturedMedia.isEmpty;
@@ -868,15 +894,33 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     });
   }
 
+  void _dismissRouteAfterContainerLock() {
+    if (_lockedRouteDismissalScheduled) return;
+    _lockedRouteDismissalScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((candidate) => candidate == route);
+      if (route.isActive) navigator.removeRoute(route);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
     ref.watch(cameraCaptureSessionProvider(captureSessionKey));
-    final isContainerLocked = ref.watch(
-      cameraCaptureLockProvider(widget.container.volId),
-    );
+    final lockProvider = cameraCaptureLockProvider(widget.container.volId);
+    ref.listen<bool>(lockProvider, (previous, locked) {
+      if (locked && previous != true) {
+        _dismissRouteAfterContainerLock();
+      }
+    });
+    final isContainerLocked = ref.watch(lockProvider);
     if (isContainerLocked) {
+      _dismissRouteAfterContainerLock();
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -1019,6 +1063,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 onCycleFlashMode: () {
                   final nextMode = captureControlsController.cyclePhotoFlashMode();
                   unawaited(applyFlash(cameraController, nextMode, logTag: 'CameraCaptureScreen'));
+                },
+                onPhotoTorchActivated: () {
+                  final mode = captureControlsController.activatePhotoTorch();
+                  if (mode != null) {
+                    unawaited(applyFlash(cameraController, mode, logTag: 'CameraCaptureScreen'));
+                  }
                 },
               ),
             ),

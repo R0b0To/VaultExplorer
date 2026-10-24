@@ -7,6 +7,8 @@ import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_destination_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -48,6 +50,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   }
 
   late final QuickCaptureApi _quickCaptureApi;
+  late final SessionLockController _sessionLockController;
+  late final VaultDashboardController _dashboardController;
+  bool _autoLockPausedForRecording = false;
 
   _Phase _phase = _Phase.camera;
 
@@ -65,6 +70,8 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     captureLifecycleApi = ref.read(vaultLifecycleApiProvider);
     engineEvents = ref.read(vaultEngineEventsProvider);
     _quickCaptureApi = ref.read(quickCaptureApiProvider);
+    _sessionLockController = ref.read(sessionLockControllerProvider);
+    _dashboardController = ref.read(vaultDashboardControllerProvider.notifier);
     cameraController = VaultCameraController(engineEvents);
 
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -124,6 +131,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
   @override
   void dispose() {
+    _resumeAutoLockAfterRecording();
     WidgetsBinding.instance.removeObserver(this);
     trayScrollController.dispose();
     timer?.cancel();
@@ -165,6 +173,20 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     } else if (state == AppLifecycleState.resumed && backgroundingFuture != null) {
       unawaited(_handleResumed());
     }
+  }
+
+  void _pauseAutoLockForRecording() {
+    if (_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = true;
+    _sessionLockController.pauseVaultAutoLock();
+    _dashboardController.pauseAutoCloseTimersForActivity();
+  }
+
+  void _resumeAutoLockAfterRecording() {
+    if (!_autoLockPausedForRecording) return;
+    _autoLockPausedForRecording = false;
+    _dashboardController.resumeAutoCloseTimersAfterActivity();
+    _sessionLockController.resumeVaultAutoLock();
   }
 
   Future<void> _handleGoingBackground() async {
@@ -498,6 +520,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       recordingStart = DateTime.now();
       captureIsRecording = true;
       if (!mounted) return;
+      _pauseAutoLockForRecording();
       captureSessionController.startRecording();
       unawaited(captureFileIoApi.setKeepScreenOn(true));
 
@@ -529,6 +552,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     final startedAt = recordingStart;
     recordingStart = null;
     captureIsRecording = false;
+    _resumeAutoLockAfterRecording();
 
     try {
       final isFirstMedia = capturedMedia.isEmpty;
@@ -739,6 +763,12 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                         onCycleFlashMode: () {
                           final nextMode = captureControlsController.cyclePhotoFlashMode();
                           unawaited(applyFlash(cameraController, nextMode, logTag: 'QuickCaptureScreen'));
+                        },
+                        onPhotoTorchActivated: () {
+                          final mode = captureControlsController.activatePhotoTorch();
+                          if (mode != null) {
+                            unawaited(applyFlash(cameraController, mode, logTag: 'QuickCaptureScreen'));
+                          }
                         },
                       ),
                     ),

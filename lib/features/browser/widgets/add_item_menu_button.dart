@@ -192,9 +192,10 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          onPressed: () => ref
-              .read(sessionLockControllerProvider)
-              .withLockSuppression(widget.onCaptureFromCamera),
+          // The callback awaits the camera route. Holding lock suppression
+          // around it would disable screen-off auto-lock for the whole time
+          // the camera is open.
+          onPressed: widget.onCaptureFromCamera,
           child: Text(context.l10n.camera),
         ),
         MenuItemButton(

@@ -83,10 +83,32 @@ class SessionLockController {
    bool _isMediaPlaying = false;
   bool _ignoreBackgroundUntilResume = false;
   int _suppressLockDepth = 0;
+  int _vaultAutoLockPauseDepth = 0;
 
   bool get isAppLocked => _isAppLocked;
   bool get isMediaPlaying => _isMediaPlaying;
   bool get isLockSuppressed => _suppressLockDepth > 0;
+  bool get isVaultAutoLockPaused => _vaultAutoLockPauseDepth > 0;
+
+  /// Pauses only the vault inactivity timer while a video recording is active.
+  /// App locking and explicit screen-off/manual lock actions remain in force.
+  void pauseVaultAutoLock() {
+    _vaultAutoLockPauseDepth++;
+    if (_vaultAutoLockPauseDepth == 1) {
+      VeLog.d(_kLogTag, 'pauseVaultAutoLock: cancelling vault inactivity timer');
+      _vaultLockTimer?.cancel();
+      _vaultLockTimer = null;
+    }
+  }
+
+  void resumeVaultAutoLock() {
+    if (_vaultAutoLockPauseDepth == 0) return;
+    _vaultAutoLockPauseDepth--;
+    if (_vaultAutoLockPauseDepth == 0) {
+      VeLog.d(_kLogTag, 'resumeVaultAutoLock: rearming vault inactivity timer');
+      _scheduleVaultLockTimer();
+    }
+  }
 
   /// Temporarily suppresses auto-lock for modal operations like the system file picker.
   void suppressLock() {
@@ -218,7 +240,7 @@ class SessionLockController {
   }
 
   void _scheduleVaultLockTimer() {
-    if (_settings == null || _isMediaPlaying) return;
+    if (_settings == null || _isMediaPlaying || isVaultAutoLockPaused) return;
     _vaultLockTimer?.cancel();
     final settings = _settings!();
     final mins = settings.autoLockMins;

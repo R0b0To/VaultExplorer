@@ -57,12 +57,12 @@ class CameraCaptureControlsState {
       CameraCaptureControlsState(
         isVideoMode: json['isVideoMode'] as bool? ?? false,
         flashMode: json['flashMode'] as String? ?? 'auto',
-        videoQuality: json['videoQuality'] as String? ?? 'fhd',
-        photoResolution: json['photoResolution'] as String? ?? 'max',
-        timerDelaySeconds: (json['timerDelaySeconds'] as num?)?.toInt() ?? 0,
-        aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 4 / 3,
-        preferredFacing: json['preferredFacing'] as String? ?? 'back',
-      );
+      videoQuality: json['videoQuality'] as String? ?? 'fhd',
+      photoResolution: json['photoResolution'] as String? ?? 'max',
+      timerDelaySeconds: (json['timerDelaySeconds'] as num?)?.toInt() ?? 0,
+      aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 4 / 3,
+      preferredFacing: json['preferredFacing'] as String? ?? 'back',
+    );
 
   @override
   bool operator ==(Object other) =>
@@ -166,6 +166,14 @@ class CameraCaptureControls extends _$CameraCaptureControls {
     _persistState();
   }
 
+  /// A photo-mode long press selects and persists constant torch mode.
+  String? activatePhotoTorch() {
+    if (state.isVideoMode || state.flashMode == 'torch') return null;
+    state = state.copyWith(flashMode: 'torch');
+    _persistState();
+    return 'torch';
+  }
+
   void cycleTimerDelay() {
     final next = switch (state.timerDelaySeconds) {
       0 => 3,
@@ -176,14 +184,15 @@ class CameraCaptureControls extends _$CameraCaptureControls {
     _persistState();
   }
 
-  /// Photo mode cycles auto -> on -> off. Video has no still flash, so the same
-  /// button toggles the torch (off <-> torch) there.
+  /// Photo mode cycles auto -> on -> off. In video mode, the control toggles
+  /// the torch on or off.
   String cyclePhotoFlashMode() {
     final next = state.isVideoMode
         ? (state.flashMode == 'torch' ? 'off' : 'torch')
         : switch (state.flashMode) {
             'auto' => 'on',
             'on' => 'off',
+            'torch' => 'off',
             _ => 'auto',
           };
     state = state.copyWith(flashMode: next);

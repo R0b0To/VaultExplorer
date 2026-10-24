@@ -1330,7 +1330,13 @@ class FileOperationService extends ChangeNotifier {
         // case; a same-path copy still goes through the normal conflict
         // handling below, where it needs its own care (see the
         // ConflictResolution.overwrite case).
-        final isSelfPath = src.volId == dest.volId && item.path == destPath;
+        //
+        // "Same entry" is decided on the real filesystem path when both
+        // ends have one (see [_isSameEntry]): the same folder can be
+        // mounted twice -- as a SAF storage location and as plain Local
+        // Storage -- and then neither the volIds nor the paths match even
+        // though both sides are literally the same file.
+        final isSelfPath = await _isSameEntry(src, item.path, dest, destPath);
 
         if (op.isCut && isSelfPath) {
           resolved.add((
@@ -1341,9 +1347,8 @@ class FileOperationService extends ChangeNotifier {
           ));
           continue;
         }
-        if (src.volId == dest.volId &&
-            item.isDir &&
-            destPath.startsWith('${item.path}/')) {
+        if (item.isDir &&
+            await _isInsideEntry(src, item.path, dest, destPath)) {
           resolved.add((
             item: item,
             destPath: destPath,
@@ -1753,6 +1758,67 @@ class FileOperationService extends ChangeNotifier {
   String _resolveLocal(String rootPath, String relativePath) =>
       relativePath.isEmpty ? rootPath : p.join(rootPath, relativePath);
 
+  // ── Physical identity of entries ──────────────────────────────────────────
+  //
+  // Local Storage, a SAF folder added as a storage location, and a second
+  // entry for that same folder can all show one set of files while having
+  // different volIds / URIs. Everything below answers "is this the same file
+  // on disk?" so a copy never deletes or truncates its own source.
+
+  /// Canonical real path of each local/SAF container's root, by container URI.
+  /// null = no real path exists (cloud/virtual provider, or a vault).
+  final Map<String, String?> _physicalRootCache = {};
+
+  Future<String?> _physicalRoot(MountedContainer c) async {
+    if (!c.isLocalStorage) return null;
+    if (_physicalRootCache.containsKey(c.uri)) return _physicalRootCache[c.uri];
+    final root = await _fileIoApi.getRealPath(c);
+    _physicalRootCache[c.uri] = root;
+    return root;
+  }
+
+  Future<String?> _physicalPath(MountedContainer c, String relPath) async {
+    final root = await _physicalRoot(c);
+    if (root == null) return null;
+    final rel = relPath.replaceAll('\\', '/').split('/').where((s) => s.isNotEmpty);
+    return rel.isEmpty ? root : p.joinAll([root, ...rel]);
+  }
+
+  /// True when ([a], [aPath]) and ([b], [bPath]) are the same entry.
+  Future<bool> _isSameEntry(
+    MountedContainer a,
+    String aPath,
+    MountedContainer b,
+    String bPath,
+  ) async {
+    final pa = await _physicalPath(a, aPath);
+    final pb = await _physicalPath(b, bPath);
+    // Real paths, when both sides have one, are authoritative.
+    if (pa != null && pb != null) return p.equals(pa, pb);
+    // Otherwise the container-level identity: same vault slot, or the same
+    // tree URI of a provider that has no real path (e.g. a cloud drive added
+    // twice). The same Dart-side rule the check used before.
+    if (a.volId == b.volId && aPath == bPath) return true;
+    if (a.isSafStorage && b.isSafStorage && a.uri == b.uri) {
+      String clean(String s) => p.posix.normalize(s).replaceAll(RegExp(r'^/+|/+$'), '');
+      return clean(aPath) == clean(bPath);
+    }
+    return false;
+  }
+
+  /// True when ([b], [bPath]) lies strictly inside the folder ([a], [aPath]).
+  Future<bool> _isInsideEntry(
+    MountedContainer a,
+    String aPath,
+    MountedContainer b,
+    String bPath,
+  ) async {
+    final pa = await _physicalPath(a, aPath);
+    final pb = await _physicalPath(b, bPath);
+    if (pa != null && pb != null) return p.isWithin(pa, pb);
+    return a.volId == b.volId && bPath.startsWith('$aPath/');
+  }
+
   Future<void> _copyLocalEntry(
     String sourcePath,
     String destPath,
@@ -2031,6 +2097,22 @@ class FileOperationService extends ChangeNotifier {
     try {
       final size = await _fileIoApi.getFileSize(src, srcPath);
       if (size < 0) return false;
+
+      // Last line of defence, right in front of the delete below: if the
+      // destination is the source (same real file reached through two
+      // different mounts), deleting it first would destroy the only copy
+      // before it is ever read. _run already skips such items up front;
+      // this covers anything that slips past (e.g. children of a folder).
+      if (await _isSameEntry(src, srcPath, dest, destPath)) {
+        VeLog.w(
+          'FileOperationService',
+          'SELF_COPY source and destination are the same file '
+              '${VeLog.censorName(srcPath.split('/').last)}; left untouched',
+        );
+        if (op.isCut) return false; // a "move" would delete the source next
+        op._addTransferredBytes(size);
+        return true;
+      }
 
       await _fileIoApi.deleteFile(dest, destPath);
 

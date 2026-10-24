@@ -339,6 +339,7 @@ private object ChannelMethods {
     const val SAF_SHARE_FILES           = "safShareFiles"
     const val SAF_GET_DOCUMENT_URI      = "safGetDocumentUri"
     const val SAF_COPY_FILE             = "safCopyFile"
+    const val SAF_GET_REAL_PATH         = "safGetRealPath"
     const val GET_STORAGE_VOLUMES       = "getStorageVolumes"
 }
 
@@ -1316,8 +1317,27 @@ open class MainActivity : FlutterFragmentActivity() {
                     val destTreeUri = call.argument<String>("destTreeUri")?.let { Uri.parse(it) }
                     val destPath = call.argument<String>("destPath") ?: ""
                     ioExecutor.execute {
-                        val ok = safStorageManager.copyFile(srcTreeUri, srcPath, destTreeUri, destPath)
+                        // Anything thrown on this thread is uncaught and takes the
+                        // whole app down; a failed copy is just a `false`.
+                        val ok = try {
+                            safStorageManager.copyFile(srcTreeUri, srcPath, destTreeUri, destPath)
+                        } catch (t: Throwable) {
+                            VeLog.e("MainActivity", t) { "SAF_COPY_FILE failed: ${t.message}" }
+                            false
+                        }
                         runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_GET_REAL_PATH -> {
+                    val treeUri = call.argument<String>("treeUri")?.let { Uri.parse(it) }
+                    val path = call.argument<String>("path") ?: ""
+                    ioExecutor.execute {
+                        val real = try {
+                            safStorageManager.getRealPath(treeUri, path)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        runOnUiThread { result.success(real) }
                     }
                 }
                 ChannelMethods.GET_STORAGE_VOLUMES -> {

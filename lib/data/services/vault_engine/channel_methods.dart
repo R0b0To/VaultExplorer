@@ -287,6 +287,7 @@ abstract final class ChannelMethods {
   static const String safShareFiles = 'safShareFiles';
   static const String safGetDocumentUri = 'safGetDocumentUri';
   static const String safCopyFile = 'safCopyFile';
+  static const String safGetRealPath = 'safGetRealPath';
   static const String getStorageVolumes = 'getStorageVolumes';
   static const String getMirrorPushActivity = 'getMirrorPushActivity';
   static const String exportLogFile = 'exportLogFile';

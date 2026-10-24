@@ -1012,6 +1012,17 @@ class SafStorageManager(private val context: Context) {
         destTreeUri: Uri?,
         destPath: String
     ): Boolean {
+        // Source and destination can be two different "mounts" of one physical
+        // file (a folder added as storage *and* browsed as plain local storage,
+        // or the same folder added twice). Copying a file onto itself is a
+        // no-op, but the streaming fallback below opens the destination with
+        // "wt", which truncates it -- and would do so before the source is
+        // read, silently turning the file into 0 bytes. Never go further.
+        if (isSameRealFile(srcTreeUri, srcPath, destTreeUri, destPath)) {
+            VeLog.w(TAG) { "copyFile: source and destination are the same file; nothing to copy" }
+            return true
+        }
+
         if (srcTreeUri != null && destTreeUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
             srcTreeUri.authority == destTreeUri.authority
         ) {
@@ -1035,27 +1046,42 @@ class SafStorageManager(private val context: Context) {
         }
 
         // Streaming copy fallback
-        val inStream = (if (srcTreeUri != null) {
-            val docUri = getDocumentUri(srcTreeUri, srcPath) ?: return false
-            context.contentResolver.openInputStream(docUri)
-        } else {
-            val file = File(srcPath)
-            if (file.exists()) FileInputStream(file) else null
-        }) ?: return false
-
-        val outStream = (if (destTreeUri != null) {
-            createFile(destTreeUri, destPath)
-            val docUri = getDocumentUri(destTreeUri, destPath) ?: run {
-                inStream.close()
-                return false
+        //
+        // Opening either end can throw: a provider reports a document that has
+        // vanished (or a stale cached document id) as FileNotFoundException,
+        // SecurityException or -- ExternalStorageProvider's "Failed to determine
+        // if X is child of Y" -- IllegalArgumentException. This runs on a bare
+        // executor thread, so an escaped exception kills the whole process.
+        val inStream: InputStream? = try {
+            if (srcTreeUri != null) {
+                val docUri = getDocumentUri(srcTreeUri, srcPath) ?: return false
+                context.contentResolver.openInputStream(docUri)
+            } else {
+                val file = File(srcPath)
+                if (file.exists()) FileInputStream(file) else null
             }
-            context.contentResolver.openOutputStream(docUri, "wt")
-        } else {
-            val destFile = File(destPath)
-            destFile.parentFile?.mkdirs()
-            FileOutputStream(destFile)
-        }) ?: run {
-            inStream.close()
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "copyFile: could not open source: ${e.message}" }
+            null
+        }
+        if (inStream == null) return false
+
+        val outStream: java.io.OutputStream? = try {
+            if (destTreeUri != null) {
+                createFile(destTreeUri, destPath)
+                val docUri = getDocumentUri(destTreeUri, destPath)
+                if (docUri == null) null else context.contentResolver.openOutputStream(docUri, "wt")
+            } else {
+                val destFile = File(destPath)
+                destFile.parentFile?.mkdirs()
+                FileOutputStream(destFile)
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "copyFile: could not open destination: ${e.message}" }
+            null
+        }
+        if (outStream == null) {
+            try { inStream.close() } catch (_: Exception) {}
             return false
         }
 
@@ -1075,6 +1101,76 @@ class SafStorageManager(private val context: Context) {
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "copyFile streaming failed: ${e.message}" }
             false
+        }
+    }
+
+    /**
+     * True when both ends of a copy are the very same file on disk, however
+     * they are addressed (see [getRealPath]), or the same entry of the same
+     * tree for providers that have no real path. Unknown means false.
+     */
+    private fun isSameRealFile(
+        srcTreeUri: Uri?,
+        srcPath: String,
+        destTreeUri: Uri?,
+        destPath: String
+    ): Boolean {
+        if (srcTreeUri != null && destTreeUri != null && srcTreeUri == destTreeUri &&
+            normalizePath(srcPath) == normalizePath(destPath)
+        ) return true
+        val src = getRealPath(srcTreeUri, srcPath) ?: return false
+        val dest = getRealPath(destTreeUri, destPath) ?: return false
+        return src == dest
+    }
+
+    /**
+     * Canonical absolute filesystem path behind an entry, or null when there
+     * is no such path.
+     *
+     * With a null [treeUri], [path] is already an absolute path and is only
+     * canonicalised. With a tree URI, [path] is relative to the tree and the
+     * mapping is only possible for the built-in ExternalStorageProvider, whose
+     * document ids are "<volume>:<relative path>"; cloud and virtual providers
+     * (Drive, Filen, this app's own provider, ...) have no real path.
+     *
+     * This is what lets the same folder -- added as a storage location through
+     * SAF, and also reachable as plain local storage -- be recognised as one
+     * place instead of two unrelated ones.
+     */
+    @Suppress("DEPRECATION")
+    fun getRealPath(treeUri: Uri?, path: String): String? {
+        val raw: String = if (treeUri == null) {
+            if (path.isBlank()) return null
+            path
+        } else {
+            if (treeUri.authority != EXTERNAL_STORAGE_AUTHORITY) return null
+            val rootDocId = try {
+                DocumentsContract.getTreeDocumentId(treeUri)
+            } catch (_: Exception) {
+                return null
+            }
+            val colon = rootDocId.indexOf(':')
+            if (colon <= 0) return null
+            val volume = rootDocId.substring(0, colon)
+            val rootSub = rootDocId.substring(colon + 1).trim('/')
+            val volumeRoot = when (volume) {
+                "primary" -> Environment.getExternalStorageDirectory().absolutePath
+                // ExternalStorageProvider's "Documents" shortcut root.
+                "home" -> Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOCUMENTS
+                ).absolutePath
+                else -> "/storage/$volume"
+            }
+            var f = if (rootSub.isEmpty()) File(volumeRoot) else File(volumeRoot, rootSub)
+            val rel = normalizePath(path)
+            if (rel.isNotEmpty()) f = File(f, rel)
+            f.path
+        }
+        val file = File(raw)
+        return try {
+            file.canonicalPath
+        } catch (_: java.io.IOException) {
+            file.absolutePath
         }
     }
 

@@ -797,18 +797,23 @@ class VaultFileIoApi {
       // file in chunks instead.
       final other = src.isSafStorage ? dest : src;
       if (!other.isLocalStorage) return false;
-      final res = await _channel
-          .invokeMethod<bool>(ChannelMethods.safCopyFile, {
-            'srcTreeUri': src.isSafStorage ? src.uri : null,
-            'srcPath': src.isSafStorage
-                ? srcPath
-                : _local.resolve(src.uri, srcPath),
-            'destTreeUri': dest.isSafStorage ? dest.uri : null,
-            'destPath': dest.isSafStorage
-                ? destPath
-                : _local.resolve(dest.uri, destPath),
-          });
-      return res ?? false;
+      try {
+        final res = await _channel
+            .invokeMethod<bool>(ChannelMethods.safCopyFile, {
+              'srcTreeUri': src.isSafStorage ? src.uri : null,
+              'srcPath': src.isSafStorage
+                  ? srcPath
+                  : _local.resolve(src.uri, srcPath),
+              'destTreeUri': dest.isSafStorage ? dest.uri : null,
+              'destPath': dest.isSafStorage
+                  ? destPath
+                  : _local.resolve(dest.uri, destPath),
+            });
+        return res ?? false;
+      } catch (e) {
+        logSwallowed('safCopyFile', e, expected: true);
+        return false;
+      }
     }
     if (src.isLocalStorage) {
       return writeBackFile(
@@ -837,6 +842,32 @@ class VaultFileIoApi {
       return ok ?? false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Canonical absolute path of [path] inside [container] on the device's
+  /// real filesystem, or null when there is none (a vault, or a cloud /
+  /// virtual Document Provider).
+  ///
+  /// This is how two *different* mounts of one physical folder -- e.g. a
+  /// folder added as a SAF storage location while the same folder is also
+  /// reachable through plain Local Storage -- are recognised as the same
+  /// place. Comparing volIds or URIs can't: they differ by construction.
+  Future<String?> getRealPath(
+    MountedContainer container, [
+    String path = '',
+  ]) async {
+    if (!container.isLocalStorage) return null;
+    try {
+      return await _channel.invokeMethod<String>(ChannelMethods.safGetRealPath, {
+        'treeUri': container.isSafStorage ? container.uri : null,
+        'path': container.isSafStorage
+            ? path
+            : _local.resolve(container.uri, path),
+      });
+    } catch (e) {
+      logSwallowed('getRealPath', e, expected: true);
+      return null;
     }
   }
 

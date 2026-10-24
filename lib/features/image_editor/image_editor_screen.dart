@@ -536,6 +536,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     final result = await showModalBottomSheet<ViewerAdjustments>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: false,
       backgroundColor: Colors.transparent,
       builder: (_) => ImageEditorAdjustmentsSheet(
         initialValue: ViewerAdjustments.identity,

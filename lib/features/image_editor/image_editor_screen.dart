@@ -95,7 +95,8 @@ class ImageEditorScreen extends ConsumerStatefulWidget {
 
 class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     with SingleTickerProviderStateMixin {
-  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
+  // Cached on first use (initState): `ref` can't be read from dispose().
+  late final VaultFileIoApi _fileIoApi = ref.read(vaultFileIoApiProvider);
   VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
   VaultEngineEvents? _vaultEvents;
   bool _containerLocked = false;
@@ -583,6 +584,16 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     }
     _controlsController.toggleTool(tool);
   }
+
+  /// Colour for the active tool: redaction boxes have their own (black by
+  /// default); pencil and text share the other.
+  Color get _toolColor => _controls.activeTool == EditorTool.redact
+      ? _controls.redactColor
+      : _controls.currentColor;
+
+  void _setToolColor(Color color) => _controls.activeTool == EditorTool.redact
+      ? _controlsController.setRedactColor(color)
+      : _controlsController.setColor(color);
 
   void _addAnnotation(EditAnnotation annotation) {
     _pushUndoSnapshot();
@@ -1142,8 +1153,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                         _controlsController.setCropRotationAngle(0.0),
                     onRotate90: _stepRotate90,
                     onSetCropAspect: _setCropAspect,
-                    currentColor: _controls.currentColor,
-                    onSetColor: _controlsController.setColor,
+                    currentColor: _toolColor,
+                    onSetColor: _setToolColor,
                     onShowStrokeWidthPicker: _showStrokeWidthPicker,
                     hasAnnotations: _annotations.isNotEmpty,
                     onClearAllAnnotations: _clearAllAnnotations,
@@ -1153,6 +1164,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                     l10n: l10n,
                     activeTool: _controls.activeTool,
                     onSelectTool: _selectTool,
+                    onAdjust: _showColorAdjustments,
                   ),
                 )
               : _PortraitLayout(
@@ -1170,8 +1182,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                         _controlsController.setCropRotationAngle(0.0),
                     onRotate90: _stepRotate90,
                     onSetCropAspect: _setCropAspect,
-                    currentColor: _controls.currentColor,
-                    onSetColor: _controlsController.setColor,
+                    currentColor: _toolColor,
+                    onSetColor: _setToolColor,
                     onShowStrokeWidthPicker: _showStrokeWidthPicker,
                     hasAnnotations: _annotations.isNotEmpty,
                     onClearAllAnnotations: _clearAllAnnotations,
@@ -1181,6 +1193,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                     l10n: l10n,
                     activeTool: _controls.activeTool,
                     onSelectTool: _selectTool,
+                    onAdjust: _showColorAdjustments,
                   ),
                 ),
         ),
@@ -1216,11 +1229,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       ];
     }
     final actions = <Widget>[
-      IconButton(
-        icon: const Icon(Icons.tune_rounded),
-        tooltip: l10n.adjustmentsSheetTitle,
-        onPressed: _showColorAdjustments,
-      ),
       IconButton(
         icon: const Icon(Icons.undo_rounded),
         tooltip: l10n.undoTooltip,
@@ -1395,14 +1403,15 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                           imageSize: fitted.size,
                           annotations: _annotations,
                           activeTool: _controls.activeTool,
-                          color: _controls.currentColor,
+                          color: _toolColor,
                           strokeWidthFraction:
                               _controls.currentStrokeWidthFraction,
                           onAnnotationAdded: _addAnnotation,
-                          onAnnotationUpdated: (idx, ann) {
-                            _pushUndoSnapshot();
-                            _annotationsController.update(idx, ann);
-                          },
+                          // One undo snapshot per move/resize gesture, taken
+                          // before its first change (not one per frame).
+                          onAnnotationEditStart: _pushUndoSnapshot,
+                          onAnnotationUpdated: (idx, ann) =>
+                              _annotationsController.update(idx, ann),
                           onAnnotationRemoved: (idx) {
                             _pushUndoSnapshot();
                             _annotationsController.removeAt(idx);
@@ -1849,7 +1858,7 @@ class _ToolButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _ToolButton({
     required this.icon,
@@ -1860,20 +1869,26 @@ class _ToolButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
+    final base = selected
         ? Theme.of(context).colorScheme.primary
         : Colors.white;
+    final color = onTap == null ? base.withValues(alpha: 0.38) : base;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: color, fontSize: 12)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontSize: 12),
+            ),
           ],
         ),
       ),
@@ -1887,7 +1902,7 @@ class _SquareToolCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _SquareToolCard({
     required this.icon,
@@ -1902,7 +1917,10 @@ class _SquareToolCard extends StatelessWidget {
     final bgColor = selected
         ? cs.primaryContainer
         : Colors.white.withValues(alpha: 0.08);
-    final iconColor = selected ? cs.onPrimaryContainer : Colors.white;
+    final baseColor = selected ? cs.onPrimaryContainer : Colors.white;
+    final iconColor = onTap == null
+        ? baseColor.withValues(alpha: 0.38)
+        : baseColor;
 
     return Material(
       color: bgColor,

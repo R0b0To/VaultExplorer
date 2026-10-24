@@ -25,6 +25,23 @@ void main() {
       expect(state.cropAspectRatio, isNull);
     });
 
+    test('redaction colour defaults to black and is independent', () {
+      final controller = container.read(
+        imageEditorControlsProvider('image-a').notifier,
+      );
+      expect(
+        container.read(imageEditorControlsProvider('image-a')).redactColor,
+        const Color(0xFF000000),
+      );
+
+      controller.setRedactColor(Colors.white);
+      controller.setColor(Colors.blue);
+
+      final state = container.read(imageEditorControlsProvider('image-a'));
+      expect(state.redactColor, Colors.white);
+      expect(state.currentColor, Colors.blue);
+    });
+
     test('toggles tools and retains the chosen annotation controls', () {
       final controller = container.read(
         imageEditorControlsProvider('image-a').notifier,

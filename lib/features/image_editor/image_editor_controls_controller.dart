@@ -10,6 +10,7 @@ class ImageEditorControlsState {
   const ImageEditorControlsState({
     this.activeTool = EditorTool.none,
     this.currentColor = const Color(0xFFEF4444),
+    this.redactColor = const Color(0xFF000000),
     this.currentStrokeWidthFraction = 0.010,
     this.currentFontSizeFraction = 0.055,
     this.cropAspectRatio,
@@ -18,6 +19,11 @@ class ImageEditorControlsState {
 
   final EditorTool activeTool;
   final Color currentColor;
+
+  /// Fill colour for redaction boxes. Kept separate from [currentColor] so
+  /// switching between the pencil/text colour and redaction doesn't make the
+  /// boxes come out red.
+  final Color redactColor;
   final double currentStrokeWidthFraction;
   final double currentFontSizeFraction;
   final double? cropAspectRatio;
@@ -26,6 +32,7 @@ class ImageEditorControlsState {
   ImageEditorControlsState copyWith({
     EditorTool? activeTool,
     Color? currentColor,
+    Color? redactColor,
     double? currentStrokeWidthFraction,
     double? currentFontSizeFraction,
     double? cropAspectRatio,
@@ -34,6 +41,7 @@ class ImageEditorControlsState {
   }) => ImageEditorControlsState(
     activeTool: activeTool ?? this.activeTool,
     currentColor: currentColor ?? this.currentColor,
+    redactColor: redactColor ?? this.redactColor,
     currentStrokeWidthFraction:
         currentStrokeWidthFraction ?? this.currentStrokeWidthFraction,
     currentFontSizeFraction:
@@ -60,6 +68,9 @@ class ImageEditorControls extends _$ImageEditorControls {
   void clearActiveTool() => state = state.copyWith(activeTool: EditorTool.none);
 
   void setColor(Color value) => state = state.copyWith(currentColor: value);
+
+  void setRedactColor(Color value) =>
+      state = state.copyWith(redactColor: value);
 
   void setStrokeWidth(double value) =>
       state = state.copyWith(currentStrokeWidthFraction: value);

@@ -103,42 +103,61 @@ class _ToolSelectorRow extends StatelessWidget {
     required this.l10n,
     required this.activeTool,
     required this.onSelectTool,
+    required this.onAdjust,
   });
 
   final AppLocalizations l10n;
   final EditorTool activeTool;
   final void Function(EditorTool) onSelectTool;
+  final VoidCallback onAdjust;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _ToolButton(
-            icon: Icons.crop_rounded,
-            label: l10n.cropToolLabel,
-            selected: activeTool == EditorTool.crop,
-            onTap: () => onSelectTool(EditorTool.crop),
+          Expanded(
+            child: _ToolButton(
+              icon: Icons.crop_rounded,
+              label: l10n.cropToolLabel,
+              selected: activeTool == EditorTool.crop,
+              onTap: () => onSelectTool(EditorTool.crop),
+            ),
           ),
-          _ToolButton(
-            icon: Icons.brush_rounded,
-            label: l10n.drawToolLabel,
-            selected: activeTool == EditorTool.draw,
-            onTap: () => onSelectTool(EditorTool.draw),
+          Expanded(
+            child: _ToolButton(
+              icon: Icons.brush_rounded,
+              label: l10n.drawToolLabel,
+              selected: activeTool == EditorTool.draw,
+              onTap: () => onSelectTool(EditorTool.draw),
+            ),
           ),
-          _ToolButton(
-            icon: Icons.text_fields_rounded,
-            label: l10n.textToolLabel,
-            selected: activeTool == EditorTool.text,
-            onTap: () => onSelectTool(EditorTool.text),
+          Expanded(
+            child: _ToolButton(
+              icon: Icons.text_fields_rounded,
+              label: l10n.textToolLabel,
+              selected: activeTool == EditorTool.text,
+              onTap: () => onSelectTool(EditorTool.text),
+            ),
           ),
-          _ToolButton(
-            icon: Icons.visibility_off_outlined,
-            label: l10n.redactToolLabel,
-            selected: activeTool == EditorTool.redact,
-            onTap: () => onSelectTool(EditorTool.redact),
+          Expanded(
+            child: _ToolButton(
+              icon: Icons.visibility_off_outlined,
+              label: l10n.redactToolLabel,
+              selected: activeTool == EditorTool.redact,
+              onTap: () => onSelectTool(EditorTool.redact),
+            ),
+          ),
+          Expanded(
+            child: _ToolButton(
+              icon: Icons.tune_rounded,
+              label: l10n.adjustmentsSheetTitle,
+              selected: false,
+              // Adjustments bake into the whole image, which doesn't mix with
+              // an in-progress crop.
+              onTap: activeTool == EditorTool.crop ? null : onAdjust,
+            ),
           ),
         ],
       ),
@@ -153,11 +172,13 @@ class _SquaredToolGrid extends StatelessWidget {
     required this.l10n,
     required this.activeTool,
     required this.onSelectTool,
+    required this.onAdjust,
   });
 
   final AppLocalizations l10n;
   final EditorTool activeTool;
   final void Function(EditorTool) onSelectTool;
+  final VoidCallback onAdjust;
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +227,13 @@ class _SquaredToolGrid extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        _SquareToolCard(
+          icon: Icons.tune_rounded,
+          label: l10n.adjustmentsSheetTitle,
+          selected: false,
+          onTap: activeTool == EditorTool.crop ? null : onAdjust,
         ),
       ],
     );
@@ -372,12 +400,16 @@ class _ContextualShelf extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _EditorActionButton(
-                  icon: Icons.tune_rounded,
-                  label: 'Stroke',
-                  onPressed: onShowStrokeWidthPicker,
-                ),
-                const SizedBox(width: 12),
+                // Redaction boxes are drawn by dragging, so stroke width only
+                // applies to the pencil.
+                if (activeTool == EditorTool.draw) ...[
+                  _EditorActionButton(
+                    icon: Icons.tune_rounded,
+                    label: 'Stroke',
+                    onPressed: onShowStrokeWidthPicker,
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 _EditorActionButton(
                   icon: Icons.delete_outline_rounded,
                   label: 'Clear',

@@ -274,7 +274,17 @@ class _MainShellState extends ConsumerState<MainShell>
       // System pickers and similar operations deliberately suppress auto-lock;
       // they may briefly background this activity but should not close the
       // revealed vault shell while the external operation is in progress.
-      leaveToDecoy = !lockController.isLockSuppressed;
+      //
+      // The same goes for a running audio/video recording
+      // ([SessionLockController.isVaultAutoLockPaused] is held for exactly as
+      // long as one is in progress). Popping to the decoy would dispose the
+      // capture screen, which ends the recording and throws the take away --
+      // and nothing is being locked by it, so there is nothing to gain. The
+      // vault shell simply stays as the person left it until the next time the
+      // app is backgrounded without a recording running.
+      leaveToDecoy =
+          !lockController.isLockSuppressed &&
+          !lockController.isVaultAutoLockPaused;
     }
     if (leaveToDecoy) {
       final navigator = Navigator.of(context, rootNavigator: true);
@@ -334,7 +344,21 @@ class _MainShellState extends ConsumerState<MainShell>
       if (!mounted) return;
 
       final navigator = Navigator.of(context);
-      navigator.popUntil((route) => route.isFirst);
+      // In the decoy identity there is no lock gate: "locking the app" only
+      // means going back to the decoy page. That pop would dispose a live
+      // capture screen and end its recording, so it waits for the recording
+      // to finish (see didChangeAppLifecycleState, same reasoning).
+      final recordingActive = _container
+          .read(sessionLockControllerProvider)
+          .isVaultAutoLockPaused;
+      if (mode == DisguiseMode.decoy && recordingActive) {
+        VeLog.i(
+          _kLogTag,
+          '_enforceAppLock: decoy mode with a recording active, staying on the current page',
+        );
+      } else {
+        navigator.popUntil((route) => route.isFirst);
+      }
 
       if (mode == DisguiseMode.decoy) {
         VeLog.i(

@@ -820,14 +820,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       }
 
       if (mounted) {
-        Navigator.pop(
-          context,
-          (
-            savedName: _firstSavedCaptureName ?? firstName ?? 'media',
-            isVideo: _hasSavedVideoCapture || hasVideo,
-            backgroundSaves: List.unmodifiable(_backgroundSaves),
-          ),
+        // Declare the type: in an untyped record literal,
+        // List.unmodifiable(...) infers List<dynamic>, which is not a
+        // CameraCaptureResult, so Navigator.pop throws a TypeError and the
+        // save is reported as failed even though it is running.
+        final CameraCaptureResult captured = (
+          savedName: _firstSavedCaptureName ?? firstName ?? 'media',
+          isVideo: _hasSavedVideoCapture || hasVideo,
+          backgroundSaves: List<FileOperation>.unmodifiable(_backgroundSaves),
         );
+        Navigator.pop(context, captured);
       }
     } catch (_) {
       if (mounted) {

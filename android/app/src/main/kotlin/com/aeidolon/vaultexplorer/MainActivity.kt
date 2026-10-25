@@ -554,6 +554,10 @@ open class MainActivity : FlutterFragmentActivity() {
         vaultCameraPlugin = null
         vaultAudioCapturePlugin?.dispose()
         vaultAudioCapturePlugin = null
+        // Any recording those plugins owned has just ended. Dart can no longer
+        // stop the background-recording service (its engine is going away), so
+        // do it here, or its notification outlives the recording.
+        cameraRecordingServiceHandlers.onActivityDestroyed()
         quickCaptureScratchpadPlugin?.dispose()
         quickCaptureScratchpadPlugin = null
         nativePlayerManager.release()

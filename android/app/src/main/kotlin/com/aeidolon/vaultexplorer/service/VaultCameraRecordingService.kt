@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.VaultCameraStopRequestedBridge
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.util.NotificationLocale
@@ -54,6 +55,7 @@ import com.aeidolon.vaultexplorer.util.NotificationLocale
 class VaultCameraRecordingService : Service() {
 
     companion object {
+        private const val TAG = "VaultCameraRecordingService"
         private const val CHANNEL_ID = "vault_camera_recording"
         private const val NOTIFICATION_ID = 4202
         private const val WAKE_LOCK_TAG = "com.aeidolon.vaultexplorer:CameraRecordingWakeLock"
@@ -131,6 +133,23 @@ class VaultCameraRecordingService : Service() {
     }
 
     override fun onBind(intent: Intent?) = null
+
+    /**
+     * The app's task was swiped away from Recents. This service is declared
+     * `stopWithTask="false"` so a recording survives the screen turning off
+     * or the app being backgrounded, but the recording it protects belongs
+     * to the Activity's camera/audio plugins, which are torn down when that
+     * task goes away -- so there is nothing left to keep alive. Without this
+     * the ongoing notification stays up claiming a recording that has
+     * already stopped, and [isRunning] stays true, which suppresses
+     * screen-off handling and postpones native auto-close indefinitely.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        VeLog.i(TAG) { "onTaskRemoved: app task removed, stopping recording service and its notification" }
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
 
     override fun onDestroy() {
         isRunning = false

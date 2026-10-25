@@ -12528,4 +12528,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String skinEditPageColors(String page) {
     return 'Кольори: $page';
   }
+
+  @override
+  String get skinEditDockTop => 'Перемістити панель угору';
+
+  @override
+  String get skinEditDockBottom => 'Перемістити панель униз';
+
+  @override
+  String get skinEditEditorIndependent =>
+      'Текстовий редактор використовує власні кольори, тож зміни тут не з’являться в ньому, доки він не почне наслідувати тему застосунку.';
 }

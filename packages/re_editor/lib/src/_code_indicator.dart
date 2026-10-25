@@ -1,6 +1,6 @@
 part of re_editor;
 
-class CodeLineNumberRenderObject extends RenderBox {
+class CodeLineNumberRenderObject extends RenderBox implements CodeTextColorProbe {
 
   CodeLineEditingController _controller;
   CodeIndicatorValueNotifier _notifier;
@@ -95,6 +95,12 @@ class CodeLineNumberRenderObject extends RenderBox {
 
   @override
   bool hitTestSelf(Offset position) => true;
+
+  @override
+  Color? textColorAt(Offset globalPosition) {
+    final Offset position = globalToLocal(globalPosition);
+    return size.contains(position) ? _textStyle.color : null;
+  }
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {

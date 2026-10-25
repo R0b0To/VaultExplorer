@@ -20766,6 +20766,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Colors on {page}'**
   String skinEditPageColors(String page);
+
+  /// Tooltip of the button that docks the floating skin editor panel to the top of the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Move panel to the top'**
+  String get skinEditDockTop;
+
+  /// Tooltip of the button that docks the floating skin editor panel to the bottom of the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Move panel to the bottom'**
+  String get skinEditDockBottom;
+
+  /// Note shown when a text editor color is picked while the editor does not follow the app skin.
+  ///
+  /// In en, this message translates to:
+  /// **'The text editor uses its own colors, so changes here will not show in it until it follows the app skin.'**
+  String get skinEditEditorIndependent;
 }
 
 class _AppLocalizationsDelegate

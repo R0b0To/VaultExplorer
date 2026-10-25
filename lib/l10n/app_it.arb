@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "Tutti i colori e le opzioni",
   "skinEditCollapse": "Comprimi pannello",
   "skinEditExpand": "Espandi pannello",
-  "skinEditPageColors": "Colori di {page}"
+  "skinEditPageColors": "Colori di {page}",
+  "skinEditDockTop": "Sposta il pannello in alto",
+  "skinEditDockBottom": "Sposta il pannello in basso",
+  "skinEditEditorIndependent": "L'editor di testo usa colori propri, quindi le modifiche non vi compariranno finché non segue la skin dell'app."
 }

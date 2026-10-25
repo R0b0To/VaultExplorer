@@ -14017,5 +14017,17 @@
         "type": "String"
       }
     }
+  },
+  "skinEditDockTop": "Move panel to the top",
+  "@skinEditDockTop": {
+    "description": "Tooltip of the button that docks the floating skin editor panel to the top of the screen."
+  },
+  "skinEditDockBottom": "Move panel to the bottom",
+  "@skinEditDockBottom": {
+    "description": "Tooltip of the button that docks the floating skin editor panel to the bottom of the screen."
+  },
+  "skinEditEditorIndependent": "The text editor uses its own colors, so changes here will not show in it until it follows the app skin.",
+  "@skinEditEditorIndependent": {
+    "description": "Note shown when a text editor color is picked while the editor does not follow the app skin."
   }
 }

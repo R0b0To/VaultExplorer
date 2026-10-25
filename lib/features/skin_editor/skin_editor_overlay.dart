@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
@@ -119,6 +120,14 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
   bool _showAll = false;
   bool _collapsed = false;
 
+  /// A color is being dragged: the panel and the highlight step aside so the
+  /// whole page can be seen.
+  bool _interacting = false;
+
+  /// Where the person docked the panel; null lets it move out of the way of
+  /// the element that was picked.
+  bool? _dockTopOverride;
+
   bool _pillOnRight = true;
   double? _pillTop;
   double _lastDragX = 0;
@@ -132,6 +141,7 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
     _target = null;
     _highlight = null;
     _showAll = false;
+    _interacting = false;
   }
 
   void _inspect(
@@ -153,6 +163,7 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
       _pick = result;
       _collapsed = false;
       _showAll = false;
+      _interacting = false;
       if (result.layers.isEmpty) {
         _layerIndex = null;
         _target = null;
@@ -175,6 +186,7 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
     if (pick == null || index >= pick.layers.length) return;
     setState(() {
       _showAll = false;
+      _interacting = false;
       _applyLayer(pick, index);
     });
   }
@@ -188,6 +200,7 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
         pick.layers[layerIndex].candidates.contains(target);
     _target = target;
     _showAll = false;
+    _interacting = false;
     if (!stillOnLayer) {
       // Chosen from the full list, not from what was tapped.
       _layerIndex = null;
@@ -248,7 +261,28 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
         .toDouble();
 
     final highlight = _highlight;
-    final dockTop = highlight != null && highlight.center.dy > size.height * 0.5;
+    final fileManagerFollows = ref.watch(
+      appSkinSettingsProvider.select((s) => s.fileManagerFollowsAppSkin),
+    );
+    final editorFollows = ref.watch(
+      appSkinSettingsProvider.select((s) => s.editorFollowsAppSkin),
+    );
+    // File manager and editor colors only show once those parts of the app are
+    // drawn from this skin.
+    final target = _target;
+    final skinSettings = ref.read(appSkinSettingsProvider.notifier);
+    String? independentNotice;
+    VoidCallback onFollowAppSkin = () {};
+    if (target is FileItemTarget && !fileManagerFollows) {
+      independentNotice = context.l10n.skinFileManagerIndependentDescription;
+      onFollowAppSkin = () => skinSettings.setFileManagerFollowsAppSkin(true);
+    } else if (target is EditorRoleTarget && !editorFollows) {
+      independentNotice = context.l10n.skinEditEditorIndependent;
+      onFollowAppSkin = () => skinSettings.setEditorFollowsAppSkin(true);
+    }
+    final autoDockTop =
+        highlight != null && highlight.center.dy > size.height * 0.5;
+    final dockTop = _dockTopOverride ?? autoDockTop;
     final sideInset = 8 + _pillWidth + 8;
     final panelMaxHeight = math.max(
       180.0,
@@ -266,8 +300,12 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
           // While picking, the app underneath does not receive touches: a tap
           // selects what is there instead of pressing it. Switching picking
           // off hands every touch back to the app.
+          // Keyed so that the highlight appearing and disappearing (it hides
+          // while a color is dragged) never rebuilds the panel, which would
+          // cancel the drag in progress.
           if (picking)
             Positioned.fill(
+              key: const ValueKey('skinEditorSurface'),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapUp: (details) => _inspect(
@@ -279,8 +317,9 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
                 child: const SizedBox.expand(),
               ),
             ),
-          if (picking && highlight != null)
+          if (picking && highlight != null && !_interacting)
             Positioned.fromRect(
+              key: const ValueKey('skinEditorHighlight'),
               rect: highlight,
               child: const IgnorePointer(
                 child: DecoratedBox(
@@ -295,6 +334,7 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
             ),
           if (picking)
             Positioned(
+              key: const ValueKey('skinEditorPanel'),
               left: safe.left + (_pillOnRight ? 8 : sideInset),
               right: safe.right + (_pillOnRight ? sideInset : 8),
               top: dockTop ? safe.top + 8 : null,
@@ -316,6 +356,9 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
                     showAll: _showAll,
                     collapsed: _collapsed,
                     maxHeight: panelMaxHeight,
+                    dockTop: dockTop,
+                    fade: _interacting,
+                    independentNotice: independentNotice,
                     onSelectLayer: _selectLayer,
                     onSelectTarget: _selectTarget,
                     onColor: (color) {
@@ -336,11 +379,18 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
                     onUndo: _notifier.undo,
                     onSetDark: _setDark,
                     onMoreOptions: _openControls,
+                    onToggleDock: () =>
+                        setState(() => _dockTopOverride = !dockTop),
+                    onDock: (top) => setState(() => _dockTopOverride = top),
+                    onInteraction: (interacting) =>
+                        setState(() => _interacting = interacting),
+                    onFollowAppSkin: onFollowAppSkin,
                   ),
                 ),
               ),
             ),
           Positioned(
+            key: const ValueKey('skinEditorPill'),
             top: pillTop,
             left: _pillOnRight ? null : safe.left + 8,
             right: _pillOnRight ? safe.right + 8 : null,

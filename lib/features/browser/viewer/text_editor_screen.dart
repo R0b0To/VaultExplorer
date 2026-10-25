@@ -12,6 +12,8 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -1869,7 +1871,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => SkinAreaHint(
+    area: SkinArea.editor,
+    child: _buildEditorScreen(context),
+  );
+
+  Widget _buildEditorScreen(BuildContext context) {
     if (_tabs.isEmpty) {
       return const Scaffold(body: SizedBox.shrink());
     }

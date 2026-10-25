@@ -107,3 +107,19 @@ class _SkinAreaMarker extends InheritedTheme {
   bool updateShouldNotify(_SkinAreaMarker oldWidget) =>
       colors != oldWidget.colors || !identical(baseTheme, oldWidget.baseTheme);
 }
+
+/// Tells the skin editor's element picker which page a subtree is, for pages
+/// that paint their own theme instead of using a [SkinAreaScope] (the text
+/// editor). It changes no color and no widget behavior.
+class SkinAreaHint extends InheritedWidget {
+  final SkinArea area;
+
+  const SkinAreaHint({super.key, required this.area, required super.child});
+
+  /// The hinted page above [context], without subscribing to it.
+  static SkinArea? peek(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SkinAreaHint>()?.area;
+
+  @override
+  bool updateShouldNotify(SkinAreaHint oldWidget) => area != oldWidget.area;
+}

@@ -127,7 +127,7 @@ class _CodeField extends SingleChildRenderObjectWidget {
 
 const Duration positionCenteringDuration = Duration(milliseconds: 300);
 
-class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
+class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation, CodeTextColorProbe {
 
   ViewportOffset _verticalViewport;
   ViewportOffset? _horizontalViewport;
@@ -881,6 +881,28 @@ class _CodeFieldRender extends RenderBox implements MouseTrackerAnnotation {
 
   @override
   bool hitTestSelf(Offset position) => true;
+
+  @override
+  Color? textColorAt(Offset globalPosition) {
+    final Offset position = globalToLocal(globalPosition);
+    if (!size.contains(position)) {
+      return null;
+    }
+    final CodeLineRenderParagraph? paragraph = _findDisplayRenderParagraph(position + paintOffset);
+    if (paragraph == null) {
+      return null;
+    }
+    final Offset local = position - paragraph.offset + paintOffset;
+    // Right of the end of a line there is no text, only the canvas.
+    if (local.dx < 0 || local.dx > paragraph.paragraph.width) {
+      return null;
+    }
+    final IParagraph target = paragraph.paragraph;
+    if (target is! _ParagraphImpl) {
+      return null;
+    }
+    return _colorAtTextOffset(target.span, target.getPosition(local).offset, _textStyle.color);
+  }
 
   @override
   void attach(covariant PipelineOwner owner) {
@@ -1808,4 +1830,37 @@ class _CodeFieldFloatingCursorPainter extends _CodeFieldExtraPainter {
     canvas.drawRRect(RRect.fromRectXY(Rect.fromLTWH(offset.dx - _width / 2, offset.dy, _width, _height), _width / 2, _width / 2), _paint);
   }
 
+}
+
+/// The color the character at [target] (a UTF-16 offset into the span's plain
+/// text) is painted in: the nearest enclosing span that sets one, else [base].
+Color? _colorAtTextOffset(TextSpan root, int target, Color? base) {
+  int cursor = 0;
+  Color? found;
+  bool visit(InlineSpan span, Color? inherited) {
+    final Color? color = span.style?.color ?? inherited;
+    if (span is TextSpan) {
+      final String? text = span.text;
+      if (text != null) {
+        if (target < cursor + text.length) {
+          found = color;
+          return false;
+        }
+        cursor += text.length;
+      }
+      final List<InlineSpan>? children = span.children;
+      if (children != null) {
+        for (final InlineSpan child in children) {
+          if (!visit(child, color)) {
+            return false;
+          }
+        }
+      }
+    } else {
+      cursor += 1;
+    }
+    return true;
+  }
+  visit(root, base);
+  return found ?? base;
 }

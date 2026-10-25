@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "모든 색과 옵션",
   "skinEditCollapse": "패널 접기",
   "skinEditExpand": "패널 펼치기",
-  "skinEditPageColors": "{page}의 색"
+  "skinEditPageColors": "{page}의 색",
+  "skinEditDockTop": "패널을 위로 이동",
+  "skinEditDockBottom": "패널을 아래로 이동",
+  "skinEditEditorIndependent": "텍스트 편집기는 자체 색상을 사용하므로 앱 스킨을 따르도록 설정하기 전에는 여기서 바꾼 색이 적용되지 않습니다."
 }

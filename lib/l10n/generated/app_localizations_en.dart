@@ -12250,4 +12250,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String skinEditPageColors(String page) {
     return 'Colors on $page';
   }
+
+  @override
+  String get skinEditDockTop => 'Move panel to the top';
+
+  @override
+  String get skinEditDockBottom => 'Move panel to the bottom';
+
+  @override
+  String get skinEditEditorIndependent =>
+      'The text editor uses its own colors, so changes here will not show in it until it follows the app skin.';
 }

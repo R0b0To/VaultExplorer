@@ -11566,4 +11566,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String skinEditPageColors(String page) {
     return '$page的颜色';
   }
+
+  @override
+  String get skinEditDockTop => '将面板移到顶部';
+
+  @override
+  String get skinEditDockBottom => '将面板移到底部';
+
+  @override
+  String get skinEditEditorIndependent =>
+      '文本编辑器使用自己的颜色，因此在它跟随应用皮肤之前，这里的更改不会显示在其中。';
 }

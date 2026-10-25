@@ -15,10 +15,15 @@ class SkinInlineColorEditor extends StatefulWidget {
   final Color color;
   final ValueChanged<Color> onChanged;
 
+  /// Called with true while the wheel or the opacity slider is being dragged and
+  /// false when the drag ends, so the panel can get out of the way.
+  final ValueChanged<bool>? onInteraction;
+
   const SkinInlineColorEditor({
     super.key,
     required this.color,
     required this.onChanged,
+    this.onInteraction,
   });
 
   @override
@@ -93,7 +98,9 @@ class _SkinInlineColorEditorState extends State<SkinInlineColorEditor> {
         Expanded(
           child: Slider(
             value: _hsv.alpha,
+            onChangeStart: (_) => widget.onInteraction?.call(true),
             onChanged: (value) => _emit(_hsv.withAlpha(value)),
+            onChangeEnd: (_) => widget.onInteraction?.call(false),
           ),
         ),
         SizedBox(
@@ -138,7 +145,11 @@ class _SkinInlineColorEditorState extends State<SkinInlineColorEditor> {
         final wheelSize = wide ? 150.0 : 160.0;
         final wheel = SizedBox.square(
           dimension: wheelSize,
-          child: SkinHsvWheel(value: _hsv, onChanged: _emit),
+          child: SkinHsvWheel(
+            value: _hsv,
+            onChanged: _emit,
+            onInteraction: widget.onInteraction,
+          ),
         );
         return Column(
           mainAxisSize: MainAxisSize.min,

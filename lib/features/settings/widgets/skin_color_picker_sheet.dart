@@ -334,10 +334,15 @@ class SkinHsvWheel extends StatefulWidget {
   final HSVColor value;
   final ValueChanged<HSVColor> onChanged;
 
+  /// Called with true when a drag on the wheel starts and false when it ends,
+  /// so a host can get out of the way while the color is being dragged.
+  final ValueChanged<bool>? onInteraction;
+
   const SkinHsvWheel({
     super.key,
     required this.value,
     required this.onChanged,
+    this.onInteraction,
   });
 
   @override
@@ -353,12 +358,20 @@ class _SkinHsvWheelState extends State<SkinHsvWheel> {
     final distance = (position - geometry.center).distance;
     if (geometry.square.contains(position)) {
       _dragMode = _WheelDragMode.shade;
-      _update(position, size);
     } else if (distance >= geometry.innerRadius - 9 &&
         distance <= geometry.radius + 9) {
       _dragMode = _WheelDragMode.hue;
+    }
+    if (_dragMode != null) {
+      widget.onInteraction?.call(true);
       _update(position, size);
     }
+  }
+
+  void _end() {
+    if (_dragMode == null) return;
+    _dragMode = null;
+    widget.onInteraction?.call(false);
   }
 
   void _update(Offset position, Size size) {
@@ -405,8 +418,8 @@ class _SkinHsvWheelState extends State<SkinHsvWheel> {
             _update(event.localPosition, constraints.biggest);
           }
         },
-        onPointerUp: (_) => _dragMode = null,
-        onPointerCancel: (_) => _dragMode = null,
+        onPointerUp: (_) => _end(),
+        onPointerCancel: (_) => _end(),
         child: CustomPaint(
           painter: _HsvWheelPainter(widget.value),
           child: const SizedBox.expand(),

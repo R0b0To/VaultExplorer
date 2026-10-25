@@ -33,6 +33,18 @@ class SkinPickerPanel extends StatelessWidget {
   final bool collapsed;
   final double maxHeight;
 
+  /// Whether the panel sits at the top of the screen rather than the bottom.
+  final bool dockTop;
+
+  /// True while a color is being dragged: the panel turns almost transparent so
+  /// the whole page can be seen.
+  final bool fade;
+
+  /// Set when the selected color belongs to a part of the app (the file
+  /// manager, the text editor) that is not drawn from this skin, so changing it
+  /// shows nothing yet. Explains that and offers [onFollowAppSkin].
+  final String? independentNotice;
+
   final ValueChanged<int> onSelectLayer;
   final ValueChanged<SkinTarget> onSelectTarget;
   final ValueChanged<Color> onColor;
@@ -42,6 +54,10 @@ class SkinPickerPanel extends StatelessWidget {
   final VoidCallback onUndo;
   final ValueChanged<bool> onSetDark;
   final VoidCallback onMoreOptions;
+  final VoidCallback onToggleDock;
+  final ValueChanged<bool> onDock;
+  final ValueChanged<bool> onInteraction;
+  final VoidCallback onFollowAppSkin;
 
   const SkinPickerPanel({
     super.key,
@@ -55,6 +71,9 @@ class SkinPickerPanel extends StatelessWidget {
     required this.showAll,
     required this.collapsed,
     required this.maxHeight,
+    required this.dockTop,
+    required this.fade,
+    required this.independentNotice,
     required this.onSelectLayer,
     required this.onSelectTarget,
     required this.onColor,
@@ -64,29 +83,39 @@ class SkinPickerPanel extends StatelessWidget {
     required this.onUndo,
     required this.onSetDark,
     required this.onMoreOptions,
+    required this.onToggleDock,
+    required this.onDock,
+    required this.onInteraction,
+    required this.onFollowAppSkin,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 10,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _toolbar(context),
-            if (!collapsed)
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                  child: _body(context),
+    return AnimatedOpacity(
+      // Hit testing is unaffected by opacity, so the drag in progress on the
+      // wheel keeps working while the panel is see-through.
+      opacity: fade ? 0.08 : 1,
+      duration: const Duration(milliseconds: 120),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 10,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _toolbar(context),
+              if (!collapsed)
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                    child: _body(context),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -94,51 +123,76 @@ class SkinPickerPanel extends StatelessWidget {
 
   Widget _toolbar(BuildContext context) {
     final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 4, 2),
-      child: Row(
-        children: [
-          SegmentedButton<bool>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
+    final cs = Theme.of(context).colorScheme;
+    const compact = VisualDensity.compact;
+    return GestureDetector(
+      // Flick the panel up or down to dock it to that edge, out of the way of
+      // whatever is being picked.
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -150) {
+          onDock(true);
+        } else if (velocity > 150) {
+          onDock(false);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 6, 2, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  visualDensity: compact,
+                  tooltip: dark ? l10n.skinDark : l10n.skinLight,
+                  onPressed: () => onSetDark(!dark),
+                  icon: Icon(
+                    dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  visualDensity: compact,
+                  tooltip: l10n.undo,
+                  onPressed: undoDepth > 0 ? onUndo : null,
+                  icon: const Icon(Icons.undo_rounded),
+                ),
+                IconButton(
+                  visualDensity: compact,
+                  tooltip: dockTop
+                      ? l10n.skinEditDockBottom
+                      : l10n.skinEditDockTop,
+                  onPressed: onToggleDock,
+                  icon: Icon(
+                    dockTop
+                        ? Icons.vertical_align_bottom_rounded
+                        : Icons.vertical_align_top_rounded,
+                  ),
+                ),
+                IconButton(
+                  visualDensity: compact,
+                  tooltip: l10n.skinEditMoreOptions,
+                  onPressed: onMoreOptions,
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+                IconButton(
+                  visualDensity: compact,
+                  tooltip: collapsed
+                      ? l10n.skinEditExpand
+                      : l10n.skinEditCollapse,
+                  onPressed: onToggleCollapsed,
+                  icon: Icon(
+                    collapsed
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                  ),
+                ),
+              ],
             ),
-            segments: [
-              ButtonSegment(
-                value: false,
-                icon: const Icon(Icons.light_mode_rounded, size: 18),
-                tooltip: l10n.skinLight,
-              ),
-              ButtonSegment(
-                value: true,
-                icon: const Icon(Icons.dark_mode_rounded, size: 18),
-                tooltip: l10n.skinDark,
-              ),
-            ],
-            selected: {dark},
-            onSelectionChanged: (selection) => onSetDark(selection.first),
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: l10n.undo,
-            onPressed: undoDepth > 0 ? onUndo : null,
-            icon: const Icon(Icons.undo_rounded),
-          ),
-          IconButton(
-            tooltip: l10n.skinEditMoreOptions,
-            onPressed: onMoreOptions,
-            icon: const Icon(Icons.tune_rounded),
-          ),
-          IconButton(
-            tooltip: collapsed ? l10n.skinEditExpand : l10n.skinEditCollapse,
-            onPressed: onToggleCollapsed,
-            icon: Icon(
-              collapsed
-                  ? Icons.expand_less_rounded
-                  : Icons.expand_more_rounded,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -259,6 +313,10 @@ class SkinPickerPanel extends StatelessWidget {
         if (target != null) ...[
           _header(context, target),
           const SizedBox(height: 10),
+          if (independentNotice != null) ...[
+            _independentNotice(context, independentNotice!),
+            const SizedBox(height: 10),
+          ],
         ],
         if (listMode)
           _allColors(context)
@@ -267,6 +325,7 @@ class SkinPickerPanel extends StatelessWidget {
             key: ValueKey(target.id),
             color: target.current(skin, base, dark: dark),
             onChanged: onColor,
+            onInteraction: onInteraction,
           ),
         // Nothing to go back to while the list is all there is.
         if (!(listMode && target == null)) ...[
@@ -285,6 +344,47 @@ class SkinPickerPanel extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _independentNotice(BuildContext context, String message) {
+    final l10n = context.l10n;
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 20, color: cs.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onFollowAppSkin,
+                icon: const Icon(Icons.palette_outlined),
+                label: Text(l10n.skinFollowAppSkin),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -12439,4 +12439,14 @@ class AppLocalizationsIt extends AppLocalizations {
   String skinEditPageColors(String page) {
     return 'Colori di $page';
   }
+
+  @override
+  String get skinEditDockTop => 'Sposta il pannello in alto';
+
+  @override
+  String get skinEditDockBottom => 'Sposta il pannello in basso';
+
+  @override
+  String get skinEditEditorIndependent =>
+      'L\'editor di testo usa colori propri, quindi le modifiche non vi compariranno finché non segue la skin dell\'app.';
 }

@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "كل الألوان والخيارات",
   "skinEditCollapse": "طي اللوحة",
   "skinEditExpand": "توسيع اللوحة",
-  "skinEditPageColors": "ألوان {page}"
+  "skinEditPageColors": "ألوان {page}",
+  "skinEditDockTop": "نقل اللوحة إلى الأعلى",
+  "skinEditDockBottom": "نقل اللوحة إلى الأسفل",
+  "skinEditEditorIndependent": "يستخدم محرر النصوص ألوانه الخاصة، لذا لن تظهر التغييرات هنا فيه حتى يتبع المظهر التطبيق."
 }

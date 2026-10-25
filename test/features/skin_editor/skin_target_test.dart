@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_element_inspector.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_target.dart';
 
@@ -83,6 +84,72 @@ void main() {
       expect(const EditorRoleTarget('panel').canReset, isTrue);
       expect(const EditorRoleTarget('keyword').canReset, isTrue);
       expect(const EditorRoleTarget('background').canReset, isFalse);
+    });
+  });
+
+  group('FileItemTarget', () {
+    test('an icon color only counts once the skin says custom', () {
+      const folderIcon = FileItemTarget(FileItemPart.folderIcon);
+      expect(folderIcon.isCustom(skin, dark: false), isFalse);
+
+      final edited = folderIcon.write(skin, red, dark: false);
+      expect(
+        edited.fileManagerSkin.folders.iconColorMode,
+        SkinIconColorMode.custom,
+      );
+      expect(folderIcon.customValue(edited, dark: false), red);
+      // Files are styled independently of folders.
+      expect(
+        const FileItemTarget(FileItemPart.fileIcon)
+            .isCustom(edited, dark: false),
+        isFalse,
+      );
+    });
+
+    test('resetting an icon returns it to the automatic color', () {
+      const fileIcon = FileItemTarget(FileItemPart.fileIcon);
+      final reset = fileIcon.write(
+        fileIcon.write(skin, red, dark: false),
+        null,
+        dark: false,
+      );
+      expect(reset.fileManagerSkin.files.iconColorMode, SkinIconColorMode.auto);
+      expect(reset.fileManagerSkin.files.customIconColor, isNull);
+    });
+
+    test('names and the details line are set and cleared separately', () {
+      const folderName = FileItemTarget(FileItemPart.folderName);
+      const fileName = FileItemTarget(FileItemPart.fileName);
+      const details = FileItemTarget(FileItemPart.details);
+
+      var edited = folderName.write(skin, red, dark: false);
+      edited = details.write(edited, blue, dark: false);
+      expect(edited.fileManagerSkin.folders.nameColor, red);
+      expect(edited.fileManagerSkin.files.nameColor, isNull);
+      expect(edited.fileManagerSkin.detailsColor, blue);
+      expect(fileName.isCustom(edited, dark: false), isFalse);
+
+      edited = details.write(edited, null, dark: false);
+      expect(edited.fileManagerSkin.detailsColor, isNull);
+      expect(edited.fileManagerSkin.folders.nameColor, red);
+    });
+
+    test('file manager colors are the same in the light and dark palette', () {
+      const fileName = FileItemTarget(FileItemPart.fileName);
+      final edited = fileName.write(skin, red, dark: true);
+      expect(fileName.customValue(edited, dark: false), red);
+      expect(fileName.customValue(edited, dark: true), red);
+    });
+
+    test('they are offered on the Files page and nowhere else', () {
+      expect(
+        skinTargetsForArea(SkinArea.files).whereType<FileItemTarget>().length,
+        FileItemPart.values.length,
+      );
+      expect(
+        skinTargetsForArea(SkinArea.tools).whereType<FileItemTarget>(),
+        isEmpty,
+      );
     });
   });
 

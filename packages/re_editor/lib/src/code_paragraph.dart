@@ -26,3 +26,14 @@ abstract class IParagraph {
   List<Rect> getRangeRects(TextRange range);
 
 }
+
+/// Implemented by render objects that paint text a tool cannot read back from
+/// the widget tree (the code canvas and its line numbers are painted straight
+/// onto a canvas). Lets an inspector ask what color the text under a point is.
+abstract class CodeTextColorProbe {
+
+  /// The color of the text painted at [globalPosition], or null when that point
+  /// is not over text this object paints.
+  Color? textColorAt(Offset globalPosition);
+
+}

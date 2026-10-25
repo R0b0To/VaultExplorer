@@ -31,6 +31,12 @@ class FileManagerSkinScope extends InheritedWidget {
           ?.skin ??
       FileManagerSkin.classic;
 
+  /// The skin in effect above [context] without subscribing to it, or null
+  /// outside any scope. For tools that inspect an element once.
+  static FileManagerSkin? peek(BuildContext context) => context
+      .getInheritedWidgetOfExactType<FileManagerSkinScope>()
+      ?.skin;
+
   @override
   bool updateShouldNotify(FileManagerSkinScope oldWidget) =>
       skin != oldWidget.skin;

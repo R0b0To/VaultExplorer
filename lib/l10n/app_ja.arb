@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "すべての色とオプション",
   "skinEditCollapse": "パネルを折りたたむ",
   "skinEditExpand": "パネルを展開",
-  "skinEditPageColors": "{page}の色"
+  "skinEditPageColors": "{page}の色",
+  "skinEditDockTop": "パネルを上に移動",
+  "skinEditDockBottom": "パネルを下に移動",
+  "skinEditEditorIndependent": "テキストエディターは独自の色を使っているため、アプリのスキンに従うよう設定するまで、ここでの変更は反映されません。"
 }

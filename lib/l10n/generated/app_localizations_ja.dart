@@ -11750,4 +11750,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String skinEditPageColors(String page) {
     return '$pageの色';
   }
+
+  @override
+  String get skinEditDockTop => 'パネルを上に移動';
+
+  @override
+  String get skinEditDockBottom => 'パネルを下に移動';
+
+  @override
+  String get skinEditEditorIndependent =>
+      'テキストエディターは独自の色を使っているため、アプリのスキンに従うよう設定するまで、ここでの変更は反映されません。';
 }

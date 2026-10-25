@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/settings/widgets/skin_role_copy.dart';
 
 /// One color of a custom skin that the floating picker can change.
@@ -259,6 +260,121 @@ final class ComponentRoleTarget extends SkinTarget {
   }
 }
 
+/// Which part of a file or folder row a [FileItemTarget] colors.
+enum FileItemPart { folderIcon, folderName, fileIcon, fileName, details }
+
+/// A color of the file manager's own skin: the icon or name of files and of
+/// folders, and the secondary text (date, size). These live in the skin's
+/// file-manager section, not in a page's tokens, and are the same in the light
+/// and the dark palette.
+final class FileItemTarget extends SkinTarget {
+  final FileItemPart part;
+
+  const FileItemTarget(this.part);
+
+  bool get isFolder =>
+      part == FileItemPart.folderIcon || part == FileItemPart.folderName;
+
+  bool get isIcon =>
+      part == FileItemPart.folderIcon || part == FileItemPart.fileIcon;
+
+  @override
+  String get id => 'file:${part.name}';
+
+  @override
+  String title(BuildContext context) {
+    final l10n = context.l10n;
+    return switch (part) {
+      FileItemPart.folderIcon => l10n.skinIconColorForItem(
+        l10n.fileSkinFoldersHeader,
+      ),
+      FileItemPart.folderName => l10n.skinNameColorForItem(
+        l10n.fileSkinFoldersHeader,
+      ),
+      FileItemPart.fileIcon => l10n.skinIconColorForItem(l10n.filesTabLabel),
+      FileItemPart.fileName => l10n.skinNameColorForItem(l10n.filesTabLabel),
+      FileItemPart.details => l10n.skinDetailsTextColor,
+    };
+  }
+
+  @override
+  String group(BuildContext context) => context.l10n.skinFileManager;
+
+  @override
+  Color inherited(ThemeData base) {
+    switch (part) {
+      case FileItemPart.folderIcon:
+        return base.colorScheme.secondary;
+      case FileItemPart.fileIcon:
+        return base.colorScheme.primary;
+      case FileItemPart.folderName:
+      case FileItemPart.fileName:
+        return const AreaTokenTarget(
+          SkinArea.files,
+          SkinToken.text,
+        ).inherited(base);
+      case FileItemPart.details:
+        return const AreaTokenTarget(
+          SkinArea.files,
+          SkinToken.textSecondary,
+        ).inherited(base);
+    }
+  }
+
+  @override
+  Color? customValue(CustomAppSkin skin, {required bool dark}) {
+    final manager = skin.fileManagerSkin;
+    switch (part) {
+      case FileItemPart.folderIcon:
+        return manager.folders.iconColorMode == SkinIconColorMode.custom
+            ? manager.folders.customIconColor
+            : null;
+      case FileItemPart.fileIcon:
+        return manager.files.iconColorMode == SkinIconColorMode.custom
+            ? manager.files.customIconColor
+            : null;
+      case FileItemPart.folderName:
+        return manager.folders.nameColor;
+      case FileItemPart.fileName:
+        return manager.files.nameColor;
+      case FileItemPart.details:
+        return manager.detailsColor;
+    }
+  }
+
+  @override
+  CustomAppSkin write(CustomAppSkin skin, Color? color, {required bool dark}) {
+    final manager = skin.fileManagerSkin;
+    SkinItemStyle icon(SkinItemStyle style) => color == null
+        ? style.copyWith(
+            iconColorMode: SkinIconColorMode.auto,
+            clearCustomIconColor: true,
+          )
+        : style.copyWith(
+            iconColorMode: SkinIconColorMode.custom,
+            customIconColor: color,
+          );
+    SkinItemStyle name(SkinItemStyle style) => color == null
+        ? style.copyWith(clearNameColor: true)
+        : style.copyWith(nameColor: color);
+    final updated = switch (part) {
+      FileItemPart.folderIcon => manager.copyWith(
+        folders: icon(manager.folders),
+      ),
+      FileItemPart.fileIcon => manager.copyWith(files: icon(manager.files)),
+      FileItemPart.folderName => manager.copyWith(
+        folders: name(manager.folders),
+      ),
+      FileItemPart.fileName => manager.copyWith(files: name(manager.files)),
+      FileItemPart.details =>
+        color == null
+            ? manager.copyWith(clearDetailsColor: true)
+            : manager.copyWith(detailsColor: color),
+    };
+    return skin.copyWith(fileManagerSkin: updated);
+  }
+}
+
 /// A text-editor color: canvas, gutter, cursor, syntax colors, ...
 final class EditorRoleTarget extends SkinTarget {
   final String role;
@@ -360,6 +476,9 @@ List<SkinTarget> skinTargetsForArea(SkinArea? area) => [
     for (final token in area.tokens) AreaTokenTarget(area, token),
     if (area == SkinArea.editor) ...[
       for (final role in editorColorRoles) EditorRoleTarget(role),
+    ],
+    if (area == SkinArea.files) ...[
+      for (final part in FileItemPart.values) FileItemTarget(part),
     ],
   ] else ...[
     for (final role in _sharedBasics) SchemeRoleTarget(role),

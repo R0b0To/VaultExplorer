@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "Alle Farben und Optionen",
   "skinEditCollapse": "Bereich einklappen",
   "skinEditExpand": "Bereich ausklappen",
-  "skinEditPageColors": "Farben auf {page}"
+  "skinEditPageColors": "Farben auf {page}",
+  "skinEditDockTop": "Bereich nach oben verschieben",
+  "skinEditDockBottom": "Bereich nach unten verschieben",
+  "skinEditEditorIndependent": "Der Texteditor verwendet eigene Farben, daher erscheinen Änderungen hier erst, wenn er dem App-Skin folgt."
 }

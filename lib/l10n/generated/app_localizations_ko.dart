@@ -11753,4 +11753,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String skinEditPageColors(String page) {
     return '$page의 색';
   }
+
+  @override
+  String get skinEditDockTop => '패널을 위로 이동';
+
+  @override
+  String get skinEditDockBottom => '패널을 아래로 이동';
+
+  @override
+  String get skinEditEditorIndependent =>
+      '텍스트 편집기는 자체 색상을 사용하므로 앱 스킨을 따르도록 설정하기 전에는 여기서 바꾼 색이 적용되지 않습니다.';
 }

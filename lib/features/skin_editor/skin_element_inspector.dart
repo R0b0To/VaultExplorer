@@ -2,9 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:re_editor/re_editor.dart' show CodeTextColorProbe;
+import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
+import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
+import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_target.dart';
 
 /// What a painted layer is, which decides which colors it can be.
@@ -85,6 +90,7 @@ SkinPickResult inspectSkinElementAt({
 
   final owners = _renderObjectOwners(root);
   Element? deepest;
+  var sawEditorCanvas = false;
   final raws = <_RawLayer>[];
   for (final entry in hit.path) {
     final target = entry.target;
@@ -94,10 +100,21 @@ SkinPickResult inspectSkinElementAt({
     deepest ??= owner;
     final rect = target.localToGlobal(Offset.zero) & target.size;
     _collectLayers(owner, rect, raws);
+  // The code canvas and its line numbers paint straight onto a canvas, so
+    // their text color has to be asked for rather than read from a widget.
+    if (target case final CodeTextColorProbe probe) {
+      final color = probe.textColorAt(globalPosition);
+      if (color != null && color.a != 0) {
+        sawEditorCanvas = true;
+        raws.add(_RawLayer(SkinLayerKind.text, color, rect, owner));
+      }
+    }
   }
   if (deepest == null) return SkinPickResult.empty;
 
-  final area = SkinAreaScope.peekColorsOf(deepest)?.area;
+  var area =
+      SkinAreaHint.peek(deepest) ?? SkinAreaScope.peekColorsOf(deepest)?.area;
+  if (sawEditorCanvas) area ??= SkinArea.editor;
   final table = <(SkinTarget, Color)>[
     for (final target in skinMatchTargets(area))
       (target, target.current(skin, base, dark: dark)),
@@ -121,15 +138,26 @@ SkinPickResult inspectSkinElementAt({
       table: table,
       hints: _ancestorHints(raw.element),
     );
-    if (match.targets.isEmpty) continue;
+    // Inside a file or folder row the icon, the name and the date/size line
+    // each have a color of their own in the skin, which a plain color match
+    // could not tell apart from the page's text colors.
+    final fileItem = _fileItemOf(raw.element);
+    final forced = fileItem == null
+        ? const <SkinTarget>[]
+        : _fileItemTargets(raw, fileItem);
+    final targets = [
+      ...forced,
+      ...match.targets.where((target) => !forced.contains(target)),
+    ];
+    if (targets.isEmpty) continue;
     perKind[raw.kind] = (perKind[raw.kind] ?? 0) + 1;
     layers.add(
       SkinLayer(
         kind: raw.kind,
         color: raw.color,
         rect: raw.rect,
-        candidates: match.targets,
-        approximate: match.approximate,
+        candidates: targets,
+        approximate: forced.isEmpty && match.approximate,
       ),
     );
   }
@@ -257,6 +285,7 @@ int _rank(SkinTarget target, SkinLayerKind kind, Set<SkinToken> hints) {
     SchemeRoleTarget() => 70,
     ComponentRoleTarget() => 80,
     SemanticRoleTarget() => 90,
+    FileItemTarget() => 20,
     AreaTokenTarget() => 40,
   };
 }
@@ -292,18 +321,28 @@ class _RawLayer {
   final Rect rect;
   final Element element;
 
-  const _RawLayer(this.kind, this.color, this.rect, this.element);
+  /// A text layer that is really an icon glyph.
+  final bool isIcon;
+
+  const _RawLayer(
+    this.kind,
+    this.color,
+    this.rect,
+    this.element, {
+    this.isIcon = false,
+  });
 }
 
 void _collectLayers(Element element, Rect rect, List<_RawLayer> out) {
-  void add(SkinLayerKind kind, Color? color) {
+  void add(SkinLayerKind kind, Color? color, {bool isIcon = false}) {
     if (color == null || color.a == 0) return;
-    out.add(_RawLayer(kind, color, rect, element));
+    out.add(_RawLayer(kind, color, rect, element, isIcon: isIcon));
   }
 
   final widget = element.widget;
   if (widget is RichText) {
-    add(SkinLayerKind.text, widget.text.style?.color);
+    final span = widget.text;
+    add(SkinLayerKind.text, span.style?.color, isIcon: _isIconGlyph(span));
   } else if (widget is DecoratedBox) {
     final decoration = widget.decoration;
     if (decoration is BoxDecoration) {
@@ -332,6 +371,93 @@ void _collectLayers(Element element, Rect rect, List<_RawLayer> out) {
   } else if (widget is PhysicalShape) {
     add(SkinLayerKind.fill, widget.color);
   }
+}
+
+/// Icons are drawn as one private-use character in an icon font.
+bool _isIconGlyph(InlineSpan span) {
+  if (span is! TextSpan) return false;
+  final text = span.text;
+  if (text == null || text.isEmpty || span.style?.fontFamily == null) {
+    return false;
+  }
+  final runes = text.runes;
+  if (runes.length != 1) return false;
+  final rune = runes.first;
+  return (rune >= 0xE000 && rune <= 0xF8FF) || rune >= 0xF0000;
+}
+
+/// The file or folder row (list, grid or masonry) that an element is part of.
+class _FileItemContext {
+  final bool isDir;
+  final String name;
+  final FileManagerSkin skin;
+  final ColorScheme scheme;
+
+  const _FileItemContext({
+    required this.isDir,
+    required this.name,
+    required this.skin,
+    required this.scheme,
+  });
+}
+
+_FileItemContext? _fileItemOf(Element element) {
+  bool? isDir;
+  String? name;
+  var depth = 0;
+  element.visitAncestorElements((ancestor) {
+    final widget = ancestor.widget;
+    if (widget is FileRowShell) {
+      isDir = widget.entry.isDir;
+      name = widget.entry.name;
+      return false;
+    }
+    if (widget is GridCardShell) {
+      isDir = widget.isFolder;
+      name = widget.label;
+      return false;
+    }
+    depth++;
+    return depth < 40;
+  });
+  final dir = isDir;
+  final label = name;
+  if (dir == null || label == null) return null;
+  return _FileItemContext(
+    isDir: dir,
+    name: label,
+    skin: FileManagerSkinScope.peek(element) ?? FileManagerSkin.classic,
+    scheme: Theme.of(element).colorScheme,
+  );
+}
+
+/// The file manager skin colors a painted layer inside a row can be: the icon
+/// when it has exactly the color the skin gives this entry's icon, otherwise
+/// the date/size line when it matches the details color, otherwise the name.
+List<SkinTarget> _fileItemTargets(_RawLayer raw, _FileItemContext item) {
+  if (raw.kind != SkinLayerKind.text) return const [];
+  if (raw.isIcon) {
+    final expected = item.isDir
+        ? item.skin.folderIconColor(item.scheme)
+        : item.skin.fileIconColor(item.scheme, item.name);
+    if (expected.toARGB32() != raw.color.toARGB32()) return const [];
+    return [
+      FileItemTarget(
+        item.isDir ? FileItemPart.folderIcon : FileItemPart.fileIcon,
+      ),
+    ];
+  }
+  final details =
+      (item.skin.detailsColor ?? item.scheme.onSurfaceVariant).toARGB32() &
+      0xFFFFFF;
+  if ((raw.color.toARGB32() & 0xFFFFFF) == details) {
+    return const [FileItemTarget(FileItemPart.details)];
+  }
+  return [
+    FileItemTarget(
+      item.isDir ? FileItemPart.folderName : FileItemPart.fileName,
+    ),
+  ];
 }
 
 /// Maps every render object under [root] to the element that owns it, so a

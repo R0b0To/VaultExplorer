@@ -12470,4 +12470,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String skinEditPageColors(String page) {
     return 'ألوان $page';
   }
+
+  @override
+  String get skinEditDockTop => 'نقل اللوحة إلى الأعلى';
+
+  @override
+  String get skinEditDockBottom => 'نقل اللوحة إلى الأسفل';
+
+  @override
+  String get skinEditEditorIndependent =>
+      'يستخدم محرر النصوص ألوانه الخاصة، لذا لن تظهر التغييرات هنا فيه حتى يتبع المظهر التطبيق.';
 }

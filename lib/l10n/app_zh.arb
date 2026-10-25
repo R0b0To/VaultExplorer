@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "所有颜色和选项",
   "skinEditCollapse": "收起面板",
   "skinEditExpand": "展开面板",
-  "skinEditPageColors": "{page}的颜色"
+  "skinEditPageColors": "{page}的颜色",
+  "skinEditDockTop": "将面板移到顶部",
+  "skinEditDockBottom": "将面板移到底部",
+  "skinEditEditorIndependent": "文本编辑器使用自己的颜色，因此在它跟随应用皮肤之前，这里的更改不会显示在其中。"
 }

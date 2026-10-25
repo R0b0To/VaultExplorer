@@ -3434,5 +3434,8 @@
   "skinEditMoreOptions": "Усі кольори та параметри",
   "skinEditCollapse": "Згорнути панель",
   "skinEditExpand": "Розгорнути панель",
-  "skinEditPageColors": "Кольори: {page}"
+  "skinEditPageColors": "Кольори: {page}",
+  "skinEditDockTop": "Перемістити панель угору",
+  "skinEditDockBottom": "Перемістити панель униз",
+  "skinEditEditorIndependent": "Текстовий редактор використовує власні кольори, тож зміни тут не з’являться в ньому, доки він не почне наслідувати тему застосунку."
 }

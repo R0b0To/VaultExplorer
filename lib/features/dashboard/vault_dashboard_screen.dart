@@ -499,7 +499,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             .map((f) => f.path)
             .toList() ??
         const <String>[];
-    final autoOpen = state.appSettings.autoOpenOnUnlock;
+    // Read the live setting. `state.appSettings` is a snapshot that is only
+    // refreshed by loadAll(), so right after the toggle was changed it still
+    // held the old value for exactly one unlock attempt.
+    final autoOpen = _container
+        .read(appSettingsControllerProvider)
+        .settings
+        .autoOpenOnUnlock;
 
     MountedContainer? newlyMountedContainer;
     try {
@@ -565,7 +571,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     if (state.actionInFlight) return;
     dashboardController.setActionInFlight(true);
 
-    final autoOpen = state.appSettings.autoOpenOnUnlock;
+    // Read the live setting. `state.appSettings` is a snapshot that is only
+    // refreshed by loadAll(), so right after the toggle was changed it still
+    // held the old value for exactly one unlock attempt.
+    final autoOpen = _container
+        .read(appSettingsControllerProvider)
+        .settings
+        .autoOpenOnUnlock;
 
     MountedContainer? newlyMountedContainer;
     try {

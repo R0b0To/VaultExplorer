@@ -544,15 +544,11 @@ class _MainShellState extends ConsumerState<MainShell>
       case MountedVaultItem(:final container):
         _openBrowser(container);
       case LockedVaultItem(:final record):
-        // Reuse the dashboard's unlock flow when its location is mounted.
-        // If the Dashboard tab was closed, present the same flow from the
-        // shell instead of switching to Dashboard just to reach its widget.
-        final dashboard = _dashboardKey.currentState;
-        if (dashboard != null) {
-          dashboard.openItem(item);
-        } else {
-          unawaited(_showDrawerUnlock(record));
-        }
+        // The drawer is a navigation surface: tapping a locked vault means
+        // "take me there", exactly like tapping a mounted one. It therefore
+        // always has one unlock path (independent of whether the Dashboard
+        // tab happens to be mounted) and always opens the vault afterwards.
+        unawaited(_showDrawerUnlock(record));
     }
   }
 
@@ -577,7 +573,10 @@ class _MainShellState extends ConsumerState<MainShell>
           : null;
       if (!mounted) return;
 
-      final autoOpen = state.appSettings.autoOpenOnUnlock;
+      // Deliberately ignores the Dashboard's "auto-open on unlock" setting:
+      // that setting means "stay on the Vaults page", which has no meaning
+      // when the unlock was started from the drawer (often while browsing
+      // another vault). Without this the unlock gave no visible feedback.
       if (record.isUsbSource) {
         await navigator.push<void>(
           MaterialPageRoute<void>(
@@ -594,7 +593,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 onMounted: (container, {record}) {
                   controller.onContainerMounted(container, record: record);
                   newlyMountedContainer = container;
-                  if (autoOpen && mounted) _openBrowser(container);
+                  if (mounted) _openBrowser(container);
                 },
                 onReconnected: (container, migratedRecord, oldUri) {
                   controller.onUsbContainerReconnected(
@@ -628,7 +627,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 onMounted: (container, {record}) {
                   controller.onContainerMounted(container, record: record);
                   newlyMountedContainer = container;
-                  if (autoOpen && mounted) _openBrowser(container);
+                  if (mounted) _openBrowser(container);
                 },
               ),
             ),

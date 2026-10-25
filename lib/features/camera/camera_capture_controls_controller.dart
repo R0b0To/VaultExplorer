@@ -6,6 +6,12 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowe
 
 part 'camera_capture_controls_controller.g.dart';
 
+/// Part lengths offered for segmented recording, in minutes. 0 means off.
+const List<int> kSegmentMinuteOptions = [0, 1, 5, 10, 30];
+
+/// Upper bound accepted when reading a persisted value back.
+const int kMaxSegmentMinutes = 240;
+
 class CameraCaptureControlsState {
   const CameraCaptureControlsState({
     this.isVideoMode = false,
@@ -15,6 +21,8 @@ class CameraCaptureControlsState {
     this.timerDelaySeconds = 0,
     this.aspectRatio = 4 / 3,
     this.preferredFacing = 'back',
+    this.continuousCapture = false,
+    this.segmentMinutes = 0,
   });
 
   final bool isVideoMode;
@@ -25,6 +33,15 @@ class CameraCaptureControlsState {
   final double aspectRatio;
   final String preferredFacing;
 
+  /// Stay on the camera after a capture instead of jumping to the review
+  /// screen. Everything captured piles up in the tray and is reviewed and
+  /// saved in one go whenever the user opens it.
+  final bool continuousCapture;
+
+  /// Length of one part of a segmented recording, in minutes. 0 records one
+  /// normal file that is reviewed before it is saved.
+  final int segmentMinutes;
+
   CameraCaptureControlsState copyWith({
     bool? isVideoMode,
     String? flashMode,
@@ -33,6 +50,8 @@ class CameraCaptureControlsState {
     int? timerDelaySeconds,
     double? aspectRatio,
     String? preferredFacing,
+    bool? continuousCapture,
+    int? segmentMinutes,
   }) => CameraCaptureControlsState(
     isVideoMode: isVideoMode ?? this.isVideoMode,
     flashMode: flashMode ?? this.flashMode,
@@ -41,6 +60,8 @@ class CameraCaptureControlsState {
     timerDelaySeconds: timerDelaySeconds ?? this.timerDelaySeconds,
     aspectRatio: aspectRatio ?? this.aspectRatio,
     preferredFacing: preferredFacing ?? this.preferredFacing,
+    continuousCapture: continuousCapture ?? this.continuousCapture,
+    segmentMinutes: segmentMinutes ?? this.segmentMinutes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -51,6 +72,8 @@ class CameraCaptureControlsState {
     'timerDelaySeconds': timerDelaySeconds,
     'aspectRatio': aspectRatio,
     'preferredFacing': preferredFacing,
+    'continuousCapture': continuousCapture,
+    'segmentMinutes': segmentMinutes,
   };
 
   factory CameraCaptureControlsState.fromJson(Map<String, dynamic> json) =>
@@ -62,6 +85,11 @@ class CameraCaptureControlsState {
       timerDelaySeconds: (json['timerDelaySeconds'] as num?)?.toInt() ?? 0,
       aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 4 / 3,
       preferredFacing: json['preferredFacing'] as String? ?? 'back',
+      continuousCapture: json['continuousCapture'] as bool? ?? false,
+      segmentMinutes: ((json['segmentMinutes'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        kMaxSegmentMinutes,
+      ),
     );
 
   @override
@@ -75,7 +103,9 @@ class CameraCaptureControlsState {
           photoResolution == other.photoResolution &&
           timerDelaySeconds == other.timerDelaySeconds &&
           aspectRatio == other.aspectRatio &&
-          preferredFacing == other.preferredFacing;
+          preferredFacing == other.preferredFacing &&
+          continuousCapture == other.continuousCapture &&
+          segmentMinutes == other.segmentMinutes;
 
   @override
   int get hashCode => Object.hash(
@@ -86,6 +116,8 @@ class CameraCaptureControlsState {
     timerDelaySeconds,
     aspectRatio,
     preferredFacing,
+    continuousCapture,
+    segmentMinutes,
   );
 }
 
@@ -209,6 +241,19 @@ class CameraCaptureControls extends _$CameraCaptureControls {
   void setPreferredFacing(String value) {
     if (state.preferredFacing == value) return;
     state = state.copyWith(preferredFacing: value);
+    _persistState();
+  }
+
+  void toggleContinuousCapture() {
+    state = state.copyWith(continuousCapture: !state.continuousCapture);
+    _persistState();
+  }
+
+  /// Picks the part length of a segmented recording (0 = off).
+  void selectSegmentMinutes(int value) {
+    final clamped = value.clamp(0, kMaxSegmentMinutes);
+    if (state.segmentMinutes == clamped) return;
+    state = state.copyWith(segmentMinutes: clamped);
     _persistState();
   }
 }

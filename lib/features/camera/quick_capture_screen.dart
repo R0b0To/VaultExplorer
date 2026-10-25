@@ -125,6 +125,17 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       setState(() => _phase = _Phase.camera);
     } else if (capturedMedia.isNotEmpty) {
       HapticFeedback.lightImpact();
+      _backWithCapturedMedia();
+    }
+  }
+
+  /// Back from the camera while captures wait in the tray: discards them, or,
+  /// with "keep shooting" on (the user may never have seen the review
+  /// screen), opens the review so the discard stays an explicit choice.
+  void _backWithCapturedMedia() {
+    if (captureControls.continuousCapture) {
+      setState(() => _phase = _Phase.reviewing);
+    } else {
       _discardAllMedia();
     }
   }
@@ -584,7 +595,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
             thumbnailBytes: result.thumbnail ?? Uint8List(0),
           ),
         );
-        if (isFirstMedia) {
+        if (isFirstMedia && captureOpensReviewOnFirstMedia) {
           _phase = _Phase.reviewing;
         }
       });
@@ -645,7 +656,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           setState(() => _phase = _Phase.camera);
         } else if (capturedMedia.isNotEmpty) {
           HapticFeedback.lightImpact();
-          _discardAllMedia();
+          _backWithCapturedMedia();
         }
       },
       child: isReviewing
@@ -760,6 +771,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                         onVideoQualityChanged: changeQuality,
                         onPhotoResolutionChanged: changePhotoResolution,
                         onCycleTimerDelay: captureControlsController.cycleTimerDelay,
+                        continuousCapture: captureControls.continuousCapture,
+                        onToggleContinuousCapture:
+                            captureControlsController.toggleContinuousCapture,
                         onCycleFlashMode: () {
                           final nextMode = captureControlsController.cyclePhotoFlashMode();
                           unawaited(applyFlash(cameraController, nextMode, logTag: 'QuickCaptureScreen'));

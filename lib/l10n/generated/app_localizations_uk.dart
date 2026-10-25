@@ -1186,14 +1186,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Зберегти поведінку, безпеку та типові налаштування програми у файл. Вигляд зберігається в розділі «Тема оформлення програми».';
+      'Зберегти у файл налаштування програми, менеджера файлів, медіаплеєра та текстового редактора. Власні теми — за бажанням.';
 
   @override
   String get importSettingsTitle => 'Імпорт налаштувань';
 
   @override
   String get importSettingsSubtitle =>
-      'Відновити поведінку, безпеку та типові налаштування програми з файлу';
+      'Відновити з файлу налаштування програми, менеджера файлів, медіаплеєра та текстового редактора';
 
   @override
   String get importSettingsConfirmTitle => 'Імпортувати налаштування?';
@@ -1201,6 +1201,28 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       'Це замінить ваші поточні налаштування програми. Ваші теми оформлення та розташування інтерфейсу не зміняться. Дію не можна скасувати.';
+
+  @override
+  String get exportSettingsOnlyTitle => 'Лише налаштування';
+
+  @override
+  String get exportSettingsOnlySubtitle =>
+      'Налаштування програми, менеджера файлів, медіаплеєра та текстового редактора';
+
+  @override
+  String get exportSettingsWithSkinsTitle => 'Налаштування та теми';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle =>
+      'Також зберігає ваші власні теми оформлення програми';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      'Це замінить ваші поточні налаштування програми, менеджера файлів, медіаплеєра та текстового редактора, зокрема їхнє розташування. Ваші теми не зміняться. Дію не можна скасувати.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      'Це замінить ваші поточні налаштування програми, менеджера файлів, медіаплеєра та текстового редактора, зокрема їхнє розташування, і додасть теми з цього файлу. Тему, яка у вас уже є, буде замінено версією з файлу. Дію не можна скасувати.';
 
   @override
   String get exportSettingsSuccessMessage => 'Налаштування експортовано';
@@ -12538,4 +12560,50 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       'Текстовий редактор використовує власні кольори, тож зміни тут не з’являться в ньому, доки він не почне наслідувати тему застосунку.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

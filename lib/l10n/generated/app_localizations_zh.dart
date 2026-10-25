@@ -1101,13 +1101,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exportSettingsTitle => '导出设置';
 
   @override
-  String get exportSettingsSubtitle => '将应用行为、安全和默认设置保存到文件。外观请从“应用皮肤”中保存。';
+  String get exportSettingsSubtitle =>
+      '将应用、文件管理器、媒体播放器和文本编辑器的设置保存到文件。自定义皮肤为可选项。';
 
   @override
   String get importSettingsTitle => '导入设置';
 
   @override
-  String get importSettingsSubtitle => '从文件恢复应用行为、安全和默认设置';
+  String get importSettingsSubtitle => '从文件恢复应用、文件管理器、媒体播放器和文本编辑器的设置';
 
   @override
   String get importSettingsConfirmTitle => '导入设置？';
@@ -1115,6 +1116,26 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       '这将替换您当前的应用设置。您的皮肤和界面布局不受影响。此操作无法撤销。';
+
+  @override
+  String get exportSettingsOnlyTitle => '仅设置';
+
+  @override
+  String get exportSettingsOnlySubtitle => '应用、文件管理器、媒体播放器和文本编辑器的设置';
+
+  @override
+  String get exportSettingsWithSkinsTitle => '设置和皮肤';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle => '同时保存您的自定义应用皮肤';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      '这将替换您当前的应用、文件管理器、媒体播放器和文本编辑器设置（包括布局）。您的皮肤不受影响。此操作无法撤销。';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      '这将替换您当前的应用、文件管理器、媒体播放器和文本编辑器设置（包括布局），并添加此文件中的皮肤。您已有的皮肤将被文件中的版本替换。此操作无法撤销。';
 
   @override
   String get exportSettingsSuccessMessage => '设置已导出';
@@ -11576,4 +11597,50 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       '文本编辑器使用自己的颜色，因此在它跟随应用皮肤之前，这里的更改不会显示在其中。';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

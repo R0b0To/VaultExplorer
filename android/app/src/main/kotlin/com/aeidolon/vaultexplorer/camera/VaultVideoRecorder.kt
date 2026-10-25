@@ -56,6 +56,9 @@ class MemFile {
 
 data class RecordingResult(val durationMs: Long)
 
+/** One finished part of a segmented recording: a complete, playable temp file. */
+data class VideoSegment(val path: String, val durationMs: Long)
+
 private const val TAG = "VaultVideoRecorder"
 
 // HEVC (H.265) needs roughly 40% less bitrate than H264 for the same
@@ -85,10 +88,20 @@ class VaultVideoRecorder(
     private val quality: VaultVideoQuality,
     private val recordAudio: Boolean = true,
     private val cacheDir: File? = null,
+    /**
+     * Above zero, the recording is cut into parts of about this many seconds.
+     * Each part is closed as its own complete MP4 while the recorder keeps
+     * running, so nothing is dropped at the seam and a crash can only ever
+     * cost the part in progress.
+     */
+    private val segmentSeconds: Int = 0,
 ) {
     companion object {
         private const val TEMP_PREFIX = "vx_vid_"
         private const val TEMP_SUFFIX = ".mp4"
+        private const val AUDIO_BITRATE = 128_000
+        // MediaRecorder cannot honour a tiny size limit; never ask for less.
+        private const val MIN_SEGMENT_BYTES = 1L * 1024 * 1024
 
         /**
          * Sweeps [cacheDir] for plaintext recording temp files left behind
@@ -285,9 +298,38 @@ class VaultVideoRecorder(
         private set
 
     private var mediaRecorder: MediaRecorder? = null
+
+    @Volatile
     private var tempFile: File? = null
     private var startTimeMs: Long = 0L
     private var stopTimeMs: Long = 0L
+
+    // --- Segmented recording -------------------------------------------------
+    private val segmentLock = Any()
+
+    /** File handed to MediaRecorder.setNextOutputFile that has not started yet. */
+    private var pendingNextFile: File? = null
+    private var segmentStartMs: Long = 0L
+
+    /**
+     * Called whenever a part has been closed. Runs on the thread MediaRecorder
+     * delivers its info callbacks on, so it must only queue the segment.
+     */
+    @Volatile
+    var onSegmentFinished: ((VideoSegment) -> Unit)? = null
+
+    private val infoListener = MediaRecorder.OnInfoListener { recorder, what, _ ->
+        when (what) {
+            MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_APPROACHING -> queueNextFile(recorder)
+            MediaRecorder.MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED -> onNextFileStarted()
+            MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED ->
+                // Only reached if the next file could not be set in time; the
+                // recorder has stopped by itself. Everything up to here is a
+                // valid file, so stopping normally still yields it.
+                VeLog.w(TAG) { "segment size reached without a next file; recorder stopped" }
+            else -> Unit
+        }
+    }
 
     fun prepareEncoder(orientationDegrees: Int = 0) {
         releaseEncoder()
@@ -321,6 +363,13 @@ class VaultVideoRecorder(
         recorder.setVideoEncodingBitRate(bitrate)
         recorder.setVideoFrameRate(TARGET_RECORDING_FPS)
         recorder.setOutputFile(temp.absolutePath)
+        if (segmentSeconds > 0) {
+            val bytesPerSecond = (bitrate + if (recordAudio) AUDIO_BITRATE else 0) / 8L
+            val maxBytes = (bytesPerSecond * segmentSeconds).coerceAtLeast(MIN_SEGMENT_BYTES)
+            recorder.setMaxFileSize(maxBytes)
+            recorder.setOnInfoListener(infoListener)
+            VeLog.d(TAG) { "prepareEncoder: segmented, ~${segmentSeconds}s parts, maxFileSize=$maxBytes" }
+        }
 
         recorder.prepare()
         inputSurface = recorder.surface
@@ -333,6 +382,7 @@ class VaultVideoRecorder(
         VeLog.d(TAG) { "beginRecording: starting" }
         recorder.start()
         startTimeMs = System.currentTimeMillis()
+        segmentStartMs = startTimeMs
         VeLog.d(TAG) { "beginRecording: started at $startTimeMs" }
     }
 
@@ -398,6 +448,78 @@ class VaultVideoRecorder(
     fun releaseEncoder() {
         releaseRecorderOnly()
         secureDeleteTempFile()
+        val next = synchronized(segmentLock) { pendingNextFile.also { pendingNextFile = null } }
+        if (next != null) secureDeleteFile(next)
+    }
+
+    /**
+     * Gives MediaRecorder the file to continue into once the current one is
+     * full. Called when the recorder reports the size limit is near.
+     */
+    private fun queueNextFile(recorder: MediaRecorder) {
+        synchronized(segmentLock) {
+            if (pendingNextFile == null) {
+                val next = try {
+                    File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
+                } catch (e: Exception) {
+                    VeLog.e(TAG, e) { "could not create the next segment file" }
+                    null
+                }
+                if (next != null) {
+                    try {
+                        recorder.setNextOutputFile(next)
+                        pendingNextFile = next
+                    } catch (e: Exception) {
+                        VeLog.e(TAG, e) { "setNextOutputFile failed" }
+                        secureDeleteFile(next)
+                    }
+                }
+            }
+        }
+    }
+
+    /** The recorder has closed the previous file and moved on to the next. */
+    private fun onNextFileStarted() {
+        val segment = synchronized(segmentLock) {
+            val closed = tempFile
+            val next = pendingNextFile
+            if (closed == null || next == null) {
+                null
+            } else {
+                tempFile = next
+                pendingNextFile = null
+                val now = System.currentTimeMillis()
+                val durationMs = maxOf(0L, now - segmentStartMs)
+                segmentStartMs = now
+                VideoSegment(closed.absolutePath, durationMs)
+            }
+        } ?: return
+        VeLog.d(TAG) { "segment finished: ${segment.durationMs}ms" }
+        onSegmentFinished?.invoke(segment)
+    }
+
+    /**
+     * Call after [requestStop]. If the recorder had already moved on to the
+     * next file when the stop arrived (before its "next file started" callback
+     * was delivered), the file it was leaving is a finished part and the new
+     * file holds the tail: this makes that switch and returns the finished
+     * part. Otherwise the unused next file is wiped and null is returned.
+     */
+    fun finalizePendingSegment(): VideoSegment? = synchronized(segmentLock) {
+        val next = pendingNextFile
+        pendingNextFile = null
+        val closed = tempFile
+        when {
+            next == null -> null
+            closed == null || !next.exists() || next.length() == 0L -> {
+                secureDeleteFile(next)
+                null
+            }
+            else -> {
+                tempFile = next
+                VideoSegment(closed.absolutePath, maxOf(0L, System.currentTimeMillis() - segmentStartMs))
+            }
+        }
     }
 
     fun secureDeleteTempFile() {

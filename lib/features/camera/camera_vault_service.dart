@@ -63,6 +63,46 @@ class CameraVaultService {
     return _nextAvailableName(prefix: 'AUD_', ext: '.m4a', at: at);
   }
 
+  /// Start time that names every part of one segmented recording.
+  ///
+  /// All parts of a recording share one timestamp so they sort together:
+  /// `VID_20261025_101500_part001.mp4`, `..._part002.mp4` and so on. The
+  /// timestamp is checked once, here, against the folder and [reserved]: if a
+  /// first part with that name is already taken (two recordings started in
+  /// the same second) the stamp moves forward a second, so the parts of one
+  /// recording never end up with different stamps.
+  Future<DateTime> segmentGroupStart({
+    required String prefix,
+    required String ext,
+    required DateTime at,
+    Set<String> reserved = const {},
+  }) async {
+    final existing = {...await _getExistingNames(), ...reserved};
+    var start = at;
+    for (var i = 0; i < 600; i++) {
+      if (!existing.contains(segmentName(prefix: prefix, ext: ext, groupStart: start, index: 1))) {
+        return start;
+      }
+      start = start.add(const Duration(seconds: 1));
+    }
+    return start;
+  }
+
+  /// Name of part [index] (1-based) of the recording that began at
+  /// [groupStart]; see [segmentGroupStart].
+  String segmentName({
+    required String prefix,
+    required String ext,
+    required DateTime groupStart,
+    required int index,
+  }) {
+    final stamp = _timestamp(groupStart);
+    return '$prefix${stamp}_part${index.toString().padLeft(3, '0')}$ext';
+  }
+
+  static String _timestamp(DateTime now) =>
+      '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
   Future<String> _nextAvailableName({
     required String prefix,
     required String ext,

@@ -462,7 +462,8 @@ class FileManagerToolbarConfig {
   };
 
   /// How the file manager behaves rather than how it looks. Travels with
-  /// Settings -> Export.
+  /// Settings -> Export, in the `fileManagerBehavior` section; the look and
+  /// layout half travels in its `interface` section.
   static const Set<String> behaviorKeys = {
     'showHiddenFiles',
     'selectByIcon',

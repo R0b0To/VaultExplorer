@@ -1983,7 +1983,7 @@ abstract class AppLocalizations {
   /// Settings row subtitle for exporting app settings to a file
   ///
   /// In en, this message translates to:
-  /// **'Save app behavior, security and defaults to a file. Appearance is saved from App skin.'**
+  /// **'Save app, file manager, media player and text editor settings to a file. Custom skins are optional.'**
   String get exportSettingsSubtitle;
 
   /// Settings row title for importing app settings from a file
@@ -1995,7 +1995,7 @@ abstract class AppLocalizations {
   /// Settings row subtitle for importing app settings from a file
   ///
   /// In en, this message translates to:
-  /// **'Restore app behavior, security and defaults from a file'**
+  /// **'Restore app, file manager, media player and text editor settings from a file'**
   String get importSettingsSubtitle;
 
   /// Confirmation dialog title before overwriting settings with an imported file
@@ -2009,6 +2009,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This replaces your current app settings. Your skins and interface layout aren\'t affected. This can\'t be undone.'**
   String get importSettingsConfirmMessage;
+
+  /// Export chooser option: export settings without custom skins
+  ///
+  /// In en, this message translates to:
+  /// **'Settings only'**
+  String get exportSettingsOnlyTitle;
+
+  /// Subtitle of the settings-only export option, naming what the file contains
+  ///
+  /// In en, this message translates to:
+  /// **'App, file manager, media player and text editor settings'**
+  String get exportSettingsOnlySubtitle;
+
+  /// Export chooser option: export settings together with custom skins
+  ///
+  /// In en, this message translates to:
+  /// **'Settings and skins'**
+  String get exportSettingsWithSkinsTitle;
+
+  /// Subtitle of the settings-and-skins export option
+  ///
+  /// In en, this message translates to:
+  /// **'Also saves your custom app skins'**
+  String get exportSettingsWithSkinsSubtitle;
+
+  /// Confirmation message before importing a settings file that also restores layout and look (no skins in the file)
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces your current app, file manager, media player and text editor settings, including their layout. Your skins aren\'t affected. This can\'t be undone.'**
+  String get importSettingsConfirmFullMessage;
+
+  /// Confirmation message before importing a settings file that also restores layout and adds its skins
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces your current app, file manager, media player and text editor settings, including their layout, and adds the skins from this file. A skin you already have is replaced by the file\'s version. This can\'t be undone.'**
+  String get importSettingsConfirmFullSkinsMessage;
 
   /// Snackbar shown after successfully exporting settings
   ///
@@ -20784,6 +20820,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The text editor uses its own colors, so changes here will not show in it until it follows the app skin.'**
   String get skinEditEditorIndependent;
+
+  /// Tooltip of the camera button that keeps the camera open after a photo or video instead of opening the review screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep shooting after each capture'**
+  String get cameraKeepShootingTooltip;
+
+  /// Label of the segmented-recording menu entry that records one normal file.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get cameraSegmentLengthOff;
+
+  /// Length of one part of a segmented recording, for example 10 min.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String cameraSegmentLengthMinutes(int minutes);
+
+  /// Tooltip of the menu that picks how long each part of a segmented video or audio recording is.
+  ///
+  /// In en, this message translates to:
+  /// **'Split recording into parts that save as they go'**
+  String get cameraSegmentLengthTooltip;
+
+  /// Error shown when a segmented video recording runs out of vault space.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.'**
+  String get cameraSegmentSpaceMessage;
+
+  /// Title of the dialog shown when leaving the audio recorder during a segmented recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording?'**
+  String get audioSegmentedStopTitle;
+
+  /// Body of the dialog shown when leaving the audio recorder during a segmented recording.
+  ///
+  /// In en, this message translates to:
+  /// **'The parts recorded so far are already saved in the vault. Stop now and save the rest?'**
+  String get audioSegmentedStopMessage;
+
+  /// Confirm button that stops a segmented audio recording and saves its last part.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and save'**
+  String get audioSegmentedStopAction;
+
+  /// Title of the dialog shown when parts of a segmented audio recording could not be saved to the vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Some parts were not saved'**
+  String get audioUnsavedPartsTitle;
+
+  /// Body of the dialog shown when parts of a segmented audio recording could not be saved to the vault.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 recorded part could not be saved.} other{{count} recorded parts could not be saved.}} Free up space and try again, or discard them.'**
+  String audioUnsavedPartsMessage(int count);
+
+  /// Button that retries saving recorded parts that could not be written to the vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get segmentRetrySave;
 }
 
 class _AppLocalizationsDelegate

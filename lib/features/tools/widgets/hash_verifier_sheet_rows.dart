@@ -82,6 +82,7 @@ class _SourceRow extends StatelessWidget {
                             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ),
+                        SizedBox(width: 8),
                         Expanded(
                           child: SelectableText(
                             result!.digests[algo]!,

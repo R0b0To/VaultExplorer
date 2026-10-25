@@ -2337,18 +2337,50 @@ class AdvancedSettingsScreen extends ConsumerWidget {
 
   const AdvancedSettingsScreen({super.key, this.embedded = false});
 
+  /// Asks whether the export should also carry the custom themes. Themes are
+  /// optional because they can be large and are often shared on their own from
+  /// App skin. Returns null when the dialog is dismissed.
+  Future<bool?> _chooseExport(BuildContext context) => showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(dialogContext.l10n.exportSettingsTitle),
+      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.settings_outlined),
+            title: Text(dialogContext.l10n.exportSettingsOnlyTitle),
+            subtitle: Text(dialogContext.l10n.exportSettingsOnlySubtitle),
+            onTap: () => Navigator.pop(dialogContext, false),
+          ),
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: Text(dialogContext.l10n.exportSettingsWithSkinsTitle),
+            subtitle: Text(dialogContext.l10n.exportSettingsWithSkinsSubtitle),
+            onTap: () => Navigator.pop(dialogContext, true),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Future<void> _exportSettings(
     BuildContext context,
     WidgetRef ref,
     AppSettingsViewState state,
   ) async {
     if (state.backupBusy) return;
+    final includeThemes = await _chooseExport(context);
+    if (includeThemes == null || !context.mounted) return;
     ref.read(appSettingsControllerProvider.notifier).setExportBusy(true);
     try {
       final ok = await ref
           .read(sessionLockControllerProvider)
           .withLockSuppression(
-            () => ref.read(settingsBackupServiceProvider).exportToFile(),
+            () => ref
+                .read(settingsBackupServiceProvider)
+                .exportToFile(includeThemes: includeThemes),
           );
       if (!context.mounted) return;
       if (ok) {
@@ -2412,7 +2444,11 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     final confirmed = await showAppConfirmDialog(
       context,
       title: context.l10n.importSettingsConfirmTitle,
-      message: context.l10n.importSettingsConfirmMessage,
+      message: bundle.hasThemes
+          ? context.l10n.importSettingsConfirmFullSkinsMessage
+          : bundle.restoresInterface
+          ? context.l10n.importSettingsConfirmFullMessage
+          : context.l10n.importSettingsConfirmMessage,
       confirmLabel: context.l10n.importSettingsTitle,
       isDestructive: true,
     );
@@ -2434,6 +2470,11 @@ class AdvancedSettingsScreen extends ConsumerWidget {
         await ref
             .read(appSettingsControllerProvider.notifier)
             .setShareTargetEnabled(bundle.shareTargetEnabled!);
+      }
+      if (bundle.usbAttachPromptEnabled != null) {
+        await ref
+            .read(appSettingsControllerProvider.notifier)
+            .setUsbAttachPromptEnabled(bundle.usbAttachPromptEnabled!);
       }
       showAppSnackBar(
         context,

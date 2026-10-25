@@ -1197,14 +1197,14 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'حفظ سلوك التطبيق والأمان والإعدادات الافتراضية في ملف. يُحفظ المظهر من «مظهر التطبيق».';
+      'حفظ إعدادات التطبيق ومدير الملفات ومشغل الوسائط ومحرر النصوص في ملف. المظاهر المخصصة اختيارية.';
 
   @override
   String get importSettingsTitle => 'استيراد الإعدادات';
 
   @override
   String get importSettingsSubtitle =>
-      'استعادة سلوك التطبيق والأمان والإعدادات الافتراضية من ملف';
+      'استعادة إعدادات التطبيق ومدير الملفات ومشغل الوسائط ومحرر النصوص من ملف';
 
   @override
   String get importSettingsConfirmTitle => 'استيراد الإعدادات؟';
@@ -1212,6 +1212,28 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       'سيستبدل هذا إعدادات التطبيق الحالية. لن تتأثر مظاهرك وتخطيط الواجهة. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get exportSettingsOnlyTitle => 'الإعدادات فقط';
+
+  @override
+  String get exportSettingsOnlySubtitle =>
+      'إعدادات التطبيق ومدير الملفات ومشغل الوسائط ومحرر النصوص';
+
+  @override
+  String get exportSettingsWithSkinsTitle => 'الإعدادات والمظاهر';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle =>
+      'يحفظ أيضًا مظاهر التطبيق المخصصة الخاصة بك';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      'سيستبدل هذا الإعدادات الحالية للتطبيق ومدير الملفات ومشغل الوسائط ومحرر النصوص، بما في ذلك تخطيطها. لن تتأثر مظاهرك. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      'سيستبدل هذا الإعدادات الحالية للتطبيق ومدير الملفات ومشغل الوسائط ومحرر النصوص، بما في ذلك تخطيطها، وسيضيف المظاهر الموجودة في هذا الملف. سيُستبدل أي مظهر لديك بالفعل بنسخة الملف. لا يمكن التراجع عن هذا الإجراء.';
 
   @override
   String get exportSettingsSuccessMessage => 'تم تصدير الإعدادات';
@@ -12480,4 +12502,50 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       'يستخدم محرر النصوص ألوانه الخاصة، لذا لن تظهر التغييرات هنا فيه حتى يتبع المظهر التطبيق.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

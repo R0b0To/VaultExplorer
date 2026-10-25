@@ -1114,13 +1114,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      '앱 동작, 보안, 기본 설정을 파일로 저장. 모양은 앱 스킨에서 저장합니다.';
+      '앱, 파일 관리자, 미디어 플레이어, 텍스트 편집기 설정을 파일로 저장. 사용자 지정 스킨은 선택 사항입니다.';
 
   @override
   String get importSettingsTitle => '설정 가져오기';
 
   @override
-  String get importSettingsSubtitle => '파일에서 앱 동작, 보안, 기본 설정을 복원';
+  String get importSettingsSubtitle =>
+      '파일에서 앱, 파일 관리자, 미디어 플레이어, 텍스트 편집기 설정을 복원';
 
   @override
   String get importSettingsConfirmTitle => '설정을 가져올까요?';
@@ -1128,6 +1129,26 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       '현재 앱 설정이 대체됩니다. 스킨과 인터페이스 레이아웃은 영향을 받지 않습니다. 이 작업은 되돌릴 수 없습니다.';
+
+  @override
+  String get exportSettingsOnlyTitle => '설정만';
+
+  @override
+  String get exportSettingsOnlySubtitle => '앱, 파일 관리자, 미디어 플레이어, 텍스트 편집기 설정';
+
+  @override
+  String get exportSettingsWithSkinsTitle => '설정 및 스킨';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle => '사용자 지정 앱 스킨도 함께 저장합니다';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      '현재 앱, 파일 관리자, 미디어 플레이어, 텍스트 편집기 설정이 레이아웃을 포함해 대체됩니다. 스킨은 영향을 받지 않습니다. 이 작업은 되돌릴 수 없습니다.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      '현재 앱, 파일 관리자, 미디어 플레이어, 텍스트 편집기 설정이 레이아웃을 포함해 대체되고, 이 파일의 스킨이 추가됩니다. 이미 있는 스킨은 파일의 버전으로 대체됩니다. 이 작업은 되돌릴 수 없습니다.';
 
   @override
   String get exportSettingsSuccessMessage => '설정을 내보냈습니다';
@@ -11763,4 +11784,50 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       '텍스트 편집기는 자체 색상을 사용하므로 앱 스킨을 따르도록 설정하기 전에는 여기서 바꾼 색이 적용되지 않습니다.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

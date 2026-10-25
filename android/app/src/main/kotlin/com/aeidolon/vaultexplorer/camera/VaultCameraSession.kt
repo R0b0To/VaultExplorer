@@ -210,6 +210,18 @@ class VaultCameraSession(
     val currentVideoResolution: String get() = "${maxOf(videoSize.width, videoSize.height)}x${minOf(videoSize.width, videoSize.height)}"
 
     private var isRecording = false
+
+    /** Finished parts of a segmented recording that Dart has not collected yet. */
+    private val finishedSegments = java.util.concurrent.ConcurrentLinkedQueue<VideoSegment>()
+
+    /** Hands over (and forgets) every finished part collected so far, oldest first. */
+    fun takeVideoSegments(): List<VideoSegment> {
+        val out = ArrayList<VideoSegment>()
+        while (true) {
+            out.add(finishedSegments.poll() ?: break)
+        }
+        return out
+    }
     private var recordingChunkWriter: ChunkSink? = null
 
     private var pendingOpenResult: ((Boolean, String?) -> Unit)? = null
@@ -603,21 +615,22 @@ class VaultCameraSession(
         width: Int,
         height: Int,
         quality: VaultVideoQuality,
-        orientation: Int
+        orientation: Int,
+        segmentSeconds: Int = 0,
     ): VaultVideoRecorder {
         return try {
-            val recorder = VaultVideoRecorder(width, height, quality, recordAudio = true, cacheDir = context.cacheDir)
+            val recorder = VaultVideoRecorder(width, height, quality, recordAudio = true, cacheDir = context.cacheDir, segmentSeconds = segmentSeconds)
             recorder.prepareEncoder(orientation)
             recorder
         } catch (e: Exception) {
             VeLog.w(TAG, e) { "Failed to prepare encoder at ${width}x$height, falling back to 1080p" }
             try {
-                val fallback = VaultVideoRecorder(1920, 1080, VaultVideoQuality.FHD, recordAudio = true, cacheDir = context.cacheDir)
+                val fallback = VaultVideoRecorder(1920, 1080, VaultVideoQuality.FHD, recordAudio = true, cacheDir = context.cacheDir, segmentSeconds = segmentSeconds)
                 fallback.prepareEncoder(orientation)
                 fallback
             } catch (e2: Exception) {
                 VeLog.w(TAG, e2) { "1080p fallback failed, falling back to 720p" }
-                val fallback720 = VaultVideoRecorder(1280, 720, VaultVideoQuality.HD, recordAudio = true, cacheDir = context.cacheDir)
+                val fallback720 = VaultVideoRecorder(1280, 720, VaultVideoQuality.HD, recordAudio = true, cacheDir = context.cacheDir, segmentSeconds = segmentSeconds)
                 fallback720.prepareEncoder(orientation)
                 fallback720
             }
@@ -1594,8 +1607,18 @@ class VaultCameraSession(
         }
     }
 
-    fun startRecording(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
-        startRecordingInternal(VaultChunkWriter(volId, virtualPath), callback)
+    /**
+     * [segmentSeconds] above zero records in parts of about that length (see
+     * [VaultVideoRecorder]); each finished part is queued for [takeVideoSegments]
+     * and announced with a `video_segment` event.
+     */
+    fun startRecording(
+        volId: Int,
+        virtualPath: String,
+        segmentSeconds: Int = 0,
+        callback: (Boolean, String?) -> Unit,
+    ) {
+        startRecordingInternal(VaultChunkWriter(volId, virtualPath), segmentSeconds, callback)
     }
 
     fun startRecordingToScratchpad(
@@ -1603,10 +1626,10 @@ class VaultCameraSession(
         key: SecretKey,
         callback: (Boolean, String?) -> Unit,
     ) {
-        startRecordingInternal(ScratchpadChunkWriter(scratchpadFile, key), callback)
+        startRecordingInternal(ScratchpadChunkWriter(scratchpadFile, key), 0, callback)
     }
 
-    private fun startRecordingInternal(writer: ChunkSink, callback: (Boolean, String?) -> Unit) {
+    private fun startRecordingInternal(writer: ChunkSink, segmentSeconds: Int, callback: (Boolean, String?) -> Unit) {
         runOnCameraThread {
             if (cameraDevice == null || captureSession == null) {
                 callback(false, "camera not ready")
@@ -1617,11 +1640,19 @@ class VaultCameraSession(
                 return@runOnCameraThread
             }
             val recorder = try {
-                safePrepareRecorder(videoSize.width, videoSize.height, pendingQuality, computeCaptureOrientation())
+                safePrepareRecorder(videoSize.width, videoSize.height, pendingQuality, computeCaptureOrientation(), segmentSeconds)
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "prepare recorder failed" }
                 callback(false, e.message ?: "recorder prepare failed")
                 return@runOnCameraThread
+            }
+            if (segmentSeconds > 0) {
+                recorder.onSegmentFinished = { segment ->
+                    finishedSegments.add(segment)
+                    // Only a nudge: the parts themselves stay queued here until
+                    // Dart collects them, so a missed event loses nothing.
+                    onEvent(mapOf("event" to "video_segment"))
+                }
             }
             videoRecorder = recorder
             recordingChunkWriter = writer
@@ -1646,8 +1677,21 @@ class VaultCameraSession(
                 captureSession?.abortCaptures()
             } catch (_: Exception) {}
             val result = recorder.requestStop()
+            // If the recorder had already rolled over to the next part when the
+            // stop arrived, the part it left is finished and the new file holds
+            // the tail.
+            recorder.finalizePendingSegment()?.let { finishedSegments.add(it) }
             val path = recorder.tempFilePath
             recorder.releaseRecorderOnly()
+
+            // A recording stopped before anything was encoded leaves an empty
+            // file; report it as "no video" instead of handing it on.
+            if (path != null && File(path).let { !it.exists() || it.length() == 0L }) {
+                VaultVideoRecorder.secureDeleteFile(File(path))
+                callback(false, null, 0, null, "no video was captured")
+                createSessionLocked()
+                return@runOnCameraThread
+            }
 
             val thumbBytes = if (path != null) {
                 try {

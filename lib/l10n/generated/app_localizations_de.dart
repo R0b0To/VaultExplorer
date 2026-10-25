@@ -1172,14 +1172,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'App-Verhalten, Sicherheit und Standardwerte in einer Datei speichern. Das Erscheinungsbild wird über App-Skin gespeichert.';
+      'App-, Dateimanager-, Mediaplayer- und Texteditor-Einstellungen in einer Datei speichern. Eigene Skins sind optional.';
 
   @override
   String get importSettingsTitle => 'Einstellungen importieren';
 
   @override
   String get importSettingsSubtitle =>
-      'App-Verhalten, Sicherheit und Standardwerte aus einer Datei wiederherstellen';
+      'App-, Dateimanager-, Mediaplayer- und Texteditor-Einstellungen aus einer Datei wiederherstellen';
 
   @override
   String get importSettingsConfirmTitle => 'Einstellungen importieren?';
@@ -1187,6 +1187,28 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       'Dadurch werden Ihre aktuellen App-Einstellungen ersetzt. Ihre Skins und das Oberflächenlayout bleiben unverändert. Dies kann nicht rückgängig gemacht werden.';
+
+  @override
+  String get exportSettingsOnlyTitle => 'Nur Einstellungen';
+
+  @override
+  String get exportSettingsOnlySubtitle =>
+      'App-, Dateimanager-, Mediaplayer- und Texteditor-Einstellungen';
+
+  @override
+  String get exportSettingsWithSkinsTitle => 'Einstellungen und Skins';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle =>
+      'Speichert auch Ihre eigenen App-Skins';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      'Dadurch werden Ihre aktuellen App-, Dateimanager-, Mediaplayer- und Texteditor-Einstellungen samt Layout ersetzt. Ihre Skins bleiben unverändert. Dies kann nicht rückgängig gemacht werden.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      'Dadurch werden Ihre aktuellen App-, Dateimanager-, Mediaplayer- und Texteditor-Einstellungen samt Layout ersetzt und die Skins aus dieser Datei hinzugefügt. Ein bereits vorhandener Skin wird durch die Version aus der Datei ersetzt. Dies kann nicht rückgängig gemacht werden.';
 
   @override
   String get exportSettingsSuccessMessage => 'Einstellungen exportiert';
@@ -12451,4 +12473,50 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       'Der Texteditor verwendet eigene Farben, daher erscheinen Änderungen hier erst, wenn er dem App-Skin folgt.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'camera_capture_controls_controller.dart' show kSegmentMinuteOptions;
 import 'vault_camera_controller.dart' show NativeCameraLens;
 
 class CameraPopupMenuItem<T> {
@@ -409,6 +411,17 @@ class CameraTopControlsBar extends StatelessWidget {
   final VoidCallback onCycleFlashMode;
   final VoidCallback onPhotoTorchActivated;
 
+  /// "Keep shooting": stay on the camera after each capture. The button is
+  /// hidden when [onToggleContinuousCapture] is null.
+  final bool continuousCapture;
+  final VoidCallback? onToggleContinuousCapture;
+
+  /// Length of one part of a segmented video recording, in minutes (0 = off).
+  /// The control is hidden when [onSegmentMinutesChanged] is null, for screens
+  /// that cannot record in segments.
+  final int segmentMinutes;
+  final ValueChanged<int>? onSegmentMinutesChanged;
+
   const CameraTopControlsBar({
     super.key,
     required this.isVideoMode,
@@ -433,7 +446,15 @@ class CameraTopControlsBar extends StatelessWidget {
     required this.onCycleTimerDelay,
     required this.onCycleFlashMode,
     required this.onPhotoTorchActivated,
+    this.continuousCapture = false,
+    this.onToggleContinuousCapture,
+    this.segmentMinutes = 0,
+    this.onSegmentMinutesChanged,
   });
+
+  String _segmentLabel(BuildContext context, int minutes) => minutes <= 0
+      ? context.l10n.cameraSegmentLengthOff
+      : context.l10n.cameraSegmentLengthMinutes(minutes);
 
   String _formatVideoResolution(String quality) {
     final exact = videoQualities[quality];
@@ -544,7 +565,13 @@ class CameraTopControlsBar extends StatelessWidget {
                 ),
               )
             else
-              Row(
+              Flexible(
+                // Keeps the row inside the bar on narrow screens instead of
+                // overflowing; at normal widths it is laid out at full size.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
                 children: [
                   // Aspect Ratio Selector
                   CameraPopupMenuButton<double>(
@@ -689,6 +716,65 @@ class CameraTopControlsBar extends StatelessWidget {
                       ),
                     ),
 
+                  // Split a long recording into parts that save as they go.
+                  if (isVideoMode && onSegmentMinutesChanged != null)
+                    CameraPopupMenuButton<int>(
+                      iconTurns: iconTurns,
+                      onSelected: onSegmentMinutesChanged!,
+                      items: [
+                        for (final m in kSegmentMinuteOptions)
+                          CameraPopupMenuItem(
+                            value: m,
+                            isSelected: segmentMinutes == m,
+                            child: Text(
+                              _segmentLabel(context, m),
+                              style: TextStyle(
+                                color: segmentMinutes == m ? Colors.amber : Colors.white,
+                                fontWeight: segmentMinutes == m ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                      ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(6.0),
+                        child: buildRotatedWidget(
+                          iconTurns: iconTurns,
+                          child: Tooltip(
+                            message: context.l10n.cameraSegmentLengthTooltip,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.black45,
+                                border: Border.all(
+                                  color: segmentMinutes > 0 ? Colors.amber : Colors.white30,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.call_split_rounded,
+                                    size: 13,
+                                    color: segmentMinutes > 0 ? Colors.amber : Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _segmentLabel(context, segmentMinutes),
+                                    style: TextStyle(
+                                      color: segmentMinutes > 0 ? Colors.amber : Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
                   if (!isVideoMode) ...[
                     buildRotatedWidget(
                       iconTurns: iconTurns,
@@ -729,7 +815,21 @@ class CameraTopControlsBar extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (onToggleContinuousCapture != null)
+                    buildRotatedWidget(
+                      iconTurns: iconTurns,
+                      child: IconButton(
+                        tooltip: context.l10n.cameraKeepShootingTooltip,
+                        icon: Icon(
+                          Icons.burst_mode_rounded,
+                          color: continuousCapture ? Colors.amber : Colors.white,
+                        ),
+                        onPressed: onToggleContinuousCapture,
+                      ),
+                    ),
                 ],
+              ),
+                ),
               ),
           ],
         ),

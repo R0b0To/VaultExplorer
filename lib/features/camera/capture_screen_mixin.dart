@@ -54,6 +54,16 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   /// Live outline from the native document detector.
   void onDocumentQuadEvent(Map<String, dynamic> event) {}
 
+  /// A part of a segmented video recording has been closed natively and is
+  /// waiting to be picked up. Only the screen that records segmented video
+  /// overrides this.
+  void onVideoSegmentEvent() {}
+
+  /// Whether a capture should open the review screen. With "keep shooting"
+  /// on, the first capture stays on the camera and the tray collects
+  /// everything until the user opens it.
+  bool get captureOpensReviewOnFirstMedia => !captureControls.continuousCapture;
+
   // --- Shared state ---------------------------------------------------------
   late final VaultFileIoApi captureFileIoApi;
 
@@ -177,6 +187,10 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   void handleCameraEvent(Map<String, dynamic> event) {
     if (event['event'] == 'document_quad') {
       onDocumentQuadEvent(event);
+      return;
+    }
+    if (event['event'] == 'video_segment') {
+      onVideoSegmentEvent();
       return;
     }
     if (event['event'] != 'error' || !mounted) return;
@@ -511,7 +525,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
               thumbnailBytes: result.thumbnail ?? result.bytes!,
             ),
           );
-          if (isFirstMedia) {
+          if (isFirstMedia && captureOpensReviewOnFirstMedia) {
             enterReviewing();
           }
         });

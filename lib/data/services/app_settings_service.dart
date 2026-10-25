@@ -421,9 +421,11 @@ class AppSettings {
   /// * [configurationToJson] -- how the app *behaves* (locks, defaults,
   ///   playback/import handling, language). Travels with Settings -> Export.
   /// * [interfaceToJson] -- how the app *looks and is laid out* (theme mode,
-  ///   view modes, editor appearance, ...). Travels with App skin -> Export.
+  ///   view modes, editor appearance, ...). Travels with both Settings ->
+  ///   Export and App skin -> Export ("Skins and interface").
   /// * [skinsToJson] -- the skin library and which skin is active. Owned by
-  ///   the App skin screens.
+  ///   the App skin screens; Settings -> Export includes the library only
+  ///   when asked to.
   Map<String, dynamic> toJson() => {
     ...configurationToJson(),
     ...interfaceToJson(),

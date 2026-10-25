@@ -50,6 +50,12 @@ class VaultAudioCapturePlugin(
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val ioExecutor = Executors.newSingleThreadExecutor()
+
+    // Writing a finished part into the vault and wiping it take their own
+    // thread: while a segmented recording is running, parts are saved every
+    // few seconds, and a stop must never queue up behind one of those writes
+    // (the recorder keeps recording until the stop actually runs).
+    private val saveExecutor = Executors.newSingleThreadExecutor()
     private val recorder = VaultAudioRecorder(context)
     private var pendingPermissionResult: MethodChannel.Result? = null
 
@@ -73,7 +79,9 @@ class VaultAudioCapturePlugin(
                             bitrate = (args?.get("bitrate") as? Number)?.toInt(),
                             sampleRate = (args?.get("sampleRate") as? Number)?.toInt(),
                         )
-                        recorder.start(params)
+                        val segmentSeconds = ((args?.get("segmentSeconds") as? Number)?.toInt() ?: 0)
+                            .coerceIn(0, 4 * 60 * 60)
+                        recorder.start(params, segmentSeconds)
                         result.success(mapOf("success" to true))
                     } catch (e: Exception) {
                         VeLog.e(TAG, e) { "start failed" }
@@ -99,13 +107,28 @@ class VaultAudioCapturePlugin(
                     }
                 }
                 "amplitude" -> result.success(recorder.amplitude())
+                "takeSegments" -> ioExecutor.execute {
+                    val parts = try {
+                        recorder.takeSegments().map { segmentToMap(it) }
+                    } catch (e: Exception) {
+                        VeLog.e(TAG, e) { "takeSegments failed" }
+                        emptyList()
+                    }
+                    mainHandler.post { result.success(parts) }
+                }
                 "stop" -> ioExecutor.execute {
                     val reply: Map<String, Any?> = try {
-                        val res = recorder.stop()
+                        // The last part is null when a segmented recording ended
+                        // with nothing usable after its earlier parts; those are
+                        // still returned below.
+                        val res = recorder.stopAllowingEmptyLastPart()
                         mapOf(
                             "success" to true,
-                            "path" to res.file.absolutePath,
-                            "durationMs" to res.durationMs,
+                            "path" to res?.file?.absolutePath,
+                            "durationMs" to (res?.durationMs ?: 0L),
+                            // Parts closed since the last takeSegments(), oldest
+                            // first; the last part (path above) comes after them.
+                            "segments" to recorder.takeSegments().map { segmentToMap(it) },
                         )
                     } catch (e: Exception) {
                         VeLog.e(TAG, e) { "stop failed" }
@@ -150,7 +173,7 @@ class VaultAudioCapturePlugin(
                         result.error("bad_args", "path, volId and virtualPath are required", null)
                         return
                     }
-                    ioExecutor.execute {
+                    saveExecutor.execute {
                         val ok = try {
                             streamIntoVault(file, volId, virtualPath)
                         } catch (e: Exception) {
@@ -167,7 +190,7 @@ class VaultAudioCapturePlugin(
                         result.success(null)
                         return
                     }
-                    ioExecutor.execute {
+                    saveExecutor.execute {
                         VaultVideoRecorder.secureDeleteFile(file)
                         mainHandler.post { result.success(null) }
                     }
@@ -179,6 +202,9 @@ class VaultAudioCapturePlugin(
             result.error("audio_capture_error", e.message, null)
         }
     }
+
+    private fun segmentToMap(part: AudioRecordingResult): Map<String, Any?> =
+        mapOf("path" to part.file.absolutePath, "durationMs" to part.durationMs)
 
     /** Called from MainActivity.onRequestPermissionsResult. */
     fun onPermissionResult(granted: Boolean) {
@@ -195,6 +221,7 @@ class VaultAudioCapturePlugin(
         // the executor is shut down only after the cancel has run.
         ioExecutor.execute { recorder.cancel() }
         ioExecutor.shutdown()
+        saveExecutor.shutdown()
     }
 
     private fun hasMicPermission(): Boolean =

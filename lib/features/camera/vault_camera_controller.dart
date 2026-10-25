@@ -412,9 +412,14 @@ class VaultCameraController {
     return (success: ok, error: error);
   }
 
+  /// Starts recording. With [segmentSeconds] above zero the recording is cut
+  /// into parts of about that length: each part is closed as a complete,
+  /// playable file the moment it is full, and is announced with a
+  /// `video_segment` event and handed over by [takeVideoSegments].
   Future<({bool success, String? error})> startVideoRecording({
     required int volId,
     required String virtualPath,
+    int segmentSeconds = 0,
   }) async {
     final sId = _sessionId;
     if (sId == null) return (success: false, error: 'Camera not open');
@@ -423,6 +428,7 @@ class VaultCameraController {
       'sessionId': sId,
       'volId': volId,
       'virtualPath': virtualPath,
+      'segmentSeconds': segmentSeconds,
     });
 
     final ok = res?['success'] as bool? ?? false;
@@ -465,6 +471,31 @@ class VaultCameraController {
     final thumbnail = res?['thumbnail'] as Uint8List?;
     final error = res?['error'] as String?;
     return (success: ok, videoPath: videoPath, durationMs: durationMs, thumbnail: thumbnail, error: error);
+  }
+
+  /// Parts of a segmented recording that are complete and have not been
+  /// handed over yet, oldest first. Each file is a plaintext temp file that
+  /// the caller must save and wipe (or [discardVideo]). Safe to call at any
+  /// time, including after the recording has stopped.
+  Future<List<({String path, int durationMs})>> takeVideoSegments() async {
+    final sId = _sessionId;
+    if (sId == null) return const [];
+    try {
+      final res = await _channel.invokeMethod<List<dynamic>>('takeVideoSegments', {
+        'sessionId': sId,
+      });
+      return [
+        for (final raw in res ?? const <dynamic>[])
+          if (raw is Map && raw['path'] is String)
+            (
+              path: raw['path'] as String,
+              durationMs: (raw['durationMs'] as num?)?.toInt() ?? 0,
+            ),
+      ];
+    } catch (e) {
+      logSwallowed('takeVideoSegments', e);
+      return const [];
+    }
   }
 
   Future<String?> trimVideo({

@@ -9,22 +9,40 @@ import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 
 const String _tag = 'VaultAudioRecorder';
 
+/// One finished part of a segmented recording: a complete, playable
+/// plaintext temp file that the caller must save into the vault and wipe (or
+/// [VaultAudioRecorderController.discard]).
+class AudioSegment {
+  final String path;
+  final int durationMs;
+
+  const AudioSegment({required this.path, required this.durationMs});
+}
+
 /// Outcome of [VaultAudioRecorderController.stop].
 class AudioRecordingResult {
   final bool success;
 
-  /// Plaintext temp file holding the finished take. Only set on success.
-  /// It lives until it is saved into a vault or discarded -- both of which
-  /// wipe it natively.
+  /// Plaintext temp file holding the finished take -- the last part, for a
+  /// segmented recording. Only set on success, and `null` on success when a
+  /// segmented recording ended without a usable last part (the earlier parts
+  /// are in [segments]). It lives until it is saved into a vault or discarded
+  /// -- both of which wipe it natively.
   final String? path;
   final int durationMs;
   final String? error;
+
+  /// Parts of a segmented recording that closed since the last
+  /// [VaultAudioRecorderController.takeSegments], oldest first. They come
+  /// before [path]. Empty for an ordinary recording.
+  final List<AudioSegment> segments;
 
   const AudioRecordingResult({
     required this.success,
     this.path,
     this.durationMs = 0,
     this.error,
+    this.segments = const [],
   });
 }
 
@@ -86,12 +104,18 @@ class VaultAudioRecorderController {
   /// Starts a recording at [quality] (bitrate + sample rate, mono AAC). The
   /// native side clamps anything it can't use, so a bad value degrades to
   /// its default rather than failing the start.
+  ///
+  /// With [segmentSeconds] above zero the recording is cut into parts of about
+  /// that length. Each part is closed as a complete file while recording
+  /// continues; collect them with [takeSegments].
   Future<({bool success, String? error})> start({
     AudioRecordingQuality quality = AudioRecordingQuality.defaultQuality,
+    int segmentSeconds = 0,
   }) async {
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('start', {
       'bitrate': quality.bitrate,
       'sampleRate': quality.sampleRate,
+      'segmentSeconds': segmentSeconds,
     });
     return (success: res?['success'] == true, error: res?['error'] as String?);
   }
@@ -127,7 +151,33 @@ class VaultAudioRecorderController {
       path: (success && rawPath is String) ? rawPath : null,
       durationMs: (res?['durationMs'] as num?)?.toInt() ?? 0,
       error: res?['error'] as String?,
+      segments: success ? _parseSegments(res?['segments']) : const [],
     );
+  }
+
+  /// Parts of a segmented recording that are complete and have not been
+  /// collected yet, oldest first. Never throws: a failed call reads as "none
+  /// yet" and the parts stay queued natively for the next call.
+  Future<List<AudioSegment>> takeSegments() async {
+    try {
+      final res = await _channel.invokeMethod<List<dynamic>>('takeSegments');
+      return _parseSegments(res);
+    } catch (e) {
+      logSwallowed('audioTakeSegments', e, expected: true);
+      return const [];
+    }
+  }
+
+  static List<AudioSegment> _parseSegments(Object? raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map && item['path'] is String)
+          AudioSegment(
+            path: item['path'] as String,
+            durationMs: (item['durationMs'] as num?)?.toInt() ?? 0,
+          ),
+    ];
   }
 
   /// Cuts [path] down to [startMs]..[endMs] without re-encoding. Returns the

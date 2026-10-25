@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -92,6 +93,28 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   bool _isReviewingMedia = false;
 
   bool _lockedRouteDismissalScheduled = false;
+
+  // --- Segmented video recording ------------------------------------------
+  // With a part length chosen, a recording is cut into parts that are handed
+  // to a background save the moment each one closes. There is no review: the
+  // user starts and stops like any recording, and only the part in progress
+  // is ever at risk.
+
+  /// True while the recording in progress is segmented.
+  bool _segmentedRecording = false;
+
+  /// Timestamp shared by the names of every part of this recording.
+  DateTime? _segmentGroupStart;
+
+  /// Number of parts handed to a background save so far.
+  int _segmentIndex = 0;
+
+  /// Shows the "vault full" message once per recording, not once per part.
+  bool _segmentSpaceWarned = false;
+
+  /// Runs part collection one at a time, so the event nudges and the final
+  /// stop never overlap and parts are always numbered in order.
+  Future<void> _segmentChain = Future<void>.value();
 
   // --- Document scanning --------------------------------------------------
   final _scanApi = const DocumentScanApi();
@@ -195,6 +218,18 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       setState(() => _isReviewingMedia = false);
     } else if (capturedMedia.isNotEmpty) {
       HapticFeedback.lightImpact();
+      _backWithCapturedMedia();
+    }
+  }
+
+  /// Back from the camera while photos or videos wait in the tray. Normally
+  /// that discards them. With "keep shooting" on, the user may never have seen
+  /// the review screen, so back opens it instead and the explicit discard
+  /// stays there.
+  void _backWithCapturedMedia() {
+    if (captureControls.continuousCapture) {
+      setState(() => _isReviewingMedia = true);
+    } else {
       _discardAllMedia();
     }
   }
@@ -475,7 +510,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         capturedMedia.add(
           CapturedMediaItem.scanPage(pageBytes: page.bytes, thumbnailBytes: page.thumbnail),
         );
-        if (isFirstMedia) {
+        if (isFirstMedia && captureOpensReviewOnFirstMedia) {
           enterReviewing();
         }
       });
@@ -862,6 +897,29 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       _currentRecordingName = name;
       _currentRecordingPath = virtualPath;
 
+      final segmentSeconds = captureControls.segmentMinutes * 60;
+      _segmentedRecording = segmentSeconds > 0;
+      _segmentIndex = 0;
+      _segmentSpaceWarned = false;
+      _segmentGroupStart = null;
+      if (_segmentedRecording) {
+        // Parts are named after one shared start time, checked against the
+        // folder (and saves still in flight) once, up front.
+        final opSvc = ref.read(fileOperationServiceProvider);
+        _segmentGroupStart = await _vaultService.segmentGroupStart(
+          prefix: 'VID_',
+          ext: '.mp4',
+          at: DateTime.now(),
+          reserved: {
+            for (final e in opSvc.getActivePlaceholders(
+              widget.container.volId,
+              widget.targetDirPath,
+            ))
+              e.name,
+          },
+        );
+      }
+
       await cameraController.setOrientationDegrees(
         await computePreviewRotationDegrees(),
       );
@@ -869,9 +927,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       final result = await cameraController.startVideoRecording(
         volId: widget.container.volId,
         virtualPath: virtualPath,
+        segmentSeconds: segmentSeconds,
       );
 
       if (!result.success) {
+        _segmentedRecording = false;
         showErrorToast(
           result.error ?? context.l10n.cameraRecordingFailedMessage,
         );
@@ -906,6 +966,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         );
       });
     } catch (e) {
+      _segmentedRecording = false;
       showErrorToast(
         context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
       );
@@ -932,6 +993,15 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       final isFirstMedia = capturedMedia.isEmpty;
       final result = await cameraController.stopVideoRecordingForReview();
 
+      if (_segmentedRecording) {
+        await _finishSegmentedRecording(
+          success: result.success,
+          videoPath: result.videoPath,
+          durationMs: result.durationMs,
+        );
+        return;
+      }
+
       final elapsedMs = startedAt == null
           ? 9999
           : DateTime.now().difference(startedAt).inMilliseconds;
@@ -953,7 +1023,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
             thumbnailBytes: result.thumbnail ?? Uint8List(0),
           ),
         );
-        if (isFirstMedia) {
+        if (isFirstMedia && captureOpensReviewOnFirstMedia) {
           _isReviewingMedia = true;
         }
       });
@@ -964,6 +1034,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         );
       }
     } finally {
+      _segmentedRecording = false;
       unawaited(captureFileIoApi.setKeepScreenOn(false));
       _activeRecordingRegistry.unregister(widget.container.uri);
       if (_backgroundRecordingActive) {
@@ -971,6 +1042,132 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         unawaited(captureFileIoApi.stopBackgroundRecording());
       }
     }
+  }
+
+  // --- Segmented recording: collecting and saving parts ----------------------
+
+  @override
+  void onVideoSegmentEvent() {
+    if (!_segmentedRecording) return;
+    unawaited(_collectVideoSegments());
+  }
+
+  /// Picks up every part the recorder has closed and hands each to a
+  /// background save. Safe to call at any time; calls queue up and run in turn.
+  Future<void> _collectVideoSegments() {
+    final next = _segmentChain.then((_) async {
+      final parts = await cameraController.takeVideoSegments();
+      for (final part in parts) {
+        await _handOffVideoSegment(
+          path: part.path,
+          durationMs: part.durationMs,
+        );
+      }
+    }).catchError((Object e) {
+      logSwallowed('collectVideoSegments', e);
+    });
+    _segmentChain = next;
+    return next;
+  }
+
+  /// Hands one finished part to a background save under the next part name.
+  /// Returns false when it could not be handed over because the vault has no
+  /// room; the part then waits in the tray so it can still be saved.
+  Future<bool> _handOffVideoSegment({
+    required String path,
+    required int durationMs,
+  }) async {
+    if (!mounted) {
+      // Nothing can be saved without the screen; do not leave plaintext behind.
+      unawaited(CapturedVideoChannel.discard(path));
+      return false;
+    }
+    final item = CapturedMediaItem.video(
+      videoPath: path,
+      videoDurationMs: durationMs,
+      thumbnailBytes: Uint8List(0),
+    );
+    final estimatedBytes = await _vaultService.localFileSize(path) ?? 0;
+    if (estimatedBytes > 0 &&
+        !await _vaultService.hasEnoughSpaceFor(estimatedBytes)) {
+      _keepSegmentForReview(item);
+      return false;
+    }
+    if (!mounted) {
+      unawaited(CapturedVideoChannel.discard(path));
+      return false;
+    }
+    final index = ++_segmentIndex;
+    final name = _vaultService.segmentName(
+      prefix: 'VID_',
+      ext: '.mp4',
+      groupStart: _segmentGroupStart ?? DateTime.now(),
+      index: index,
+    );
+    _backgroundSaves.add(
+      _enqueueBackgroundVideoSave(
+        opSvc: ref.read(fileOperationServiceProvider),
+        item: item,
+        name: name,
+        virtualPath: _vaultService.buildVirtualPath(name),
+        estimatedBytes: estimatedBytes,
+      ),
+    );
+    _firstSavedCaptureName ??= name;
+    _hasSavedVideoCapture = true;
+    return true;
+  }
+
+  /// A part the vault has no room for. It is kept (nothing is lost) and the
+  /// recording stops, since every further part would fail the same way; the
+  /// review screen then lets the user free up space and save, or discard.
+  void _keepSegmentForReview(CapturedMediaItem item) {
+    if (!mounted) {
+      final path = item.videoPath;
+      if (path != null) unawaited(CapturedVideoChannel.discard(path));
+      return;
+    }
+    setState(() => capturedMedia.add(item));
+    if (!_segmentSpaceWarned) {
+      _segmentSpaceWarned = true;
+      showErrorToast(context.l10n.cameraSegmentSpaceMessage);
+    }
+    if (captureIsRecording) unawaited(stopVideoRecording());
+  }
+
+  /// Ends a segmented recording: the parts closed since the last pickup, then
+  /// the last part, all go to background saves; there is no review. Closes the
+  /// screen like a finished save would, unless some part had to be kept.
+  Future<void> _finishSegmentedRecording({
+    required bool success,
+    required String? videoPath,
+    required int durationMs,
+  }) async {
+    await _collectVideoSegments();
+    var savedAny = _segmentIndex > 0;
+    if (success && videoPath != null) {
+      // A short last part is still real footage, so it is kept.
+      if (await _handOffVideoSegment(path: videoPath, durationMs: durationMs)) {
+        savedAny = true;
+      }
+    } else if (videoPath != null) {
+      await cameraController.discardVideo(videoPath);
+    }
+    if (!mounted) return;
+    if (!savedAny && capturedMedia.isEmpty) {
+      showErrorToast(context.l10n.cameraRecordingTooShortMessage);
+      return;
+    }
+    if (capturedMedia.isNotEmpty) {
+      setState(() => _isReviewingMedia = true);
+      return;
+    }
+    final CameraCaptureResult captured = (
+      savedName: _firstSavedCaptureName ?? 'video',
+      isVideo: true,
+      backgroundSaves: List<FileOperation>.unmodifiable(_backgroundSaves),
+    );
+    Navigator.pop(context, captured);
   }
 
   void _discardAllMedia() {
@@ -1049,7 +1246,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         if (didPop) return;
         if (capturedMedia.isNotEmpty) {
           HapticFeedback.lightImpact();
-          _discardAllMedia();
+          _backWithCapturedMedia();
         }
       },
       child: Scaffold(
@@ -1153,6 +1350,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 onVideoQualityChanged: changeQuality,
                 onPhotoResolutionChanged: changePhotoResolution,
                 onCycleTimerDelay: captureControlsController.cycleTimerDelay,
+                continuousCapture: captureControls.continuousCapture,
+                onToggleContinuousCapture:
+                    captureControlsController.toggleContinuousCapture,
+                segmentMinutes: captureControls.segmentMinutes,
+                onSegmentMinutesChanged:
+                    captureControlsController.selectSegmentMinutes,
                 onCycleFlashMode: () {
                   final nextMode = captureControlsController.cyclePhotoFlashMode();
                   unawaited(applyFlash(cameraController, nextMode, logTag: 'CameraCaptureScreen'));

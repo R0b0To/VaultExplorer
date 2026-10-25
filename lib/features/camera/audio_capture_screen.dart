@@ -23,6 +23,7 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 import 'active_recording_registry.dart';
 import 'audio_waveform_trimmer.dart';
+import 'camera_capture_controls_controller.dart';
 import 'camera_capture_lock_controller.dart';
 import 'camera_vault_service.dart';
 import 'vault_audio_recorder_controller.dart';
@@ -32,6 +33,13 @@ const String _tag = 'AudioCaptureScreen';
 /// Anything shorter than this is treated as an accidental tap, same as the
 /// camera's video recording.
 const int _minRecordingMs = 500;
+
+/// Key of the persisted capture settings this screen keeps its segment
+/// length under (the same store the camera uses, under its own key).
+const String _audioControlsKey = 'audio_capture';
+
+/// How often finished parts of a segmented recording are collected and saved.
+const Duration _segmentPollInterval = Duration(seconds: 3);
 
 /// Smallest span the trim handles can be dragged to.
 const int _minTrimSpanMs = 500;
@@ -108,6 +116,37 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   /// Set once the take is safely in the vault.
   bool _saved = false;
 
+  // --- Segmented recording --------------------------------------------------
+  // With a part length chosen, the recording is cut into parts that are saved
+  // into the vault as soon as each one closes. There is no review: starting and
+  // stopping look like any recording, and only the part in progress is ever at
+  // risk.
+
+  /// True while the recording in progress is segmented.
+  bool _segmentedRecording = false;
+
+  /// Timestamp shared by the names of every part of this recording.
+  DateTime? _segmentGroupStart;
+
+  /// Number of parts saved into the vault so far.
+  int _segmentIndex = 0;
+
+  /// Name of the first saved part, returned to the caller.
+  String? _firstSegmentName;
+
+  Timer? _segmentTimer;
+
+  /// Runs part saving one at a time, so the timer and the final stop never
+  /// overlap and parts are always numbered in order.
+  Future<void> _segmentChain = Future<void>.value();
+
+  /// Closed parts that could not be saved yet. They stay on disk, in order,
+  /// and are retried; nothing is wiped until it is saved or the user discards.
+  final List<AudioSegment> _unsavedSegments = [];
+
+  /// Why the last part could not be saved, for the message shown to the user.
+  String? _segmentFailureMessage;
+
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   // --- Recording -----------------------------------------------------------
@@ -161,6 +200,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _segmentTimer?.cancel();
     _events.removeBackgroundRecordingStopRequestedListener(
       _onBackgroundStopRequested,
     );
@@ -172,6 +212,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     unawaited(_recorder.cancel());
     final leftover = _recordedPath;
     if (leftover != null) unawaited(_recorder.discard(leftover));
+    _wipeUnsavedSegments();
     _player?.removeListener(_onPlayerTick);
     unawaited(_player?.dispose());
     super.dispose();
@@ -191,6 +232,9 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       // still running natively at this point is a leftover from a screen
       // that went away without cleaning up.
       await _recorder.cancel();
+      await ref
+          .read(cameraCaptureControlsProvider(_audioControlsKey).notifier)
+          .loadPersisted();
       var granted = await _recorder.hasPermission();
       if (!granted) granted = await _recorder.requestPermission();
       if (!mounted) return;
@@ -264,7 +308,23 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
           ? await ref.read(appSettingsServiceProvider).loadSettings()
           : settingsState.settings;
       final quality = settings.audioRecordingQuality;
-      final res = await _recorder.start(quality: quality);
+      final segmentSeconds =
+          ref
+              .read(cameraCaptureControlsProvider(_audioControlsKey))
+              .segmentMinutes *
+          60;
+      // Checked before the recorder starts, so the lookup cannot delay it.
+      final groupStart = segmentSeconds > 0
+          ? await _vaultService.segmentGroupStart(
+              prefix: 'AUD_',
+              ext: '.m4a',
+              at: DateTime.now(),
+            )
+          : null;
+      final res = await _recorder.start(
+        quality: quality,
+        segmentSeconds: segmentSeconds,
+      );
       if (!mounted) {
         await _recorder.cancel();
         return;
@@ -282,6 +342,20 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         return;
       }
       _startedAt = DateTime.now();
+      _segmentedRecording = segmentSeconds > 0;
+      _segmentGroupStart = groupStart;
+      _segmentIndex = 0;
+      _firstSegmentName = null;
+      _segmentFailureMessage = null;
+      _wipeUnsavedSegments();
+      _segmentChain = Future<void>.value();
+      _segmentTimer?.cancel();
+      if (_segmentedRecording) {
+        _segmentTimer = Timer.periodic(
+          _segmentPollInterval,
+          (_) => unawaited(_collectSegments()),
+        );
+      }
       _clock
         ..reset()
         ..start();
@@ -390,6 +464,10 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     try {
       unawaited(HapticFeedback.mediumImpact());
       final res = await _recorder.stop();
+      if (_segmentedRecording) {
+        await _finishSegmentedRecording(res);
+        return;
+      }
       final path = res.path;
       if (!res.success || path == null) {
         if (mounted) {
@@ -432,10 +510,197 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         setState(() => _phase = _Phase.ready);
       }
     } finally {
+      _segmentTimer?.cancel();
+      _segmentedRecording = false;
       _releaseRecordingResources();
       _busy = false;
       if (orphanPath != null) unawaited(_recorder.discard(orphanPath));
     }
+  }
+
+  // ── Segmented recording: collecting and saving parts ─────────────────────
+
+  /// Picks up the parts the recorder has closed and saves them. Safe to call
+  /// at any time; calls queue up and run one after another.
+  Future<void> _collectSegments() => _runSegmentSave(null);
+
+  /// Runs one save pass: first anything still unsaved from before, then
+  /// [extra], or, with null, whatever the recorder has closed since last time.
+  Future<void> _runSegmentSave(List<AudioSegment>? extra) {
+    final next = _segmentChain.then((_) async {
+      final fresh = extra ?? await _recorder.takeSegments();
+      _unsavedSegments.addAll(fresh);
+      while (_unsavedSegments.isNotEmpty) {
+        if (!await _saveAudioSegment(_unsavedSegments.first)) break;
+        _unsavedSegments.removeAt(0);
+      }
+    }).catchError((Object e) {
+      VeLog.w(_tag, 'saving segments failed', e);
+    });
+    _segmentChain = next;
+    return next;
+  }
+
+  /// Saves one part under the next part name and wipes its temp file. Returns
+  /// false, leaving the file in place, when it could not be saved.
+  Future<bool> _saveAudioSegment(AudioSegment part) async {
+    final bytes = await _vaultService.localFileSize(part.path);
+    if (bytes != null && !await _vaultService.hasEnoughSpaceFor(bytes)) {
+      _noteSegmentFailure(notEnoughSpace: true);
+      return false;
+    }
+    final index = _segmentIndex + 1;
+    final name = _vaultService.segmentName(
+      prefix: 'AUD_',
+      ext: '.m4a',
+      groupStart: _segmentGroupStart ?? _startedAt ?? DateTime.now(),
+      index: index,
+    );
+    final virtualPath = _vaultService.buildVirtualPath(name);
+    try {
+      final ok = widget.container.isLocalStorage
+          ? await _fileIo.writeFileFromLocalPath(
+              widget.container,
+              virtualPath,
+              part.path,
+            )
+          : await _recorder.saveToVault(
+              path: part.path,
+              volId: widget.container.volId,
+              virtualPath: virtualPath,
+            );
+      if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
+        await _deletePartialVaultFile(virtualPath);
+        _noteSegmentFailure(notEnoughSpace: false);
+        return false;
+      }
+    } catch (e) {
+      VeLog.w(_tag, 'saving a part failed', e);
+      await _deletePartialVaultFile(virtualPath);
+      _noteSegmentFailure(notEnoughSpace: false);
+      return false;
+    }
+    await _recorder.discard(part.path);
+    _segmentIndex = index;
+    _firstSegmentName ??= name;
+    return true;
+  }
+
+  /// A part could not be saved while recording continues: tell the user once
+  /// and stop, since every further part would most likely fail the same way.
+  /// The unsaved parts are kept and offered again when the recording ends.
+  void _noteSegmentFailure({required bool notEnoughSpace}) {
+    if (!mounted) return;
+    final l10n = context.l10n;
+    _segmentFailureMessage = notEnoughSpace
+        ? l10n.cameraNotEnoughVaultSpaceMessage
+        : l10n.cameraCouldNotSaveRecordingMessage;
+    if (_phase == _Phase.recording || _phase == _Phase.paused) {
+      _showError(_segmentFailureMessage!);
+      unawaited(_stopRecording());
+    }
+  }
+
+  /// Ends a segmented recording: every closed part, then the last one, is
+  /// saved straight into the vault with no review, and the screen closes with
+  /// the name of the first part. Parts that cannot be saved are offered again
+  /// instead of being dropped.
+  Future<void> _finishSegmentedRecording(AudioRecordingResult res) async {
+    _segmentTimer?.cancel();
+    if (!res.success) {
+      // Nothing was ever closed, so there is nothing to keep.
+      if (mounted) {
+        _showError(
+          context.l10n.cameraRecordingFailedWithReasonMessage(res.error ?? ''),
+        );
+        _resetRecordingDisplay();
+        setState(() => _phase = _Phase.ready);
+      }
+      return;
+    }
+    final parts = <AudioSegment>[
+      ...res.segments,
+      if (res.path != null)
+        AudioSegment(path: res.path!, durationMs: res.durationMs),
+    ];
+    if (parts.isEmpty && _segmentIndex == 0 && _unsavedSegments.isEmpty) {
+      if (mounted) {
+        _showError(context.l10n.cameraRecordingTooShortMessage);
+        _resetRecordingDisplay();
+        setState(() => _phase = _Phase.ready);
+      }
+      return;
+    }
+    await _runSegmentSave(parts);
+    while (_unsavedSegments.isNotEmpty && mounted) {
+      final retry = await _confirmRetryUnsavedParts(_unsavedSegments.length);
+      if (retry != true) break;
+      await _runSegmentSave(const []);
+    }
+    _wipeUnsavedSegments();
+    if (!mounted) return;
+    if (_segmentIndex == 0) {
+      _resetRecordingDisplay();
+      setState(() => _phase = _Phase.ready);
+      return;
+    }
+    _saved = true;
+    Navigator.pop(context, _firstSegmentName);
+  }
+
+  /// Wipes parts that were never saved. Used when the user gives up on them
+  /// and when the screen goes away.
+  void _wipeUnsavedSegments() {
+    for (final part in _unsavedSegments) {
+      unawaited(_recorder.discard(part.path));
+    }
+    _unsavedSegments.clear();
+  }
+
+  Future<bool?> _confirmRetryUnsavedParts(int count) {
+    final l10n = context.l10n;
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.audioUnsavedPartsTitle),
+        content: Text(
+          '${_segmentFailureMessage ?? ''}\n\n'
+          '${l10n.audioUnsavedPartsMessage(count)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.discard),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.segmentRetrySave),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _confirmSegmentedStop() {
+    final l10n = context.l10n;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.audioSegmentedStopTitle),
+        content: Text(l10n.audioSegmentedStopMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.audioSegmentedStopAction),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadWaveform(String path) async {
@@ -670,6 +935,8 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   /// Stops everything and wipes any unsaved take.
   Future<void> _abandon() async {
     _ticker?.cancel();
+    _segmentTimer?.cancel();
+    _wipeUnsavedSegments();
     _clock.stop();
     final waveOp = _waveOpId;
     if (waveOp != null) unawaited(_audioEditApi.cancel(waveOp));
@@ -720,6 +987,17 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         return;
       case _Phase.recording:
       case _Phase.paused:
+        if (_segmentedRecording) {
+          // Parts are saved as they close, so leaving is "stop and save the
+          // rest", not a discard.
+          if (await _confirmSegmentedStop() != true || !mounted) return;
+          await _stopRecording();
+          return;
+        }
+        if (await _confirmDiscard() != true || !mounted) return;
+        await _abandon();
+        if (mounted) Navigator.pop(context);
+        return;
       case _Phase.reviewing:
         if (await _confirmDiscard() != true || !mounted) return;
         await _abandon();
@@ -756,6 +1034,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         (s) => s.settings.audioRecordingQuality,
       ),
     );
+    final segmentMinutes = ref.watch(
+      cameraCaptureControlsProvider(
+        _audioControlsKey,
+      ).select((s) => s.segmentMinutes),
+    );
     if (isLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -773,7 +1056,10 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
         appBar: AppBar(
           leading: CloseButton(onPressed: () => unawaited(_requestClose())),
           title: Text(context.l10n.audioRecorder),
-          actions: [?_buildQualityAction(context, selectedQuality)],
+          actions: [
+            ?_buildSegmentAction(context, segmentMinutes),
+            ?_buildQualityAction(context, selectedQuality),
+          ],
         ),
         body: SafeArea(child: _buildBody(context)),
       ),
@@ -789,6 +1075,99 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       ref
           .read(appSettingsControllerProvider.notifier)
           .updateSettings((s) => s.copyWith(audioRecordingQuality: quality)),
+    );
+  }
+
+  String _segmentLabel(BuildContext context, int minutes) => minutes <= 0
+      ? context.l10n.cameraSegmentLengthOff
+      : context.l10n.cameraSegmentLengthMinutes(minutes);
+
+  /// The "split into parts" pill in the app bar: a menu before recording
+  /// starts, and a read-only label while a segmented take is running. Null
+  /// when it has nothing to show.
+  Widget? _buildSegmentAction(BuildContext context, int selected) {
+    final ready = _phase == _Phase.ready;
+    final running =
+        _segmentedRecording &&
+        (_phase == _Phase.recording ||
+            _phase == _Phase.paused ||
+            _phase == _Phase.stopping);
+    if (!ready && !running) return null;
+
+    final cs = context.colors;
+    final textTheme = Theme.of(context).textTheme;
+    final active = selected > 0 || running;
+
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: active ? cs.primary : (ready ? cs.outline : cs.outlineVariant),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.call_split_rounded,
+            size: 16,
+            color: active ? cs.primary : cs.onSurface,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            _segmentLabel(context, selected),
+            style: textTheme.labelLarge?.copyWith(
+              color: active ? cs.primary : cs.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 8),
+      child: ready
+          ? PopupMenuButton<int>(
+              tooltip: context.l10n.cameraSegmentLengthTooltip,
+              initialValue: selected,
+              onSelected: (minutes) => ref
+                  .read(
+                    cameraCaptureControlsProvider(_audioControlsKey).notifier,
+                  )
+                  .selectSegmentMinutes(minutes),
+              itemBuilder: (context) => [
+                for (final m in kSegmentMinuteOptions)
+                  PopupMenuItem<int>(
+                    value: m,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          child: m == selected
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  size: 20,
+                                  color: cs.primary,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _segmentLabel(context, m),
+                          style: textTheme.bodyLarge?.copyWith(
+                            fontWeight: m == selected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              child: pill,
+            )
+          : pill,
     );
   }
 

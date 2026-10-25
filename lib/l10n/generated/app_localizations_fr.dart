@@ -1172,14 +1172,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Enregistrer le comportement, la sécurité et les valeurs par défaut de l\'application dans un fichier. L\'apparence est enregistrée depuis Thème de l\'application.';
+      'Enregistrer les paramètres de l\'application, du gestionnaire de fichiers, du lecteur multimédia et de l\'éditeur de texte dans un fichier. Les thèmes personnalisés sont facultatifs.';
 
   @override
   String get importSettingsTitle => 'Importer les paramètres';
 
   @override
   String get importSettingsSubtitle =>
-      'Restaurer le comportement, la sécurité et les valeurs par défaut de l\'application à partir d\'un fichier';
+      'Restaurer les paramètres de l\'application, du gestionnaire de fichiers, du lecteur multimédia et de l\'éditeur de texte à partir d\'un fichier';
 
   @override
   String get importSettingsConfirmTitle => 'Importer les paramètres ?';
@@ -1187,6 +1187,28 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       'Cela remplacera vos paramètres actuels. Vos thèmes et la disposition de l\'interface ne sont pas affectés. Cette action est irréversible.';
+
+  @override
+  String get exportSettingsOnlyTitle => 'Paramètres uniquement';
+
+  @override
+  String get exportSettingsOnlySubtitle =>
+      'Paramètres de l\'application, du gestionnaire de fichiers, du lecteur multimédia et de l\'éditeur de texte';
+
+  @override
+  String get exportSettingsWithSkinsTitle => 'Paramètres et thèmes';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle =>
+      'Enregistre aussi vos thèmes personnalisés de l\'application';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      'Cela remplacera vos paramètres actuels de l\'application, du gestionnaire de fichiers, du lecteur multimédia et de l\'éditeur de texte, y compris leur disposition. Vos thèmes ne sont pas affectés. Cette action est irréversible.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      'Cela remplacera vos paramètres actuels de l\'application, du gestionnaire de fichiers, du lecteur multimédia et de l\'éditeur de texte, y compris leur disposition, et ajoutera les thèmes de ce fichier. Un thème que vous possédez déjà sera remplacé par la version du fichier. Cette action est irréversible.';
 
   @override
   String get exportSettingsSuccessMessage => 'Paramètres exportés';
@@ -12556,4 +12578,50 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       'L\'éditeur de texte utilise ses propres couleurs ; les changements n\'y apparaîtront qu\'une fois qu\'il suit le thème de l\'app.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

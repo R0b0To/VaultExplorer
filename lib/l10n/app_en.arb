@@ -1545,7 +1545,7 @@
   "@exportSettingsTitle": {
     "description": "Settings row title for exporting app settings to a file"
   },
-  "exportSettingsSubtitle": "Save app behavior, security and defaults to a file. Appearance is saved from App skin.",
+  "exportSettingsSubtitle": "Save app, file manager, media player and text editor settings to a file. Custom skins are optional.",
   "@exportSettingsSubtitle": {
     "description": "Settings row subtitle for exporting app settings to a file"
   },
@@ -1553,7 +1553,7 @@
   "@importSettingsTitle": {
     "description": "Settings row title for importing app settings from a file"
   },
-  "importSettingsSubtitle": "Restore app behavior, security and defaults from a file",
+  "importSettingsSubtitle": "Restore app, file manager, media player and text editor settings from a file",
   "@importSettingsSubtitle": {
     "description": "Settings row subtitle for importing app settings from a file"
   },
@@ -1564,6 +1564,30 @@
   "importSettingsConfirmMessage": "This replaces your current app settings. Your skins and interface layout aren't affected. This can't be undone.",
   "@importSettingsConfirmMessage": {
     "description": "Confirmation dialog message before overwriting settings with an imported file"
+  },
+  "exportSettingsOnlyTitle": "Settings only",
+  "@exportSettingsOnlyTitle": {
+    "description": "Export chooser option: export settings without custom skins"
+  },
+  "exportSettingsOnlySubtitle": "App, file manager, media player and text editor settings",
+  "@exportSettingsOnlySubtitle": {
+    "description": "Subtitle of the settings-only export option, naming what the file contains"
+  },
+  "exportSettingsWithSkinsTitle": "Settings and skins",
+  "@exportSettingsWithSkinsTitle": {
+    "description": "Export chooser option: export settings together with custom skins"
+  },
+  "exportSettingsWithSkinsSubtitle": "Also saves your custom app skins",
+  "@exportSettingsWithSkinsSubtitle": {
+    "description": "Subtitle of the settings-and-skins export option"
+  },
+  "importSettingsConfirmFullMessage": "This replaces your current app, file manager, media player and text editor settings, including their layout. Your skins aren't affected. This can't be undone.",
+  "@importSettingsConfirmFullMessage": {
+    "description": "Confirmation message before importing a settings file that also restores layout and look (no skins in the file)"
+  },
+  "importSettingsConfirmFullSkinsMessage": "This replaces your current app, file manager, media player and text editor settings, including their layout, and adds the skins from this file. A skin you already have is replaced by the file's version. This can't be undone.",
+  "@importSettingsConfirmFullSkinsMessage": {
+    "description": "Confirmation message before importing a settings file that also restores layout and adds its skins"
   },
   "exportSettingsSuccessMessage": "Settings exported",
   "@exportSettingsSuccessMessage": {
@@ -14029,5 +14053,59 @@
   "skinEditEditorIndependent": "The text editor uses its own colors, so changes here will not show in it until it follows the app skin.",
   "@skinEditEditorIndependent": {
     "description": "Note shown when a text editor color is picked while the editor does not follow the app skin."
+  },
+  "cameraKeepShootingTooltip": "Keep shooting after each capture",
+  "@cameraKeepShootingTooltip": {
+    "description": "Tooltip of the camera button that keeps the camera open after a photo or video instead of opening the review screen."
+  },
+  "cameraSegmentLengthOff": "Off",
+  "@cameraSegmentLengthOff": {
+    "description": "Label of the segmented-recording menu entry that records one normal file."
+  },
+  "cameraSegmentLengthMinutes": "{minutes} min",
+  "@cameraSegmentLengthMinutes": {
+    "description": "Length of one part of a segmented recording, for example 10 min.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "cameraSegmentLengthTooltip": "Split recording into parts that save as they go",
+  "@cameraSegmentLengthTooltip": {
+    "description": "Tooltip of the menu that picks how long each part of a segmented video or audio recording is."
+  },
+  "cameraSegmentSpaceMessage": "Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.",
+  "@cameraSegmentSpaceMessage": {
+    "description": "Error shown when a segmented video recording runs out of vault space."
+  },
+  "audioSegmentedStopTitle": "Stop recording?",
+  "@audioSegmentedStopTitle": {
+    "description": "Title of the dialog shown when leaving the audio recorder during a segmented recording."
+  },
+  "audioSegmentedStopMessage": "The parts recorded so far are already saved in the vault. Stop now and save the rest?",
+  "@audioSegmentedStopMessage": {
+    "description": "Body of the dialog shown when leaving the audio recorder during a segmented recording."
+  },
+  "audioSegmentedStopAction": "Stop and save",
+  "@audioSegmentedStopAction": {
+    "description": "Confirm button that stops a segmented audio recording and saves its last part."
+  },
+  "audioUnsavedPartsTitle": "Some parts were not saved",
+  "@audioUnsavedPartsTitle": {
+    "description": "Title of the dialog shown when parts of a segmented audio recording could not be saved to the vault."
+  },
+  "audioUnsavedPartsMessage": "{count, plural, =1{1 recorded part could not be saved.} other{{count} recorded parts could not be saved.}} Free up space and try again, or discard them.",
+  "@audioUnsavedPartsMessage": {
+    "description": "Body of the dialog shown when parts of a segmented audio recording could not be saved to the vault.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "segmentRetrySave": "Try again",
+  "@segmentRetrySave": {
+    "description": "Button that retries saving recorded parts that could not be written to the vault."
   }
 }

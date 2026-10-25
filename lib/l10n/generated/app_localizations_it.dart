@@ -1171,14 +1171,14 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get exportSettingsSubtitle =>
-      'Salva comportamento, sicurezza e valori predefiniti dell\'app in un file. L\'aspetto si salva da Skin dell\'app.';
+      'Salva in un file le impostazioni dell\'app, del gestore file, del lettore multimediale e dell\'editor di testo. Le skin personalizzate sono facoltative.';
 
   @override
   String get importSettingsTitle => 'Importa impostazioni';
 
   @override
   String get importSettingsSubtitle =>
-      'Ripristina comportamento, sicurezza e valori predefiniti dell\'app da un file';
+      'Ripristina da un file le impostazioni dell\'app, del gestore file, del lettore multimediale e dell\'editor di testo';
 
   @override
   String get importSettingsConfirmTitle => 'Importare le impostazioni?';
@@ -1186,6 +1186,28 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get importSettingsConfirmMessage =>
       'Questo sostituirà le impostazioni correnti dell\'app. Le tue skin e il layout dell\'interfaccia non vengono modificati. L\'operazione non può essere annullata.';
+
+  @override
+  String get exportSettingsOnlyTitle => 'Solo impostazioni';
+
+  @override
+  String get exportSettingsOnlySubtitle =>
+      'Impostazioni dell\'app, del gestore file, del lettore multimediale e dell\'editor di testo';
+
+  @override
+  String get exportSettingsWithSkinsTitle => 'Impostazioni e skin';
+
+  @override
+  String get exportSettingsWithSkinsSubtitle =>
+      'Salva anche le tue skin personalizzate dell\'app';
+
+  @override
+  String get importSettingsConfirmFullMessage =>
+      'Questo sostituirà le impostazioni correnti dell\'app, del gestore file, del lettore multimediale e dell\'editor di testo, compreso il loro layout. Le tue skin non vengono modificate. L\'operazione non può essere annullata.';
+
+  @override
+  String get importSettingsConfirmFullSkinsMessage =>
+      'Questo sostituirà le impostazioni correnti dell\'app, del gestore file, del lettore multimediale e dell\'editor di testo, compreso il loro layout, e aggiungerà le skin di questo file. Una skin che hai già verrà sostituita dalla versione del file. L\'operazione non può essere annullata.';
 
   @override
   String get exportSettingsSuccessMessage => 'Impostazioni esportate';
@@ -12449,4 +12471,50 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get skinEditEditorIndependent =>
       'L\'editor di testo usa colori propri, quindi le modifiche non vi compariranno finché non segue la skin dell\'app.';
+
+  @override
+  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+
+  @override
+  String get cameraSegmentLengthOff => 'Off';
+
+  @override
+  String cameraSegmentLengthMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get cameraSegmentLengthTooltip =>
+      'Split recording into parts that save as they go';
+
+  @override
+  String get cameraSegmentSpaceMessage =>
+      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+
+  @override
+  String get audioSegmentedStopTitle => 'Stop recording?';
+
+  @override
+  String get audioSegmentedStopMessage =>
+      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+
+  @override
+  String get audioSegmentedStopAction => 'Stop and save';
+
+  @override
+  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+
+  @override
+  String audioUnsavedPartsMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded parts could not be saved.',
+      one: '1 recorded part could not be saved.',
+    );
+    return '$_temp0 Free up space and try again, or discard them.';
+  }
+
+  @override
+  String get segmentRetrySave => 'Try again';
 }

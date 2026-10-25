@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.camera.VaultVideoRecorder
 import java.io.File
+import java.util.concurrent.ConcurrentLinkedQueue
 
 private const val TAG = "VaultAudioRecorder"
 
@@ -42,6 +43,9 @@ class VaultAudioRecorder(private val context: Context) {
     enum class State { IDLE, RECORDING, PAUSED }
 
     companion object {
+        // MediaRecorder cannot honour a tiny size limit; never ask for less.
+        private const val MIN_SEGMENT_BYTES = 128L * 1024
+
         /**
          * Whether RECORD_AUDIO is granted. Audio-only capture needs nothing
          * else -- notably not CAMERA, which [com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession.hasPermissions]
@@ -74,13 +78,35 @@ class VaultAudioRecorder(private val context: Context) {
         }
     }
 
-    private class Detached(val recorder: MediaRecorder, val file: File, val wallMs: Long)
+    private class Detached(
+        val recorder: MediaRecorder,
+        val file: File,
+        val wallMs: Long,
+        val pendingNext: File?,
+    )
+
+    /** A closed part whose duration has not been measured yet. */
+    private class FinishedPart(val file: File, val wallMs: Long)
 
     private val lock = Any()
     private var recorder: MediaRecorder? = null
     private var tempFile: File? = null
     private var segmentStartMs = 0L
     private var accumulatedMs = 0L
+
+    // --- Segmented recording -------------------------------------------------
+    /** File handed to setNextOutputFile that the recorder has not switched to yet. */
+    private var pendingNextFile: File? = null
+
+    /** Recorded time (pauses excluded) at the moment the current part began. */
+    private var partStartRecordedMs = 0L
+
+    /** Closed parts that have not been collected by [takeSegments] yet. */
+    private val finishedParts = ConcurrentLinkedQueue<FinishedPart>()
+
+    /** How many parts have been closed since [start], collected or not. */
+    @Volatile
+    private var closedPartCount = 0
 
     @Volatile
     private var errorWhat: Int? = null
@@ -92,10 +118,11 @@ class VaultAudioRecorder(private val context: Context) {
     /** Starts a new recording with [params] (bitrate / sample rate, mono AAC).
      *  Throws if one is already in progress, or if the platform refuses to
      *  open the microphone. */
-    fun start(params: AudioRecordingParams = AudioRecordingParams.DEFAULT) {
+    fun start(params: AudioRecordingParams = AudioRecordingParams.DEFAULT, segmentSeconds: Int = 0) {
         synchronized(lock) {
             check(state == State.IDLE) { "already recording" }
         }
+        discardFinishedParts()
         val temp = File.createTempFile(AUDIO_TEMP_PREFIX, AUDIO_TEMP_SUFFIX, context.cacheDir)
         val rec = createMediaRecorder()
         try {
@@ -107,6 +134,13 @@ class VaultAudioRecorder(private val context: Context) {
             rec.setAudioSamplingRate(params.sampleRate)
             rec.setAudioChannels(1)
             rec.setOutputFile(temp.absolutePath)
+            if (segmentSeconds > 0) {
+                // The part length is enforced as a file size, which is what
+                // MediaRecorder can roll over on without dropping audio.
+                val maxBytes = ((params.bitrate / 8L) * segmentSeconds).coerceAtLeast(MIN_SEGMENT_BYTES)
+                rec.setMaxFileSize(maxBytes)
+                rec.setOnInfoListener { mr, what, _ -> onRecorderInfo(mr, what) }
+            }
             rec.setOnErrorListener { _, what, extra ->
                 // Fires for things like the media server dying or the mic
                 // being taken over (incoming call). The take is unusable
@@ -125,11 +159,14 @@ class VaultAudioRecorder(private val context: Context) {
         synchronized(lock) {
             recorder = rec
             tempFile = temp
+            pendingNextFile = null
+            partStartRecordedMs = 0L
+            closedPartCount = 0
             accumulatedMs = 0L
             segmentStartMs = SystemClock.elapsedRealtime()
             state = State.RECORDING
         }
-        VeLog.d(TAG) { "start: recording to temp file (${params.bitrate / 1000} kbps, ${params.sampleRate} Hz, mono)" }
+        VeLog.d(TAG) { "start: recording to temp file (${params.bitrate / 1000} kbps, ${params.sampleRate} Hz, mono, segmentSeconds=$segmentSeconds)" }
     }
 
     fun pause() {
@@ -171,16 +208,28 @@ class VaultAudioRecorder(private val context: Context) {
      * partial file is wiped and an exception is thrown -- the caller never
      * receives a path to a corrupt take.
      */
-    fun stop(): AudioRecordingResult {
+    fun stop(): AudioRecordingResult =
+        stopAllowingEmptyLastPart() ?: throw IllegalStateException("no audio was captured")
+
+    /**
+     * Like [stop], for segmented recordings: returns the last part (earlier
+     * parts come from [takeSegments]). A segmented recording that already
+     * closed at least one part has good earlier parts, so when its last part
+     * turns out empty or unusable this returns null instead of throwing.
+     * Without any closed part it behaves exactly like [stop].
+     */
+    fun stopAllowingEmptyLastPart(): AudioRecordingResult? {
         val detached = synchronized(lock) {
             val rec = recorder ?: throw IllegalStateException("not recording")
             val file = tempFile ?: throw IllegalStateException("no temp file")
             val wall = accumulatedMs +
                 if (state == State.RECORDING) SystemClock.elapsedRealtime() - segmentStartMs else 0L
+            val pending = pendingNextFile
             recorder = null
             tempFile = null
+            pendingNextFile = null
             state = State.IDLE
-            Detached(rec, file, wall)
+            Detached(rec, file, wall, pending)
         }
 
         var stopped = true
@@ -195,36 +244,143 @@ class VaultAudioRecorder(private val context: Context) {
             releaseQuietly(detached.recorder)
         }
 
+        // If the recorder had already switched to the next part when the stop
+        // arrived (before its callback was delivered), the part it left is
+        // finished and the new file holds the tail. The two lengths cannot be
+        // told apart from here, so the time since the part began stands in for
+        // both; it only matters if measuring the files fails.
+        var lastFile = detached.file
+        val sincePartStartMs = (detached.wallMs - partStartRecordedMs).coerceAtLeast(0L)
+        var lastWallMs = if (closedPartCount > 0) sincePartStartMs else detached.wallMs
+        val pending = detached.pendingNext
+        if (pending != null) {
+            if (stopped && pending.exists() && pending.length() > 0L) {
+                finishedParts.add(FinishedPart(detached.file, sincePartStartMs))
+                closedPartCount++
+                lastFile = pending
+                lastWallMs = sincePartStartMs
+            } else {
+                VaultVideoRecorder.secureDeleteFile(pending)
+            }
+        }
+
         val failedWith = errorWhat
-        if (!stopped || failedWith != null || !detached.file.exists() || detached.file.length() == 0L) {
-            VaultVideoRecorder.secureDeleteFile(detached.file)
+        if (!stopped || failedWith != null || !lastFile.exists() || lastFile.length() == 0L) {
+            VaultVideoRecorder.secureDeleteFile(lastFile)
+            if (closedPartCount > 0) {
+                VeLog.w(TAG) { "stop: last part unusable, keeping $closedPartCount earlier part(s)" }
+                return null
+            }
             throw IllegalStateException(
                 if (failedWith != null) "recorder error $failedWith" else "no audio was captured",
             )
         }
 
-        val duration = probeDurationMs(detached.file) ?: detached.wallMs
-        VeLog.d(TAG) { "stop: ${detached.file.length()} bytes, ${duration}ms" }
-        return AudioRecordingResult(detached.file, duration)
+        val duration = probeDurationMs(lastFile) ?: lastWallMs
+        VeLog.d(TAG) { "stop: ${lastFile.length()} bytes, ${duration}ms" }
+        return AudioRecordingResult(lastFile, duration)
     }
 
-    /** Aborts any in-progress recording and wipes its file. Safe to call
-     *  when idle. */
+    /** Aborts any in-progress recording and wipes its file, any part that was
+     *  closed but not collected yet, and the file waiting to be switched to.
+     *  Safe to call when idle. */
     fun cancel() {
         val detached = synchronized(lock) {
             val rec = recorder
             val file = tempFile
+            val pending = pendingNextFile
             recorder = null
             tempFile = null
+            pendingNextFile = null
             state = State.IDLE
-            if (rec != null && file != null) Detached(rec, file, 0L) else null
-        } ?: return
+            if (rec != null && file != null) Detached(rec, file, 0L, pending) else null
+        }
+        discardFinishedParts()
+        if (detached == null) return
         try {
             detached.recorder.stop()
         } catch (_: Exception) {
         }
         releaseQuietly(detached.recorder)
         VaultVideoRecorder.secureDeleteFile(detached.file)
+        detached.pendingNext?.let { VaultVideoRecorder.secureDeleteFile(it) }
+    }
+
+    /**
+     * Hands over (and forgets) every part closed since the last call, oldest
+     * first, each as a finished, playable file. Blocks on file I/O (it measures
+     * each part's duration), so call it off the main thread.
+     */
+    fun takeSegments(): List<AudioRecordingResult> {
+        val out = ArrayList<AudioRecordingResult>()
+        while (true) {
+            val part = finishedParts.poll() ?: break
+            if (!part.file.exists() || part.file.length() == 0L) {
+                VaultVideoRecorder.secureDeleteFile(part.file)
+                continue
+            }
+            out.add(AudioRecordingResult(part.file, probeDurationMs(part.file) ?: part.wallMs))
+        }
+        return out
+    }
+
+    /** True once at least one part of a segmented recording has been closed. */
+    val hasClosedParts: Boolean get() = closedPartCount > 0
+
+    private fun discardFinishedParts() {
+        while (true) {
+            val part = finishedParts.poll() ?: break
+            VaultVideoRecorder.secureDeleteFile(part.file)
+        }
+    }
+
+    // MediaRecorder info callback. Runs on the thread that started the
+    // recording (the platform channel's), and only touches in-memory state
+    // and a new empty temp file.
+    private fun onRecorderInfo(rec: MediaRecorder, what: Int) {
+        when (what) {
+            MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_APPROACHING -> {
+                synchronized(lock) {
+                    if (recorder === rec && pendingNextFile == null) {
+                        val next = try {
+                            File.createTempFile(AUDIO_TEMP_PREFIX, AUDIO_TEMP_SUFFIX, context.cacheDir)
+                        } catch (e: Exception) {
+                            VeLog.e(TAG, e) { "could not create the next part file" }
+                            null
+                        }
+                        if (next != null) {
+                            try {
+                                rec.setNextOutputFile(next)
+                                pendingNextFile = next
+                            } catch (e: Exception) {
+                                VeLog.e(TAG, e) { "setNextOutputFile failed" }
+                                VaultVideoRecorder.secureDeleteFile(next)
+                            }
+                        }
+                    }
+                }
+            }
+            MediaRecorder.MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED -> {
+                synchronized(lock) {
+                    val closed = tempFile
+                    val next = pendingNextFile
+                    if (recorder === rec && closed != null && next != null) {
+                        val recordedMs = accumulatedMs +
+                            if (state == State.RECORDING) SystemClock.elapsedRealtime() - segmentStartMs else 0L
+                        val partMs = (recordedMs - partStartRecordedMs).coerceAtLeast(0L)
+                        partStartRecordedMs = recordedMs
+                        tempFile = next
+                        pendingNextFile = null
+                        finishedParts.add(FinishedPart(closed, partMs))
+                        closedPartCount++
+                        VeLog.d(TAG) { "part $closedPartCount finished (~${partMs}ms)" }
+                    }
+                }
+            }
+            MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED ->
+                VeLog.w(TAG) { "part size reached without a next file; recorder stopped" }
+            else -> Unit
+        }
     }
 
     private fun createMediaRecorder(): MediaRecorder =

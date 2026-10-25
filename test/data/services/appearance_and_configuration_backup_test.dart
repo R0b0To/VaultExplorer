@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/api/vault_panic_api.dart';
@@ -17,10 +18,12 @@ import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/data/services/skin_backup_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
-// Settings -> Export is "how the app behaves"; App skin -> Export is "how it
-// looks and is laid out". These run the real services over an in-memory
-// stand-in for secure storage and check what each file contains, and what each
-// import does and does not touch.
+// Settings -> Export holds everything that was configured (app, file manager,
+// media player and text editor settings, with custom skins on request);
+// App skin -> Export shares looks on their own, with or without the layout.
+// These run the real services over an in-memory stand-in for secure storage
+// and check what each file contains, and what each import does and does not
+// touch.
 
 class _FakeFileIoApi extends VaultFileIoApi {
   _FakeFileIoApi() : super(const MethodChannel('test/file-io-api'));
@@ -70,11 +73,41 @@ class _FakePanicApi implements VaultPanicApi {
 }
 
 class _FakeLifecycleApi implements VaultLifecycleApi {
-  @override
-  Future<bool> isShareTargetEnabled() async => true;
+  bool shareTarget = true;
+  bool usbPrompt = false;
 
   @override
-  Future<void> setShareTargetEnabled(bool enabled) async {}
+  Future<bool> isShareTargetEnabled() async => shareTarget;
+
+  @override
+  Future<void> setShareTargetEnabled(bool enabled) async {
+    shareTarget = enabled;
+  }
+
+  @override
+  Future<bool> isUsbAttachPromptEnabled() async => usbPrompt;
+
+  @override
+  Future<void> setUsbAttachPromptEnabled(bool enabled) async {
+    usbPrompt = enabled;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeQuickCaptureApi implements QuickCaptureApi {
+  bool tileEnabled = true;
+
+  @override
+  Future<QuickCaptureSettingsSnapshot> getQuickCaptureSettings() async =>
+      (tileEnabled: tileEnabled);
+
+  @override
+  Future<bool> setQuickCaptureTileEnabled(bool enabled) async {
+    tileEnabled = enabled;
+    return true;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -132,8 +165,8 @@ AppSettings _settingsB() => AppSettings(
   editorAppearancePrefs: {'fontSize': 12.0},
 );
 
-FileManagerToolbarConfig _toolbarB() => FileManagerToolbarConfig.defaults()
-    .copyWith(
+FileManagerToolbarConfig _toolbarB() =>
+    FileManagerToolbarConfig.defaults().copyWith(
       gridSpacing: 4,
       useFabForToolbar: true,
       folderLayoutModes: {'b:/': 'list'},
@@ -150,6 +183,8 @@ void main() {
   late _FakeFileIoApi fileIo;
   late SettingsBackupService settingsBackup;
   late SkinBackupService skinBackup;
+  late _FakeLifecycleApi lifecycle;
+  late _FakeQuickCaptureApi quickCapture;
 
   setUp(() {
     store = {};
@@ -173,17 +208,21 @@ void main() {
     settingsService = const AppSettingsService();
     toolbarService = FileManagerToolbarService();
     fileIo = _FakeFileIoApi();
-    settingsBackup = SettingsBackupService(
-      appSettingsService: settingsService,
-      toolbarService: toolbarService,
-      fileIoApi: fileIo,
-      panicApi: _FakePanicApi(),
-      lifecycleApi: _FakeLifecycleApi(),
-    );
+    lifecycle = _FakeLifecycleApi();
+    quickCapture = _FakeQuickCaptureApi();
     skinBackup = SkinBackupService(
       appSettingsService: settingsService,
       toolbarService: toolbarService,
       fileIoApi: fileIo,
+    );
+    settingsBackup = SettingsBackupService(
+      appSettingsService: settingsService,
+      toolbarService: toolbarService,
+      skinBackupService: skinBackup,
+      fileIoApi: fileIo,
+      panicApi: _FakePanicApi(),
+      lifecycleApi: lifecycle,
+      quickCaptureApi: quickCapture,
     );
   });
 
@@ -206,75 +245,144 @@ void main() {
   Map<String, dynamic> exported() =>
       jsonDecode(fileIo.exportedContents!) as Map<String, dynamic>;
 
-  group('Settings export (configuration)', () {
-    test('contains configuration only, no interface setting', () async {
+  group('Settings export (everything configured)', () {
+    test(
+      'holds configuration, look and layout, and the native toggles',
+      () async {
+        await deviceA();
+        lifecycle.usbPrompt = true;
+        quickCapture.tileEnabled = false;
+
+        expect(await settingsBackup.exportToFile(), isTrue);
+        final bundle = exported();
+
+        expect(bundle['schemaVersion'], 5);
+        expect(bundle.containsKey('fileManagerToolbar'), isFalse);
+
+        // App settings: behavior in `appSettings`, nothing visual duplicated.
+        expect(
+          (bundle['appSettings'] as Map).keys.toSet(),
+          AppSettings().configurationToJson().keys.toSet(),
+        );
+        for (final key in [
+          ...AppSettings().interfaceToJson().keys,
+          ...AppSettings().skinsToJson().keys,
+        ]) {
+          expect(bundle['appSettings'], isNot(contains(key)), reason: key);
+        }
+
+        // File manager and media player behavior.
+        final behavior = bundle['fileManagerBehavior'] as Map<String, dynamic>;
+        expect(behavior.keys.toSet(), {
+          ...FileManagerToolbarConfig.behaviorKeys,
+          'mediaViewerToolbarConfig',
+        });
+        final viewerBehavior = behavior['mediaViewerToolbarConfig'] as Map;
+        for (final key in MediaViewerToolbarConfig.interfaceKeys) {
+          expect(viewerBehavior, isNot(contains(key)), reason: key);
+        }
+        expect(viewerBehavior, contains('loopPlaylist'));
+
+        // Look and layout: app, file manager, media player, text editor.
+        final section = bundle['interface'] as Map<String, dynamic>;
+        final app = section['app'] as Map<String, dynamic>;
+        expect(app.keys.toSet(), AppSettings().interfaceToJson().keys.toSet());
+        expect(app['themeMode'], isNotNull);
+        expect((app['editorAppearancePrefs'] as Map)['fontSize'], 18.0);
+        final fileManager = section['fileManager'] as Map<String, dynamic>;
+        expect(
+          fileManager.keys.toSet(),
+          FileManagerToolbarConfig.defaults().interfaceToJson().keys.toSet(),
+        );
+        final viewerLayout = fileManager['mediaViewerToolbarConfig'] as Map;
+        expect(viewerLayout['showProgressBar'], isFalse);
+
+        // The two toggles that live on the native side.
+        expect(bundle['usbAttachPromptEnabled'], isTrue);
+        expect(bundle['quickCaptureTileEnabled'], isFalse);
+
+        // Per-folder memory and credentials are never part of it.
+        expect(fileManager.keys, isNot(contains('folderLayoutModes')));
+        expect(fileIo.exportedContents, isNot(contains('folderLayoutModes')));
+      },
+    );
+
+    test(
+      'leaves the skins out unless asked, but records the active one',
+      () async {
+        await deviceA();
+
+        await settingsBackup.exportToFile();
+        final bundle = exported();
+
+        expect(bundle.containsKey('skins'), isFalse);
+        final active =
+            (bundle['interface'] as Map)['activeSkin'] as Map<String, dynamic>;
+        expect(active['preset'], AppSkinPreset.custom.id);
+        expect(active['skinId'], 'skin-a');
+      },
+    );
+
+    test('carries the custom skins when asked to', () async {
       await deviceA();
 
-      expect(await settingsBackup.exportToFile(), isTrue);
+      await settingsBackup.exportToFile(includeThemes: true);
       final bundle = exported();
 
-      expect(bundle['schemaVersion'], 4);
-      expect(
-        (bundle['appSettings'] as Map).keys.toSet(),
-        AppSettings().configurationToJson().keys.toSet(),
-      );
-      // Nothing visual, and no skin library, in the configuration file.
-      for (final key in [
-        ...AppSettings().interfaceToJson().keys,
-        ...AppSettings().skinsToJson().keys,
-      ]) {
-        expect(bundle['appSettings'], isNot(contains(key)), reason: key);
-      }
+      final skins = bundle['skins'] as List;
+      expect(skins, hasLength(1));
+      expect((skins.single as Map)['id'], 'skin-a');
     });
 
-    test('keeps only behavior options of the file manager', () async {
-      await deviceA();
-
-      await settingsBackup.exportToFile();
-      final bundle = exported();
-
-      expect(bundle.containsKey('fileManagerToolbar'), isFalse);
-      final behavior = bundle['fileManagerBehavior'] as Map<String, dynamic>;
-      expect(
-        behavior.keys.toSet(),
-        {...FileManagerToolbarConfig.behaviorKeys, 'mediaViewerToolbarConfig'},
-      );
-      // The media viewer's layout stays out; only its behavior is exported.
-      final viewer = behavior['mediaViewerToolbarConfig'] as Map;
-      for (final key in MediaViewerToolbarConfig.interfaceKeys) {
-        expect(viewer, isNot(contains(key)), reason: key);
-      }
-      expect(viewer, contains('loopPlaylist'));
-    });
-
-    test('importing it changes only the configuration', () async {
+    test('importing restores configuration, look and layout', () async {
       await deviceA();
       final a = await settingsService.loadSettings();
+      lifecycle.usbPrompt = true;
+      quickCapture.tileEnabled = false;
       await settingsBackup.exportToFile();
       final file = fileIo.exportedContents!;
 
       await deviceB();
-      final b = await settingsService.loadSettings();
+      lifecycle.usbPrompt = false;
+      quickCapture.tileEnabled = true;
       fileIo.toImport = file;
       final bundle = (await settingsBackup.pickAndParseFile())!;
       expect(bundle.includesInterface, isFalse);
+      expect(bundle.restoresInterface, isTrue);
+      expect(bundle.hasThemes, isFalse);
       final applied = await settingsBackup.applyImportedBundle(bundle);
 
-      // Behavior comes from the file...
+      // App settings, both halves.
       expect(applied.settings.configurationToJson(), a.configurationToJson());
+      expect(applied.settings.themeMode, ThemeMode.dark);
+      expect(applied.settings.defaultLayoutMode, BrowserLayoutMode.masonry);
+      expect(applied.settings.showStorageLocationsInDrawer, isFalse);
+      // Text editor.
+      expect(applied.settings.editorAppearancePrefs['fontSize'], 18.0);
+      expect(applied.settings.editorAppearancePrefs['showLineNumbers'], false);
+      // File manager and media player: behavior and layout.
       expect(
         applied.toolbarConfig.behaviorToJson(),
         _toolbarA().behaviorToJson(),
       );
-      // ...while this device keeps its own look, skins and folder memory.
-      expect(applied.settings.interfaceToJson(), b.interfaceToJson());
-      expect(applied.settings.skinsToJson(), b.skinsToJson());
       expect(
         applied.toolbarConfig.interfaceToJson(),
-        _toolbarB().interfaceToJson(),
+        _toolbarA().interfaceToJson(),
       );
+      expect(
+        applied.toolbarConfig.mediaViewerToolbarConfig.showProgressBar,
+        isFalse,
+      );
+      // Native toggles.
+      expect(lifecycle.usbPrompt, isTrue);
+      expect(quickCapture.tileEnabled, isFalse);
+      // Folder memory belongs to the device and is kept.
       expect(applied.toolbarConfig.folderLayoutModes, {'b:/': 'list'});
       expect(applied.toolbarConfig.folderSortModes, {'b:/': 'date'});
+      // A skin this device does not have cannot be selected, so the current
+      // selection stays.
+      expect(applied.settings.appSkinPreset, _settingsB().appSkinPreset);
+      expect(applied.settings.customAppSkins, isEmpty);
 
       // And that is what was persisted.
       AppSettingsService.invalidateCache();
@@ -283,6 +391,113 @@ void main() {
         applied.settings.toJson(),
       );
     });
+
+    test('importing with skins adds them and selects the active one', () async {
+      await deviceA();
+      await settingsBackup.exportToFile(includeThemes: true);
+      final file = fileIo.exportedContents!;
+
+      await deviceB();
+      fileIo.toImport = file;
+      final bundle = (await settingsBackup.pickAndParseFile())!;
+      expect(bundle.hasThemes, isTrue);
+      final applied = await settingsBackup.applyImportedBundle(bundle);
+
+      expect(applied.settings.customAppSkins.single.id, 'skin-a');
+      expect(applied.settings.appSkinPreset, AppSkinPreset.custom);
+      expect(applied.settings.customAppSkin.id, 'skin-a');
+    });
+
+    test('importing the same file twice does not duplicate skins', () async {
+      await deviceA();
+      await settingsBackup.exportToFile(includeThemes: true);
+      fileIo.toImport = fileIo.exportedContents;
+
+      await deviceB();
+      final first = await settingsBackup.applyImportedBundle(
+        (await settingsBackup.pickAndParseFile())!,
+      );
+      final second = await settingsBackup.applyImportedBundle(
+        (await settingsBackup.pickAndParseFile())!,
+      );
+
+      expect(first.settings.customAppSkins, hasLength(1));
+      expect(second.settings.customAppSkins, hasLength(1));
+    });
+
+    test('a skin with the same id is replaced, others are kept', () async {
+      await deviceA();
+      await settingsBackup.exportToFile(includeThemes: true);
+      fileIo.toImport = fileIo.exportedContents;
+
+      const stale = CustomAppSkin(
+        id: 'skin-a',
+        name: 'Old name',
+        lightColors: {'primary': 0xFF000000},
+        darkColors: {'primary': 0xFF000000},
+      );
+      const unrelated = CustomAppSkin(id: 'skin-z', name: 'Unrelated');
+      await settingsService.replaceSettings(
+        _settingsB().copyWith(
+          customAppSkin: stale,
+          customAppSkins: [stale, unrelated],
+        ),
+      );
+      await toolbarService.save(_toolbarB());
+
+      final applied = await settingsBackup.applyImportedBundle(
+        (await settingsBackup.pickAndParseFile())!,
+      );
+
+      final byId = {
+        for (final skin in applied.settings.customAppSkins) skin.id: skin,
+      };
+      expect(byId.keys.toSet(), {'skin-a', 'skin-z'});
+      expect(byId['skin-a']!.name, 'Dusk');
+      expect(applied.settings.customAppSkin.name, 'Dusk');
+    });
+
+    test(
+      'a file that only has configuration leaves look and skins alone',
+      () async {
+        // What schema 4 wrote: no interface section, no skins, no new toggles.
+        await deviceA();
+        final a = await settingsService.loadSettings();
+        await settingsBackup.exportToFile(includeThemes: true);
+        final v4 = exported()
+          ..['schemaVersion'] = 4
+          ..remove('interface')
+          ..remove('skins')
+          ..remove('usbAttachPromptEnabled')
+          ..remove('quickCaptureTileEnabled');
+
+        await deviceB();
+        final b = await settingsService.loadSettings();
+        lifecycle.usbPrompt = false;
+        quickCapture.tileEnabled = true;
+        fileIo.toImport = jsonEncode(v4);
+        final bundle = (await settingsBackup.pickAndParseFile())!;
+        expect(bundle.restoresInterface, isFalse);
+        expect(bundle.hasThemes, isFalse);
+        final applied = await settingsBackup.applyImportedBundle(bundle);
+
+        expect(applied.settings.configurationToJson(), a.configurationToJson());
+        expect(
+          applied.toolbarConfig.behaviorToJson(),
+          _toolbarA().behaviorToJson(),
+        );
+        expect(applied.settings.interfaceToJson(), b.interfaceToJson());
+        expect(applied.settings.skinsToJson(), b.skinsToJson());
+        expect(
+          applied.toolbarConfig.interfaceToJson(),
+          _toolbarB().interfaceToJson(),
+        );
+        expect(applied.toolbarConfig.folderLayoutModes, {'b:/': 'list'});
+        // Toggles the file does not mention are untouched.
+        expect(lifecycle.usbPrompt, isFalse);
+        expect(quickCapture.tileEnabled, isTrue);
+      },
+    );
 
     test('a file from before the split still restores everything', () async {
       final skinned = _settingsA();
@@ -297,6 +512,7 @@ void main() {
 
       final bundle = (await settingsBackup.pickAndParseFile())!;
       expect(bundle.includesInterface, isTrue);
+      expect(bundle.restoresInterface, isTrue);
       final applied = await settingsBackup.applyImportedBundle(bundle);
 
       expect(
@@ -326,6 +542,27 @@ void main() {
         throwsA(isA<InvalidSettingsBackupException>()),
       );
     });
+
+    test(
+      'rejects a file whose interface or skins section is malformed',
+      () async {
+        await deviceA();
+        await settingsBackup.exportToFile();
+        final good = exported();
+
+        fileIo.toImport = jsonEncode({...good, 'interface': 'nope'});
+        await expectLater(
+          settingsBackup.pickAndParseFile(),
+          throwsA(isA<InvalidSettingsBackupException>()),
+        );
+
+        fileIo.toImport = jsonEncode({...good, 'skins': 'nope'});
+        await expectLater(
+          settingsBackup.pickAndParseFile(),
+          throwsA(isA<InvalidSettingsBackupException>()),
+        );
+      },
+    );
   });
 
   group('App skin export (skins and interface)', () {
@@ -417,7 +654,10 @@ void main() {
       expect(applied.settings.themeMode, ThemeMode.dark);
       expect(applied.settings.defaultLayoutMode, BrowserLayoutMode.masonry);
       expect(applied.settings.showStorageLocationsInDrawer, isFalse);
-      expect(applied.settings.editorAppearancePrefs['showLineNumbers'], isFalse);
+      expect(
+        applied.settings.editorAppearancePrefs['showLineNumbers'],
+        isFalse,
+      );
       expect(applied.settings.appSkinPreset, AppSkinPreset.custom);
       expect(applied.settings.customAppSkin.id, 'skin-a');
       expect(
@@ -426,8 +666,10 @@ void main() {
       );
       // Behavior and per-device folder memory are this device's own.
       expect(applied.settings.configurationToJson(), b.configurationToJson());
-      expect(applied.settings.configurationToJson(),
-          isNot(a.configurationToJson()));
+      expect(
+        applied.settings.configurationToJson(),
+        isNot(a.configurationToJson()),
+      );
       expect(
         applied.toolbarConfig.behaviorToJson(),
         _toolbarB().behaviorToJson(),
@@ -442,23 +684,25 @@ void main() {
       expect(stored.customAppSkins.single.id, 'skin-a');
     });
 
-    test('a custom skin missing from the library keeps the current look',
-        () async {
-      await deviceA();
-      await skinBackup.exportToFile([_skin()], includeInterface: true);
-      final file = fileIo.exportedContents!;
+    test(
+      'a custom skin missing from the library keeps the current look',
+      () async {
+        await deviceA();
+        await skinBackup.exportToFile([_skin()], includeInterface: true);
+        final file = fileIo.exportedContents!;
 
-      await deviceB();
-      fileIo.toImport = file;
-      final parsed = (await skinBackup.pickAndParseFile())!;
-      // Skins deliberately NOT added to this device.
-      final applied = await skinBackup.applyInterface(
-        parsed.interfaceSettings!,
-      );
+        await deviceB();
+        fileIo.toImport = file;
+        final parsed = (await skinBackup.pickAndParseFile())!;
+        // Skins deliberately NOT added to this device.
+        final applied = await skinBackup.applyInterface(
+          parsed.interfaceSettings!,
+        );
 
-      expect(applied.settings.appSkinPreset, AppSkinPreset.defaultSkin);
-      expect(applied.settings.themeMode, ThemeMode.dark);
-    });
+        expect(applied.settings.appSkinPreset, AppSkinPreset.defaultSkin);
+        expect(applied.settings.themeMode, ThemeMode.dark);
+      },
+    );
 
     test('a skins-only file parses without interface settings', () async {
       await deviceA();
@@ -490,10 +734,7 @@ void main() {
         'interface': {'app': 'nope'},
       });
 
-      expect(
-        skinBackup.pickAndParseFile(),
-        throwsA(isA<FormatException>()),
-      );
+      expect(skinBackup.pickAndParseFile(), throwsA(isA<FormatException>()));
     });
   });
 }

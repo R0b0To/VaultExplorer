@@ -85,9 +85,10 @@ class AppliedInterface {
 /// columns and the media viewer's button layout.
 ///
 /// How the app *behaves* (locks, defaults, playback, language, ...) is not in
-/// here; that is Settings -> Export ([SettingsBackupService]). A skin that is
-/// exported on its own, or one of several, never carries an `interface`
-/// section, so it stays safe to share.
+/// here; that is Settings -> Export ([SettingsBackupService]), which also
+/// carries this same `interface` section so that one file can restore
+/// everything. A skin that is exported on its own, or one of several, never
+/// carries an `interface` section, so it stays safe to share.
 ///
 /// Importing is additive for skins (see
 /// [AppSkinSettingsNotifier.addImportedSkins]) and a replace for the interface
@@ -122,29 +123,37 @@ class SkinBackupService {
     };
 
     if (includeInterface) {
-      // Loading through the editor service first migrates preferences that
-      // still sit in the editor's old standalone file, and yields the
-      // defaults when the person never changed anything.
-      final editor = await const TextEditorAppearanceService().load();
-      final settings = await _appSettingsService.loadSettings();
-      final toolbar = await _toolbarService.load();
-      // The toolbar config owns the file-manager skin override; the copy in
-      // AppSettings mirrors it (see FileManagerToolbarSettings.setSkin).
-      final interfaceSettings = settings.copyWith(
-        fileManagerSkin: toolbar.skin,
-        editorAppearancePrefs: editor.toJson(),
-      );
-      payload['interface'] = {
-        'activeSkin': {
-          'preset': settings.appSkinPreset.id,
-          if (settings.appSkinPreset == AppSkinPreset.custom)
-            'skinId': settings.customAppSkin.id,
-        },
-        'app': interfaceSettings.interfaceToJson(),
-        'fileManager': toolbar.interfaceToJson(),
-      };
+      payload['interface'] = await buildInterfaceSection();
     }
     return const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
+  /// The `interface` section of this device, in the shape [exportToFile]
+  /// writes and [parseInterfaceSection] reads. Shared with Settings -> Export
+  /// ([SettingsBackupService]), which carries the same section so that one
+  /// file can hold everything.
+  Future<Map<String, dynamic>> buildInterfaceSection() async {
+    // Loading through the editor service first migrates preferences that
+    // still sit in the editor's old standalone file, and yields the
+    // defaults when the person never changed anything.
+    final editor = await const TextEditorAppearanceService().load();
+    final settings = await _appSettingsService.loadSettings();
+    final toolbar = await _toolbarService.load();
+    // The toolbar config owns the file-manager skin override; the copy in
+    // AppSettings mirrors it (see FileManagerToolbarSettings.setSkin).
+    final interfaceSettings = settings.copyWith(
+      fileManagerSkin: toolbar.skin,
+      editorAppearancePrefs: editor.toJson(),
+    );
+    return {
+      'activeSkin': {
+        'preset': settings.appSkinPreset.id,
+        if (settings.appSkinPreset == AppSkinPreset.custom)
+          'skinId': settings.customAppSkin.id,
+      },
+      'app': interfaceSettings.interfaceToJson(),
+      'fileManager': toolbar.interfaceToJson(),
+    };
   }
 
   /// Opens the system "save as" picker. Returns false if the person cancelled,
@@ -179,7 +188,7 @@ class SkinBackupService {
     if (decoded is Map && decoded['skins'] is List) {
       payloads.addAll(decoded['skins'] as List);
       if (decoded.containsKey('interface')) {
-        interfaceSettings = _parseInterface(decoded['interface']);
+        interfaceSettings = parseInterfaceSection(decoded['interface']);
       }
     } else if (decoded is Map && decoded['skin'] is Map) {
       payloads.add(decoded['skin']);
@@ -249,7 +258,9 @@ class SkinBackupService {
   }
 }
 
-ImportedInterface _parseInterface(Object? raw) {
+/// Parses the `interface` section of a skin or settings file. Throws a
+/// [FormatException] when it is not a valid section.
+ImportedInterface parseInterfaceSection(Object? raw) {
   const invalid = FormatException(
     'This file does not contain valid interface settings.',
   );
@@ -275,6 +286,15 @@ ImportedInterface _parseInterface(Object? raw) {
     activePreset: preset,
     activeSkinId: skinId,
   );
+}
+
+/// Parses a `skins` list (skin file or settings file). Throws a
+/// [FormatException] when it is not a list of skins.
+List<CustomAppSkin> parseSkinList(Object? raw) {
+  if (raw is! List || raw.any((value) => !_isSkinPayload(value))) {
+    throw const FormatException('This file does not contain an app skin.');
+  }
+  return raw.map(CustomAppSkin.fromJson).toList();
 }
 
 bool _isSkinPayload(Object? value) =>

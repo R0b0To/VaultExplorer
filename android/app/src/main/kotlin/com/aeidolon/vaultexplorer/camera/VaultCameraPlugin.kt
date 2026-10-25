@@ -277,13 +277,21 @@ class VaultCameraPlugin(
                 "startVideoRecording" -> withSession(call, result) { session, args ->
                     val volId = (args["volId"] as? Number)?.toInt() ?: return@withSession result.error("bad_args", "volId required", null)
                     val path = args["virtualPath"] as? String ?: return@withSession result.error("bad_args", "virtualPath required", null)
-                    VeLog.d(TAG) { "startVideoRecording (pathLen=${path.length})" }
-                    session.startRecording(volId, path) { ok, error ->
+                    val segmentSeconds = ((args["segmentSeconds"] as? Number)?.toInt() ?: 0).coerceIn(0, 4 * 60 * 60)
+                    VeLog.d(TAG) { "startVideoRecording (pathLen=${path.length}, segmentSeconds=$segmentSeconds)" }
+                    session.startRecording(volId, path, segmentSeconds) { ok, error ->
                         mainHandler.post {
                             VeLog.d(TAG) { "startVideoRecording result: ok=$ok error=$error" }
                             result.success(mapOf("success" to ok, "error" to error))
                         }
                     }
+                }
+                "takeVideoSegments" -> withSession(call, result) { session, _ ->
+                    result.success(
+                        session.takeVideoSegments().map {
+                            mapOf<String, Any?>("path" to it.path, "durationMs" to it.durationMs)
+                        }
+                    )
                 }
                 "startVideoRecordingToScratchpad" -> withSession(call, result) { session, args ->
                     val scratchpadPath = args["scratchpadPath"] as? String

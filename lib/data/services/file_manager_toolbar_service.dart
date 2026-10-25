@@ -15,7 +15,7 @@ const _secure = AppSecureStorage.instance;
 /// keyed by `containerUri:dirPath` (see
 /// [FileManagerToolbarConfig.folderKey]) -- genuinely per-container path
 /// data, the same category of thing [SettingsBackupService]'s export
-/// already strips out. Encrypting the whole blob is simpler and more
+/// already leaves out. Encrypting the whole blob is simpler and more
 /// robust than trying to selectively encrypt just those three maps while
 /// leaving the rest of the config in a plain file.
 const _kToolbarConfigBlob = 'file_manager_toolbar_blob_v1';

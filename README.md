@@ -55,7 +55,7 @@ Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 - **USB OTG** — read and write USB drives without root
 - **Create and format** new volumes on device storage or a USB drive, with an optional randomness pad that mixes your touch movements into the keys and salts alongside the device's secure random generator
 - **Up to 8 volumes** mounted at once
-- **Themes and settings** — 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), Default and OLED skins, a custom skin editor with per-page colors, Material You colors, a built-in Logcat viewer, and settings export/import (preferences and file manager layout only; never passwords, keys, or the container list)
+- **Themes and settings** — 11 languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Spanish, Ukrainian), Default and OLED skins, a custom skin editor with per-page colors, Material You colors, a built-in Logcat viewer, and settings export/import (app, file manager, media player and text editor settings, with custom skins optional; never passwords, keys, or the container list)
 
 ### Tools tab
 

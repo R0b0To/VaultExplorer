@@ -12374,4 +12374,65 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'Mover para a lista do menu';
+
+  @override
+  String get skinEditStarted =>
+      'O editor de skins está ativo. Use os botões flutuantes em qualquer tela para escolher uma cor e alterá-la.';
+
+  @override
+  String get skinEditSaved => 'Skin salva';
+
+  @override
+  String get skinEditPickTooltip => 'Escolher um elemento para recolorir';
+
+  @override
+  String get skinEditPickStopTooltip =>
+      'Parar de escolher e usar o app normalmente';
+
+  @override
+  String get skinEditDoneTooltip => 'Salvar e fechar o editor de skins';
+
+  @override
+  String get skinEditHint =>
+      'Toque em qualquer elemento para mudar sua cor. Toque no conta-gotas novamente para usar o app normalmente.';
+
+  @override
+  String get skinEditLayersTitle => 'Cores neste ponto';
+
+  @override
+  String get skinEditAlsoUsedBy => 'A mesma cor também é usada por';
+
+  @override
+  String get skinEditClosest =>
+      'Não há correspondência exata para esta cor; esta é a cor da skin mais próxima.';
+
+  @override
+  String get skinEditNoMatch =>
+      'Este ponto não usa diretamente uma cor da skin. Escolha uma cor na lista.';
+
+  @override
+  String get skinEditAllColors => 'Todas as cores';
+
+  @override
+  String get skinEditBackToEditor => 'Voltar ao editor de cores';
+
+  @override
+  String get skinEditStatusInherited => 'Herdada';
+
+  @override
+  String get skinEditReset => 'Redefinir';
+
+  @override
+  String get skinEditMoreOptions => 'Todas as cores e opções';
+
+  @override
+  String get skinEditCollapse => 'Recolher painel';
+
+  @override
+  String get skinEditExpand => 'Expandir painel';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Cores de $page';
+  }
 }

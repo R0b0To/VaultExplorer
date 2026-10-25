@@ -36,6 +36,12 @@ class SkinAreaScope extends StatefulWidget {
   static SkinAreaColors? maybeColorsOf(BuildContext context) =>
       _SkinAreaMarker.maybeOf(context)?.colors;
 
+  /// Like [maybeColorsOf], but does not subscribe [context] to changes. For
+  /// code that inspects an arbitrary element once (the skin editor's element
+  /// picker) rather than building from it.
+  static SkinAreaColors? peekColorsOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_SkinAreaMarker>()?.colors;
+
   /// The resolved color of [token] on the current page, or [fallback] when the
   /// context is not inside a [SkinAreaScope].
   static Color colorOf(

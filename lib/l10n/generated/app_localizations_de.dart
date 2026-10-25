@@ -12380,4 +12380,65 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'In die Menüliste verschieben';
+
+  @override
+  String get skinEditStarted =>
+      'Skin-Editor ist aktiv. Nutze die schwebenden Schaltflächen auf jedem Bildschirm, um eine Farbe auszuwählen und zu ändern.';
+
+  @override
+  String get skinEditSaved => 'Skin gespeichert';
+
+  @override
+  String get skinEditPickTooltip => 'Element zum Umfärben auswählen';
+
+  @override
+  String get skinEditPickStopTooltip =>
+      'Auswahl beenden und App normal bedienen';
+
+  @override
+  String get skinEditDoneTooltip => 'Speichern und Skin-Editor schließen';
+
+  @override
+  String get skinEditHint =>
+      'Tippe auf ein Element, um seine Farbe zu ändern. Tippe erneut auf die Pipette, um die App normal zu bedienen.';
+
+  @override
+  String get skinEditLayersTitle => 'Farben an dieser Stelle';
+
+  @override
+  String get skinEditAlsoUsedBy => 'Dieselbe Farbe wird auch verwendet von';
+
+  @override
+  String get skinEditClosest =>
+      'Keine exakte Übereinstimmung für diese Farbe – das ist die ähnlichste Skin-Farbe.';
+
+  @override
+  String get skinEditNoMatch =>
+      'Diese Stelle verwendet keine Skin-Farbe direkt. Wähle eine Farbe aus der Liste.';
+
+  @override
+  String get skinEditAllColors => 'Alle Farben';
+
+  @override
+  String get skinEditBackToEditor => 'Zurück zum Farbeditor';
+
+  @override
+  String get skinEditStatusInherited => 'Geerbt';
+
+  @override
+  String get skinEditReset => 'Zurücksetzen';
+
+  @override
+  String get skinEditMoreOptions => 'Alle Farben und Optionen';
+
+  @override
+  String get skinEditCollapse => 'Bereich einklappen';
+
+  @override
+  String get skinEditExpand => 'Bereich ausklappen';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Farben auf $page';
+  }
 }

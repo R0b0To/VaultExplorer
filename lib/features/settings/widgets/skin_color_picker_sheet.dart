@@ -174,7 +174,7 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
                             ),
                           ),
                         ),
-                        _ColorSample(color: _color),
+                        SkinColorSample(color: _color),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -188,7 +188,7 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
                     Center(
                       child: SizedBox.square(
                         dimension: wheelSize,
-                        child: _HsvWheel(
+                        child: SkinHsvWheel(
                           value: _selected,
                           onChanged: _updateHsv,
                         ),
@@ -230,7 +230,7 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
                       runSpacing: 11,
                       children: [
                         for (final color in kSkinPalette)
-                          _Swatch(
+                          SkinColorSwatch(
                             color: color,
                             selected: _color.toARGB32() == color.toARGB32(),
                             onTap: () => _updateColor(color),
@@ -278,7 +278,7 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
                               const SizedBox(width: 12),
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
-                                child: _ColorSample(
+                                child: SkinColorSample(
                                   color: _typedColor ?? Colors.transparent,
                                 ),
                               ),
@@ -328,17 +328,23 @@ class _SkinColorPickerSheetState extends State<_SkinColorPickerSheet> {
   }
 }
 
-class _HsvWheel extends StatefulWidget {
+/// The hue ring with a saturation/brightness square inside it. Shared by the
+/// color picker sheet and the floating skin picker.
+class SkinHsvWheel extends StatefulWidget {
   final HSVColor value;
   final ValueChanged<HSVColor> onChanged;
 
-  const _HsvWheel({required this.value, required this.onChanged});
+  const SkinHsvWheel({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
 
   @override
-  State<_HsvWheel> createState() => _HsvWheelState();
+  State<SkinHsvWheel> createState() => _SkinHsvWheelState();
 }
 
-class _HsvWheelState extends State<_HsvWheel> {
+class _SkinHsvWheelState extends State<SkinHsvWheel> {
   _WheelDragMode? _dragMode;
 
   void _start(Offset position, Size size) {
@@ -547,10 +553,11 @@ class _HsvWheelPainter extends CustomPainter {
       oldDelegate.value != value;
 }
 
-class _ColorSample extends StatelessWidget {
+/// A round preview of a color.
+class SkinColorSample extends StatelessWidget {
   final Color color;
 
-  const _ColorSample({required this.color});
+  const SkinColorSample({super.key, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -577,12 +584,14 @@ class _ColorSample extends StatelessWidget {
   }
 }
 
-class _Swatch extends StatelessWidget {
+/// A tappable round color choice.
+class SkinColorSwatch extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
 
-  const _Swatch({
+  const SkinColorSwatch({
+    super.key,
     required this.color,
     required this.selected,
     required this.onTap,

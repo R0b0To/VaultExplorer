@@ -11510,4 +11510,60 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => '移到菜单列表';
+
+  @override
+  String get skinEditStarted => '皮肤编辑器已开启。在任意界面使用悬浮按钮即可选取并更改颜色。';
+
+  @override
+  String get skinEditSaved => '皮肤已保存';
+
+  @override
+  String get skinEditPickTooltip => '选取要更改颜色的元素';
+
+  @override
+  String get skinEditPickStopTooltip => '停止选取，正常使用应用';
+
+  @override
+  String get skinEditDoneTooltip => '保存并关闭皮肤编辑器';
+
+  @override
+  String get skinEditHint => '点按任意元素即可更改其颜色。再次点按吸管可正常使用应用。';
+
+  @override
+  String get skinEditLayersTitle => '此处的颜色';
+
+  @override
+  String get skinEditAlsoUsedBy => '同一颜色还用于';
+
+  @override
+  String get skinEditClosest => '此颜色没有完全匹配的皮肤颜色，这是最接近的一个。';
+
+  @override
+  String get skinEditNoMatch => '此处没有直接使用皮肤颜色。请从列表中选择颜色。';
+
+  @override
+  String get skinEditAllColors => '所有颜色';
+
+  @override
+  String get skinEditBackToEditor => '返回颜色编辑器';
+
+  @override
+  String get skinEditStatusInherited => '继承';
+
+  @override
+  String get skinEditReset => '重置';
+
+  @override
+  String get skinEditMoreOptions => '所有颜色和选项';
+
+  @override
+  String get skinEditCollapse => '收起面板';
+
+  @override
+  String get skinEditExpand => '展开面板';
+
+  @override
+  String skinEditPageColors(String page) {
+    return '$page的颜色';
+  }
 }

@@ -12485,4 +12485,65 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'Déplacer vers la liste du menu';
+
+  @override
+  String get skinEditStarted =>
+      'L\'éditeur de thème est activé. Utilisez les boutons flottants sur n\'importe quel écran pour choisir une couleur et la modifier.';
+
+  @override
+  String get skinEditSaved => 'Thème enregistré';
+
+  @override
+  String get skinEditPickTooltip => 'Choisir un élément à recolorer';
+
+  @override
+  String get skinEditPickStopTooltip =>
+      'Arrêter la sélection et utiliser l\'app normalement';
+
+  @override
+  String get skinEditDoneTooltip => 'Enregistrer et fermer l\'éditeur de thème';
+
+  @override
+  String get skinEditHint =>
+      'Touchez un élément pour changer sa couleur. Touchez à nouveau la pipette pour utiliser l\'app normalement.';
+
+  @override
+  String get skinEditLayersTitle => 'Couleurs à cet endroit';
+
+  @override
+  String get skinEditAlsoUsedBy => 'La même couleur est aussi utilisée par';
+
+  @override
+  String get skinEditClosest =>
+      'Aucune correspondance exacte pour cette couleur ; voici la couleur du thème la plus proche.';
+
+  @override
+  String get skinEditNoMatch =>
+      'Cet endroit n\'utilise pas directement une couleur du thème. Choisissez une couleur dans la liste.';
+
+  @override
+  String get skinEditAllColors => 'Toutes les couleurs';
+
+  @override
+  String get skinEditBackToEditor => 'Retour à l\'éditeur de couleur';
+
+  @override
+  String get skinEditStatusInherited => 'Héritée';
+
+  @override
+  String get skinEditReset => 'Réinitialiser';
+
+  @override
+  String get skinEditMoreOptions => 'Toutes les couleurs et options';
+
+  @override
+  String get skinEditCollapse => 'Réduire le panneau';
+
+  @override
+  String get skinEditExpand => 'Développer le panneau';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Couleurs de $page';
+  }
 }

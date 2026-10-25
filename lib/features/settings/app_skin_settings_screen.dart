@@ -9,8 +9,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/skin_backup_service.dart';
 import 'package:vaultexplorer/features/settings/settings_live_refresh.dart';
 import 'package:vaultexplorer/features/settings/custom_app_skin_screen.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
 
 class AppSkinSettingsScreen extends ConsumerWidget {
   final bool showFileManagerSkinShortcut;
@@ -166,19 +165,7 @@ class AppSkinSettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     CustomAppSkin skin,
   ) async {
-    final notifier = ref.read(appSkinSettingsProvider.notifier);
-    await notifier.activateCustomSkin(skin);
-    if (!context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SkinAreaScope(
-          area: SkinArea.settings,
-          child: CustomAppSkinScreen(
-            showFileManagerSkinShortcut: showFileManagerSkinShortcut,
-          ),
-        ),
-      ),
-    );
+    await beginSkinEditing(context, ref, skin);
   }
 
   Future<void> _removeSkin(
@@ -276,17 +263,7 @@ class AppSkinSettingsScreen extends ConsumerWidget {
                           ).copyWith(id: createCustomAppSkinId());
                     await notifier.saveCustomSkin(skin);
                     if (!context.mounted) return;
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SkinAreaScope(
-                          area: SkinArea.settings,
-                          child: CustomAppSkinScreen(
-                            showFileManagerSkinShortcut:
-                                showFileManagerSkinShortcut,
-                          ),
-                        ),
-                      ),
-                    );
+                    await beginSkinEditing(context, ref, skin);
                   },
                 ),
                 const SizedBox(height: 12),

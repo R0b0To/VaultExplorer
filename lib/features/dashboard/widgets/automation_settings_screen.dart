@@ -736,17 +736,7 @@ class _AutomationSettingsScreenState
           ),
         ],
       ),
-      const SizedBox(height: 8),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text(
-          l10n.automationDocCommentFootnote,
-          style: textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            height: 1.4,
-          ),
-        ),
-      ),
+     
       const SizedBox(height: 12),
       Material(
         color: Colors.transparent,

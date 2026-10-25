@@ -13940,5 +13940,82 @@
   "itemActionsMoveToMenuList": "Move to menu list",
   "@itemActionsMoveToMenuList": {
     "description": "Tooltip of the button that moves an item action from the quick actions row into the item sheet menu list"
+  },
+  "skinEditStarted": "Skin editor is on. Use the floating buttons on any screen to pick a color and change it.",
+  "@skinEditStarted": {
+    "description": "Snackbar shown when the floating skin editor starts."
+  },
+  "skinEditSaved": "Skin saved",
+  "@skinEditSaved": {
+    "description": "Snackbar shown after the floating skin editor is closed and the skin was saved."
+  },
+  "skinEditPickTooltip": "Pick an element to recolor",
+  "@skinEditPickTooltip": {
+    "description": "Tooltip of the floating button that turns element picking on."
+  },
+  "skinEditPickStopTooltip": "Stop picking and use the app normally",
+  "@skinEditPickStopTooltip": {
+    "description": "Tooltip of the floating button that turns element picking off again."
+  },
+  "skinEditDoneTooltip": "Save and close the skin editor",
+  "@skinEditDoneTooltip": {
+    "description": "Tooltip of the floating button that saves the skin and closes the editor."
+  },
+  "skinEditHint": "Tap any element to change its color. Tap the eyedropper again to use the app normally.",
+  "@skinEditHint": {
+    "description": "Hint in the skin editor panel before an element was picked."
+  },
+  "skinEditLayersTitle": "Colors at this spot",
+  "@skinEditLayersTitle": {
+    "description": "Heading above the list of colors painted where the user tapped."
+  },
+  "skinEditAlsoUsedBy": "The same color is also used by",
+  "@skinEditAlsoUsedBy": {
+    "description": "Heading above other skin colors that currently have the same value as the picked one."
+  },
+  "skinEditClosest": "No exact match for this paint, so this is the closest skin color.",
+  "@skinEditClosest": {
+    "description": "Note shown when the tapped color only approximately matches a skin color."
+  },
+  "skinEditNoMatch": "This spot doesn't use a skin color directly. Choose a color from the list.",
+  "@skinEditNoMatch": {
+    "description": "Message shown when the tapped spot matches no skin color."
+  },
+  "skinEditAllColors": "All colors",
+  "@skinEditAllColors": {
+    "description": "Button that shows every editable color of the current page."
+  },
+  "skinEditBackToEditor": "Back to the color editor",
+  "@skinEditBackToEditor": {
+    "description": "Button that returns from the list of all colors to the color editor."
+  },
+  "skinEditStatusInherited": "Inherited",
+  "@skinEditStatusInherited": {
+    "description": "Status of a skin color that has no custom value and follows the shared palette or default."
+  },
+  "skinEditReset": "Reset",
+  "@skinEditReset": {
+    "description": "Button that clears a custom skin color back to its default."
+  },
+  "skinEditMoreOptions": "All colors and options",
+  "@skinEditMoreOptions": {
+    "description": "Tooltip of the button that opens the full skin customization page."
+  },
+  "skinEditCollapse": "Collapse panel",
+  "@skinEditCollapse": {
+    "description": "Tooltip of the button that collapses the floating skin editor panel."
+  },
+  "skinEditExpand": "Expand panel",
+  "@skinEditExpand": {
+    "description": "Tooltip of the button that expands the floating skin editor panel."
+  },
+  "skinEditPageColors": "Colors on {page}",
+  "@skinEditPageColors": {
+    "description": "Heading above the editable colors of one page, for example Colors on Files.",
+    "placeholders": {
+      "page": {
+        "type": "String"
+      }
+    }
   }
 }

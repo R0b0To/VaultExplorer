@@ -20658,6 +20658,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move to menu list'**
   String get itemActionsMoveToMenuList;
+
+  /// Snackbar shown when the floating skin editor starts.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin editor is on. Use the floating buttons on any screen to pick a color and change it.'**
+  String get skinEditStarted;
+
+  /// Snackbar shown after the floating skin editor is closed and the skin was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin saved'**
+  String get skinEditSaved;
+
+  /// Tooltip of the floating button that turns element picking on.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an element to recolor'**
+  String get skinEditPickTooltip;
+
+  /// Tooltip of the floating button that turns element picking off again.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop picking and use the app normally'**
+  String get skinEditPickStopTooltip;
+
+  /// Tooltip of the floating button that saves the skin and closes the editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and close the skin editor'**
+  String get skinEditDoneTooltip;
+
+  /// Hint in the skin editor panel before an element was picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap any element to change its color. Tap the eyedropper again to use the app normally.'**
+  String get skinEditHint;
+
+  /// Heading above the list of colors painted where the user tapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors at this spot'**
+  String get skinEditLayersTitle;
+
+  /// Heading above other skin colors that currently have the same value as the picked one.
+  ///
+  /// In en, this message translates to:
+  /// **'The same color is also used by'**
+  String get skinEditAlsoUsedBy;
+
+  /// Note shown when the tapped color only approximately matches a skin color.
+  ///
+  /// In en, this message translates to:
+  /// **'No exact match for this paint, so this is the closest skin color.'**
+  String get skinEditClosest;
+
+  /// Message shown when the tapped spot matches no skin color.
+  ///
+  /// In en, this message translates to:
+  /// **'This spot doesn\'t use a skin color directly. Choose a color from the list.'**
+  String get skinEditNoMatch;
+
+  /// Button that shows every editable color of the current page.
+  ///
+  /// In en, this message translates to:
+  /// **'All colors'**
+  String get skinEditAllColors;
+
+  /// Button that returns from the list of all colors to the color editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the color editor'**
+  String get skinEditBackToEditor;
+
+  /// Status of a skin color that has no custom value and follows the shared palette or default.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherited'**
+  String get skinEditStatusInherited;
+
+  /// Button that clears a custom skin color back to its default.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get skinEditReset;
+
+  /// Tooltip of the button that opens the full skin customization page.
+  ///
+  /// In en, this message translates to:
+  /// **'All colors and options'**
+  String get skinEditMoreOptions;
+
+  /// Tooltip of the button that collapses the floating skin editor panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse panel'**
+  String get skinEditCollapse;
+
+  /// Tooltip of the button that expands the floating skin editor panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand panel'**
+  String get skinEditExpand;
+
+  /// Heading above the editable colors of one page, for example Colors on Files.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors on {page}'**
+  String skinEditPageColors(String page);
 }
 
 class _AppLocalizationsDelegate

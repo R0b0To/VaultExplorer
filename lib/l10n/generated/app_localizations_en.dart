@@ -12190,4 +12190,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'Move to menu list';
+
+  @override
+  String get skinEditStarted =>
+      'Skin editor is on. Use the floating buttons on any screen to pick a color and change it.';
+
+  @override
+  String get skinEditSaved => 'Skin saved';
+
+  @override
+  String get skinEditPickTooltip => 'Pick an element to recolor';
+
+  @override
+  String get skinEditPickStopTooltip => 'Stop picking and use the app normally';
+
+  @override
+  String get skinEditDoneTooltip => 'Save and close the skin editor';
+
+  @override
+  String get skinEditHint =>
+      'Tap any element to change its color. Tap the eyedropper again to use the app normally.';
+
+  @override
+  String get skinEditLayersTitle => 'Colors at this spot';
+
+  @override
+  String get skinEditAlsoUsedBy => 'The same color is also used by';
+
+  @override
+  String get skinEditClosest =>
+      'No exact match for this paint, so this is the closest skin color.';
+
+  @override
+  String get skinEditNoMatch =>
+      'This spot doesn\'t use a skin color directly. Choose a color from the list.';
+
+  @override
+  String get skinEditAllColors => 'All colors';
+
+  @override
+  String get skinEditBackToEditor => 'Back to the color editor';
+
+  @override
+  String get skinEditStatusInherited => 'Inherited';
+
+  @override
+  String get skinEditReset => 'Reset';
+
+  @override
+  String get skinEditMoreOptions => 'All colors and options';
+
+  @override
+  String get skinEditCollapse => 'Collapse panel';
+
+  @override
+  String get skinEditExpand => 'Expand panel';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Colors on $page';
+  }
 }

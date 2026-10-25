@@ -3,7 +3,11 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/data/models/app_skin_preset.dart';
+import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
+import 'package:vaultexplorer/features/skin_editor/skin_editor_overlay.dart';
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -31,6 +35,13 @@ class VaultExplorerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appSkin = ref.watch(appSkinSettingsProvider);
+    // While a skin is being edited the whole app is drawn from the live draft
+    // (always as a custom skin), so every change shows on every page at once.
+    final editSession = ref.watch(skinEditSessionProvider);
+    final skinPreset = editSession == null
+        ? appSkin.preset
+        : AppSkinPreset.custom;
+    final customSkin = editSession?.draft ?? appSkin.customAppSkin;
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
         return ValueListenableBuilder<ThemeMode>(
@@ -47,11 +58,12 @@ class VaultExplorerApp extends ConsumerWidget {
                         lightDynamic != null &&
                         darkDynamic != null;
                     return MaterialApp(
+                      navigatorKey: appNavigatorKey,
                       debugShowCheckedModeBanner: false,
                       theme: buildLightTheme(
                         dynamicScheme: useDynamic ? lightDynamic : null,
-                        appSkin: appSkin.preset,
-                        customAppSkin: appSkin.customAppSkin,
+                        appSkin: skinPreset,
+                        customAppSkin: customSkin,
                         manualFileManagerSkin: appSkin.fileManagerSkin,
                         fileManagerFollowsAppSkin:
                             appSkin.fileManagerFollowsAppSkin,
@@ -59,14 +71,24 @@ class VaultExplorerApp extends ConsumerWidget {
                       ),
                       darkTheme: buildDarkTheme(
                         dynamicScheme: useDynamic ? darkDynamic : null,
-                        appSkin: appSkin.preset,
-                        customAppSkin: appSkin.customAppSkin,
+                        appSkin: skinPreset,
+                        customAppSkin: customSkin,
                         manualFileManagerSkin: appSkin.fileManagerSkin,
                         fileManagerFollowsAppSkin:
                             appSkin.fileManagerFollowsAppSkin,
                         editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
                       ),
-                      themeMode: themeMode,
+                      // The editor can show the other palette without touching
+                      // the saved theme mode, and a theme change must not
+                      // animate: dragging the color wheel changes it every frame.
+                      themeMode: switch (editSession?.forcedBrightness) {
+                        Brightness.dark => ThemeMode.dark,
+                        Brightness.light => ThemeMode.light,
+                        null => themeMode,
+                      },
+                      themeAnimationDuration: Duration(
+                        milliseconds: editSession == null ? 200 : 0,
+                      ),
                       locale: locale,
 
                       localizationsDelegates: [
@@ -99,7 +121,9 @@ class VaultExplorerApp extends ConsumerWidget {
                                     )
                                     .resetAllAutoCloseTimers();
                               },
-                              child: child ?? const SizedBox.shrink(),
+                              child: SkinEditorHost(
+                                child: child ?? const SizedBox.shrink(),
+                              ),
                             );
                           },
                         );

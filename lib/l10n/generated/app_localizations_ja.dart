@@ -11694,4 +11694,60 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'メニューリストに移動';
+
+  @override
+  String get skinEditStarted => 'スキンエディターがオンになりました。どの画面でも浮かぶボタンで色を選んで変更できます。';
+
+  @override
+  String get skinEditSaved => 'スキンを保存しました';
+
+  @override
+  String get skinEditPickTooltip => '色を変える要素を選ぶ';
+
+  @override
+  String get skinEditPickStopTooltip => '選択を終了して通常どおりアプリを操作';
+
+  @override
+  String get skinEditDoneTooltip => '保存してスキンエディターを閉じる';
+
+  @override
+  String get skinEditHint => '要素をタップすると色を変更できます。スポイトをもう一度タップすると通常どおり操作できます。';
+
+  @override
+  String get skinEditLayersTitle => 'この位置の色';
+
+  @override
+  String get skinEditAlsoUsedBy => '同じ色は次でも使われています';
+
+  @override
+  String get skinEditClosest => 'この色と完全に一致するスキンカラーはありません。最も近い色です。';
+
+  @override
+  String get skinEditNoMatch => 'この位置ではスキンカラーが直接使われていません。リストから色を選んでください。';
+
+  @override
+  String get skinEditAllColors => 'すべての色';
+
+  @override
+  String get skinEditBackToEditor => 'カラーエディターに戻る';
+
+  @override
+  String get skinEditStatusInherited => '継承';
+
+  @override
+  String get skinEditReset => 'リセット';
+
+  @override
+  String get skinEditMoreOptions => 'すべての色とオプション';
+
+  @override
+  String get skinEditCollapse => 'パネルを折りたたむ';
+
+  @override
+  String get skinEditExpand => 'パネルを展開';
+
+  @override
+  String skinEditPageColors(String page) {
+    return '$pageの色';
+  }
 }

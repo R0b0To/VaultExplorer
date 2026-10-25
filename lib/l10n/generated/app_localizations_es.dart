@@ -12406,4 +12406,65 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'Mover a la lista del menú';
+
+  @override
+  String get skinEditStarted =>
+      'El editor de aspecto está activado. Usa los botones flotantes en cualquier pantalla para elegir un color y cambiarlo.';
+
+  @override
+  String get skinEditSaved => 'Aspecto guardado';
+
+  @override
+  String get skinEditPickTooltip => 'Elegir un elemento para recolorear';
+
+  @override
+  String get skinEditPickStopTooltip =>
+      'Dejar de elegir y usar la app con normalidad';
+
+  @override
+  String get skinEditDoneTooltip => 'Guardar y cerrar el editor de aspecto';
+
+  @override
+  String get skinEditHint =>
+      'Toca cualquier elemento para cambiar su color. Vuelve a tocar el cuentagotas para usar la app con normalidad.';
+
+  @override
+  String get skinEditLayersTitle => 'Colores en este punto';
+
+  @override
+  String get skinEditAlsoUsedBy => 'El mismo color también lo usan';
+
+  @override
+  String get skinEditClosest =>
+      'No hay coincidencia exacta para este color; este es el color del aspecto más cercano.';
+
+  @override
+  String get skinEditNoMatch =>
+      'Este punto no usa directamente un color del aspecto. Elige un color de la lista.';
+
+  @override
+  String get skinEditAllColors => 'Todos los colores';
+
+  @override
+  String get skinEditBackToEditor => 'Volver al editor de color';
+
+  @override
+  String get skinEditStatusInherited => 'Heredado';
+
+  @override
+  String get skinEditReset => 'Restablecer';
+
+  @override
+  String get skinEditMoreOptions => 'Todos los colores y opciones';
+
+  @override
+  String get skinEditCollapse => 'Contraer panel';
+
+  @override
+  String get skinEditExpand => 'Expandir panel';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Colores de $page';
+  }
 }

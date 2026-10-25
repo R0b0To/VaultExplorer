@@ -11695,4 +11695,62 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => '메뉴 목록으로 이동';
+
+  @override
+  String get skinEditStarted =>
+      '스킨 편집기가 켜졌습니다. 어느 화면에서든 떠 있는 버튼으로 색을 골라 바꿀 수 있습니다.';
+
+  @override
+  String get skinEditSaved => '스킨이 저장되었습니다';
+
+  @override
+  String get skinEditPickTooltip => '색을 바꿀 요소 선택';
+
+  @override
+  String get skinEditPickStopTooltip => '선택을 끄고 앱을 평소처럼 사용';
+
+  @override
+  String get skinEditDoneTooltip => '저장하고 스킨 편집기 닫기';
+
+  @override
+  String get skinEditHint =>
+      '요소를 탭하면 색을 바꿀 수 있습니다. 스포이트를 다시 탭하면 앱을 평소처럼 사용할 수 있습니다.';
+
+  @override
+  String get skinEditLayersTitle => '이 위치의 색';
+
+  @override
+  String get skinEditAlsoUsedBy => '같은 색을 함께 사용하는 항목';
+
+  @override
+  String get skinEditClosest => '이 색과 정확히 일치하는 스킨 색이 없어 가장 가까운 색을 보여 줍니다.';
+
+  @override
+  String get skinEditNoMatch => '이 위치는 스킨 색을 직접 사용하지 않습니다. 목록에서 색을 선택하세요.';
+
+  @override
+  String get skinEditAllColors => '모든 색';
+
+  @override
+  String get skinEditBackToEditor => '색 편집기로 돌아가기';
+
+  @override
+  String get skinEditStatusInherited => '상속됨';
+
+  @override
+  String get skinEditReset => '초기화';
+
+  @override
+  String get skinEditMoreOptions => '모든 색과 옵션';
+
+  @override
+  String get skinEditCollapse => '패널 접기';
+
+  @override
+  String get skinEditExpand => '패널 펼치기';
+
+  @override
+  String skinEditPageColors(String page) {
+    return '$page의 색';
+  }
 }

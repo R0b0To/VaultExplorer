@@ -12467,4 +12467,65 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get itemActionsMoveToMenuList => 'Перемістити до списку меню';
+
+  @override
+  String get skinEditStarted =>
+      'Редактор тем увімкнено. Використовуйте плаваючі кнопки на будь-якому екрані, щоб вибрати колір і змінити його.';
+
+  @override
+  String get skinEditSaved => 'Тему збережено';
+
+  @override
+  String get skinEditPickTooltip => 'Вибрати елемент для перефарбування';
+
+  @override
+  String get skinEditPickStopTooltip =>
+      'Припинити вибір і користуватися застосунком як зазвичай';
+
+  @override
+  String get skinEditDoneTooltip => 'Зберегти й закрити редактор тем';
+
+  @override
+  String get skinEditHint =>
+      'Торкніться будь-якого елемента, щоб змінити його колір. Торкніться піпетки ще раз, щоб користуватися застосунком як зазвичай.';
+
+  @override
+  String get skinEditLayersTitle => 'Кольори в цьому місці';
+
+  @override
+  String get skinEditAlsoUsedBy => 'Цей самий колір також використовують';
+
+  @override
+  String get skinEditClosest =>
+      'Точного збігу для цього кольору немає; це найближчий колір теми.';
+
+  @override
+  String get skinEditNoMatch =>
+      'У цьому місці не використовується колір теми напряму. Виберіть колір зі списку.';
+
+  @override
+  String get skinEditAllColors => 'Усі кольори';
+
+  @override
+  String get skinEditBackToEditor => 'Назад до редактора кольору';
+
+  @override
+  String get skinEditStatusInherited => 'Успадкований';
+
+  @override
+  String get skinEditReset => 'Скинути';
+
+  @override
+  String get skinEditMoreOptions => 'Усі кольори та параметри';
+
+  @override
+  String get skinEditCollapse => 'Згорнути панель';
+
+  @override
+  String get skinEditExpand => 'Розгорнути панель';
+
+  @override
+  String skinEditPageColors(String page) {
+    return 'Кольори: $page';
+  }
 }

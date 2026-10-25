@@ -1,15 +1,18 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/features/settings/app_skin_settings_screen.dart';
-import 'package:vaultexplorer/features/settings/custom_app_skin_screen.dart';
+import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 /// A contextual link from a component appearance page to app-wide skins.
-/// Custom skins open directly in their preview/editor; built-in skins open
-/// the preset page so the user can choose or create a custom skin.
-class AppSkinShortcutTile extends StatelessWidget {
+/// For a custom skin it starts the floating skin editor right here (the
+/// person can then tap any element, on any page, to recolor it); built-in
+/// skins open the preset page so the user can choose or create a custom skin.
+class AppSkinShortcutTile extends ConsumerWidget {
   final AppSkinPreset preset;
   final bool showFileManagerSkinShortcut;
 
@@ -20,7 +23,7 @@ class AppSkinShortcutTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isCustom = preset == AppSkinPreset.custom;
     final l10n = context.l10n;
 
@@ -42,20 +45,26 @@ class AppSkinShortcutTile extends StatelessWidget {
             : l10n.skinSkinShortcutPresetDescription,
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => SkinAreaScope(
-            area: SkinArea.settings,
-            child: isCustom
-                ? CustomAppSkinScreen(
-                    showFileManagerSkinShortcut: showFileManagerSkinShortcut,
-                  )
-                : AppSkinSettingsScreen(
-                    showFileManagerSkinShortcut: showFileManagerSkinShortcut,
-                  ),
+      onTap: () {
+        if (isCustom) {
+          beginSkinEditing(
+            context,
+            ref,
+            ref.read(appSkinSettingsProvider).customAppSkin,
+          );
+          return;
+        }
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => SkinAreaScope(
+              area: SkinArea.settings,
+              child: AppSkinSettingsScreen(
+                showFileManagerSkinShortcut: showFileManagerSkinShortcut,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

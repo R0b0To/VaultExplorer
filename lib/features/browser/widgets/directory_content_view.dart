@@ -4063,6 +4063,47 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _attachImportCompletionListener(op, isFolder: true);
   }
 
+  /// Follows a video that is still being written after the camera screen
+  /// closed: refresh the folder it lands in once it is done, then drop the
+  /// operation from the transfer list. A failed or cancelled save stays listed
+  /// so its error remains readable (see [_opNeedsAttention]).
+  void _attachCaptureSaveCompletionListener(FileOperation op) {
+    void listener() {
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (!done) return;
+      op.removeListener(listener);
+      if (!mounted) {
+        // This view is gone, so nothing will refresh for it; just don't leave
+        // a finished save in the transfer list (and its placeholder).
+        if (op.status == FileOperationStatus.completed) _opSvc.dismiss(op.id);
+        return;
+      }
+      if (op.status == FileOperationStatus.completed) {
+        final inCurrentDir = op.destDirPath == _currentDirPath;
+        if (inCurrentDir) {
+          FolderThumbnailPreview.clearSessionCache();
+          _loadDirectoryContents(
+            _currentDirPath,
+            refresh: true,
+          ).then((_) => _opSvc.dismiss(op.id));
+        } else {
+          _opSvc.dismiss(op.id);
+        }
+      } else if (!_opNeedsAttention(op)) {
+        _opSvc.dismiss(op.id);
+      }
+    }
+
+    // The save may already have finished by the time the screen is popped.
+    listener();
+    if (op.status == FileOperationStatus.pending ||
+        op.status == FileOperationStatus.running) {
+      op.addListener(listener);
+    }
+  }
+
   Future<void> _captureFromCamera() async {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
@@ -4070,7 +4111,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     _signalActivity();
     try {
-      final captured = await Navigator.push<({String savedName, bool isVideo})>(
+      final captured = await Navigator.push<CameraCaptureResult>(
         context,
         MaterialPageRoute(
           builder: (_) => CameraCaptureScreen(
@@ -4080,9 +4121,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ),
       );
       if (captured == null || !mounted) return;
+      // Videos may still be writing. They report through the transfer UI, so
+      // follow them to the end and refresh the listing when they land.
+      for (final op in captured.backgroundSaves) {
+        _attachCaptureSaveCompletionListener(op);
+      }
       await _loadDirectoryContents(_currentDirPath);
+      final stillSaving = captured.backgroundSaves.any(
+        (op) =>
+            op.status == FileOperationStatus.pending ||
+            op.status == FileOperationStatus.running,
+      );
       _setStatus(
-        captured.isVideo
+        stillSaving
+            ? context.l10n.savingToVault
+            : captured.isVideo
             ? context.l10n.videoCapturedEncrypted
             : context.l10n.photoCapturedEncrypted,
         autoClear: const Duration(seconds: 3),

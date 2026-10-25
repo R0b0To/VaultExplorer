@@ -334,9 +334,11 @@ void main() {
   });
 
   // pauseVaultAutoLock/resumeVaultAutoLock are held by the camera and audio
-  // capture screens for the length of a recording: the *timed* vault lock must
-  // not unmount the vault (and so force-stop the recording) while one runs.
-  // App lock and screen-off handling are deliberately unaffected.
+  // capture screens for the length of a recording: no *automatic* vault lock
+  // (inactivity timer, return from the background, "Immediately", screen-off,
+  // per-container overrides) may unmount the vault -- and so force-stop the
+  // recording -- while one runs. The app-lock gate is deliberately unaffected:
+  // it leaves mounted containers alone.
   group('recording hold (pauseVaultAutoLock)', () {
     test('pausing cancels the armed vault timer and activity does not re-arm it', () {
       fakeAsync((async) {
@@ -440,7 +442,22 @@ void main() {
       });
     });
 
-    test('screen-off locking is not suppressed by the hold', () {
+    test('performVaultLock does nothing while held and works again once released', () async {
+      settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+      buildController();
+
+      controller.pauseVaultAutoLock();
+      await controller.performVaultLock();
+      expect(lockAllMountedContainersCalls, 0);
+
+      controller.resumeVaultAutoLock();
+      await controller.performVaultLock();
+      expect(lockAllMountedContainersCalls, 1);
+
+      controller.dispose();
+    });
+
+    test('screen-off "Immediately" does not lock while held, and does again once released', () {
       fakeAsync((async) {
         settings = AppSettings(
           autoLockMins: 0,
@@ -450,8 +467,71 @@ void main() {
 
         controller.pauseVaultAutoLock();
         controller.handleScreenOff();
+        expect(lockAllMountedContainersCalls, 0);
 
+        controller.resumeVaultAutoLock();
+        controller.handleScreenOff();
         expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('screen-off "Screen Lock Only" does not lock while held', () {
+      fakeAsync((async) {
+        settings = AppSettings(
+          autoLockScreenLockOnly: true,
+          lockContainersOnScreenLock: true,
+        );
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleScreenOff();
+
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('per-container "Immediately" and "Screen Lock Only" overrides do not fire on screen-off while held', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleScreenOff();
+        expect(lockImmediateOverrideContainersCalls, 0);
+        expect(lockScreenLockOnlyContainersCalls, 0);
+
+        controller.resumeVaultAutoLock();
+        controller.handleScreenOff();
+        expect(lockImmediateOverrideContainersCalls, 1);
+        expect(lockScreenLockOnlyContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('a per-container "Immediately" override does not fire on return from the background while held', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockImmediateOverrideContainersCalls, 0);
+
+        // Same flow once the recording is over: the override applies again.
+        controller.resumeVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockImmediateOverrideContainersCalls, 1);
 
         controller.dispose();
       });
@@ -467,6 +547,229 @@ void main() {
         async.elapse(const Duration(minutes: 30));
 
         expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('returning after a long away period does not vault-lock while the hold is active', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('vault inactivity lock re-arms once the hold is released after returning', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.resumeVaultAutoLock();
+        async.elapse(const Duration(minutes: 4, seconds: 59));
+        expect(lockAllMountedContainersCalls, 0);
+        async.elapse(const Duration(seconds: 1));
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('"Immediately" (autoLockMins 0) does not vault-lock on return while the hold is active', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 0, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        async.elapse(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('the app-lock gate still applies on return while the hold is active', () {
+      fakeAsync((async) {
+        settings = AppSettings(
+          autoLockMins: 5,
+          lockContainersOnScreenLock: true,
+          appLockAfterMins: 5,
+          useMasterPassword: true,
+          masterPasswordHash: 'h',
+        );
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(enforceAppLockCalls, 1);
+        expect(lockAllMountedContainersCalls, 0);
+
+        controller.dispose();
+      });
+    });
+
+    test('a screen-off lock skipped while held does not make the next return skip its own check', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 0, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        controller.handleScreenOff(); // skipped: a recording is running
+        expect(lockAllMountedContainersCalls, 0);
+
+        // The recording ends while the app is still away; on return the usual
+        // "Immediately" lock applies. (If the skipped screen-off had been
+        // recorded as a completed lock, this check would be skipped too.)
+        controller.resumeVaultAutoLock();
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('hold released while backgrounded: idle time counts from the release, not from backgrounding', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        // A long recording runs with the app in the background...
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+
+        // ...and is stopped from its notification.
+        controller.resumeVaultAutoLock();
+        fakeNow = fakeNow.add(const Duration(minutes: 2));
+        async.elapse(const Duration(minutes: 2));
+
+        // Back in the app 2 minutes after the stop: 32 minutes away overall,
+        // but the vault was only idle for 2 -- it must not lock.
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockAllMountedContainersCalls, 0);
+
+        // A normal fresh idle timeout is armed from here.
+        async.elapse(const Duration(minutes: 4, seconds: 59));
+        expect(lockAllMountedContainersCalls, 0);
+        async.elapse(const Duration(seconds: 1));
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('hold released while backgrounded: still vault-locks if idle past the timeout after the release', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        controller.resumeVaultAutoLock();
+
+        // Only the clock moves (as if the process was frozen), so this
+        // exercises the check on return rather than the re-armed timer.
+        fakeNow = fakeNow.add(const Duration(minutes: 6));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('a hold released in the foreground does not affect a later background period', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        // Recording starts and ends entirely in the foreground.
+        controller.pauseVaultAutoLock();
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        async.elapse(const Duration(minutes: 30));
+        controller.resumeVaultAutoLock();
+
+        // Later the app is backgrounded for longer than the timeout: normal
+        // behavior, the vault locks on return.
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 10));
+        async.elapse(const Duration(minutes: 10));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+
+        expect(lockAllMountedContainersCalls, 1);
+
+        controller.dispose();
+      });
+    });
+
+    test('a release time from an earlier background period is not reused', () {
+      fakeAsync((async) {
+        settings = AppSettings(autoLockMins: 5, lockContainersOnScreenLock: true);
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
+        buildController();
+
+        // First background period: hold released while away, then back
+        // shortly after -- no lock.
+        controller.pauseVaultAutoLock();
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 30));
+        controller.resumeVaultAutoLock();
+        fakeNow = fakeNow.add(const Duration(minutes: 1));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockAllMountedContainersCalls, 0);
+
+        // Second, plain background period longer than the timeout: the first
+        // period's release time must not shorten it.
+        controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 10));
+        controller.handleAppLifecycleState(AppLifecycleState.resumed);
+        expect(lockAllMountedContainersCalls, 1);
 
         controller.dispose();
       });

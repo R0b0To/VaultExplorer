@@ -28,10 +28,19 @@ class CameraVaultService {
     return target.isEmpty ? name : '$target/$name';
   }
 
-  Future<String> nextAvailableName({required bool isPhoto}) {
+  /// Name for a captured photo or video.
+  ///
+  /// [reserved] lists names that are spoken for but not in the folder yet,
+  /// such as a video that is still being written in the background. Without
+  /// it two captures saved within the same second would be given one name.
+  Future<String> nextAvailableName({
+    required bool isPhoto,
+    Set<String> reserved = const {},
+  }) {
     return _nextAvailableName(
       prefix: isPhoto ? 'IMG_' : 'VID_',
       ext: isPhoto ? '.jpg' : '.mp4',
+      reserved: reserved,
     );
   }
 
@@ -58,8 +67,9 @@ class CameraVaultService {
     required String prefix,
     required String ext,
     DateTime? at,
+    Set<String> reserved = const {},
   }) async {
-    final existing = await _getExistingNames();
+    final existing = {...await _getExistingNames(), ...reserved};
     final now = at ?? DateTime.now();
     final stamp = '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
 

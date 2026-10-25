@@ -20,8 +20,11 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
 
 private const val METHOD_CHANNEL = "com.aeidolon.vaultexplorer/camera"
 private const val EVENT_CHANNEL_PREFIX = "com.aeidolon.vaultexplorer/camera/events/"
@@ -36,6 +39,15 @@ class VaultCameraPlugin(
 ) : MethodChannel.MethodCallHandler {
     private val context: Context = activity.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
+    // Trimming, streaming a recording into the vault and zero-filling the
+    // plaintext temp file are all long, blocking file I/O. onMethodCall runs
+    // on the platform (UI) thread, so they must never run inline there: a
+    // long video froze the whole app for the duration. One thread keeps
+    // queued saves strictly sequential, which also avoids two large writes
+    // fighting over the same vault.
+    private val saveExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "vault-camera-save").apply { isDaemon = true }
+    }
     private val nextId = AtomicLong(0)
     private val sessions = LinkedHashMap<Long, VaultCameraSession>()
     private val eventChannels = LinkedHashMap<Long, EventChannel>()
@@ -312,26 +324,69 @@ class VaultCameraPlugin(
                         result.error("bad_args", "videoPath required", null)
                         return
                     }
-                    val trimmedPath = VaultVideoRecorder.trimVideo(videoPath, startMs, endMs)
-                    result.success(mapOf<String, Any?>("videoPath" to trimmedPath))
+                    saveExecutor.execute {
+                        val trimmedPath = try {
+                            VaultVideoRecorder.trimVideo(videoPath, startMs, endMs)
+                        } catch (e: Exception) {
+                            VeLog.e(TAG, e) { "trimVideo failed" }
+                            videoPath
+                        }
+                        mainHandler.post {
+                            result.success(mapOf<String, Any?>("videoPath" to trimmedPath))
+                        }
+                    }
                 }
                 "saveVideoToVault" -> {
                     val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
                     val volId = (args["volId"] as? Number)?.toInt()
                     val virtualPath = args["virtualPath"] as? String
                     val videoPath = args["videoPath"] as? String
+                    // Optional: the FileOperation id of a tracked background
+                    // save. When present, progress is reported through the
+                    // regular import-progress channel and the operation can
+                    // be cancelled from the transfer UI.
+                    val opId = (args["opId"] as? Number)?.toInt() ?: 0
                     if (volId == null || virtualPath == null || videoPath == null) {
                         result.error("bad_args", "volId, virtualPath and videoPath required", null)
                         return
                     }
-                    // Keep the review copy until Dart has successfully finalized
-                    // the vault write. If the write or finalization fails, the
-                    // capture remains available for retry.
-                    val ok = VaultVideoRecorder.streamFileToSink(
-                        java.io.File(videoPath),
-                        VaultChunkWriter(volId, virtualPath)
-                    )
-                    result.success(mapOf<String, Any?>("success" to ok))
+                    saveExecutor.execute {
+                        var ok = false
+                        var cancelled = false
+                        try {
+                            // Keep the review copy until Dart has successfully
+                            // finalized the vault write. If the write or
+                            // finalization fails, Dart decides what to do with it.
+                            val file = java.io.File(videoPath)
+                            val writer = VaultChunkWriter(volId, virtualPath)
+                            if (opId > 0) {
+                                val name = virtualPath.substringAfterLast('/')
+                                val total = file.length()
+                                ImportProgressBridge.begin(opId)
+                                ImportProgressBridge.reportProgress(opId, 0, 1, name, 0L, total)
+                                ImportProgressBridge.beginFileChunks(opId, 0L)
+                                val sink = TrackedChunkSink(writer, opId)
+                                ok = VaultVideoRecorder.streamFileToSink(file, sink)
+                                cancelled = sink.cancelled
+                                if (ok) {
+                                    ImportProgressBridge.reportProgress(opId, 1, 1, name, total, total)
+                                }
+                            } else {
+                                ok = VaultVideoRecorder.streamFileToSink(file, writer)
+                            }
+                        } catch (e: Exception) {
+                            VeLog.e(TAG, e) { "saveVideoToVault failed" }
+                            ok = false
+                        } finally {
+                            if (opId > 0) {
+                                ImportProgressBridge.clear(opId)
+                                ImportCancellation.clear(opId)
+                            }
+                        }
+                        mainHandler.post {
+                            result.success(mapOf<String, Any?>("success" to ok, "cancelled" to cancelled))
+                        }
+                    }
                 }
                 "saveVideoToScratchpad" -> {
                     val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
@@ -347,19 +402,36 @@ class VaultCameraPlugin(
                         result.error("no_such_session", "Scratchpad session expired", null)
                         return
                     }
-                    val ok = VaultVideoRecorder.streamFileToSinkAndWipe(
-                        java.io.File(videoPath),
-                        ScratchpadChunkWriter(java.io.File(scratchpadPath), key)
-                    )
-                    result.success(mapOf<String, Any?>("success" to ok))
+                    saveExecutor.execute {
+                        val ok = try {
+                            VaultVideoRecorder.streamFileToSinkAndWipe(
+                                java.io.File(videoPath),
+                                ScratchpadChunkWriter(java.io.File(scratchpadPath), key)
+                            )
+                        } catch (e: Exception) {
+                            VeLog.e(TAG, e) { "saveVideoToScratchpad failed" }
+                            false
+                        }
+                        mainHandler.post { result.success(mapOf<String, Any?>("success" to ok)) }
+                    }
                 }
                 "discardVideo" -> {
                     val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
                     val videoPath = args["videoPath"] as? String
-                    if (videoPath != null) {
-                        VaultVideoRecorder.secureDeleteFile(java.io.File(videoPath))
+                    if (videoPath == null) {
+                        result.success(null)
+                        return
                     }
-                    result.success(null)
+                    // The zero-fill of a long recording is as slow as writing
+                    // it, so it runs on the save thread too.
+                    saveExecutor.execute {
+                        try {
+                            VaultVideoRecorder.secureDeleteFile(java.io.File(videoPath))
+                        } catch (e: Exception) {
+                            VeLog.w(TAG, e) { "discardVideo failed" }
+                        }
+                        mainHandler.post { result.success(null) }
+                    }
                 }
                 "stopVideoRecording" -> withSession(call, result) { session, _ ->
                     VeLog.d(TAG) { "stopVideoRecording" }
@@ -446,6 +518,9 @@ class VaultCameraPlugin(
         sessions.keys.toList().forEach { disposeSession(it) }
         methodChannel.setMethodCallHandler(null)
         documentScan.dispose()
+        // shutdown(), not shutdownNow(): an in-flight save must run to the end
+        // rather than be interrupted half-way through writing a vault file.
+        saveExecutor.shutdown()
     }
 }
 

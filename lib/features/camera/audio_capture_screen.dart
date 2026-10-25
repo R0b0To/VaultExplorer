@@ -204,9 +204,9 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   void _acquireRecordingResources() {
     _resourcesHeld = true;
     unawaited(_fileIo.setKeepScreenOn(true));
-    // The timed auto-lock must not cut a running recording short.
+    // No automatic lock may cut a running recording short.
     _pauseAutoLockForRecording();
-    // If the vault is locked mid-recording by anything else (e.g. the user
+    // If the vault is locked mid-recording by an explicit user action (e.g.
     // tapping Lock), stop and save what exists so far.
     _registry.register(widget.container.uri, _stopAndSaveForLock);
     unawaited(
@@ -227,16 +227,16 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
     _resumeAutoLockAfterRecording();
   }
 
-  /// Holds off the two inactivity timers for as long as a take is being
+  /// Holds off automatic vault locking for as long as a take is being
   /// recorded (including while it is paused): the global vault auto-lock
-  /// ([SessionLockController.pauseVaultAutoLock]) and this container's own
-  /// auto-close timer. Both would otherwise lock the vault out from under the
-  /// recording and force it to be stopped. Like an app lock, they simply do
-  /// not apply while a recording is in progress; the idle timeout starts
-  /// fresh once the recording ends. Screen-off is already ignored while this
-  /// screen is open (the add-item menu opens it under
-  /// `withLockSuppression`), and a manual lock still goes through
-  /// [_registry], which saves what was recorded so far.
+  /// ([SessionLockController.pauseVaultAutoLock] -- which also stops the
+  /// away-from-the-app, "Immediately", screen-off and per-container override
+  /// locks from firing) and this container's own auto-close timer. All of
+  /// them would otherwise lock the vault out from under the recording and
+  /// force it to be stopped. Like an app lock, they simply do not apply while
+  /// a recording is in progress; the idle timeout starts fresh once it ends.
+  /// An explicit lock by the user still goes through [_registry], which saves
+  /// what was recorded so far.
   void _pauseAutoLockForRecording() {
     if (_autoLockPausedForRecording) return;
     _autoLockPausedForRecording = true;

@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/data/models/clipboard_item.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'active_recording_registry.dart';
+import 'background_video_save.dart';
 import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
 import 'camera_capture_lock_controller.dart';
@@ -22,6 +25,18 @@ import 'scan/document_scan_api.dart';
 import 'scan/document_scan_editor_screen.dart';
 import 'scan/scan_geometry.dart';
 import 'vault_camera_controller.dart';
+
+/// What [CameraCaptureScreen] pops with after a successful save.
+///
+/// Photos are written before the screen closes. Videos are not: they are
+/// handed to the file-operation system and keep saving after the screen is
+/// gone, so a long recording never holds the user on the capture screen.
+/// [backgroundSaves] holds those operations, for the caller to watch.
+typedef CameraCaptureResult = ({
+  String savedName,
+  bool isVideo,
+  List<FileOperation> backgroundSaves,
+});
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -54,6 +69,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   late CameraVaultService _vaultService;
 
   late final ActiveRecordingRegistry _activeRecordingRegistry;
+
+  /// Video saves handed to the file-operation system so far. Kept for the
+  /// whole life of the screen, not per save attempt: a later attempt that
+  /// fails on a photo and is retried must still report the videos that were
+  /// already handed off.
+  final List<FileOperation> _backgroundSaves = [];
   late final SessionLockController _sessionLockController;
   late final VaultDashboardController _dashboardController;
   bool _autoLockPausedForRecording = false;
@@ -592,6 +613,63 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
   }
 
+  /// Hands one recorded video to the file-operation system and returns the
+  /// operation. The save (trim, write into the vault, wipe of the plaintext
+  /// copy) runs in the background, so the caller can leave this screen at once
+  /// and the progress shows in the usual transfer UI.
+  FileOperation _enqueueBackgroundVideoSave({
+    required FileOperationService opSvc,
+    required CapturedMediaItem item,
+    required String name,
+    required String virtualPath,
+    required int estimatedBytes,
+  }) {
+    final job = BackgroundVideoSave(
+      container: widget.container,
+      vaultService: _vaultService,
+      fileIoApi: captureFileIoApi,
+      videoPath: item.videoPath!,
+      virtualPath: virtualPath,
+      trimStartMs: item.trimStartMs,
+      trimEndMs: item.trimEndMs,
+      durationMs: item.videoDurationMs,
+      failureMessage: context.l10n.statusFailed,
+    );
+
+    // Leaving this screen must not let the vault lock itself out from under
+    // the write, so hold both auto-lock timers until the operation ends.
+    // Both holds are counted, so they stack with the screen's own.
+    final sessionLock = _sessionLockController;
+    final dashboard = _dashboardController;
+    final volId = widget.container.volId;
+    sessionLock.pauseVaultAutoLock();
+    dashboard.pauseAutoCloseForActivity(volId);
+
+    final op = opSvc.enqueueImport(
+      dest: widget.container,
+      destDirPath: widget.targetDirPath,
+      items: [
+        ClipboardItem(path: name, isDir: false, sizeBytes: estimatedBytes),
+      ],
+      isFolder: false,
+      performImport: job.run,
+      l10n: context.l10n,
+    );
+
+    void releaseOnFinish() {
+      final finished =
+          op.status != FileOperationStatus.pending &&
+          op.status != FileOperationStatus.running;
+      if (!finished) return;
+      op.removeListener(releaseOnFinish);
+      dashboard.resumeAutoCloseAfterActivity(volId);
+      sessionLock.resumeVaultAutoLock();
+    }
+
+    op.addListener(releaseOnFinish);
+    return op;
+  }
+
   Future<void> _commitAllMediaToVault(List<CapturedMediaItem> mediaToSave) async {
     if (mediaToSave.isEmpty) return;
 
@@ -604,6 +682,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     await Future.delayed(const Duration(milliseconds: 50));
 
     final successfullySaved = <CapturedMediaItem>[];
+    // Videos are written after this screen is gone, so their names are not in
+    // the folder yet. Keep them out of the pool for the next name.
+    final opSvc = ref.read(fileOperationServiceProvider);
+    final reservedNames = <String>{
+      for (final e in opSvc.getActivePlaceholders(
+        widget.container.volId,
+        widget.targetDirPath,
+      ))
+        e.name,
+    };
     try {
       String? firstName;
       bool hasVideo = false;
@@ -680,23 +768,23 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           _firstSavedCaptureName ??= name;
           successfullySaved.add(item);
         } else if (item.isVideo && item.videoPath != null) {
-          var finalVideoPath = item.videoPath!;
-          if (item.trimStartMs > 0 || (item.trimEndMs > 0 && item.trimEndMs < item.videoDurationMs)) {
-            final trimmed = await cameraController.trimVideo(
-              videoPath: item.videoPath!,
-              startMs: item.trimStartMs,
-              endMs: item.trimEndMs,
-            );
-            if (trimmed != null) {
-              finalVideoPath = trimmed;
-              item.videoPath = trimmed;
-              item.trimStartMs = 0;
-              item.trimEndMs = item.videoDurationMs;
-            }
-          }
-          final videoBytes = await _vaultService.localFileSize(finalVideoPath);
-          if (videoBytes != null &&
-              !await _vaultService.hasEnoughSpaceFor(videoBytes)) {
+          // Check space while the capture is still on screen, so a full vault
+          // is reported with the video intact and retryable. Anything that
+          // goes wrong after the hand-off below can only be reported in the
+          // transfer UI.
+          final sourceBytes = await _vaultService.localFileSize(
+            item.videoPath!,
+          );
+          final estimatedBytes = sourceBytes == null
+              ? 0
+              : BackgroundVideoSave.estimateBytes(
+                  sourceBytes: sourceBytes,
+                  trimStartMs: item.trimStartMs,
+                  trimEndMs: item.trimEndMs,
+                  durationMs: item.videoDurationMs,
+                );
+          if (estimatedBytes > 0 &&
+              !await _vaultService.hasEnoughSpaceFor(estimatedBytes)) {
             if (mounted) {
               _handleSaveFailure(
                 mediaToSave,
@@ -706,35 +794,27 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
             }
             return;
           }
-          final name = await _vaultService.nextAvailableName(isPhoto: false);
+          final name = await _vaultService.nextAvailableName(
+            isPhoto: false,
+            reserved: reservedNames,
+          );
+          reservedNames.add(name);
           final virtualPath = _vaultService.buildVirtualPath(name);
-          final ok = widget.container.isLocalStorage
-              ? await captureFileIoApi.writeFileFromLocalPath(
-                  widget.container,
-                  virtualPath,
-                  finalVideoPath,
-                )
-              : await cameraController.saveVideoToVault(
-                  videoPath: finalVideoPath,
-                  volId: widget.container.volId,
-                  virtualPath: virtualPath,
-                );
-          if (!ok || !await _vaultService.finalizeVaultWrite(virtualPath)) {
-            await _vaultService.deleteFile(virtualPath);
-            if (mounted) {
-              _handleSaveFailure(
-                mediaToSave,
-                successfullySaved,
-                context.l10n.cameraCouldNotSaveCaptureMessage,
-              );
-            }
-            return;
-          }
-          await cameraController.discardVideo(finalVideoPath);
+          _backgroundSaves.add(
+            _enqueueBackgroundVideoSave(
+              opSvc: opSvc,
+              item: item,
+              name: name,
+              virtualPath: virtualPath,
+              estimatedBytes: estimatedBytes,
+            ),
+          );
           firstName ??= name;
           hasVideo = true;
           _firstSavedCaptureName ??= name;
           _hasSavedVideoCapture = true;
+          // From here on the operation owns the recording, so it must leave
+          // the tray: a later failure in this loop must not offer it again.
           successfullySaved.add(item);
         }
       }
@@ -745,6 +825,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           (
             savedName: _firstSavedCaptureName ?? firstName ?? 'media',
             isVideo: _hasSavedVideoCapture || hasVideo,
+            backgroundSaves: List.unmodifiable(_backgroundSaves),
           ),
         );
       }

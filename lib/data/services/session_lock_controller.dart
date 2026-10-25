@@ -85,16 +85,38 @@ class SessionLockController {
   int _suppressLockDepth = 0;
   int _vaultAutoLockPauseDepth = 0;
 
+  /// When the last [pauseVaultAutoLock] hold was released while the app was
+  /// in the background (e.g. a recording stopped from its notification).
+  /// The vault was in use right up to that moment, so the timed vault lock
+  /// measures its "time away" from here instead of from when the app was
+  /// backgrounded -- see the resumed branch of [handleAppLifecycleState].
+  DateTime? _vaultAutoLockReleasedAt;
+
   bool get isAppLocked => _isAppLocked;
   bool get isMediaPlaying => _isMediaPlaying;
   bool get isLockSuppressed => _suppressLockDepth > 0;
   bool get isVaultAutoLockPaused => _vaultAutoLockPauseDepth > 0;
 
-  /// Pauses only the vault inactivity timer while a recording (video or
-  /// audio) is active, so the timed auto-lock can't unmount the vault under
-  /// it and force the recording to stop. App locking and explicit
-  /// screen-off/manual lock actions remain in force. Calls nest: the timer
-  /// only re-arms once every hold has been released.
+  /// Holds off every *automatic* vault lock while a recording (video or
+  /// audio) is in progress, so nothing unmounts the vault under it and forces
+  /// the recording to stop. While at least one hold is active:
+  ///
+  /// - the inactivity timer is cancelled and not re-armed;
+  /// - [performVaultLock] does nothing, which covers the "away for longer
+  ///   than [AppSettings.autoLockMins]" check on return from the background,
+  ///   "Immediately" (`autoLockMins == 0`) and screen-off locking;
+  /// - the per-container "Immediately" and "Screen Lock Only" overrides
+  ///   ([_lockImmediateOverrides], [_lockScreenLockOnlyOverrides]) do nothing.
+  ///
+  /// A trigger skipped this way is dropped, not replayed once the recording
+  /// ends: the inactivity timer starts fresh and any later trigger applies as
+  /// usual. Not affected: the app-lock gate (it leaves mounted containers,
+  /// and so the recording, alone) and explicit user actions such as tapping
+  /// Lock, which still stop and save the recording through
+  /// `ActiveRecordingRegistry`.
+  ///
+  /// Calls nest: automatic locking resumes only once every hold has been
+  /// released.
   void pauseVaultAutoLock() {
     _vaultAutoLockPauseDepth++;
     if (_vaultAutoLockPauseDepth == 1) {
@@ -108,6 +130,9 @@ class SessionLockController {
     if (_vaultAutoLockPauseDepth == 0) return;
     _vaultAutoLockPauseDepth--;
     if (_vaultAutoLockPauseDepth == 0) {
+      // Released while the app is backgrounded: the idle clock starts now, not
+      // when the app left the foreground (which was during the recording).
+      if (_pausedAt != null) _vaultAutoLockReleasedAt = _now();
       VeLog.d(_kLogTag, 'resumeVaultAutoLock: rearming vault inactivity timer');
       _scheduleVaultLockTimer();
     }
@@ -209,6 +234,10 @@ class SessionLockController {
   /// backgrounding/screen-off signals below, never from foreground activity.
   void _lockImmediateOverrides() {
     if (_lockImmediateOverrideContainers == null) return;
+    if (isVaultAutoLockPaused) {
+      VeLog.d(_kLogTag, '_lockImmediateOverrides: recording active, skipping');
+      return;
+    }
     VeLog.i(_kLogTag, '_lockImmediateOverrides: locking any Immediately-configured containers');
     unawaited(_lockImmediateOverrideContainers!.call());
   }
@@ -229,6 +258,10 @@ class SessionLockController {
   /// mode at all, foreground or otherwise.
   void _lockScreenLockOnlyOverrides() {
     if (_lockScreenLockOnlyContainers == null) return;
+    if (isVaultAutoLockPaused) {
+      VeLog.d(_kLogTag, '_lockScreenLockOnlyOverrides: recording active, skipping');
+      return;
+    }
     VeLog.i(_kLogTag, '_lockScreenLockOnlyOverrides: locking any Screen-Lock-Only containers');
     unawaited(_lockScreenLockOnlyContainers!.call());
   }
@@ -296,9 +329,15 @@ class SessionLockController {
   }
 
   /// Unmounts every open container. Independent of [performAppLock] -- does
-  /// not touch `LockGateScreen`.
+  /// not touch `LockGateScreen`. Does nothing while a recording holds
+  /// [pauseVaultAutoLock]; every automatic trigger (inactivity timer, return
+  /// from the background, screen-off) funnels through here.
   Future<void> performVaultLock() async {
     if (_settings == null) return;
+    if (isVaultAutoLockPaused) {
+      VeLog.i(_kLogTag, 'performVaultLock: recording active, skipping vault lock');
+      return;
+    }
     VeLog.i(_kLogTag, 'performVaultLock: invoking lockAllMountedContainers()');
     await _lockAllMountedContainers?.call();
   }
@@ -437,8 +476,10 @@ class SessionLockController {
         unawaited(resumeFromPersistedBackgroundState(evaluateAppLock: evaluateAppLock));
         return;
       }
+      final vaultHoldReleasedAt = _vaultAutoLockReleasedAt;
       if (pausedAt != null) _cancelTimers();
       _pausedAt = null;
+      _vaultAutoLockReleasedAt = null;
       _persistPausedAt(null);
       final lockedAppOnScreenOff = _appLockedOnScreenOff;
       final lockedVaultOnScreenOff = _vaultLockedOnScreenOff;
@@ -455,6 +496,17 @@ class SessionLockController {
       _lockImmediateOverrides();
 
       final awayDuration = _now().difference(pausedAt);
+      // How long the *vault* has been idle. Normally the same as
+      // awayDuration, but if a pauseVaultAutoLock hold (a recording) ended
+      // while the app was still in the background, the vault was in use until
+      // then, so idle time only counts from that moment. The app-lock gate
+      // keeps using the real awayDuration. (A hold that is still active here
+      // needs no special case: performVaultLock skips while it is held.)
+      final vaultIdleSince =
+          (vaultHoldReleasedAt != null && vaultHoldReleasedAt.isAfter(pausedAt))
+              ? vaultHoldReleasedAt
+              : pausedAt;
+      final vaultAwayDuration = _now().difference(vaultIdleSince);
       final settings = _settings!();
       final hasMasterPassword = _hasMasterPassword(settings);
 
@@ -525,7 +577,7 @@ class SessionLockController {
         } else {
           final shouldLockVault = settings.autoLockMins == 0 ||
               (settings.autoLockMins > 0 &&
-                  awayDuration >= Duration(minutes: settings.autoLockMins));
+                  vaultAwayDuration >= Duration(minutes: settings.autoLockMins));
           if (shouldLockVault) {
             VeLog.i(_kLogTag, 'handleAppLifecycleState: away >= autoLockMins -> performVaultLock');
             performVaultLock();
@@ -587,7 +639,10 @@ class SessionLockController {
           'handleScreenOff: autoLockScreenLockOnly=${settings.autoLockScreenLockOnly}, '
           'autoLockMins=${settings.autoLockMins} -> performVaultLock immediately',
         );
-        _vaultLockedOnScreenOff = true;
+        // Only record the screen-off lock as done if it will actually
+        // happen: while a recording holds the vault open it is skipped, and
+        // the flag would otherwise make the next resume skip its own check.
+        if (!isVaultAutoLockPaused) _vaultLockedOnScreenOff = true;
         performVaultLock();
       } else {
         VeLog.i(

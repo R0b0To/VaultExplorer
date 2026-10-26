@@ -18,6 +18,7 @@ import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.audiocapture.AudioRecordingParams
 import com.aeidolon.vaultexplorer.audiocapture.VaultAudioRecorder
 import com.aeidolon.vaultexplorer.automation.VaultAutomationCaptureBridge
+import com.aeidolon.vaultexplorer.camera.SegmentedVaultWriter
 import com.aeidolon.vaultexplorer.camera.VaultChunkWriter
 import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
 import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
@@ -78,6 +79,9 @@ class VaultAutomationRecordingService : Service() {
         private const val WAKE_LOCK_TAG = "com.aeidolon.vaultexplorer:AutomationRecordingWakeLock"
         private const val MAX_RECORDING_MS = 3 * 60 * 60 * 1000L // 3h safety cap, see class doc comment
 
+        /** How often finished parts of a segmented audio recording are collected and saved. */
+        private const val AUDIO_PART_POLL_MS = 3_000L
+
         const val ACTION_START = "com.aeidolon.vaultexplorer.action.internal.START_AUTOMATION_RECORDING"
         const val ACTION_STOP = "com.aeidolon.vaultexplorer.action.internal.STOP_AUTOMATION_RECORDING"
 
@@ -89,6 +93,7 @@ class VaultAutomationRecordingService : Service() {
         const val EXTRA_CONTAINER_NAME = "containerName"   // for the notification only
         const val EXTRA_AUDIO_ONLY = "audioOnly"            // true: mic-only recording, no camera session
         const val EXTRA_AUDIO_QUALITY = "audioQuality"      // audio-only: "voice" | "standard" | "high"; absent/unknown = standard
+        const val EXTRA_SEGMENT_SECONDS = "segmentSeconds"  // > 0: cut the recording into parts of about this length, saved as they close
 
         @Volatile
         var isRecording: Boolean = false
@@ -131,6 +136,15 @@ class VaultAutomationRecordingService : Service() {
     private var audioVaultPath = ""
     private val audioStopping = AtomicBoolean(false)
     @Volatile private var audioStopResult: VaultAutomationCaptureBridge.Result? = null
+
+    // Segmented audio: parts are collected and saved into the vault every few
+    // seconds on their own thread, so that neither a slow vault write nor the
+    // periodic pick-up can delay the stop queued on [audioExecutor].
+    private val audioPartExecutor = Executors.newSingleThreadExecutor()
+    private val audioPartLock = Any()
+    private var audioPartWriter: SegmentedVaultWriter? = null
+    private var audioPartPoll: Runnable? = null
+    private var audioPartsDurationMs = 0L
     @Volatile private var destroyed = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -165,6 +179,7 @@ class VaultAutomationRecordingService : Service() {
         }
         val recordAudio = intent.getBooleanExtra(EXTRA_RECORD_AUDIO, true)
         val audioOnly = intent.getBooleanExtra(EXTRA_AUDIO_ONLY, false)
+        val segmentSeconds = intent.getIntExtra(EXTRA_SEGMENT_SECONDS, 0).coerceIn(0, 4 * 60 * 60)
 
         // An audio-only recording has no camera, so no camera id to require.
         if (volId == -1 || vaultPath.isNullOrEmpty() || (!audioOnly && cameraId.isNullOrEmpty())) {
@@ -199,13 +214,14 @@ class VaultAutomationRecordingService : Service() {
                 volId,
                 vaultPath,
                 AudioRecordingParams.fromQualityName(intent.getStringExtra(EXTRA_AUDIO_QUALITY)),
+                segmentSeconds,
             )
             return
         }
 
         val newSession = VaultHeadlessCameraSession(applicationContext)
         session = newSession
-        newSession.openForRecording(cameraId!!, quality, recordAudio) { openOk, openError ->
+        newSession.openForRecording(cameraId!!, quality, recordAudio, segmentSeconds) { openOk, openError ->
             if (!openOk) {
                 VeLog.e(TAG) { "handleStart: openForRecording failed: $openError" }
                 VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(false, openError ?: "open failed"))
@@ -238,24 +254,26 @@ class VaultAutomationRecordingService : Service() {
             return
         }
         cancelSafetyStop()
-        current.stopRecordingAndClose { ok, durationMs, error ->
-            VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(ok, error, durationMs))
+        current.stopRecordingAndClose { ok, durationMs, error, parts ->
+            VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(ok, error, durationMs, parts))
             stopSelf()
         }
     }
 
     // ── Audio-only recording ────────────────────────────────────────────
 
-    private fun startAudioRecording(volId: Int, vaultPath: String, params: AudioRecordingParams) {
+    private fun startAudioRecording(volId: Int, vaultPath: String, params: AudioRecordingParams, segmentSeconds: Int) {
         val recorder = VaultAudioRecorder(applicationContext)
         audioRecorder = recorder
         audioVolId = volId
         audioVaultPath = vaultPath
         audioStopping.set(false)
         audioStopResult = null
+        audioPartWriter = null
+        audioPartsDurationMs = 0L
         audioExecutor.execute {
             try {
-                recorder.start(params)
+                recorder.start(params, segmentSeconds)
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "startAudioRecording: recorder.start failed" }
                 VaultAutomationCaptureBridge.complete(
@@ -278,7 +296,44 @@ class VaultAutomationRecordingService : Service() {
                 }
                 isRecording = true
                 scheduleSafetyStop()
+                if (segmentSeconds > 0) startAudioPartPolling(recorder, volId, vaultPath)
                 VaultAutomationCaptureBridge.complete(VaultAutomationCaptureBridge.Result(true, null))
+            }
+        }
+    }
+
+    /**
+     * Every few seconds, saves the parts of a segmented audio recording that
+     * have closed since the last pass. Runs until the recording stops.
+     */
+    private fun startAudioPartPolling(recorder: VaultAudioRecorder, volId: Int, vaultPath: String) {
+        audioPartWriter = SegmentedVaultWriter(volId, vaultPath)
+        val poll = object : Runnable {
+            override fun run() {
+                if (destroyed || audioStopping.get() || !isRecording) return
+                try {
+                    audioPartExecutor.execute { saveFinishedAudioParts(recorder) }
+                } catch (_: java.util.concurrent.RejectedExecutionException) {
+                    return // the service is shutting down
+                }
+                mainHandler.postDelayed(this, AUDIO_PART_POLL_MS)
+            }
+        }
+        audioPartPoll = poll
+        mainHandler.postDelayed(poll, AUDIO_PART_POLL_MS)
+    }
+
+    /**
+     * Saves every closed part in order, under [audioPartLock] so that a pass
+     * from the poller and the final one at stop can never interleave and
+     * number parts out of recording order.
+     */
+    private fun saveFinishedAudioParts(recorder: VaultAudioRecorder) {
+        val writer = audioPartWriter ?: return
+        synchronized(audioPartLock) {
+            for (part in recorder.takeSegments()) {
+                audioPartsDurationMs += part.durationMs
+                writer.save(part.file)
             }
         }
     }
@@ -326,27 +381,58 @@ class VaultAutomationRecordingService : Service() {
             return
         }
         cancelSafetyStop()
+        audioPartPoll?.let { mainHandler.removeCallbacks(it) }
+        audioPartPoll = null
         val volId = audioVolId
         val vaultPath = audioVaultPath
+        val parts = audioPartWriter
         audioExecutor.execute {
             var ok = false
             var durationMs = 0L
+            var savedParts = 0
             var error: String? = null
             try {
-                val take = recorder.stop() // throws (and wipes) if nothing usable was captured
-                durationMs = take.durationMs
-                // streamFileToSinkAndWipe wipes the temp file whether or not
-                // the write succeeds. finishWrite is the commit step
-                // directory vaults (Cryptomator/gocryptfs/CryFS) need and the
-                // in-app path leaves to Dart -- there is no Dart layer here.
-                ok = VaultVideoRecorder.streamFileToSinkAndWipe(take.file, VaultChunkWriter(volId, vaultPath)) &&
-                    ContainerFileSystem.finishWrite(volId, vaultPath)
-                if (!ok) error = "vault write failed"
+                if (parts != null) {
+                    // Segmented: the last part is null when the recording ended
+                    // with nothing usable after the earlier ones, which are
+                    // already in the vault or queued to be.
+                    val last = recorder.stopAllowingEmptyLastPart()
+                    synchronized(audioPartLock) {
+                        for (part in recorder.takeSegments()) {
+                            audioPartsDurationMs += part.durationMs
+                            parts.save(part.file)
+                        }
+                        if (last != null) {
+                            audioPartsDurationMs += last.durationMs
+                            parts.save(last.file)
+                        }
+                    }
+                    durationMs = audioPartsDurationMs
+                    savedParts = parts.savedCount
+                    ok = parts.failedCount == 0 && parts.savedCount > 0
+                    if (!ok) {
+                        error = if (parts.savedCount == 0) {
+                            "vault write failed"
+                        } else {
+                            "vault write failed (${parts.failedCount} of ${parts.savedCount + parts.failedCount} parts not saved)"
+                        }
+                    }
+                } else {
+                    val take = recorder.stop() // throws (and wipes) if nothing usable was captured
+                    durationMs = take.durationMs
+                    // streamFileToSinkAndWipe wipes the temp file whether or not
+                    // the write succeeds. finishWrite is the commit step
+                    // directory vaults (Cryptomator/gocryptfs/CryFS) need and the
+                    // in-app path leaves to Dart -- there is no Dart layer here.
+                    ok = VaultVideoRecorder.streamFileToSinkAndWipe(take.file, VaultChunkWriter(volId, vaultPath)) &&
+                        ContainerFileSystem.finishWrite(volId, vaultPath)
+                    if (ok) savedParts = 1 else error = "vault write failed"
+                }
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "stopAudioRecording failed" }
                 error = e.message ?: "stop failed"
             }
-            val result = VaultAutomationCaptureBridge.Result(ok, error, durationMs)
+            val result = VaultAutomationCaptureBridge.Result(ok, error, durationMs, savedParts)
             audioStopResult = result
             VaultAutomationCaptureBridge.complete(result)
             mainHandler.post { stopSelf() }
@@ -381,7 +467,10 @@ class VaultAutomationRecordingService : Service() {
             audioExecutor.execute { recorder.cancel() }
         }
         audioRecorder = null
+        audioPartPoll?.let { mainHandler.removeCallbacks(it) }
+        audioPartPoll = null
         audioExecutor.shutdown()
+        audioPartExecutor.shutdown()
         isRecording = false
         currentIsAudioOnly = false
         currentVaultUri = null

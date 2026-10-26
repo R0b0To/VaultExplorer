@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -59,6 +60,35 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   ScratchpadSession? _pendingScratchpad;
 
   String? _saveError;
+
+  // --- Segmented video recording ---------------------------------------------
+  // Quick capture normally lets the person pick the vault after shooting. A
+  // segmented recording saves each part as soon as it closes, so it needs the
+  // vault up front: it is asked for (and unlocked if needed) when recording
+  // starts, every part goes straight into it, and there is no review.
+
+  /// True while the recording in progress is segmented.
+  bool _segmentedRecording = false;
+
+  /// Where the parts of the segmented recording are saved.
+  CryptoDestination? _segmentDestination;
+  CameraVaultService? _segmentVaultService;
+
+  /// Timestamp shared by the names of every part of this recording.
+  DateTime? _segmentGroupStart;
+
+  /// Number of parts saved into the vault so far.
+  int _segmentIndex = 0;
+
+  /// Name of the first saved part, shown in the "saved" toast.
+  String? _firstSegmentName;
+
+  /// Shows the "vault full" message once per recording, not once per part.
+  bool _segmentSpaceWarned = false;
+
+  /// Runs part collection one at a time, so event nudges and the final stop
+  /// never overlap and parts are always numbered in order.
+  Future<void> _segmentChain = Future<void>.value();
 
   @override
   bool get captureIsCountingDown => captureSession.countdownValue > 0 && captureSession.isCountingDown;
@@ -450,23 +480,11 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         }
       }
 
-      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
-      final shouldRelock = switch (settings.quickActionLockMode) {
-        QuickActionLockMode.alwaysLock => true,
-        QuickActionLockMode.leaveAsFound => destination.wasInitiallyLocked,
-        QuickActionLockMode.leaveOpen => false,
-      };
-
-      if (shouldRelock) {
-        await captureLifecycleApi.lockContainer(container.uri);
-      }
-
-      if (mounted) {
-        await _quickCaptureApi.showToast(
-          context.l10n.quickCaptureSavedToast(firstName ?? 'media', destination.displayName),
-        );
-        Navigator.pop(context, (savedName: firstName ?? 'media', isVideo: hasVideo));
-      }
+      await _relockAndFinish(
+        destination: destination,
+        savedName: firstName ?? 'media',
+        isVideo: hasVideo,
+      );
     } catch (_) {
       if (mounted) {
         _returnToReviewWithError(
@@ -493,11 +511,60 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   }
 
   @override
+  /// Applies the "after saving" lock policy to the vault the capture was
+  /// saved into, tells the person, and closes the screen.
+  Future<void> _relockAndFinish({
+    required CryptoDestination destination,
+    required String savedName,
+    required bool isVideo,
+  }) async {
+    final container = destination.container!;
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+    final shouldRelock = switch (settings.quickActionLockMode) {
+      QuickActionLockMode.alwaysLock => true,
+      QuickActionLockMode.leaveAsFound => destination.wasInitiallyLocked,
+      QuickActionLockMode.leaveOpen => false,
+    };
+
+    if (shouldRelock) {
+      await captureLifecycleApi.lockContainer(container.uri);
+    }
+
+    if (mounted) {
+      await _quickCaptureApi.showToast(
+        context.l10n.quickCaptureSavedToast(savedName, destination.displayName),
+      );
+      Navigator.pop(context, (savedName: savedName, isVideo: isVideo));
+    }
+  }
+
+  /// Asks for the vault a segmented recording saves into, unlocking the app
+  /// and the vault if needed. Null when the person backs out.
+  Future<CryptoDestination?> _pickSegmentDestination() async {
+    if (!await _ensureAppUnlockedForSave() || !mounted) return null;
+    final destination = await Navigator.push<CryptoDestination>(
+      context,
+      MaterialPageRoute(builder: (_) => const ShareDestinationSheet()),
+    );
+    if (destination == null || !mounted) return null;
+    if (!destination.isVault ||
+        destination.container == null ||
+        destination.relativePath == null) {
+      return null;
+    }
+    return destination;
+  }
+
   Future<void> startVideoRecording() async {
     if (!cameraController.isInitialized ||
         isEncrypting ||
         captureIsRecording ||
         isStartingVideo) {
+      return;
+    }
+
+    if (captureControls.segmentMinutes > 0) {
+      await _startSegmentedRecording();
       return;
     }
 
@@ -568,6 +635,16 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     try {
       final isFirstMedia = capturedMedia.isEmpty;
       final result = await cameraController.stopVideoRecordingForReview();
+
+      if (_segmentedRecording) {
+        await _finishSegmentedRecording(
+          success: result.success,
+          videoPath: result.videoPath,
+          durationMs: result.durationMs,
+        );
+        return;
+      }
+
       final elapsedMs = startedAt == null
           ? 9999
           : DateTime.now().difference(startedAt).inMilliseconds;
@@ -611,8 +688,226 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         );
       }
     } finally {
+      _segmentedRecording = false;
       unawaited(captureFileIoApi.setKeepScreenOn(false));
     }
+  }
+
+  // --- Segmented recording: destination, collecting and saving parts ----------
+
+  Future<void> _startSegmentedRecording() async {
+    final segmentSeconds = captureControls.segmentMinutes * 60;
+    captureSessionController.setStartingVideo(true);
+    try {
+      final destination = await _pickSegmentDestination();
+      // Unlocking the vault can take the app to the background, which closes
+      // the camera; a new tap on record starts over once it has reopened.
+      if (destination == null || !mounted || !cameraController.isInitialized) {
+        return;
+      }
+      final container = destination.container!;
+      final vaultService = CameraVaultService(
+        container: container,
+        targetDirPath: destination.relativePath!,
+        fileIoApi: captureFileIoApi,
+        lifecycleApi: captureLifecycleApi,
+      );
+      final groupStart = await vaultService.segmentGroupStart(
+        prefix: 'VID_',
+        ext: '.mp4',
+        at: DateTime.now(),
+      );
+      if (!mounted) return;
+
+      await cameraController.setOrientationDegrees(
+        await computePreviewRotationDegrees(),
+      );
+      final result = await cameraController.startVideoRecording(
+        volId: container.volId,
+        virtualPath: vaultService.buildVirtualPath(
+          vaultService.segmentName(
+            prefix: 'VID_',
+            ext: '.mp4',
+            groupStart: groupStart,
+            index: 1,
+          ),
+        ),
+        segmentSeconds: segmentSeconds,
+      );
+      if (!result.success) {
+        showErrorToast(
+          result.error ?? context.l10n.cameraRecordingFailedMessage,
+        );
+        return;
+      }
+
+      _segmentedRecording = true;
+      _segmentDestination = destination;
+      _segmentVaultService = vaultService;
+      _segmentGroupStart = groupStart;
+      _segmentIndex = 0;
+      _firstSegmentName = null;
+      _segmentSpaceWarned = false;
+      _segmentChain = Future<void>.value();
+
+      recordingStart = DateTime.now();
+      captureIsRecording = true;
+      if (!mounted) return;
+      _pauseAutoLockForRecording();
+      captureSessionController.startRecording();
+      unawaited(captureFileIoApi.setKeepScreenOn(true));
+
+      timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (!mounted || recordingStart == null) return;
+        final elapsed = DateTime.now().difference(recordingStart!).inSeconds;
+        captureSessionController.updateTimerText(
+          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
+        );
+      });
+    } catch (e) {
+      _segmentedRecording = false;
+      if (mounted) {
+        showErrorToast(
+          context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
+        );
+      }
+    } finally {
+      captureSessionController.setStartingVideo(false);
+      if (pendingStopAfterStart) {
+        pendingStopAfterStart = false;
+        if (captureIsRecording) unawaited(stopVideoRecording());
+      }
+    }
+  }
+
+  @override
+  void onVideoSegmentEvent() {
+    if (!_segmentedRecording) return;
+    unawaited(_collectVideoSegments());
+  }
+
+  /// Picks up every part the recorder has closed and saves each into the
+  /// chosen vault. Safe to call at any time; calls queue up and run in turn.
+  Future<void> _collectVideoSegments() {
+    final next = _segmentChain.then((_) async {
+      final parts = await cameraController.takeVideoSegments();
+      for (final part in parts) {
+        await _saveVideoSegment(path: part.path, durationMs: part.durationMs);
+      }
+    }).catchError((Object e) {
+      logSwallowed('quickCollectVideoSegments', e);
+    });
+    _segmentChain = next;
+    return next;
+  }
+
+  /// Saves one finished part into the vault under the next part name and
+  /// wipes its temp file. Returns false when it could not be saved; the part
+  /// then waits in the tray (nothing is lost) and the recording stops, since
+  /// every further part would most likely fail the same way. The review
+  /// screen lets the person free up space and save it, or discard it.
+  Future<bool> _saveVideoSegment({
+    required String path,
+    required int durationMs,
+  }) async {
+    final service = _segmentVaultService;
+    final container = _segmentDestination?.container;
+    if (service == null || container == null || !mounted) {
+      unawaited(cameraController.discardVideo(path));
+      return false;
+    }
+
+    final bytes = await service.localFileSize(path);
+    final enoughSpace =
+        bytes == null || await service.hasEnoughSpaceFor(bytes);
+    var saved = false;
+    String? name;
+    if (enoughSpace) {
+      final index = _segmentIndex + 1;
+      name = service.segmentName(
+        prefix: 'VID_',
+        ext: '.mp4',
+        groupStart: _segmentGroupStart ?? DateTime.now(),
+        index: index,
+      );
+      final virtualPath = service.buildVirtualPath(name);
+      saved = await cameraController.saveVideoToVault(
+            videoPath: path,
+            volId: container.volId,
+            virtualPath: virtualPath,
+          ) &&
+          await service.finalizeVaultWrite(virtualPath);
+      if (!saved) await service.deleteFile(virtualPath);
+    }
+
+    if (saved && name != null) {
+      await cameraController.discardVideo(path);
+      _segmentIndex++;
+      _firstSegmentName ??= name;
+      return true;
+    }
+
+    if (!mounted) {
+      unawaited(cameraController.discardVideo(path));
+      return false;
+    }
+    setState(() {
+      capturedMedia.add(
+        CapturedMediaItem.video(
+          videoPath: path,
+          videoDurationMs: durationMs,
+          thumbnailBytes: Uint8List(0),
+        ),
+      );
+    });
+    if (!_segmentSpaceWarned) {
+      _segmentSpaceWarned = true;
+      showErrorToast(
+        enoughSpace
+            ? context.l10n.cameraCouldNotSaveCaptureMessage
+            : context.l10n.cameraSegmentSpaceMessage,
+      );
+    }
+    if (captureIsRecording) unawaited(stopVideoRecording());
+    return false;
+  }
+
+  /// Ends a segmented recording: every part closed since the last pickup,
+  /// then the last one, is saved into the vault chosen at the start, with no
+  /// review. Then the vault gets the usual after-quick-capture lock policy
+  /// and the screen closes. A part that could not be saved goes to the review
+  /// screen instead.
+  Future<void> _finishSegmentedRecording({
+    required bool success,
+    required String? videoPath,
+    required int durationMs,
+  }) async {
+    if (mounted) setState(() => _phase = _Phase.saving);
+    await _collectVideoSegments();
+    if (success && videoPath != null) {
+      // A short last part is still real footage, so it is kept.
+      await _saveVideoSegment(path: videoPath, durationMs: durationMs);
+    } else if (videoPath != null) {
+      await cameraController.discardVideo(videoPath);
+    }
+    final destination = _segmentDestination;
+    final savedName = _firstSegmentName;
+    if (!mounted) return;
+
+    if (capturedMedia.isNotEmpty) {
+      setState(() => _phase = _Phase.reviewing);
+      return;
+    }
+    if (savedName == null || destination == null) {
+      setState(() => _phase = _Phase.camera);
+      showErrorToast(context.l10n.cameraRecordingTooShortMessage);
+      return;
+    }
+    await _relockAndFinish(
+      destination: destination,
+      savedName: savedName,
+      isVideo: true,
+    );
   }
 
   void _discardAllMedia() {
@@ -774,6 +1069,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                         continuousCapture: captureControls.continuousCapture,
                         onToggleContinuousCapture:
                             captureControlsController.toggleContinuousCapture,
+                        segmentMinutes: captureControls.segmentMinutes,
+                        onSegmentMinutesChanged:
+                            captureControlsController.selectSegmentMinutes,
                         onCycleFlashMode: () {
                           final nextMode = captureControlsController.cyclePhotoFlashMode();
                           unawaited(applyFlash(cameraController, nextMode, logTag: 'QuickCaptureScreen'));

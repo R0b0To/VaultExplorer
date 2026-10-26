@@ -18,6 +18,9 @@ import android.util.Size
 import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.VeLog
+import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 private const val TAG = "VaultHeadlessCameraSession"
@@ -84,6 +87,12 @@ class VaultHeadlessCameraSession(private val context: Context) {
     private var recordingChunkWriter: VaultChunkWriter? = null
     private var recordingVolId: Int = -1
     private var recordingVaultPath: String = ""
+
+    // Segmented recording: parts are saved into the vault as they close, on
+    // their own thread so a slow vault write never stalls the camera thread.
+    // Null for an ordinary recording, which is written once, at stop.
+    private var segmentWriter: SegmentedVaultWriter? = null
+    private var segmentExecutor: ExecutorService? = null
     @Volatile private var closed = false
     private var awaitingDeviceClose = false
 
@@ -273,6 +282,7 @@ class VaultHeadlessCameraSession(private val context: Context) {
         cameraId: String,
         quality: VaultVideoQuality,
         recordAudio: Boolean,
+        segmentSeconds: Int = 0,
         callback: (Boolean, String?) -> Unit,
     ) {
         if (!hasPermissions()) {
@@ -286,7 +296,10 @@ class VaultHeadlessCameraSession(private val context: Context) {
                 val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                 val size = chooseSize(map?.getOutputSizes(MediaRecorder::class.java), quality.targetVideoLongEdge)
 
-                val recorder = VaultVideoRecorder(size.width, size.height, quality, recordAudio, context.cacheDir)
+                val recorder = VaultVideoRecorder(
+                    size.width, size.height, quality, recordAudio, context.cacheDir,
+                    segmentSeconds = segmentSeconds,
+                )
                 recorder.prepareEncoder(orientationDegrees = computeCaptureOrientation())
                 val surface = recorder.inputSurface
                     ?: throw IllegalStateException("encoder produced no input surface")
@@ -364,6 +377,24 @@ class VaultHeadlessCameraSession(private val context: Context) {
                 return@runOnCameraThread
             }
             try {
+                if (recorder.isSegmented) {
+                    // Each part closed while recording goes straight into the
+                    // vault; the last one is saved at stop.
+                    val writer = SegmentedVaultWriter(volId, virtualPath)
+                    val executor = Executors.newSingleThreadExecutor()
+                    segmentWriter = writer
+                    segmentExecutor = executor
+                    recorder.onSegmentFinished = { segment ->
+                        try {
+                            executor.execute { writer.save(File(segment.path)) }
+                        } catch (e: java.util.concurrent.RejectedExecutionException) {
+                            // Only possible once the session is closing; the
+                            // part is wiped with the rest of the temp files.
+                            VeLog.w(TAG, e) { "segment finished after the session closed" }
+                            VaultVideoRecorder.secureDeleteFile(File(segment.path))
+                        }
+                    }
+                }
                 recorder.beginRecording()
                 recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
                 recordingVolId = volId
@@ -381,23 +412,59 @@ class VaultHeadlessCameraSession(private val context: Context) {
      * Stops recording, streams the result into the vault, and closes the
      * camera entirely -- unlike VaultCameraSession, a headless session is
      * single-use and never rearms itself for a second recording.
+     *
+     * [callback] gets (everything saved, total recording time, error, number
+     * of parts written). For a segmented recording "everything saved" means
+     * every part made it into the vault; the earlier parts are already there
+     * by the time this runs, only the last one is written here.
      */
-    fun stopRecordingAndClose(callback: (Boolean, Long, String?) -> Unit) {
+    fun stopRecordingAndClose(callback: (Boolean, Long, String?, Int) -> Unit) {
         runOnCameraThread {
             val recorder = videoRecorder
             val writer = recordingChunkWriter
             if (recorder == null || !isRecording || writer == null) {
                 closeAll()
-                callback(false, 0, "not recording")
+                callback(false, 0, "not recording", 0)
                 return@runOnCameraThread
             }
             isRecording = false
             val result = recorder.requestStop()
+
+            val parts = segmentWriter
+            val executor = segmentExecutor
+            if (parts != null && executor != null) {
+                // requestStop() has already reported every earlier part through
+                // onSegmentFinished, so they are queued ahead of the last one,
+                // which keeps the numbering in recording order.
+                val lastPath = recorder.tempFilePath
+                try {
+                    // Same single thread as the earlier parts, so waiting for
+                    // this also waits for every one of them.
+                    executor.submit(Runnable {
+                        val last = lastPath?.let { File(it) }
+                        if (last != null && last.exists() && last.length() > 0L) parts.save(last)
+                    }).get()
+                } catch (e: Exception) {
+                    VeLog.e(TAG, e) { "saving the last part failed" }
+                }
+                executor.shutdown()
+                val ok = parts.failedCount == 0 && parts.savedCount > 0
+                val error = when {
+                    ok -> null
+                    parts.savedCount == 0 -> "vault write failed"
+                    else -> "vault write failed (${parts.failedCount} of ${parts.savedCount + parts.failedCount} parts not saved)"
+                }
+                recorder.releaseEncoder()
+                closeAll()
+                callback(ok, result.durationMs, error, parts.savedCount)
+                return@runOnCameraThread
+            }
+
             val ok = recorder.writeTo(writer)
             if (ok) ContainerFileSystem.finishWrite(recordingVolId, recordingVaultPath)
             recorder.releaseEncoder()
             closeAll()
-            callback(ok, result.durationMs, if (ok) null else "vault write failed")
+            callback(ok, result.durationMs, if (ok) null else "vault write failed", if (ok) 1 else 0)
         }
     }
 
@@ -439,6 +506,10 @@ class VaultHeadlessCameraSession(private val context: Context) {
             videoRecorder = null
             recordingChunkWriter = null
             isRecording = false
+            // Parts already queued still get written; only new ones stop.
+            segmentExecutor?.shutdown()
+            segmentExecutor = null
+            segmentWriter = null
             if (deviceToClose == null) {
                 // Nothing was ever opened (or something already closed and
                 // nulled it out on an earlier closeAll call) -- there is no

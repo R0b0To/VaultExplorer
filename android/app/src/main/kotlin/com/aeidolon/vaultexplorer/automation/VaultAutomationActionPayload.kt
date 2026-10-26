@@ -28,6 +28,7 @@ internal object VaultAutomationActionPayload {
         VaultAutomationReceiver.EXTRA_PIM,
         VaultAutomationReceiver.EXTRA_CIPHER_ID,
         VaultAutomationReceiver.EXTRA_HASH_ID,
+        VaultAutomationReceiver.EXTRA_SEGMENT_MINUTES,
     )
     private val booleanKeys = setOf(
         VaultAutomationReceiver.EXTRA_READ_ONLY,
@@ -53,6 +54,11 @@ internal object VaultAutomationActionPayload {
             val value = extras?.get(key) as? Boolean ?: continue
             payload.put(key, value)
         }
+        // Senders such as Tasker often type this one as text, which the loops
+        // above would drop; it is stored as the number it means.
+        VaultAutomationReceiver.parseSegmentMinutes(extras?.get(VaultAutomationReceiver.EXTRA_SEGMENT_MINUTES))
+            .takeIf { it > 0 }
+            ?.let { payload.put(VaultAutomationReceiver.EXTRA_SEGMENT_MINUTES, it) }
         return if (AutomationSettings.storePendingActionPayload(context, id, payload.toString())) id else null
     }
 

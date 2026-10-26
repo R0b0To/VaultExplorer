@@ -26,7 +26,10 @@ import java.util.concurrent.atomic.AtomicReference
  * handleStart), so there's never more than one waiter to juggle.
  */
 object VaultAutomationCaptureBridge {
-    data class Result(val ok: Boolean, val message: String?, val durationMs: Long = 0)
+    /** [parts] is how many files a finished recording was saved as: 1 for an
+     *  ordinary recording, more when it was cut into segments, 0 when unknown
+     *  or when nothing was saved. */
+    data class Result(val ok: Boolean, val message: String?, val durationMs: Long = 0, val parts: Int = 0)
 
     @Volatile private var latch: CountDownLatch? = null
     private val pendingResult = AtomicReference<Result?>()

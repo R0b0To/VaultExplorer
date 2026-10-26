@@ -178,6 +178,9 @@ class VaultAutomationCaptureActivity : Activity() {
             else -> VaultVideoQuality.FHD
         }
         val recordAudio = intent.getBooleanExtra(VaultAutomationReceiver.EXTRA_RECORD_AUDIO, true)
+        val segmentMinutes = VaultAutomationReceiver.parseSegmentMinutes(
+            intent.extras?.get(VaultAutomationReceiver.EXTRA_SEGMENT_MINUTES),
+        )
         val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
 
         val serviceIntent = Intent(this, VaultAutomationRecordingService::class.java).apply {
@@ -187,6 +190,7 @@ class VaultAutomationCaptureActivity : Activity() {
             putExtra(VaultAutomationRecordingService.EXTRA_CAMERA_ID, cameraId)
             putExtra(VaultAutomationRecordingService.EXTRA_VIDEO_QUALITY, quality.name)
             putExtra(VaultAutomationRecordingService.EXTRA_RECORD_AUDIO, recordAudio)
+            putExtra(VaultAutomationRecordingService.EXTRA_SEGMENT_SECONDS, segmentMinutes * 60)
             putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra("vaultUri", vaultUri)
         }
@@ -218,6 +222,9 @@ class VaultAutomationCaptureActivity : Activity() {
         // service (AudioRecordingParams.fromQualityName), so pass the raw
         // string through rather than validating it twice.
         val audioQuality = intent.getStringExtra(VaultAutomationReceiver.EXTRA_AUDIO_QUALITY)
+        val segmentMinutes = VaultAutomationReceiver.parseSegmentMinutes(
+            intent.extras?.get(VaultAutomationReceiver.EXTRA_SEGMENT_MINUTES),
+        )
         val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
 
         val serviceIntent = Intent(this, VaultAutomationRecordingService::class.java).apply {
@@ -226,6 +233,7 @@ class VaultAutomationCaptureActivity : Activity() {
             putExtra(VaultAutomationRecordingService.EXTRA_VAULT_PATH, vaultPath)
             putExtra(VaultAutomationRecordingService.EXTRA_AUDIO_ONLY, true)
             putExtra(VaultAutomationRecordingService.EXTRA_AUDIO_QUALITY, audioQuality)
+            putExtra(VaultAutomationRecordingService.EXTRA_SEGMENT_SECONDS, segmentMinutes * 60)
             putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra("vaultUri", vaultUri)
         }

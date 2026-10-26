@@ -325,6 +325,9 @@ class VaultVideoRecorder(
     /** The file being recorded to: the current part when segmented. */
     private val currentFile: File? get() = engine?.currentFile ?: tempFile
 
+    /** True when this recording is cut into parts (see the constructor's [segmentSeconds]). */
+    val isSegmented: Boolean get() = segmentSeconds > 0
+
     fun prepareEncoder(orientationDegrees: Int = 0) {
         releaseEncoder()
         val useHevc = hevcEncoderAvailable

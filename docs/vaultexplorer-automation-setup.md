@@ -193,6 +193,7 @@ Starts recording video (with audio, by default) directly into the vault, and kee
   - `camera_facing` *(String, optional)*: `back` (default) or `front`.
   - `video_quality` *(String, optional)*: `hd` / `fhd` (default) / `uhd`.
   - `record_audio` *(Boolean, optional)*: Default `true`.
+  - `segment_minutes` *(Int, optional)*: Default `0` (one file, written when the recording stops). Above `0` the recording is cut into parts of about that many minutes, and each part is saved into the vault the moment it is complete, so a crash, a kill or a camera that is taken away costs at most the part in progress instead of the whole recording. See *Segmented recording* below.
 
 Only one automation-triggered recording can be in progress at a time (across all vaults) -- a second `START_RECORDING` while one is already running gets `BUSY`. Because this needs a real, ongoing camera session, Android requires a persistent notification while it's active (unlike `TAKE_PHOTO`, which is fast enough to need none at all) -- the notification has its own **Stop** button too, in case your automation task never gets to send `STOP_RECORDING`. As a further backstop, a recording auto-stops and saves on its own after **3 hours** if nothing tells it to stop -- so a missed trigger loses at most the tail end, not the whole recording.
 
@@ -220,6 +221,8 @@ Starts recording audio only (microphone, no camera) directly into the vault, and
   - `vault_path` *(String, optional)*: Destination path inside the vault. If omitted, a name like `AUD_20260823_153000.m4a` is generated at the vault root (matching the in-app audio recorder's own naming), with a numeric suffix added if that name is already taken. The recording is AAC audio in an M4A container, so a custom `vault_path` should end in `.m4a`.
   - `audio_quality` *(String, optional)*: `voice` / `standard` (default) / `high`. Mono AAC, the same presets as the in-app recorder's "Audio recording quality" setting: `voice` = 32 kbps / 22.05 kHz (smallest files, fine for speech), `standard` = 64 kbps / 44.1 kHz, `high` = 128 kbps / 44.1 kHz (music and ambient sound). Case-insensitive; a missing or unrecognised value records at `standard`. This is chosen per request -- the in-app setting isn't applied to automation recordings.
 
+  - `segment_minutes` *(Int, optional)*: Same as for `START_RECORDING`: above `0`, the audio is cut into parts of about that many minutes, each saved into the vault as it is complete. See *Segmented recording* below.
+
 There are no `camera_facing`, `video_quality` or `record_audio` extras -- they don't apply. Only the microphone permission is needed (the camera permission is **not**); grant it once by recording from VaultExplorer's own audio recorder, since automation can't show the system prompt itself.
 
 There is one automation recording slot, shared with video: a `START_AUDIO_RECORDING` while a video (or audio) recording is in progress gets `BUSY`, and so does a `START_RECORDING` while an audio recording is in progress. Android requires a persistent notification while the microphone is in use in the background, so the recording shows a notification ("Recording audio") with its own **Stop & save** button, in case your task never gets to send `STOP_AUDIO_RECORDING`. As a backstop, an audio recording auto-stops and saves on its own after **3 hours** if nothing tells it to stop.
@@ -239,6 +242,15 @@ Stops the in-progress automation recording started by `START_AUDIO_RECORDING` an
   - `vault_uri` *(String, required)*: Must match the vault the current recording is writing into.
 
 On success, the `AUTOMATION_RESULT` broadcast includes an extra `duration_ms` *(Long)* with the recording's length. The same finalize-timeout caveat as `STOP_RECORDING` applies.
+
+#### Segmented recording (`segment_minutes`)
+With `segment_minutes` set, a long unattended recording no longer lives in a single temporary file until the very end. The recorder switches to a new file when a part is full -- without pausing, so no audio or video is dropped at the seam -- and every finished part is written into the vault right away and wiped from temporary storage.
+
+- **File names**: the part number is added before the extension of the recording's name: `VID_20260823_153000.mp4` is saved as `VID_20260823_153000_part001.mp4`, `..._part002.mp4` and so on (a custom `vault_path` works the same way). A part name that is already taken in the vault is skipped, never overwritten, so numbers can have gaps.
+- **Length**: video parts are cut on a keyframe, so each is the length you asked for to within a couple of frames. Audio part length is enforced as a file size derived from the bitrate, so an audio part can be somewhat shorter or longer than the minutes you asked for. Values above 240 are capped at 240. The value may be sent as a number or as text (Tasker and MacroDroid often send text).
+- **Result**: `STOP_RECORDING` / `STOP_AUDIO_RECORDING` report `OK` only when every part reached the vault, and the message names the number of parts (`Recording saved in 3 parts (...)`); `duration_ms` is the length of the whole recording. If some parts could not be saved (the vault was locked or full while they closed), the result is `ERROR` and says how many parts were not saved -- the parts that were saved stay in the vault.
+- **Still true**: only one recording at a time, the notification and its **Stop** button, and the 3-hour backstop all behave exactly as for a single-file recording.
+- **Limit**: if the camera or microphone is taken away mid-recording (a call, another app), the part that was in progress is lost; the earlier parts are already safe.
 
 Each STOP only stops its own kind of recording: `STOP_AUDIO_RECORDING` won't end a video recording and `STOP_RECORDING` won't end an audio one -- either gets `NOT_RECORDING` with a message naming the right action to send. If the save to the vault fails, the take is discarded and the result is `ERROR` (there is no UI to retry from).
 

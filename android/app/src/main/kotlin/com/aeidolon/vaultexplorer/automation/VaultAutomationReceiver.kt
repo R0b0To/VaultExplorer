@@ -135,6 +135,29 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_VIDEO_QUALITY = "video_quality"   // START_RECORDING only, optional: "hd" | "fhd" (default) | "uhd"
         const val EXTRA_RECORD_AUDIO = "record_audio"     // START_RECORDING only, optional, default true
         const val EXTRA_AUDIO_QUALITY = "audio_quality"   // START_AUDIO_RECORDING only, optional: "voice" | "standard" (default) | "high"
+        const val EXTRA_SEGMENT_MINUTES = "segment_minutes" // START_RECORDING / START_AUDIO_RECORDING, optional: > 0 cuts the recording into parts of about this many minutes, each saved into the vault as it closes (default 0 = one file)
+
+        /** Longest part length accepted for [EXTRA_SEGMENT_MINUTES]. */
+        private const val MAX_SEGMENT_MINUTES = 240
+
+        /**
+         * Reads a `segment_minutes` extra however the sender typed it: Tasker
+         * and MacroDroid often send numbers as text. Anything missing,
+         * unreadable or not positive means 0 (no segmenting); anything above
+         * the limit is capped.
+         */
+        internal fun parseSegmentMinutes(raw: Any?): Int {
+            val minutes = when (raw) {
+                is Number -> raw.toInt()
+                is String -> raw.trim().toIntOrNull() ?: 0
+                else -> 0
+            }
+            return minutes.coerceIn(0, MAX_SEGMENT_MINUTES)
+        }
+
+        /** `Recording saved (…ms)`, naming the part count when it was cut into parts. */
+        internal fun recordingSavedMessage(kind: String, durationMs: Long, parts: Int): String =
+            if (parts > 1) "$kind saved in $parts parts (${durationMs}ms)" else "$kind saved (${durationMs}ms)"
 
         const val EXTRA_ORIGINAL_ACTION = "original_action"
         const val RESULT_CODE = "result_code"       // see the full list in this class's own doc comment below
@@ -1004,7 +1027,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val result = VaultAutomationCaptureBridge.await(latch, STOP_RECORDING_TIMEOUT_MS)
             ?: return Outcome("ERROR", "Timed out waiting for the recording to finish saving (it may still complete in the background)")
         return if (result.ok) {
-            Outcome("OK", "Recording saved (${result.durationMs}ms)", durationMs = result.durationMs)
+            Outcome("OK", recordingSavedMessage("Recording", result.durationMs, result.parts), durationMs = result.durationMs)
         } else {
             outcomeForCameraError(result.message)
         }
@@ -1066,7 +1089,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val result = VaultAutomationCaptureBridge.await(latch, STOP_RECORDING_TIMEOUT_MS)
             ?: return Outcome("ERROR", "Timed out waiting for the audio recording to finish saving (it may still complete in the background)")
         return if (result.ok) {
-            Outcome("OK", "Audio recording saved (${result.durationMs}ms)", durationMs = result.durationMs)
+            Outcome("OK", recordingSavedMessage("Audio recording", result.durationMs, result.parts), durationMs = result.durationMs)
         } else {
             // A finalize failure ("vault write failed", "no audio was captured")
             // is not a mic problem, so it reports as a plain ERROR.

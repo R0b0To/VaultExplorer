@@ -133,6 +133,45 @@ object AudioEditMath {
     fun frameAtUs(timeUs: Long, sampleRate: Int): Long =
         Math.round(max(0L, timeUs) * sampleRate / 1_000_000.0)
 
+    // ── A rough picture of a long file, first ────────────────────────────
+
+    /**
+     * Decoding a 3 hour file in full takes minutes whatever is done to the PCM afterwards (a frame is
+     * decoded whole before anything can be thrown away), so a long file first gets a rough picture from
+     * short samples spread across it: [OVERVIEW_WINDOW_US] of audio every few seconds, about a tenth of
+     * the file or less. The editor shows that at once; the full decode then replaces it from the left.
+     */
+    const val OVERVIEW_MAX_WINDOWS = 3000
+    const val OVERVIEW_MIN_SPACING_US = 3_000_000L
+    const val OVERVIEW_WINDOW_US = 300_000L
+
+    /** The rough pass needs exact seeks (like the parallel decode) and a file long enough to be worth it. */
+    fun overviewEligible(mime: String, durationUs: Long): Boolean =
+        seeksExactly(mime) && durationUs >= PARALLEL_MIN_DURATION_US
+
+    fun overviewWindowCount(durationUs: Long): Int =
+        ((durationUs + OVERVIEW_MIN_SPACING_US - 1) / OVERVIEW_MIN_SPACING_US).toInt()
+            .coerceIn(1, OVERVIEW_MAX_WINDOWS)
+
+    /** The stretch of the file each window stands for. */
+    fun overviewSpacingUs(durationUs: Long, windows: Int): Long =
+        max(1L, ceil(durationUs.toDouble() / max(1, windows)).toLong())
+
+    /** Where window [window] measures: the middle of its stretch, so it is the most typical sample of it. */
+    fun overviewWindowStartUs(window: Int, spacingUs: Long): Long =
+        window * spacingUs + max(0L, (spacingUs - OVERVIEW_WINDOW_US) / 2)
+
+    /** Spreads one level per window over the full-resolution peak array: each peak takes its window's level. */
+    fun expandOverview(levels: ByteArray, spacingUs: Long, bucketCount: Int, peaksPerSecond: Double): ByteArray {
+        val out = ByteArray(bucketCount)
+        if (levels.isEmpty() || spacingUs <= 0 || peaksPerSecond <= 0) return out
+        for (bucket in 0 until bucketCount) {
+            val window = (bucketStartUs(bucket, peaksPerSecond) / spacingUs).toInt().coerceIn(0, levels.size - 1)
+            out[bucket] = levels[window]
+        }
+        return out
+    }
+
     /** The coarse-bucket sampler looks at no fewer than this many frames per peak (see [strideFor]). */
     const val MIN_FRAMES_PER_PEAK_SAMPLED = 256
 

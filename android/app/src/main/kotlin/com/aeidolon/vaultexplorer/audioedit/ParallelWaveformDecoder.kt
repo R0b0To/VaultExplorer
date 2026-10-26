@@ -33,6 +33,21 @@ class WaveformStats {
     @Volatile
     var mode: String = "sequential"
 
+    /** Opening the file and reading its track list (for a vault file: reading and parsing the index). */
+    @Volatile
+    var openMs: Long = 0
+
+    /** Finding the length. Instant when the container states it; a pass through every frame when not. */
+    @Volatile
+    var durationMs: Long = 0
+
+    /** The rough first pass over a long file, and how many windows it measured (0 = not run or skipped). */
+    @Volatile
+    var overviewMs: Long = 0
+
+    @Volatile
+    var overviewWindows: Int = 0
+
     inline fun <T> time(counter: AtomicLong, block: () -> T): T {
         val start = System.nanoTime()
         try {

@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -397,6 +398,62 @@ class AudioEditMathTest {
         assertEquals(0, acc.peaks[1].toInt() and 0xFF)
         assertEquals(255, acc.peaks[2].toInt() and 0xFF)
         assertEquals(128, acc.peaks[3].toInt() and 0xFF)
+    }
+
+    // ── The rough first pass over a long file ────────────────────────────
+
+    @Test
+    fun theRoughPassIsForLongFilesWithExactSeeks() {
+        assertTrue(AudioEditMath.overviewEligible(AudioEditMath.MIME_AAC, 3 * oneHourUs))
+        assertTrue(AudioEditMath.overviewEligible(AudioEditMath.MIME_OPUS, oneHourUs))
+        assertFalse(AudioEditMath.overviewEligible(AudioEditMath.MIME_AAC, 10L * 60_000_000L))
+        assertFalse(AudioEditMath.overviewEligible(AudioEditMath.MIME_MP3, 3 * oneHourUs))
+        assertFalse(AudioEditMath.overviewEligible(AudioEditMath.MIME_RAW, 3 * oneHourUs))
+    }
+
+    @Test
+    fun theRoughPassSamplesAboutATenthOfTheFileOrLess() {
+        for (hours in listOf(1L, 3L, 10L)) {
+            val d = hours * oneHourUs
+            val windows = AudioEditMath.overviewWindowCount(d)
+            val spacing = AudioEditMath.overviewSpacingUs(d, windows)
+            assertTrue("windows $windows", windows in 1..AudioEditMath.OVERVIEW_MAX_WINDOWS)
+            assertTrue("spacing $spacing", spacing >= AudioEditMath.OVERVIEW_MIN_SPACING_US)
+            assertTrue("windows cover the file", windows * spacing >= d)
+            val sampled = windows * AudioEditMath.OVERVIEW_WINDOW_US.toDouble() / d
+            assertTrue("sampled $sampled of the file", sampled <= 0.101)
+        }
+        // 20 minutes: a window every 3 s, the densest it goes.
+        assertEquals(400, AudioEditMath.overviewWindowCount(20L * 60_000_000L))
+        assertEquals(AudioEditMath.OVERVIEW_MAX_WINDOWS, AudioEditMath.overviewWindowCount(10 * oneHourUs))
+    }
+
+    @Test
+    fun aWindowMeasuresTheMiddleOfItsStretchAndStaysInsideIt() {
+        val spacing = 3_600_000L
+        for (w in listOf(0, 1, 2999)) {
+            val start = AudioEditMath.overviewWindowStartUs(w, spacing)
+            assertTrue(start >= w * spacing)
+            assertTrue(start + AudioEditMath.OVERVIEW_WINDOW_US <= (w + 1) * spacing)
+        }
+        assertEquals(1_650_000L, AudioEditMath.overviewWindowStartUs(0, spacing)) // (3.6 s - 0.3 s) / 2
+    }
+
+    @Test
+    fun theRoughLevelsAreSpreadOverTheFullResolutionPeaks() {
+        // 4 windows of 10 s over 40 s at 2 peaks/s: 80 peaks, 20 per window.
+        val levels = byteArrayOf(10, 20, 30, 40)
+        val out = AudioEditMath.expandOverview(levels, 10_000_000L, 80, 2.0)
+        assertEquals(80, out.size)
+        for (i in 0 until 80) assertEquals(levels[i / 20], out[i])
+    }
+
+    @Test
+    fun expandingWithNothingToExpandIsSilence() {
+        assertArrayEquals(ByteArray(5), AudioEditMath.expandOverview(ByteArray(0), 1_000_000L, 5, 10.0))
+        // a peak past the last window (the length was rounded up) takes the last window's level
+        val out = AudioEditMath.expandOverview(byteArrayOf(7, 9), 1_000_000L, 40, 10.0)
+        assertEquals(9, out[39].toInt())
     }
 
     // ── Progressive waveform ─────────────────────────────────────────────

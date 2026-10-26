@@ -6,6 +6,7 @@ import android.os.SystemClock
 import com.aeidolon.vaultexplorer.VeLog
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegPcmDecoder
 import java.nio.ByteBuffer
+import kotlin.math.max
 
 /**
  * Decodes an audio file just far enough to draw its waveform: the loudest
@@ -40,7 +41,30 @@ object AudioWaveformExtractor {
     private const val FFMPEG_IDLE_SLEEP_MS = 2L
     private const val MAX_SAMPLE_BUFFER = 16 * 1024 * 1024
 
+    /** The rough first pass is only worth having if it is quick; past this it is dropped. */
+    private const val OVERVIEW_BUDGET_MS = 45_000L
+
     class CancelledException : Exception("Waveform cancelled")
+
+    /**
+     * How far the rough first pass was from the real result. Not a pass mark: a sparse sample of
+     * speech or music differs a fair bit from the full measurement. A number near the maximum (or
+     * most peaks far off) would mean the windows were decoded wrongly on this device.
+     */
+    private fun logOverviewAccuracy(rough: ByteArray?, peaks: ByteArray) {
+        if (rough == null || rough.size != peaks.size || peaks.isEmpty()) return
+        var sum = 0L
+        var far = 0
+        for (i in peaks.indices) {
+            val d = kotlin.math.abs((rough[i].toInt() and 0xFF) - (peaks[i].toInt() and 0xFF))
+            sum += d
+            if (d > 64) far++
+        }
+        VeLog.i(TAG) {
+            "overview vs real: mean difference ${"%.1f".format(sum.toDouble() / peaks.size)} of 255 levels, " +
+                "${"%.1f".format(far * 100.0 / peaks.size)}% of peaks more than 64 levels off"
+        }
+    }
 
     /** One line in the log saying how long the decode took and where the time went. */
     private fun logTiming(stats: WaveformStats, mime: String, durationUs: Long, wallStartNs: Long, complete: Boolean) {
@@ -49,7 +73,16 @@ object AudioWaveformExtractor {
         val speed = if (wallMs > 0) audioSeconds * 1000.0 / wallMs else 0.0
         VeLog.i(TAG) {
             "waveform timing: ${stats.mode}, $mime, ${audioSeconds}s of audio in ${wallMs}ms " +
-                "(${"%.0f".format(speed)}x realtime), complete=$complete; thread time: " +
+                "(${"%.0f".format(speed)}x realtime), complete=$complete; " +
+                "opening ${stats.openMs}ms, length ${stats.durationMs}ms, " +
+                "overview ${
+                    when {
+                        stats.overviewWindows > 0 -> "${stats.overviewMs}ms (${stats.overviewWindows} windows)"
+                        stats.overviewMs > 0 -> "gave up after ${stats.overviewMs}ms"
+                        else -> "none"
+                    }
+                }; " +
+                "thread time: " +
                 "reading ${stats.extractorNs.get() / 1_000_000L}ms, " +
                 "waiting on decoder ${stats.waitNs.get() / 1_000_000L}ms, " +
                 "measuring peaks ${stats.peaksNs.get() / 1_000_000L}ms"
@@ -93,9 +126,12 @@ object AudioWaveformExtractor {
             if (useFfmpeg && !FfmpegPcmDecoder.supports(mime)) {
                 throw IllegalStateException("This device can't decode $mime, so there is no waveform")
             }
+            stats.openMs = (System.nanoTime() - wallStartNs) / 1_000_000L
+            val durationStartNs = System.nanoTime()
             val durationUs = LosslessAudioCutter.durationUsOrMeasure(extractor, track, format) {
                 if (isCancelled()) throw CancelledException()
             }
+            stats.durationMs = (System.nanoTime() - durationStartNs) / 1_000_000L
             if (durationUs <= 0L) throw IllegalStateException("Unknown audio length")
 
             val peaksPerSecond = AudioEditMath.peaksPerSecondFor(durationUs)
@@ -135,6 +171,38 @@ object AudioWaveformExtractor {
             } else {
                 AudioEditMath.parallelWorkersFor(mime, durationUs, cpuCount)
             }
+            // A rough picture of the whole file first: short windows spread across it, shown at once and
+            // then replaced from the left as the real decode catches up. Optional: if it can't be done
+            // or gives up, the real decode just starts without it.
+            var rough: ByteArray? = null
+            if (!isRaw && !useFfmpeg && AudioEditMath.overviewEligible(mime, durationUs)) {
+                val overviewStartNs = System.nanoTime()
+                val overview = WaveformOverview.measure(
+                    newExtractor = newExtractor,
+                    track = track,
+                    format = format,
+                    mime = mime,
+                    sampleRate = sampleRate,
+                    channels = reader.channels,
+                    durationUs = durationUs,
+                    peaksPerSecond = peaksPerSecond,
+                    workers = max(1, workers),
+                    budgetMs = OVERVIEW_BUDGET_MS,
+                    isCancelled = isCancelled,
+                    stats = stats,
+                )
+                stats.overviewMs = (System.nanoTime() - overviewStartNs) / 1_000_000L
+                if (overview != null) {
+                    val expanded = AudioEditMath.expandOverview(
+                        overview.levels, overview.spacingUs, accumulator.bucketCount, peaksPerSecond,
+                    )
+                    rough = expanded
+                    onPartial(expanded, peaksPerSecond, 0, expanded.size)
+                } else {
+                    stats.overviewWindows = 0
+                }
+            }
+
             if (workers > 1) {
                 stats.mode = "parallel x$workers"
                 val done = ParallelWaveformDecoder.decode(
@@ -154,6 +222,7 @@ object AudioWaveformExtractor {
                 )
                 if (done) {
                     onProgress(1f)
+                    logOverviewAccuracy(rough, accumulator.peaks)
                     logTiming(stats, mime, durationUs, wallStartNs, complete = true)
                     return Waveform(accumulator.peaks, peaksPerSecond, true)
                 }
@@ -377,6 +446,7 @@ object AudioWaveformExtractor {
 
             VeLog.d(TAG) { "extract: ${accumulator.bucketCount} peaks, complete=$complete" }
             onProgress(1f)
+            if (complete) logOverviewAccuracy(rough, accumulator.peaks)
             logTiming(stats, mime, durationUs, wallStartNs, complete)
             return Waveform(accumulator.peaks, peaksPerSecond, complete)
         } finally {
